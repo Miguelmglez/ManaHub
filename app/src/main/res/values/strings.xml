@@ -753,6 +753,8 @@
     <string name="deck_studio_seed_sheet_title">Build from a seed</string>
     <string name="deck_studio_seed_built">Deck built from seed — %1$d cards added</string>
     <string name="deck_studio_seed_build_failed">Couldn\'t build the deck from your seeds. Please try again.</string>
+    <string name="deck_studio_seed_build_no_results">No cards matched your seeds within the budget. Try raising the budget or adding more seeds.</string>
+    <string name="deck_studio_add_card_fab">Add card to deck</string>
     <string name="deck_studio_suggestions_tab_health">Health</string>
     <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
     <string name="deck_studio_suggestions_tab_adds">Adds</string>

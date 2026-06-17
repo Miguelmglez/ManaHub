@@ -233,7 +233,7 @@ fun DeckStudioScreen(
                         shape = CardShape,
                         modifier = Modifier.navigationBarsPadding(),
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.deckdetail_add_basic_lands))
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.deck_studio_add_card_fab))
                     }
                 }
             },
@@ -926,7 +926,9 @@ private fun InspirationsSheetContent(
                 contentPadding = PaddingValues(vertical = spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
-                items(discoveries.take(20), key = { it.primaryTag.key }) { discovery ->
+                // C3: key by primaryTag.key + label — two discoveries can share the same
+                // CardTag, and a bare primaryTag.key would crash the LazyColumn on duplicate keys.
+                items(discoveries.take(20), key = { "${it.primaryTag.key}_${it.label}" }) { discovery ->
                     DiscoveryRow(
                         discovery = discovery,
                         onCardClick = onCardClick,
@@ -1056,7 +1058,7 @@ private fun SuggestionsTab(
         when {
             uiState.isAddsLoading -> item(key = "adds_loading") {
                 Box(
-                    Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    Modifier.fillMaxWidth().padding(vertical = spacing.xl),
                     contentAlignment = Alignment.Center,
                 ) {
                     androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)

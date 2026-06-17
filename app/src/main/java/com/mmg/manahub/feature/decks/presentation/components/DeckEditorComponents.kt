@@ -475,7 +475,10 @@ internal fun groupCards(cards: List<DeckSlotEntry>, mode: GroupingMode): List<Pa
             }
         }
         GroupingMode.COLOR -> {
-            val order = listOf("W", "U", "B", "R", "G", "Multicolor", "Colorless", "Land")
+            // L4: "Other" must be in the order list — unresolved slots (card == null) are
+            // bucketed there, and omitting it from `order` silently DROPPED those rows from
+            // the editor. Kept only when non-empty (unlike "Land", which always shows).
+            val order = listOf("W", "U", "B", "R", "G", "Multicolor", "Colorless", "Land", "Other")
             val groups = cards.groupBy { entry ->
                 val card = entry.card ?: return@groupBy "Other"
                 if (card.typeLine.contains("Land")) return@groupBy "Land"

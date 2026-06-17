@@ -283,10 +283,12 @@ class DeckStudioViewModel @Inject constructor(
             }
             observeDeck()
             observeCollection()
+            // Inspirations (Phase 4): compute collection-synergy discoveries on a SEPARATE
+            // launch so they never block the (more important) deck load above. Gated on a
+            // successfully resolved `deckId` — a failed draft creation returns early above,
+            // so discoveries must NOT run for a deck that never came into existence.
+            if (::deckId.isInitialized) loadDiscoveries()
         }
-        // Inspirations (Phase 4): compute collection-synergy discoveries on a SEPARATE
-        // launch so they never block the (more important) deck load above.
-        loadDiscoveries()
     }
 
     /**
@@ -465,15 +467,12 @@ class DeckStudioViewModel @Inject constructor(
     fun moveQuantityToSideboard(scryfallId: String, quantity: Int = 1) {
         invalidateSuggestions()
         viewModelScope.launch {
-            val mainQty = currentQuantity(scryfallId, false)
-            if (mainQty <= 0) return@launch
-            val toMove = quantity.coerceIn(1, mainQty)
-            val newMain = mainQty - toMove
+            // H4: a single atomic repo write — the old two-write sequence let Room
+            // re-emit an intermediate state (copies briefly in neither board), which the
+            // editor rendered as a flicker. The repo no-ops when there are no mainboard
+            // copies, so the prior mainQty<=0 guard is now redundant.
             runCatching {
-                if (newMain <= 0) deckRepository.removeCardFromDeck(deckId, scryfallId, false)
-                else deckRepository.addCardToDeck(deckId, scryfallId, newMain, false)
-                val sideQty = currentQuantity(scryfallId, true)
-                deckRepository.addCardToDeck(deckId, scryfallId, sideQty + toMove, true)
+                deckRepository.moveCardQuantity(deckId, scryfallId, fromSideboard = false, quantity = quantity)
             }.onFailure { logFailure("deck_studio_move_to_side_failed", it) }
         }
     }
@@ -481,15 +480,9 @@ class DeckStudioViewModel @Inject constructor(
     fun moveQuantityToMainboard(scryfallId: String, quantity: Int = 1) {
         invalidateSuggestions()
         viewModelScope.launch {
-            val sideQty = currentQuantity(scryfallId, true)
-            if (sideQty <= 0) return@launch
-            val toMove = quantity.coerceIn(1, sideQty)
-            val newSide = sideQty - toMove
+            // H4: atomic single-transaction move (see moveQuantityToSideboard).
             runCatching {
-                if (newSide <= 0) deckRepository.removeCardFromDeck(deckId, scryfallId, true)
-                else deckRepository.addCardToDeck(deckId, scryfallId, newSide, true)
-                val mainQty = currentQuantity(scryfallId, false)
-                deckRepository.addCardToDeck(deckId, scryfallId, mainQty + toMove, false)
+                deckRepository.moveCardQuantity(deckId, scryfallId, fromSideboard = true, quantity = quantity)
             }.onFailure { logFailure("deck_studio_move_to_main_failed", it) }
         }
     }
@@ -514,12 +507,19 @@ class DeckStudioViewModel @Inject constructor(
             // searchCardByName can throw — keep it inside the protected block so a
             // lookup failure logs instead of cancelling the coroutine.
             runCatching {
+                // M3: when a mainboard slot for this land name already exists, reuse its
+                // scryfallId directly (avoiding an unnecessary network search and a possible
+                // printing mismatch); only search Scryfall when no slot exists yet. A slot
+                // whose Card is still unresolved still carries its scryfallId, so we increment
+                // by id even when `existing.card` is null.
                 val existing = _uiState.value.cards.find { it.card?.name == name && !it.isSideboard }
-                val card = existing?.card ?: (cardRepository.searchCardByName(name) as? DataResult.Success)?.data
-                if (card != null) {
-                    cardCache = cardCache + (card.scryfallId to card)
-                    val currentQty = currentQuantity(card.scryfallId, false)
-                    deckRepository.addCardToDeck(deckId, card.scryfallId, currentQty + 1, false)
+                val scryfallId = existing?.scryfallId
+                    ?: (cardRepository.searchCardByName(name) as? DataResult.Success)?.data
+                        ?.also { card -> cardCache = cardCache + (card.scryfallId to card) }
+                        ?.scryfallId
+                if (scryfallId != null) {
+                    val currentQty = currentQuantity(scryfallId, false)
+                    deckRepository.addCardToDeck(deckId, scryfallId, currentQty + 1, false)
                 }
             }.onFailure { logFailure("deck_studio_add_land_failed", it) }
         }
@@ -748,7 +748,9 @@ class DeckStudioViewModel @Inject constructor(
             } else {
                 crashlytics.log("deck_studio_draft_kept")
             }
-            _events.send(DeckStudioEvent.NavigateBack)
+            // H5: navigate via the direct callback ONLY. Previously we ALSO emitted
+            // DeckStudioEvent.NavigateBack, but the screen ignores that event (navigation
+            // is driven by this callback), so emitting it was a latent double-pop risk.
             onNavigateBack()
         }
     }
@@ -774,8 +776,20 @@ class DeckStudioViewModel @Inject constructor(
 
     private var analysisJob: Job? = null
 
+    /**
+     * The in-flight ADD recompute job (H3). A budget edit, an incremental recompute, and the
+     * initial analysis can all race to recompute the external pool; each writes
+     * `analysisCache.externalPool`. Tracking + cancel-before-launch (mirroring [analysisJob])
+     * guarantees only the latest recompute survives, so a stale slower fetch can't clobber the
+     * cache or emit a stale ADD list.
+     */
+    private var recomputeAddsJob: Job? = null
+
     /** The debounced seed-search job (Phase 3); cancelled on each new keystroke / sheet close. */
     private var seedSearchJob: Job? = null
+
+    /** The in-flight seed-generation job (Phase 3); cancelled when the seed sheet is closed (M6). */
+    private var generateJob: Job? = null
 
     private class AnalysisCache(
         var workingMainboard: List<DeckEntry>,
@@ -909,7 +923,10 @@ class DeckStudioViewModel @Inject constructor(
         val context = analysisCache ?: return
         val profile = _uiState.value.health?.profile ?: return
         val evaluation = _uiState.value.health?.evaluation ?: return
-        viewModelScope.launch {
+        // Cancel any in-flight recompute so two racing fetches can't both write
+        // context.externalPool / emit a stale ADD list (H3).
+        recomputeAddsJob?.cancel()
+        recomputeAddsJob = viewModelScope.launch {
             _uiState.update { it.copy(isAddsLoading = true) }
             val mainboardIds = context.workingMainboard.map { it.card.scryfallId }.toSet()
             val mainboardCopiesByName = context.workingMainboard
@@ -1036,8 +1053,14 @@ class DeckStudioViewModel @Inject constructor(
      */
     private fun reparseBudget() {
         val state = _uiState.value
+        // M1: `toDoubleOrNull()` accepts "Infinity"/"NaN" and zero/negative values, all of
+        // which BudgetConstraints rejects in its init block (a thrown IAE down below). Treat a
+        // non-finite or non-positive amount as a parse error here so we keep the last valid
+        // budget WITHOUT ever invoking the throwing constructor.
         val perCard = state.rawPerCardText.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
         val total = state.rawTotalText.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0.0 }
         // A non-blank-but-unparseable field (e.g. "1.2.3") is an error without ever
         // calling the throwing constructor.
         val perCardBlank = state.rawPerCardText.isBlank()
@@ -1112,15 +1135,28 @@ class DeckStudioViewModel @Inject constructor(
     fun onCutSuggestion(scryfallId: String, cardName: String) {
         viewModelScope.launch {
             val context = analysisCache
-            runCatching { deckRepository.removeCardFromDeck(deckId, scryfallId, false) }
-                .onFailure { logFailure("deck_studio_suggestion_cut_failed", it); return@launch }
+            // C1: cut ONE copy, not the whole slot. A 3-of must become a 2-of (mirrors the
+            // Build-tab decrement). Previously this removed the entire slot, silently dropping
+            // every copy — a data-loss bug for multi-copy 60-card decks.
+            val currentQty = context?.workingMainboard
+                ?.firstOrNull { it.card.scryfallId == scryfallId }?.quantity
+                ?: currentQuantity(scryfallId, false)
+            runCatching {
+                if (currentQty <= 1) deckRepository.removeCardFromDeck(deckId, scryfallId, false)
+                else deckRepository.addCardToDeck(deckId, scryfallId, currentQty - 1, false)
+            }.onFailure { logFailure("deck_studio_suggestion_cut_failed", it); return@launch }
             _events.send(DeckStudioEvent.CardCut(cardName))
 
             if (context == null) {
                 loadAnalysis()
                 return@launch
             }
-            context.workingMainboard = context.workingMainboard.filterNot { it.card.scryfallId == scryfallId }
+            // Decrement the in-memory working entry in parallel; drop the entry only at qty 0.
+            context.workingMainboard = context.workingMainboard.mapNotNull { entry ->
+                if (entry.card.scryfallId != scryfallId) entry
+                else if (entry.quantity <= 1) null
+                else entry.copy(quantity = entry.quantity - 1)
+            }
             recomputeIncremental()
         }
     }
@@ -1140,8 +1176,11 @@ class DeckStudioViewModel @Inject constructor(
     private fun invalidateSuggestions() {
         if (_uiState.value.suggestionsLoaded) {
             analysisJob?.cancel()
+            recomputeAddsJob?.cancel()
             analysisCache = null
-            _uiState.update { it.copy(suggestionsLoaded = false) }
+            // M9: clear any stale budget parse error too, so the next time the user opens
+            // Suggestions the inline error doesn't linger from a previous editing session.
+            _uiState.update { it.copy(suggestionsLoaded = false, budgetError = false) }
         }
     }
 
@@ -1153,8 +1192,18 @@ class DeckStudioViewModel @Inject constructor(
 
     fun closeSeedSheet() {
         seedSearchJob?.cancel()
+        // M6: cancel any in-flight generation so dismissing the sheet doesn't leave a build
+        // running (which would later write cards into a deck the user backed out of) and
+        // reset the spinner.
+        generateJob?.cancel()
         _uiState.update {
-            it.copy(showSeedSheet = false, seedQuery = "", seedSearchResults = emptyList(), isSearchingSeeds = false)
+            it.copy(
+                showSeedSheet = false,
+                seedQuery = "",
+                seedSearchResults = emptyList(),
+                isSearchingSeeds = false,
+                isGenerating = false,
+            )
         }
     }
 
@@ -1179,22 +1228,22 @@ class DeckStudioViewModel @Inject constructor(
 
     /** Adds a seed (de-duped by scryfallId) and re-infers identity. */
     fun addSeed(card: Card) {
-        _uiState.update { s ->
-            if (s.seedCards.any { it.scryfallId == card.scryfallId }) return@update s
-            val seeds = s.seedCards + card
-            s.copy(seedCards = seeds, inferredIdentity = inferDeckIdentityUseCase(seeds))
-        }
+        // M7: compute the inferred identity OUTSIDE the update lambda. _uiState.update may
+        // re-run its block under contention, and inferDeckIdentityUseCase is non-trivial work
+        // that must not execute more than once per state change.
+        val current = _uiState.value.seedCards
+        if (current.any { it.scryfallId == card.scryfallId }) return
+        val seeds = current + card
+        val identity = inferDeckIdentityUseCase(seeds)
+        _uiState.update { it.copy(seedCards = seeds, inferredIdentity = identity) }
     }
 
     /** Removes a seed and re-infers identity (null when empty). */
     fun removeSeed(card: Card) {
-        _uiState.update { s ->
-            val seeds = s.seedCards.filterNot { it.scryfallId == card.scryfallId }
-            s.copy(
-                seedCards = seeds,
-                inferredIdentity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds),
-            )
-        }
+        // M7: identity inference computed outside the update lambda (see addSeed).
+        val seeds = _uiState.value.seedCards.filterNot { it.scryfallId == card.scryfallId }
+        val identity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds)
+        _uiState.update { it.copy(seedCards = seeds, inferredIdentity = identity) }
     }
 
     /**
@@ -1218,7 +1267,18 @@ class DeckStudioViewModel @Inject constructor(
         }
         val snapshot = captured ?: return
 
-        viewModelScope.launch {
+        // L5: a failed draft creation returns early in init without initializing `deckId`.
+        // Guard the lateinit access here so a generate tap on a half-created studio surfaces a
+        // toast instead of throwing UninitializedPropertyAccessException.
+        if (!::deckId.isInitialized) {
+            _uiState.update { it.copy(isGenerating = false) }
+            viewModelScope.launch {
+                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_seed_build_failed)))
+            }
+            return
+        }
+
+        generateJob = viewModelScope.launch {
             val crashlytics = FirebaseCrashlytics.getInstance()
             crashlytics.log("deck_studio_seed_build_started")
 
@@ -1247,8 +1307,11 @@ class DeckStudioViewModel @Inject constructor(
                     val card = magicCard.card
                     // Cache the generated card so the observe rebuild resolves it without a re-fetch.
                     cardCache = cardCache + (card.scryfallId to card)
-                    deckRepository.addCardToDeck(deckId, card.scryfallId, 1, false)
-                    written++
+                    // H1: write the engine-recommended copy count, not a hard-coded 1 (the seed
+                    // engine may recommend multiples of a card in 60-card formats).
+                    val copies = magicCard.quantity.coerceAtLeast(1)
+                    deckRepository.addCardToDeck(deckId, card.scryfallId, copies, false)
+                    written += copies
                 }
                 // seedResult.reservedLandSlots land slots are INTENTIONALLY left for the user to
                 // fill via the existing BasicLandsSheet: BuildDeckFromSeedsUseCase deliberately does
@@ -1265,8 +1328,21 @@ class DeckStudioViewModel @Inject constructor(
             }
 
             // Refresh suggestions lazily: the next Suggestions open re-runs loadAnalysis()
-            // against the new cards (consistent with every other manual mutation).
+            // against the new cards (consistent with every other manual mutation). Done
+            // unconditionally — even a zero-card build invalidates the prior analysis.
             invalidateSuggestions()
+
+            // M5: a successful build that wrote zero cards means the engine found nothing
+            // within the active budget (distinct from an engine error, handled in getOrElse
+            // above). Surface a budget-specific toast and keep the sheet open so the user can
+            // raise the budget / add seeds, instead of silently closing on an empty result.
+            if (writtenCount == 0) {
+                crashlytics.log("deck_studio_seed_build_no_results")
+                _uiState.update { it.copy(isGenerating = false) }
+                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_seed_build_no_results)))
+                return@launch
+            }
+
             crashlytics.log("deck_studio_seed_build_succeeded")
             _uiState.update {
                 it.copy(
@@ -1306,13 +1382,21 @@ class DeckStudioViewModel @Inject constructor(
      * the discovery's `primaryTag` directly, so the seed sheet shows the same identity shape.
      */
     fun startFromDiscovery(discovery: MagicDiscovery) {
-        val seeds = discovery.cards.map { it.card }.distinctBy { it.scryfallId }.take(MAX_SEED_CARDS)
+        // H2: MERGE the discovery's cards into any seeds the user already picked (de-duped by
+        // scryfallId) rather than overwriting them — opening Inspirations after manually adding
+        // seeds must not silently discard the manual picks. Capped at MAX_SEED_CARDS.
+        val discoverySeeds = discovery.cards.map { it.card }
+        val seeds = (_uiState.value.seedCards + discoverySeeds)
+            .distinctBy { it.scryfallId }
+            .take(MAX_SEED_CARDS)
+        // M7: identity inference computed outside the update lambda (see addSeed).
+        val identity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds)
         _uiState.update {
             it.copy(
                 showInspirations = false,
                 showSeedSheet = true,
                 seedCards = seeds,
-                inferredIdentity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds),
+                inferredIdentity = identity,
                 seedQuery = "",
                 seedSearchResults = emptyList(),
             )

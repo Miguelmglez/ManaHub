@@ -404,6 +404,11 @@ class DeckMagicDetailViewModel @Inject constructor(
         rebuildUiState()
     }
 
+    // NOTE (H4): DeckStudioViewModel.moveQuantityTo{Side,Main}board share this move pattern but
+    // write THROUGH the repository, where the old two-write sequence caused a flicker; they now use
+    // the atomic DeckRepository.moveCardQuantity. This legacy VM mutates an in-memory draftCardsMap
+    // (flushed to Room only on save), so it has no intermediate-re-emit problem and intentionally
+    // keeps the simple in-memory update.
     fun moveQuantityToSideboard(scryfallId: String, quantity: Int) {
         val mainEntry = _uiState.value.cards.find { it.scryfallId == scryfallId && !it.isSideboard } ?: return
         val toMove = quantity.coerceIn(1, mainEntry.quantity)
