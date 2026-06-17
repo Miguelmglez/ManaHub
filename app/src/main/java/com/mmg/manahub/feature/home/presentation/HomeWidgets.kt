@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -52,6 +54,9 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
@@ -245,6 +250,41 @@ private fun WidgetEmptyBody(message: String) {
     Text(text = message, style = ty.bodySmall, color = mc.textSecondary)
 }
 
+/**
+ * Empty body with a tap-to-retry affordance, used when a widget's data failed to load
+ * (e.g. the Discover/Card-of-the-day fetch) so the user can re-trigger it instead of
+ * staring at an endless spinner. The whole row is a ≥48dp tap target.
+ */
+@Composable
+private fun WidgetRetryBody(message: String, onRetry: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(ChipShape)
+            .clickable(onClickLabel = stringResourceSafe(R.string.home_retry), role = Role.Button, onClick = onRetry)
+            .padding(vertical = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Default.Refresh,
+            contentDescription = null,
+            tint = mc.primaryAccent,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = message,
+            style = ty.bodySmall,
+            color = mc.textSecondary,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 /** Sign-in prompt used by account-gated widgets when the user is unauthenticated. */
 @Composable
 fun AccountGatedPlaceholder(
@@ -318,10 +358,10 @@ fun HomeWidgetHost(
             HomeWidgetType.COLLECTION_STATS_HUB -> CollectionStatsHubWidget(uiState, onAction)
             HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
             HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(uiState.wishlistStats, uiState.isAuthenticated, onAction)
-            HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(uiState.discoverCards, onAction)
-            HomeWidgetType.CARD_OF_THE_DAY -> CardOfTheDayWidget(uiState.cardOfTheDay, onAction)
+            HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(uiState.discoverCards, uiState.discoverLoadState, onAction)
+            HomeWidgetType.CARD_OF_THE_DAY -> CardOfTheDayWidget(uiState.cardOfTheDay, uiState.discoverLoadState, onAction)
             HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
-            HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, onAction)
+            HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
             HomeWidgetType.RULES_TIP -> RulesTipWidget()
             HomeWidgetType.SOCIAL_HUB -> SocialHubWidget(uiState, onAction)
             HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
@@ -1725,16 +1765,24 @@ private fun WishlistWidget(stats: WishlistStats?, isAuthenticated: Boolean, onAc
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun DiscoverCardsWidget(cards: List<DiscoverCard>, onAction: (HomeAction) -> Unit) {
+private fun DiscoverCardsWidget(
+    cards: List<DiscoverCard>,
+    loadState: DiscoverLoadState,
+    onAction: (HomeAction) -> Unit,
+) {
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.SearchCard) }) {
-        if (cards.isEmpty()) {
-            WidgetLoading()
-            return@WidgetShell
-        }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-            items(cards, key = { it.id }) { card ->
-                DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+        when {
+            // Only spin while genuinely loading — a failed/empty fetch shows a retry affordance.
+            cards.isEmpty() && loadState == DiscoverLoadState.LOADING -> WidgetLoading()
+            cards.isEmpty() -> WidgetRetryBody(
+                message = stringResourceSafe(R.string.home_discover_unavailable),
+                onRetry = { onAction(HomeAction.RetryDiscover) },
+            )
+            else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                items(cards, key = { it.id }) { card ->
+                    DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+                }
             }
         }
     }
@@ -1770,13 +1818,24 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun CardOfTheDayWidget(card: DiscoverCard?, onAction: (HomeAction) -> Unit) {
+private fun CardOfTheDayWidget(
+    card: DiscoverCard?,
+    loadState: DiscoverLoadState,
+    onAction: (HomeAction) -> Unit,
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId)) } }) {
         if (card == null) {
-            WidgetLoading()
+            if (loadState == DiscoverLoadState.LOADING) {
+                WidgetLoading()
+            } else {
+                WidgetRetryBody(
+                    message = stringResourceSafe(R.string.home_discover_unavailable),
+                    onRetry = { onAction(HomeAction.RetryDiscover) },
+                )
+            }
             return@WidgetShell
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
@@ -1809,21 +1868,72 @@ private fun CardOfTheDayWidget(card: DiscoverCard?, onAction: (HomeAction) -> Un
     }
 }
 
+/**
+ * Shared "See all" trailing tile for horizontal widget rows (Latest Sets, News).
+ *
+ * A prominent, clearly-tappable tile (≥48dp) with a chevron + label, consistent across
+ * widgets. Full-height so it lines up with the cards it follows in the [LazyRow].
+ */
+@Composable
+private fun SeeAllTile(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Column(
+        modifier = modifier
+            .widthIn(min = 72.dp)
+            .heightIn(min = 88.dp)
+            .clip(ChipShape)
+            .background(mc.primaryAccent.copy(alpha = 0.10f))
+            .border(BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.25f)), ChipShape)
+            .clickable(onClickLabel = stringResourceSafe(R.string.home_news_see_all), role = Role.Button, onClick = onClick)
+            .padding(horizontal = spacing.md, vertical = spacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(mc.primaryAccent.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.height(spacing.xs))
+        Text(
+            text = stringResourceSafe(R.string.home_news_see_all),
+            style = ty.labelSmall,
+            color = mc.primaryAccent,
+            maxLines = 1,
+        )
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  LATEST_SETS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
 private fun LatestSetsWidget(sets: List<DraftSet>, onAction: (HomeAction) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.OpenDraftGuide) }) {
         if (sets.isEmpty()) {
             WidgetEmptyBody(stringResourceSafe(R.string.home_latest_sets_empty))
             return@WidgetShell
         }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             items(sets, key = { it.id }) { set ->
                 DraftSetCard(
                     set = set,
@@ -1832,32 +1942,7 @@ private fun LatestSetsWidget(sets: List<DraftSet>, onAction: (HomeAction) -> Uni
                 )
             }
             item(key = "see_more") {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(ChipShape)
-                        .background(mc.surface.copy(alpha = 0.4f))
-                        .border(BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.15f)), ChipShape)
-                        .clickable { onAction(HomeAction.OpenDraftGuide) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            tint = mc.primaryAccent,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            text = stringResourceSafe(R.string.home_news_see_all),
-                            style = ty.labelSmall,
-                            color = mc.primaryAccent,
-                        )
-                    }
-                }
+                SeeAllTile(onClick = { onAction(HomeAction.OpenDraftGuide) })
             }
         }
     }
@@ -1868,54 +1953,78 @@ private fun LatestSetsWidget(sets: List<DraftSet>, onAction: (HomeAction) -> Uni
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun NewsWidget(news: List<NewsItem>?, onAction: (HomeAction) -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
+private fun NewsWidget(
+    news: List<NewsItem>?,
+    filtersActive: Boolean,
+    onAction: (HomeAction) -> Unit,
+) {
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.OpenNews) }) {
         when {
             news == null -> WidgetLoading()
-            news.isEmpty() -> WidgetEmptyBody(stringResourceSafe(R.string.home_news_empty))
-            else -> {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    items(news.take(MAX_NEWS_PREVIEW), key = { it.id }) { item ->
-                        NewsItemCard(
-                            item = item,
-                            orientation = NewsItemOrientation.VERTICAL,
-                            modifier = Modifier.width(220.dp),
-                            onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
-                        )
-                    }
-                    item(key = "see_more") {
-                        Box(
-                            modifier = Modifier
-                                .width(80.dp)
-                                .heightIn(min = 80.dp)
-                                .clip(ChipShape)
-                                .background(mc.surface.copy(alpha = 0.4f))
-                                .border(BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.15f)), ChipShape)
-                                .clickable { onAction(HomeAction.OpenNews) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                    contentDescription = null,
-                                    tint = mc.primaryAccent,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Text(
-                                    text = stringResourceSafe(R.string.home_news_see_all),
-                                    style = ty.labelSmall,
-                                    color = mc.primaryAccent,
-                                )
-                            }
-                        }
-                    }
+            // Empty list: offer to reset the (possibly over-restrictive) persisted filters.
+            news.isEmpty() -> NewsEmptyWithReset(filtersActive = filtersActive, onAction = onAction)
+            else -> LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items(news.take(MAX_NEWS_PREVIEW), key = { it.id }) { item ->
+                    NewsItemCard(
+                        item = item,
+                        orientation = NewsItemOrientation.VERTICAL,
+                        modifier = Modifier.width(220.dp),
+                        onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
+                    )
                 }
+                item(key = "see_more") {
+                    SeeAllTile(onClick = { onAction(HomeAction.OpenNews) })
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Empty-state body for the News widget. Always offers a "Reset filters" button (per spec)
+ * so the user can recover when the persisted filters hide everything; the message hints at
+ * filtering when [filtersActive].
+ */
+@Composable
+private fun NewsEmptyWithReset(filtersActive: Boolean, onAction: (HomeAction) -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        WidgetEmptyBody(stringResourceSafe(R.string.home_news_empty))
+        Surface(
+            color = mc.primaryAccent.copy(alpha = 0.15f),
+            shape = ButtonShape,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .clip(ButtonShape)
+                .clickable(
+                    onClickLabel = stringResourceSafe(R.string.home_news_reset_filters),
+                    role = Role.Button,
+                    onClick = { onAction(HomeAction.ResetNewsFilters) },
+                ),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = stringResourceSafe(R.string.home_news_reset_filters),
+                    style = ty.labelSmall,
+                    color = mc.primaryAccent,
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -2395,56 +2504,44 @@ private const val MAX_NEWS_PREVIEW = 5
 /** Navigation icon for a Quick Start action. */
 private val QuickStartAction.navIcon: ImageVector
     get() = when (this) {
-        QuickStartAction.START_GAME -> Icons.Default.PlayArrow
-        QuickStartAction.SCAN_CARD -> Icons.Default.AutoAwesome
+        QuickStartAction.SCAN_CARD -> Icons.Default.Camera
         QuickStartAction.CREATE_DECK -> Icons.Default.Style
-        QuickStartAction.DRAFT_GUIDE -> Icons.AutoMirrored.Filled.MenuBook
-        QuickStartAction.DRAFT_SIMULATOR -> Icons.Default.AutoAwesome
-        QuickStartAction.SEARCH_CARD -> Icons.Default.AutoAwesome
-        QuickStartAction.LIBRARY -> Icons.Default.Style
+        QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
+        QuickStartAction.SEARCH_CARD -> Icons.Default.Search
         QuickStartAction.DECKS -> Icons.Default.Style
-        QuickStartAction.NEWS -> Icons.AutoMirrored.Filled.ArrowForward
+        QuickStartAction.NEWS -> Icons.AutoMirrored.Filled.MenuBook
         QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
-        QuickStartAction.TOURNAMENTS -> Icons.Default.EmojiEvents
-        QuickStartAction.SETTINGS -> Icons.Default.AutoAwesome
+        QuickStartAction.SETTINGS -> Icons.Default.Settings
     }
 
 /** Human label for a Quick Start action. */
 private val QuickStartAction.navLabel: String
     get() = when (this) {
-        QuickStartAction.START_GAME -> "Game"
-        QuickStartAction.SCAN_CARD -> "Scan"
-        QuickStartAction.CREATE_DECK -> "Build"
-        QuickStartAction.DRAFT_GUIDE -> "Guide"
-        QuickStartAction.DRAFT_SIMULATOR -> "Draft"
-        QuickStartAction.SEARCH_CARD -> "Search"
-        QuickStartAction.LIBRARY -> "Library"
-        QuickStartAction.DECKS -> "Decks"
+        QuickStartAction.SCAN_CARD -> "Scan Card"
+        QuickStartAction.CREATE_DECK -> "Deck Builder"
+        QuickStartAction.DRAFT_GUIDE -> "Draft Guides"
+        QuickStartAction.SEARCH_CARD -> "Search Card"
+        QuickStartAction.DECKS -> "My Decks"
         QuickStartAction.NEWS -> "News"
-        QuickStartAction.STATS -> "Stats"
+        QuickStartAction.STATS -> "My Stats"
         QuickStartAction.FRIENDS -> "Friends"
         QuickStartAction.TRADES -> "Trades"
-        QuickStartAction.TOURNAMENTS -> "Events"
         QuickStartAction.SETTINGS -> "Settings"
     }
 
 /** Maps a Quick Start action to its navigation intent. */
 private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
-    QuickStartAction.START_GAME -> HomeAction.StartGame
     QuickStartAction.SCAN_CARD -> HomeAction.ScanCard
     QuickStartAction.CREATE_DECK -> HomeAction.CreateDeck
     QuickStartAction.DRAFT_GUIDE -> HomeAction.DraftGuide
-    QuickStartAction.DRAFT_SIMULATOR -> HomeAction.DraftSimulator
     QuickStartAction.SEARCH_CARD -> HomeAction.SearchCard
-    QuickStartAction.LIBRARY -> HomeAction.OpenLibrary
     QuickStartAction.DECKS -> HomeAction.OpenDecks
     QuickStartAction.NEWS -> HomeAction.OpenNews
     QuickStartAction.STATS -> HomeAction.OpenStats
     QuickStartAction.FRIENDS -> HomeAction.OpenFriends
     QuickStartAction.TRADES -> HomeAction.OpenTrades
-    QuickStartAction.TOURNAMENTS -> HomeAction.OpenTournaments
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
 }
 

@@ -29,14 +29,19 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Widgets
@@ -119,11 +124,13 @@ fun HomeScreen(
                 HomeAction.DismissAccountNudge -> viewModel.dismissAccountNudge()
                 is HomeAction.SkipFirstStep -> viewModel.onAction(action)
                 HomeAction.OpenWidgetGallery -> showGallerySheet = true
-                // Board mutations are handled in the ViewModel.
+                // Board mutations + discover/news widget actions are handled in the ViewModel.
                 is HomeAction.MoveWidget,
                 is HomeAction.AddWidget,
                 is HomeAction.RemoveWidget,
                 HomeAction.ResetLayout,
+                HomeAction.RetryDiscover,
+                HomeAction.ResetNewsFilters,
                 -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.
                 HomeAction.RateApp -> onAction(action)
@@ -253,23 +260,36 @@ private fun EditWidgetsButton(onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    Row(
+    // Prominent tonal pill (full width, ≥48dp) using the primary accent so the entry point
+    // to the widget gallery reads as a clear, tappable action rather than plain text.
+    Surface(
+        color = mc.primaryAccent.copy(alpha = 0.12f),
+        shape = ButtonShape,
+        border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.35f)),
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clip(ButtonShape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = spacing.lg, vertical = spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+            .clickable(onClickLabel = stringResource(R.string.home_edit_widgets), onClick = onClick),
     ) {
-        Icon(Icons.Default.Widgets, contentDescription = null, tint = mc.textSecondary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(spacing.sm))
-        Text(
-            text = stringResource(R.string.home_edit_widgets),
-            style = ty.labelMedium,
-            color = mc.textSecondary,
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                Icons.Default.Widgets,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(spacing.sm))
+            Text(
+                text = stringResource(R.string.home_edit_widgets),
+                style = ty.labelLarge,
+                color = mc.primaryAccent,
+            )
+        }
     }
 }
 
@@ -527,37 +547,29 @@ fun QuickStartCustomizeSheet(
 /** Human label for a Quick Start action (used by the customization sheet). */
 private val QuickStartAction.label: String
     get() = when (this) {
-        QuickStartAction.START_GAME -> "Start game"
         QuickStartAction.SCAN_CARD -> "Scan card"
         QuickStartAction.CREATE_DECK -> "Build deck"
         QuickStartAction.DRAFT_GUIDE -> "Draft guide"
-        QuickStartAction.DRAFT_SIMULATOR -> "Draft sim"
         QuickStartAction.SEARCH_CARD -> "Search card"
-        QuickStartAction.LIBRARY -> "Library"
         QuickStartAction.DECKS -> "Decks"
         QuickStartAction.NEWS -> "News"
         QuickStartAction.STATS -> "Stats"
         QuickStartAction.FRIENDS -> "Friends"
         QuickStartAction.TRADES -> "Trades"
-        QuickStartAction.TOURNAMENTS -> "Tournaments"
         QuickStartAction.SETTINGS -> "Settings"
     }
 
 /** Icon for a Quick Start action (used by the customization sheet). */
 private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVector
     get() = when (this) {
-        QuickStartAction.START_GAME -> Icons.Default.PlayArrow
-        QuickStartAction.SCAN_CARD -> Icons.Default.AutoAwesome
+        QuickStartAction.SCAN_CARD -> Icons.Default.Camera
         QuickStartAction.CREATE_DECK -> Icons.Default.Style
-        QuickStartAction.DRAFT_GUIDE -> Icons.Default.MenuBook
-        QuickStartAction.DRAFT_SIMULATOR -> Icons.Default.AutoAwesome
-        QuickStartAction.SEARCH_CARD -> Icons.Default.AutoAwesome
-        QuickStartAction.LIBRARY -> Icons.Default.Style
+        QuickStartAction.DRAFT_GUIDE -> Icons.Default.SportsEsports
+        QuickStartAction.SEARCH_CARD -> Icons.Default.Search
         QuickStartAction.DECKS -> Icons.Default.Style
-        QuickStartAction.NEWS -> Icons.AutoMirrored.Filled.ArrowForward
+        QuickStartAction.NEWS -> Icons.AutoMirrored.Filled.MenuBook
         QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
-        QuickStartAction.TOURNAMENTS -> Icons.Default.EmojiEvents
-        QuickStartAction.SETTINGS -> Icons.Default.AutoAwesome
+        QuickStartAction.SETTINGS -> Icons.Default.Settings
     }

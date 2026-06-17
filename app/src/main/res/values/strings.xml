@@ -739,6 +739,22 @@
     <string name="deck_seeds_generate_cta">Generate deck →</string>
     <string name="deck_seeds_generating">Generating…</string>
 
+    <!-- Deck Studio — unified hybrid deck builder (manual + suggestions + seed auto-build) -->
+    <string name="deck_studio_title">Deck Studio</string>
+    <string name="deck_studio_default_name">New deck</string>
+    <string name="deck_studio_budget_per_card_label">Max per card (€)</string>
+    <string name="deck_studio_budget_total_label">Total budget (€)</string>
+    <string name="deck_studio_budget_invalid_error">Enter a valid amount greater than 0.</string>
+    <string name="deck_studio_discard_confirm_title">Discard this deck?</string>
+    <string name="deck_studio_discard_confirm_body">This deck is empty and hasn\'t been named. It won\'t be saved.</string>
+    <string name="deck_studio_seed_sheet_title">Build from a seed</string>
+    <string name="deck_studio_suggestions_tab_health">Health</string>
+    <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
+    <string name="deck_studio_suggestions_tab_adds">Adds</string>
+    <string name="deck_studio_card_added">Added %1$s</string>
+    <string name="deck_studio_card_cut">Removed %1$s</string>
+    <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Check your connection and try again.</string>
+
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
     <string name="deck_reason_fills_gap">Fills: %1$s</string>
@@ -2424,6 +2440,9 @@
     <string name="home_video_empty">No video available.</string>
     <string name="home_news_empty">No news right now.</string>
     <string name="home_news_see_all">See all</string>
+    <string name="home_news_reset_filters">Reset filters</string>
+    <string name="home_discover_unavailable">Couldn\'t load cards. Tap to retry.</string>
+    <string name="home_retry">Retry</string>
     <string name="home_improve_playtest">Playtest</string>
     <string name="home_improve_draft_guide">Draft guide</string>
     <string name="home_improve_tune_deck">Tune deck</string>

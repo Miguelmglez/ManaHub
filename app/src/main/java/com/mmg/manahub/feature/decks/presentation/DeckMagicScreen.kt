@@ -181,7 +181,7 @@ private fun DashboardContent(
                 Text("Based on your collection's strongest synergies", style = ty.bodyMedium, color = mc.textSecondary)
             }
 
-            items(uiState.discoveries, key = { it.label }) { discovery ->
+            items(uiState.discoveries, key = { it.primaryTag.key }) { discovery ->
                 DiscoveryCard(discovery = discovery, onClick = { onDiscoveryClick(discovery) })
             }
         }

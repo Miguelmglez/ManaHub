@@ -357,7 +357,7 @@ class ManaBaseAnalyzer @Inject constructor() {
 
     private companion object {
         /** Matches one `{...}` mana symbol; group 1 is the inner token (e.g. "W", "W/U", "2"). */
-        val SYMBOL_REGEX = Regex("\\{([^}]+)}")
+        val SYMBOL_REGEX = Regex("""\{([^}]+)\}""")
 
         /**
          * An "Add …" oracle clause up to the sentence end (group 1 is everything after "Add"

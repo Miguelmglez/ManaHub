@@ -25,6 +25,25 @@ sealed class Screen(val route: String) {
         fun createRoute(deckId: String) = "collection/deckmagic/$deckId"
     }
     object DeckBuilder : Screen("collection/decks/builder")
+
+    /**
+     * Unified hybrid deck builder ("Deck Studio") — combines manual editing,
+     * card suggestions, and seed-based auto-build in a single destination.
+     * The optional [deckId] query parameter opens an existing deck; when absent a
+     * fresh draft is created.
+     */
+    object DeckStudio : Screen("deck/studio?deckId={deckId}") {
+        /** Base route for the destination when no deck id is supplied (creates a fresh draft). */
+        const val baseRoute = "deck/studio"
+
+        /**
+         * Builds the route. A non-empty [deckId] opens an existing deck in the studio;
+         * null/empty creates a new draft.
+         */
+        fun createRoute(deckId: String? = null) =
+            baseRoute + if (!deckId.isNullOrEmpty()) "?deckId=$deckId" else ""
+    }
+
     object DeckAddCards : Screen("collection/decks/{deckId}/add") {
         fun createRoute(deckId: String) = "collection/decks/$deckId/add"
     }

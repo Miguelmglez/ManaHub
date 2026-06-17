@@ -23,14 +23,18 @@ import com.mmg.manahub.core.gamification.domain.repository.GamificationRepositor
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
+import com.mmg.manahub.feature.news.domain.model.ContentSource
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.R
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
@@ -81,6 +85,7 @@ class HomeViewModel @Inject constructor(
     private val cardRepository: com.mmg.manahub.core.domain.repository.CardRepository,
     private val getNewsFeedUseCase: GetNewsFeedUseCase,
     private val refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
+    private val manageSourcesUseCase: ManageSourcesUseCase,
     private val communityStatsRepository: CommunityStatsRepository,
     private val draftRepository: DraftRepository,
     private val wishlistRepository: WishlistRepository,
@@ -101,6 +106,13 @@ class HomeViewModel @Inject constructor(
      * succeeds, at which point [discoverSnapshotFlow] re-emits with the new cards.
      */
     private val discoverCardsFlow = MutableStateFlow<List<DiscoverCard>>(emptyList())
+
+    /**
+     * Load state for the Discover / Card-of-the-day slice. Lets the widgets distinguish
+     * "still loading" (spinner) from "failed / empty" (retry affordance) — without it a
+     * failed fetch would spin forever. [HomeAction.RetryDiscover] resets this to Loading.
+     */
+    private val discoverLoadStateFlow = MutableStateFlow(DiscoverLoadState.LOADING)
 
     // ── First Steps carousel ──────────────────────────────────────────────────
 
@@ -126,13 +138,36 @@ class HomeViewModel @Inject constructor(
             statsRepository.observeCollectionStats(currency)
         }
 
+    /** Persisted news filter selection, shared with the full News screen. */
+    private val newsFiltersFlow: StateFlow<NewsFilterPrefs> =
+        userPrefsDataStore.observeNewsFilters()
+            .catch { emit(NewsFilterPrefs.DEFAULT) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewsFilterPrefs.DEFAULT)
+
+    /**
+     * Recent news for the Home widget, filtered by the SAME persisted filters the News
+     * screen uses (enabled sources ∩ language ∩ type ∩ explicit source allowlist). The
+     * default is English-only. Capped at [MAX_NEWS]. Catch-isolated so a failing source
+     * never collapses the board.
+     */
     private val recentNewsFlow: StateFlow<List<NewsItem>?> =
-        getNewsFeedUseCase()
-            .map<List<NewsItem>, List<NewsItem>?> { items ->
-                items.take(MAX_NEWS)
-            }
+        combine(
+            getNewsFeedUseCase(),
+            manageSourcesUseCase.observeSources(),
+            newsFiltersFlow,
+        ) { items, sources, filters ->
+            applyNewsFilters(items, sources, filters).take(MAX_NEWS)
+        }
+            .map<List<NewsItem>, List<NewsItem>?> { it }
             .catch { emit(emptyList()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** True when the persisted news filters differ from the English-only default. */
+    private val newsFiltersActiveFlow: StateFlow<Boolean> =
+        newsFiltersFlow
+            .map { it != NewsFilterPrefs.DEFAULT }
+            .catch { emit(false) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /**
      * The persisted layout. The default is auth-dependent, so this re-resolves
@@ -215,11 +250,12 @@ class HomeViewModel @Inject constructor(
      * for the session once [discoverCardsFlow] is populated.
      */
     private val discoverSnapshotFlow: Flow<DiscoverSnapshot> =
-        combine(latestSetsFlow, discoverCardsFlow) { sets, cards ->
+        combine(latestSetsFlow, discoverCardsFlow, discoverLoadStateFlow) { sets, cards, loadState ->
             DiscoverSnapshot(
                 latestSets = sets,
                 discoverCards = cards,
                 cardOfTheDay = cards.firstOrNull(),
+                loadState = loadState,
             )
         }
 
@@ -392,10 +428,17 @@ class HomeViewModel @Inject constructor(
             )
         }
 
-        combine(coreFlow, recentNewsFlow, dataFlow) { core, news, data ->
+        // Bundle the news list with the "filters active" flag so the final combine stays a
+        // typed 3-arg overload (no Array<Any?> erasure).
+        val newsFlow = combine(recentNewsFlow, newsFiltersActiveFlow) { news, filtersActive ->
+            NewsBundle(items = news, filtersActive = filtersActive)
+        }
+
+        combine(coreFlow, newsFlow, dataFlow) { core, news, data ->
             buildUiState(
                 core = core,
-                news = news,
+                news = news.items,
+                newsFiltersActive = news.filtersActive,
                 layout = data.layout,
                 stats = data.stats,
                 discover = data.discover,
@@ -437,6 +480,7 @@ class HomeViewModel @Inject constructor(
      */
     private fun fetchRandomCardsIfNeeded() {
         if (discoverCardsFlow.value.isNotEmpty()) return
+        discoverLoadStateFlow.value = DiscoverLoadState.LOADING
         viewModelScope.launch {
             val result = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1) }
                 .getOrNull()
@@ -453,8 +497,24 @@ class HomeViewModel @Inject constructor(
                     )
                 }
                 .orEmpty()
-            if (cards.isNotEmpty()) discoverCardsFlow.value = cards
+            if (cards.isNotEmpty()) {
+                discoverCardsFlow.value = cards
+                discoverLoadStateFlow.value = DiscoverLoadState.LOADED
+            } else {
+                // An empty/failed result must NOT leave the widgets spinning forever.
+                discoverLoadStateFlow.value = DiscoverLoadState.FAILED
+            }
         }
+    }
+
+    /**
+     * Re-runs the Discover / Card-of-the-day fetch after a failure. Clears the cached
+     * cards so the once-only guard in [fetchRandomCardsIfNeeded] doesn't short-circuit,
+     * resets the slice to [DiscoverLoadState.LOADING], and re-fetches.
+     */
+    private fun retryDiscover() {
+        discoverCardsFlow.value = emptyList()
+        fetchRandomCardsIfNeeded()
     }
 
     // ── Public intents ──────────────────────────────────────────────────────────
@@ -468,6 +528,8 @@ class HomeViewModel @Inject constructor(
             is HomeAction.RemoveWidget -> removeWidget(action.type)
             HomeAction.ResetLayout -> resetLayout()
             is HomeAction.SkipFirstStep -> skipFirstStep(action.stepId)
+            HomeAction.RetryDiscover -> retryDiscover()
+            HomeAction.ResetNewsFilters -> resetNewsFilters()
             HomeAction.RateApp -> Unit // no-op; UI handles the store deep link
             else -> Unit // navigation intents are resolved by AppNavGraph
         }
@@ -485,6 +547,11 @@ class HomeViewModel @Inject constructor(
      */
     fun skipFirstStep(stepId: String) {
         viewModelScope.launch { userPrefsDataStore.skipFirstStep(stepId) }
+    }
+
+    /** Clears the persisted News filters back to the English-only default. */
+    fun resetNewsFilters() {
+        viewModelScope.launch { userPrefsDataStore.resetNewsFilters() }
     }
 
     /** Dismisses the current account nudge, starting its 48-hour cooldown. */
@@ -518,8 +585,15 @@ class HomeViewModel @Inject constructor(
     private fun addWidget(type: HomeWidgetType) {
         val current = uiState.value.layout
         if (current.any { it.type == type }) return
-        val size = type.defaultSize()
-        persistLayout(current + WidgetInstance(type, size))
+        val newInstance = WidgetInstance(type, type.defaultSize())
+        // Insert so the layout stays grouped by the canonical WidgetCategory order: place the
+        // new widget at the END of its own category's run (after the last existing widget whose
+        // category ordinal <= the new type's). This keeps each category contiguous and ordered.
+        val newOrdinal = type.category.ordinal
+        val insertIndex = current.indexOfLast { it.type.category.ordinal <= newOrdinal } + 1
+        val mutable = current.toMutableList()
+        mutable.add(insertIndex, newInstance)
+        persistLayout(mutable)
     }
 
     private fun removeWidget(type: HomeWidgetType) {
@@ -540,6 +614,7 @@ class HomeViewModel @Inject constructor(
     private fun buildUiState(
         core: CoreSnapshot,
         news: List<NewsItem>?,
+        newsFiltersActive: Boolean,
         layout: List<WidgetInstance>,
         stats: StatsSnapshot,
         discover: DiscoverSnapshot,
@@ -585,6 +660,7 @@ class HomeViewModel @Inject constructor(
             quickStartActions = core.quickStart,
             libraryStats = libraryStats,
             recentNews = news,
+            newsFiltersActive = newsFiltersActive,
             accountNudge = nudge,
             isAuthenticated = core.account.isAuthenticated,
             playerName = core.playerName,
@@ -602,6 +678,7 @@ class HomeViewModel @Inject constructor(
             collectionByRarity = collectionStats.byRarity.toRarityMap(),
             discoverCards = discover.discoverCards,
             cardOfTheDay = discover.cardOfTheDay,
+            discoverLoadState = discover.loadState,
             latestSets = discover.latestSets,
             wishlistStats = social.wishlist,
             decks = core.library.decks,
@@ -877,6 +954,13 @@ class HomeViewModel @Inject constructor(
         val latestSets: List<DraftSet>,
         val discoverCards: List<DiscoverCard> = emptyList(),
         val cardOfTheDay: DiscoverCard? = null,
+        val loadState: DiscoverLoadState = DiscoverLoadState.LOADING,
+    )
+
+    /** Bundles the filtered news list with the "filters active" flag for the final combine. */
+    private data class NewsBundle(
+        val items: List<NewsItem>?,
+        val filtersActive: Boolean,
     )
 
     private data class SocialSnapshot(
@@ -896,8 +980,13 @@ class HomeViewModel @Inject constructor(
         private const val DAY_MS = 24L * 60L * 60L * 1000L
         private const val GLOBAL_SEAT = "Wizard"
 
-        /** Scryfall query used to surface random cards in the Discover widget. */
-        private const val DISCOVER_RANDOM_QUERY = "order:random"
+        /**
+         * Scryfall query used to surface random cards in the Discover widget. A bare
+         * `order:random` is REJECTED by Scryfall (no real filter term), so it must include a
+         * concrete predicate. This restricts to real, non-digital, Commander-legal cards
+         * (which reliably have art) and randomises the order.
+         */
+        private const val DISCOVER_RANDOM_QUERY = "-is:digital legal:commander order:random"
 
         /** Number of random cards fetched for the Discover widget. */
         private const val DISCOVER_CARD_COUNT = 10
@@ -998,3 +1087,38 @@ private fun HomeWidgetType.defaultSize(): WidgetSize =
         WidgetSize.SMALL in supportedSizes -> WidgetSize.SMALL
         else -> supportedSizes.first()
     }
+
+/**
+ * Load state for the Home Discover / Card-of-the-day slice.
+ *
+ * [LOADING] → show a spinner; [LOADED] → show the cards; [FAILED] → show a retry
+ * affordance instead of an endless spinner (a bare `order:random` Scryfall query, or any
+ * network failure, would otherwise leave the widgets spinning forever).
+ */
+enum class DiscoverLoadState { LOADING, LOADED, FAILED }
+
+/**
+ * Applies the persisted [NewsFilterPrefs] to [items] using the SAME logic as the full News
+ * screen: keep only items from enabled sources, whose source language is selected, whose
+ * content type is selected, and (when an explicit allowlist is set) whose source id is in it.
+ *
+ * @param sources the known content sources (supplies the enabled set + per-source language).
+ */
+private fun applyNewsFilters(
+    items: List<NewsItem>,
+    sources: List<ContentSource>,
+    filters: NewsFilterPrefs,
+): List<NewsItem> {
+    val languageMap = sources.associate { it.id to it.language }
+    val enabledSourceIds = sources.filter { it.isEnabled }.map { it.id }.toSet()
+    return items
+        .filter { it.sourceId in enabledSourceIds }
+        .filter { (languageMap[it.sourceId] ?: "en") in filters.languages }
+        .filter { item ->
+            when (item) {
+                is NewsItem.Article -> SourceType.ARTICLE in filters.types
+                is NewsItem.Video -> SourceType.VIDEO in filters.types
+            }
+        }
+        .filter { filters.sourceIds == null || it.sourceId in filters.sourceIds }
+}
