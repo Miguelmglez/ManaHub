@@ -767,6 +767,13 @@
     <string name="deck_studio_suggestions_coming_soon_subtitle">Deck Doctor analysis arrives in a future update.</string>
     <string name="deck_studio_seed_coming_soon">Build from seed arrives in a future update.</string>
     <string name="deck_studio_inspirations_coming_soon">Inspirations arrive in a future update.</string>
+    <string name="deck_studio_create_failed">Couldn\'t create the deck. Please try again.</string>
+    <string name="deck_studio_add_failed">Couldn\'t add the card. Please try again.</string>
+    <string name="deck_studio_edit_deck">Edit deck</string>
+    <string name="deck_studio_share_deck">Share deck</string>
+    <string name="deck_studio_inspirations">Browse inspirations</string>
+    <string name="deck_studio_expand_section">Expand section</string>
+    <string name="deck_studio_collapse_section">Collapse section</string>
 
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
