@@ -100,6 +100,7 @@ import com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar
 import com.mmg.manahub.feature.decks.presentation.components.CardRow
 import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
+import com.mmg.manahub.feature.decks.presentation.components.DiscoveryRow
 import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
@@ -190,11 +191,6 @@ fun DeckStudioScreen(
     val isCommanderFormat = uiState.deck?.format
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } } == DeckFormat.COMMANDER
 
-    // Pre-resolved "coming soon" message for the Phase 4 Inspirations stub CTA (cannot call
-    // stringResource inside non-composable click lambdas). The Phase-3 seed flow is now live
-    // (see onBuildFromSeed → viewModel.openSeedSheet()).
-    val inspirationsComingSoonMsg = stringResource(R.string.deck_studio_inspirations_coming_soon)
-
     Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.material3.Scaffold(
             containerColor = mc.background,
@@ -205,6 +201,7 @@ fun DeckStudioScreen(
                     format = uiState.deck?.format,
                     onBack = handleBack,
                     onBuildFromSeed = { viewModel.openSeedSheet() },
+                    onBrowseInspirations = { viewModel.openInspirations() },
                     onEdit = { showEditDeckSheet = true },
                     onShare = {
                         val text = viewModel.exportDeckToText()
@@ -294,12 +291,7 @@ fun DeckStudioScreen(
                                 // Phase 3 (P3-T1/P3-T2): opens the seed-build sheet (VM state-driven).
                                 viewModel.openSeedSheet()
                             },
-                            onBrowseInspirations = {
-                                // FORWARD HOOK (Phase 4, P4-T1): when Inspirations/Discoveries
-                                // ship, log "deck_studio_discovery_seeding" (+ a non-fatal on
-                                // failure) here to observe discovery usage.
-                                toastState.show(inspirationsComingSoonMsg, MagicToastType.INFO)
-                            },
+                            onBrowseInspirations = { viewModel.openInspirations() },
                         )
                         DeckStudioTab.SUGGESTIONS -> SuggestionsTab(
                             uiState = uiState,
@@ -384,6 +376,27 @@ fun DeckStudioScreen(
                     },
                 )
             }
+        }
+    }
+
+    // Inspirations (Discoveries) sheet (Phase 4): VM-state driven (uiState.showInspirations).
+    if (uiState.showInspirations) {
+        val inspirationsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.closeInspirations() },
+            sheetState = inspirationsSheetState,
+            shape = BottomSheetShape,
+            containerColor = mc.background,
+        ) {
+            InspirationsSheetContent(
+                discoveries = uiState.discoveries,
+                isLoading = uiState.isLoadingDiscoveries,
+                onCardClick = { id ->
+                    focusManager.clearFocus()
+                    onCardClick(id)
+                },
+                onSeedStudio = { discovery -> viewModel.startFromDiscovery(discovery) },
+            )
         }
     }
 
@@ -481,6 +494,7 @@ private fun DeckStudioTopBar(
     format: String?,
     onBack: () -> Unit,
     onBuildFromSeed: () -> Unit,
+    onBrowseInspirations: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
     shareEnabled: Boolean,
@@ -519,14 +533,14 @@ private fun DeckStudioTopBar(
                     }
                 }
             }
-            // Inspirations (Discoveries) — wired in Phase 4; present-but-inert for now.
-            // FORWARD HOOK (Phase 4, P4-T1): on enable, log "deck_studio_discovery_seeding"
-            // (+ a non-fatal on failure) when the Inspirations sheet opens.
-            IconButton(onClick = { /* Phase 4: Inspirations sheet */ }, enabled = false) {
+            // Inspirations (Discoveries) — Phase 4 (P4-T1): opens the Inspirations sheet
+            // listing collection-synergy discoveries. The "opened" breadcrumb is logged
+            // in the VM (openInspirations).
+            IconButton(onClick = onBrowseInspirations) {
                 Icon(
                     Icons.Default.AutoAwesome,
                     contentDescription = stringResource(R.string.deck_studio_inspirations),
-                    tint = mc.goldMtg.copy(alpha = 0.4f),
+                    tint = mc.goldMtg,
                 )
             }
             IconButton(onClick = onEdit) {
@@ -859,6 +873,68 @@ private fun SectionHeader(
             tint = mc.primaryAccent,
             modifier = Modifier.graphicsLayer { rotationZ = rotation },
         )
+    }
+}
+
+/**
+ * The Inspirations (Discoveries) sheet content (Phase 4, P4-T1): lists collection-synergy
+ * discoveries. Tapping "Seed Studio" pre-seeds the seed sheet (the user still taps Generate).
+ *
+ * Stateless: discoveries + loading flag come from the VM; every tap is a callback.
+ */
+@Composable
+private fun InspirationsSheetContent(
+    discoveries: List<com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery>,
+    isLoading: Boolean,
+    onCardClick: (String) -> Unit,
+    onSeedStudio: (com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Column(
+        modifier = Modifier
+            .fillMaxHeight(0.92f)
+            .padding(horizontal = spacing.lg),
+    ) {
+        Text(
+            text = stringResource(R.string.deck_studio_inspirations_title),
+            style = ty.titleLarge,
+            color = mc.textPrimary,
+            modifier = Modifier.padding(top = spacing.md),
+        )
+        Text(
+            text = stringResource(R.string.deck_studio_inspirations_subtitle),
+            style = ty.bodySmall,
+            color = mc.textSecondary,
+            modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
+        )
+
+        when {
+            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            }
+            discoveries.isEmpty() -> EmptyState(
+                title = stringResource(R.string.deck_studio_inspirations_empty_title),
+                subtitle = stringResource(R.string.deck_studio_inspirations_empty_subtitle),
+                icon = Icons.Default.AutoAwesome,
+            )
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = rememberLazyListState(),
+                contentPadding = PaddingValues(vertical = spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
+            ) {
+                items(discoveries.take(20), key = { it.primaryTag.key }) { discovery ->
+                    DiscoveryRow(
+                        discovery = discovery,
+                        onCardClick = onCardClick,
+                        onSeedStudio = { onSeedStudio(discovery) },
+                    )
+                }
+            }
+        }
     }
 }
 

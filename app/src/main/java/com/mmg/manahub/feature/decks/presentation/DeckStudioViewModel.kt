@@ -27,6 +27,8 @@ import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
+import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
+import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
@@ -173,6 +175,14 @@ data class DeckStudioUiState(
     val inferredIdentity: InferredIdentity? = null,
     /** True while the seed deck is being generated + written. */
     val isGenerating: Boolean = false,
+
+    // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
+    /** Collection-synergy discoveries (Inspirations surface, Phase 4). Empty until loaded. */
+    val discoveries: List<MagicDiscovery> = emptyList(),
+    /** Whether the Inspirations (Discoveries) bottom sheet is visible. */
+    val showInspirations: Boolean = false,
+    /** True while discoveries are being computed off the collection. */
+    val isLoadingDiscoveries: Boolean = false,
 ) {
     val isEmptyDeck: Boolean get() = cards.isEmpty() && commanderCard == null
 }
@@ -205,6 +215,7 @@ class DeckStudioViewModel @Inject constructor(
     private val suggestCutsUseCase: SuggestCutsUseCase,
     private val suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase,
     private val buildDeckFromSeedsUseCase: BuildDeckFromSeedsUseCase,
+    private val deckMagicEngine: DeckMagicEngine,
     private val wishlistRepository: WishlistRepository,
     private val userPreferences: UserPreferencesDataStore,
     @ApplicationContext private val appContext: Context,
@@ -272,6 +283,33 @@ class DeckStudioViewModel @Inject constructor(
             }
             observeDeck()
             observeCollection()
+        }
+        // Inspirations (Phase 4): compute collection-synergy discoveries on a SEPARATE
+        // launch so they never block the (more important) deck load above.
+        loadDiscoveries()
+    }
+
+    /**
+     * Computes collection-synergy discoveries off the user's collection for the
+     * Inspirations surface (Phase 4). Mirrors `DeckMagicViewModel.loadDiscoveries()`:
+     * feeds the RAW `observeCollection()` items (List<UserCardWithCard>) to the engine.
+     * A failure logs + records and leaves the discovery list empty — never fatal.
+     */
+    private fun loadDiscoveries() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingDiscoveries = true) }
+            runCatching {
+                val collection = userCardRepository.observeCollection().first()
+                deckMagicEngine.discoverSynergies(collection)
+            }.onSuccess { discoveries ->
+                _uiState.update { it.copy(discoveries = discoveries, isLoadingDiscoveries = false) }
+            }.onFailure { t ->
+                FirebaseCrashlytics.getInstance().apply {
+                    log("deck_studio_discovery_seeding_failed")
+                    recordException(RuntimeException("[DeckStudio] deck_studio_discovery_seeding_failed", t))
+                }
+                _uiState.update { it.copy(isLoadingDiscoveries = false) }
+            }
         }
     }
 
@@ -1242,6 +1280,42 @@ class DeckStudioViewModel @Inject constructor(
                 )
             }
             onComplete(writtenCount)
+        }
+    }
+
+    // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
+
+    /** Opens the Inspirations (Discoveries) bottom sheet. */
+    fun openInspirations() {
+        FirebaseCrashlytics.getInstance().log("deck_studio_inspirations_opened")
+        _uiState.update { it.copy(showInspirations = true) }
+    }
+
+    /** Closes the Inspirations (Discoveries) bottom sheet. */
+    fun closeInspirations() {
+        _uiState.update { it.copy(showInspirations = false) }
+    }
+
+    /**
+     * Seeds the studio from a collection discovery: pre-populates [DeckStudioUiState.seedCards]
+     * from the discovery's cards (de-duped and capped at [MAX_SEED_CARDS]), sets the inferred
+     * identity from those seeds, closes the Inspirations sheet, and OPENS the seed sheet.
+     *
+     * The user still taps Generate — we deliberately do NOT auto-generate (R3/U9). We re-infer
+     * identity from the seed cards (consistent with [addSeed]/[removeSeed]) rather than using
+     * the discovery's `primaryTag` directly, so the seed sheet shows the same identity shape.
+     */
+    fun startFromDiscovery(discovery: MagicDiscovery) {
+        val seeds = discovery.cards.map { it.card }.distinctBy { it.scryfallId }.take(MAX_SEED_CARDS)
+        _uiState.update {
+            it.copy(
+                showInspirations = false,
+                showSeedSheet = true,
+                seedCards = seeds,
+                inferredIdentity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds),
+                seedQuery = "",
+                seedSearchResults = emptyList(),
+            )
         }
     }
 
