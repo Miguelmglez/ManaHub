@@ -223,11 +223,32 @@ class DeckStudioViewModel @Inject constructor(
         // blank as "create a fresh draft".
         val existingId = savedStateHandle.get<String?>("deckId")?.takeIf { it.isNotEmpty() }
         viewModelScope.launch {
-            deckId = existingId ?: deckRepository.createDeck(
-                name = defaultDeckName,
-                description = "Draft",
-                format = "casual",
-            )
+            val crashlytics = FirebaseCrashlytics.getInstance()
+            if (existingId != null) {
+                deckId = existingId
+                crashlytics.log("deck_studio_opened_existing")
+                crashlytics.setCustomKey("deck_studio_deck_id", existingId)
+            } else {
+                // A failed draft creation must NOT leave `deckId` uninitialized — that
+                // would strand the screen on an infinite spinner and later throw
+                // UninitializedPropertyAccessException on the first mutation. Bail out.
+                val createdId = runCatching {
+                    deckRepository.createDeck(
+                        name = defaultDeckName,
+                        description = "Draft",
+                        format = "casual",
+                    )
+                }.getOrElse { e ->
+                    crashlytics.log("deck_studio_init_create_failed")
+                    crashlytics.recordException(RuntimeException("[DeckStudio] deck_studio_init_create_failed", e))
+                    _uiState.update { it.copy(isLoading = false) }
+                    _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_create_failed)))
+                    return@launch
+                }
+                deckId = createdId
+                crashlytics.log("deck_studio_created")
+                crashlytics.setCustomKey("deck_studio_deck_id", createdId)
+            }
             observeDeck()
             observeCollection()
         }
@@ -337,16 +358,24 @@ class DeckStudioViewModel @Inject constructor(
     fun addCardToDeck(scryfallId: String, isSideboard: Boolean = false) {
         invalidateSuggestions()
         viewModelScope.launch {
-            val card = (_uiState.value.addCardsResults + _uiState.value.scryfallResults)
-                .find { it.card.scryfallId == scryfallId }?.card
-                ?: _uiState.value.cards.find { it.scryfallId == scryfallId }?.card
-                ?: resolveCard(scryfallId)
-            if (card != null) cardCache = cardCache + (scryfallId to card)
-
-            val currentQty = currentQuantity(scryfallId, isSideboard)
+            // resolveCard hits getCardById, which can throw. Keep it INSIDE the
+            // protected block so a lookup failure logs + falls back to an unresolved
+            // add rather than escaping and cancelling this coroutine (which silently
+            // dropped the add). A null card here is non-fatal: the slot is still
+            // written and the Card resolves on the next observe rebuild.
             runCatching {
+                val card = (_uiState.value.addCardsResults + _uiState.value.scryfallResults)
+                    .find { it.card.scryfallId == scryfallId }?.card
+                    ?: _uiState.value.cards.find { it.scryfallId == scryfallId }?.card
+                    ?: resolveCard(scryfallId)
+                if (card != null) cardCache = cardCache + (scryfallId to card)
+
+                val currentQty = currentQuantity(scryfallId, isSideboard)
                 deckRepository.addCardToDeck(deckId, scryfallId, currentQty + 1, isSideboard)
-            }.onFailure { logFailure("deck_studio_add_failed", it) }
+            }.onFailure {
+                logFailure("deck_studio_add_failed", it)
+                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_add_failed)))
+            }
         }
     }
 
@@ -423,14 +452,17 @@ class DeckStudioViewModel @Inject constructor(
     fun addBasicLandByName(name: String) {
         invalidateSuggestions()
         viewModelScope.launch {
-            val existing = _uiState.value.cards.find { it.card?.name == name && !it.isSideboard }
-            val card = existing?.card ?: (cardRepository.searchCardByName(name) as? DataResult.Success)?.data
-            if (card != null) {
-                cardCache = cardCache + (card.scryfallId to card)
-                val currentQty = currentQuantity(card.scryfallId, false)
-                runCatching { deckRepository.addCardToDeck(deckId, card.scryfallId, currentQty + 1, false) }
-                    .onFailure { logFailure("deck_studio_add_land_failed", it) }
-            }
+            // searchCardByName can throw — keep it inside the protected block so a
+            // lookup failure logs instead of cancelling the coroutine.
+            runCatching {
+                val existing = _uiState.value.cards.find { it.card?.name == name && !it.isSideboard }
+                val card = existing?.card ?: (cardRepository.searchCardByName(name) as? DataResult.Success)?.data
+                if (card != null) {
+                    cardCache = cardCache + (card.scryfallId to card)
+                    val currentQty = currentQuantity(card.scryfallId, false)
+                    deckRepository.addCardToDeck(deckId, card.scryfallId, currentQty + 1, false)
+                }
+            }.onFailure { logFailure("deck_studio_add_land_failed", it) }
         }
     }
 
@@ -550,7 +582,14 @@ class DeckStudioViewModel @Inject constructor(
             _uiState.update { it.copy(isSearchingScryfall = true) }
             val cards = when (val result = searchCardsUseCase(query)) {
                 is DataResult.Success -> result.data
-                is DataResult.Error -> emptyList()
+                is DataResult.Error -> {
+                    // No Throwable is carried by DataResult.Error — log only (no recordException).
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("deck_studio_search_scryfall_error")
+                        deckFormat?.let { setCustomKey("deck_studio_format", it.name) }
+                    }
+                    emptyList()
+                }
             }
             val ownedIds = _uiState.value.collectionIds
             _uiState.update { s ->
@@ -642,9 +681,13 @@ class DeckStudioViewModel @Inject constructor(
             val shouldDiscard = state.isEmptyDeck &&
                 deck != null &&
                 deck.name == defaultDeckName
+            val crashlytics = FirebaseCrashlytics.getInstance()
             if (shouldDiscard && ::deckId.isInitialized) {
+                crashlytics.log("deck_studio_draft_discarded")
                 runCatching { deckRepository.deleteDeck(deckId) }
                     .onFailure { logFailure("deck_studio_discard_failed", it) }
+            } else {
+                crashlytics.log("deck_studio_draft_kept")
             }
             _events.send(DeckStudioEvent.NavigateBack)
             onNavigateBack()
@@ -703,10 +746,13 @@ class DeckStudioViewModel @Inject constructor(
         analysisCache = null
         analysisJob?.cancel()
         analysisJob = viewModelScope.launch {
+            val crashlytics = FirebaseCrashlytics.getInstance()
+            crashlytics.log("deck_studio_suggestions_analysis_started")
             _uiState.update { it.copy(isSuggestionsLoading = true, suggestionsLoaded = true) }
 
             val deckWithCards = deckRepository.observeDeckWithCards(deckId).first()
             if (deckWithCards == null) {
+                crashlytics.log("deck_studio_suggestions_analysis_aborted")
                 _uiState.update { it.copy(isSuggestionsLoading = false) }
                 return@launch
             }
@@ -771,6 +817,11 @@ class DeckStudioViewModel @Inject constructor(
                 externalPool = emptyList(),
             )
 
+            if (unresolvedCount > 0) {
+                crashlytics.setCustomKey("deck_studio_card_count", mainboardEntries.sumOf { it.quantity } + unresolvedCount)
+            }
+            crashlytics.log("deck_studio_suggestions_analysis_succeeded")
+
             _uiState.update {
                 it.copy(
                     health = withUnresolvedWarning(health, unresolvedCount),
@@ -803,7 +854,7 @@ class DeckStudioViewModel @Inject constructor(
                 .groupBy { it.card.name }
                 .mapValues { (_, entries) -> entries.sumOf { it.quantity } }
             val weights = userPreferences.observeScoreWeightOverrides().first().toScoreWeights()
-            val selection = runCatching {
+            val result = runCatching {
                 suggestAddsWithBudgetUseCase(
                     collection = context.collection,
                     wishlistIds = context.wishlistIds,
@@ -815,9 +866,19 @@ class DeckStudioViewModel @Inject constructor(
                     externalCardsOverride = externalOverride,
                     mainboardCopiesByName = mainboardCopiesByName,
                 )
-            }.getOrNull()
+            }
+            val selection = result.getOrNull()
 
             if (selection == null) {
+                val error = result.exceptionOrNull()
+                FirebaseCrashlytics.getInstance().apply {
+                    log("deck_studio_external_pool_failed")
+                    setCustomKey("deck_studio_format", context.format.name)
+                    setCustomKey("deck_studio_card_count", context.workingMainboard.sumOf { it.quantity })
+                    if (error != null) {
+                        recordException(RuntimeException("[DeckStudio] deck_studio_external_pool_failed", error))
+                    }
+                }
                 _uiState.update { it.copy(isAddsLoading = false) }
                 _events.send(DeckStudioEvent.ExternalPoolFailed)
                 return@launch
@@ -920,6 +981,7 @@ class DeckStudioViewModel @Inject constructor(
         val perCardBlank = state.rawPerCardText.isBlank()
         val totalBlank = state.rawTotalText.isBlank()
         if ((!perCardBlank && perCard == null) || (!totalBlank && total == null)) {
+            logBudgetParseError("non_numeric")
             _uiState.update { it.copy(budgetError = true) }
             return
         }
@@ -933,7 +995,15 @@ class DeckStudioViewModel @Inject constructor(
             recomputeAdds(constraints = constraints, externalOverride = null)
         } catch (e: IllegalArgumentException) {
             // Keep the last valid budgetConstraints; just flag the error.
+            logBudgetParseError("non_positive_or_constructor_rejected")
             _uiState.update { it.copy(budgetError = true) }
+        }
+    }
+
+    private fun logBudgetParseError(type: String) {
+        FirebaseCrashlytics.getInstance().apply {
+            log("deck_studio_budget_parse_error")
+            setCustomKey("deck_studio_budget_error_type", type)
         }
     }
 
@@ -1055,6 +1125,10 @@ class DeckStudioViewModel @Inject constructor(
     private fun logFailure(tag: String, t: Throwable) {
         FirebaseCrashlytics.getInstance().apply {
             log("$tag: deckId=${if (::deckId.isInitialized) deckId else "uninitialized"}")
+            // Non-PII context to triage the failure (format, deck size, active tab).
+            deckFormat?.let { setCustomKey("deck_studio_format", it.name) }
+            setCustomKey("deck_studio_card_count", _uiState.value.totalCards)
+            setCustomKey("deck_studio_active_tab", _uiState.value.selectedTab.name)
             recordException(RuntimeException("[DeckStudio] $tag", t))
         }
     }

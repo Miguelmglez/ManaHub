@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,7 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -60,15 +60,17 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.domain.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
@@ -76,8 +78,12 @@ import com.mmg.manahub.core.ui.components.GroupingFlowSelector
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
@@ -135,6 +141,11 @@ fun DeckStudioScreen(
     val cardAddedMsg = stringResource(R.string.deck_studio_card_added)
     val cardCutMsg = stringResource(R.string.deck_studio_card_cut)
     val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
+
+    // Screen-entry breadcrumb (no PII).
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: deck_studio")
+    }
 
     // One-shot events (buffered Channel; collected once, never via state).
     LaunchedEffect(Unit) {
@@ -211,7 +222,8 @@ fun DeckStudioScreen(
                         },
                         containerColor = mc.primaryAccent,
                         contentColor = mc.background,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = CardShape,
+                        modifier = Modifier.navigationBarsPadding(),
                     ) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.deckdetail_add_basic_lands))
                     }
@@ -254,19 +266,29 @@ fun DeckStudioScreen(
                         DeckStudioTab.BUILD -> BuildTab(
                             uiState = uiState,
                             isCommanderFormat = isCommanderFormat,
-                            viewModel = viewModel,
                             onCardClick = onCardClick,
+                            onSetGroupingMode = viewModel::setGroupingMode,
+                            onToggleMainboard = viewModel::toggleMainboard,
+                            onToggleSideboard = viewModel::toggleSideboard,
+                            onRemoveCard = viewModel::removeCard,
+                            onMoveToSideboard = { id -> viewModel.moveQuantityToSideboard(id) },
+                            onMoveToMainboard = { id -> viewModel.moveQuantityToMainboard(id) },
+                            onRemoveCommander = viewModel::removeCommander,
                             onAddBasicLands = { showBasicLandsSheet = true },
                             onChooseCommander = {
                                 viewModel.showCollectionCards()
                                 showCommanderSearchSheet = true
                             },
                             onBuildFromSeed = {
-                                // Seed flow lands in Phase 3 (P3-T1/P3-T2).
+                                // FORWARD HOOK (Phase 3, P3-T1/P3-T2): when the seed-build flow
+                                // is wired, log "deck_studio_seed_build" (+ a non-fatal on
+                                // failure) here so seeding adoption/failure is observable.
                                 toastState.show(seedComingSoonMsg, MagicToastType.INFO)
                             },
                             onBrowseInspirations = {
-                                // Discoveries land in Phase 4 (P4-T1).
+                                // FORWARD HOOK (Phase 4, P4-T1): when Inspirations/Discoveries
+                                // ship, log "deck_studio_discovery_seeding" (+ a non-fatal on
+                                // failure) here to observe discovery usage.
                                 toastState.show(inspirationsComingSoonMsg, MagicToastType.INFO)
                             },
                         )
@@ -391,56 +413,72 @@ private fun DeckStudioTopBar(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     Surface(color = mc.backgroundSecondary) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = spacing.xs, vertical = spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = mc.textSecondary)
             }
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(horizontal = spacing.sm)) {
                 Text(
                     text = title,
-                    style = ty.titleMedium,
+                    style = ty.titleLarge,
                     color = mc.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 format?.let { fmt ->
-                    Surface(shape = RoundedCornerShape(4.dp), color = mc.goldMtg.copy(alpha = 0.15f)) {
+                    Surface(shape = ChipShape, color = mc.goldMtg.copy(alpha = 0.15f)) {
                         Text(
                             text = fmt.uppercase(),
                             style = ty.labelSmall,
                             color = mc.goldMtg,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                            modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs),
                         )
                     }
                 }
             }
             // Inspirations (Discoveries) — wired in Phase 4; present-but-inert for now.
+            // FORWARD HOOK (Phase 4, P4-T1): on enable, log "deck_studio_discovery_seeding"
+            // (+ a non-fatal on failure) when the Inspirations sheet opens.
             IconButton(onClick = { /* Phase 4: Inspirations sheet */ }, enabled = false) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg.copy(alpha = 0.4f))
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = stringResource(R.string.deck_studio_inspirations),
+                    tint = mc.goldMtg.copy(alpha = 0.4f),
+                )
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = null, tint = mc.textSecondary)
+                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.deck_studio_edit_deck), tint = mc.textSecondary)
             }
             IconButton(onClick = onShare, enabled = shareEnabled) {
-                Icon(Icons.Default.Share, contentDescription = null, tint = mc.textSecondary)
+                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.deck_studio_share_deck), tint = mc.textSecondary)
             }
         }
     }
 }
 
+/** Bottom clearance so the last list item clears the FAB. */
+private val FabClearance = 120.dp
+
 @Composable
 private fun BuildTab(
     uiState: DeckStudioUiState,
     isCommanderFormat: Boolean,
-    viewModel: DeckStudioViewModel,
     onCardClick: (String) -> Unit,
+    onSetGroupingMode: (GroupingMode) -> Unit,
+    onToggleMainboard: () -> Unit,
+    onToggleSideboard: () -> Unit,
+    onRemoveCard: (String, Boolean) -> Unit,
+    onMoveToSideboard: (String) -> Unit,
+    onMoveToMainboard: (String) -> Unit,
+    onRemoveCommander: () -> Unit,
     onAddBasicLands: () -> Unit,
     onChooseCommander: () -> Unit,
     onBuildFromSeed: () -> Unit,
@@ -448,6 +486,7 @@ private fun BuildTab(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     if (uiState.isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -467,8 +506,8 @@ private fun BuildTab(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = rememberLazyListState(),
-        contentPadding = PaddingValues(bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = FabClearance),
+        verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
         item(key = "summary") {
             val targetCount = if (isCommanderFormat) 100 else 60
@@ -483,35 +522,36 @@ private fun BuildTab(
                 manaCurve = uiState.manaCurve,
                 maxInCurve = maxInCurve,
                 deckCards = deckCards,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).animateItem(),
+                modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md).animateItem(),
             )
         }
 
         item(key = "grouping_selector") {
-            Column(Modifier.padding(horizontal = 16.dp).animateItem()) {
-                GroupingFlowSelector(selected = uiState.groupingMode, onSelect = viewModel::setGroupingMode)
+            Column(Modifier.padding(horizontal = spacing.lg).animateItem()) {
+                GroupingFlowSelector(selected = uiState.groupingMode, onSelect = onSetGroupingMode)
             }
         }
 
         if (isCommanderFormat) {
             item(key = "commander_section") {
-                Column(modifier = Modifier.padding(horizontal = 16.dp).animateItem()) {
+                Column(modifier = Modifier.padding(horizontal = spacing.lg).animateItem()) {
                     Text(
                         text = stringResource(R.string.deckbuilder_commander_label),
                         style = ty.titleMedium,
                         color = mc.goldMtg,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp),
+                        modifier = Modifier.padding(vertical = spacing.sm),
                     )
                     val commander = uiState.commanderCard
                     if (commander?.card != null) {
                         CommanderBanner(
                             commander = commander.card!!,
-                            modifier = Modifier.clickable { onCardClick(commander.scryfallId) },
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .clickable { onCardClick(commander.scryfallId) },
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(spacing.xs))
                         TextButton(
-                            onClick = viewModel::removeCommander,
+                            onClick = onRemoveCommander,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         ) {
                             Text(stringResource(R.string.deckbuilder_remove_commander), style = ty.labelLarge, color = mc.lifeNegative)
@@ -521,10 +561,10 @@ private fun BuildTab(
                             onClick = onChooseCommander,
                             modifier = Modifier.fillMaxWidth(),
                             border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = ChipShape,
                         ) {
                             Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(spacing.sm))
                             Text(stringResource(R.string.deckbuilder_setup_commander_label), style = ty.labelLarge)
                         }
                     }
@@ -536,7 +576,7 @@ private fun BuildTab(
             SectionHeader(
                 title = stringResource(R.string.deckdetail_tab_mainboard, mainboardCards.sumOf { it.quantity }),
                 expanded = uiState.mainboardExpanded,
-                onToggle = viewModel::toggleMainboard,
+                onToggle = onToggleMainboard,
                 modifier = Modifier.animateItem(),
             )
         }
@@ -549,36 +589,36 @@ private fun BuildTab(
                     GroupHeader(
                         label = groupLabel,
                         count = cards.sumOf { it.quantity },
-                        modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
+                        modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
                     )
                 }
                 if (isLandGroup) {
                     item(key = "main_lands_logic") {
-                        AddBasicLandsRow(onClick = onAddBasicLands, modifier = Modifier.padding(horizontal = 16.dp).animateItem())
+                        AddBasicLandsRow(onClick = onAddBasicLands, modifier = Modifier.padding(horizontal = spacing.lg).animateItem())
                     }
                 }
                 items(cards, key = { "main_${it.scryfallId}_$groupLabel" }) { entry ->
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = CardShape,
                         color = mc.backgroundSecondary,
                         border = BorderStroke(0.5.dp, mc.surfaceVariant),
-                        modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
+                        modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
                     ) {
                         Column {
                             CardRow(
                                 entry = entry,
                                 isInCollection = entry.scryfallId in uiState.collectionIds,
                                 onClick = { onCardClick(entry.scryfallId) },
-                                onRemove = { viewModel.removeCard(entry.scryfallId) },
+                                onRemove = { onRemoveCard(entry.scryfallId, false) },
                             )
                             if (!isCommanderFormat) {
                                 val qtyInSideboard = uiState.cards.find { it.scryfallId == entry.scryfallId && it.isSideboard }?.quantity ?: 0
                                 MovementRow(
                                     labelTo = stringResource(R.string.deckbuilder_move_to_sideboard),
-                                    onMoveTo = { viewModel.moveQuantityToSideboard(entry.scryfallId) },
+                                    onMoveTo = { onMoveToSideboard(entry.scryfallId) },
                                     labelFrom = if (qtyInSideboard > 0) stringResource(R.string.deckbuilder_from_sideboard) else null,
                                     onMoveFrom = if (qtyInSideboard > 0) {
-                                        { viewModel.moveQuantityToMainboard(entry.scryfallId) }
+                                        { onMoveToMainboard(entry.scryfallId) }
                                     } else null,
                                 )
                             }
@@ -593,7 +633,7 @@ private fun BuildTab(
                 SectionHeader(
                     title = stringResource(R.string.deckdetail_tab_sideboard, sideboardCards.sumOf { it.quantity }),
                     expanded = uiState.sideboardExpanded,
-                    onToggle = viewModel::toggleSideboard,
+                    onToggle = onToggleSideboard,
                     modifier = Modifier.animateItem(),
                 )
             }
@@ -602,29 +642,29 @@ private fun BuildTab(
                     item(key = "sideboard_empty") {
                         Text(
                             text = stringResource(R.string.deckbuilder_sideboard_empty),
-                            style = ty.labelSmall,
-                            color = mc.textDisabled,
-                            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp).animateItem(),
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(horizontal = spacing.xxl, vertical = spacing.sm).animateItem(),
                         )
                     }
                 } else {
                     items(sideboardCards, key = { "side_${it.scryfallId}" }) { entry ->
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = CardShape,
                             color = mc.backgroundSecondary,
                             border = BorderStroke(0.5.dp, mc.surfaceVariant),
-                            modifier = Modifier.padding(horizontal = 16.dp).animateItem(),
+                            modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
                         ) {
                             Column {
                                 CardRow(
                                     entry = entry,
                                     isInCollection = entry.scryfallId in uiState.collectionIds,
                                     onClick = { onCardClick(entry.scryfallId) },
-                                    onRemove = { viewModel.removeCard(entry.scryfallId, true) },
+                                    onRemove = { onRemoveCard(entry.scryfallId, true) },
                                 )
                                 MovementRow(
                                     labelTo = stringResource(R.string.deckbuilder_move_to_mainboard),
-                                    onMoveTo = { viewModel.moveQuantityToMainboard(entry.scryfallId) },
+                                    onMoveTo = { onMoveToMainboard(entry.scryfallId) },
                                 )
                             }
                         }
@@ -635,6 +675,9 @@ private fun BuildTab(
     }
 }
 
+/** Standard large primary/secondary action button height. */
+private val LargeButtonHeight = 52.dp
+
 @Composable
 private fun EmptyDeckState(
     onBuildFromSeed: () -> Unit,
@@ -642,35 +685,36 @@ private fun EmptyDeckState(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(spacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(48.dp))
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(spacing.md))
         Text(stringResource(R.string.deck_studio_empty_title), style = ty.titleMedium, color = mc.textPrimary)
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(spacing.xs))
         Text(
             stringResource(R.string.deck_studio_empty_subtitle),
             style = ty.bodyMedium,
             color = mc.textSecondary,
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(spacing.xl))
         androidx.compose.material3.Button(
             onClick = onBuildFromSeed,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(LargeButtonHeight),
             colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            shape = RoundedCornerShape(12.dp),
+            shape = ButtonShape,
         ) {
             Text(stringResource(R.string.deck_studio_build_from_seed), style = ty.labelLarge, color = mc.background)
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(spacing.sm))
         OutlinedButton(
             onClick = onBrowseInspirations,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(LargeButtonHeight),
             border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-            shape = RoundedCornerShape(12.dp),
+            shape = ButtonShape,
         ) {
             Text(stringResource(R.string.deck_studio_browse_inspirations), style = ty.labelLarge, color = mc.primaryAccent)
         }
@@ -686,22 +730,29 @@ private fun SectionHeader(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     val rotation by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         label = "SectionHeaderRotation",
     )
+    val toggleDescription = if (expanded) {
+        stringResource(R.string.deck_studio_collapse_section)
+    } else {
+        stringResource(R.string.deck_studio_expand_section)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clickable(onClick = onToggle)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = spacing.lg, vertical = spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = ty.titleMedium, color = mc.primaryAccent, fontWeight = FontWeight.Bold)
+        Text(title, style = ty.titleLarge, color = mc.primaryAccent)
         Spacer(Modifier.weight(1f))
         Icon(
             Icons.Default.ExpandMore,
-            contentDescription = null,
+            contentDescription = toggleDescription,
             tint = mc.primaryAccent,
             modifier = Modifier.graphicsLayer { rotationZ = rotation },
         )
@@ -748,12 +799,13 @@ private fun SuggestionsTab(
     }
 
     val evaluation = health.evaluation
+    val spacing = MaterialTheme.spacing
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = rememberLazyListState(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
         // ── Health summary ────────────────────────────────────────────────────
         item(key = "health_ring") {
@@ -849,8 +901,7 @@ private fun SuggestionsTab(
 private fun SuggestionsSectionHeader(text: String, color: androidx.compose.ui.graphics.Color) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.magicTypography.labelMedium,
+        style = MaterialTheme.magicTypography.labelLarge,
         color = color,
-        fontWeight = FontWeight.Bold,
     )
 }

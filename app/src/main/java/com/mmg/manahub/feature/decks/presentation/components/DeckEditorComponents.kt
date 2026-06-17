@@ -12,13 +12,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -67,8 +68,12 @@ import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Shared deck-editor composables
@@ -97,22 +102,23 @@ internal fun CardRow(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = ChipShape,
         color = mc.surface,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) {}
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
             AsyncImage(
                 model = entry.card?.imageNormal,
                 contentDescription = null,
-                modifier = Modifier.size(width = 44.dp, height = 60.dp).clip(RoundedCornerShape(4.dp)),
+                modifier = Modifier.size(width = 44.dp, height = 60.dp).clip(ChipShape),
                 contentScale = ContentScale.Crop
             )
             Column(Modifier.weight(1f)) {
@@ -132,14 +138,14 @@ internal fun CardRow(
                 }
             }
             if (entry.quantity > 1) {
-                Surface(shape = RoundedCornerShape(4.dp), color = mc.primaryAccent.copy(alpha = 0.2f)) {
-                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.2f)) {
+                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs))
                 }
             }
             if (isInCollection) {
                 Icon(Icons.Default.Star, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(14.dp))
             }
-            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onRemove) {
                 Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
             }
         }
@@ -164,8 +170,9 @@ internal fun GroupHeader(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = spacing.sm),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -194,7 +201,7 @@ internal fun GroupHeader(
             else -> label
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             if (label.length == 1 && label[0] in "WUBRG") {
                 ManaSymbolImage(token = label, size = 20.dp)
             }
@@ -205,7 +212,7 @@ internal fun GroupHeader(
         if (showSuggestionToggle) {
             TextButton(
                 onClick = onToggleSuggestion,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = spacing.sm, vertical = spacing.xxs)
             ) {
                 val text = if (isSuggestionEnabled) stringResource(R.string.deckbuilder_land_suggestions_disable) else stringResource(R.string.deckbuilder_land_suggestions_enable)
                 Text(text = text, style = ty.labelSmall, color = mc.primaryAccent)
@@ -228,11 +235,12 @@ internal fun MovementRow(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 8.dp),
+            .padding(start = spacing.md, end = spacing.md, top = spacing.xxs, bottom = spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -240,9 +248,10 @@ internal fun MovementRow(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .heightIn(min = 48.dp)
+                .clip(ChipShape)
                 .clickable(onClick = onMoveTo)
-                .padding(vertical = 4.dp, horizontal = 4.dp)
+                .padding(vertical = spacing.xs, horizontal = spacing.xs)
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.CompareArrows,
@@ -250,7 +259,7 @@ internal fun MovementRow(
                 tint = mc.primaryAccent,
                 modifier = Modifier.size(16.dp)
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(spacing.xs))
             Text(labelTo, style = ty.labelMedium, color = mc.primaryAccent)
         }
 
@@ -259,12 +268,13 @@ internal fun MovementRow(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                    .heightIn(min = 48.dp)
+                    .clip(ChipShape)
                     .clickable(onClick = onMoveFrom)
-                    .padding(vertical = 4.dp, horizontal = 4.dp)
+                    .padding(vertical = spacing.xs, horizontal = spacing.xs)
             ) {
                 Text(labelFrom, style = ty.labelMedium, color = mc.secondaryAccent)
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(spacing.xs))
                 Icon(
                     Icons.AutoMirrored.Filled.CompareArrows,
                     null,
@@ -300,11 +310,12 @@ internal fun BasicLandsSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = mc.backgroundSecondary) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.deckdetail_basic_lands_sheet_title), style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(vertical = 8.dp))
+        Column(modifier = Modifier.fillMaxWidth().padding(spacing.lg).padding(bottom = spacing.xxl), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            Text(stringResource(R.string.deckdetail_basic_lands_sheet_title), style = ty.titleMedium, color = mc.textPrimary, modifier = Modifier.padding(vertical = spacing.sm))
             BASIC_LAND_NAMES.forEach { landName ->
                 BasicLandRow(
                     name = landName,
@@ -322,18 +333,19 @@ internal fun BasicLandsSheet(
 internal fun BasicLandRow(name: String, quantityInDeck: Int, onAdd: () -> Unit, onRemove: () -> Unit, manaCode: () -> String?) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    Surface(shape = RoundedCornerShape(8.dp), color = mc.surface) {
-        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    val spacing = MaterialTheme.spacing
+    Surface(shape = ChipShape, color = mc.surface) {
+        Row(modifier = Modifier.fillMaxWidth().padding(spacing.md), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             manaCode()?.let { ManaSymbolImage(token = it, size = 24.dp) }
             Text(name, style = ty.bodyMedium, color = mc.textPrimary, modifier = Modifier.weight(1f))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                 if (quantityInDeck > 0) {
-                    IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onRemove) {
                         Icon(Icons.Default.Remove, null, tint = mc.textSecondary, modifier = Modifier.size(16.dp))
                     }
                     Text("$quantityInDeck", style = ty.labelMedium, color = mc.primaryAccent)
                 }
-                IconButton(onClick = onAdd, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onAdd) {
                     Icon(Icons.Default.Add, null, tint = mc.primaryAccent, modifier = Modifier.size(16.dp))
                 }
             }
@@ -345,12 +357,13 @@ internal fun BasicLandRow(name: String, quantityInDeck: Int, onAdd: () -> Unit, 
 internal fun AddBasicLandsRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = ChipShape,
         color = mc.surface,
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(spacing.md), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
             Icon(Icons.Default.Park, null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
             Text(stringResource(R.string.deckdetail_add_basic_lands), style = ty.bodyMedium, color = mc.primaryAccent, modifier = Modifier.weight(1f))
             Icon(Icons.Default.Add, null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp))
@@ -375,6 +388,7 @@ internal fun EditDeckSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var nameText by remember(deck?.name) { mutableStateOf(deck?.name ?: "") }
@@ -386,17 +400,17 @@ internal fun EditDeckSheet(
         containerColor = mc.backgroundSecondary,
         dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled) },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(bottom = 16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(bottom = spacing.lg)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(spacing.lg), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(stringResource(R.string.deck_edit_title), style = ty.titleLarge, color = mc.textPrimary)
-                Button(onClick = { onSave(nameText, selectedCoverId) }, colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = RoundedCornerShape(8.dp)) {
+                Button(onClick = { onSave(nameText, selectedCoverId) }, colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent), shape = ButtonShape) {
                     Text(stringResource(R.string.action_save), style = ty.labelLarge, fontWeight = FontWeight.SemiBold, color = mc.background)
                 }
             }
             OutlinedTextField(
                 value = nameText,
                 onValueChange = { nameText = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg),
                 label = { Text(stringResource(R.string.deckbuilder_setup_name_label), style = ty.labelLarge) },
                 singleLine = true,
                 textStyle = ty.bodyLarge,
@@ -408,14 +422,14 @@ internal fun EditDeckSheet(
                 cards.filter { it.card?.imageArtCrop != null }.distinctBy { it.scryfallId }
             }
             if (coverCards.isNotEmpty()) {
-                Text(stringResource(R.string.deck_edit_cover_section), style = ty.labelLarge, modifier = Modifier.padding(16.dp))
-                LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.deck_edit_cover_section), style = ty.labelLarge, modifier = Modifier.padding(spacing.lg))
+                LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().padding(horizontal = spacing.md), horizontalArrangement = Arrangement.spacedBy(spacing.sm), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                     items(coverCards, key = { "cover_" + it.scryfallId }) { dc ->
                         val isSelected = dc.scryfallId == selectedCoverId
                         Box(
-                            modifier = Modifier.aspectRatio(1.37f).clip(RoundedCornerShape(8.dp))
+                            modifier = Modifier.aspectRatio(1.37f).clip(ChipShape)
                                 .clickable { selectedCoverId = dc.scryfallId }
-                                .then(if (isSelected) Modifier.border(2.dp, mc.primaryAccent, RoundedCornerShape(8.dp)) else Modifier)
+                                .then(if (isSelected) Modifier.border(2.dp, mc.primaryAccent, ChipShape) else Modifier)
                         ) {
                             AsyncImage(
                                 model = dc.card?.imageArtCrop,
