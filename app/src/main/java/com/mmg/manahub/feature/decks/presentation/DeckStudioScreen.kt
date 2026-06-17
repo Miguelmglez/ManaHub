@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,15 +37,20 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -78,6 +84,7 @@ import com.mmg.manahub.core.ui.components.GroupingFlowSelector
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.BottomSheetShape
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -85,6 +92,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
@@ -95,6 +103,7 @@ import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
 import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
+import com.mmg.manahub.feature.decks.presentation.components.SeedsContent
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
 import com.mmg.manahub.feature.decks.presentation.improvement.components.AddSuggestionRow
 import com.mmg.manahub.feature.decks.presentation.improvement.components.CutSuggestionRow
@@ -141,6 +150,7 @@ fun DeckStudioScreen(
     val cardAddedMsg = stringResource(R.string.deck_studio_card_added)
     val cardCutMsg = stringResource(R.string.deck_studio_card_cut)
     val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
+    val seedBuiltMsg = stringResource(R.string.deck_studio_seed_built)
 
     // Screen-entry breadcrumb (no PII).
     LaunchedEffect(Unit) {
@@ -180,9 +190,9 @@ fun DeckStudioScreen(
     val isCommanderFormat = uiState.deck?.format
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } } == DeckFormat.COMMANDER
 
-    // Pre-resolved "coming soon" messages for the Phase 3/4 stub CTAs (cannot call
-    // stringResource inside non-composable click lambdas).
-    val seedComingSoonMsg = stringResource(R.string.deck_studio_seed_coming_soon)
+    // Pre-resolved "coming soon" message for the Phase 4 Inspirations stub CTA (cannot call
+    // stringResource inside non-composable click lambdas). The Phase-3 seed flow is now live
+    // (see onBuildFromSeed → viewModel.openSeedSheet()).
     val inspirationsComingSoonMsg = stringResource(R.string.deck_studio_inspirations_coming_soon)
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -194,6 +204,7 @@ fun DeckStudioScreen(
                     title = uiState.deck?.name ?: stringResource(R.string.deck_studio_title),
                     format = uiState.deck?.format,
                     onBack = handleBack,
+                    onBuildFromSeed = { viewModel.openSeedSheet() },
                     onEdit = { showEditDeckSheet = true },
                     onShare = {
                         val text = viewModel.exportDeckToText()
@@ -280,10 +291,8 @@ fun DeckStudioScreen(
                                 showCommanderSearchSheet = true
                             },
                             onBuildFromSeed = {
-                                // FORWARD HOOK (Phase 3, P3-T1/P3-T2): when the seed-build flow
-                                // is wired, log "deck_studio_seed_build" (+ a non-fatal on
-                                // failure) here so seeding adoption/failure is observable.
-                                toastState.show(seedComingSoonMsg, MagicToastType.INFO)
+                                // Phase 3 (P3-T1/P3-T2): opens the seed-build sheet (VM state-driven).
+                                viewModel.openSeedSheet()
                             },
                             onBrowseInspirations = {
                                 // FORWARD HOOK (Phase 4, P4-T1): when Inspirations/Discoveries
@@ -313,6 +322,70 @@ fun DeckStudioScreen(
     }
 
     // ── Sheets ──────────────────────────────────────────────────────────────────
+
+    // Seed-build sheet (Phase 3): VM-state driven (uiState.showSeedSheet), unlike the
+    // local-state sheets below.
+    if (uiState.showSeedSheet) {
+        val seedSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.closeSeedSheet() },
+            sheetState = seedSheetState,
+            shape = BottomSheetShape,
+            containerColor = mc.background,
+        ) {
+            Column(Modifier.fillMaxHeight(0.92f)) {
+                Text(
+                    text = stringResource(R.string.deck_studio_seed_sheet_title),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.padding(
+                        horizontal = MaterialTheme.spacing.lg,
+                        vertical = MaterialTheme.spacing.md,
+                    ),
+                )
+                val seedFormat = uiState.deck?.format
+                    ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
+                    ?: DeckFormat.STANDARD
+                SeedsContent(
+                    seedCards = uiState.seedCards,
+                    identity = uiState.inferredIdentity,
+                    skeleton = DeckSkeletons.forFormat(seedFormat),
+                    budget = uiState.budgetConstraints,
+                    query = uiState.seedQuery,
+                    searchResults = uiState.seedSearchResults,
+                    isSearching = uiState.isSearchingSeeds,
+                    canGenerate = uiState.seedCards.isNotEmpty() && !uiState.isGenerating,
+                    isGenerating = uiState.isGenerating,
+                    onQueryChange = viewModel::onSeedQueryChange,
+                    onAddSeed = viewModel::addSeed,
+                    onRemoveSeed = viewModel::removeSeed,
+                    // Unused: the budget is driven by the custom budgetSlot below (free-text input).
+                    onBudgetChanged = { },
+                    onGenerate = {
+                        focusManager.clearFocus()
+                        viewModel.generateFromSeeds { count ->
+                            toastState.show(
+                                String.format(seedBuiltMsg, count),
+                                MagicToastType.SUCCESS,
+                            )
+                        }
+                    },
+                    budgetSlot = {
+                        BudgetInputBar(
+                            perCardText = uiState.rawPerCardText,
+                            totalText = uiState.rawTotalText,
+                            ownedCardsAreFree = uiState.ownedCardsAreFree,
+                            hasError = uiState.budgetError,
+                            onPerCardChange = viewModel::onPerCardBudgetChange,
+                            onTotalChange = viewModel::onTotalBudgetChange,
+                            onOwnedFreeChange = viewModel::onOwnedCardsFreeChange,
+                            onClear = viewModel::onClearBudget,
+                        )
+                    },
+                )
+            }
+        }
+    }
 
     if (showEditDeckSheet) {
         EditDeckSheet(
@@ -407,6 +480,7 @@ private fun DeckStudioTopBar(
     title: String,
     format: String?,
     onBack: () -> Unit,
+    onBuildFromSeed: () -> Unit,
     onEdit: () -> Unit,
     onShare: () -> Unit,
     shareEnabled: Boolean,
@@ -414,6 +488,7 @@ private fun DeckStudioTopBar(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    var showOverflow by remember { mutableStateOf(false) }
     Surface(color = mc.backgroundSecondary) {
         Row(
             modifier = Modifier
@@ -459,6 +534,34 @@ private fun DeckStudioTopBar(
             }
             IconButton(onClick = onShare, enabled = shareEnabled) {
                 Icon(Icons.Default.Share, contentDescription = stringResource(R.string.deck_studio_share_deck), tint = mc.textSecondary)
+            }
+            // Overflow menu (Phase 3): the "Build from Seed" entry that opens the seed sheet.
+            Box {
+                IconButton(onClick = { showOverflow = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.deck_studio_more_options),
+                        tint = mc.textSecondary,
+                    )
+                }
+                DropdownMenu(
+                    expanded = showOverflow,
+                    onDismissRequest = { showOverflow = false },
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.deck_studio_build_from_seed),
+                                style = ty.bodyMedium,
+                                color = mc.textPrimary,
+                            )
+                        },
+                        onClick = {
+                            showOverflow = false
+                            onBuildFromSeed()
+                        },
+                    )
+                }
             }
         }
     }

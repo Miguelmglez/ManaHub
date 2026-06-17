@@ -30,6 +30,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.AddOrigin
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetOptimizer
+import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetSelection
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
@@ -112,6 +113,15 @@ class DeckStudioViewModelTest {
 
     // ── Mocked suggestAddsWithBudgetUseCase for Phase 2 budget/incremental tests ──
     private val mockSuggestAddsWithBudgetUseCase = mockk<SuggestAddsWithBudgetUseCase>()
+
+    // ── Real BuildDeckFromSeedsUseCase for Phase 3 seed-build (reuses the engine instances) ──
+    private val buildDeckFromSeedsUseCase = BuildDeckFromSeedsUseCase(
+        deckScorer = scorer,
+        roleClassifier = RoleClassifier(),
+        candidatePoolGenerator = candidatePoolGenerator,
+        budgetOptimizer = budgetOptimizer,
+        ioDispatcher = dispatcher,
+    )
 
     // ── Constants ─────────────────────────────────────────────────────────────
     private val DEFAULT_DECK_NAME = "New deck"
@@ -222,6 +232,7 @@ class DeckStudioViewModelTest {
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+            buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             appContext = appContext,
@@ -242,6 +253,7 @@ class DeckStudioViewModelTest {
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsWithBudgetUseCase = mockSuggestAddsWithBudgetUseCase,
+            buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             appContext = appContext,
@@ -281,6 +293,7 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 appContext = appContext,

@@ -751,6 +751,8 @@
     <string name="deck_studio_discard_confirm_title">Discard this deck?</string>
     <string name="deck_studio_discard_confirm_body">This deck is empty and hasn\'t been named. It won\'t be saved.</string>
     <string name="deck_studio_seed_sheet_title">Build from a seed</string>
+    <string name="deck_studio_seed_built">Deck built from seed — %1$d cards added</string>
+    <string name="deck_studio_seed_build_failed">Couldn\'t build the deck from your seeds. Please try again.</string>
     <string name="deck_studio_suggestions_tab_health">Health</string>
     <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
     <string name="deck_studio_suggestions_tab_adds">Adds</string>
@@ -762,6 +764,7 @@
     <string name="deck_studio_empty_title">Your deck is empty</string>
     <string name="deck_studio_empty_subtitle">Add cards with the + button, build from a seed, or browse inspirations.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
+    <string name="deck_studio_more_options">More options</string>
     <string name="deck_studio_browse_inspirations">Browse Inspirations</string>
     <string name="deck_studio_suggestions_coming_soon_title">Suggestions coming soon</string>
     <string name="deck_studio_suggestions_coming_soon_subtitle">Deck Doctor analysis arrives in a future update.</string>
