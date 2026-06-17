@@ -56,6 +56,18 @@ sealed interface HomeAction {
     /** Opens the platform store listing so the user can rate the app (UI resolves the deep link). */
     object RateApp : HomeAction
 
+    /**
+     * Retries the Discover / Card-of-the-day random card fetch after a failure.
+     * Handled in [HomeViewModel]: resets the discover load state to Loading and re-runs the fetch.
+     */
+    object RetryDiscover : HomeAction
+
+    /**
+     * Resets the persisted News filters (languages/types/sources) back to their defaults
+     * (English-only). Handled in [HomeViewModel] via DataStore.
+     */
+    object ResetNewsFilters : HomeAction
+
     // ── Per-widget navigation intents (resolved by AppNavGraph) ─────────────────
     object OpenDraftSimulator : HomeAction
     object OpenDraftGuide : HomeAction

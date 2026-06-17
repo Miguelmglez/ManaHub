@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -177,6 +176,10 @@ fun WidgetGallerySheet(
                         // When gamification is off, omit its widget types from the gallery entirely
                         // (instead of showing them as greyed/disabled rows).
                         .filter { gamificationEnabled || !it.isGamification }
+                    // Skip categories with no visible widget types (e.g. TOURNAMENT / COMMUNITY have
+                    // no types assigned, and gamification-only categories vanish when the toggle is off)
+                    // so we never render an orphaned header.
+                    if (widgets.isEmpty()) return@forEach
                     val isDraggingCategory = draggedCategory == category
                     
                     val categoryZIndex = if (isDraggingCategory) 10f else 1f
@@ -262,17 +265,24 @@ fun WidgetGallerySheet(
                                         onDrag = { change, amount ->
                                             change.consume()
                                             dragAccumY += amount.y
-                                            
+
                                             val currentIdx = currentLayout.indexOfFirst { it.type == type }
                                             if (currentIdx != -1) {
-                                                // Boundary check: cannot move into the Activity block (Today + Quick Actions)
-                                                val activityCount = HomeWidgetType.entries.count { it.category == WidgetCategory.ACTIVITY }
-                                                
-                                                if (dragAccumY <= -rowHeightPx && currentIdx > activityCount) {
-                                                    onMoveWidget(currentIdx, currentIdx - 1)
+                                                // Items may ONLY be reordered WITHIN their own category run:
+                                                // a move is rejected if the neighbour it would swap with belongs
+                                                // to a different category (that keeps the category-grouped
+                                                // invariant the ViewModel relies on).
+                                                if (dragAccumY <= -rowHeightPx && currentIdx > 0) {
+                                                    val target = currentIdx - 1
+                                                    if (currentLayout[target].type.category == category) {
+                                                        onMoveWidget(currentIdx, target)
+                                                    }
                                                     dragAccumY += rowHeightPx
                                                 } else if (dragAccumY >= rowHeightPx && currentIdx < currentLayout.lastIndex) {
-                                                    onMoveWidget(currentIdx, currentIdx + 1)
+                                                    val target = currentIdx + 1
+                                                    if (currentLayout[target].type.category == category) {
+                                                        onMoveWidget(currentIdx, target)
+                                                    }
                                                     dragAccumY -= rowHeightPx
                                                 }
                                             }
@@ -324,6 +334,8 @@ private fun CategoryHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.sm)
     ) {
+        // Categories WITH a drag handle (everything except ACTIVITY) show the ≡ grip.
+        // ACTIVITY has no handle AND no leading spacer, so its title is flush-left.
         if (category != WidgetCategory.ACTIVITY) {
             Box(
                 modifier = dragHandleModifier
@@ -337,9 +349,6 @@ private fun CategoryHeader(
                     modifier = Modifier.size(20.dp)
                 )
             }
-        } else {
-            // Spacer to keep text alignment consistent
-            Spacer(modifier = Modifier.size(32.dp))
         }
         Icon(
             imageVector = category.icon,
@@ -376,8 +385,11 @@ private fun CatalogRow(
     Surface(
         color = if (isFixed) mc.surfaceVariant.copy(alpha = 0.5f) else mc.surface,
         shape = CardShape,
+        // The whole added row is the long-press drag target now (the standalone ≡ handle
+        // icon was removed) — dragHandleModifier carries the pointerInput when draggable.
         modifier = modifier
             .fillMaxWidth()
+            .then(dragHandleModifier)
             .alpha(if (isDragging) 0.6f else 1f)
     ) {
         Row(
@@ -385,27 +397,6 @@ private fun CatalogRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            // Drag Handle
-            if (isAdded && !isFixed && type.category != WidgetCategory.ACTIVITY) {
-                Box(
-                    modifier = dragHandleModifier
-                        .size(44.dp)
-                        .clip(ChipShape)
-                        .background(mc.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DragHandle,
-                        contentDescription = null,
-                        tint = mc.secondaryAccent,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            } else {
-                // Static icon or spacer
-                Box(modifier = Modifier.size(44.dp))
-            }
-
             // Widget Icon
             Box(
                 modifier = Modifier

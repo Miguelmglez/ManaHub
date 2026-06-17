@@ -13,19 +13,15 @@ package com.mmg.manahub.feature.home.presentation
  * user is unauthenticated rather than failing.
  */
 enum class QuickStartAction(val persistedId: String) {
-    START_GAME("start_game"),
     SCAN_CARD("scan_card"),
     CREATE_DECK("create_deck"),
     DRAFT_GUIDE("draft_guide"),
-    DRAFT_SIMULATOR("draft_simulator"),
     SEARCH_CARD("search_card"),
-    LIBRARY("library"),
     DECKS("decks"),
     NEWS("news"),
     STATS("stats"),
     FRIENDS("friends"),
     TRADES("trades"),
-    TOURNAMENTS("tournaments"),
     SETTINGS("settings");
 
     companion object {
@@ -33,7 +29,7 @@ enum class QuickStartAction(val persistedId: String) {
          * Default shortcut set for zero-data users: one tap to start a game, scan a
          * card, build a deck, or open the draft guide.
          */
-        val defaults = listOf(START_GAME, SCAN_CARD, CREATE_DECK, DRAFT_GUIDE)
+        val defaults = listOf(SCAN_CARD, CREATE_DECK, DRAFT_GUIDE, STATS)
 
         /** Resolves a persisted id back to its action, or null if unknown/removed. */
         fun fromPersistedId(id: String): QuickStartAction? =

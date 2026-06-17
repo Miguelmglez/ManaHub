@@ -20,6 +20,8 @@ data class HomeUiState(
     val libraryStats: LibraryStats? = null,
     /** Up to 3 latest news/video items. Null while the initial DB query is still pending. */
     val recentNews: List<NewsItem>? = null,
+    /** True when the persisted news filters differ from the English-only default (drives the Reset CTA). */
+    val newsFiltersActive: Boolean = false,
     val accountNudge: AccountNudge? = null,
     val isAuthenticated: Boolean = false,
     /** User's display name from DataStore. */
@@ -42,6 +44,8 @@ data class HomeUiState(
     val collectionByRarity: Map<String, Int> = emptyMap(),
     val discoverCards: List<DiscoverCard> = emptyList(),
     val cardOfTheDay: DiscoverCard? = null,
+    /** Load state of the Discover / Card-of-the-day slice (drives spinner vs. retry affordance). */
+    val discoverLoadState: DiscoverLoadState = DiscoverLoadState.LOADING,
     val latestSets: List<DraftSet> = emptyList(),
     val wishlistStats: WishlistStats? = null,
     /** All of the user's decks, newest-first. Drives the Your Decks shelf widget. */

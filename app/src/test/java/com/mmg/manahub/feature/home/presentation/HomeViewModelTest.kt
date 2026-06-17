@@ -28,9 +28,11 @@ import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.model.PassDirection
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
@@ -107,6 +109,7 @@ class HomeViewModelTest {
     private val authRepository: AuthRepository = mockk(relaxed = true)
     private val getNewsFeedUseCase: GetNewsFeedUseCase = mockk(relaxed = true)
     private val refreshNewsFeedUseCase: RefreshNewsFeedUseCase = mockk(relaxed = true)
+    private val manageSourcesUseCase: ManageSourcesUseCase = mockk(relaxed = true)
     private val communityStatsRepository: CommunityStatsRepository = mockk(relaxed = true)
     private val draftRepository: DraftRepository = mockk(relaxed = true)
     private val cardRepository: com.mmg.manahub.core.domain.repository.CardRepository = mockk(relaxed = true)
@@ -140,6 +143,10 @@ class HomeViewModelTest {
         every { tournamentRepository.observeTournaments() } returns tournamentsFlow
         every { getNewsFeedUseCase() } returns flowOf(emptyList())
         coEvery { refreshNewsFeedUseCase() } returns Result.success(Unit)
+        // News filter source of truth: default (English-only, all enabled sources).
+        every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
+        // Default to no sources; news tests override this with sources that enable their feed.
+        every { manageSourcesUseCase.observeSources() } returns flowOf(emptyList())
 
         // Phase 2 stats flows.
         every { gameSessionRepository.observeLocalWins() } returns flowOf(0)
@@ -202,6 +209,7 @@ class HomeViewModelTest {
         authRepository = authRepository,
         getNewsFeedUseCase = getNewsFeedUseCase,
         refreshNewsFeedUseCase = refreshNewsFeedUseCase,
+        manageSourcesUseCase = manageSourcesUseCase,
         cardRepository = cardRepository,
         communityStatsRepository = communityStatsRepository,
         draftRepository = draftRepository,
@@ -285,6 +293,27 @@ class HomeViewModelTest {
         sourceName = "MTG News", sourceId = "src", url = "https://example.com/$id",
         author = null,
     )
+
+    /**
+     * Stubs [manageSourcesUseCase] so every source id present in [feed] resolves to an
+     * enabled English source — the Home news widget now filters by enabled-source ∩
+     * language ∩ type, so without matching sources the feed would be filtered out.
+     */
+    private fun stubEnabledEnglishSourcesFor(feed: List<NewsItem>) {
+        val sources = feed.map { it.sourceId }.distinct().map { sid ->
+            com.mmg.manahub.feature.news.domain.model.ContentSource(
+                id = sid,
+                name = sid,
+                feedUrl = "https://example.com/$sid/feed",
+                type = com.mmg.manahub.core.domain.model.news.SourceType.ARTICLE,
+                isEnabled = true,
+                isDefault = true,
+                iconUrl = null,
+                language = "en",
+            )
+        }
+        every { manageSourcesUseCase.observeSources() } returns flowOf(sources)
+    }
 
     // ── Initial state ──────────────────────────────────────────────────────────
 
@@ -624,6 +653,7 @@ class HomeViewModelTest {
         // Feed has more items than MAX_NEWS (10); result must be exactly MAX_NEWS.
         val feed = (1..HomeViewModel.MAX_NEWS + 5).map { newsArticle(it.toString()) }
         every { getNewsFeedUseCase() } returns flowOf(feed)
+        stubEnabledEnglishSourcesFor(feed)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -636,6 +666,7 @@ class HomeViewModelTest {
     fun `recentNews contains fewer than MAX_NEWS items when feed has fewer`() = runTest(testDispatcher) {
         val feed = listOf(newsArticle("1"), newsArticle("2"))
         every { getNewsFeedUseCase() } returns flowOf(feed)
+        stubEnabledEnglishSourcesFor(feed)
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -665,6 +696,7 @@ class HomeViewModelTest {
                 url = "https://mtggoldfish.com/news/42", author = "Reporter",
             )
             every { getNewsFeedUseCase() } returns flowOf(listOf(article))
+            stubEnabledEnglishSourcesFor(listOf(article))
 
             val vm = buildViewModel()
             backgroundScope.launch { vm.state.collect {} }
@@ -817,7 +849,7 @@ class HomeViewModelTest {
     // ── Widget board: mutations ────────────────────────────────────────────────
 
     @Test
-    fun `AddWidget appends the widget and persists`() = runTest(testDispatcher) {
+    fun `AddWidget inserts the widget grouped by category and persists`() = runTest(testDispatcher) {
         sessionStateFlow.value = SessionState.Unauthenticated
 
         val vm = buildViewModel()
@@ -825,10 +857,16 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
 
+        // GAME_STATS_HUB is in the STATS category — it must be inserted into its category run
+        // (after ACTIVITY, before DISCOVER), NOT appended to the end of the layout.
         vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
         advanceUntilIdle()
 
-        assertEquals(HomeWidgetType.GAME_STATS_HUB, vm.state.value.layout.last().type)
+        val layout = vm.state.value.layout
+        assertTrue(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+        // The layout stays grouped: every widget's category ordinal is non-decreasing.
+        val ordinals = layout.map { it.type.category.ordinal }
+        assertEquals(ordinals.sorted(), ordinals)
         coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
     }
 
@@ -1134,7 +1172,8 @@ class HomeViewModelTest {
         assertEquals(1, stats.cards.size)
         assertEquals("c1", stats.cards.first().id)
         assertEquals("Black Lotus", stats.cards.first().name)
-        assertEquals("https://example.com/lotus_art.jpg", stats.cards.first().imageUrl)
+        // Wishlist previews use the full card image (imageNormal), not the art crop.
+        assertEquals("https://example.com/lotus.jpg", stats.cards.first().imageUrl)
     }
 
     @Test
@@ -1295,4 +1334,136 @@ class HomeViewModelTest {
 
         assertFalse(vm.state.value.hero is HomeHeroState.QuestsReady)
     }
+
+    // ── Discover load state + retry ───────────────────────────────────────────
+
+    @Test
+    fun `discover load state is LOADED when the random card fetch succeeds`() = runTest(testDispatcher) {
+        coEvery { cardRepository.searchCards(any(), any()) } returns
+            DataResult.Success(listOf(discoverCard("c1")))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(DiscoverLoadState.LOADED, vm.state.value.discoverLoadState)
+        assertTrue(vm.state.value.discoverCards.isNotEmpty())
+    }
+
+    @Test
+    fun `discover load state is FAILED when the random card fetch returns empty`() = runTest(testDispatcher) {
+        coEvery { cardRepository.searchCards(any(), any()) } returns DataResult.Success(emptyList())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        // A failed/empty fetch must not leave the slice stuck on LOADING.
+        assertEquals(DiscoverLoadState.FAILED, vm.state.value.discoverLoadState)
+    }
+
+    @Test
+    fun `RetryDiscover re-fetches and reaches LOADED on success`() = runTest(testDispatcher) {
+        coEvery { cardRepository.searchCards(any(), any()) } returns DataResult.Success(emptyList())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+        assertEquals(DiscoverLoadState.FAILED, vm.state.value.discoverLoadState)
+
+        // Next attempt succeeds.
+        coEvery { cardRepository.searchCards(any(), any()) } returns
+            DataResult.Success(listOf(discoverCard("c1")))
+        vm.onAction(HomeAction.RetryDiscover)
+        advanceUntilIdle()
+
+        assertEquals(DiscoverLoadState.LOADED, vm.state.value.discoverLoadState)
+        assertTrue(vm.state.value.discoverCards.isNotEmpty())
+    }
+
+    // ── News filters (persisted, shared with NewsScreen) ──────────────────────
+
+    @Test
+    fun `newsFiltersActive is false when filters match the English-only default`() = runTest(testDispatcher) {
+        every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertFalse(vm.state.value.newsFiltersActive)
+    }
+
+    @Test
+    fun `newsFiltersActive is true when persisted filters differ from default`() = runTest(testDispatcher) {
+        every { userPrefsDataStore.observeNewsFilters() } returns
+            flowOf(NewsFilterPrefs.DEFAULT.copy(languages = setOf("en", "es")))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.newsFiltersActive)
+    }
+
+    @Test
+    fun `recentNews filters out items whose source language is not selected`() = runTest(testDispatcher) {
+        val enArticle = newsArticle("en-1").copy(sourceId = "en-src")
+        val esArticle = newsArticle("es-1").copy(sourceId = "es-src")
+        every { getNewsFeedUseCase() } returns flowOf(listOf(enArticle, esArticle))
+        every { manageSourcesUseCase.observeSources() } returns flowOf(
+            listOf(
+                contentSource("en-src", "en"),
+                contentSource("es-src", "es"),
+            ),
+        )
+        // Default filters are English-only.
+        every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val ids = vm.state.value.recentNews!!.map { it.id }
+        assertEquals(listOf("en-1"), ids)
+    }
+
+    @Test
+    fun `ResetNewsFilters delegates to userPrefsDataStore`() = runTest(testDispatcher) {
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.ResetNewsFilters)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { userPrefsDataStore.resetNewsFilters() }
+    }
+
+    private fun discoverCard(id: String) = com.mmg.manahub.core.domain.model.Card(
+        scryfallId = id, name = "Card $id", printedName = null,
+        manaCost = "{1}", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList(),
+        typeLine = "Creature", printedTypeLine = null, oracleText = null,
+        printedText = null, keywords = emptyList(), power = null,
+        toughness = null, loyalty = null, setCode = "TST",
+        setName = "Test", collectorNumber = "1",
+        rarity = "common", releasedAt = "2020-01-01",
+        frameEffects = emptyList(), promoTypes = emptyList(), lang = "en",
+        imageNormal = "https://example.com/$id.jpg",
+        imageArtCrop = "https://example.com/${id}_art.jpg",
+        imageBackNormal = null, priceUsd = null, priceUsdFoil = null,
+        priceEur = null, priceEurFoil = null,
+        legalityStandard = "legal", legalityPioneer = "legal",
+        legalityModern = "legal", legalityCommander = "legal",
+        flavorText = null, artist = "Artist", scryfallUri = "",
+        tags = emptyList(), userTags = emptyList(), suggestedTags = emptyList(),
+        relatedUris = emptyMap(), purchaseUris = emptyMap(),
+    )
+
+    private fun contentSource(id: String, language: String) =
+        com.mmg.manahub.feature.news.domain.model.ContentSource(
+            id = id, name = id, feedUrl = "https://example.com/$id/feed",
+            type = com.mmg.manahub.core.domain.model.news.SourceType.ARTICLE,
+            isEnabled = true, isDefault = true, iconUrl = null, language = language,
+        )
 }

@@ -2,7 +2,9 @@ package com.mmg.manahub.feature.news.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.feature.news.domain.model.ContentSource
+import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,6 +31,7 @@ class NewsViewModel @Inject constructor(
     getNewsFeed: GetNewsFeedUseCase,
     private val refreshNewsFeed: RefreshNewsFeedUseCase,
     manageSources: ManageSourcesUseCase,
+    private val userPrefsDataStore: UserPreferencesDataStore,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -36,10 +40,12 @@ class NewsViewModel @Inject constructor(
     private val _isInitialLoad = MutableStateFlow(true)
     private val _error = MutableStateFlow<String?>(null)
 
-    // Advanced search filter state
-    private val _filterTypes = MutableStateFlow(setOf(SourceType.ARTICLE, SourceType.VIDEO))
-    private val _filterLanguages = MutableStateFlow(setOf("en", "es"))
-    private val _filterSourceIds = MutableStateFlow<Set<String>?>(null) // null = all enabled
+    // Advanced search filter state. Seeded from the persisted NewsFilterPrefs (default
+    // English-only) in init; user edits are written back through to DataStore so the
+    // selection is shared with the Home news widget and survives process death.
+    private val _filterTypes = MutableStateFlow(NewsFilterPrefs.DEFAULT.types)
+    private val _filterLanguages = MutableStateFlow(NewsFilterPrefs.DEFAULT.languages)
+    private val _filterSourceIds = MutableStateFlow(NewsFilterPrefs.DEFAULT.sourceIds) // null = all enabled
 
     private val debouncedQuery = _searchQuery.debounce(300)
 
@@ -99,6 +105,13 @@ class NewsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NewsUiState())
 
     init {
+        // Seed the in-memory filter state from the persisted selection (default English-only).
+        viewModelScope.launch {
+            val persisted = userPrefsDataStore.observeNewsFilters().first()
+            _filterTypes.value = persisted.types
+            _filterLanguages.value = persisted.languages
+            _filterSourceIds.value = persisted.sourceIds
+        }
         refresh()
     }
 
@@ -126,9 +139,19 @@ class NewsViewModel @Inject constructor(
         languages: Set<String>,
         sourceIds: Set<String>?,
     ) {
-        _filterTypes.value = types.ifEmpty { setOf(SourceType.ARTICLE, SourceType.VIDEO) }
-        _filterLanguages.value = languages.ifEmpty { setOf("en", "es") }
+        val effectiveTypes = types.ifEmpty { NewsFilterPrefs.DEFAULT.types }
+        val effectiveLanguages = languages.ifEmpty { NewsFilterPrefs.DEFAULT.languages }
+        _filterTypes.value = effectiveTypes
+        _filterLanguages.value = effectiveLanguages
         _filterSourceIds.value = sourceIds
+        // Write through to DataStore so NewsScreen and the Home widget share one source of truth.
+        viewModelScope.launch {
+            userPrefsDataStore.setNewsFilters(
+                languages = effectiveLanguages,
+                types = effectiveTypes,
+                sourceIds = sourceIds,
+            )
+        }
     }
 
     fun onErrorDismissed() { _error.value = null }
@@ -139,9 +162,9 @@ data class NewsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val searchQuery: String = "",
-    val filterTypes: Set<SourceType> = setOf(SourceType.ARTICLE, SourceType.VIDEO),
-    val filterLanguages: Set<String> = setOf("en", "es"),
-    val filterSourceIds: Set<String>? = null,
+    val filterTypes: Set<SourceType> = NewsFilterPrefs.DEFAULT.types,
+    val filterLanguages: Set<String> = NewsFilterPrefs.DEFAULT.languages,
+    val filterSourceIds: Set<String>? = NewsFilterPrefs.DEFAULT.sourceIds,
     val error: String? = null,
     val sourceLanguageMap: Map<String, String> = emptyMap(),
     val showLanguageBadge: Boolean = false,

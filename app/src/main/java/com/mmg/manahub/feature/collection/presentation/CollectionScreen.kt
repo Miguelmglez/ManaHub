@@ -106,11 +106,18 @@ fun CollectionScreen(
     onPlaytestClick:          (deckId: String) -> Unit = {},
     onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
+    initialTab:               CollectionTab = CollectionTab.CARDS,
     viewModel:                CollectionViewModel = hiltViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
+
+    // Synchronize initialTab with ViewModel — specifically useful for
+    // deep-links or direct navigation to sub-routes (e.g. collection/decks).
+    LaunchedEffect(initialTab) {
+        viewModel.onTabSelected(initialTab)
+    }
 
     CollectionContent(
         uiState               = uiState,
