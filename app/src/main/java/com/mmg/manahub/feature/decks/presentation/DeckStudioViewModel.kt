@@ -35,9 +35,12 @@ import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
+import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
+import com.mmg.manahub.feature.decks.domain.usecase.SeedDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.queryFragment
@@ -46,6 +49,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -153,6 +157,22 @@ data class DeckStudioUiState(
     val budgetConstraints: BudgetConstraints = BudgetConstraints(),
     /** True when the current raw text failed to parse — the inline error is shown and the last valid budget is kept. */
     val budgetError: Boolean = false,
+
+    // ── Seed-build flow (Phase 3) ─────────────────────────────────────────────
+    /** Whether the "Build from seed" sheet is visible. */
+    val showSeedSheet: Boolean = false,
+    /** Currently picked seed cards (de-duped by scryfallId). */
+    val seedCards: List<Card> = emptyList(),
+    /** Seed-search text. */
+    val seedQuery: String = "",
+    /** Scryfall search results for the current seed query. */
+    val seedSearchResults: List<Card> = emptyList(),
+    /** True while a debounced seed search is in flight. */
+    val isSearchingSeeds: Boolean = false,
+    /** Inferred identity from the picked seeds (null when no seeds). */
+    val inferredIdentity: InferredIdentity? = null,
+    /** True while the seed deck is being generated + written. */
+    val isGenerating: Boolean = false,
 ) {
     val isEmptyDeck: Boolean get() = cards.isEmpty() && commanderCard == null
 }
@@ -184,6 +204,7 @@ class DeckStudioViewModel @Inject constructor(
     private val inferDeckIdentityUseCase: InferDeckIdentityUseCase,
     private val suggestCutsUseCase: SuggestCutsUseCase,
     private val suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase,
+    private val buildDeckFromSeedsUseCase: BuildDeckFromSeedsUseCase,
     private val wishlistRepository: WishlistRepository,
     private val userPreferences: UserPreferencesDataStore,
     @ApplicationContext private val appContext: Context,
@@ -715,6 +736,9 @@ class DeckStudioViewModel @Inject constructor(
 
     private var analysisJob: Job? = null
 
+    /** The debounced seed-search job (Phase 3); cancelled on each new keystroke / sheet close. */
+    private var seedSearchJob: Job? = null
+
     private class AnalysisCache(
         var workingMainboard: List<DeckEntry>,
         val format: DeckFormat,
@@ -1083,6 +1107,144 @@ class DeckStudioViewModel @Inject constructor(
         }
     }
 
+    // ── Seed-build flow (Phase 3) ─────────────────────────────────────────────
+
+    fun openSeedSheet() {
+        _uiState.update { it.copy(showSeedSheet = true) }
+    }
+
+    fun closeSeedSheet() {
+        seedSearchJob?.cancel()
+        _uiState.update {
+            it.copy(showSeedSheet = false, seedQuery = "", seedSearchResults = emptyList(), isSearchingSeeds = false)
+        }
+    }
+
+    /** Debounced Scryfall seed search (mirrors DeckMagicViewModel.onSeedQueryChange). */
+    fun onSeedQueryChange(query: String) {
+        _uiState.update { it.copy(seedQuery = query) }
+        seedSearchJob?.cancel()
+        if (query.trim().length < SEED_QUERY_MIN_LENGTH) {
+            _uiState.update { it.copy(seedSearchResults = emptyList(), isSearchingSeeds = false) }
+            return
+        }
+        seedSearchJob = viewModelScope.launch {
+            delay(SEED_SEARCH_DEBOUNCE_MS)
+            _uiState.update { it.copy(isSearchingSeeds = true) }
+            val results = when (val res = searchCardsUseCase(query.trim())) {
+                is DataResult.Success -> res.data
+                is DataResult.Error -> emptyList()
+            }
+            _uiState.update { it.copy(seedSearchResults = results, isSearchingSeeds = false) }
+        }
+    }
+
+    /** Adds a seed (de-duped by scryfallId) and re-infers identity. */
+    fun addSeed(card: Card) {
+        _uiState.update { s ->
+            if (s.seedCards.any { it.scryfallId == card.scryfallId }) return@update s
+            val seeds = s.seedCards + card
+            s.copy(seedCards = seeds, inferredIdentity = inferDeckIdentityUseCase(seeds))
+        }
+    }
+
+    /** Removes a seed and re-infers identity (null when empty). */
+    fun removeSeed(card: Card) {
+        _uiState.update { s ->
+            val seeds = s.seedCards.filterNot { it.scryfallId == card.scryfallId }
+            s.copy(
+                seedCards = seeds,
+                inferredIdentity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds),
+            )
+        }
+    }
+
+    /**
+     * Generates a deck from the picked seeds and writes it INTO the live draft deck.
+     *
+     * Double-tap guard: the snapshot is captured atomically INSIDE [_uiState.update] so two
+     * rapid taps can't both pass the `isGenerating` check (mirrors DeckMagicViewModel).
+     *
+     * On success the seeds are cleared, the sheet is closed and the Build tab is selected; the
+     * caller's [onComplete] fires the SUCCESS toast with the number of cards written. On failure
+     * the sheet stays open so the user can retry.
+     *
+     * @param onComplete invoked with the number of mainboard cards actually written.
+     */
+    fun generateFromSeeds(onComplete: (Int) -> Unit) {
+        var captured: DeckStudioUiState? = null
+        _uiState.update { s ->
+            if (s.seedCards.isEmpty() || s.isGenerating) return@update s
+            captured = s
+            s.copy(isGenerating = true)
+        }
+        val snapshot = captured ?: return
+
+        viewModelScope.launch {
+            val crashlytics = FirebaseCrashlytics.getInstance()
+            crashlytics.log("deck_studio_seed_build_started")
+
+            val writtenCount = runCatching {
+                val format = deckFormat ?: DeckFormat.STANDARD
+                val identity = snapshot.inferredIdentity ?: inferDeckIdentityUseCase(snapshot.seedCards)
+                // REUSE the Phase-2 free-text budget state (never a separate budget here).
+                val constraints = snapshot.budgetConstraints
+                val collection = userCardRepository.observeCollection().first().map { it.card }
+                val weights = userPreferences.observeScoreWeightOverrides().first().toScoreWeights()
+                val seedResult: SeedDeckResult = buildDeckFromSeedsUseCase(
+                    seeds = snapshot.seedCards,
+                    identity = identity,
+                    format = format,
+                    constraints = constraints,
+                    collection = collection,
+                    weights = weights,
+                )
+
+                // U8: write straight through the repository, one card per copy. A coroutine
+                // cancellation mid-loop leaves a PARTIAL write — this is ACCEPTABLE (the live
+                // deck is the source of truth and the user reviews the result on the Build tab);
+                // we intentionally do NOT add a batch repo method.
+                var written = 0
+                seedResult.mainboard.forEach { magicCard ->
+                    val card = magicCard.card
+                    // Cache the generated card so the observe rebuild resolves it without a re-fetch.
+                    cardCache = cardCache + (card.scryfallId to card)
+                    deckRepository.addCardToDeck(deckId, card.scryfallId, 1, false)
+                    written++
+                }
+                // seedResult.reservedLandSlots land slots are INTENTIONALLY left for the user to
+                // fill via the existing BasicLandsSheet: BuildDeckFromSeedsUseCase deliberately does
+                // NOT materialize lands (no color-distribution logic lives in the studio), so
+                // auto-adding basics here would invent a mana base. Per the use-case contract,
+                // lands are out of scope and `written` is the spell count only.
+                written
+            }.getOrElse { t ->
+                logFailure("deck_studio_seed_build_failed", t)
+                _uiState.update { it.copy(isGenerating = false) }
+                // Sheet stays open so the user can retry.
+                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_seed_build_failed)))
+                return@launch
+            }
+
+            // Refresh suggestions lazily: the next Suggestions open re-runs loadAnalysis()
+            // against the new cards (consistent with every other manual mutation).
+            invalidateSuggestions()
+            crashlytics.log("deck_studio_seed_build_succeeded")
+            _uiState.update {
+                it.copy(
+                    isGenerating = false,
+                    showSeedSheet = false,
+                    seedCards = emptyList(),
+                    seedQuery = "",
+                    seedSearchResults = emptyList(),
+                    inferredIdentity = null,
+                    selectedTab = DeckStudioTab.BUILD,
+                )
+            }
+            onComplete(writtenCount)
+        }
+    }
+
     /**
      * Picks the inference seed cards: the commander (when present) plus the deck's
      * highest-weight identity cards (most STRATEGY / ARCHETYPE / TRIBAL tags), capped so
@@ -1139,5 +1301,11 @@ class DeckStudioViewModel @Inject constructor(
 
         /** Cap on auto-selected identity seed cards (plus the commander) so one card can't skew the seed. */
         const val MAX_SEED_CARDS = 8
+
+        /** Minimum seed-query length before a Scryfall search fires (mirrors DeckMagicViewModel). */
+        const val SEED_QUERY_MIN_LENGTH = 2
+
+        /** Debounce before a seed search runs, in ms (mirrors DeckMagicViewModel). */
+        const val SEED_SEARCH_DEBOUNCE_MS = 400L
     }
 }

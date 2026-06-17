@@ -76,6 +76,9 @@ import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetF
  * @param isSearching true while a seed search is in flight.
  * @param canGenerate true when generation is allowed (≥1 seed and not already generating).
  * @param isGenerating true while the deck is being generated.
+ * @param budgetSlot optional custom budget UI rendered in place of the default [BudgetFilterBar]
+ *        (the Deck Studio passes its free-text [com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar]);
+ *        when null the default chip-based [BudgetFilterBar] driven by [budget]/[onBudgetChanged] is shown.
  */
 @Composable
 fun SeedsContent(
@@ -93,6 +96,7 @@ fun SeedsContent(
     onRemoveSeed: (Card) -> Unit,
     onBudgetChanged: (BudgetConstraints) -> Unit,
     onGenerate: () -> Unit,
+    budgetSlot: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -162,9 +166,10 @@ fun SeedsContent(
                 }
             }
 
-            // Budget filter.
+            // Budget filter (default chip bar, or a caller-supplied custom slot).
             item(key = "budget") {
-                BudgetFilterBar(budget = budget, onBudgetChanged = onBudgetChanged)
+                if (budgetSlot != null) budgetSlot()
+                else BudgetFilterBar(budget = budget, onBudgetChanged = onBudgetChanged)
             }
         }
 
