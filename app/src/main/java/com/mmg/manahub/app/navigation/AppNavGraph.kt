@@ -57,6 +57,7 @@ import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionTab
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.presentation.DeckMagicScreen
+import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
@@ -487,13 +488,14 @@ fun AppNavGraph(
                         defaultValue = ""
                     }
                 ),
-            ) { backStackEntry ->
-                // PLACEHOLDER — the real DeckStudioScreen + DeckStudioViewModel land in Phase 1 (P1-T4).
-                // Nav passes "" (not null) for an absent optional StringType arg — never assume null.
-                val deckId = backStackEntry.arguments?.getString("deckId")?.takeIf { it.isNotEmpty() }
-                DeckStudioPlaceholder(
-                    deckId = deckId,
+            ) {
+                // The VM reads the optional deckId from SavedStateHandle ("" ⇒ fresh draft).
+                DeckStudioScreen(
+                    viewModel = hiltViewModel(),
                     onBack = { navController.popBackStack() },
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
                 )
             }
 
@@ -1132,49 +1134,5 @@ private fun NavController.navigateTab(route: String) {
         popUpTo(graph.startDestinationId) { saveState = true }
         launchSingleTop = true
         restoreState = true
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Deck Studio placeholder
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Phase-0 scaffolding placeholder for the unified Deck Studio destination.
- * The real [com.mmg.manahub.feature.decks] DeckStudioScreen + ViewModel land in
- * Phase 1 (P1-T4); this only verifies the route + navigation wiring.
- *
- * @param deckId the deck to open, or `null` for a fresh draft.
- * @param onBack invoked when the user navigates up.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DeckStudioPlaceholder(
-    deckId: String?,
-    onBack: () -> Unit,
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.deck_studio_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                        )
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = stringResource(R.string.deck_studio_title))
-        }
     }
 }
