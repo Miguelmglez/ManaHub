@@ -24,7 +24,6 @@ sealed class Screen(val route: String) {
     object DeckDetail  : Screen("collection/deckmagic/{deckId}") {
         fun createRoute(deckId: String) = "collection/deckmagic/$deckId"
     }
-    object DeckBuilder : Screen("collection/decks/builder")
 
     /**
      * Unified hybrid deck builder ("Deck Studio") — combines manual editing,
