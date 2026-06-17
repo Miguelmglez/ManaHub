@@ -745,6 +745,9 @@
     <string name="deck_studio_budget_per_card_label">Max per card (€)</string>
     <string name="deck_studio_budget_total_label">Total budget (€)</string>
     <string name="deck_studio_budget_invalid_error">Enter a valid amount greater than 0.</string>
+    <string name="deck_studio_budget_title">Budget</string>
+    <string name="deck_studio_budget_owned_free">Owned cards are free</string>
+    <string name="deck_studio_budget_clear">Clear budget</string>
     <string name="deck_studio_discard_confirm_title">Discard this deck?</string>
     <string name="deck_studio_discard_confirm_body">This deck is empty and hasn\'t been named. It won\'t be saved.</string>
     <string name="deck_studio_seed_sheet_title">Build from a seed</string>
