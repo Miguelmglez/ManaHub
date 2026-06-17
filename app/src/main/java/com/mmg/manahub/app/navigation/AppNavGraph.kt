@@ -55,7 +55,6 @@ import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionTab
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
-import com.mmg.manahub.feature.decks.presentation.DeckMagicScreen
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
@@ -472,10 +471,6 @@ fun AppNavGraph(
                 arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
             ) {
                 //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
-            }
-
-            composable(Screen.DeckBuilder.route) {
-                DeckMagicScreen()
             }
 
             // ── Deck Studio (unified hybrid builder) ──────────────────────────
