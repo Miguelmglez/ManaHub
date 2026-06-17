@@ -754,6 +754,16 @@
     <string name="deck_studio_card_added">Added %1$s</string>
     <string name="deck_studio_card_cut">Removed %1$s</string>
     <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Check your connection and try again.</string>
+    <string name="deck_studio_tab_build">Build</string>
+    <string name="deck_studio_tab_suggestions">Suggestions</string>
+    <string name="deck_studio_empty_title">Your deck is empty</string>
+    <string name="deck_studio_empty_subtitle">Add cards with the + button, build from a seed, or browse inspirations.</string>
+    <string name="deck_studio_build_from_seed">Build from Seed</string>
+    <string name="deck_studio_browse_inspirations">Browse Inspirations</string>
+    <string name="deck_studio_suggestions_coming_soon_title">Suggestions coming soon</string>
+    <string name="deck_studio_suggestions_coming_soon_subtitle">Deck Doctor analysis arrives in a future update.</string>
+    <string name="deck_studio_seed_coming_soon">Build from seed arrives in a future update.</string>
+    <string name="deck_studio_inspirations_coming_soon">Inspirations arrive in a future update.</string>
 
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
