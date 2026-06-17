@@ -309,8 +309,19 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   rule-line syntax: terms joined by ` + ` are ANDed, `!term` excludes.
 - → memory: `project_tagging_engine_v2`
 
+### Deck Studio (`feature/decks/presentation/DeckStudio*`)
+Unified hybrid deck creator — the target of Home → "Build deck" (route `Screen.DeckStudio`). Fuses manual
+editing + inline Deck Doctor suggestions + seed-build + Discoveries on ONE **live draft deck** (created on
+entry; `onExitRequested` discards it only if still empty AND default-named, and the delete completes BEFORE
+nav — never navigate-then-delete). Free-text budget: **never build `BudgetConstraints` from raw `TextField`
+text** — keep raw String + last-valid + error flag, parse-guard in the VM. The Deck Doctor incremental
+`AnalysisCache`/`GapSignature` pattern is DUPLICATED here (not shared with `DeckImprovementViewModel`).
+Replaced + retired the legacy `DeckMagicScreen`/`DeckMagicViewModel` + `presentation/engine/DeckBuilder{Engine,
+State}` + `Screen.DeckBuilder`. The rich existing editor (`DeckMagicDetailScreen` in `DeckBuilderScreen.kt`,
+misleading name) and `DeckImprovementScreen` are UNCHANGED.
+- → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`
+
 ### Incomplete / quirks
-- **DeckMagic**: `SETUP`/`REVIEW` steps are placeholder stubs — wired into nav but not production-ready.
 - **SetPickerViewModel**: `clearFilters()` calls `applyFilters()` to respect `restrictedSets` — do not
   assign `filteredSets = allSets`.
 
@@ -373,9 +384,10 @@ Original 8 phases complete; a separate **engine-quality plan** is in progress (s
   `DeckScoreModel` (DeckProfile/DeckRole/DeckSkeleton/`ScoreWeights`/`ScoreReason`/`ScoreFit`/`DeckWarning`/
   `Magic*`), `DeckImportExportHelper`, `DeckMagicEngine`, and the pure model types (`GameFormat`,
   `ManaColor`, `SeedStrategy`, `DeckEntry`, `CardSuggestion`, `PathDecision` in `DeckEngineModels.kt`) are
-  in **`...decks.domain.engine`**. ONLY `DeckBuilderEngine` (`@HiltViewModel`) + the UI-state of
-  `DeckBuilderState.kt` (`DeckBuilderStep`/`DeckBuilderFilters`/`DeckBuilderUiState`) stay in
-  `presentation/engine/`. **Layering rule: `feature/decks/domain/**` must never import `...presentation...`**
+  in **`...decks.domain.engine`**. (The old `presentation/engine/` builder — `DeckBuilderEngine`
+  + `DeckBuilderState.kt` — was **retired** with the legacy Deck Magic creator when the unified
+  **Deck Studio** screen landed; see `→ memory: project_deck_studio_*`.) **Layering rule:
+  `feature/decks/domain/**` must never import `...presentation...`**
   (domain→presentation is the bug Phase 8 fixed). **Phase 8 weight tuning (F2):** `ScoreWeights` is
   debug-tunable via core `ScoreWeightOverrides` (7 nullable Floats + `NONE`) persisted in
   `UserPreferencesDataStore` (primitive floats — core never imports the feature-layer `ScoreWeights`); the
