@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.Card
@@ -16,20 +17,40 @@ import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
+import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
+import com.mmg.manahub.feature.decks.domain.engine.DeckRole
+import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
+import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
+import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
+import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
+import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.queryFragment
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -50,6 +71,18 @@ sealed interface DeckStudioEvent {
 
     /** Show a transient toast. */
     data class ShowToast(val message: String) : DeckStudioEvent
+
+    /** A card was added via the Suggestions surface (carries the card name for the toast). */
+    data class CardAdded(val cardName: String) : DeckStudioEvent
+
+    /** A card was cut via the Suggestions surface (carries the card name for the toast). */
+    data class CardCut(val cardName: String) : DeckStudioEvent
+
+    /**
+     * The external (Scryfall) candidate fetch failed; suggestions fell back to collection + wishlist.
+     * The UI surfaces this as a non-fatal warning toast.
+     */
+    data object ExternalPoolFailed : DeckStudioEvent
 }
 
 /**
@@ -90,6 +123,36 @@ data class DeckStudioUiState(
 
     // ── Card detail sheet ─────────────────────────────────────────────────────
     val detailTags: List<CardTag> = emptyList(),
+
+    // ── Suggestions surface (Deck Doctor inline, Phase 2) ─────────────────────
+    /** Read-only Health evaluation from the scoring engine. Null until first computed. */
+    val health: DeckHealth? = null,
+    /** Cut candidates (worst fit first), excluding lands / commander / combo cores. */
+    val cuts: List<CardFit> = emptyList(),
+    /** Add suggestions (collection + wishlist + external), budget-filtered, best fit first. */
+    val adds: List<AddSuggestion> = emptyList(),
+    /** Total € the currently shown adds would cost to buy (owned/free cards excluded). */
+    val addsTotalCostEur: Double = 0.0,
+    /** How many of the shown adds have a non-zero price (i.e. need buying). */
+    val addsCardsToBuy: Int = 0,
+    /** True while the full analysis (Health + Cut + Add) is being computed. */
+    val isSuggestionsLoading: Boolean = false,
+    /** True while only the external (Scryfall) ADD pool is being fetched/recomputed. */
+    val isAddsLoading: Boolean = false,
+    /** True once the Suggestions surface has been opened at least once (lazy first analysis). */
+    val suggestionsLoaded: Boolean = false,
+
+    // ── Free-text budget state (U7) ───────────────────────────────────────────
+    /** Raw per-card € text exactly as typed (may be blank or invalid mid-typing). */
+    val rawPerCardText: String = "",
+    /** Raw total € text exactly as typed (may be blank or invalid mid-typing). */
+    val rawTotalText: String = "",
+    /** Whether owned cards are treated as 0 € (mirrors [BudgetConstraints.ownedCardsAreFree]). */
+    val ownedCardsAreFree: Boolean = true,
+    /** The LAST VALID parsed budget (default unconstrained); never an invalid object. */
+    val budgetConstraints: BudgetConstraints = BudgetConstraints(),
+    /** True when the current raw text failed to parse — the inline error is shown and the last valid budget is kept. */
+    val budgetError: Boolean = false,
 ) {
     val isEmptyDeck: Boolean get() = cards.isEmpty() && commanderCard == null
 }
@@ -117,6 +180,12 @@ class DeckStudioViewModel @Inject constructor(
     private val userCardRepository: UserCardRepository,
     private val searchCardsUseCase: SearchCardsUseCase,
     private val suggestTagsUseCase: SuggestTagsUseCase,
+    private val evaluateDeckUseCase: EvaluateDeckUseCase,
+    private val inferDeckIdentityUseCase: InferDeckIdentityUseCase,
+    private val suggestCutsUseCase: SuggestCutsUseCase,
+    private val suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase,
+    private val wishlistRepository: WishlistRepository,
+    private val userPreferences: UserPreferencesDataStore,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
@@ -249,7 +318,15 @@ class DeckStudioViewModel @Inject constructor(
 
     // ── Tab / UI toggles ──────────────────────────────────────────────────────
 
-    fun onSelectTab(tab: DeckStudioTab) = _uiState.update { it.copy(selectedTab = tab) }
+    fun onSelectTab(tab: DeckStudioTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+        // Lazily run the first Deck Doctor analysis the first time the user opens
+        // Suggestions — never on init (keeps Phase-1 "straight into the editor" fast
+        // and avoids a Scryfall call for a deck the user may never analyse).
+        if (tab == DeckStudioTab.SUGGESTIONS && !_uiState.value.suggestionsLoaded && ::deckId.isInitialized) {
+            loadAnalysis()
+        }
+    }
     fun toggleMainboard() = _uiState.update { it.copy(mainboardExpanded = !it.mainboardExpanded) }
     fun toggleSideboard() = _uiState.update { it.copy(sideboardExpanded = !it.sideboardExpanded) }
     fun setGroupingMode(mode: GroupingMode) = _uiState.update { it.copy(groupingMode = mode) }
@@ -258,6 +335,7 @@ class DeckStudioViewModel @Inject constructor(
 
     /** Adds one copy of [scryfallId] to the deck (resolving + caching its Card). */
     fun addCardToDeck(scryfallId: String, isSideboard: Boolean = false) {
+        invalidateSuggestions()
         viewModelScope.launch {
             val card = (_uiState.value.addCardsResults + _uiState.value.scryfallResults)
                 .find { it.card.scryfallId == scryfallId }?.card
@@ -274,6 +352,7 @@ class DeckStudioViewModel @Inject constructor(
 
     /** Removes one copy of [scryfallId]; deletes the slot when it hits zero. */
     fun removeCardFromDeck(scryfallId: String, isSideboard: Boolean = false) {
+        invalidateSuggestions()
         viewModelScope.launch {
             val currentQty = currentQuantity(scryfallId, isSideboard)
             if (currentQty <= 1) {
@@ -288,6 +367,7 @@ class DeckStudioViewModel @Inject constructor(
 
     /** Removes a card slot entirely (the "delete" action in the detail sheet). */
     fun removeCard(scryfallId: String, isSideboard: Boolean = false) {
+        invalidateSuggestions()
         viewModelScope.launch {
             runCatching { deckRepository.removeCardFromDeck(deckId, scryfallId, isSideboard) }
                 .onFailure { logFailure("deck_studio_delete_failed", it) }
@@ -295,6 +375,7 @@ class DeckStudioViewModel @Inject constructor(
     }
 
     fun moveQuantityToSideboard(scryfallId: String, quantity: Int = 1) {
+        invalidateSuggestions()
         viewModelScope.launch {
             val mainQty = currentQuantity(scryfallId, false)
             if (mainQty <= 0) return@launch
@@ -310,6 +391,7 @@ class DeckStudioViewModel @Inject constructor(
     }
 
     fun moveQuantityToMainboard(scryfallId: String, quantity: Int = 1) {
+        invalidateSuggestions()
         viewModelScope.launch {
             val sideQty = currentQuantity(scryfallId, true)
             if (sideQty <= 0) return@launch
@@ -339,6 +421,7 @@ class DeckStudioViewModel @Inject constructor(
     }
 
     fun addBasicLandByName(name: String) {
+        invalidateSuggestions()
         viewModelScope.launch {
             val existing = _uiState.value.cards.find { it.card?.name == name && !it.isSideboard }
             val card = existing?.card ?: (cardRepository.searchCardByName(name) as? DataResult.Success)?.data
@@ -368,6 +451,7 @@ class DeckStudioViewModel @Inject constructor(
     // ── Commander ─────────────────────────────────────────────────────────────
 
     fun setCommander(card: Card) {
+        invalidateSuggestions()
         viewModelScope.launch {
             val deck = _uiState.value.deck ?: return@launch
             val oldCommanderId = deck.commanderCardId
@@ -397,6 +481,7 @@ class DeckStudioViewModel @Inject constructor(
     }
 
     fun removeCommander() {
+        invalidateSuggestions()
         viewModelScope.launch {
             val deck = _uiState.value.deck ?: return@launch
             val commanderId = deck.commanderCardId ?: return@launch
@@ -567,24 +652,418 @@ class DeckStudioViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Phase-2 Suggestions stub
+    //  Suggestions surface — Deck Doctor inline (Phase 2)
     //
-    //  The Suggestions tab (Deck Doctor: Health / Cut list / Add list, budget-
-    //  aware, incremental recompute) lands in Phase 2 (P2-T2/P2-T3). For Phase 1
-    //  the tab renders a "coming soon" placeholder and this VM holds no Deck
-    //  Doctor use-cases. When Phase 2 wires in:
-    //   - inject EvaluateDeckUseCase / SuggestCutsUseCase /
-    //     SuggestAddsWithBudgetUseCase / InferDeckIdentityUseCase,
-    //   - duplicate the AnalysisCache / GapSignature incremental pattern from
-    //     DeckImprovementViewModel (U6 — do NOT extract a shared class),
-    //   - add budget free-text state (rawPerCardText/rawTotalText/budgetError) per
-    //     U7 and the parse-on-change guard.
+    //  This DUPLICATES the AnalysisCache / GapSignature / loadAnalysis /
+    //  recomputeIncremental / recomputeAdds incremental pattern from
+    //  DeckImprovementViewModel (U6 — intentionally NOT a shared class; the two VMs
+    //  have different state shapes). The external Scryfall pool is re-fetched ONLY
+    //  when the queryable gap set changes; otherwise the cached pool is reused via
+    //  `externalCardsOverride` (zero Scryfall calls).
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Everything an in-memory incremental re-analysis needs after the first full
+     * [loadAnalysis]. A suggestion add/cut mutates [workingMainboard] and recomputes
+     * profile/evaluation/cuts locally; the expensive external (Scryfall) pool is only
+     * re-fetched when [gapSignature] changes. Null until the first full analysis runs.
+     */
+    private var analysisCache: AnalysisCache? = null
+
+    private var analysisJob: Job? = null
+
+    private class AnalysisCache(
+        var workingMainboard: List<DeckEntry>,
+        val format: DeckFormat,
+        val commanderId: String?,
+        val commanderIdentity: Set<String>,
+        val seedTags: List<CardTag>,
+        val collection: List<Card>,
+        val wishlistIds: Set<String>,
+        val resolvedById: MutableMap<String, Card>,
+        val unresolvedCount: Int,
+        var gapSignature: GapSignature,
+        var externalPool: List<Card>,
+    )
+
+    /** Drives the external Scryfall candidate query; an unchanged signature reuses the cached pool. */
+    private data class GapSignature(
+        val gapRoles: Set<DeckRole>,
+        val colorIdentity: Set<ManaColor>,
+        val format: DeckFormat,
+    )
+
+    /**
+     * Full analysis: snapshot the live deck, resolve the mainboard, infer the seed
+     * tags (commander + top identity-tag cards), evaluate Health + cuts, then run the
+     * ADD pipeline. Primes [analysisCache] for subsequent incremental recompute and
+     * sets `suggestionsLoaded`.
+     */
+    private fun loadAnalysis() {
+        analysisCache = null
+        analysisJob?.cancel()
+        analysisJob = viewModelScope.launch {
+            _uiState.update { it.copy(isSuggestionsLoading = true, suggestionsLoaded = true) }
+
+            val deckWithCards = deckRepository.observeDeckWithCards(deckId).first()
+            if (deckWithCards == null) {
+                _uiState.update { it.copy(isSuggestionsLoading = false) }
+                return@launch
+            }
+
+            val collection = userCardRepository.observeCollection().first()
+            val format = DeckFormat.entries
+                .firstOrNull { it.name.equals(deckWithCards.deck.format, ignoreCase = true) }
+                ?: DeckFormat.STANDARD
+
+            var unresolvedCount = 0
+            val mainboardEntries = deckWithCards.mainboard.mapNotNull { slot ->
+                val card = resolveCard(slot.scryfallId)
+                if (card == null) {
+                    unresolvedCount += slot.quantity
+                    null
+                } else {
+                    DeckEntry(card = card, quantity = slot.quantity, isOwned = false, isSideboard = false)
+                }
+            }
+
+            val commanderId = deckWithCards.deck.commanderCardId
+            val commanderCard = commanderId?.let { resolveCard(it) }
+            val commanderIdentity = commanderCard?.colorIdentity?.toSet().orEmpty()
+
+            val seedCards = inferenceSeeds(commanderCard, mainboardEntries)
+            val seedTags = inferDeckIdentityUseCase(seedCards).seedTags
+            val weights = userPreferences.observeScoreWeightOverrides().first().toScoreWeights()
+
+            val health = evaluateDeckUseCase(
+                mainboard = mainboardEntries,
+                format = format,
+                commanderIdentity = commanderIdentity,
+                seedTags = seedTags,
+                weights = weights,
+            )
+            val cuts = suggestCutsUseCase(
+                mainboard = mainboardEntries,
+                profile = health.profile,
+                protectedIds = setOfNotNull(commanderId),
+                weights = weights,
+            )
+
+            val collectionCards = collection.map { it.card }
+            val wishlistIds = wishlistRepository.observeLocal().first().map { it.cardId }.toSet()
+
+            val resolvedById = HashMap<String, Card>()
+            mainboardEntries.forEach { resolvedById[it.card.scryfallId] = it.card }
+            collectionCards.forEach { resolvedById.putIfAbsent(it.scryfallId, it) }
+            commanderCard?.let { resolvedById.putIfAbsent(it.scryfallId, it) }
+
+            analysisCache = AnalysisCache(
+                workingMainboard = mainboardEntries,
+                format = format,
+                commanderId = commanderId,
+                commanderIdentity = commanderIdentity,
+                seedTags = seedTags,
+                collection = collectionCards,
+                wishlistIds = wishlistIds,
+                resolvedById = resolvedById,
+                unresolvedCount = unresolvedCount,
+                gapSignature = gapSignatureOf(health),
+                externalPool = emptyList(),
+            )
+
+            _uiState.update {
+                it.copy(
+                    health = withUnresolvedWarning(health, unresolvedCount),
+                    cuts = cuts,
+                    isSuggestionsLoading = false,
+                )
+            }
+            recomputeAdds(externalOverride = null)
+        }
+    }
+
+    /**
+     * Recomputes the ADD suggestions from [analysisCache] using the current parsed
+     * [DeckStudioUiState.budgetConstraints].
+     *
+     * @param externalOverride when non-null, the cached external pool is reused and NO
+     *        Scryfall call is made; when null, a fresh external pool is fetched and re-cached.
+     */
+    private fun recomputeAdds(
+        constraints: BudgetConstraints = _uiState.value.budgetConstraints,
+        externalOverride: List<Card>?,
+    ) {
+        val context = analysisCache ?: return
+        val profile = _uiState.value.health?.profile ?: return
+        val evaluation = _uiState.value.health?.evaluation ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAddsLoading = true) }
+            val mainboardIds = context.workingMainboard.map { it.card.scryfallId }.toSet()
+            val mainboardCopiesByName = context.workingMainboard
+                .groupBy { it.card.name }
+                .mapValues { (_, entries) -> entries.sumOf { it.quantity } }
+            val weights = userPreferences.observeScoreWeightOverrides().first().toScoreWeights()
+            val selection = runCatching {
+                suggestAddsWithBudgetUseCase(
+                    collection = context.collection,
+                    wishlistIds = context.wishlistIds,
+                    mainboardIds = mainboardIds,
+                    profile = profile,
+                    evaluation = evaluation,
+                    constraints = constraints,
+                    weights = weights,
+                    externalCardsOverride = externalOverride,
+                    mainboardCopiesByName = mainboardCopiesByName,
+                )
+            }.getOrNull()
+
+            if (selection == null) {
+                _uiState.update { it.copy(isAddsLoading = false) }
+                _events.send(DeckStudioEvent.ExternalPoolFailed)
+                return@launch
+            }
+
+            context.externalPool = selection.externalPool
+            selection.selected.forEach { context.resolvedById.putIfAbsent(it.fit.card.scryfallId, it.fit.card) }
+
+            _uiState.update {
+                it.copy(
+                    adds = selection.selected,
+                    addsTotalCostEur = selection.totalCostEur,
+                    addsCardsToBuy = selection.cardsToBuy,
+                    isAddsLoading = false,
+                )
+            }
+        }
+    }
+
+    /**
+     * Re-evaluates the deck IN MEMORY from [AnalysisCache.workingMainboard] after a
+     * single-card suggestion add/cut: rebuild profile/evaluation/cuts (pure), then
+     * recompute ADD suggestions. The external pool is re-fetched ONLY when the queryable
+     * gap set changed; otherwise the cached pool is reused (ZERO Scryfall calls).
+     */
+    private fun recomputeIncremental() {
+        val context = analysisCache ?: return
+        viewModelScope.launch {
+            val mainboard = context.workingMainboard
+            val weights = userPreferences.observeScoreWeightOverrides().first().toScoreWeights()
+            val health = evaluateDeckUseCase(
+                mainboard = mainboard,
+                format = context.format,
+                commanderIdentity = context.commanderIdentity,
+                seedTags = context.seedTags,
+                weights = weights,
+            )
+            val cuts = suggestCutsUseCase(
+                mainboard = mainboard,
+                profile = health.profile,
+                protectedIds = setOfNotNull(context.commanderId),
+                weights = weights,
+            )
+            _uiState.update {
+                it.copy(
+                    health = withUnresolvedWarning(health, context.unresolvedCount),
+                    cuts = cuts,
+                )
+            }
+
+            val newSignature = gapSignatureOf(health)
+            val gapsUnchanged = newSignature == context.gapSignature
+            context.gapSignature = newSignature
+            recomputeAdds(externalOverride = if (gapsUnchanged) context.externalPool else null)
+        }
+    }
+
+    // ── Budget free-text (U7) ─────────────────────────────────────────────────
+
+    /**
+     * Updates the raw per-card € text and re-parses the budget. The parse guard keeps
+     * the LAST VALID [BudgetConstraints] and flips [DeckStudioUiState.budgetError] on an
+     * invalid amount — it NEVER constructs an invalid constraints object. Blank ⇒ null cap.
+     */
+    fun onPerCardBudgetChange(text: String) {
+        _uiState.update { it.copy(rawPerCardText = text) }
+        reparseBudget()
+    }
+
+    fun onTotalBudgetChange(text: String) {
+        _uiState.update { it.copy(rawTotalText = text) }
+        reparseBudget()
+    }
+
+    fun onOwnedCardsFreeChange(free: Boolean) {
+        _uiState.update { it.copy(ownedCardsAreFree = free) }
+        reparseBudget()
+    }
+
+    /** Clears both budget fields back to "no constraint". */
+    fun onClearBudget() {
+        _uiState.update { it.copy(rawPerCardText = "", rawTotalText = "") }
+        reparseBudget()
+    }
+
+    /**
+     * Parses the current raw text into a [BudgetConstraints]. A blank field maps to a
+     * null cap. [BudgetConstraints.init] THROWS on ≤0/non-finite values; on that
+     * [IllegalArgumentException] we keep the previous valid budget and set
+     * [DeckStudioUiState.budgetError] = true. On success we clear the error and
+     * recompute the ADD suggestions (external pool re-fetched: a budget change alters
+     * the external USD pre-filter).
+     */
+    private fun reparseBudget() {
+        val state = _uiState.value
+        val perCard = state.rawPerCardText.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+        val total = state.rawTotalText.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+        // A non-blank-but-unparseable field (e.g. "1.2.3") is an error without ever
+        // calling the throwing constructor.
+        val perCardBlank = state.rawPerCardText.isBlank()
+        val totalBlank = state.rawTotalText.isBlank()
+        if ((!perCardBlank && perCard == null) || (!totalBlank && total == null)) {
+            _uiState.update { it.copy(budgetError = true) }
+            return
+        }
+        try {
+            val constraints = BudgetConstraints(
+                maxPerCardEur = perCard,
+                maxTotalEur = total,
+                ownedCardsAreFree = state.ownedCardsAreFree,
+            )
+            _uiState.update { it.copy(budgetConstraints = constraints, budgetError = false) }
+            recomputeAdds(constraints = constraints, externalOverride = null)
+        } catch (e: IllegalArgumentException) {
+            // Keep the last valid budgetConstraints; just flag the error.
+            _uiState.update { it.copy(budgetError = true) }
+        }
+    }
+
+    // ── Suggestion add / cut (write-through + incremental recompute) ───────────
+
+    /**
+     * Adds one copy of a suggested card to the live deck's mainboard, then recomputes
+     * INCREMENTALLY. Falls back to a full [loadAnalysis] only when the cache is missing
+     * or the card cannot be resolved from any cached source.
+     */
+    fun onAddSuggestion(scryfallId: String, cardName: String) {
+        viewModelScope.launch {
+            val context = analysisCache
+            val currentQty = currentQuantity(scryfallId, false)
+            runCatching { deckRepository.addCardToDeck(deckId, scryfallId, currentQty + 1, false) }
+                .onFailure { logFailure("deck_studio_suggestion_add_failed", it); return@launch }
+            _events.send(DeckStudioEvent.CardAdded(cardName))
+
+            if (context == null) {
+                loadAnalysis()
+                return@launch
+            }
+            val added = findCachedCard(context, scryfallId)
+            if (added == null) {
+                loadAnalysis()
+                return@launch
+            }
+            val existing = context.workingMainboard.firstOrNull { it.card.scryfallId == scryfallId }
+            context.workingMainboard = if (existing != null) {
+                context.workingMainboard.map {
+                    if (it.card.scryfallId == scryfallId) it.copy(quantity = it.quantity + 1) else it
+                }
+            } else {
+                context.workingMainboard + DeckEntry(card = added, quantity = 1, isOwned = false, isSideboard = false)
+            }
+            recomputeIncremental()
+        }
+    }
+
+    /**
+     * Removes a cut-candidate card from the live deck's mainboard, then recomputes
+     * INCREMENTALLY. Falls back to [loadAnalysis] when the cache is missing.
+     */
+    fun onCutSuggestion(scryfallId: String, cardName: String) {
+        viewModelScope.launch {
+            val context = analysisCache
+            runCatching { deckRepository.removeCardFromDeck(deckId, scryfallId, false) }
+                .onFailure { logFailure("deck_studio_suggestion_cut_failed", it); return@launch }
+            _events.send(DeckStudioEvent.CardCut(cardName))
+
+            if (context == null) {
+                loadAnalysis()
+                return@launch
+            }
+            context.workingMainboard = context.workingMainboard.filterNot { it.card.scryfallId == scryfallId }
+            recomputeIncremental()
+        }
+    }
+
+    /** Looks up a resolved [Card] in the cached add list / resolved-by-id map (no repository call). */
+    private fun findCachedCard(context: AnalysisCache, scryfallId: String): Card? =
+        _uiState.value.adds.firstOrNull { it.fit.card.scryfallId == scryfallId }?.fit?.card
+            ?: context.resolvedById[scryfallId]
+
+    /**
+     * Invalidates the loaded analysis after a MANUAL (Build-tab) deck mutation so the
+     * next time the user opens Suggestions a fresh [loadAnalysis] re-syncs with the live
+     * deck. We deliberately do NOT recompute here (the work is wasted while the user is
+     * still editing on the Build tab) and we NEVER trigger analysis from the deck-observe
+     * transformer (that would create a write→observe→recompute feedback loop).
+     */
+    private fun invalidateSuggestions() {
+        if (_uiState.value.suggestionsLoaded) {
+            analysisJob?.cancel()
+            analysisCache = null
+            _uiState.update { it.copy(suggestionsLoaded = false) }
+        }
+    }
+
+    /**
+     * Picks the inference seed cards: the commander (when present) plus the deck's
+     * highest-weight identity cards (most STRATEGY / ARCHETYPE / TRIBAL tags), capped so
+     * one off-theme card can't skew the seed.
+     */
+    private fun inferenceSeeds(commander: Card?, mainboard: List<DeckEntry>): List<Card> {
+        val ranked = mainboard
+            .map { it.card }
+            .filter { it.scryfallId != commander?.scryfallId }
+            .map { card -> card to identityTagCount(card) }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .take(MAX_SEED_CARDS)
+            .map { it.first }
+        return (listOfNotNull(commander) + ranked).distinctBy { it.scryfallId }
+    }
+
+    private fun identityTagCount(card: Card): Int =
+        (card.tags + card.userTags).count { it.category in IDENTITY_CATEGORIES }
+
+    /** The queryable gap set + identity/format that drives the external Scryfall pool. */
+    private fun gapSignatureOf(health: DeckHealth): GapSignature = GapSignature(
+        gapRoles = health.evaluation.roleCoverage
+            .filter { it.gap > 0 && it.role.queryFragment() != null }
+            .map { it.role }
+            .toSet(),
+        colorIdentity = health.profile.colorIdentity,
+        format = health.profile.format,
+    )
+
+    /** Appends a [DeckWarning.UnresolvedCards] when one or more mainboard slots failed to resolve. */
+    private fun withUnresolvedWarning(health: DeckHealth, unresolvedCount: Int): DeckHealth {
+        if (unresolvedCount <= 0) return health
+        val withWarning = health.evaluation.copy(
+            warnings = health.evaluation.warnings + DeckWarning.UnresolvedCards(unresolvedCount)
+        )
+        return health.copy(evaluation = withWarning)
+    }
 
     private fun logFailure(tag: String, t: Throwable) {
         FirebaseCrashlytics.getInstance().apply {
             log("$tag: deckId=${if (::deckId.isInitialized) deckId else "uninitialized"}")
             recordException(RuntimeException("[DeckStudio] $tag", t))
         }
+    }
+
+    private companion object {
+        /** Identity tag categories used to rank inference seed cards (mirrors the scorer's set). */
+        val IDENTITY_CATEGORIES = setOf(TagCategory.STRATEGY, TagCategory.ARCHETYPE, TagCategory.TRIBAL)
+
+        /** Cap on auto-selected identity seed cards (plus the commander) so one card can't skew the seed. */
+        const val MAX_SEED_CARDS = 8
     }
 }

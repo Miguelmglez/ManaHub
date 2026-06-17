@@ -78,8 +78,11 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
+import com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar
 import com.mmg.manahub.feature.decks.presentation.components.CardRow
 import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
@@ -87,6 +90,13 @@ import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
+import com.mmg.manahub.feature.decks.presentation.improvement.components.AddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.improvement.components.CutSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.improvement.components.HealthScoreRing
+import com.mmg.manahub.feature.decks.presentation.improvement.components.RoleCoverageRow
+import com.mmg.manahub.feature.decks.presentation.improvement.components.WarningChip
+import com.mmg.manahub.feature.decks.presentation.improvement.components.key
+import com.mmg.manahub.feature.decks.presentation.improvement.components.label
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -122,12 +132,22 @@ fun DeckStudioScreen(
     var showBasicLandsSheet by remember { mutableStateOf(false) }
     var showEditDeckSheet by remember { mutableStateOf(false) }
 
+    val cardAddedMsg = stringResource(R.string.deck_studio_card_added)
+    val cardCutMsg = stringResource(R.string.deck_studio_card_cut)
+    val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
+
     // One-shot events (buffered Channel; collected once, never via state).
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 DeckStudioEvent.NavigateBack -> Unit // navigation is invoked in the VM callback
                 is DeckStudioEvent.ShowToast -> toastState.show(event.message, MagicToastType.INFO)
+                is DeckStudioEvent.CardAdded ->
+                    toastState.show(String.format(cardAddedMsg, event.cardName), MagicToastType.SUCCESS)
+                is DeckStudioEvent.CardCut ->
+                    toastState.show(String.format(cardCutMsg, event.cardName), MagicToastType.SUCCESS)
+                DeckStudioEvent.ExternalPoolFailed ->
+                    toastState.show(externalFailedMsg, MagicToastType.ERROR)
             }
         }
     }
@@ -250,7 +270,15 @@ fun DeckStudioScreen(
                                 toastState.show(inspirationsComingSoonMsg, MagicToastType.INFO)
                             },
                         )
-                        DeckStudioTab.SUGGESTIONS -> SuggestionsTabStub()
+                        DeckStudioTab.SUGGESTIONS -> SuggestionsTab(
+                            uiState = uiState,
+                            onPerCardBudgetChange = viewModel::onPerCardBudgetChange,
+                            onTotalBudgetChange = viewModel::onTotalBudgetChange,
+                            onOwnedFreeChange = viewModel::onOwnedCardsFreeChange,
+                            onClearBudget = viewModel::onClearBudget,
+                            onAdd = { s -> viewModel.onAddSuggestion(s.fit.card.scryfallId, s.fit.card.name) },
+                            onCut = { fit -> viewModel.onCutSuggestion(fit.card.scryfallId, fit.card.name) },
+                        )
                     }
                 }
             }
@@ -681,14 +709,148 @@ private fun SectionHeader(
 }
 
 /**
- * Phase-1 placeholder for the Suggestions tab. The full Deck Doctor surface
- * (Health / Cuts / Adds, budget-aware, incremental recompute) lands in Phase 2.
+ * The Suggestions surface (Deck Doctor inline, Phase 2): a Health summary, the Cut
+ * list, the Add list, and the free-text [BudgetInputBar], all driven by the live
+ * deck via [DeckStudioViewModel]. The row composables and string helpers are reused
+ * verbatim from the standalone Deck Doctor screen
+ * ([com.mmg.manahub.feature.decks.presentation.improvement.components]).
+ *
+ * Stateless: all state comes from [uiState]; every mutation is a callback to the VM.
  */
 @Composable
-private fun SuggestionsTabStub() {
-    EmptyState(
-        title = stringResource(R.string.deck_studio_suggestions_coming_soon_title),
-        subtitle = stringResource(R.string.deck_studio_suggestions_coming_soon_subtitle),
-        icon = Icons.Default.AutoAwesome,
+private fun SuggestionsTab(
+    uiState: DeckStudioUiState,
+    onPerCardBudgetChange: (String) -> Unit,
+    onTotalBudgetChange: (String) -> Unit,
+    onOwnedFreeChange: (Boolean) -> Unit,
+    onClearBudget: () -> Unit,
+    onAdd: (AddSuggestion) -> Unit,
+    onCut: (CardFit) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+
+    // First-open loading (the lazy full analysis kicked off by onSelectTab).
+    if (uiState.isSuggestionsLoading && uiState.health == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+        }
+        return
+    }
+
+    val health = uiState.health
+    if (health == null) {
+        EmptyState(
+            title = stringResource(R.string.deck_studio_suggestions_coming_soon_title),
+            subtitle = stringResource(R.string.deck_studio_suggestions_coming_soon_subtitle),
+            icon = Icons.Default.AutoAwesome,
+        )
+        return
+    }
+
+    val evaluation = health.evaluation
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = rememberLazyListState(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // ── Health summary ────────────────────────────────────────────────────
+        item(key = "health_ring") {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                HealthScoreRing(score = evaluation.healthScore)
+            }
+        }
+        item(key = "health_roles_header") {
+            SuggestionsSectionHeader(stringResource(R.string.deck_health_section_roles), mc.primaryAccent)
+        }
+        items(evaluation.roleCoverage, key = { "role_${it.role.name}" }) { coverage ->
+            RoleCoverageRow(coverage = coverage)
+        }
+        if (evaluation.warnings.isNotEmpty()) {
+            item(key = "health_warnings_header") {
+                SuggestionsSectionHeader(stringResource(R.string.deck_health_section_warnings), mc.lifeNegative)
+            }
+            items(evaluation.warnings, key = { "warn_${it.key}" }) { warning ->
+                WarningChip(text = warning.label())
+            }
+        }
+
+        // ── Cuts ────────────────────────────────────────────────────────────────
+        item(key = "cuts_header") {
+            SuggestionsSectionHeader(stringResource(R.string.deck_studio_suggestions_tab_cuts), mc.lifeNegative)
+        }
+        if (uiState.cuts.isEmpty()) {
+            item(key = "cuts_empty") {
+                Text(
+                    text = stringResource(R.string.deck_doctor_cut_empty_title),
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
+                )
+            }
+        } else {
+            items(uiState.cuts, key = { "cut_${it.card.scryfallId}" }) { fit ->
+                CutSuggestionRow(fit = fit, onCut = { onCut(fit) })
+            }
+        }
+
+        // ── Budget + Adds ────────────────────────────────────────────────────────
+        item(key = "adds_header") {
+            SuggestionsSectionHeader(stringResource(R.string.deck_studio_suggestions_tab_adds), mc.lifePositive)
+        }
+        item(key = "budget_bar") {
+            BudgetInputBar(
+                perCardText = uiState.rawPerCardText,
+                totalText = uiState.rawTotalText,
+                ownedCardsAreFree = uiState.ownedCardsAreFree,
+                hasError = uiState.budgetError,
+                onPerCardChange = onPerCardBudgetChange,
+                onTotalChange = onTotalBudgetChange,
+                onOwnedFreeChange = onOwnedFreeChange,
+                onClear = onClearBudget,
+            )
+        }
+        item(key = "budget_summary") {
+            val summaryText = if (uiState.addsCardsToBuy == 0) {
+                stringResource(R.string.deck_doctor_budget_all_owned)
+            } else {
+                stringResource(
+                    R.string.deck_doctor_budget_to_buy,
+                    String.format(java.util.Locale.US, "%.2f", uiState.addsTotalCostEur),
+                    uiState.addsCardsToBuy,
+                )
+            }
+            Text(text = summaryText, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
+        }
+        when {
+            uiState.isAddsLoading -> item(key = "adds_loading") {
+                Box(
+                    Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+                }
+            }
+            uiState.adds.isEmpty() -> item(key = "adds_empty") {
+                Text(
+                    text = stringResource(R.string.deck_doctor_add_empty_title),
+                    style = MaterialTheme.magicTypography.bodySmall,
+                    color = mc.textSecondary,
+                )
+            }
+            else -> items(uiState.adds, key = { "add_${it.fit.card.scryfallId}" }) { suggestion ->
+                AddSuggestionRow(suggestion = suggestion, onAdd = { onAdd(suggestion) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionsSectionHeader(text: String, color: androidx.compose.ui.graphics.Color) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.magicTypography.labelMedium,
+        color = color,
+        fontWeight = FontWeight.Bold,
     )
 }
