@@ -30,24 +30,8 @@ class DeckViewModel @Inject constructor(
         }
     }
 
-    fun onShowCreateDialog() = _uiState.update { it.copy(showCreateDialog = true) }
-    fun onDismissCreateDialog() = _uiState.update { it.copy(showCreateDialog = false) }
-
     fun onShowImportSheet() = _uiState.update { it.copy(showImportSheet = true) }
     fun onDismissImportSheet() = _uiState.update { it.copy(showImportSheet = false, importError = null) }
-
-    fun createDeck(name: String, format: String = "casual") {
-        if (name.isBlank()) return
-        viewModelScope.launch {
-            runCatching { deckRepo.createDeck(name = name.trim(), description = "", format = format) }
-                .onSuccess { id -> _uiState.update { it.copy(showCreateDialog = false, createdDeckId = id) } }
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
-        }
-    }
-
-    fun onCreatedDeckNavigated() {
-        _uiState.update { it.copy(createdDeckId = null) }
-    }
 
     fun deleteDeck(deckId: String) {
         viewModelScope.launch {
@@ -107,10 +91,8 @@ class DeckViewModel @Inject constructor(
 data class DeckListUiState(
     val decks:            List<DeckSummary> = emptyList(),
     val isLoading:        Boolean           = true,
-    val showCreateDialog: Boolean           = false,
     val showImportSheet:  Boolean           = false,
     val isImporting:      Boolean           = false,
     val importError:      String?           = null,
     val error:            String?           = null,
-    val createdDeckId:    String?           = null,
 )

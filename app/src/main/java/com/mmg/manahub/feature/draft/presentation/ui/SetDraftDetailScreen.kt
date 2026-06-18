@@ -96,6 +96,7 @@ import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.MechanicGuide
 import com.mmg.manahub.feature.draft.domain.model.MechanicKeyCard
 import com.mmg.manahub.feature.draft.domain.model.TierCard
+import com.mmg.manahub.feature.draft.presentation.DraftFeatureFlags
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailViewModel
 import java.time.LocalDate
@@ -184,7 +185,8 @@ fun SetDraftDetailScreen(
                     }
                 }
                 // Simulate Draft entry point — only when the set has a published booster config.
-                if (state.boosterVersion != null) {
+                // HIDDEN for release behind DraftFeatureFlags.SIMULATOR_ENABLED (UI-only).
+                if (DraftFeatureFlags.SIMULATOR_ENABLED && state.boosterVersion != null) {
                     Surface(
                         onClick = { onSimulateDraft(state.setCode) },
                         shape = RoundedCornerShape(10.dp),

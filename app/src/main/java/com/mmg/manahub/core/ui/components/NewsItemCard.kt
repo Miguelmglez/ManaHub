@@ -34,9 +34,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -200,11 +202,18 @@ private fun ThumbnailBox(
     languageBadge: String? = null,
 ) {
     val mt = MaterialTheme.magicTypography
+    // Card-back placeholder so items with no image (fallback) or a failed load (error),
+    // and the brief loading window (placeholder), render the card back instead of blank.
+    val cardBack = painterResource(R.drawable.mtg_card_back)
     Box(modifier = modifier) {
         AsyncImage(
             model = imageUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            placeholder = cardBack,
+            error = cardBack,
+            fallback = cardBack,
             modifier = Modifier.fillMaxSize(),
         )
         if (isVideo) {

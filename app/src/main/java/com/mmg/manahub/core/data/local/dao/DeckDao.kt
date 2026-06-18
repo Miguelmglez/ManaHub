@@ -49,6 +49,51 @@ interface DeckDao {
     @Query("DELETE FROM deck_cards WHERE deck_id = :deckId AND scryfall_id = :scryfallId AND is_sideboard = :isSideboard")
     fun removeDeckCard(deckId: String, scryfallId: String, isSideboard: Boolean)
 
+    /**
+     * Atomically moves [quantity] copies of a card between the mainboard and the
+     * sideboard in a SINGLE transaction.
+     *
+     * The non-atomic alternative (remove-then-add via two separate repository writes)
+     * makes Room re-emit an intermediate state in which the moved copies briefly exist
+     * in neither board (or in both), which the editor observes and renders as a flicker
+     * / phantom count. Performing both halves inside one [Transaction] means the deck
+     * observer never sees the in-between state.
+     *
+     * The new quantities are passed in pre-computed by the repository (which already
+     * holds the current counts), so this method only writes:
+     *  - source side: removed entirely when [newSourceQty] <= 0, otherwise upserted.
+     *  - target side: always upserted with [newTargetQty].
+     */
+    @Transaction
+    fun moveCardQuantity(
+        deckId: String,
+        scryfallId: String,
+        fromSideboard: Boolean,
+        newSourceQty: Int,
+        newTargetQty: Int,
+    ) {
+        if (newSourceQty <= 0) {
+            removeDeckCard(deckId, scryfallId, fromSideboard)
+        } else {
+            upsertDeckCard(
+                DeckCardEntity(
+                    deckId = deckId,
+                    scryfallId = scryfallId,
+                    quantity = newSourceQty,
+                    isSideboard = fromSideboard,
+                )
+            )
+        }
+        upsertDeckCard(
+            DeckCardEntity(
+                deckId = deckId,
+                scryfallId = scryfallId,
+                quantity = newTargetQty,
+                isSideboard = !fromSideboard,
+            )
+        )
+    }
+
     // Soft-delete: preserves the row so the tombstone can be synced to Supabase.
     @Query("UPDATE decks SET is_deleted = 1, updated_at = :updatedAt WHERE id = :deckId")
     fun softDeleteDeck(deckId: String, updatedAt: Long = System.currentTimeMillis())

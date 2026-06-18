@@ -20,6 +20,8 @@ data class HomeUiState(
     val libraryStats: LibraryStats? = null,
     /** Up to 3 latest news/video items. Null while the initial DB query is still pending. */
     val recentNews: List<NewsItem>? = null,
+    /** True when the persisted news filters differ from the English-only default (drives the Reset CTA). */
+    val newsFiltersActive: Boolean = false,
     val accountNudge: AccountNudge? = null,
     val isAuthenticated: Boolean = false,
     /** User's display name from DataStore. */
@@ -41,7 +43,19 @@ data class HomeUiState(
     val collectionByColor: Map<String, Int> = emptyMap(),
     val collectionByRarity: Map<String, Int> = emptyMap(),
     val discoverCards: List<DiscoverCard> = emptyList(),
+    /** The independent Random card widget's card (repurposed from the old card-of-the-day). */
     val cardOfTheDay: DiscoverCard? = null,
+    /** Load state of the Discover cards row (drives spinner vs. retry affordance). */
+    val discoverLoadState: DiscoverLoadState = DiscoverLoadState.LOADING,
+    /** Load state of the independent Random card widget. */
+    val randomCardLoadState: DiscoverLoadState = DiscoverLoadState.LOADING,
+    /** Set code the Discover cards row is currently scoped to, or null when unfiltered. */
+    val discoverSetCode: String? = null,
+    /**
+     * The full [com.mmg.manahub.core.domain.model.MagicSet] the Discover row is scoped to, or null
+     * when unfiltered. Drives the set-icon + code affordance in the widget header.
+     */
+    val discoverSet: com.mmg.manahub.core.domain.model.MagicSet? = null,
     val latestSets: List<DraftSet> = emptyList(),
     val wishlistStats: WishlistStats? = null,
     /** All of the user's decks, newest-first. Drives the Your Decks shelf widget. */

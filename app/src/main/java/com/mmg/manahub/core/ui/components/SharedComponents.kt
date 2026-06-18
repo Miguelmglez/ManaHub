@@ -20,7 +20,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.MagicTheme
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -61,7 +73,7 @@ fun CopyBadge(
     Surface(
         color = if (showBackground) mc.surfaceVariant.copy(alpha = 0.5f) else Color.Transparent,
         shape = MaterialTheme.shapes.extraSmall,
-        border = if (showBackground) androidx.compose.foundation.BorderStroke(0.5.dp, mc.textDisabled.copy(alpha = 0.2f)) else null,
+        border = if (showBackground) BorderStroke(0.5.dp, mc.textDisabled.copy(alpha = 0.2f)) else null,
         modifier = modifier
     ) {
         Text(
@@ -230,34 +242,91 @@ fun StaleWarningBanner() {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GroupingFlowSelector(
     selected: GroupingMode,
     onSelect: (GroupingMode) -> Unit
 ) {
     val mc = MaterialTheme.magicColors
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        GroupingMode.entries.forEach { mode ->
-            val label = when (mode) {
-                GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
-                GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
-                GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
-                GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
-            }
-            FilterChip(
-                selected = mode == selected,
-                onClick = { onSelect(mode) },
-                label = { Text(label) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent,
-                    selectedLabelColor = mc.background
+    val ty = MaterialTheme.magicTypography
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            color = mc.backgroundSecondary,
+            shape = MaterialTheme.shapes.medium,
+            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(18.dp)
                 )
-            )
+                Text(
+                    text = stringResource(R.string.deckbuilder_group_label),
+                    style = ty.labelLarge,
+                    color = mc.textSecondary
+                )
+                Text(
+                    text = when (selected) {
+                        GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
+                        GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
+                        GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
+                        GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
+                    },
+                    style = ty.labelLarge,
+                    color = mc.primaryAccent
+                )
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = mc.backgroundSecondary,
+            modifier = Modifier.width(200.dp)
+        ) {
+            GroupingMode.entries.forEachIndexed { index, mode ->
+                val label = when (mode) {
+                    GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
+                    GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
+                    GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
+                    GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
+                }
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = label,
+                            style = ty.bodyMedium,
+                            color = if (mode == selected) mc.primaryAccent else mc.textPrimary
+                        )
+                    },
+                    onClick = {
+                        onSelect(mode)
+                        expanded = false
+                    },
+                    trailingIcon = if (mode == selected) {
+                        { Icon(Icons.Default.Check, null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp)) }
+                    } else null
+                )
+                if (index < GroupingMode.entries.size - 1) {
+                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                }
+            }
         }
     }
 }

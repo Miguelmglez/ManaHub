@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.foundation.Image
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -109,6 +112,7 @@ fun DeckItem(
                             .build(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter,
                         modifier = Modifier.fillMaxSize(),
                     )
                     // Bottom gradient to blend into the card surface
@@ -124,52 +128,48 @@ fun DeckItem(
                             ),
                     )
                 } else {
-                    // Aesthetic Placeholder
+                    // MTG Card Back Placeholder
+                    Image(
+                        painter = painterResource(id = R.drawable.mtg_card_back),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // Bottom gradient to blend into the card surface
                     Box(
-                        contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.6f)
+                            .align(Alignment.BottomCenter)
                             .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        mc.primaryAccent.copy(alpha = 0.15f),
-                                        mc.surfaceVariant,
-                                        mc.secondaryAccent.copy(alpha = 0.05f),
-                                    ),
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, mc.surface.copy(alpha = 0.9f)),
                                 ),
                             ),
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.LibraryBooks,
-                                contentDescription = null,
-                                tint = mc.primaryAccent.copy(alpha = 0.4f),
-                                modifier = Modifier.size(if (reduced) 32.dp else 48.dp),
-                            )
-                            if (!reduced) {
-                                Text(
-                                    text = deck.format.uppercase(),
-                                    style = ty.labelSmall,
-                                    color = mc.textDisabled.copy(alpha = 0.6f),
-                                    letterSpacing = 2.sp
-                                )
-                            }
-                        }
-                    }
+                    )
                 }
+                
                 // Format badge — top-right overlay
+                val formatLower = deck.format.lowercase()
+                val formatColor = when (formatLower) {
+                    "commander" -> mc.goldMtg.copy(alpha = 0.9f)
+                    "casual" -> mc.primaryAccent.copy(alpha = 0.9f)
+                    "draft" -> mc.secondaryAccent.copy(alpha = 0.9f)
+                    "standard" -> mc.lifePositive.copy(alpha = 0.9f)
+                    "modern" -> mc.lifeNegative.copy(alpha = 0.9f)
+                    else -> mc.surfaceVariant.copy(alpha = 0.9f)
+                }
+
                 Surface(
-                    color = if (deck.format == "commander") mc.primaryAccent.copy(alpha = 0.9f) else mc.secondaryAccent.copy(alpha = 0.9f),
+                    color = formatColor,
                     shape = RoundedCornerShape(bottomStart = 8.dp),
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {
                     Text(
-                        text = deck.format.replaceFirstChar { it.uppercase() },
+                        text = formatLower.replaceFirstChar { it.uppercase() },
                         style = if (reduced) ty.labelSmall else ty.labelLarge,
-                        color = mc.background,
+                        color = if (formatLower == "draft" || formatLower == "casual") mc.onAccent else mc.background,
                         modifier = Modifier.padding(
                             horizontal = if (reduced) 6.dp else 10.dp, 
                             vertical = if (reduced) 2.dp else 4.dp
@@ -219,15 +219,53 @@ fun DeckItem(
                                 color = mc.textDisabled,
                             )
                         }
-                    }
 
-                    // Mana identity symbols
-                    if (deck.colorIdentity.isNotEmpty()) {
-                        if (!reduced) Spacer(Modifier.height(4.dp))
-                        ColorIdentityRow(
-                            colorIdentity = deck.colorIdentity, 
-                            size = if (reduced) 14.dp else 18.dp
-                        )
+                        // Mana identity symbols
+                        Spacer(Modifier.height(4.dp))
+                        if (deck.colorIdentity.isNotEmpty()) {
+                            ColorIdentityRow(
+                                colorIdentity = deck.colorIdentity, 
+                                size = 18.dp
+                            )
+                        } else {
+                            Spacer(Modifier.height(18.dp))
+                        }
+                    } else {
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // Card count with icon
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Style,
+                                    contentDescription = null,
+                                    tint = mc.textSecondary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = deck.cardCount.toString(),
+                                    style = ty.labelSmall,
+                                    color = mc.textSecondary,
+                                    maxLines = 1
+                                )
+                            }
+
+                            // Mana identity symbols
+                            if (deck.colorIdentity.isNotEmpty()) {
+                                ColorIdentityRow(
+                                    colorIdentity = deck.colorIdentity, 
+                                    size = 14.dp
+                                )
+                            } else {
+                                Spacer(Modifier.height(14.dp))
+                            }
+                        }
                     }
                 }
 

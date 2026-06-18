@@ -309,8 +309,34 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   rule-line syntax: terms joined by ` + ` are ANDed, `!term` excludes.
 - → memory: `project_tagging_engine_v2`
 
+### Deck Studio (`feature/decks/presentation/DeckStudio*`)
+**The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
+empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
+`Screen.DeckStudio.createRoute(deckId?)` (null ⇒ fresh draft). The old `CreateDeckBottomSheet` + the
+`DeckViewModel.createDeck`/`showCreateDialog`/`createdDeckId` state are GONE — DeckStudio creates its own
+draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Discoveries on ONE **live deck**.
+- **Format + Import live INSIDE Studio:** `DeckFormatChipRow` (empty-state + `EditDeckSheet`) → `changeFormat`
+  (writes through repo + `invalidateSuggestions()`). Import via `ImportDeckUseCase` (`domain/usecase/`,
+  shared extraction — writes into the live draft, renames from a parsed header; `DeckViewModel.importDeck`
+  still backs the legacy DeckList import sheet). `importDeck` sets `isImporting`, which **blocks
+  `onExitRequested`** (no discard/keep mid-write).
+- **Discard-if-empty is gated on `createdFreshDraft`** (set true ONLY on the no-deckId create path). An
+  EXISTING deck opened in Studio is NEVER auto-deleted — even if empty + default-named. (Critical data-loss
+  guard added when existing decks started routing through Studio; without it, opening a real empty deck and
+  backing out deleted it.) Delete completes BEFORE nav.
+- Free-text budget: **never build `BudgetConstraints` from raw `TextField` text** — raw String + last-valid +
+  error flag, parse-guard in the VM. Deck Doctor incremental `AnalysisCache`/`GapSignature` is DUPLICATED
+  here (not shared with `DeckImprovementViewModel`).
+- Migrated from the legacy editor: inline `CardDetailSheet` (deck-card taps; search-result taps still nav to
+  CardDetail), basic-land suggestions (`landDeltas`/`applyLandSuggestions`), stateless `WarningOverlay`
+  (over-limit/color-identity/non-legendary-commander + acknowledge), deck game-stats card, playtest button.
+  `CardDetailSheet`/`WarningOverlay`/`DeckFormatChipRow` are reusable composables in `presentation/components/`.
+- `DeckMagicDetailScreen` (in `DeckBuilderScreen.kt`) + `DeckBuilderViewModel` + `Screen.DeckDetail` route are
+  now an UNUSED fallback (kept compiling until parity confirmed in real use — then delete). `DeckImprovementScreen`
+  unchanged (still reachable as a secondary path; the Studio Suggestions tab covers the same engine inline).
+- → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`
+
 ### Incomplete / quirks
-- **DeckMagic**: `SETUP`/`REVIEW` steps are placeholder stubs — wired into nav but not production-ready.
 - **SetPickerViewModel**: `clearFilters()` calls `applyFilters()` to respect `restrictedSets` — do not
   assign `filteredSets = allSets`.
 
@@ -373,9 +399,10 @@ Original 8 phases complete; a separate **engine-quality plan** is in progress (s
   `DeckScoreModel` (DeckProfile/DeckRole/DeckSkeleton/`ScoreWeights`/`ScoreReason`/`ScoreFit`/`DeckWarning`/
   `Magic*`), `DeckImportExportHelper`, `DeckMagicEngine`, and the pure model types (`GameFormat`,
   `ManaColor`, `SeedStrategy`, `DeckEntry`, `CardSuggestion`, `PathDecision` in `DeckEngineModels.kt`) are
-  in **`...decks.domain.engine`**. ONLY `DeckBuilderEngine` (`@HiltViewModel`) + the UI-state of
-  `DeckBuilderState.kt` (`DeckBuilderStep`/`DeckBuilderFilters`/`DeckBuilderUiState`) stay in
-  `presentation/engine/`. **Layering rule: `feature/decks/domain/**` must never import `...presentation...`**
+  in **`...decks.domain.engine`**. (The old `presentation/engine/` builder — `DeckBuilderEngine`
+  + `DeckBuilderState.kt` — was **retired** with the legacy Deck Magic creator when the unified
+  **Deck Studio** screen landed; see `→ memory: project_deck_studio_*`.) **Layering rule:
+  `feature/decks/domain/**` must never import `...presentation...`**
   (domain→presentation is the bug Phase 8 fixed). **Phase 8 weight tuning (F2):** `ScoreWeights` is
   debug-tunable via core `ScoreWeightOverrides` (7 nullable Floats + `NONE`) persisted in
   `UserPreferencesDataStore` (primitive floats — core never imports the feature-layer `ScoreWeights`); the
@@ -655,6 +682,7 @@ Apply to every new migration/RPC/trigger/view:
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
 
 Rules:
+- **Mandatory for ALL agents and subagents (architect, edge-case-tester, orchestrator, explore, etc.):** before grepping or reading source files broadly to find or understand code, **orient via the graph first** — `graphify query "<question>"` / `graphify explain "<concept>"` / `graphify path "<A>" "<B>"`, or the wiki at `graphify-out/wiki/index.md`. The graph returns a scoped subgraph at a fraction of the token cost of raw search; only fall back to direct `Grep`/`Read` once the graph has pointed you at the relevant files (or when modifying/debugging specific code, where the graph lacks the detail). This keeps token consumption low across the whole agent team. **Do not revert or treat this rule as out-of-scope cleanup** — it is a standing project rule.
 - For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
 - A wiki exists at graphify-out/wiki/index.md — use it as the entry point for broad codebase navigation: read the index, then follow its `[[wiki-links]]` into community/god-node articles BEFORE falling back to raw source browsing or GRAPH_REPORT.md (this is the lower-token path).
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
