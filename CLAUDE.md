@@ -310,15 +310,30 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
 - → memory: `project_tagging_engine_v2`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
-Unified hybrid deck creator — the target of Home → "Build deck" (route `Screen.DeckStudio`). Fuses manual
-editing + inline Deck Doctor suggestions + seed-build + Discoveries on ONE **live draft deck** (created on
-entry; `onExitRequested` discards it only if still empty AND default-named, and the delete completes BEFORE
-nav — never navigate-then-delete). Free-text budget: **never build `BudgetConstraints` from raw `TextField`
-text** — keep raw String + last-valid + error flag, parse-guard in the VM. The Deck Doctor incremental
-`AnalysisCache`/`GapSignature` pattern is DUPLICATED here (not shared with `DeckImprovementViewModel`).
-Replaced + retired the legacy `DeckMagicScreen`/`DeckMagicViewModel` + `presentation/engine/DeckBuilder{Engine,
-State}` + `Screen.DeckBuilder`. The rich existing editor (`DeckMagicDetailScreen` in `DeckBuilderScreen.kt`,
-misleading name) and `DeckImprovementScreen` are UNCHANGED.
+**The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
+empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
+`Screen.DeckStudio.createRoute(deckId?)` (null ⇒ fresh draft). The old `CreateDeckBottomSheet` + the
+`DeckViewModel.createDeck`/`showCreateDialog`/`createdDeckId` state are GONE — DeckStudio creates its own
+draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Discoveries on ONE **live deck**.
+- **Format + Import live INSIDE Studio:** `DeckFormatChipRow` (empty-state + `EditDeckSheet`) → `changeFormat`
+  (writes through repo + `invalidateSuggestions()`). Import via `ImportDeckUseCase` (`domain/usecase/`,
+  shared extraction — writes into the live draft, renames from a parsed header; `DeckViewModel.importDeck`
+  still backs the legacy DeckList import sheet). `importDeck` sets `isImporting`, which **blocks
+  `onExitRequested`** (no discard/keep mid-write).
+- **Discard-if-empty is gated on `createdFreshDraft`** (set true ONLY on the no-deckId create path). An
+  EXISTING deck opened in Studio is NEVER auto-deleted — even if empty + default-named. (Critical data-loss
+  guard added when existing decks started routing through Studio; without it, opening a real empty deck and
+  backing out deleted it.) Delete completes BEFORE nav.
+- Free-text budget: **never build `BudgetConstraints` from raw `TextField` text** — raw String + last-valid +
+  error flag, parse-guard in the VM. Deck Doctor incremental `AnalysisCache`/`GapSignature` is DUPLICATED
+  here (not shared with `DeckImprovementViewModel`).
+- Migrated from the legacy editor: inline `CardDetailSheet` (deck-card taps; search-result taps still nav to
+  CardDetail), basic-land suggestions (`landDeltas`/`applyLandSuggestions`), stateless `WarningOverlay`
+  (over-limit/color-identity/non-legendary-commander + acknowledge), deck game-stats card, playtest button.
+  `CardDetailSheet`/`WarningOverlay`/`DeckFormatChipRow` are reusable composables in `presentation/components/`.
+- `DeckMagicDetailScreen` (in `DeckBuilderScreen.kt`) + `DeckBuilderViewModel` + `Screen.DeckDetail` route are
+  now an UNUSED fallback (kept compiling until parity confirmed in real use — then delete). `DeckImprovementScreen`
+  unchanged (still reachable as a secondary path; the Studio Suggestions tab covers the same engine inline).
 - → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`
 
 ### Incomplete / quirks

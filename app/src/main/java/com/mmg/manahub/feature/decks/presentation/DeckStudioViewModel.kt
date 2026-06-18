@@ -24,6 +24,7 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
@@ -40,6 +41,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
 import com.mmg.manahub.feature.decks.domain.usecase.SeedDeckResult
@@ -53,13 +55,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -126,6 +135,22 @@ data class DeckStudioUiState(
 
     // ── Commander (Commander format only) ─────────────────────────────────────
     val commanderCard: DeckSlotEntry? = null,
+    /** True when the deck is Commander format and the commander card is not legendary (C5). */
+    val isCommanderInvalid: Boolean = false,
+
+    // ── Basic-land suggestions (C4) ───────────────────────────────────────────
+    /** Per-color basic-land add/remove deltas suggested by [BasicLandCalculator]. */
+    val landDeltas: List<LandDelta> = emptyList(),
+    /** Whether the land-suggestion strip is shown in the Lands group (default on). */
+    val showLandSuggestions: Boolean = true,
+
+    // ── Per-card construction warnings (C5) ───────────────────────────────────
+    /** Mainboard scryfallIds that exceed the format copy limit (non-basics only). */
+    val overLimitCards: Set<String> = emptySet(),
+    /** Slots the user has acknowledged as intentional deviations (over-limit / off-identity). */
+    val acknowledgedOverLimitCards: Set<String> = emptySet(),
+    /** Scryfallids outside the commander's color identity (Commander format only). */
+    val invalidColorIdentityCards: Set<String> = emptySet(),
 
     // ── Card detail sheet ─────────────────────────────────────────────────────
     val detailTags: List<CardTag> = emptyList(),
@@ -183,6 +208,10 @@ data class DeckStudioUiState(
     val showInspirations: Boolean = false,
     /** True while discoveries are being computed off the collection. */
     val isLoadingDiscoveries: Boolean = false,
+
+    // ── Import (Group B) ──────────────────────────────────────────────────────
+    /** True while a pasted deck list is being resolved + written into the live draft. */
+    val isImporting: Boolean = false,
 ) {
     val isEmptyDeck: Boolean get() = cards.isEmpty() && commanderCard == null
 }
@@ -203,6 +232,7 @@ data class DeckStudioUiState(
  * kill before [onExitRequested] runs is OUT OF SCOPE. Such orphans are cleaned
  * manually from the Decks list; there is no `isDraft` column or schema change.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DeckStudioViewModel @Inject constructor(
     private val deckRepository: DeckRepository,
@@ -215,6 +245,8 @@ class DeckStudioViewModel @Inject constructor(
     private val suggestCutsUseCase: SuggestCutsUseCase,
     private val suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase,
     private val buildDeckFromSeedsUseCase: BuildDeckFromSeedsUseCase,
+    private val getDeckGameStatsUseCase: GetDeckGameStatsUseCase,
+    private val importDeckUseCase: ImportDeckUseCase,
     private val deckMagicEngine: DeckMagicEngine,
     private val wishlistRepository: WishlistRepository,
     private val userPreferences: UserPreferencesDataStore,
@@ -235,8 +267,46 @@ class DeckStudioViewModel @Inject constructor(
     private val _events = Channel<DeckStudioEvent>(Channel.BUFFERED)
     val events: Flow<DeckStudioEvent> = _events.receiveAsFlow()
 
+    /**
+     * Per-deck game statistics for the [DeckStatsCard], kept independent of [uiState]
+     * so a stats update never invalidates the editor state machine.
+     *
+     * Unlike [DeckMagicDetailViewModel], the live `deckId` here is resolved
+     * ASYNCHRONOUSLY in [init] (it may be a freshly created draft), so this flow keys
+     * off `uiState.deck?.id` — which becomes non-null only after [observeDeck] emits,
+     * i.e. once `deckId` exists — rather than off a synchronous SavedStateHandle id.
+     * Emits null until the deck loads and the first Room query fires.
+     */
+    val deckStatsFlow: StateFlow<GetDeckGameStatsUseCase.Result?> =
+        _uiState
+            .map { it.deck?.id }
+            .distinctUntilChanged()
+            .filterNotNull()
+            .flatMapLatest { id -> getDeckGameStatsUseCase(id) }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = null,
+            )
+
+    /** The app user's player name, used to compute win/loss in [DeckStatsCard]. */
+    val playerNameFlow: StateFlow<String> = userPreferences.playerNameFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = "",
+        )
+
     /** The live deck id. Resolved on init; either passed in or created as a draft. */
     private lateinit var deckId: String
+
+    /**
+     * True only when THIS ViewModel created a brand-new draft deck on entry (the
+     * no-`deckId` path). It gates the discard-if-empty contract in [onExitRequested]:
+     * an EXISTING deck passed in via `savedStateHandle` must NEVER be auto-deleted,
+     * even if it is empty and happens to share the default name.
+     */
+    private var createdFreshDraft: Boolean = false
 
     /** Card data cache (scryfallId → Card) to avoid re-fetching on each rebuild. */
     private var cardCache: Map<String, Card> = emptyMap()
@@ -278,6 +348,10 @@ class DeckStudioViewModel @Inject constructor(
                     return@launch
                 }
                 deckId = createdId
+                // Mark this as a VM-created draft so onExitRequested may discard it if
+                // abandoned empty. Set ONLY after a successful create (the early
+                // return@launch above leaves it false), and never in the existingId branch.
+                createdFreshDraft = true
                 crashlytics.log("deck_studio_created")
                 crashlytics.setCustomKey("deck_studio_deck_id", createdId)
             }
@@ -368,14 +442,47 @@ class DeckStudioViewModel @Inject constructor(
             allEntries
         }
 
+        // C5: mainboard non-basics whose total copies exceed the format limit.
+        val overLimit = mainEntries
+            .groupBy { it.scryfallId }
+            .filter { (_, slots) ->
+                val card = slots.first().card
+                card != null && !BasicLandCalculator.isBasicLand(card) &&
+                    slots.sumOf { it.quantity } > (format?.maxCopies ?: 4)
+            }
+            .keys
+
+        // C5: cards outside the commander's color identity (Commander format only).
+        val commanderColorIdentity = commanderEntry?.card?.colorIdentity?.toSet()
+        val invalidIdentity = if (isCommanderFormat && commanderColorIdentity != null) {
+            otherEntries
+                .filter { entry -> entry.card != null && !commanderColorIdentity.containsAll(entry.card.colorIdentity) }
+                .map { it.scryfallId }
+                .toSet()
+        } else {
+            emptySet()
+        }
+
+        // C5: a Commander format with a non-legendary commander card.
+        val isCommanderInvalid = isCommanderFormat && commanderEntry?.card != null &&
+            !commanderEntry.card.typeLine.contains("Legendary", ignoreCase = true)
+
         _uiState.update { s ->
             s.copy(
                 deck = deck,
                 cards = otherEntries,
                 commanderCard = commanderEntry,
+                isCommanderInvalid = isCommanderInvalid,
                 isLoading = false,
                 totalCards = mainEntries.sumOf { it.quantity },
                 manaCurve = calculateManaCurve(allEntries),
+                landDeltas = calculateLandDeltas(
+                    entries = allEntries,
+                    formatName = deck.format,
+                    commanderIdentity = commanderColorIdentity,
+                ),
+                overLimitCards = overLimit,
+                invalidColorIdentityCards = invalidIdentity,
                 addCardsResults = s.addCardsResults.map { row ->
                     row.copy(quantityInDeck = quantityInMainboard(allEntries, row.card.scryfallId))
                 },
@@ -398,6 +505,83 @@ class DeckStudioViewModel @Inject constructor(
         return curve
     }
 
+    // ── Basic-land suggestions (C4) ─────────────────────────────────────────────
+
+    /**
+     * Computes the per-color basic-land deltas between the [BasicLandCalculator] recommendation
+     * and the deck's current basic-land counts. A positive delta = add that many of the land; a
+     * negative delta = remove that many. Ported from [DeckMagicDetailViewModel.calculateLandDeltas]
+     * (identical math; this VM only reads from resolved [DeckSlotEntry]s instead of an in-memory map).
+     */
+    private fun calculateLandDeltas(
+        entries: List<DeckSlotEntry>,
+        formatName: String,
+        commanderIdentity: Set<String>? = null,
+    ): List<LandDelta> {
+        val format = DeckFormat.entries.firstOrNull { it.name.equals(formatName, ignoreCase = true) }
+            ?: DeckFormat.CASUAL
+
+        val deckCards = entries.filter { it.card != null && !it.isSideboard }
+            .map { DeckCard(it.card!!, it.quantity, isOwned = true) }
+
+        val nonBasicLands = deckCards.filter { !BasicLandCalculator.isBasicLand(it.card) && BasicLandCalculator.isLand(it.card) }
+        val mainboardNonLands = deckCards.filter { !BasicLandCalculator.isLand(it.card) }
+
+        val suggestedMap = BasicLandCalculator.calculate(
+            mainboard = mainboardNonLands,
+            nonBasicLands = nonBasicLands,
+            format = format,
+            commanderIdentity = commanderIdentity,
+        ).toMap()
+
+        val currentCounts = mutableMapOf<String, Int>()
+        entries.filter { it.card != null && !it.isSideboard && BasicLandCalculator.isBasicLand(it.card!!) }
+            .forEach { currentCounts[it.card!!.name] = (currentCounts[it.card!!.name] ?: 0) + it.quantity }
+
+        val deltas = mutableListOf<LandDelta>()
+        BasicLandCalculator.LAND_FOR_COLOR.forEach { (symbol, landName) ->
+            val suggestedCount = suggestedMap[symbol] ?: 0
+            val currentCount = currentCounts[landName] ?: 0
+            if (suggestedCount != currentCount) {
+                deltas.add(LandDelta(landName, symbol, suggestedCount - currentCount))
+            }
+        }
+        return deltas
+    }
+
+    /**
+     * Applies every current [DeckStudioUiState.landDeltas] entry to the live deck by writing
+     * the resulting ABSOLUTE quantity through the repository (this VM is write-through; there is
+     * no in-memory draft to mutate). Positive deltas add the land (searching Scryfall for its
+     * printing when no mainboard slot exists yet); negative deltas reduce / remove the slot.
+     */
+    fun applyLandSuggestions() {
+        invalidateSuggestions()
+        viewModelScope.launch {
+            runCatching {
+                for (delta in _uiState.value.landDeltas) {
+                    val existing = _uiState.value.cards.find { it.card?.name == delta.landName && !it.isSideboard }
+                    when {
+                        delta.delta > 0 -> {
+                            val scryfallId = existing?.scryfallId
+                                ?: (cardRepository.searchCardByName(delta.landName) as? DataResult.Success)?.data
+                                    ?.also { card -> cardCache = cardCache + (card.scryfallId to card) }
+                                    ?.scryfallId
+                                ?: continue
+                            val currentQty = currentQuantity(scryfallId, false)
+                            deckRepository.addCardToDeck(deckId, scryfallId, currentQty + delta.delta, false)
+                        }
+                        delta.delta < 0 && existing != null -> {
+                            val newQty = currentQuantity(existing.scryfallId, false) + delta.delta
+                            if (newQty <= 0) deckRepository.removeCardFromDeck(deckId, existing.scryfallId, false)
+                            else deckRepository.addCardToDeck(deckId, existing.scryfallId, newQty, false)
+                        }
+                    }
+                }
+            }.onFailure { logFailure("deck_studio_apply_land_suggestions_failed", it) }
+        }
+    }
+
     // ── Tab / UI toggles ──────────────────────────────────────────────────────
 
     fun onSelectTab(tab: DeckStudioTab) {
@@ -412,6 +596,17 @@ class DeckStudioViewModel @Inject constructor(
     fun toggleMainboard() = _uiState.update { it.copy(mainboardExpanded = !it.mainboardExpanded) }
     fun toggleSideboard() = _uiState.update { it.copy(sideboardExpanded = !it.sideboardExpanded) }
     fun setGroupingMode(mode: GroupingMode) = _uiState.update { it.copy(groupingMode = mode) }
+
+    /** Toggles the basic-land suggestion strip in the Lands group (C4). */
+    fun toggleLandSuggestions() = _uiState.update { it.copy(showLandSuggestions = !it.showLandSuggestions) }
+
+    /** Marks a slot's over-limit / off-identity deviation as acknowledged (C5). */
+    fun acknowledgeOverLimit(scryfallId: String) =
+        _uiState.update { it.copy(acknowledgedOverLimitCards = it.acknowledgedOverLimitCards + scryfallId) }
+
+    /** Clears a slot's deviation acknowledgement (C5). */
+    fun unacknowledgeOverLimit(scryfallId: String) =
+        _uiState.update { it.copy(acknowledgedOverLimitCards = it.acknowledgedOverLimitCards - scryfallId) }
 
     // ── Manual mutations (write straight through the repository) ───────────────
 
@@ -603,6 +798,56 @@ class DeckStudioViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Changes the live deck's format (Group B / B1). Writes through the repository
+     * (mirroring [updateDeckName] / [setCoverCard]) then invalidates the loaded
+     * Suggestions analysis so a stale per-format evaluation isn't reused.
+     *
+     * A format change deliberately does NOT touch the discard-if-empty gate
+     * ([onExitRequested]): a freshly created draft is "casual", and a user who only
+     * picks a format but adds no cards must STILL discard on exit.
+     */
+    fun changeFormat(format: DeckFormat) {
+        // No-op when the format is unchanged (avoids a wasted write + analysis invalidation).
+        if (deckFormat == format) return
+        viewModelScope.launch {
+            val deck = _uiState.value.deck ?: return@launch
+            runCatching {
+                deckRepository.updateDeck(deck.copy(format = format.name, updatedAt = System.currentTimeMillis()))
+            }.onFailure { logFailure("deck_studio_change_format_failed", it) }
+        }
+        // Invalidate AFTER scheduling the write so the next Suggestions open re-analyses
+        // against the new format (mirrors every other manual mutation).
+        invalidateSuggestions()
+    }
+
+    // ── Import (Group B / B2) ───────────────────────────────────────────────────
+
+    /**
+     * Imports a pasted Moxfield / Arena deck list INTO the live draft deck via
+     * [ImportDeckUseCase]. The observe flow rebuilds the card list automatically once
+     * the writes land; an [isImporting] guard blocks exit (see [onExitRequested]) so a
+     * half-imported deck can't be discarded or kept mid-write.
+     */
+    fun importDeck(text: String) {
+        if (text.isBlank()) return
+        if (!::deckId.isInitialized) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isImporting = true) }
+            FirebaseCrashlytics.getInstance().log("deck_studio_import_started")
+            importDeckUseCase(deckId, text)
+                .onSuccess {
+                    // Invalidate so the next Suggestions open re-analyses the imported cards.
+                    invalidateSuggestions()
+                }
+                .onFailure { t ->
+                    logFailure("deck_studio_import_failed", t)
+                    _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_import_failed)))
+                }
+            _uiState.update { it.copy(isImporting = false) }
+        }
+    }
+
     // ── Search ────────────────────────────────────────────────────────────────
 
     fun showCollectionCards() {
@@ -727,8 +972,11 @@ class DeckStudioViewModel @Inject constructor(
     /**
      * Handles a back request from the screen (back arrow OR system back).
      *
-     * If the deck is still empty AND still carries the untouched default name, it
-     * is deleted so an abandoned session leaves no orphan; otherwise it is kept.
+     * Discard applies ONLY to a fresh draft this ViewModel created on entry
+     * ([createdFreshDraft]); an EXISTING deck opened via `savedStateHandle` is never
+     * auto-deleted, even if it is empty and shares the default name. When discardable
+     * and still empty with the untouched default name, the draft is deleted so an
+     * abandoned session leaves no orphan; otherwise it is kept.
      * [onNavigateBack] is invoked ONLY after the (optional) delete completes — we
      * never navigate-then-delete, and the delete runs in [viewModelScope] so the
      * main thread is never blocked.
@@ -736,8 +984,15 @@ class DeckStudioViewModel @Inject constructor(
     fun onExitRequested(onNavigateBack: () -> Unit) {
         viewModelScope.launch {
             val state = _uiState.value
+            // Block exit while an import is in flight: discarding now could delete a deck the
+            // import is still writing into, and keeping now could strand a half-imported deck.
+            if (state.isImporting) {
+                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_import_in_progress)))
+                return@launch
+            }
             val deck = state.deck
-            val shouldDiscard = state.isEmptyDeck &&
+            val shouldDiscard = createdFreshDraft &&
+                state.isEmptyDeck &&
                 deck != null &&
                 deck.name == defaultDeckName
             val crashlytics = FirebaseCrashlytics.getInstance()
@@ -836,7 +1091,7 @@ class DeckStudioViewModel @Inject constructor(
             val collection = userCardRepository.observeCollection().first()
             val format = DeckFormat.entries
                 .firstOrNull { it.name.equals(deckWithCards.deck.format, ignoreCase = true) }
-                ?: DeckFormat.STANDARD
+                ?: DeckFormat.CASUAL
 
             var unresolvedCount = 0
             val mainboardEntries = deckWithCards.mainboard.mapNotNull { slot ->
@@ -1283,7 +1538,7 @@ class DeckStudioViewModel @Inject constructor(
             crashlytics.log("deck_studio_seed_build_started")
 
             val writtenCount = runCatching {
-                val format = deckFormat ?: DeckFormat.STANDARD
+                val format = deckFormat ?: DeckFormat.CASUAL
                 val identity = snapshot.inferredIdentity ?: inferDeckIdentityUseCase(snapshot.seedCards)
                 // REUSE the Phase-2 free-text budget state (never a separate budget here).
                 val constraints = snapshot.budgetConstraints

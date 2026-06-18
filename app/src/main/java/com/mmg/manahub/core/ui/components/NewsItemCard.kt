@@ -210,6 +210,7 @@ private fun ThumbnailBox(
             model = imageUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
             placeholder = cardBack,
             error = cardBack,
             fallback = cardBack,

@@ -52,9 +52,9 @@ class CardRepositoryImpl @Inject constructor(
             }
         }
 
-    override suspend fun searchCards(query: String, page: Int): DataResult<List<Card>> =
+    override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> =
         withContext(ioDispatcher) {
-            val result = remote.searchCards(query, page)
+            val result = remote.searchCards(query, page, bypassCache)
             if (result.isSuccess) {
                 val cards = result.getOrThrow()
                 // Single batch DB read for existing cache entries; tag computation on defaultDispatcher.

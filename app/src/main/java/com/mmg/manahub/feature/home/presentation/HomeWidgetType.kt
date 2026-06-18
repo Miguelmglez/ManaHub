@@ -122,7 +122,7 @@ enum class HomeWidgetType(
     CARD_OF_THE_DAY(
         persistedId = "card_of_the_day",
         defaultTitleRes = R.string.widget_title_card_of_day,
-        supportedSizes = setOf(WidgetSize.MEDIUM),
+        supportedSizes = setOf(WidgetSize.MEDIUM, WidgetSize.LARGE),
         category = WidgetCategory.DISCOVER,
         audience = WidgetAudience.ALL,
         icon = Icons.Default.AutoAwesome,

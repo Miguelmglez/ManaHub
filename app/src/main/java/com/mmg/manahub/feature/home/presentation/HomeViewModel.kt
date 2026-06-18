@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow
+import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.CommunityStats
 import com.mmg.manahub.core.domain.model.DeckSummary
+import com.mmg.manahub.core.domain.model.MagicSet
+import com.mmg.manahub.core.domain.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.Rarity
@@ -40,6 +43,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 // Step ID constants are top-level in FirstStepItem.kt (same package — no import needed).
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -53,7 +57,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -83,6 +89,7 @@ class HomeViewModel @Inject constructor(
     private val tournamentRepository: TournamentRepository,
     private val authRepository: AuthRepository,
     private val cardRepository: com.mmg.manahub.core.domain.repository.CardRepository,
+    private val scryfallRemoteDataSource: ScryfallRemoteDataSource,
     private val getNewsFeedUseCase: GetNewsFeedUseCase,
     private val refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
     private val manageSourcesUseCase: ManageSourcesUseCase,
@@ -113,6 +120,22 @@ class HomeViewModel @Inject constructor(
      * failed fetch would spin forever. [HomeAction.RetryDiscover] resets this to Loading.
      */
     private val discoverLoadStateFlow = MutableStateFlow(DiscoverLoadState.LOADING)
+
+    /**
+     * Set the Discover cards row is currently scoped to. Null = unfiltered (uses the default
+     * random query). Selecting a set re-fetches the row scoped to that set.
+     */
+    private val discoverSetFlow = MutableStateFlow<MagicSet?>(null)
+
+    /**
+     * The single random card shown by the Random card widget. INDEPENDENT of the Discover row:
+     * it is re-fetchable on demand via [fetchRandomCard] with no once-guard, so every refresh
+     * surfaces a fresh card.
+     */
+    private val randomCardFlow = MutableStateFlow<DiscoverCard?>(null)
+
+    /** Load state for the independent Random card widget (spinner vs. retry affordance). */
+    private val randomCardLoadStateFlow = MutableStateFlow(DiscoverLoadState.LOADING)
 
     // ── First Steps carousel ──────────────────────────────────────────────────
 
@@ -245,17 +268,33 @@ class HomeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
-     * Discover slice: latest sets plus the random Scryfall cards for the Discover and
-     * Card-of-the-day widgets. The card-of-the-day is the first random card, kept stable
-     * for the session once [discoverCardsFlow] is populated.
+     * Discover-row slice: scoped set + cards + load state, bundled so the parent combine stays
+     * a typed (non-vararg) overload (no Array<Any?> erasure).
+     */
+    private val discoverRowFlow: Flow<DiscoverRow> =
+        combine(discoverSetFlow, discoverCardsFlow, discoverLoadStateFlow) { set, cards, loadState ->
+            DiscoverRow(selectedSet = set, cards = cards, loadState = loadState)
+        }
+
+    /**
+     * Discover slice: latest sets, the scoped Discover cards row, and the independent single
+     * random card for the Random card widget. The random card is fully decoupled from the row
+     * and re-fetchable on demand.
      */
     private val discoverSnapshotFlow: Flow<DiscoverSnapshot> =
-        combine(latestSetsFlow, discoverCardsFlow, discoverLoadStateFlow) { sets, cards, loadState ->
+        combine(
+            latestSetsFlow,
+            discoverRowFlow,
+            randomCardFlow,
+            randomCardLoadStateFlow,
+        ) { sets, row, randomCard, randomCardLoadState ->
             DiscoverSnapshot(
                 latestSets = sets,
-                discoverCards = cards,
-                cardOfTheDay = cards.firstOrNull(),
-                loadState = loadState,
+                discoverCards = row.cards,
+                loadState = row.loadState,
+                selectedSet = row.selectedSet,
+                randomCard = randomCard,
+                randomCardLoadState = randomCardLoadState,
             )
         }
 
@@ -465,56 +504,137 @@ class HomeViewModel @Inject constructor(
         // before the user has ever visited the News tab. The freshness check inside
         // refreshAll() (1-hour window) prevents redundant network calls.
         viewModelScope.launch { runCatching { refreshNewsFeedUseCase() } }
-        // Populate the Discover / Card-of-the-day widgets with random Scryfall cards.
-        fetchRandomCardsIfNeeded()
+        // Pick a random playable set (>10 cards) to seed the Discover row BEFORE the first fetch,
+        // then populate the Discover row (lazy once-guard) and the independent Random card widget.
+        // On failure/empty the set stays null and the fetch falls back to the global random query.
+        viewModelScope.launch {
+            seedRandomDiscoverSet()
+            fetchDiscoverCards(forceRefresh = false)
+            fetchRandomCard()
+        }
     }
 
     /**
-     * Lazily fetches a batch of random Scryfall cards for the Discover and
-     * Card-of-the-day widgets. No-op once [discoverCardsFlow] already holds cards,
-     * so the card-of-the-day stays stable for the session and re-fetches are avoided.
-     *
-     * Rate limiting is handled inside [CardRepository] (every Scryfall call is wrapped
-     * in [com.mmg.manahub.core.network.ScryfallRequestQueue]), so no extra guard is
-     * needed here. Failures degrade silently to an empty list.
+     * Chooses a random playable set with more than 10 cards and assigns it to [discoverSetFlow]
+     * so the FIRST Discover fetch is already scoped to it. Runs off the main thread and is fully
+     * guarded: any failure (or an empty set list) leaves the set null, falling back to the global
+     * [DISCOVER_RANDOM_QUERY]. Best-effort — never throws.
      */
-    private fun fetchRandomCardsIfNeeded() {
-        if (discoverCardsFlow.value.isNotEmpty()) return
+    private suspend fun seedRandomDiscoverSet() {
+        val chosen = runCatching {
+            withContext(Dispatchers.IO) {
+                scryfallRemoteDataSource.getAllSets()
+                    .filter { it.setType in PLAYABLE_SET_TYPES && it.cardCount > MIN_DISCOVER_SET_CARDS }
+                    .randomOrNull()
+            }
+        }.getOrNull()
+        if (chosen != null) discoverSetFlow.value = chosen
+    }
+
+    /**
+     * Fetches the random Scryfall cards for the Discover row.
+     *
+     * When [forceRefresh] is false this is lazy: it no-ops if the row already holds cards (the
+     * init / auto path). When true it always re-runs the query (manual refresh / set change).
+     * The query is scoped to [discoverSetFlow] when a set is selected, otherwise the default
+     * random query.
+     *
+     * Rate limiting is handled inside [CardRepository] (every Scryfall call is wrapped in
+     * [com.mmg.manahub.core.network.ScryfallRequestQueue]), so no extra guard is needed here.
+     * An empty/failed result degrades to [DiscoverLoadState.FAILED] (never an endless spinner).
+     */
+    private fun fetchDiscoverCards(forceRefresh: Boolean) {
+        if (!forceRefresh && discoverCardsFlow.value.isNotEmpty()) return
+        val set = discoverSetFlow.value
+        val query = if (set != null) {
+            "set:${set.code} -is:digital order:random"
+        } else {
+            DISCOVER_RANDOM_QUERY
+        }
         discoverLoadStateFlow.value = DiscoverLoadState.LOADING
+        // Clear the row so the spinner shows immediately on a refresh and cards stream in fresh.
+        discoverCardsFlow.value = emptyList()
         viewModelScope.launch {
-            val result = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1) }
+            // bypassCache = true avoids the in-memory map, but Scryfall's CDN still caches the page.
+            // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
+            val result = runCatching { cardRepository.searchCards(query, page = 1, bypassCache = true) }
                 .getOrNull()
-            val cards = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
+            val fetched = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
                 ?.data
+                ?.shuffled()
                 ?.take(DISCOVER_CARD_COUNT)
-                ?.map { card ->
-                    DiscoverCard(
+                .orEmpty()
+            if (fetched.isEmpty()) {
+                // An empty/failed result must NOT leave the widget spinning forever.
+                discoverLoadStateFlow.value = DiscoverLoadState.FAILED
+                return@launch
+            }
+            // Stream each card into the row as it is mapped so the LazyRow starts rendering with
+            // the first card rather than waiting for all of them. De-dup by id (a repeated
+            // scryfallId would crash the LazyRow's stable-key contract).
+            val seen = HashSet<String>()
+            fetched.forEach { card ->
+                if (seen.add(card.scryfallId)) {
+                    val mapped = DiscoverCard(
                         id = card.scryfallId,
                         scryfallId = card.scryfallId,
                         name = card.name,
-                        imageUrl = card.imageArtCrop ?: card.imageNormal,
+                        // Full card image now (was art-crop), fall back to art-crop if absent.
+                        imageUrl = card.imageNormal ?: card.imageArtCrop,
                         typeLine = card.typeLine,
                     )
+                    discoverCardsFlow.update { it + mapped }
+                    // Flip to LOADED on the FIRST appended card so the row renders while the rest stream in.
+                    if (discoverLoadStateFlow.value != DiscoverLoadState.LOADED) {
+                        discoverLoadStateFlow.value = DiscoverLoadState.LOADED
+                    }
                 }
-                .orEmpty()
-            if (cards.isNotEmpty()) {
-                discoverCardsFlow.value = cards
-                discoverLoadStateFlow.value = DiscoverLoadState.LOADED
-            } else {
-                // An empty/failed result must NOT leave the widgets spinning forever.
-                discoverLoadStateFlow.value = DiscoverLoadState.FAILED
             }
         }
     }
 
     /**
-     * Re-runs the Discover / Card-of-the-day fetch after a failure. Clears the cached
-     * cards so the once-only guard in [fetchRandomCardsIfNeeded] doesn't short-circuit,
-     * resets the slice to [DiscoverLoadState.LOADING], and re-fetches.
+     * Fetches a fresh single random card for the Random card widget. Always re-fetches (no
+     * once-guard) so a manual refresh always surfaces a new card. Failures degrade to
+     * [DiscoverLoadState.FAILED] without clearing the previously-shown card.
      */
-    private fun retryDiscover() {
-        discoverCardsFlow.value = emptyList()
-        fetchRandomCardsIfNeeded()
+    private fun fetchRandomCard() {
+        randomCardLoadStateFlow.value = DiscoverLoadState.LOADING
+        viewModelScope.launch {
+            // bypassCache = true avoids the in-memory map, but Scryfall's CDN still caches the page.
+            // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
+            val result = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1, bypassCache = true) }
+                .getOrNull()
+            val card = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
+                ?.data
+                ?.shuffled()
+                ?.firstOrNull()
+                ?.let { c ->
+                    DiscoverCard(
+                        id = c.scryfallId,
+                        scryfallId = c.scryfallId,
+                        name = c.name,
+                        // Full card image, fall back to art-crop.
+                        imageUrl = c.imageNormal ?: c.imageArtCrop,
+                        typeLine = c.typeLine,
+                    )
+                }
+            if (card != null) {
+                randomCardFlow.value = card
+                randomCardLoadStateFlow.value = DiscoverLoadState.LOADED
+            } else {
+                randomCardLoadStateFlow.value = DiscoverLoadState.FAILED
+            }
+        }
+    }
+
+    /**
+     * Scopes the Discover row to [set] (or clears the filter when null) and re-fetches the row
+     * for the new scope.
+     */
+    private fun selectDiscoverSet(set: MagicSet?) {
+        discoverSetFlow.value = set
+        fetchDiscoverCards(forceRefresh = true)
     }
 
     // ── Public intents ──────────────────────────────────────────────────────────
@@ -528,7 +648,10 @@ class HomeViewModel @Inject constructor(
             is HomeAction.RemoveWidget -> removeWidget(action.type)
             HomeAction.ResetLayout -> resetLayout()
             is HomeAction.SkipFirstStep -> skipFirstStep(action.stepId)
-            HomeAction.RetryDiscover -> retryDiscover()
+            HomeAction.RetryDiscover -> fetchDiscoverCards(forceRefresh = true)
+            HomeAction.RefreshDiscover -> fetchDiscoverCards(forceRefresh = true)
+            HomeAction.RefreshRandomCard -> fetchRandomCard()
+            is HomeAction.SelectDiscoverSet -> selectDiscoverSet(action.set)
             HomeAction.ResetNewsFilters -> resetNewsFilters()
             HomeAction.RateApp -> Unit // no-op; UI handles the store deep link
             else -> Unit // navigation intents are resolved by AppNavGraph
@@ -677,8 +800,11 @@ class HomeViewModel @Inject constructor(
             collectionByColor = collectionStats.byColor.toColorMap(),
             collectionByRarity = collectionStats.byRarity.toRarityMap(),
             discoverCards = discover.discoverCards,
-            cardOfTheDay = discover.cardOfTheDay,
+            cardOfTheDay = discover.randomCard,
             discoverLoadState = discover.loadState,
+            randomCardLoadState = discover.randomCardLoadState,
+            discoverSetCode = discover.selectedSet?.code,
+            discoverSet = discover.selectedSet,
             latestSets = discover.latestSets,
             wishlistStats = social.wishlist,
             decks = core.library.decks,
@@ -874,7 +1000,7 @@ class HomeViewModel @Inject constructor(
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.DISCOVER_CARDS, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.LARGE),
         WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.LATEST_SETS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.MTG_NEWS, WidgetSize.MEDIUM),
@@ -950,11 +1076,23 @@ class HomeViewModel @Inject constructor(
         val performance: PerformanceDetails,
     )
 
+    /** Bundles the Discover-row sources (scoped set + cards + load state) for the parent combine. */
+    private data class DiscoverRow(
+        val selectedSet: MagicSet?,
+        val cards: List<DiscoverCard>,
+        val loadState: DiscoverLoadState,
+    )
+
     private data class DiscoverSnapshot(
         val latestSets: List<DraftSet>,
         val discoverCards: List<DiscoverCard> = emptyList(),
-        val cardOfTheDay: DiscoverCard? = null,
         val loadState: DiscoverLoadState = DiscoverLoadState.LOADING,
+        /** Set the Discover row is scoped to, or null when unfiltered. */
+        val selectedSet: MagicSet? = null,
+        /** The independent single random card for the Random card widget. */
+        val randomCard: DiscoverCard? = null,
+        /** Load state of the independent Random card widget. */
+        val randomCardLoadState: DiscoverLoadState = DiscoverLoadState.LOADING,
     )
 
     /** Bundles the filtered news list with the "filters active" flag for the final combine. */
@@ -990,6 +1128,9 @@ class HomeViewModel @Inject constructor(
 
         /** Number of random cards fetched for the Discover widget. */
         private const val DISCOVER_CARD_COUNT = 10
+
+        /** Minimum card count for a set to be eligible as the default random Discover scope. */
+        private const val MIN_DISCOVER_SET_CARDS = 10
 
         private const val WISHLIST_PREVIEW_LIMIT = 10
 

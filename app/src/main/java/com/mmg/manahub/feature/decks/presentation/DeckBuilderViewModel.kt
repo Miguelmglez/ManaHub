@@ -335,7 +335,7 @@ class DeckMagicDetailViewModel @Inject constructor(
         commanderIdentity: Set<String>? = null
     ): List<LandDelta> {
         val format = DeckFormat.entries.find { it.name.equals(formatName, ignoreCase = true) }
-            ?: DeckFormat.STANDARD
+            ?: DeckFormat.CASUAL
 
         val deckCards = entries.filter { it.card != null && !it.isSideboard }.map {
             DeckCard(it.card!!, it.quantity, isOwned = true)

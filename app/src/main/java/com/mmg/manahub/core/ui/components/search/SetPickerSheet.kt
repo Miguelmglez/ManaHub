@@ -70,6 +70,12 @@ fun SetPickerSheet(
     onToggleSet: (MagicSet) -> Unit,
     onDismiss: () -> Unit,
     availableSets: List<MagicSet>? = null,
+    /**
+     * When true, the sheet behaves as a single-pick selector: the per-row checkbox and the
+     * bottom Done button are hidden, and the call site is expected to dismiss the sheet itself
+     * after a pick. Defaults to false (multi-select with checkboxes + Done).
+     */
+    singleSelection: Boolean = false,
 ) {
     // Force a new ViewModel whenever availableSets changes to ensure clean initialization
     val viewModel: SetPickerViewModel = hiltViewModel(key = availableSets?.hashCode()?.toString())
@@ -253,29 +259,32 @@ fun SetPickerSheet(
                                 set = set,
                                 isSelected = selectedSetCodes.contains(set.code),
                                 onClick = { onToggleSet(set) },
+                                showCheckbox = !singleSelection,
                             )
                         }
                     }
                 }
             }
 
-            // ── Done button ──
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-            ) {
-                Text(
-                    if (selectedSetCodes.isEmpty())
-                        stringResource(R.string.action_close)
-                    else
-                        stringResource(R.string.advsearch_set_done, selectedSetCodes.size),
-                    style = ty.labelLarge,
-                )
+            // ── Done button (multi-select only; single-pick dismisses on tap) ──
+            if (!singleSelection) {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                ) {
+                    Text(
+                        if (selectedSetCodes.isEmpty())
+                            stringResource(R.string.action_close)
+                        else
+                            stringResource(R.string.advsearch_set_done, selectedSetCodes.size),
+                        style = ty.labelLarge,
+                    )
+                }
             }
         }
     }
@@ -286,6 +295,7 @@ private fun SetPickerRow(
     set: MagicSet,
     isSelected: Boolean,
     onClick: () -> Unit,
+    showCheckbox: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -337,23 +347,25 @@ private fun SetPickerRow(
                 }
             }
 
-            // Checkbox visual
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(
-                        if (isSelected) mc.primaryAccent else mc.surfaceVariant,
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
-                        shape = RoundedCornerShape(4.dp),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (isSelected) {
-                    Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            // Checkbox visual (hidden in single-selection mode)
+            if (showCheckbox) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
+                            shape = RoundedCornerShape(4.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isSelected) {
+                        Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

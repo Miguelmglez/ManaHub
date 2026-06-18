@@ -552,6 +552,7 @@
     <string name="deckbuilder_group_color">Color</string>
     <string name="deckbuilder_group_cmc">CMC</string>
     <string name="deckbuilder_group_rarity">Rarity</string>
+    <string name="deckbuilder_group_label">Group by:</string>
     <string name="deckbuilder_format_total_cards">Total: %1$d</string>
     <string name="deckbuilder_lands">Lands</string>
     <string name="deckbuilder_no_cards">No cards yet</string>
@@ -742,6 +743,7 @@
     <!-- Deck Studio — unified hybrid deck builder (manual + suggestions + seed auto-build) -->
     <string name="deck_studio_title">Deck Studio</string>
     <string name="deck_studio_default_name">New deck</string>
+    <string name="deck_studio_playtest">Playtest deck</string>
     <string name="deck_studio_budget_per_card_label">Max per card (€)</string>
     <string name="deck_studio_budget_total_label">Total budget (€)</string>
     <string name="deck_studio_budget_invalid_error">Enter a valid amount greater than 0.</string>
@@ -764,10 +766,14 @@
     <string name="deck_studio_tab_build">Build</string>
     <string name="deck_studio_tab_suggestions">Suggestions</string>
     <string name="deck_studio_empty_title">Your deck is empty</string>
-    <string name="deck_studio_empty_subtitle">Add cards with the + button, build from a seed, or browse inspirations.</string>
+    <string name="deck_studio_empty_subtitle">Add cards with the + button, or import an existing list.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
     <string name="deck_studio_more_options">More options</string>
     <string name="deck_studio_browse_inspirations">Browse Inspirations</string>
+    <string name="deck_studio_format_section">Format</string>
+    <string name="deck_studio_import_deck">Import deck list</string>
+    <string name="deck_studio_import_failed">Couldn\'t import the deck list. Check the format and try again.</string>
+    <string name="deck_studio_import_in_progress">Import in progress…</string>
     <string name="deck_studio_suggestions_coming_soon_title">Suggestions coming soon</string>
     <string name="deck_studio_suggestions_coming_soon_subtitle">Deck Doctor analysis arrives in a future update.</string>
     <string name="deck_studio_seed_coming_soon">Build from seed arrives in a future update.</string>
@@ -2475,6 +2481,10 @@
     <string name="home_news_see_all">See all</string>
     <string name="home_news_reset_filters">Reset filters</string>
     <string name="home_discover_unavailable">Couldn\'t load cards. Tap to retry.</string>
+    <string name="home_random_refresh">Refresh card</string>
+    <string name="home_discover_refresh">Refresh cards</string>
+    <string name="home_discover_select_set">Choose set</string>
+    <string name="home_discover_set_selected">Set: %1$s. Tap to change</string>
     <string name="home_retry">Retry</string>
     <string name="home_improve_playtest">Playtest</string>
     <string name="home_improve_draft_guide">Draft guide</string>
@@ -2522,7 +2532,7 @@
     <string name="home_edit_widgets">Edit Widgets</string>
     <string name="widget_title_wishlist">Wishlist</string>
     <string name="widget_title_discover">Discover cards</string>
-    <string name="widget_title_card_of_day">Card of the day</string>
+    <string name="widget_title_card_of_day">Random card</string>
     <string name="widget_title_latest_sets">Latest sets</string>
     <string name="widget_title_draft_guide">Draft guide spotlight</string>
     <string name="widget_title_video">Video spotlight</string>
