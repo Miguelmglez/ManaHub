@@ -176,6 +176,39 @@ class DeckRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun moveCardQuantity(
+        deckId: String,
+        scryfallId: String,
+        fromSideboard: Boolean,
+        quantity: Int,
+    ) {
+        withContext(ioDispatcher) {
+            // Read the current per-board counts so the atomic DAO move only needs the
+            // pre-computed target quantities. Both boards are derived from the same
+            // single DAO read to avoid a torn view.
+            val rows = deckDao.getDeckCards(deckId)
+            val sourceQty = rows.firstOrNull {
+                it.scryfallId == scryfallId && it.isSideboard == fromSideboard
+            }?.quantity ?: 0
+            if (sourceQty <= 0) return@withContext
+            val toMove = quantity.coerceIn(1, sourceQty)
+            val targetQty = rows.firstOrNull {
+                it.scryfallId == scryfallId && it.isSideboard == !fromSideboard
+            }?.quantity ?: 0
+
+            deckDao.moveCardQuantity(
+                deckId = deckId,
+                scryfallId = scryfallId,
+                fromSideboard = fromSideboard,
+                newSourceQty = sourceQty - toMove,
+                newTargetQty = targetQty + toMove,
+            )
+            deckDao.getDeckById(deckId)?.let { deck ->
+                deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
+            }
+        }
+    }
+
     override suspend fun clearDeck(deckId: String) {
         withContext(ioDispatcher) {
             deckDao.clearDeckCards(deckId)

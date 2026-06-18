@@ -158,8 +158,8 @@ class DeckImprovementViewModel @Inject constructor(
             val collection = userCardRepository.observeCollection().first()
             val deckFormat = DeckFormat.entries
                 .firstOrNull { it.name.equals(deckWithCards.deck.format, ignoreCase = true) }
-                ?: DeckFormat.STANDARD.also {
-                    FirebaseCrashlytics.getInstance().log("Unknown deck format: '${deckWithCards.deck.format}' – defaulting to STANDARD")
+                ?: DeckFormat.CASUAL.also {
+                    FirebaseCrashlytics.getInstance().log("Unknown deck format: '${deckWithCards.deck.format}' – defaulting to CASUAL")
                 }
 
             // Resolve every mainboard slot. Slots whose card cannot be resolved are counted (E6) and
@@ -376,16 +376,32 @@ class DeckImprovementViewModel @Inject constructor(
      */
     fun onCut(scryfallId: String, cardName: String) {
         viewModelScope.launch {
-            deckRepository.removeCardFromDeck(deckId, scryfallId, isSideboard = false)
+            val context = analysisCache
+            // C1: cut ONE copy, not the whole slot. A 3-of must become a 2-of. Previously this
+            // always removed the entire slot, silently dropping every copy of a multi-copy card
+            // — a data-loss bug. The current quantity comes from the in-memory working list
+            // (the only quantity source this VM holds); with no cache yet we fall back to a full
+            // slot removal, which then triggers a fresh loadAnalysis below.
+            val currentQty = context?.workingMainboard
+                ?.firstOrNull { it.card.scryfallId == scryfallId }?.quantity
+                ?: 1
+            if (currentQty <= 1) {
+                deckRepository.removeCardFromDeck(deckId, scryfallId, isSideboard = false)
+            } else {
+                deckRepository.addCardToDeck(deckId, scryfallId, currentQty - 1, false)
+            }
             _events.send(DeckImprovementEvent.CardCut(cardName))
 
-            val context = analysisCache
             if (context == null) {
                 loadAnalysis()
                 return@launch
             }
-            // Mutate the working list in memory: drop one entry of the cut card.
-            context.workingMainboard = context.workingMainboard.filterNot { it.card.scryfallId == scryfallId }
+            // Mutate the working list in memory: decrement one copy, dropping the entry at qty 0.
+            context.workingMainboard = context.workingMainboard.mapNotNull { entry ->
+                if (entry.card.scryfallId != scryfallId) entry
+                else if (entry.quantity <= 1) null
+                else entry.copy(quantity = entry.quantity - 1)
+            }
             recomputeIncremental()
         }
     }

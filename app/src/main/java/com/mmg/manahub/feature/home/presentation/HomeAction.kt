@@ -56,6 +56,38 @@ sealed interface HomeAction {
     /** Opens the platform store listing so the user can rate the app (UI resolves the deep link). */
     object RateApp : HomeAction
 
+    /**
+     * Retries the Discover cards fetch after a failure.
+     * Handled in [HomeViewModel]: resets the discover load state to Loading and re-runs the fetch.
+     */
+    object RetryDiscover : HomeAction
+
+    /**
+     * Re-fetches a fresh single random card for the Random card widget, on demand.
+     * Always issues a new Scryfall request (no once-guard). Handled in [HomeViewModel].
+     */
+    object RefreshRandomCard : HomeAction
+
+    /**
+     * Re-fetches the Discover cards row, on demand. Forces a new Scryfall request even when
+     * cards are already loaded (bypasses the lazy once-guard). Handled in [HomeViewModel].
+     */
+    object RefreshDiscover : HomeAction
+
+    /**
+     * Scopes the Discover cards row to a single MTG set (or clears the filter when null).
+     * Re-fetches the row for the new scope. Handled in [HomeViewModel].
+     *
+     * @param set the set to scope to, or null to clear the filter and use the default random query.
+     */
+    data class SelectDiscoverSet(val set: com.mmg.manahub.core.domain.model.MagicSet?) : HomeAction
+
+    /**
+     * Resets the persisted News filters (languages/types/sources) back to their defaults
+     * (English-only). Handled in [HomeViewModel] via DataStore.
+     */
+    object ResetNewsFilters : HomeAction
+
     // ── Per-widget navigation intents (resolved by AppNavGraph) ─────────────────
     object OpenDraftSimulator : HomeAction
     object OpenDraftGuide : HomeAction

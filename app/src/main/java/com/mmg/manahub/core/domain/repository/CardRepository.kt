@@ -8,7 +8,19 @@ import kotlinx.coroutines.flow.Flow
 
 interface CardRepository {
     suspend fun searchCardByName(query: String): DataResult<Card>
-    suspend fun searchCards(query: String, page: Int = 1): DataResult<List<Card>>
+
+    /**
+     * Searches Scryfall for cards matching [query].
+     *
+     * @param bypassCache when true, skips the in-memory search cache and always re-fetches.
+     *   Required for `order:random` queries where a stable cache key would otherwise return the
+     *   same page on every refresh. Defaults to false (cached) for all existing callers.
+     */
+    suspend fun searchCards(
+        query: String,
+        page: Int = 1,
+        bypassCache: Boolean = false,
+    ): DataResult<List<Card>>
     suspend fun getCardById(scryfallId: String): DataResult<Card>
 
     /** Fetches all prints (versions) of a card by its exact English name. */

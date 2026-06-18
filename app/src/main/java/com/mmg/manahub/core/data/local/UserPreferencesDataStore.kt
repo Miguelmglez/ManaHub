@@ -15,6 +15,8 @@ import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
 import com.mmg.manahub.core.domain.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
+import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
+import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.ScoreWeightOverrides
 import com.mmg.manahub.core.domain.model.UserDefinedTag
@@ -42,6 +44,10 @@ internal val Context.userPrefsDataStore by preferencesDataStore(name = "user_pre
 private val KEY_APP_LANGUAGE      = stringPreferencesKey("app_language")
 private val KEY_CARD_LANGUAGE     = stringPreferencesKey("card_language")
 private val KEY_NEWS_LANGUAGES    = stringSetPreferencesKey("news_languages")
+/** News filter: included [SourceType] names. Absent → both ARTICLE + VIDEO. */
+private val KEY_NEWS_FILTER_TYPES      = stringSetPreferencesKey("news_filter_types")
+/** News filter: explicit source-id allowlist. Absent/empty → null (= all enabled sources). */
+private val KEY_NEWS_FILTER_SOURCE_IDS = stringSetPreferencesKey("news_filter_source_ids")
 private val KEY_PREFERRED_CURRENCY = stringPreferencesKey("preferred_currency")
 private val LAST_PRICE_REFRESH_KEY = longPreferencesKey("last_price_refresh")
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
@@ -178,6 +184,77 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun setNewsLanguages(languages: Set<NewsLanguage>) {
         context.userPrefsDataStore.edit { it[KEY_NEWS_LANGUAGES] = languages.map { l -> l.code }.toSet() }
+    }
+
+    // ── News feed filters (shared by NewsScreen + Home news widget) ───────────────
+    //
+    // The single persisted source of truth for the news filter selection. Languages
+    // reuse the existing KEY_NEWS_LANGUAGES key (which stores long NewsLanguage codes
+    // such as "en-GB"); the filter layer works in SHORT codes ("en"/"es"/"de") that
+    // match ContentSource.language, so we project to the first two chars on read and
+    // map short → NewsLanguage on write. Default is English-only.
+
+    /**
+     * Emits the persisted [NewsFilterPrefs]. Absent values fall back to
+     * [NewsFilterPrefs.DEFAULT] (English-only, both content types, all enabled sources).
+     */
+    fun observeNewsFilters(): Flow<NewsFilterPrefs> =
+        context.userPrefsDataStore.data
+            .map { prefs ->
+                val languages = prefs[KEY_NEWS_LANGUAGES]
+                    ?.map { it.take(2) }
+                    ?.toSet()
+                    ?.ifEmpty { null }
+                    ?: NewsFilterPrefs.DEFAULT.languages
+
+                val types = prefs[KEY_NEWS_FILTER_TYPES]
+                    ?.mapNotNull { name -> SourceType.entries.firstOrNull { it.name == name } }
+                    ?.toSet()
+                    ?.ifEmpty { null }
+                    ?: NewsFilterPrefs.DEFAULT.types
+
+                // An empty/absent source-id set means "all enabled sources" (null).
+                val sourceIds = prefs[KEY_NEWS_FILTER_SOURCE_IDS]?.takeIf { it.isNotEmpty() }
+
+                NewsFilterPrefs(languages = languages, types = types, sourceIds = sourceIds)
+            }
+            .catch { emit(NewsFilterPrefs.DEFAULT) }
+
+    /**
+     * Persists the full news filter selection. Languages are stored as long
+     * [NewsLanguage] codes (resolved from the short codes), so [preferencesFlow]'s
+     * `newsLanguages` and [setNewsLanguages] keep working unchanged.
+     */
+    suspend fun setNewsFilters(
+        languages: Set<String>,
+        types: Set<SourceType>,
+        sourceIds: Set<String>?,
+    ) {
+        context.userPrefsDataStore.edit { prefs ->
+            val longLangCodes = languages
+                .mapNotNull { short -> NewsLanguage.entries.firstOrNull { it.code.take(2) == short }?.code }
+                .toSet()
+                .ifEmpty { setOf(NewsLanguage.ENGLISH.code) }
+            prefs[KEY_NEWS_LANGUAGES] = longLangCodes
+            prefs[KEY_NEWS_FILTER_TYPES] = types
+                .ifEmpty { NewsFilterPrefs.DEFAULT.types }
+                .map { it.name }
+                .toSet()
+            if (sourceIds.isNullOrEmpty()) {
+                prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
+            } else {
+                prefs[KEY_NEWS_FILTER_SOURCE_IDS] = sourceIds
+            }
+        }
+    }
+
+    /** Clears all persisted news filters back to [NewsFilterPrefs.DEFAULT] (English-only). */
+    suspend fun resetNewsFilters() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[KEY_NEWS_LANGUAGES] = setOf(NewsLanguage.ENGLISH.code)
+            prefs.remove(KEY_NEWS_FILTER_TYPES)
+            prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
+        }
     }
 
     override suspend fun setPreferredCurrency(currency: PreferredCurrency) {

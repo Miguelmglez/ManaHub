@@ -8,8 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -76,6 +80,9 @@ import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetF
  * @param isSearching true while a seed search is in flight.
  * @param canGenerate true when generation is allowed (≥1 seed and not already generating).
  * @param isGenerating true while the deck is being generated.
+ * @param budgetSlot optional custom budget UI rendered in place of the default [BudgetFilterBar]
+ *        (the Deck Studio passes its free-text [com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar]);
+ *        when null the default chip-based [BudgetFilterBar] driven by [budget]/[onBudgetChanged] is shown.
  */
 @Composable
 fun SeedsContent(
@@ -93,16 +100,23 @@ fun SeedsContent(
     onRemoveSeed: (Card) -> Unit,
     onBudgetChanged: (BudgetConstraints) -> Unit,
     onGenerate: () -> Unit,
+    budgetSlot: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
 
+    // L6: clear the sticky CTA (52dp button + its vertical padding ≈ 76dp) PLUS the system
+    // navigation-bar inset, so the last list item is never hidden behind the button or the
+    // gesture bar on edge-to-edge devices.
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val listBottomPadding = 76.dp + navBarBottom
+
     Box(modifier = modifier.fillMaxWidth()) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = sp.lg, end = sp.lg, top = sp.lg, bottom = 96.dp,
+                start = sp.lg, end = sp.lg, top = sp.lg, bottom = listBottomPadding,
             ),
             verticalArrangement = Arrangement.spacedBy(sp.lg),
         ) {
@@ -162,16 +176,21 @@ fun SeedsContent(
                 }
             }
 
-            // Budget filter.
+            // Budget filter (default chip bar, or a caller-supplied custom slot).
             item(key = "budget") {
-                BudgetFilterBar(budget = budget, onBudgetChanged = onBudgetChanged)
+                if (budgetSlot != null) budgetSlot()
+                else BudgetFilterBar(budget = budget, onBudgetChanged = onBudgetChanged)
             }
         }
 
-        // Sticky "Generate deck" CTA pinned to the bottom.
+        // Sticky "Generate deck" CTA pinned to the bottom (L6: inset-aware so the button sits
+        // above the system navigation bar / gesture area, not behind it).
         Surface(
             color = mc.background,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding(),
         ) {
             Button(
                 onClick = onGenerate,
@@ -271,8 +290,9 @@ private fun SeedSearchField(
 private fun SeedResultRow(card: Card, onAdd: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    // L2: only the trailing IconButton fires onAdd. Previously the Surface was ALSO clickable,
+    // so a tap on the add button bubbled into a double-add (two seeds added per tap).
     Surface(
-        onClick = onAdd,
         shape = CardShape,
         color = mc.surface,
         modifier = Modifier.fillMaxWidth(),

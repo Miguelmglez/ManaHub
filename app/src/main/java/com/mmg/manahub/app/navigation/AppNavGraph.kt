@@ -14,7 +14,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -35,6 +42,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.mmg.manahub.R
 import com.mmg.manahub.core.push.ForegroundScreenTracker
 import com.mmg.manahub.core.push.PushDeeplinkRouter
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -45,8 +53,9 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
+import com.mmg.manahub.feature.collection.presentation.CollectionTab
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
-import com.mmg.manahub.feature.decks.presentation.DeckMagicScreen
+import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
@@ -101,6 +110,8 @@ import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 private val bottomBarRoutes = setOf(
     Screen.Home.route,
     Screen.Collection.route,
+    Screen.DeckList.route,
+    Screen.Trades.route,
 )
 
 @Composable
@@ -251,24 +262,43 @@ fun AppNavGraph(
                             }
                             HomeAction.ScanCard -> navController.navigate(Screen.CollectionScanner.route)
                             HomeAction.SearchCard -> navController.navigate(Screen.CollectionAddCard.route)
-                            HomeAction.CreateDeck -> navController.navigate(Screen.DeckBuilder.route)
+                            HomeAction.CreateDeck -> navController.navigate(Screen.DeckStudio.createRoute(null))
                             HomeAction.DraftGuide -> navController.navigate(Screen.Draft.route)
                             HomeAction.DraftSimulator -> navController.navigate(Screen.Draft.route)
                             HomeAction.OpenLibrary -> navController.navigateTab(Screen.Collection.route)
-                            HomeAction.OpenDecks -> navController.navigateTab(Screen.Collection.route)
+                            HomeAction.OpenDecks -> navController.navigate(Screen.DeckList.route)
                             HomeAction.OpenNews -> navController.navigate(Screen.News.route)
                             HomeAction.OpenStats -> navController.navigate(Screen.Stats.route)
                             HomeAction.OpenFriends -> navController.navigate(Screen.FriendsList.route)
-                            HomeAction.OpenTrades -> navController.navigateTab(Screen.Collection.route)
+                            HomeAction.OpenTrades -> navController.navigate(Screen.Trades.route)
                             HomeAction.OpenTournaments -> navController.navigate(Screen.TournamentList.route)
                             HomeAction.OpenSettings -> navController.navigate(Screen.Settings.route)
                             HomeAction.OpenProfile -> navController.navigate(Screen.Profile.baseRoute)
-                            HomeAction.PlaytestRecentDeck -> navController.navigateTab(Screen.Collection.route)
-                            HomeAction.ImproveRecentDeck -> navController.navigateTab(Screen.Collection.route)
+                            // No "recent deck" is resolved here, so route to the deck list
+                            // (where the user picks a deck to playtest / improve) rather than the
+                            // generic Collection card grid.
+                            HomeAction.PlaytestRecentDeck -> navController.navigate(Screen.DeckList.route)
+                            HomeAction.ImproveRecentDeck -> navController.navigate(Screen.DeckList.route)
                             // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge, RateApp are
                             // handled inside HomeScreen / HomeViewModel.
                             HomeAction.CustomizeQuickStart -> Unit
-                            HomeAction.RateApp -> Unit
+                            HomeAction.RateApp -> {
+                                val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
+                                val request = reviewManager.requestReviewFlow()
+                                request.addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        val reviewInfo = task.result
+                                        activity.let { reviewManager.launchReviewFlow(it, reviewInfo) }
+                                    } else {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
+                                        try {
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                                        }
+                                    }
+                                }
+                            }
                             is HomeAction.SaveQuickStart -> Unit
                             HomeAction.CreateAccount -> navController.navigate(Screen.Profile.baseRoute)
                             HomeAction.DismissAccountNudge -> Unit
@@ -284,7 +314,7 @@ fun AppNavGraph(
                                 Screen.CollectionCardDetail.createRoute(action.scryfallId)
                             )
                             is HomeAction.OpenDeck ->
-                                navController.navigate(Screen.DeckDetail.createRoute(action.deckId))
+                                navController.navigate(Screen.DeckStudio.createRoute(action.deckId))
                             is HomeAction.OpenNewsUrl -> {
                                 val url = action.url.trim()
                                 if (url.isNotEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
@@ -310,6 +340,11 @@ fun AppNavGraph(
                             // ── Widget board: handled in HomeScreen/VM ───────────
                             HomeAction.OpenWidgetGallery,
                             HomeAction.ResetLayout,
+                            HomeAction.RetryDiscover,
+                            HomeAction.RefreshDiscover,
+                            HomeAction.RefreshRandomCard,
+                            is HomeAction.SelectDiscoverSet,
+                            HomeAction.ResetNewsFilters,
                             is HomeAction.MoveWidget,
                             is HomeAction.AddWidget,
                             is HomeAction.RemoveWidget,
@@ -328,7 +363,54 @@ fun AppNavGraph(
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                    onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
+                    onPlaytestClick = { id ->
+                        navController.navigate(Screen.PlaytestSetup.createRoute(id))
+                    },
+                    onNavigateToTradeProposal = { receiverId ->
+                        navController.navigate(Screen.CreateTradeProposal.createRoute(receiverId))
+                    },
+                    onNavigateToTradeThread = { proposalId, rootProposalId ->
+                        navController.navigate(
+                            Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
+                        )
+                    },
+                )
+            }
+
+            composable(Screen.DeckList.route) {
+                CollectionScreen(
+                    initialTab = CollectionTab.DECKS,
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
+                    onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                    onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
+                    onPlaytestClick = { id ->
+                        navController.navigate(Screen.PlaytestSetup.createRoute(id))
+                    },
+                    onNavigateToTradeProposal = { receiverId ->
+                        navController.navigate(Screen.CreateTradeProposal.createRoute(receiverId))
+                    },
+                    onNavigateToTradeThread = { proposalId, rootProposalId ->
+                        navController.navigate(
+                            Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
+                        )
+                    },
+                )
+            }
+
+            composable(Screen.Trades.route) {
+                CollectionScreen(
+                    initialTab = CollectionTab.TRADES,
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
+                    onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                    onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
                     onPlaytestClick = { id ->
                         navController.navigate(Screen.PlaytestSetup.createRoute(id))
                     },
@@ -370,7 +452,7 @@ fun AppNavGraph(
                 CardDetailScreen(
                     onBack              = { navController.popBackStack() },
                     onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onNavigateToDeck    = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onNavigateToDeck    = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
                     onNavigateToCard    = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id)) {
                             popUpTo(Screen.CollectionCardDetail.route) { inclusive = true }
@@ -413,8 +495,30 @@ fun AppNavGraph(
                 //   DeckAddCardsScreen(onBack = { navController.popBackStack() })
             }
 
-            composable(Screen.DeckBuilder.route) {
-                DeckMagicScreen()
+            // ── Deck Studio (unified hybrid builder) ──────────────────────────
+            composable(
+                route = Screen.DeckStudio.route,
+                arguments = listOf(
+                    navArgument("deckId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    }
+                ),
+            ) {
+                // The VM reads the optional deckId from SavedStateHandle ("" ⇒ fresh draft).
+                DeckStudioScreen(
+                    viewModel = hiltViewModel(),
+                    onBack = { navController.popBackStack() },
+                    onCardClick = { id ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                    },
+                    onPlaytest = { deckId ->
+                        navController.navigate(Screen.PlaytestSetup.createRoute(deckId))
+                    },
+                    onReviewSurvey = { sessionId ->
+                        navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
+                    },
+                )
             }
 
             // ── Stats ─────────────────────────────────────────────────────────
@@ -430,7 +534,7 @@ fun AppNavGraph(
                         navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
                     },
                     onDeckClick = { deckId ->
-                        navController.navigate(Screen.DeckDetail.createRoute(deckId))
+                        navController.navigate(Screen.DeckStudio.createRoute(deckId))
                     },
                 )
             }

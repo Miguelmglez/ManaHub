@@ -310,23 +310,6 @@ private fun PortraitBattlefield(
             verticalArrangement = Arrangement.spacedBy(sp.sm),
         ) {
             FieldZone(
-                zone         = PlayZone.LANDS,
-                label        = stringResource(R.string.playtest_battle_zone_lands),
-                emptyHint    = stringResource(R.string.playtest_battle_field_empty_lands),
-                cards        = battlefield.lands,
-                cardWidth    = FIELD_CARD_WIDTH,
-                isHovered    = hoveredZone == PlayZone.LANDS,
-                draggingId   = draggingId,
-                onRegister   = { zoneBounds[PlayZone.LANDS] = it },
-                onCardClick  = onCardClick,
-                onToggleTap  = onToggleTap,
-                onDragStart  = { c, center, w -> onDragStart(c, PlayZone.LANDS, center, w) },
-                onDragDelta  = onDragDelta,
-                onDragEnd    = onDragEnd,
-                onDragCancel = onDragCancel,
-                modifier     = Modifier.weight(0.4f),
-            )
-            FieldZone(
                 zone         = PlayZone.PERMANENTS,
                 label        = stringResource(R.string.playtest_battle_zone_permanents),
                 emptyHint    = stringResource(R.string.playtest_battle_field_empty_permanents),
@@ -342,6 +325,23 @@ private fun PortraitBattlefield(
                 onDragEnd    = onDragEnd,
                 onDragCancel = onDragCancel,
                 modifier     = Modifier.weight(0.6f),
+            )
+            FieldZone(
+                zone         = PlayZone.LANDS,
+                label        = stringResource(R.string.playtest_battle_zone_lands),
+                emptyHint    = stringResource(R.string.playtest_battle_field_empty_lands),
+                cards        = battlefield.lands,
+                cardWidth    = FIELD_CARD_WIDTH,
+                isHovered    = hoveredZone == PlayZone.LANDS,
+                draggingId   = draggingId,
+                onRegister   = { zoneBounds[PlayZone.LANDS] = it },
+                onCardClick  = onCardClick,
+                onToggleTap  = onToggleTap,
+                onDragStart  = { c, center, w -> onDragStart(c, PlayZone.LANDS, center, w) },
+                onDragDelta  = onDragDelta,
+                onDragEnd    = onDragEnd,
+                onDragCancel = onDragCancel,
+                modifier     = Modifier.weight(0.4f),
             )
         }
 

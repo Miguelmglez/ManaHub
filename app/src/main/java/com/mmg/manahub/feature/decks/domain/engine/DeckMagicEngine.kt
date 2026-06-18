@@ -65,6 +65,7 @@ class DeckMagicEngine @Inject constructor(
         allTags.take(6).map { (tag, count) ->
             val matchingCards = collection
                 .filter { tag in it.card.tags || tag in it.card.userTags }
+                .distinctBy { it.card.scryfallId } // Fix: de-dup for UI stability (lazy list keys)
                 .take(12)
                 .map { MagicCard(it.card, isOwned = true) }
 
@@ -97,7 +98,7 @@ class DeckMagicEngine @Inject constructor(
             seedTags = targetTags
         )
 
-        val candidates = collection.map { it.card }
+        val candidates = collection.map { it.card }.distinctBy { it.scryfallId }
         val ownedIds = candidates.map { it.scryfallId }.toSet()
 
         val ranked = deckScorer.rankAdds(
