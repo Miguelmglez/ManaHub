@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,6 +68,7 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,6 +79,8 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -85,6 +89,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -93,6 +98,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -106,10 +112,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.decode.SvgDecoder
+import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.CommunityStats
 import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.domain.model.DraftSet
+import com.mmg.manahub.core.domain.model.MagicSet
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.ui.components.CircularDistribution
@@ -119,6 +128,7 @@ import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.NewsItemCard
 import com.mmg.manahub.core.ui.components.NewsItemOrientation
 import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.components.search.SetPickerSheet
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -127,6 +137,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -332,20 +343,7 @@ fun HomeWidgetHost(
             WidgetSectionHeader(
                 title = stringResourceSafe(widget.type.defaultTitleRes),
                 icon = widget.type.icon,
-                trailingContent = if (widget.type == HomeWidgetType.QUICK_ACTIONS) {
-                    {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Customize shortcuts",
-                            tint = MaterialTheme.magicColors.primaryAccent,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .clickable { onAction(HomeAction.CustomizeQuickStart) }
-                                .padding(4.dp)
-                        )
-                    }
-                } else null
+                trailingContent = widgetHeaderTrailingContent(widget.type, uiState, onAction),
             )
         }
         
@@ -359,12 +357,160 @@ fun HomeWidgetHost(
             HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
             HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(uiState.wishlistStats, uiState.isAuthenticated, onAction)
             HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(uiState.discoverCards, uiState.discoverLoadState, onAction)
-            HomeWidgetType.CARD_OF_THE_DAY -> CardOfTheDayWidget(uiState.cardOfTheDay, uiState.discoverLoadState, onAction)
+            HomeWidgetType.CARD_OF_THE_DAY -> RandomCardWidget(uiState.cardOfTheDay, uiState.randomCardLoadState, onAction)
             HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
             HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
             HomeWidgetType.RULES_TIP -> RulesTipWidget()
             HomeWidgetType.SOCIAL_HUB -> SocialHubWidget(uiState, onAction)
             HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
+        }
+    }
+}
+
+/**
+ * Resolves the trailing affordance shown in a widget's section header, or null when the widget
+ * has none. Each branch is self-contained; the DISCOVER_CARDS branch hosts its own local
+ * set-picker toggle state and the reusable [SetPickerSheet].
+ */
+private fun widgetHeaderTrailingContent(
+    type: HomeWidgetType,
+    uiState: HomeUiState,
+    onAction: (HomeAction) -> Unit,
+): (@Composable () -> Unit)? = when (type) {
+    HomeWidgetType.QUICK_ACTIONS -> {
+        {
+            WidgetHeaderIconButton(
+                icon = Icons.Default.Edit,
+                contentDescription = "Customize shortcuts",
+                onClick = { onAction(HomeAction.CustomizeQuickStart) },
+            )
+        }
+    }
+    HomeWidgetType.CARD_OF_THE_DAY -> {
+        {
+            WidgetHeaderIconButton(
+                icon = Icons.Default.Refresh,
+                contentDescription = stringResource(R.string.home_random_refresh),
+                onClick = { onAction(HomeAction.RefreshRandomCard) },
+            )
+        }
+    }
+    HomeWidgetType.DISCOVER_CARDS -> {
+        {
+            val spacing = MaterialTheme.spacing
+            var showSetPicker by remember { mutableStateOf(false) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                DiscoverSetAffordance(
+                    set = uiState.discoverSet,
+                    onClick = { showSetPicker = true },
+                )
+                WidgetHeaderIconButton(
+                    icon = Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.home_discover_refresh),
+                    onClick = { onAction(HomeAction.RefreshDiscover) },
+                )
+            }
+            if (showSetPicker) {
+                SetPickerSheet(
+                    selectedSetCodes = setOfNotNull(uiState.discoverSetCode),
+                    onToggleSet = { set ->
+                        // Single-selection at the call site: re-tapping the active set clears it,
+                        // any other set replaces it. Dismiss after the pick.
+                        onAction(
+                            HomeAction.SelectDiscoverSet(
+                                if (set.code == uiState.discoverSetCode) null else set,
+                            ),
+                        )
+                        showSetPicker = false
+                    },
+                    onDismiss = { showSetPicker = false },
+                    availableSets = null,
+                    singleSelection = true,
+                )
+            }
+        }
+    }
+    else -> null
+}
+
+/**
+ * The standard ManaHub icon button used in widget section headers. The 24dp glyph is wrapped in a
+ * [minimumInteractiveComponentSize] box so the touch target is ≥48dp even though the icon is small.
+ */
+@Composable
+private fun WidgetHeaderIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .clip(CircleShape)
+            .clickable(onClickLabel = contentDescription, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = MaterialTheme.magicColors.primaryAccent,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+/**
+ * Discover-widget set selector affordance. When a set is scoped, shows the set's SVG icon + its
+ * uppercase code; otherwise falls back to the generic Layers icon. The whole row is a ≥48dp tap
+ * target that re-opens the set picker.
+ */
+@Composable
+private fun DiscoverSetAffordance(
+    set: MagicSet?,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val label = set?.let { stringResource(R.string.home_discover_set_selected, it.code.uppercase()) }
+        ?: stringResource(R.string.home_discover_select_set)
+
+    Row(
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .clip(ChipShape)
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
+            .padding(horizontal = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+    ) {
+        if (set != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(set.iconSvgUri)
+                    .decoderFactory(SvgDecoder.Factory())
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                colorFilter = ColorFilter.tint(mc.primaryAccent),
+            )
+            Text(
+                text = set.code.uppercase(),
+                style = ty.labelMedium,
+                color = mc.primaryAccent,
+                maxLines = 1,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Layers,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 }
@@ -378,7 +524,8 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
     // Delegate to the carousel / completion card when the hero is the Welcome state.
     if (hero is HomeHeroState.Welcome) {
         if (hero.steps.isEmpty()) {
-            FirstStepsCompletedCard()
+            // FirstStepsCompletedCard is hidden per user request
+            return
         } else {
             FirstStepsCarousel(
                 steps = hero.steps,
@@ -386,6 +533,11 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
                 onSkip = { stepId -> onAction(HomeAction.SkipFirstStep(stepId)) },
             )
         }
+        return
+    }
+
+    if (hero is HomeHeroState.Summary) {
+        // Welcome back widget is hidden per user request
         return
     }
 
@@ -495,6 +647,7 @@ internal fun FirstStepsCarousel(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val coroutineScope = rememberCoroutineScope()
 
     // Re-key the pager whenever the number of steps changes (e.g. a step is skipped),
     // so the current page index can never point past the end of the list.
@@ -504,7 +657,7 @@ internal fun FirstStepsCarousel(
     // true during a drag/fling, which cancels and restarts this effect — pausing the timer.
     LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
         if (!pagerState.isScrollInProgress) {
-            delay(3_000L)
+            delay(4_000L)
             if (steps.size > 1) {
                 pagerState.animateScrollToPage((pagerState.currentPage + 1) % steps.size)
             }
@@ -512,126 +665,137 @@ internal fun FirstStepsCarousel(
     }
 
     WidgetShell {
-        // Section label.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Icon(
-                imageVector = Icons.Default.AutoAwesome,
-                contentDescription = null,
-                tint = mc.primaryAccent,
-                modifier = Modifier.size(14.dp),
-            )
-            Text(
-                text = stringResourceSafe(R.string.first_steps_section_label),
-                style = ty.labelMedium,
-                color = mc.primaryAccent,
-                maxLines = 1,
-            )
-        }
+        WidgetSectionHeader(
+            title = stringResourceSafe(R.string.first_steps_section_label),
+            icon = Icons.Default.AutoAwesome
+        )
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxWidth(),
-        ) { page ->
-            val step = steps.getOrNull(page) ?: steps.first()
-            Column(
+        Box(contentAlignment = Alignment.Center) {
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                // Icon badge + slide counter.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(mc.primaryAccent.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = step.icon,
-                            contentDescription = null,
-                            tint = mc.primaryAccent,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        text = "${page + 1} / ${steps.size}",
-                        style = ty.labelSmall,
-                        color = mc.textSecondary,
-                    )
-                }
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = spacing.xl)
+            ) { page ->
+                val step = steps.getOrNull(page) ?: steps.first()
+                val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                val alphaValue = (1f - kotlin.math.abs(pageOffset)).coerceIn(0f, 1f)
+                val scaleValue = (1f - 0.2f * kotlin.math.abs(pageOffset)).coerceIn(0.8f, 1f)
 
-                Text(
-                    text = stringResourceSafe(step.titleRes),
-                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = mc.textPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = stringResourceSafe(step.subtitleRes),
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Spacer(Modifier.height(spacing.xs))
-
-                // Full-width CTA + skip below it.
-                PillButton(
-                    label = stringResourceSafe(R.string.first_steps_cta_label),
-                    icon = step.icon,
-                    onClick = { onAction(step.action) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                val skipLabel = stringResourceSafe(R.string.first_step_skip)
-                Box(
+                Surface(
+                    color = mc.surface.copy(alpha = 0.6f),
+                    shape = CardShape,
+                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .clip(ButtonShape)
-                        .semantics { contentDescription = skipLabel }
-                        .clickable { onSkip(step.id) },
-                    contentAlignment = Alignment.Center,
+                        .padding(vertical = spacing.md)
+                        .padding(horizontal = spacing.xs)
+                        .graphicsLayer {
+                            alpha = alphaValue
+                            scaleX = scaleValue
+                            scaleY = scaleValue
+                        }
+                        .coloredShadow(
+                            color = mc.primaryAccent.copy(alpha = 0.15f),
+                            borderRadius = 18.dp,
+                            blurRadius = 24.dp
+                        )
+                        .clip(CardShape)
+                        .clickable {
+                            onSkip(step.id)
+                            onAction(step.action)
+                        }
                 ) {
-                    Text(
-                        text = skipLabel,
-                        style = ty.labelMedium,
-                        color = mc.textSecondary,
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.lg, vertical = spacing.xl),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(spacing.md)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(mc.primaryAccent.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when (val icon = step.icon) {
+                                is StepIcon.Vector -> Icon(
+                                    imageVector = icon.imageVector,
+                                    contentDescription = null,
+                                    tint = mc.primaryAccent,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                is StepIcon.Drawable -> Icon(
+                                    painter = painterResource(id = icon.resId),
+                                    contentDescription = null,
+                                    tint = mc.primaryAccent,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                        ) {
+                            Text(
+                                text = stringResourceSafe(step.titleRes),
+                                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = mc.textPrimary,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = stringResourceSafe(step.subtitleRes),
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
-        }
 
-        // Progress dots.
-        if (steps.size > 1) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                steps.forEachIndexed { idx, _ ->
-                    val isCurrent = idx == pagerState.currentPage
-                    Box(
+            if (steps.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = null,
+                        tint = mc.primaryAccent.copy(alpha = 0.5f),
                         modifier = Modifier
-                            .size(if (isCurrent) 8.dp else 6.dp)
+                            .size(28.dp)
+                            .alpha(if (pagerState.currentPage > 0) 1f else 0.1f)
                             .clip(CircleShape)
-                            .then(
-                                if (isCurrent) {
-                                    Modifier.background(mc.primaryAccent)
-                                } else {
-                                    Modifier.background(mc.primaryAccent.copy(alpha = 0.30f))
+                            .clickable(enabled = pagerState.currentPage > 0) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
                                 }
-                            ),
+                            }
                     )
-                    if (idx < steps.size - 1) Spacer(Modifier.width(spacing.xs))
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = mc.primaryAccent.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .alpha(if (pagerState.currentPage < steps.size - 1) 1f else 0.1f)
+                            .clip(CircleShape)
+                            .clickable(enabled = pagerState.currentPage < steps.size - 1) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                }
+                            }
+                    )
                 }
             }
         }
@@ -1096,9 +1260,22 @@ private fun <T> AutoSlideHub(
         Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.xl),
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = spacing.xl)
             ) { page ->
-                slideContent(slides[page])
+                val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                val alphaValue = (1f - kotlin.math.abs(pageOffset)).coerceIn(0f, 1f)
+                val scaleValue = (1f - 0.2f * kotlin.math.abs(pageOffset)).coerceIn(0.8f, 1f)
+
+                Box(
+                    modifier = Modifier.graphicsLayer {
+                        alpha = alphaValue
+                        scaleX = scaleValue
+                        scaleY = scaleValue
+                    }
+                ) {
+                    slideContent(slides[page])
+                }
             }
             if (showDots && slides.size > 1) {
                 Row(
@@ -1770,18 +1947,36 @@ private fun DiscoverCardsWidget(
     loadState: DiscoverLoadState,
     onAction: (HomeAction) -> Unit,
 ) {
+    val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.SearchCard) }) {
         when {
-            // Only spin while genuinely loading — a failed/empty fetch shows a retry affordance.
+            // Empty + loading: full spinner (initial load / a refresh that just cleared the row).
             cards.isEmpty() && loadState == DiscoverLoadState.LOADING -> WidgetLoading()
+            // Empty + not loading: a failed/empty fetch shows a retry affordance.
             cards.isEmpty() -> WidgetRetryBody(
                 message = stringResourceSafe(R.string.home_discover_unavailable),
-                onRetry = { onAction(HomeAction.RetryDiscover) },
+                onRetry = { onAction(HomeAction.RefreshDiscover) },
             )
-            else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                items(cards, key = { it.id }) { card ->
-                    DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+            else -> {
+                // While cards are still streaming in, show a thin inline spinner above the row so a
+                // refresh that already has partial results still reads as "loading".
+                if (loadState == DiscoverLoadState.LOADING) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            color = mc.primaryAccent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                    items(cards, key = { it.id }) { card ->
+                        DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+                    }
                 }
             }
         }
@@ -1793,8 +1988,9 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     Box(
         modifier = Modifier
-            .width(90.dp)
-            .height(130.dp)
+            .width(110.dp)
+            // Full MTG card aspect ratio (745:1040) so the whole card is shown.
+            .aspectRatio(0.717f)
             .clip(CardShape)
             .background(mc.surfaceVariant)
             .clickable(onClick = onClick),
@@ -1804,7 +2000,7 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
             AsyncImage(
                 model = card.imageUrl,
                 contentDescription = card.name,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -1814,35 +2010,37 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  CARD_OF_THE_DAY
+//  CARD_OF_THE_DAY (enum) → Random card widget: a single full card image, centered
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun CardOfTheDayWidget(
+private fun RandomCardWidget(
     card: DiscoverCard?,
     loadState: DiscoverLoadState,
     onAction: (HomeAction) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId)) } }) {
-        if (card == null) {
-            if (loadState == DiscoverLoadState.LOADING) {
-                WidgetLoading()
-            } else {
-                WidgetRetryBody(
-                    message = stringResourceSafe(R.string.home_discover_unavailable),
-                    onRetry = { onAction(HomeAction.RetryDiscover) },
-                )
-            }
+        // Priority: LOADING → spinner (even over a previously-shown card, so refresh gives visible
+        // feedback); LOADED + card → full image; otherwise → retry affordance.
+        if (loadState == DiscoverLoadState.LOADING) {
+            WidgetLoading()
             return@WidgetShell
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+        if (card == null) {
+            WidgetRetryBody(
+                message = stringResourceSafe(R.string.home_discover_unavailable),
+                onRetry = { onAction(HomeAction.RefreshRandomCard) },
+            )
+            return@WidgetShell
+        }
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
-                    .width(60.dp)
-                    .height(85.dp)
+                    // Constrain the width so the full card shows at a pleasant size even on LARGE.
+                    .fillMaxWidth(0.62f)
+                    // Full MTG card aspect ratio (745:1040).
+                    .aspectRatio(0.717f)
                     .clip(CardShape)
                     .background(mc.surfaceVariant),
                 contentAlignment = Alignment.Center,
@@ -1851,17 +2049,11 @@ private fun CardOfTheDayWidget(
                     AsyncImage(
                         model = card.imageUrl,
                         contentDescription = card.name,
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    Icon(Icons.Default.Style, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(22.dp))
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(card.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                card.typeLine?.let {
-                    Text(it, style = ty.labelSmall, color = mc.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Icon(Icons.Default.Style, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(32.dp))
                 }
             }
         }
@@ -2157,6 +2349,7 @@ private fun SocialHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
         AutoSlideHub(
             slides = slides,
             slideContent = { slide -> SocialSlideContent(slide, onAction) },
+            showDots = false,
         )
     }
 }
@@ -2262,6 +2455,7 @@ private fun TradesHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
         AutoSlideHub(
             slides = slides,
             slideContent = { slide -> TradesSlideContent(slide, onAction) },
+            showDots = false,
         )
     }
 }

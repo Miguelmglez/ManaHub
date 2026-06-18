@@ -113,6 +113,7 @@ class HomeViewModelTest {
     private val communityStatsRepository: CommunityStatsRepository = mockk(relaxed = true)
     private val draftRepository: DraftRepository = mockk(relaxed = true)
     private val cardRepository: com.mmg.manahub.core.domain.repository.CardRepository = mockk(relaxed = true)
+    private val scryfallRemoteDataSource: com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource = mockk(relaxed = true)
     private val wishlistRepository: WishlistRepository = mockk(relaxed = true)
     private val gamificationRepository: GamificationRepository = mockk(relaxed = true)
 
@@ -161,7 +162,9 @@ class HomeViewModelTest {
         every { communityStatsRepository.observeCommunityStats() } returns flowOf(null)
         coEvery { draftRepository.getDraftableSets(any()) } returns DataResult.Success(emptyList())
         // Discover widget random-card fetch: default to an empty result.
-        coEvery { cardRepository.searchCards(any(), any()) } returns DataResult.Success(emptyList())
+        coEvery { cardRepository.searchCards(any(), any(), any()) } returns DataResult.Success(emptyList())
+        // Default-random-set seeding: no sets available (falls back to the global random query).
+        coEvery { scryfallRemoteDataSource.getAllSets() } returns emptyList()
 
         // Wishlist default: empty.
         every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
@@ -211,6 +214,7 @@ class HomeViewModelTest {
         refreshNewsFeedUseCase = refreshNewsFeedUseCase,
         manageSourcesUseCase = manageSourcesUseCase,
         cardRepository = cardRepository,
+        scryfallRemoteDataSource = scryfallRemoteDataSource,
         communityStatsRepository = communityStatsRepository,
         draftRepository = draftRepository,
         wishlistRepository = wishlistRepository,
@@ -1339,7 +1343,7 @@ class HomeViewModelTest {
 
     @Test
     fun `discover load state is LOADED when the random card fetch succeeds`() = runTest(testDispatcher) {
-        coEvery { cardRepository.searchCards(any(), any()) } returns
+        coEvery { cardRepository.searchCards(any(), any(), any()) } returns
             DataResult.Success(listOf(discoverCard("c1")))
 
         val vm = buildViewModel()
@@ -1352,7 +1356,7 @@ class HomeViewModelTest {
 
     @Test
     fun `discover load state is FAILED when the random card fetch returns empty`() = runTest(testDispatcher) {
-        coEvery { cardRepository.searchCards(any(), any()) } returns DataResult.Success(emptyList())
+        coEvery { cardRepository.searchCards(any(), any(), any()) } returns DataResult.Success(emptyList())
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1364,7 +1368,7 @@ class HomeViewModelTest {
 
     @Test
     fun `RetryDiscover re-fetches and reaches LOADED on success`() = runTest(testDispatcher) {
-        coEvery { cardRepository.searchCards(any(), any()) } returns DataResult.Success(emptyList())
+        coEvery { cardRepository.searchCards(any(), any(), any()) } returns DataResult.Success(emptyList())
 
         val vm = buildViewModel()
         backgroundScope.launch { vm.state.collect {} }
@@ -1372,13 +1376,29 @@ class HomeViewModelTest {
         assertEquals(DiscoverLoadState.FAILED, vm.state.value.discoverLoadState)
 
         // Next attempt succeeds.
-        coEvery { cardRepository.searchCards(any(), any()) } returns
+        coEvery { cardRepository.searchCards(any(), any(), any()) } returns
             DataResult.Success(listOf(discoverCard("c1")))
         vm.onAction(HomeAction.RetryDiscover)
         advanceUntilIdle()
 
         assertEquals(DiscoverLoadState.LOADED, vm.state.value.discoverLoadState)
         assertTrue(vm.state.value.discoverCards.isNotEmpty())
+    }
+
+    @Test
+    fun `RefreshRandomCard reaches LOADED and sets the random card`() = runTest(testDispatcher) {
+        coEvery { cardRepository.searchCards(any(), any(), any()) } returns
+            DataResult.Success(listOf(discoverCard("r1")))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.onAction(HomeAction.RefreshRandomCard)
+        advanceUntilIdle()
+
+        assertEquals(DiscoverLoadState.LOADED, vm.state.value.randomCardLoadState)
+        assertEquals("r1", vm.state.value.cardOfTheDay?.scryfallId)
     }
 
     // ── News filters (persisted, shared with NewsScreen) ──────────────────────

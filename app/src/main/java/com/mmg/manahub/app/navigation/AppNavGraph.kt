@@ -282,7 +282,23 @@ fun AppNavGraph(
                             // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge, RateApp are
                             // handled inside HomeScreen / HomeViewModel.
                             HomeAction.CustomizeQuickStart -> Unit
-                            HomeAction.RateApp -> Unit
+                            HomeAction.RateApp -> {
+                                val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
+                                val request = reviewManager.requestReviewFlow()
+                                request.addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        val reviewInfo = task.result
+                                        activity.let { reviewManager.launchReviewFlow(it, reviewInfo) }
+                                    } else {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
+                                        try {
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                                        }
+                                    }
+                                }
+                            }
                             is HomeAction.SaveQuickStart -> Unit
                             HomeAction.CreateAccount -> navController.navigate(Screen.Profile.baseRoute)
                             HomeAction.DismissAccountNudge -> Unit
@@ -298,7 +314,7 @@ fun AppNavGraph(
                                 Screen.CollectionCardDetail.createRoute(action.scryfallId)
                             )
                             is HomeAction.OpenDeck ->
-                                navController.navigate(Screen.DeckDetail.createRoute(action.deckId))
+                                navController.navigate(Screen.DeckStudio.createRoute(action.deckId))
                             is HomeAction.OpenNewsUrl -> {
                                 val url = action.url.trim()
                                 if (url.isNotEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
@@ -325,6 +341,9 @@ fun AppNavGraph(
                             HomeAction.OpenWidgetGallery,
                             HomeAction.ResetLayout,
                             HomeAction.RetryDiscover,
+                            HomeAction.RefreshDiscover,
+                            HomeAction.RefreshRandomCard,
+                            is HomeAction.SelectDiscoverSet,
                             HomeAction.ResetNewsFilters,
                             is HomeAction.MoveWidget,
                             is HomeAction.AddWidget,
@@ -344,7 +363,8 @@ fun AppNavGraph(
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                    onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
                     onPlaytestClick = { id ->
                         navController.navigate(Screen.PlaytestSetup.createRoute(id))
                     },
@@ -366,7 +386,8 @@ fun AppNavGraph(
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                    onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
                     onPlaytestClick = { id ->
                         navController.navigate(Screen.PlaytestSetup.createRoute(id))
                     },
@@ -388,7 +409,8 @@ fun AppNavGraph(
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
                     onScannerClick = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onDeckClick = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                    onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
                     onPlaytestClick = { id ->
                         navController.navigate(Screen.PlaytestSetup.createRoute(id))
                     },
@@ -430,7 +452,7 @@ fun AppNavGraph(
                 CardDetailScreen(
                     onBack              = { navController.popBackStack() },
                     onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
-                    onNavigateToDeck    = { id -> navController.navigate(Screen.DeckDetail.createRoute(id)) },
+                    onNavigateToDeck    = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
                     onNavigateToCard    = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id)) {
                             popUpTo(Screen.CollectionCardDetail.route) { inclusive = true }
@@ -490,6 +512,12 @@ fun AppNavGraph(
                     onCardClick = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
+                    onPlaytest = { deckId ->
+                        navController.navigate(Screen.PlaytestSetup.createRoute(deckId))
+                    },
+                    onReviewSurvey = { sessionId ->
+                        navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
+                    },
                 )
             }
 
@@ -506,7 +534,7 @@ fun AppNavGraph(
                         navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
                     },
                     onDeckClick = { deckId ->
-                        navController.navigate(Screen.DeckDetail.createRoute(deckId))
+                        navController.navigate(Screen.DeckStudio.createRoute(deckId))
                     },
                 )
             }

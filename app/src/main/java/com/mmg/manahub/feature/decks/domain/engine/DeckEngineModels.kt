@@ -12,14 +12,18 @@ enum class GameFormat(
     val deckSize: Int,
     val sideboardSize: Int,
 ) {
-    STANDARD ("Standard",  60, 25),
+
+    COMMANDER("Commander", 99, 25),
+    DRAFT("Draft", 40, 25),
+    /*
     PIONEER  ("Pioneer",   60, 25),
     MODERN   ("Modern",    60, 25),
-    COMMANDER("Commander", 99,  25),
     LEGACY   ("Legacy",    60, 25),
     VINTAGE  ("Vintage",   60, 25),
     PAUPER   ("Pauper",    60, 25),
-    CASUAL   ("Casual",    60, 25),
+    STANDARD ("Standard",  60, 25),
+    */
+    CASUAL("Casual", 60, 25),
 }
 
 /**
@@ -29,16 +33,18 @@ enum class GameFormat(
  * to Standard. There is no Draft entry in [GameFormat]. Lives in the engine package so the engines
  * stay free of a presentation import.
  */
-internal fun GameFormat.toEngineDeckFormat(): com.mmg.manahub.core.domain.model.DeckFormat = when (this) {
-    GameFormat.COMMANDER -> com.mmg.manahub.core.domain.model.DeckFormat.COMMANDER
-    GameFormat.STANDARD -> com.mmg.manahub.core.domain.model.DeckFormat.STANDARD
-    GameFormat.PIONEER -> com.mmg.manahub.core.domain.model.DeckFormat.PIONEER
-    GameFormat.MODERN -> com.mmg.manahub.core.domain.model.DeckFormat.MODERN
-    GameFormat.LEGACY -> com.mmg.manahub.core.domain.model.DeckFormat.LEGACY
-    GameFormat.VINTAGE -> com.mmg.manahub.core.domain.model.DeckFormat.VINTAGE
-    GameFormat.PAUPER -> com.mmg.manahub.core.domain.model.DeckFormat.PAUPER
-    GameFormat.CASUAL -> com.mmg.manahub.core.domain.model.DeckFormat.CASUAL
-}
+internal fun GameFormat.toEngineDeckFormat(): com.mmg.manahub.core.domain.model.DeckFormat =
+    when (this) {
+        GameFormat.COMMANDER -> com.mmg.manahub.core.domain.model.DeckFormat.COMMANDER
+        /*GameFormat.STANDARD -> com.mmg.manahub.core.domain.model.DeckFormat.STANDARD
+        GameFormat.PIONEER -> com.mmg.manahub.core.domain.model.DeckFormat.PIONEER
+        GameFormat.MODERN -> com.mmg.manahub.core.domain.model.DeckFormat.MODERN
+        GameFormat.LEGACY -> com.mmg.manahub.core.domain.model.DeckFormat.LEGACY
+        GameFormat.VINTAGE -> com.mmg.manahub.core.domain.model.DeckFormat.VINTAGE
+        GameFormat.PAUPER -> com.mmg.manahub.core.domain.model.DeckFormat.PAUPER*/
+        GameFormat.DRAFT -> com.mmg.manahub.core.domain.model.DeckFormat.DRAFT
+        GameFormat.CASUAL -> com.mmg.manahub.core.domain.model.DeckFormat.CASUAL
+    }
 
 enum class ManaColor(val symbol: String, val displayName: String) {
     W("W", "White"),
@@ -102,20 +108,20 @@ enum class SeedStrategy(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 data class CardSuggestion(
-    val card:     Card,
-    val score:    Float,
+    val card: Card,
+    val score: Float,
     /**
      * Structured, localizable explanations (plan E5) — rendered via `ScoreReason.label()` in the
      * presentation layer, NOT the old `roles.map { it.name }` raw-enum-name leak.
      */
-    val reasons:  List<ScoreReason>,
-    val isOwned:  Boolean,
+    val reasons: List<ScoreReason>,
+    val isOwned: Boolean,
 )
 
 data class DeckEntry(
-    val card:        Card,
-    val quantity:    Int,
-    val isOwned:     Boolean,
+    val card: Card,
+    val quantity: Int,
+    val isOwned: Boolean,
     val isSideboard: Boolean = false,
 )
 

@@ -500,12 +500,12 @@ class DeckScorer @Inject constructor(
         // "restricted" (Vintage) is still legal (1 copy). CASUAL/DRAFT are permissive.
         fun ok(s: String) = s.equals("legal", true) || s.equals("restricted", true)
         return when (format) {
-            DeckFormat.STANDARD -> ok(card.legalityStandard)
+            /*DeckFormat.STANDARD -> ok(card.legalityStandard)
             DeckFormat.PIONEER -> ok(card.legalityPioneer)
             DeckFormat.MODERN -> ok(card.legalityModern)
             DeckFormat.LEGACY -> ok(card.legalityLegacy)
             DeckFormat.VINTAGE -> ok(card.legalityVintage)
-            DeckFormat.PAUPER -> ok(card.legalityPauper)
+            DeckFormat.PAUPER -> ok(card.legalityPauper)*/
             DeckFormat.COMMANDER -> ok(card.legalityCommander)
             DeckFormat.CASUAL -> true // permissive: no legality restriction
             DeckFormat.DRAFT -> true // limited: any card in the set is playable

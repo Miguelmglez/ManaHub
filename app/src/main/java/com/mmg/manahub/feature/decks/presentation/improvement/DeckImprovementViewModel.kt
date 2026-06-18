@@ -158,8 +158,8 @@ class DeckImprovementViewModel @Inject constructor(
             val collection = userCardRepository.observeCollection().first()
             val deckFormat = DeckFormat.entries
                 .firstOrNull { it.name.equals(deckWithCards.deck.format, ignoreCase = true) }
-                ?: DeckFormat.STANDARD.also {
-                    FirebaseCrashlytics.getInstance().log("Unknown deck format: '${deckWithCards.deck.format}' – defaulting to STANDARD")
+                ?: DeckFormat.CASUAL.also {
+                    FirebaseCrashlytics.getInstance().log("Unknown deck format: '${deckWithCards.deck.format}' – defaulting to CASUAL")
                 }
 
             // Resolve every mainboard slot. Slots whose card cannot be resolved are counted (E6) and

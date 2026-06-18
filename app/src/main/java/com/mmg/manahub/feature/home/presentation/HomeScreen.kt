@@ -130,6 +130,9 @@ fun HomeScreen(
                 is HomeAction.RemoveWidget,
                 HomeAction.ResetLayout,
                 HomeAction.RetryDiscover,
+                HomeAction.RefreshDiscover,
+                HomeAction.RefreshRandomCard,
+                is HomeAction.SelectDiscoverSet,
                 HomeAction.ResetNewsFilters,
                 -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.

@@ -45,15 +45,47 @@ class ScryfallRemoteDataSource @Inject constructor(
             }
         }
 
-    suspend fun searchCards(query: String, page: Int = 1): Result<List<Card>> =
+    /**
+     * Searches Scryfall for cards matching [query], page [page].
+     *
+     * Results are memoised in [ScryfallCache.searches] keyed by `query:page`. When [bypassCache]
+     * is true the memoised path is skipped and the loader always runs — required for queries that
+     * embed `order:random`, where a stable cache key would otherwise return the same page on every
+     * "refresh" (see Home Discover/Random-card widgets). The individual card cache is still
+     * populated either way. The request remains rate-limited inside [ScryfallRequestQueue].
+     *
+     * NOTE: bypassing the in-memory [ScryfallCache.searches] map alone is NOT enough — the OkHttp
+     * disk cache also serves `/cards/search` responses (the network interceptor forces
+     * `Cache-Control: public, max-age=300` on them), so the identical `order:random` URL would still
+     * be replayed from disk for 5 minutes. On the [bypassCache] path the loader therefore calls the
+     * no-cache endpoint [ScryfallApi.searchCardsNoCache] (`Cache-Control: no-cache`) and forces
+     * `order = "random"` so every refresh hits the network and yields genuinely different cards.
+     */
+    suspend fun searchCards(
+        query: String,
+        page: Int = 1,
+        bypassCache: Boolean = false,
+    ): Result<List<Card>> =
         safeCall {
-            val cacheKey = "${query.lowercase().trim()}:$page"
-            cache.searches.getOrFetch(cacheKey) {
-                val cards = requestQueue.execute { api.searchCards(query, page = page) }
-                    .data.toDomain()
+            val loader: suspend () -> List<Card> = {
+                val response = requestQueue.execute {
+                    if (bypassCache) {
+                        // Bypass the OkHttp disk cache and force server-side random ordering.
+                        api.searchCardsNoCache(query, order = "random", page = page)
+                    } else {
+                        api.searchCards(query, page = page)
+                    }
+                }
+                val cards = response.data.toDomain()
                 // Populate card cache with individual results
                 cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
                 cards
+            }
+            if (bypassCache) {
+                loader()
+            } else {
+                val cacheKey = "${query.lowercase().trim()}:$page"
+                cache.searches.getOrFetch(cacheKey, loader)
             }
         }
 

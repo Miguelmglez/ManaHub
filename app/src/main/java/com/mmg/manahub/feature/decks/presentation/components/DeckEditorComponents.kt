@@ -1,17 +1,24 @@
 package com.mmg.manahub.feature.decks.presentation.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
@@ -56,12 +64,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
@@ -374,9 +384,13 @@ internal fun AddBasicLandsRow(onClick: () -> Unit, modifier: Modifier = Modifier
 /**
  * Bottom sheet to edit a deck's name and cover art.
  *
- * @param deck the deck being edited (provides the current name + cover).
+ * @param deck the deck being edited (provides the current name + cover + format).
  * @param cards mainboard/sideboard slots, used to populate the cover-art picker.
  * @param onSave invoked with the new name and/or cover id (either may be null).
+ * @param onDismiss invoked when the sheet is dismissed.
+ * @param onFormatChange optional — when non-null, a format selector chip row is shown and
+ *        each pick is forwarded immediately (writes through the VM, independent of [onSave]).
+ *        Null callers (e.g. legacy Deck Magic) keep the previous name/cover-only sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -385,6 +399,7 @@ internal fun EditDeckSheet(
     cards: List<DeckSlotEntry>,
     onSave: (newName: String?, newCoverId: String?) -> Unit,
     onDismiss: () -> Unit,
+    onFormatChange: ((DeckFormat) -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -444,6 +459,130 @@ internal fun EditDeckSheet(
         }
     }
 }
+
+/**
+ * The deck formats offered by the studio's format selector (Group B / B1), in display order.
+ *
+ * A curated subset of [DeckFormat] — the formats a user actively builds toward. Other
+ * [DeckFormat] entries (e.g. the engine-internal ones) are intentionally not offered here.
+ */
+internal val STUDIO_FORMATS: List<DeckFormat> = listOf(
+    DeckFormat.COMMANDER,
+    /*DeckFormat.STANDARD,
+
+    DeckFormat.PIONEER,
+    DeckFormat.MODERN,
+    DeckFormat.PAUPER,*/
+    DeckFormat.CASUAL,
+    DeckFormat.DRAFT,
+)
+
+/**
+ * A row of pill-cards for picking a deck [DeckFormat] (Group B / B1), similar to the
+ * game mode selector.
+ *
+ * Stateless: the currently selected format is passed in and every pick is a callback. Shared
+ * by the Deck Studio empty-state and [EditDeckSheet] so the two surfaces look identical.
+ *
+ * @param selectedFormat the resolved current format (null when unrecognized → no chip selected).
+ * @param onFormatSelected invoked with the picked format.
+ */
+@Composable
+internal fun DeckFormatChipRow(
+    selectedFormat: DeckFormat?,
+    onFormatSelected: (DeckFormat) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = MaterialTheme.spacing
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(spacing.md),
+    ) {
+        STUDIO_FORMATS.forEach { format ->
+            DeckFormatPill(
+                format = format,
+                selected = format == selectedFormat,
+                onClick = { onFormatSelected(format) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * A single pill card representing one [DeckFormat] option.
+ */
+@Composable
+private fun DeckFormatPill(
+    format: DeckFormat,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.05f else 1f,
+        animationSpec = tween(durationMillis = 300),
+        label = "formatPillScale",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent else mc.surfaceVariant.copy(alpha = 0.5f),
+        animationSpec = tween(durationMillis = 300),
+        label = "formatPillBorder",
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface,
+        animationSpec = tween(durationMillis = 300),
+        label = "formatPillBg",
+    )
+
+    Column(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                shape = RoundedCornerShape(12.dp)
+                clip = true
+            }
+            .background(bgColor)
+            .border(
+                width = if (selected) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = spacing.md, horizontal = spacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
+    ) {
+        Text(
+            text = when (format) {
+                DeckFormat.COMMANDER -> "⚔️"
+                DeckFormat.DRAFT -> "📦"
+                else -> "🔮"
+            },
+            style = ty.bodyMedium,
+        )
+        Text(
+            text = stringResource(format.displayNameRes),
+            style = ty.labelLarge,
+            color = if (selected) mc.primaryAccent else mc.textPrimary,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = stringResource(R.string.decklist_card_count, format.targetDeckSize),
+            style = ty.labelSmall,
+            color = mc.textSecondary,
+        )
+    }
+}
+
 
 /**
  * Groups deck slot entries by the given [GroupingMode] for sectioned display.

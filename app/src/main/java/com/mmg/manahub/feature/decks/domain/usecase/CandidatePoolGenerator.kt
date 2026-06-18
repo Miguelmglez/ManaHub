@@ -213,12 +213,12 @@ class CandidatePoolGenerator @Inject constructor(
 
     private fun legalityFragment(profile: DeckProfile): String? = when (profile.format) {
         com.mmg.manahub.core.domain.model.DeckFormat.COMMANDER -> "legal:commander"
-        com.mmg.manahub.core.domain.model.DeckFormat.STANDARD -> "legal:standard"
+       /* com.mmg.manahub.core.domain.model.DeckFormat.STANDARD -> "legal:standard"
         com.mmg.manahub.core.domain.model.DeckFormat.PIONEER -> "legal:pioneer"
         com.mmg.manahub.core.domain.model.DeckFormat.MODERN -> "legal:modern"
         com.mmg.manahub.core.domain.model.DeckFormat.LEGACY -> "legal:legacy"
         com.mmg.manahub.core.domain.model.DeckFormat.VINTAGE -> "legal:vintage"
-        com.mmg.manahub.core.domain.model.DeckFormat.PAUPER -> "legal:pauper"
+        com.mmg.manahub.core.domain.model.DeckFormat.PAUPER -> "legal:pauper"*/
         // Casual and Draft/limited have no universal Scryfall legality token; omit the fragment.
         com.mmg.manahub.core.domain.model.DeckFormat.CASUAL,
         com.mmg.manahub.core.domain.model.DeckFormat.DRAFT -> null

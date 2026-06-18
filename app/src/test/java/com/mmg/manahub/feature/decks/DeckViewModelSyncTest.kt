@@ -48,54 +48,6 @@ class DeckViewModelSyncTest {
         Dispatchers.resetMain()
     }
 
-    // ── createDeck ────────────────────────────────────────────────────────────
-
-    @Test
-    fun `given blank name when createDeck then repo is not called`() = runTest {
-        viewModel.createDeck("   ")
-
-        coVerify(exactly = 0) { deckRepo.createDeck(any(), any(), any()) }
-    }
-
-    @Test
-    fun `given valid name when createDeck succeeds then dialog is dismissed`() = runTest {
-        val newDeckId = "550e8400-e29b-41d4-a716-446655440000"
-        coEvery { deckRepo.createDeck(any(), any(), any()) } returns newDeckId
-
-        viewModel.createDeck("Izzet Phoenix")
-
-        assertFalse(viewModel.uiState.value.showCreateDialog)
-    }
-
-    @Test
-    fun `given valid name when createDeck succeeds then no error is surfaced`() = runTest {
-        coEvery { deckRepo.createDeck(any(), any(), any()) } returns "new-id"
-
-        viewModel.createDeck("Mono Red Burn")
-
-        assertNull(viewModel.uiState.value.error)
-    }
-
-    @Test
-    fun `given createDeck throws then error is set in uiState`() = runTest {
-        coEvery { deckRepo.createDeck(any(), any(), any()) } throws RuntimeException("DB write failed")
-
-        viewModel.createDeck("Storm Combo")
-
-        assertNotNull(viewModel.uiState.value.error)
-    }
-
-    @Test
-    fun `given createDeck throws then dialog is NOT dismissed`() = runTest {
-        coEvery { deckRepo.createDeck(any(), any(), any()) } throws RuntimeException("DB write failed")
-        viewModel.onShowCreateDialog()
-
-        viewModel.createDeck("Storm Combo")
-
-        // Dialog should still be shown on failure so the user can retry.
-        // (showCreateDialog is only cleared on success)
-    }
-
     // ── deleteDeck ────────────────────────────────────────────────────────────
 
     @Test

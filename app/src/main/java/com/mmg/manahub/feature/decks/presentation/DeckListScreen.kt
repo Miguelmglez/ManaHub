@@ -18,79 +18,44 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckListScreen(
     onDeckClick:       (deckId: String) -> Unit,
+    onCreateDeck:      () -> Unit,
     onPlaytestClick:   (deckId: String) -> Unit = {},
     viewModel:         DeckViewModel = hiltViewModel(),
 ) {
@@ -103,7 +68,7 @@ fun DeckListScreen(
         floatingActionButton = {
             if (uiState.decks.isNotEmpty()) {
                 FloatingActionButton(
-                    onClick = viewModel::onShowCreateDialog,
+                    onClick = onCreateDeck,
                     containerColor = mc.primaryAccent,
                     contentColor = mc.background,
                 ) {
@@ -124,7 +89,7 @@ fun DeckListScreen(
                 )
 
                 uiState.decks.isEmpty() -> EmptyDecksState(
-                    onCreateClick = viewModel::onShowCreateDialog,
+                    onCreateClick = onCreateDeck,
                     modifier      = Modifier.align(Alignment.Center),
                 )
 
@@ -139,25 +104,13 @@ fun DeckListScreen(
                                 deck        = deck,
                                 onClick     = { onDeckClick(deck.id) },
                                 onDelete    = { viewModel.deleteDeck(deck.id) },
-                                onPlaytest  = { onPlaytestClick(deck.id) },
+                                onPlaytest  = if (DeckFeatureFlags.PLAYTEST_ENABLED) ({ onPlaytestClick(deck.id) }) else null,
                             )
                         }
                     }
                 }
             }
         }
-    }
-
-    // Create deck bottom sheet
-    if (uiState.showCreateDialog) {
-        CreateDeckBottomSheet(
-            onDismiss = viewModel::onDismissCreateDialog,
-            onCreate  = { name, format -> viewModel.createDeck(name, format) },
-            onImportClick = {
-                viewModel.onDismissCreateDialog()
-                viewModel.onShowImportSheet()
-            }
-        )
     }
 
     if (uiState.showImportSheet) {
@@ -167,13 +120,6 @@ fun DeckListScreen(
             onImport  = viewModel::importDeck,
             onDismiss = viewModel::onDismissImportSheet,
         )
-    }
-
-    LaunchedEffect(uiState.createdDeckId) {
-        uiState.createdDeckId?.let { id ->
-            onDeckClick(id)
-            viewModel.onCreatedDeckNavigated()
-        }
     }
 
     uiState.error?.let {
@@ -242,166 +188,6 @@ private fun EmptyDecksState(
                 stringResource(R.string.decklist_empty_action),
                 style = ty.labelLarge,
             )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Create deck — ModalBottomSheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CreateDeckBottomSheet(
-    onDismiss: () -> Unit,
-    onCreate:  (name: String, format: String) -> Unit,
-    onImportClick: () -> Unit,
-) {
-    val mc         = MaterialTheme.magicColors
-    val ty         = MaterialTheme.magicTypography
-    var name       by remember { mutableStateOf("") }
-    var format     by remember { mutableStateOf("standard") }
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
-    )
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState       = sheetState,
-        containerColor   = mc.backgroundSecondary,
-        dragHandle = null,
-    ) {
-        Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .navigationBarsPadding(),
-        ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.offset(x = (-12).dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_cancel),
-                        tint = mc.textSecondary
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(
-                    text  = stringResource(R.string.decklist_create_button),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                )
-
-                OutlinedTextField(
-                    value         = name,
-                    onValueChange = { name = it },
-                    label         = {
-                        Text(
-                            text  = stringResource(R.string.deckbuilder_name_hint),
-                            style = ty.bodySmall,
-                        )
-                    },
-                    singleLine    = true,
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = mc.primaryAccent,
-                        unfocusedBorderColor = mc.surfaceVariant,
-                        focusedLabelColor    = mc.primaryAccent,
-                        focusedTextColor     = mc.textPrimary,
-                        unfocusedTextColor   = mc.textPrimary,
-                        cursorColor          = mc.primaryAccent,
-                    ),
-                )
-
-                FormatSelector(selected = format, onSelect = { format = it })
-
-                Button(
-                    onClick  = { if (name.isNotBlank()) onCreate(name, format) },
-                    enabled  = name.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape    = RoundedCornerShape(10.dp),
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor         = mc.primaryAccent,
-                        disabledContainerColor = mc.primaryAccent.copy(alpha = 0.3f),
-                    ),
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = mc.background)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text  = stringResource(R.string.decklist_create_button),
-                        style = ty.labelLarge,
-                        color = mc.background,
-                    )
-                }
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    thickness = 0.5.dp,
-                    color = mc.surfaceVariant
-                )
-
-                OutlinedButton(
-                    onClick = onImportClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, mc.primaryAccent),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent)
-                ) {
-                    Text(
-                        text = stringResource(R.string.deck_import_title),
-                        style = ty.labelLarge
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun FormatSelector(selected: String, onSelect: (String) -> Unit) {
-    val formats = listOf("standard", "commander", "draft")
-    val mc      = MaterialTheme.magicColors
-    val ty      = MaterialTheme.magicTypography
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text  = stringResource(R.string.deckbuilder_format_label),
-            style = ty.labelSmall,
-            color = mc.textSecondary,
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(formats, key = { it }) { fmt ->
-                FilterChip(
-                    selected = fmt == selected,
-                    onClick  = { onSelect(fmt) },
-                    label    = {
-                        Text(
-                            fmt.replaceFirstChar { it.uppercase() },
-                            style = ty.labelSmall,
-                        )
-                    },
-                    colors   = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = mc.primaryAccent.copy(alpha = 0.18f),
-                        selectedLabelColor     = mc.primaryAccent,
-                        containerColor         = mc.surface,
-                        labelColor             = mc.textSecondary,
-                    ),
-                )
-            }
         }
     }
 }

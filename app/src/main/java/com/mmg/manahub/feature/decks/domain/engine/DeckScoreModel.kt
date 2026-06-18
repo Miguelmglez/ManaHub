@@ -281,7 +281,7 @@ object DeckSkeletons {
             targetCurve = COMMANDER_CURVE,
             cmcBand = 2.5..4.0,
         )
-        DeckFormat.STANDARD -> sixtyCardSkeleton(
+       /* DeckFormat.STANDARD -> sixtyCardSkeleton(
             format = format, targetCurve = STANDARD_CURVE,
             landMin = 22, landIdeal = 24, landMax = 26, cmcBand = 1.8..3.2,
         )
@@ -297,7 +297,7 @@ object DeckSkeletons {
         DeckFormat.PAUPER -> sixtyCardSkeleton(
             format = format, targetCurve = PAUPER_CURVE,
             landMin = 21, landIdeal = 23, landMax = 25, cmcBand = 1.6..2.8,
-        )
+        )*/
         // Casual: permissive — Standard shape & curve, used as a forgiving default.
         DeckFormat.CASUAL -> sixtyCardSkeleton(
             format = format, targetCurve = STANDARD_CURVE,

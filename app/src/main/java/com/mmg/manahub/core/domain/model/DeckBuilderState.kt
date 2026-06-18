@@ -28,7 +28,7 @@ data class BasicLandDistribution(
 
 data class DeckBuilderState(
     val deckName: String = "",
-    val format: DeckFormat = DeckFormat.STANDARD,
+    val format: DeckFormat = DeckFormat.CASUAL,
     val commander: Card? = null,
     val commanderColorIdentity: Set<String> = emptySet(),
     val mainboard: List<DeckCard> = emptyList(),
