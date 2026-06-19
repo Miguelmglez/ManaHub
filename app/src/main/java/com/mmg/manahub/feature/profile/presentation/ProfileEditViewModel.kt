@@ -156,13 +156,21 @@ class ProfileEditViewModel @Inject constructor(
         val nameWasEdited = state.pendingName != state.currentName
         if (nameWasEdited && !state.isNameValid) return
 
+        // Fire the Supabase nickname push BEFORE the coroutine. onNicknameUpdate is
+        // AuthViewModel.updateNickname, which launches in its own (Profile-scoped) coroutine that
+        // survives sheet dismissal. It must NOT live inside ProfileEditViewModel.viewModelScope:
+        // onDismiss() removes the sheet from composition and clears this ViewModel, cancelling its
+        // scope immediately — which previously cancelled the coroutine before the push could fire.
+        if (nameWasEdited) {
+            onNicknameUpdate?.invoke(state.pendingName)
+        }
+
         viewModelScope.launch {
-            // Save Name
+            // Save Name locally.
             if (state.pendingName != state.currentName) {
                 userPreferencesDataStore.savePlayerName(state.pendingName)
-                onNicknameUpdate?.invoke(state.pendingName)
             }
-            
+
             // Save Avatar locally and push to Supabase
             state.pendingSelection?.let { url ->
                 userPreferencesDataStore.saveAvatarUrl(url)
