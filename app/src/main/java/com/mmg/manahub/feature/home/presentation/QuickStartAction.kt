@@ -16,10 +16,11 @@ enum class QuickStartAction(val persistedId: String) {
     SCAN_CARD("scan_card"),
     CREATE_DECK("create_deck"),
     DRAFT_GUIDE("draft_guide"),
+
+    STATS("stats"),
     SEARCH_CARD("search_card"),
     DECKS("decks"),
     NEWS("news"),
-    STATS("stats"),
     FRIENDS("friends"),
     TRADES("trades"),
     SETTINGS("settings");

@@ -125,6 +125,11 @@
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/fcm_notification_color" />
 
+        <!-- Download ML Kit OCR models at install time via Play Services (unbundled) -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr_latin,ocr_japanese,ocr_korean" />
+
     </application>
 
 </manifest>

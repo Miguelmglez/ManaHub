@@ -8,7 +8,9 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UpdateAvatarUrlDto
 import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
+import com.mmg.manahub.feature.auth.data.remote.ProfileFetchResult
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.auth.data.remote.UserProfileDto
 import com.mmg.manahub.feature.auth.domain.model.AuthError
 import com.mmg.manahub.feature.auth.domain.model.AuthResult
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
@@ -27,6 +29,7 @@ import io.github.jan.supabase.exceptions.RestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -221,11 +224,42 @@ class AuthRepositoryImpl @Inject constructor(
 
             // Use the get_profile_by_user_id RPC instead of a direct table query.
             // The handle_new_user trigger always creates a user_profiles row for every
-            // new auth.users entry (including Google OAuth), so `existingProfile == null`
-            // can NEVER be true here. The correct gate is profile_completed:
+            // new auth.users entry (including Google OAuth), so a "not found" result
+            // really means the user is brand new. The correct gate is profile_completed:
             //   - FALSE → user is new, has not chosen a nickname yet → redirect to sign-up
             //   - TRUE  → returning user, proceed to HomeScreen
-            val profile = userProfileDataSource.getProfileByUserId(userInfo.id)
+            //
+            // A FETCH FAILURE (HTTP 401/403/network) is NOT the same as "not found": just
+            // after signInWith(IDToken) the SDK session token may not have propagated to the
+            // OkHttp interceptor yet, so the RPC is rejected with the anon key. Treating that
+            // as "not found" would send a returning, fully-completed user back to the sign-up
+            // screen. We therefore distinguish the two via ProfileFetchResult, retry once, then
+            // fall back to a direct table query before giving up with a NETWORK error (never
+            // NoProfileFound).
+            var fetchResult = userProfileDataSource.getProfileByUserId(userInfo.id)
+            if (fetchResult is ProfileFetchResult.Failure) {
+                // Retry once: the session token usually propagates within a few hundred ms.
+                delay(PROFILE_FETCH_RETRY_DELAY_MS)
+                fetchResult = userProfileDataSource.getProfileByUserId(userInfo.id)
+            }
+
+            val profile: UserProfileDto? = when (fetchResult) {
+                is ProfileFetchResult.Found -> fetchResult.profile
+                is ProfileFetchResult.NotFound -> null
+                is ProfileFetchResult.Failure -> {
+                    // Both RPC attempts failed. Fall back to the direct table query as a last
+                    // resort — it never returns profile_completed reliably for fresh rows, but for
+                    // a returning user the row exists and carries the real flag.
+                    val fallback = userProfileDataSource.fetchUserProfile(userInfo.id)
+                    if (fallback == null) {
+                        // We genuinely could not read the profile. Do NOT misreport this as a
+                        // missing profile (which would force the user into sign-up); surface a
+                        // network error so the UI can offer a retry. Keep the session intact.
+                        return@runCatching AuthResult.Error(AuthError.NetworkError)
+                    }
+                    fallback
+                }
+            }
 
             if (profile == null || !profile.profileCompleted) {
                 // Profile row was created by the trigger but the user has not yet completed
@@ -292,9 +326,10 @@ class AuthRepositoryImpl @Inject constructor(
             val userInfo = supabaseAuth.currentUserOrNull()
                 ?: return@runCatching AuthResult.Error(AuthError.SessionExpired)
 
-            val profile = runCatching {
-                userProfileDataSource.getProfileByUserId(userInfo.id)
-            }.getOrNull()
+            // Best-effort enrichment: a fetch failure here is non-fatal (the identity was
+            // already linked above), so anything other than Found simply enriches with nothing.
+            val profile = (userProfileDataSource.getProfileByUserId(userInfo.id)
+                as? ProfileFetchResult.Found)?.profile
 
             val finalUser = mapUserInfoToAuthUser(userInfo).copy(
                 nickname = profile?.nickname,
@@ -696,6 +731,14 @@ class AuthRepositoryImpl @Inject constructor(
         /** Must match the CHECK constraint on the `user_profiles.nickname` column in Supabase. */
         private const val NICKNAME_MAX_LENGTH = 30
         private const val TAG = "AuthRepositoryImpl"
+
+        /**
+         * Delay before the single retry of [getProfileByUserId] in [signInWithGoogle].
+         * Gives the supabase-kt SDK session a moment to propagate its access token to the
+         * OkHttp interceptor, so the retried RPC is authenticated rather than rejected
+         * with the anon key.
+         */
+        private const val PROFILE_FETCH_RETRY_DELAY_MS = 400L
     }
 
     private fun SessionStatus.toSessionState(): SessionState = when (this) {

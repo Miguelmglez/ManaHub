@@ -118,11 +118,26 @@ fun WidgetGallerySheet(
     var draggedId by remember { mutableStateOf<String?>(null) }
     var draggedCategory by remember { mutableStateOf<WidgetCategory?>(null) }
     var dragAccumY by remember { mutableStateOf(0f) }
-    
+
+    // Local working copy of the layout, mutated in place during an item drag so each threshold
+    // crossing is a cheap in-memory swap (NOT a DataStore write). We commit to the source of truth
+    // via onUpdateLayout only on drag END, avoiding mid-drag re-emission/recomposition that breaks
+    // multi-position drags.
+    val localLayout = remember { mutableStateListOf<WidgetInstance>() }
+    LaunchedEffect(currentLayout) {
+        // Sync from source-of-truth only when NOT actively dragging an item.
+        if (draggedId == null) {
+            localLayout.clear()
+            localLayout.addAll(currentLayout)
+        }
+    }
+
     val rowHeightPx = with(density) { (72.dp + spacing.sm).toPx() }
     val categoryHeaderHeightPx = with(density) { (40.dp + spacing.md).toPx() }
 
-    val addedTypes = remember(currentLayout) { currentLayout.map { it.type }.toSet() }
+    // No remember(key) — localLayout is snapshot state, so Compose tracks reads here automatically.
+    // Recomputing map{}.toSet() over a ~15-item list each recomposition is trivial.
+    val addedTypes = localLayout.map { it.type }.toSet()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -168,11 +183,24 @@ fun WidgetGallerySheet(
                 modifier = Modifier.weight(1f, fill = false),
             ) {
                 localCategoryOrder.forEach { category ->
-                    val widgets = HomeWidgetType.entries.filter { it.category == category }
-                        // Hidden for release — see docs/gamification-hidden-for-release.md.
-                        // When gamification is off, omit its widget types from the gallery entirely
-                        // (instead of showing them as greyed/disabled rows).
+                    // Order the gallery rows by the live working copy (localLayout), not enum
+                    // declaration order, so a within-category drag (which mutates localLayout in place)
+                    // is reflected visibly without a DataStore round-trip. ADDED widgets come first in
+                    // their layout order, followed by NOT-ADDED widgets in enum order.
+                    // Hidden for release — see docs/gamification-hidden-for-release.md.
+                    // When gamification is off, omit its widget types from the gallery entirely
+                    // (instead of showing them as greyed/disabled rows).
+                    val addedInOrder = localLayout
+                        .filter { it.type.category == category }
+                        .map { it.type }
                         .filter { gamificationEnabled || !it.isGamification }
+
+                    val notAdded = HomeWidgetType.entries
+                        .filter { it.category == category }
+                        .filter { gamificationEnabled || !it.isGamification }
+                        .filter { it !in addedTypes }
+
+                    val widgets = addedInOrder + notAdded
                     // Skip categories with no visible widget types (e.g. TOURNAMENT / COMMUNITY have
                     // no types assigned, and gamification-only categories vanish when the toggle is off)
                     // so we never render an orphaned header.
@@ -209,13 +237,13 @@ fun WidgetGallerySheet(
                                             if (dragAccumY <= -blockHeight && currentIdx > 1) {
                                                 val to = currentIdx - 1
                                                 localCategoryOrder.add(to, localCategoryOrder.removeAt(currentIdx))
-                                                val newLayout = currentLayout.sortedBy { localCategoryOrder.indexOf(it.type.category) }
+                                                val newLayout = localLayout.sortedBy { localCategoryOrder.indexOf(it.type.category) }
                                                 onUpdateLayout(newLayout)
                                                 dragAccumY += blockHeight
                                             } else if (dragAccumY >= blockHeight && currentIdx < localCategoryOrder.lastIndex) {
                                                 val to = currentIdx + 1
                                                 localCategoryOrder.add(to, localCategoryOrder.removeAt(currentIdx))
-                                                val newLayout = currentLayout.sortedBy { localCategoryOrder.indexOf(it.type.category) }
+                                                val newLayout = localLayout.sortedBy { localCategoryOrder.indexOf(it.type.category) }
                                                 onUpdateLayout(newLayout)
                                                 dragAccumY -= blockHeight
                                             }
@@ -263,29 +291,44 @@ fun WidgetGallerySheet(
                                             change.consume()
                                             dragAccumY += amount.y
 
-                                            val currentIdx = currentLayout.indexOfFirst { it.type == type }
+                                            val currentIdx = localLayout.indexOfFirst { it.type == type }
                                             if (currentIdx != -1) {
                                                 // Items may ONLY be reordered WITHIN their own category run:
                                                 // a move is rejected if the neighbour it would swap with belongs
                                                 // to a different category (that keeps the category-grouped
                                                 // invariant the ViewModel relies on).
+                                                // The swap is LOCAL (in-memory) — committed to the source of
+                                                // truth only on drag end (see onDragEnd).
                                                 if (dragAccumY <= -rowHeightPx && currentIdx > 0) {
                                                     val target = currentIdx - 1
-                                                    if (currentLayout[target].type.category == category) {
-                                                        onMoveWidget(currentIdx, target)
+                                                    if (localLayout[target].type.category == category) {
+                                                        val item = localLayout.removeAt(currentIdx)
+                                                        localLayout.add(target, item)
                                                     }
                                                     dragAccumY += rowHeightPx
-                                                } else if (dragAccumY >= rowHeightPx && currentIdx < currentLayout.lastIndex) {
+                                                } else if (dragAccumY >= rowHeightPx && currentIdx < localLayout.lastIndex) {
                                                     val target = currentIdx + 1
-                                                    if (currentLayout[target].type.category == category) {
-                                                        onMoveWidget(currentIdx, target)
+                                                    if (localLayout[target].type.category == category) {
+                                                        val item = localLayout.removeAt(currentIdx)
+                                                        localLayout.add(target, item)
                                                     }
                                                     dragAccumY -= rowHeightPx
                                                 }
                                             }
                                         },
-                                        onDragEnd = { draggedId = null; dragAccumY = 0f },
-                                        onDragCancel = { draggedId = null; dragAccumY = 0f },
+                                        onDragEnd = {
+                                            // Commit the reordered working copy once.
+                                            onUpdateLayout(localLayout.toList())
+                                            draggedId = null
+                                            dragAccumY = 0f
+                                        },
+                                        onDragCancel = {
+                                            // Revert the working copy to the source of truth.
+                                            localLayout.clear()
+                                            localLayout.addAll(currentLayout)
+                                            draggedId = null
+                                            dragAccumY = 0f
+                                        },
                                     )
                                 }
                             } else Modifier
@@ -382,8 +425,8 @@ private fun CatalogRow(
     Surface(
         color = if (isFixed) mc.surfaceVariant.copy(alpha = 0.5f) else mc.surface,
         shape = CardShape,
-        // The whole added row is the long-press drag target now (the standalone ≡ handle
-        // icon was removed) — dragHandleModifier carries the pointerInput when draggable.
+        // The whole added row is the long-press drag target now (the standalone ≡ handle icon
+        // was removed) — dragHandleModifier carries the pointerInput when draggable.
         modifier = modifier
             .fillMaxWidth()
             .then(dragHandleModifier)
