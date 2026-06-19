@@ -2,10 +2,16 @@ package com.mmg.manahub.feature.friends.data.repository
 
 import android.util.Log
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
 import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
 import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
 import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
 import com.mmg.manahub.feature.friends.data.local.entity.OutgoingFriendRequestEntity
+import com.mmg.manahub.feature.friends.data.orNullIfBlank
 import com.mmg.manahub.feature.friends.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.feature.friends.data.remote.FriendRequestWithProfile
 import com.mmg.manahub.feature.friends.data.remote.FriendWithProfile
@@ -18,18 +24,11 @@ import com.mmg.manahub.feature.friends.domain.model.FriendRequest
 import com.mmg.manahub.feature.friends.domain.model.FriendStats
 import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import retrofit2.HttpException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import retrofit2.HttpException
 import java.time.Instant
 import javax.inject.Inject
-
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
-import com.mmg.manahub.feature.friends.data.orNullIfBlank
 
 class FriendRepositoryImpl @Inject constructor(
     private val dao: FriendDao,

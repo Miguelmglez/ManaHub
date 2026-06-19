@@ -1,18 +1,16 @@
 package com.mmg.manahub.feature.draft.data.engine
 
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
-import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder.Companion.BASIC_LANDS_TOTAL
 import com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder
 import com.mmg.manahub.feature.draft.domain.model.BasicLandSlot
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
 import com.mmg.manahub.feature.draft.domain.model.DraftDeck
 import com.mmg.manahub.feature.draft.domain.model.DraftSeat
 import javax.inject.Inject
-import kotlin.math.roundToInt
 
 /**
  * Builds a 40-card limited deck (23 non-land picks + 17 basic lands) from a finished [DraftSeat].

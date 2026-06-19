@@ -4,7 +4,6 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.mmg.manahub.core.data.local.entity.CardEntity
 
 /**
  * Per-seat card-impact rating captured by the post-game survey (DB v37, see ADR-001).

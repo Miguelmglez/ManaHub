@@ -8,7 +8,6 @@ import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
 import com.mmg.manahub.feature.tournament.domain.engine.SwissEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

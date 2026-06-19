@@ -1,15 +1,11 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
-import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.core.domain.model.SuggestedTag
-import com.mmg.manahub.core.domain.model.TagCategory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import kotlin.math.sqrt
 
 /**
  * Unit tests for DeckScorer:

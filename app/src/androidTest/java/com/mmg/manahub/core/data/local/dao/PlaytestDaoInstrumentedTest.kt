@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.data.local.dao
 
 import android.content.Context
-import android.database.sqlite.SQLiteException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4

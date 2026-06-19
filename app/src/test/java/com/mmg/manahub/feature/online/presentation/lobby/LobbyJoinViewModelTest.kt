@@ -7,7 +7,6 @@ import com.mmg.manahub.core.online.domain.model.OnlineSession
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
 import com.mmg.manahub.core.online.domain.model.ParticipantStatus
 import com.mmg.manahub.core.online.domain.model.SessionEvent
-import com.mmg.manahub.core.online.domain.model.SessionPlayerState
 import com.mmg.manahub.core.online.domain.model.SessionSnapshot
 import com.mmg.manahub.core.online.domain.model.SessionState
 import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
@@ -18,7 +17,6 @@ import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.every
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow

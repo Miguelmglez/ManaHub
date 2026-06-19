@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.mmg.manahub.core.ui.theme.MagicTheme
 import com.mmg.manahub.core.ui.theme.magicColors
-import androidx.compose.material3.MaterialTheme
+import com.mmg.manahub.feature.online.presentation.deeplink.JoinByDeepLinkActivity.Companion.EXTRA_JOIN_CODE
 import dagger.hilt.android.AndroidEntryPoint
 
 /**

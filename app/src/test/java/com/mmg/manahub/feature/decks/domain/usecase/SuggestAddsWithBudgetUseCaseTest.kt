@@ -7,11 +7,9 @@ import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
-import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.RoleCoverage
 import com.mmg.manahub.feature.decks.domain.engine.ScoreComponents
 import com.mmg.manahub.feature.decks.domain.engine.card
-import com.mmg.manahub.feature.decks.domain.engine.fixedPower
 import com.mmg.manahub.feature.decks.domain.engine.minimalProfile
 import io.mockk.coEvery
 import io.mockk.every

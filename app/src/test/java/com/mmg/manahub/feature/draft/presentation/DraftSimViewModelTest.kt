@@ -1,16 +1,15 @@
 package com.mmg.manahub.feature.draft.presentation
 
 import androidx.lifecycle.SavedStateHandle
-import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftError
 import com.mmg.manahub.feature.draft.domain.model.DraftMode
 import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet

@@ -1,32 +1,32 @@
 package com.mmg.manahub.app
 
+// import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import androidx.work.WorkManager
-import com.google.firebase.messaging.FirebaseMessaging
 import coil.Coil
 import coil.ImageLoader
 import coil.decode.SvgDecoder
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.messaging.FirebaseMessaging
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.gamification.domain.GamificationEngine
-import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
+import com.mmg.manahub.core.gamification.domain.GamificationEngine
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.engine.AchievementBackfill
 import com.mmg.manahub.core.gamification.engine.EntitlementGranter
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
-// import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository

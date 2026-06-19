@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.domain.model
 
+import com.mmg.manahub.core.domain.model.ScoreWeightOverrides.Companion.NONE
+
+
 /**
  * Debug-only override of the Deck Doctor scoring weights, persisted in `UserPreferencesDataStore`.
  *

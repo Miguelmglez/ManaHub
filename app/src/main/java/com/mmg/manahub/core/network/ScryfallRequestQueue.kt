@@ -1,5 +1,9 @@
 package com.mmg.manahub.core.network
 
+import com.mmg.manahub.core.network.ScryfallRequestQueue.Companion.JITTER_FACTOR
+import com.mmg.manahub.core.network.ScryfallRequestQueue.Companion.MAX_BACKOFF_MS
+import com.mmg.manahub.core.network.ScryfallRequestQueue.Companion.MAX_RETRIES
+import com.mmg.manahub.core.network.ScryfallRequestQueue.Companion.MIN_DELAY_MS
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

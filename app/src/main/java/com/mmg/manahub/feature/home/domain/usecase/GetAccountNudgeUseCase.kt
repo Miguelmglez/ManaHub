@@ -1,5 +1,8 @@
 package com.mmg.manahub.feature.home.domain.usecase
 
+import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase.Companion.COLLECTION_MILESTONE
+import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase.Companion.DECK_MILESTONE
+import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase.Companion.GAME_MILESTONE
 import com.mmg.manahub.feature.home.presentation.NudgeTrigger
 import javax.inject.Inject
 

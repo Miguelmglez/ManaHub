@@ -9,6 +9,8 @@ import com.mmg.manahub.feature.draft.domain.model.DraftCard
 import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftSeat
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
+import com.mmg.manahub.feature.draft.engine.BotHarnessTest.Companion.SEEDS
+import com.mmg.manahub.feature.draft.engine.BotHarnessTest.Companion.SHARE_BAR
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random

@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.sync
 
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
@@ -13,7 +14,6 @@ import com.mmg.manahub.core.data.remote.collection.UserCardCollectionDto
 import com.mmg.manahub.core.data.remote.decks.DeckCardSyncDto
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.DeckSyncDto
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

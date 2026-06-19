@@ -8,6 +8,8 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
+import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator.Companion.MAX_QUERIES
+import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator.Companion.STRATEGY_OTAGS
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import javax.inject.Inject

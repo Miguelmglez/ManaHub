@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.network
 
 import android.content.Context
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallApi
 import dagger.Module
@@ -15,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton

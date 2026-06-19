@@ -1,11 +1,12 @@
 package com.mmg.manahub.feature.playtest.presentation.hand
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.playtest.domain.model.BattlefieldState
 import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
@@ -19,8 +20,6 @@ import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestSurveyUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestUseCase
-import android.util.Log
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel

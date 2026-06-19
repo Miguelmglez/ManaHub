@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.news.domain.usecase
 
-import com.mmg.manahub.feature.news.domain.model.ContentSource
 import com.mmg.manahub.core.domain.model.news.SourceType
+import com.mmg.manahub.feature.news.domain.model.ContentSource
 import com.mmg.manahub.feature.news.domain.repository.NewsRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject

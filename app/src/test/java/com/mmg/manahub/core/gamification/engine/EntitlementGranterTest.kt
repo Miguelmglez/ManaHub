@@ -9,7 +9,6 @@ import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

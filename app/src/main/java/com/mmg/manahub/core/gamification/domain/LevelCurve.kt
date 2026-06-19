@@ -1,5 +1,11 @@
 package com.mmg.manahub.core.gamification.domain
 
+import com.mmg.manahub.core.gamification.domain.LevelCurve.MIN_LEVEL
+import com.mmg.manahub.core.gamification.domain.LevelCurve.PRECOMPUTED_LEVELS
+import com.mmg.manahub.core.gamification.domain.LevelCurve.cumulativeXpForLevel
+import com.mmg.manahub.core.gamification.domain.LevelCurve.xpToAdvance
+
+
 /**
  * The XP → level curve for player progression (ADR-002 §6).
  *

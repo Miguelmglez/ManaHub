@@ -3,6 +3,7 @@ package com.mmg.manahub.core.data.local.entity
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity.Companion.SINGLETON_ID
 
 /**
  * Singleton row (id == [SINGLETON_ID]) holding the player's denormalized progression.

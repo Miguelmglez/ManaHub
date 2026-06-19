@@ -1,8 +1,9 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer.Companion.CHEAP_RAMP_CMC
+import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer.Companion.RAMP_PIECES_PER_LAND
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.ceil

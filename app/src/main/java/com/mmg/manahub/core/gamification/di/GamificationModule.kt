@@ -3,6 +3,7 @@ package com.mmg.manahub.core.gamification.di
 import com.mmg.manahub.core.gamification.data.remote.GamificationRemoteDataSource
 import com.mmg.manahub.core.gamification.data.remote.SupabaseGamificationDataSource
 import com.mmg.manahub.core.gamification.data.repository.GamificationRepositoryImpl
+import com.mmg.manahub.core.gamification.di.GamificationModule.Companion.provideZoneId
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.engine.GamificationEngineImpl
