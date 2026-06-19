@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.home.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
@@ -24,6 +25,7 @@ import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.feature.auth.domain.model.SessionState
 import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
 import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
@@ -101,6 +103,18 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
+     * Crashlytics handle for additive telemetry (breadcrumb logs + custom keys) on the Home board.
+     * Non-fatal exception reporting goes through [recordSafeNonFatal]; this instance is reserved for
+     * [FirebaseCrashlytics.log] / [FirebaseCrashlytics.setCustomKey], which have no helper wrapper.
+     * Telemetry is purely observational: it never alters control flow and never carries PII (only
+     * enum ids, counts, set codes, and exception type names are recorded — never free-text queries).
+     */
+    private val crashlytics = FirebaseCrashlytics.getInstance()
+
+    /** Set once after the first [uiState] resolves, so session context keys are attached lazily. */
+    private var sessionContextKeysSet = false
+
+    /**
      * Externally-triggered ACTION_REQUIRED nudge (highest priority). Set when the
      * user attempts an account-gated action while signed out. Cleared on dismissal
      * or successful authentication.
@@ -164,7 +178,12 @@ class HomeViewModel @Inject constructor(
     /** Persisted news filter selection, shared with the full News screen. */
     private val newsFiltersFlow: StateFlow<NewsFilterPrefs> =
         userPrefsDataStore.observeNewsFilters()
-            .catch { emit(NewsFilterPrefs.DEFAULT) }
+            .catch {
+                crashlytics.setCustomKey("home_flow_error_source", "news_filters")
+                recordSafeNonFatal("home_flow_news_filters", it)
+                crashlytics.log("home_flow_error: news_filters")
+                emit(NewsFilterPrefs.DEFAULT)
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NewsFilterPrefs.DEFAULT)
 
     /**
@@ -182,7 +201,12 @@ class HomeViewModel @Inject constructor(
             applyNewsFilters(items, sources, filters).take(MAX_NEWS)
         }
             .map<List<NewsItem>, List<NewsItem>?> { it }
-            .catch { emit(emptyList()) }
+            .catch {
+                crashlytics.setCustomKey("home_flow_error_source", "recent_news")
+                recordSafeNonFatal("home_flow_recent_news", it)
+                crashlytics.log("home_flow_error: recent_news")
+                emit(emptyList())
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** True when the persisted news filters differ from the English-only default. */
@@ -210,7 +234,12 @@ class HomeViewModel @Inject constructor(
      */
     private val historyFlow: StateFlow<List<LocalSessionHistoryRow>> =
         gameSessionRepository.observeLocalSessionHistory(HISTORY_LIMIT)
-            .catch { emit(emptyList()) }
+            .catch {
+                crashlytics.setCustomKey("home_flow_error_source", "session_history")
+                recordSafeNonFatal("home_flow_session_history", it)
+                crashlytics.log("home_flow_error: session_history")
+                emit(emptyList())
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val performanceFlow: Flow<PerformanceDetails> = combine(
@@ -264,7 +293,12 @@ class HomeViewModel @Inject constructor(
             }.getOrDefault(emptyList())
             emit(sets)
         }
-        .catch { emit(emptyList()) }
+        .catch {
+            crashlytics.setCustomKey("home_flow_error_source", "latest_sets")
+            recordSafeNonFatal("home_flow_latest_sets", it)
+            crashlytics.log("home_flow_error: latest_sets")
+            emit(emptyList())
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
@@ -336,7 +370,12 @@ class HomeViewModel @Inject constructor(
                         enabled = true,
                         data = toHomeGamification(progression, board, streak),
                     )
-                }.catch { emit(GamificationSnapshot(enabled = true, data = null)) }
+                }.catch {
+                    crashlytics.setCustomKey("home_flow_error_source", "gamification")
+                    recordSafeNonFatal("home_flow_gamification", it)
+                    crashlytics.log("home_flow_error: gamification")
+                    emit(GamificationSnapshot(enabled = true, data = null))
+                }
             }
         }
 
@@ -383,7 +422,12 @@ class HomeViewModel @Inject constructor(
                     }.toSet()
             )
         }.map<WishlistStats, WishlistStats?> { it }
-        .catch { emit(null) }
+        .catch {
+            crashlytics.setCustomKey("home_flow_error_source", "wishlist")
+            recordSafeNonFatal("home_flow_wishlist", it)
+            crashlytics.log("home_flow_error: wishlist")
+            emit(null)
+        }
 
     private val uiState: StateFlow<HomeUiState> = run {
         val libraryFlow = combine(
@@ -503,7 +547,13 @@ class HomeViewModel @Inject constructor(
         // Trigger a background news refresh so the widget has data even on first open,
         // before the user has ever visited the News tab. The freshness check inside
         // refreshAll() (1-hour window) prevents redundant network calls.
-        viewModelScope.launch { runCatching { refreshNewsFeedUseCase() } }
+        viewModelScope.launch {
+            // Additive telemetry: report a failed background refresh without surfacing it to the user.
+            runCatching { refreshNewsFeedUseCase() }.exceptionOrNull()?.let { error ->
+                recordSafeNonFatal("home_news_refresh", error)
+                crashlytics.log("home_news_refresh_failed")
+            }
+        }
         // Pick a random playable set (>10 cards) to seed the Discover row BEFORE the first fetch,
         // then populate the Discover row (lazy once-guard) and the independent Random card widget.
         // On failure/empty the set stays null and the fetch falls back to the global random query.
@@ -521,13 +571,19 @@ class HomeViewModel @Inject constructor(
      * [DISCOVER_RANDOM_QUERY]. Best-effort — never throws.
      */
     private suspend fun seedRandomDiscoverSet() {
-        val chosen = runCatching {
+        val outcome = runCatching {
             withContext(Dispatchers.IO) {
                 scryfallRemoteDataSource.getAllSets()
                     .filter { it.setType in PLAYABLE_SET_TYPES && it.cardCount > MIN_DISCOVER_SET_CARDS }
                     .randomOrNull()
             }
-        }.getOrNull()
+        }
+        // Additive telemetry: report the swallowed seed failure without altering the fallback behaviour.
+        outcome.exceptionOrNull()?.let { error ->
+            recordSafeNonFatal("home_seed_discover_set", error)
+            crashlytics.log("home_seed_discover_set_failed")
+        }
+        val chosen = outcome.getOrNull()
         if (chosen != null) discoverSetFlow.value = chosen
     }
 
@@ -557,8 +613,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             // bypassCache = true avoids the in-memory map, but Scryfall's CDN still caches the page.
             // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
-            val result = runCatching { cardRepository.searchCards(query, page = 1, bypassCache = true) }
-                .getOrNull()
+            val outcome = runCatching { cardRepository.searchCards(query, page = 1, bypassCache = true) }
+            val result = outcome.getOrNull()
             val fetched = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
                 ?.data
                 ?.shuffled()
@@ -566,6 +622,17 @@ class HomeViewModel @Inject constructor(
                 .orEmpty()
             if (fetched.isEmpty()) {
                 // An empty/failed result must NOT leave the widget spinning forever.
+                // Additive telemetry: record the silent failure WITHOUT changing control flow. Never log
+                // the raw query (free-text / potential PII) — only its length, the scoped set, and the type.
+                val error = outcome.exceptionOrNull()
+                crashlytics.setCustomKey("home_discover_query_length", query.length)
+                crashlytics.setCustomKey("home_discover_scoped_set", set?.code ?: "none")
+                crashlytics.setCustomKey(
+                    "home_discover_error_type",
+                    error?.let { it::class.simpleName ?: "Unknown" } ?: "EmptyResult",
+                )
+                if (error != null) recordSafeNonFatal("home_discover_fetch", error)
+                crashlytics.log("home_discover_fetch_failed: query_length=${query.length}")
                 discoverLoadStateFlow.value = DiscoverLoadState.FAILED
                 return@launch
             }
@@ -603,8 +670,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             // bypassCache = true avoids the in-memory map, but Scryfall's CDN still caches the page.
             // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
-            val result = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1, bypassCache = true) }
-                .getOrNull()
+            val outcome = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1, bypassCache = true) }
+            val result = outcome.getOrNull()
             val card = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
                 ?.data
                 ?.shuffled()
@@ -623,6 +690,14 @@ class HomeViewModel @Inject constructor(
                 randomCardFlow.value = card
                 randomCardLoadStateFlow.value = DiscoverLoadState.LOADED
             } else {
+                // Additive telemetry: surface the silent failure without changing control flow.
+                val error = outcome.exceptionOrNull()
+                crashlytics.setCustomKey(
+                    "home_random_card_error_type",
+                    error?.let { it::class.simpleName ?: "Unknown" } ?: "EmptyResult",
+                )
+                if (error != null) recordSafeNonFatal("home_random_card_fetch", error)
+                crashlytics.log("home_random_card_fetch_failed")
                 randomCardLoadStateFlow.value = DiscoverLoadState.FAILED
             }
         }
@@ -633,6 +708,8 @@ class HomeViewModel @Inject constructor(
      * for the new scope.
      */
     private fun selectDiscoverSet(set: MagicSet?) {
+        // Set code is a public Scryfall identifier (not PII); "cleared" when the filter is removed.
+        crashlytics.log("home_discover_set_selected: ${set?.code ?: "cleared"}")
         discoverSetFlow.value = set
         fetchDiscoverCards(forceRefresh = true)
     }
@@ -648,9 +725,19 @@ class HomeViewModel @Inject constructor(
             is HomeAction.RemoveWidget -> removeWidget(action.type)
             HomeAction.ResetLayout -> resetLayout()
             is HomeAction.SkipFirstStep -> skipFirstStep(action.stepId)
-            HomeAction.RetryDiscover -> fetchDiscoverCards(forceRefresh = true)
-            HomeAction.RefreshDiscover -> fetchDiscoverCards(forceRefresh = true)
-            HomeAction.RefreshRandomCard -> fetchRandomCard()
+            HomeAction.RetryDiscover -> {
+                // Distinguish a user-initiated retry-after-failure from a normal manual refresh.
+                crashlytics.log("home_discover_retry_after_failure")
+                fetchDiscoverCards(forceRefresh = true)
+            }
+            HomeAction.RefreshDiscover -> {
+                crashlytics.log("home_discover_refresh_manual")
+                fetchDiscoverCards(forceRefresh = true)
+            }
+            HomeAction.RefreshRandomCard -> {
+                crashlytics.log("home_random_card_refresh_manual")
+                fetchRandomCard()
+            }
             is HomeAction.SelectDiscoverSet -> selectDiscoverSet(action.set)
             HomeAction.ResetNewsFilters -> resetNewsFilters()
             HomeAction.RateApp -> Unit // no-op; UI handles the store deep link
@@ -660,6 +747,8 @@ class HomeViewModel @Inject constructor(
 
     /** Persists a newly chosen set of exactly four Quick Start actions. */
     fun saveQuickStartActions(actions: List<QuickStartAction>) {
+        // Log the chosen action enum ids (CSV) — these are fixed enum names, never free text.
+        crashlytics.log("home_quick_start_saved: ${actions.joinToString(",") { it.name }}")
         viewModelScope.launch { userPrefsDataStore.saveQuickStartActions(actions) }
     }
 
@@ -669,22 +758,31 @@ class HomeViewModel @Inject constructor(
      * next [uiState] emission.
      */
     fun skipFirstStep(stepId: String) {
+        // stepId is a fixed STEP_FIRST_* constant — safe to log (no PII).
+        crashlytics.log("home_first_step_skipped: $stepId")
         viewModelScope.launch { userPrefsDataStore.skipFirstStep(stepId) }
     }
 
     /** Clears the persisted News filters back to the English-only default. */
     fun resetNewsFilters() {
+        crashlytics.log("home_news_filters_reset")
         viewModelScope.launch { userPrefsDataStore.resetNewsFilters() }
     }
 
     /** Dismisses the current account nudge, starting its 48-hour cooldown. */
     fun dismissAccountNudge() {
+        // Record WHICH nudge trigger the user dismissed (enum name only — no PII).
+        val trigger = uiState.value.accountNudge?.trigger?.name ?: "unknown"
+        crashlytics.setCustomKey("home_nudge_trigger", trigger)
+        crashlytics.log("home_nudge_dismissed: $trigger")
         actionRequiredMessage.value = null
         viewModelScope.launch { userPrefsDataStore.dismissAccountNudge() }
     }
 
     /** Raises a high-priority ACTION_REQUIRED nudge. */
     fun triggerActionRequiredNudge(message: String) {
+        // Log only that an action-required nudge fired — never the message text (may be user-facing/PII).
+        crashlytics.log("home_nudge_action_required_triggered")
         actionRequiredMessage.value = message
     }
 
@@ -696,6 +794,7 @@ class HomeViewModel @Inject constructor(
     // to drift out of sync.
 
     private fun moveWidget(from: Int, to: Int) {
+        crashlytics.log("home_widget_moved: from=$from to=$to")
         val current = uiState.value.layout
         if (from == to) return
         if (from !in current.indices || to !in current.indices) return
@@ -706,6 +805,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun addWidget(type: HomeWidgetType) {
+        crashlytics.log("home_widget_added: ${type.persistedId}")
         val current = uiState.value.layout
         if (current.any { it.type == type }) return
         val newInstance = WidgetInstance(type, type.defaultSize())
@@ -720,11 +820,14 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun removeWidget(type: HomeWidgetType) {
+        crashlytics.log("home_widget_removed: ${type.persistedId}")
         if (type.isAlwaysPresent) return
         persistLayout(uiState.value.layout.filterNot { it.type == type })
     }
 
     private fun resetLayout() {
+        crashlytics.setCustomKey("home_layout_widget_count_before_reset", uiState.value.layout.size)
+        crashlytics.log("home_layout_reset")
         persistLayout(defaultLayoutFor(isAuthenticatedFlow.value))
     }
 
@@ -776,6 +879,16 @@ class HomeViewModel @Inject constructor(
 
         val hero = resolveHero(core.activity, core.playerName, visibleSteps, gamification)
         val nudge = resolveNudge(core.account, collectionStats, deckCount, core.activity.totalGames)
+
+        // Attach session-context custom keys ONCE, the first time the board resolves. These are
+        // observational only (auth flag, widget count, hero type name) — no PII. The widget count is
+        // refreshed here on every emission so add/reset keep it current without a separate hook.
+        if (!sessionContextKeysSet) {
+            crashlytics.setCustomKey("home_is_authenticated", core.account.isAuthenticated)
+            crashlytics.setCustomKey("home_hero_type", hero::class.simpleName ?: "Unknown")
+            sessionContextKeysSet = true
+        }
+        crashlytics.setCustomKey("home_layout_widget_count", layout.size)
 
         return HomeUiState(
             isLoading = false,

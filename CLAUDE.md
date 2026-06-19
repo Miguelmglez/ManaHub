@@ -624,6 +624,29 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
 - Online join test `SESSION_CODE` constants must be 6 digits (the join VM filters to digits only).
 - → memory: `feedback_test_suite_compiles_as_unit`, `project_unit_test_fixes`
 
+## Telemetry (Crashlytics / Analytics)
+
+**Every new feature MUST be reviewed for telemetry before it is considered done.** When you implement,
+significantly change, or remove a feature (screen / ViewModel / repository / use case), you MUST review
+whether Crashlytics instrumentation needs to be **added, removed, or modified** so we keep getting
+valuable user metrics:
+- **Add** action breadcrumbs (`log("action_context_result")`), session/context custom keys, and
+  Non-Fatals (`recordSafeNonFatal`/`recordNonFatal`) at the new friction points — silent error
+  swallowing (`runCatching{}.getOrNull()`, cold-flow `.catch{emit(...)}`), network/Room failures,
+  abandonable multi-step flows, and critical user actions.
+- **Remove / modify** instrumentation that a refactor made stale (renamed flows, deleted screens,
+  changed keys) so dashboards don't rot — never leave a dangling event/key referencing dead code.
+- Delegate the audit to the **`crashlytics-ux-auditor` agent** (it proposes telemetry; it does NOT write
+  fixes), then delegate the resulting `.kt` edits to `android-kotlin-architect`.
+- **Rules**: helpers in `core/util/CrashlyticsHelper.kt` (`recordSafeNonFatal(tag,e)` for external/user
+  input — strips PII; `recordNonFatal(message,e)` for dev-controlled). `log`/`setCustomKey` via
+  `FirebaseCrashlytics.getInstance()`. Events/keys are `snake_case` (`action_context_result`); ≤3-4
+  custom keys per operation; instrumentation is **ADDITIVE**, never a substitute for existing error
+  handling; **NEVER log PII** (emails, real names, tokens, raw free-text queries — log length/enum-id
+  only). The auditor's running spec lives in `.claude/agent-memory/crashlytics-ux-auditor/` (keys/events
+  already defined — consult it to avoid duplicates).
+- → memory: `feedback_telemetry_review_on_every_feature`
+
 ## Agent learning protocol
 
 **All Android/Kotlin (`.kt`) work goes through the `android-kotlin-architect` agent** — net-new feature
