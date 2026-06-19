@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 
 /**
@@ -328,6 +329,9 @@ class GoldenDeckHarnessTest {
         )
     }
 
+    @Ignore("Pauper format hidden for release — the DeckFormat.PAUPER entry is commented out " +
+        "in production, so the fixture now builds as CASUAL and these Pauper-skeleton/legality " +
+        "assertions no longer apply. Un-ignore if/when Pauper is restored.")
     @Test
     fun `every Pauper golden card is legal in Pauper and the deck uses the Pauper skeleton`() {
         val deck = GoldenDecks.pauperDeck()
@@ -343,9 +347,13 @@ class GoldenDeckHarnessTest {
             )
         }
         val profile = scorer.profile(deck.mainboard, deck.format, deck.colorIdentity, deck.seedTags)
-        assertEquals(DeckFormat.PAUPER, profile.skeleton.format)
+        // Pauper hidden for release: the fixture now resolves to the CASUAL skeleton.
+        assertEquals(DeckFormat.CASUAL, profile.skeleton.format)
     }
 
+    @Ignore("Pauper format hidden for release — see the companion Pauper test above. The fixture " +
+        "now builds as CASUAL (permissive legality), so Pauper-vs-Standard add filtering no longer " +
+        "applies. Un-ignore if/when Pauper is restored.")
     @Test
     fun `Pauper add candidates are filtered by Pauper legality, not Standard`() {
         val deck = GoldenDecks.pauperDeck()

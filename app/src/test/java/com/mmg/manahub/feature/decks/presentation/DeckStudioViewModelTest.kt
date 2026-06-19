@@ -2387,9 +2387,10 @@ class DeckStudioViewModelTest {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `given casual format when changeFormat STANDARD then updateDeck is called with format standard`() =
+    fun `given casual format when changeFormat COMMANDER then updateDeck is called with format commander`() =
         runTest(dispatcher) {
-            // Arrange — default deck is "casual"; changing to STANDARD must write through.
+            // Arrange — default deck is "casual"; changing to a DIFFERENT format (COMMANDER)
+            // must write through (CASUAL→CASUAL would hit the no-op guard).
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
                 deckWithCards(deckName = "My Deck")
             )
@@ -2398,12 +2399,12 @@ class DeckStudioViewModelTest {
             advanceUntilIdle()
 
             // Act
-            vm.changeFormat(DeckFormat.STANDARD)
+            vm.changeFormat(DeckFormat.COMMANDER)
             advanceUntilIdle()
 
-            // Assert — the repository received the new format name.
+            // Assert — the repository received the new format name (DeckFormat.name = "COMMANDER").
             coVerify {
-                deckRepository.updateDeck(match { it.format.equals("STANDARD", ignoreCase = true) })
+                deckRepository.updateDeck(match { it.format.equals("COMMANDER", ignoreCase = true) })
             }
         }
 
@@ -2427,12 +2428,12 @@ class DeckStudioViewModelTest {
         }
 
     @Test
-    fun `given deck already in STANDARD format when changeFormat STANDARD then updateDeck is NOT called (no-op)`() =
+    fun `given deck already in CASUAL format when changeFormat CASUAL then updateDeck is NOT called (no-op)`() =
         runTest(dispatcher) {
-            // Arrange — deck is already standard; no-op guard must fire.
+            // Arrange — deck is already casual; no-op guard must fire.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(
                 DeckWithCards(
-                    deck = Deck(id = DECK_ID, name = "My Deck", format = "standard"),
+                    deck = Deck(id = DECK_ID, name = "My Deck", format = "casual"),
                     mainboard = emptyList(),
                     sideboard = emptyList(),
                 )
@@ -2442,7 +2443,7 @@ class DeckStudioViewModelTest {
             advanceUntilIdle()
 
             // Act — same format; must be a no-op.
-            vm.changeFormat(DeckFormat.STANDARD)
+            vm.changeFormat(DeckFormat.CASUAL)
             advanceUntilIdle()
 
             // Assert — no write issued.
@@ -2454,7 +2455,7 @@ class DeckStudioViewModelTest {
         runTest(dispatcher) {
             // Arrange — load SUGGESTIONS first so suggestionsLoaded = true, then change format.
             // stubResolvableDeck() creates a COMMANDER deck (format="commander"), so we must
-            // switch to a DIFFERENT format (STANDARD) to avoid the no-op guard in changeFormat.
+            // switch to a DIFFERENT format (CASUAL) to avoid the no-op guard in changeFormat.
             stubResolvableDeck()
             val vm = createVm()
             advanceUntilIdle()
@@ -2463,8 +2464,8 @@ class DeckStudioViewModelTest {
             assertTrue("suggestionsLoaded must be true before format change",
                 vm.uiState.value.suggestionsLoaded)
 
-            // Act — change to STANDARD (deck is COMMANDER, so this is a real format change).
-            vm.changeFormat(DeckFormat.STANDARD)
+            // Act — change to CASUAL (deck is COMMANDER, so this is a real format change).
+            vm.changeFormat(DeckFormat.CASUAL)
             advanceUntilIdle()
 
             // Assert — suggestions invalidated so next open re-runs analysis.

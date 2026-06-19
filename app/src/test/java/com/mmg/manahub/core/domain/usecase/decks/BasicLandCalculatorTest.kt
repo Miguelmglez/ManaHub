@@ -65,7 +65,7 @@ class BasicLandCalculatorTest {
             DeckCard(createCard("1", "White Card", "{W}", listOf("W")), quantity = 10),
             DeckCard(createCard("2", "Blue Card", "{U}", listOf("U")), quantity = 10)
         )
-        val result = BasicLandCalculator.calculate(cards, emptyList(), DeckFormat.STANDARD)
+        val result = BasicLandCalculator.calculate(cards, emptyList(), DeckFormat.CASUAL)
         
         assertEquals(12, result.plains)
         assertEquals(12, result.islands)
@@ -110,7 +110,7 @@ class BasicLandCalculatorTest {
         val cards = listOf(
             DeckCard(createCard("1", "UW Card", "{W}{U}", listOf("W", "U")), quantity = 10)
         )
-        val result = BasicLandCalculator.calculate(cards, emptyList(), DeckFormat.STANDARD)
+        val result = BasicLandCalculator.calculate(cards, emptyList(), DeckFormat.CASUAL)
         
         // 24 slots, weights W=10, U=10.
         assertEquals(12, result.plains)
