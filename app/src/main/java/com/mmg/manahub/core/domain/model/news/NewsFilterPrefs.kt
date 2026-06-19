@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.domain.model.news
 
+import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs.Companion.DEFAULT
+
+
 /**
  * Persisted News feed filter selection — the single source of truth shared by the
  * full News screen and the Home dashboard news widget.

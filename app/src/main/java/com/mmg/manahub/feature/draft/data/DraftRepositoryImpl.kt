@@ -9,9 +9,11 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallApi
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.network.ScryfallRequestQueue
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.domain.model.DraftSet
+import com.mmg.manahub.core.network.ScryfallRequestQueue
+import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
 import com.mmg.manahub.feature.draft.data.local.DraftSetDao
 import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
@@ -19,7 +21,6 @@ import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
 import com.mmg.manahub.feature.draft.domain.model.ArchetypeGuide
 import com.mmg.manahub.feature.draft.domain.model.ArchetypeKeyCard
-import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftVideo
 import com.mmg.manahub.feature.draft.domain.model.MechanicExamples
 import com.mmg.manahub.feature.draft.domain.model.MechanicGuide

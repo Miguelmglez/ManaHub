@@ -1,5 +1,12 @@
 package com.mmg.manahub.core.gamification.domain
 
+import com.mmg.manahub.core.gamification.domain.XpConfig.collectionDailyCapXp
+import com.mmg.manahub.core.gamification.domain.XpConfig.deckCreated
+import com.mmg.manahub.core.gamification.domain.XpConfig.friendAdded
+import com.mmg.manahub.core.gamification.domain.XpConfig.gameLogged
+import com.mmg.manahub.core.gamification.domain.XpConfig.tournamentCompleted
+
+
 /**
  * The single source of truth for every XP value and cap (ADR-002 §6).
  *

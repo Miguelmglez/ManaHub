@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.gamification.domain.catalog
 
 import com.mmg.manahub.R
+import com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog.all
 
 /**
  * The immutable, code-side catalog of all unlockable cosmetics (ADR-002 §10, Phase 3).

@@ -3,10 +3,8 @@ package com.mmg.manahub.feature.survey.presentation
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -20,6 +18,7 @@ import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mmg.manahub.R
+import com.mmg.manahub.feature.survey.presentation.SurveyQuestionEngine.buildPanels
 import java.util.Locale
 
 // ── Choice & Answer models ────────────────────────────────────────────────────

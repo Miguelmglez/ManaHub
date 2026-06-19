@@ -2,7 +2,6 @@ package com.mmg.manahub.core.data.remote.collection
 
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

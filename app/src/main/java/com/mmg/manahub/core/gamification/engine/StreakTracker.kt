@@ -3,6 +3,9 @@ package com.mmg.manahub.core.gamification.engine
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.StreakEntity
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.gamification.engine.StreakTracker.Companion.MAX_FREEZE_TOKENS
+import com.mmg.manahub.core.gamification.engine.StreakTracker.Companion.TYPE_DAILY_ACTIVITY
+import com.mmg.manahub.core.gamification.engine.StreakTracker.Companion.WEEK_LENGTH
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId

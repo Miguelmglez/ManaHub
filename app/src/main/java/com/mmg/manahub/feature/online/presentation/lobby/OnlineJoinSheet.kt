@@ -46,12 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import androidx.compose.ui.res.stringResource
 import com.mmg.manahub.R
 import com.mmg.manahub.core.nearby.presentation.rememberNearbyPermissionsState
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus

@@ -72,6 +72,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.ui.components.CardFullScreenDialog
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -84,7 +85,6 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestPhase
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
-import com.mmg.manahub.core.ui.components.CardFullScreenDialog
 import com.mmg.manahub.feature.playtest.presentation.battle.BattlefieldContent
 import com.mmg.manahub.feature.playtest.presentation.components.BottomNSelector
 import com.mmg.manahub.feature.playtest.presentation.components.CommandZoneArea

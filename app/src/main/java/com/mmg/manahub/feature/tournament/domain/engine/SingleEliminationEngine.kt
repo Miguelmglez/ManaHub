@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.tournament.domain.engine
 
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
+import com.mmg.manahub.feature.tournament.domain.engine.SingleEliminationEngine.generateNextRound
+import com.mmg.manahub.feature.tournament.domain.engine.SingleEliminationEngine.isFinalRoundComplete
 
 /**
  * Single-elimination bracket engine.

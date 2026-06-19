@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.draft.engine
 
 import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
@@ -13,7 +14,6 @@ import com.mmg.manahub.feature.draft.domain.model.DraftCard
 import com.mmg.manahub.feature.draft.domain.model.DraftConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftMode
 import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet
 import com.mmg.manahub.feature.draft.domain.model.PassDirection

@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.gamification.domain.model
 
+import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.Companion.MAX_EQUIPPED_BADGES
+
+
 /**
  * The player's currently-equipped cosmetics (Phase 3).
  *

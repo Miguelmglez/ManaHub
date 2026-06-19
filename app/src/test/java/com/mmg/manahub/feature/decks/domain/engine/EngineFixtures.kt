@@ -4,7 +4,6 @@ import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.SuggestedTag
-import com.mmg.manahub.core.domain.model.TagCategory
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Shared test fixtures for the deck-scoring engine test suite.

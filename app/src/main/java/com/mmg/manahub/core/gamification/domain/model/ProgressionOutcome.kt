@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.gamification.domain.model
 
+import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome.Companion.none
+
+
 /**
  * A single line in an XP grant breakdown (e.g. "+20 game logged", "+30 win").
  *

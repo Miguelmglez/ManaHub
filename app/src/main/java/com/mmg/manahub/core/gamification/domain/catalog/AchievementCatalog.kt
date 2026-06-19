@@ -2,6 +2,7 @@ package com.mmg.manahub.core.gamification.domain.catalog
 
 import com.mmg.manahub.R
 import com.mmg.manahub.core.gamification.domain.XpConfig
+import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog.defsByEventType
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.AchievementCategory
 import kotlin.reflect.KClass

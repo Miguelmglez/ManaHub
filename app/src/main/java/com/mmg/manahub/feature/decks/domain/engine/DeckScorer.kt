@@ -5,6 +5,9 @@ import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer.Companion.FULL_BUCKET_FLOOR
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer.Companion.TRIBE_ABS_THRESHOLD
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer.Companion.TRIBE_SHARE_THRESHOLD
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.sqrt

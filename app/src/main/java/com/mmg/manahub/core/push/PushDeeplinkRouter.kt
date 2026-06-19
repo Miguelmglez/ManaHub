@@ -1,5 +1,9 @@
 package com.mmg.manahub.core.push
 
+import com.mmg.manahub.core.push.PushDeeplinkRouter.enqueue
+import com.mmg.manahub.core.push.PushDeeplinkRouter.setNavigator
+
+
 /**
  * Bridges FCM background deep links (delivered to the Activity as Intent extras) into the
  * Compose [androidx.navigation.NavController], which lives inside the composition and is not

@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.draft.data.engine
 
+import com.mmg.manahub.feature.draft.data.engine.ArchetypeAwareBotDrafter.Companion.SEAT_PRIOR
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
 import com.mmg.manahub.feature.draft.domain.model.BoosterPack
 import com.mmg.manahub.feature.draft.domain.model.DraftCard

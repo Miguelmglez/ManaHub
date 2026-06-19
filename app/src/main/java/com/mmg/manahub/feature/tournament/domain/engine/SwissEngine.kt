@@ -1,7 +1,6 @@
 package com.mmg.manahub.feature.tournament.domain.engine
 
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
 import kotlin.math.ceil
 import kotlin.math.log2

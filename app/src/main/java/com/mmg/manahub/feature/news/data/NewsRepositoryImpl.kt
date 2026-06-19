@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.news.data
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.DefaultSources
 import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
@@ -11,8 +13,6 @@ import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
 import com.mmg.manahub.feature.news.domain.model.ContentSource
-import com.mmg.manahub.core.domain.model.news.NewsItem
-import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.feature.news.domain.repository.NewsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.voice.domain
 
+import com.mmg.manahub.core.voice.domain.CommandGrammar.match
+
+
 /**
  * Central catalogue of recognized voice phrases.
  *

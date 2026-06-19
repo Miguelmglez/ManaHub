@@ -1,6 +1,9 @@
 package com.mmg.manahub.core.gamification.domain
 
 import com.mmg.manahub.core.data.local.entity.QuestInstanceEntity
+import com.mmg.manahub.core.gamification.domain.QuestGenerator.MAX_EXPLORATION
+import com.mmg.manahub.core.gamification.domain.QuestGenerator.MIN_ACCESSIBLE
+import com.mmg.manahub.core.gamification.domain.QuestGenerator.QUESTS_PER_PERIOD
 import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.QuestTemplate
 import kotlin.random.Random

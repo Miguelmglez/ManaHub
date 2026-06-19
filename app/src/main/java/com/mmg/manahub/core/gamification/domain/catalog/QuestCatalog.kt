@@ -5,6 +5,10 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.gamification.domain.QuestPeriod
 import com.mmg.manahub.core.gamification.domain.QuestWeightClass
 import com.mmg.manahub.core.gamification.domain.XpConfig
+import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog.byId
+import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog.daily
+import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog.templatesByEventType
+import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog.weekly
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import kotlin.reflect.KClass
 

@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.trades.data.repository
 
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.trades.data.remote.TradesRemoteDataSource
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemDto
 import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
@@ -9,8 +11,6 @@ import com.mmg.manahub.feature.trades.data.remote.dto.TradeProposalDto
 import com.mmg.manahub.feature.trades.domain.model.TradeItem
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.model.TradeStatus
-import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import kotlinx.coroutines.flow.Flow
