@@ -77,7 +77,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(seed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = noNetwork,
             collection = listOf(removal("r1")),
         )
@@ -96,7 +96,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(seed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = noNetwork,
             collection = collection,
         )
@@ -120,14 +120,14 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(seed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = noNetwork,
             collection = collection,
         )
 
         // STANDARD: 60 - 24 lands = 36 non-land slots. Seeds are added on top of the picked fills,
         // so the mainboard size is bounded by (non-land target picks) + seeds.
-        val nonLandTarget = DeckFormat.STANDARD.targetDeckSize - DeckFormat.STANDARD.targetLandCount
+        val nonLandTarget = DeckFormat.CASUAL.targetDeckSize - DeckFormat.CASUAL.targetLandCount
         assertTrue(
             "mainboard ${result.mainboard.size} should not exceed target+seeds",
             result.mainboard.size <= nonLandTarget + 1,
@@ -141,7 +141,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(seed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = noNetwork,
             collection = emptyList(),
         )
@@ -162,7 +162,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(seed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = noNetwork,
             collection = listOf(owned),
         )
@@ -190,7 +190,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(seed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = BudgetConstraints(maxPerCardEur = 10.0),
             collection = emptyList(),
         )
@@ -210,7 +210,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(seed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = noNetwork,
             collection = collection,
         )
@@ -237,7 +237,7 @@ class BuildDeckFromSeedsUseCaseTest {
             val result = useCase(
                 seeds = emptyList(),
                 identity = emptyIdentity,
-                format = DeckFormat.STANDARD,
+                format = DeckFormat.CASUAL,
                 constraints = noNetwork,
                 collection = emptyList(),
             )
@@ -253,7 +253,7 @@ class BuildDeckFromSeedsUseCaseTest {
                 "reservedLandSlots must be > 0 (skeleton ideal or format target)",
                 result.reservedLandSlots > 0,
             )
-            assertEquals(DeckFormat.STANDARD.targetLandCount, result.reservedLandSlots)
+            assertEquals(DeckFormat.CASUAL.targetLandCount, result.reservedLandSlots)
         }
 
     @Test
@@ -272,7 +272,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val result = useCase(
             seeds = listOf(duplicateSeed, duplicateSeed),
             identity = identity,
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             constraints = noNetwork,
             collection = emptyList(),
         )

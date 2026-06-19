@@ -8,11 +8,6 @@ import org.junit.Test
 class QuickStartActionTest {
 
     @Test
-    fun `fromPersistedId returns START_GAME for start_game`() {
-        assertEquals(QuickStartAction.START_GAME, QuickStartAction.fromPersistedId("start_game"))
-    }
-
-    @Test
     fun `fromPersistedId returns SCAN_CARD for scan_card`() {
         assertEquals(QuickStartAction.SCAN_CARD, QuickStartAction.fromPersistedId("scan_card"))
     }
@@ -28,18 +23,8 @@ class QuickStartActionTest {
     }
 
     @Test
-    fun `fromPersistedId returns DRAFT_SIMULATOR for draft_simulator`() {
-        assertEquals(QuickStartAction.DRAFT_SIMULATOR, QuickStartAction.fromPersistedId("draft_simulator"))
-    }
-
-    @Test
     fun `fromPersistedId returns SEARCH_CARD for search_card`() {
         assertEquals(QuickStartAction.SEARCH_CARD, QuickStartAction.fromPersistedId("search_card"))
-    }
-
-    @Test
-    fun `fromPersistedId returns LIBRARY for library`() {
-        assertEquals(QuickStartAction.LIBRARY, QuickStartAction.fromPersistedId("library"))
     }
 
     @Test
@@ -65,11 +50,6 @@ class QuickStartActionTest {
     @Test
     fun `fromPersistedId returns TRADES for trades`() {
         assertEquals(QuickStartAction.TRADES, QuickStartAction.fromPersistedId("trades"))
-    }
-
-    @Test
-    fun `fromPersistedId returns TOURNAMENTS for tournaments`() {
-        assertEquals(QuickStartAction.TOURNAMENTS, QuickStartAction.fromPersistedId("tournaments"))
     }
 
     @Test
@@ -103,13 +83,13 @@ class QuickStartActionTest {
     }
 
     @Test
-    fun `defaults contains START_GAME SCAN_CARD CREATE_DECK DRAFT_GUIDE in order`() {
+    fun `defaults contains SCAN_CARD CREATE_DECK DRAFT_GUIDE STATS in order`() {
         assertEquals(
             listOf(
-                QuickStartAction.START_GAME,
                 QuickStartAction.SCAN_CARD,
                 QuickStartAction.CREATE_DECK,
                 QuickStartAction.DRAFT_GUIDE,
+                QuickStartAction.STATS,
             ),
             QuickStartAction.defaults,
         )

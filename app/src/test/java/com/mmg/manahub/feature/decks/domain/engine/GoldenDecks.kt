@@ -566,7 +566,7 @@ object GoldenDecks {
         }
         return GoldenDeck(
             name = "Standard Aggro",
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             colorIdentity = setOf(ManaColor.R),
             mainboard = mainboard,
         )
@@ -613,7 +613,7 @@ object GoldenDecks {
         }
         return GoldenDeck(
             name = "Standard Control",
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             colorIdentity = setOf(ManaColor.W, ManaColor.U),
             mainboard = mainboard,
         )
@@ -809,9 +809,13 @@ object GoldenDecks {
             // 24 lands
             addAll(lands(24, "W", "pauper"))
         }
+        // NOTE: The Pauper format is hidden for release (its DeckFormat entry is commented
+        // out in production), so this fixture is built as CASUAL to keep the test source set
+        // compiling. The Pauper-specific harness assertions are @Ignore'd accordingly; the
+        // fixture still exercises the generic "evaluates within bounds" invariant under CASUAL.
         return GoldenDeck(
             name = "Pauper",
-            format = DeckFormat.PAUPER,
+            format = DeckFormat.CASUAL,
             colorIdentity = setOf(ManaColor.W, ManaColor.U),
             mainboard = mainboard,
         )
@@ -1018,7 +1022,7 @@ object GoldenDecks {
         }
         return GoldenDeck(
             name = "Healthy two-color constructed",
-            format = DeckFormat.STANDARD,
+            format = DeckFormat.CASUAL,
             colorIdentity = setOf(ManaColor.W, ManaColor.U),
             mainboard = mainboard,
         )

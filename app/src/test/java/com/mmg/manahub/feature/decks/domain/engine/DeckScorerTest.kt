@@ -503,8 +503,8 @@ class DeckScorerTest {
 
     @Test
     fun `given illegal card when fit then isLegal is false`() {
-        val profile = minimalProfile(format = DeckFormat.STANDARD)
-        val c = card(id = "banned1", legalityStandard = "banned")
+        val profile = minimalProfile(format = DeckFormat.COMMANDER)
+        val c = card(id = "banned1", legalityCommander = "banned")
 
         val fit = scorer.fit(c, profile, isOwned = false)
 
@@ -551,8 +551,8 @@ class DeckScorerTest {
 
     @Test
     fun `given illegal card when rankAdds then card is excluded`() {
-        val profile = minimalProfile(format = DeckFormat.STANDARD)
-        val banned  = card(id = "banned2", legalityStandard = "banned",
+        val profile = minimalProfile(format = DeckFormat.COMMANDER)
+        val banned  = card(id = "banned2", legalityCommander = "banned",
             colorIdentity = listOf("U"))
 
         val result = scorer.rankAdds(listOf(banned), profile, emptySet())
