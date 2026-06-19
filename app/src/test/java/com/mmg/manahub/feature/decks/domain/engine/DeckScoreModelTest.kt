@@ -235,8 +235,8 @@ class DeckScoreModelTest {
     }
 
     @Test
-    fun `DeckSkeletons Standard has LAND slot with ideal 24`() {
-        val skeleton = DeckSkeletons.forFormat(DeckFormat.STANDARD)
+    fun `DeckSkeletons Casual has LAND slot with ideal 24`() {
+        val skeleton = DeckSkeletons.forFormat(DeckFormat.CASUAL)
         assertEquals(24, skeleton.idealFor(DeckRole.LAND))
     }
 

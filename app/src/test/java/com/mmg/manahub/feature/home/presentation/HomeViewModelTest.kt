@@ -36,11 +36,14 @@ import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -120,12 +123,17 @@ class HomeViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // HomeViewModel resolves FirebaseCrashlytics.getInstance() at construction (additive
+        // telemetry, no PII) — mock the static so the un-initialized FirebaseApp doesn't throw.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
         stubDefaultDependencies()
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     private fun stubDefaultDependencies() {
@@ -566,10 +574,10 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         val actions = listOf(
-            QuickStartAction.START_GAME,
             QuickStartAction.SCAN_CARD,
             QuickStartAction.CREATE_DECK,
             QuickStartAction.DRAFT_GUIDE,
+            QuickStartAction.STATS,
         )
         vm.saveQuickStartActions(actions)
         advanceUntilIdle()
@@ -717,7 +725,7 @@ class HomeViewModelTest {
     @Test
     fun `state reflects quickStartActions from userPrefsDataStore`() = runTest(testDispatcher) {
         val customActions = listOf(
-            QuickStartAction.TOURNAMENTS,
+            QuickStartAction.SETTINGS,
             QuickStartAction.STATS,
             QuickStartAction.FRIENDS,
             QuickStartAction.TRADES,

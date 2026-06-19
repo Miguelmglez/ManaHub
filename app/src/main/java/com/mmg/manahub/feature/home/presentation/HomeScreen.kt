@@ -55,6 +55,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -76,6 +77,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.theme.ButtonShape
@@ -107,6 +109,10 @@ fun HomeScreen(
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
     var showGallerySheet by remember { mutableStateOf(false) }
+
+    // Additive telemetry: leave a breadcrumb when the Home screen is first composed so crash reports
+    // can show that the user was on Home. Fires once per entry (keyed on Unit).
+    LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("screen_viewed: home") }
 
     // The active game lives in the activity-scoped GameViewModel and is passed in
     // from AppNavGraph; it always wins the hero slot when present.
@@ -144,6 +150,8 @@ fun HomeScreen(
     )
 
     if (showCustomizeSheet) {
+        // Breadcrumb: the quick-start customize sheet was opened (fires once per open).
+        LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("home_quick_start_customize_opened") }
         QuickStartCustomizeSheet(
             allActions = QuickStartAction.entries,
             selectedActions = uiState.quickStartActions,
@@ -156,6 +164,8 @@ fun HomeScreen(
     }
 
     if (showGallerySheet) {
+        // Breadcrumb: the widget gallery sheet was opened (fires once per open).
+        LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("home_widget_gallery_opened") }
         WidgetGallerySheet(
             currentLayout = uiState.layout,
             isAuthenticated = uiState.isAuthenticated,
