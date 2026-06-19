@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.auth.data.remote
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.feature.auth.domain.model.AuthUser
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -26,6 +27,32 @@ data class UserProfileDto(
     @SerialName("provider") val provider: String?,
     @SerialName("profile_completed") val profileCompleted: Boolean = false,
 )
+
+/**
+ * Outcome of [UserProfileDataSource.getProfileByUserId].
+ *
+ * This deliberately distinguishes two cases the old `UserProfileDto?` contract collapsed into
+ * a single `null`, which caused the Google sign-in gate to misreport a transient fetch failure
+ * as "no profile" and bounce returning users back to the sign-up screen:
+ *
+ * - [Found]    — the RPC responded with a profile row.
+ * - [NotFound] — the RPC responded successfully but no row exists for the user.
+ * - [Failure]  — a real network/auth/parse error occurred (e.g. HTTP 401/403 because the
+ *   session token had not propagated to the OkHttp interceptor yet). Callers MUST NOT treat
+ *   this as "not found"; they should retry or surface a network error instead.
+ *
+ * A plain sealed type is used rather than [kotlin.Result] on purpose: [kotlin.Result] is an
+ * inline value class whose name-mangled accessors are awkward to stub with MockK at the
+ * data-source boundary.
+ */
+sealed interface ProfileFetchResult {
+    /** The RPC returned a profile row. */
+    data class Found(val profile: UserProfileDto) : ProfileFetchResult
+    /** The RPC succeeded but no profile row exists for this user. */
+    data object NotFound : ProfileFetchResult
+    /** The fetch failed with a real error (network/auth/parse) — never "not found". */
+    data class Failure(val error: Throwable) : ProfileFetchResult
+}
 
 /**
  * Data source for the `user_profiles` Supabase table.
@@ -73,24 +100,35 @@ class UserProfileDataSource(
      * trigger always inserts a row immediately, so a table query would never return null,
      * but the row would have `profile_completed = FALSE` until the user finishes sign-up.
      *
-     * Returns null on any network/parse failure (non-fatal).
+     * Returns a [ProfileFetchResult] that distinguishes the three outcomes the old
+     * `null`-on-everything contract collapsed together — a critical distinction for the
+     * Google sign-in gate (see [ProfileFetchResult] for the rationale).
+     *
+     * An invalid UUID is a caller contract violation (not a "not found"), so it is reported
+     * as a [ProfileFetchResult.Failure] rather than [ProfileFetchResult.NotFound].
      */
-    suspend fun getProfileByUserId(userId: String): UserProfileDto? = withContext(ioDispatcher) {
+    suspend fun getProfileByUserId(userId: String): ProfileFetchResult = withContext(ioDispatcher) {
         if (!isValidUuid(userId)) {
             if (BuildConfig.DEBUG) Log.w(TAG, "getProfileByUserId: invalid UUID '${userId.take(8)}'")
-            return@withContext null
+            return@withContext ProfileFetchResult.Failure(IllegalArgumentException("Invalid UUID"))
         }
         try {
-            service.getProfileByUserId(GetProfileByUserIdDto(pUserId = userId))
+            val dto = service.getProfileByUserId(GetProfileByUserIdDto(pUserId = userId))
                 .firstOrNull()
                 ?.toUserProfileDto()
+            if (dto != null) ProfileFetchResult.Found(dto) else ProfileFetchResult.NotFound
         } catch (e: Exception) {
+            // Surface these in production dashboards: a spike here means the OkHttp
+            // interceptor is falling back to the anon key (session not yet propagated
+            // after signInWith(IDToken)), which the RPC rejects. recordSafeNonFatal
+            // strips the message so no PII (user id, token) reaches Crashlytics.
+            recordSafeNonFatal("auth_profile_fetch_failed", e)
             if (BuildConfig.DEBUG) {
                 Log.w(TAG, "getProfileByUserId failed for user $userId", e)
             } else {
                 Log.w(TAG, "getProfileByUserId failed: ${e.javaClass.simpleName}")
             }
-            null
+            ProfileFetchResult.Failure(e)
         }
     }
 

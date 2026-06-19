@@ -1219,6 +1219,7 @@ private fun <T> AutoSlideHub(
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
+    val coroutineScope = rememberCoroutineScope()
 
     if (loadingWhen) {
         WidgetLoading()
@@ -1292,13 +1293,29 @@ private fun <T> AutoSlideHub(
                     imageVector = Icons.Default.ChevronLeft,
                     contentDescription = null,
                     tint = mc.primaryAccent.copy(alpha = 0.25f),
-                    modifier = Modifier.size(24.dp).alpha(if (pagerState.currentPage > 0) 1f else 0.1f)
+                    modifier = Modifier
+                        .size(28.dp)
+                        .alpha(if (pagerState.currentPage > 0) 1f else 0.1f)
+                        .clip(CircleShape)
+                        .clickable(enabled = pagerState.currentPage > 0) {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            }
+                        }
                 )
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
                     tint = mc.primaryAccent.copy(alpha = 0.25f),
-                    modifier = Modifier.size(24.dp).alpha(if (pagerState.currentPage < slides.size - 1) 1f else 0.1f)
+                    modifier = Modifier
+                        .size(28.dp)
+                        .alpha(if (pagerState.currentPage < slides.size - 1) 1f else 0.1f)
+                        .clip(CircleShape)
+                        .clickable(enabled = pagerState.currentPage < slides.size - 1) {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                            }
+                        }
                 )
             }
         }

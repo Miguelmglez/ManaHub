@@ -58,6 +58,10 @@ android {
             "CLOUDFLARE_WORKER_URL",
             "\"${localProperties.getProperty("CLOUDFLARE_WORKER_URL", "https://manahub-draft-api.miguel-mglez.workers.dev/")}\""
         )
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     testOptions {
@@ -206,9 +210,9 @@ dependencies {
     // implementation("org.tensorflow:tensorflow-lite:2.16.1")
     // implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
-    implementation("com.google.mlkit:text-recognition:16.0.1")
-    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
-    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1")
 
     implementation(libs.accompanist.permissions)
     implementation(libs.material.icons.extended)

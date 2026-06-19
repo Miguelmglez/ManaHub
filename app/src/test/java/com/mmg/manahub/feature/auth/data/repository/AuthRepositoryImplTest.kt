@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.auth.data.repository
 
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.feature.auth.data.remote.ProfileFetchResult
 import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
@@ -32,6 +33,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -65,7 +67,11 @@ class AuthRepositoryImplTest {
 
     // ── Test dispatcher ───────────────────────────────────────────────────────
 
-    private val testDispatcher = UnconfinedTestDispatcher()
+    // A single shared scheduler so that tests which use runTest(testDispatcher) drive the
+    // SAME virtual clock as the repository's withContext(ioDispatcher) work — required so that
+    // delay() inside the signInWithGoogle retry path is auto-advanced rather than hanging.
+    private val testScheduler = TestCoroutineScheduler()
+    private val testDispatcher = UnconfinedTestDispatcher(testScheduler)
     private val testScope = CoroutineScope(testDispatcher + SupervisorJob())
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
@@ -449,7 +455,8 @@ class AuthRepositoryImplTest {
             profileCompleted = true,
         )
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns existingProfile
+        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns
+            ProfileFetchResult.Found(existingProfile)
 
         val result = repository.signInWithGoogle("google-token", "raw-nonce")
 
@@ -465,7 +472,9 @@ class AuthRepositoryImplTest {
     fun `given new Google user with incomplete profile when signInWithGoogle then returns NoProfileFound`() = runTest {
         val userInfoMock = buildUserInfoMock(providerName = "google", nicknameMetadata = null)
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns null
+        // RPC responded successfully but found no profile row (NotFound).
+        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns
+            ProfileFetchResult.NotFound
         coEvery { supabaseAuth.signOut(any()) } just Runs
 
         val result = repository.signInWithGoogle("google-token", "raw-nonce")
@@ -473,6 +482,84 @@ class AuthRepositoryImplTest {
         assertTrue(result is AuthResult.Error)
         assertTrue((result as AuthResult.Error).error is AuthError.NoProfileFound)
         coVerify(exactly = 0) { userProfileDataSource.upsertUserProfile(any()) }
+        // A genuine "not found" must NOT fall back to the direct table query.
+        coVerify(exactly = 0) { userProfileDataSource.fetchUserProfile(any()) }
+    }
+
+    @Test
+    fun `given fetch fails once then succeeds when signInWithGoogle then retries and returns Success`() = runTest(testDispatcher) {
+        val userInfoMock = buildUserInfoMock(providerName = "google", nicknameMetadata = "ExistingNick")
+        val existingProfile = com.mmg.manahub.feature.auth.data.remote.UserProfileDto(
+            id               = "user-uuid-001",
+            nickname         = "ExistingNick",
+            gameTag          = "#XYZ1234",
+            avatarUrl        = null,
+            provider         = "google",
+            profileCompleted = true,
+        )
+        every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+        // First RPC attempt fails (token not yet propagated → 401); retry succeeds.
+        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returnsMany listOf(
+            ProfileFetchResult.Failure(IOException("HTTP 401")),
+            ProfileFetchResult.Found(existingProfile),
+        )
+
+        val result = repository.signInWithGoogle("google-token", "raw-nonce")
+
+        assertTrue(result is AuthResult.Success)
+        val user = (result as AuthResult.Success).data
+        assertEquals("ExistingNick", user.nickname)
+        // The RPC was hit twice (original + retry); the table-query fallback was never needed.
+        coVerify(exactly = 2) { userProfileDataSource.getProfileByUserId("user-uuid-001") }
+        coVerify(exactly = 0) { userProfileDataSource.fetchUserProfile(any()) }
+    }
+
+    @Test
+    fun `given RPC fails twice but table query succeeds when signInWithGoogle then falls back and returns Success`() = runTest(testDispatcher) {
+        val userInfoMock = buildUserInfoMock(providerName = "google", nicknameMetadata = "ExistingNick")
+        val fallbackProfile = com.mmg.manahub.feature.auth.data.remote.UserProfileDto(
+            id               = "user-uuid-001",
+            nickname         = "ExistingNick",
+            gameTag          = "#XYZ1234",
+            avatarUrl        = null,
+            provider         = "google",
+            profileCompleted = true,
+        )
+        every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+        // Both RPC attempts fail; the direct table query is the last-resort fallback.
+        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns
+            ProfileFetchResult.Failure(IOException("HTTP 403"))
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns fallbackProfile
+
+        val result = repository.signInWithGoogle("google-token", "raw-nonce")
+
+        assertTrue(result is AuthResult.Success)
+        assertEquals("ExistingNick", (result as AuthResult.Success).data.nickname)
+        coVerify(exactly = 2) { userProfileDataSource.getProfileByUserId("user-uuid-001") }
+        coVerify(exactly = 1) { userProfileDataSource.fetchUserProfile("user-uuid-001") }
+        // Critical: a fetch error for a real user must never be reported as NoProfileFound,
+        // so the user is never wrongly signed out.
+        coVerify(exactly = 0) { supabaseAuth.signOut(any()) }
+    }
+
+    @Test
+    fun `given all profile fetches fail when signInWithGoogle then returns NetworkError not NoProfileFound`() = runTest(testDispatcher) {
+        val userInfoMock = buildUserInfoMock(providerName = "google", nicknameMetadata = null)
+        every { supabaseAuth.currentUserOrNull() } returns userInfoMock
+        // RPC fails on both attempts AND the table-query fallback yields nothing.
+        coEvery { userProfileDataSource.getProfileByUserId("user-uuid-001") } returns
+            ProfileFetchResult.Failure(IOException("network down"))
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns null
+        coEvery { supabaseAuth.signOut(any()) } just Runs
+
+        val result = repository.signInWithGoogle("google-token", "raw-nonce")
+
+        assertTrue(result is AuthResult.Error)
+        // A transient fetch failure must surface as a retryable network error, NOT as a
+        // missing profile (which would force a returning user into the sign-up flow).
+        assertTrue((result as AuthResult.Error).error is AuthError.NetworkError)
+        // The session must be kept intact so the user can retry.
+        coVerify(exactly = 0) { supabaseAuth.signOut(any()) }
     }
 
     @Test
