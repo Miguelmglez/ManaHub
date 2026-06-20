@@ -107,6 +107,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.core.domain.model.MagicSet
+import com.mmg.manahub.core.domain.model.QuickStartAction
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.DeckItem
@@ -2707,6 +2708,7 @@ private val QuickStartAction.navIcon: ImageVector
         QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
+        QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Group
         QuickStartAction.SETTINGS -> Icons.Default.Settings
     }
 
@@ -2722,6 +2724,7 @@ private val QuickStartAction.navLabel: String
         QuickStartAction.STATS -> "My Stats"
         QuickStartAction.FRIENDS -> "Friends"
         QuickStartAction.TRADES -> "Trades"
+        QuickStartAction.COMMUNITY_DECKS -> "Community"
         QuickStartAction.SETTINGS -> "Settings"
     }
 
@@ -2736,6 +2739,7 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.STATS -> HomeAction.OpenStats
     QuickStartAction.FRIENDS -> HomeAction.OpenFriends
     QuickStartAction.TRADES -> HomeAction.OpenTrades
+    QuickStartAction.COMMUNITY_DECKS -> HomeAction.OpenCommunityDecks
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
 }
 

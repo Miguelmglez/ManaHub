@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.home.presentation
 import androidx.annotation.StringRes
 import com.mmg.manahub.core.domain.model.DeckSummary
 import com.mmg.manahub.core.domain.model.DraftSet
+import com.mmg.manahub.core.domain.model.QuickStartAction
 import com.mmg.manahub.core.domain.model.news.NewsItem
 // FirstStepItem is defined in the same package — no explicit import needed.
 

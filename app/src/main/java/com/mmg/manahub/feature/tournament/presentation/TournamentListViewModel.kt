@@ -3,7 +3,7 @@ package com.mmg.manahub.feature.tournament.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

@@ -19,9 +19,9 @@ import com.mmg.manahub.core.online.domain.usecase.GetMyActiveSessionsUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.StartSessionUseCase
-import com.mmg.manahub.feature.auth.domain.model.AuthResult
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthResult
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext

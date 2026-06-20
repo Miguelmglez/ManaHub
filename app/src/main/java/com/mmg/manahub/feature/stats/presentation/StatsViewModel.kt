@@ -8,7 +8,7 @@ import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.model.MagicSet
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase

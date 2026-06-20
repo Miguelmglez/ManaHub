@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.trades.domain.repository
 
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.core.domain.model.WishlistEntry
 import kotlinx.coroutines.flow.Flow
 
 interface WishlistRepository {

@@ -2,8 +2,8 @@ package com.mmg.manahub.feature.trades.domain.usecase
 
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntity
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
 import com.mmg.manahub.feature.trades.domain.model.TradeItem
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository

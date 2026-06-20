@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.trades.data.repository
 
-import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
 import com.mmg.manahub.feature.trades.data.remote.OpenForTradeRemoteDataSource
 import io.mockk.coEvery
 import io.mockk.coVerify

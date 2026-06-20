@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
 import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
 import com.mmg.manahub.core.online.domain.usecase.ConfirmDefeatUseCase

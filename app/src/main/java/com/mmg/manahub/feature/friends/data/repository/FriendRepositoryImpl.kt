@@ -7,10 +7,10 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
-import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
-import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
-import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
-import com.mmg.manahub.feature.friends.data.local.entity.OutgoingFriendRequestEntity
+import com.mmg.manahub.core.data.local.dao.FriendDao
+import com.mmg.manahub.core.data.local.entity.FriendEntity
+import com.mmg.manahub.core.data.local.entity.FriendRequestEntity
+import com.mmg.manahub.core.data.local.entity.OutgoingFriendRequestEntity
 import com.mmg.manahub.feature.friends.data.orNullIfBlank
 import com.mmg.manahub.feature.friends.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.feature.friends.data.remote.FriendRequestWithProfile

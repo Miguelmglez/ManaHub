@@ -50,6 +50,8 @@ import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionTab
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
 import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
@@ -263,7 +265,8 @@ fun AppNavGraph(
                             HomeAction.OpenStats -> navController.navigate(Screen.Stats.route)
                             HomeAction.OpenFriends -> navController.navigate(Screen.FriendsList.route)
                             HomeAction.OpenTrades -> navController.navigate(Screen.Trades.route)
-                            HomeAction.OpenTournaments -> navController.navigate(Screen.TournamentList.route)
+                HomeAction.OpenCommunityDecks -> navController.navigate(Screen.CommunityDecks.route)
+                HomeAction.OpenTournaments -> navController.navigate(Screen.TournamentList.route)
                             HomeAction.OpenSettings -> navController.navigate(Screen.Settings.route)
                             HomeAction.OpenProfile -> navController.navigate(Screen.Profile.baseRoute)
                             // No "recent deck" is resolved here, so route to the deck list
@@ -368,6 +371,9 @@ fun AppNavGraph(
                             Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
                         )
                     },
+                    onBrowseCommunityDecks = {
+                        navController.navigate(Screen.CommunityDecks.route)
+                    }
                 )
             }
 
@@ -391,6 +397,9 @@ fun AppNavGraph(
                             Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
                         )
                     },
+                    onBrowseCommunityDecks = {
+                        navController.navigate(Screen.CommunityDecks.route)
+                    }
                 )
             }
 
@@ -414,6 +423,9 @@ fun AppNavGraph(
                             Screen.TradeNegotiationDetail.createRoute(proposalId, rootProposalId)
                         )
                     },
+                    onBrowseCommunityDecks = {
+                        navController.navigate(Screen.CommunityDecks.route)
+                    }
                 )
             }
 
@@ -450,6 +462,9 @@ fun AppNavGraph(
                             popUpTo(Screen.CollectionCardDetail.route) { inclusive = true }
                         }
                     },
+                    onNavigateToCommunityDecks = { cardName ->
+                        navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
+                    },
                 )
             }
 
@@ -478,6 +493,44 @@ fun AppNavGraph(
             ) {
                 DeckImprovementScreen(
                     onBack = { navController.popBackStack() }
+                )
+            }
+
+            // ── Community Decks (Archidekt browse + import) ───────────────────
+            composable(
+                route = Screen.CommunityDeckDetail.route,
+                arguments = listOf(navArgument("archidektId") { type = NavType.IntType }),
+            ) {
+                CommunityDeckDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToDeck = { deckId ->
+                        navController.navigate(Screen.DeckStudio.createRoute(deckId)) {
+                            popUpTo(Screen.CommunityDeckDetail.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            // Community Decks browse / search (landing)
+            composable(route = Screen.CommunityDecks.route) {
+                CommunityDecksScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToDeck = { archidektId ->
+                        navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
+                    },
+                )
+            }
+
+            // Community Decks filtered by card name (deep-linked from card detail)
+            composable(
+                route = Screen.CommunityDecksByCard.route,
+                arguments = listOf(navArgument("cardName") { type = NavType.StringType }),
+            ) {
+                CommunityDecksScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToDeck = { archidektId ->
+                        navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
+                    },
                 )
             }
             composable(

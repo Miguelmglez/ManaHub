@@ -1,5 +1,7 @@
 package com.mmg.manahub.core.domain.model
 
+import com.mmg.manahub.core.model.CollectionViewMode
+
 data class UserPreferences(
     val appLanguage: AppLanguage,
     val cardLanguage: CardLanguage,

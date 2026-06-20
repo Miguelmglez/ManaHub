@@ -44,6 +44,8 @@
 # ── App models (Room entities, domain models) ────────────────────────────────
 -keep class com.mmg.manahub.core.data.local.entity.** { *; }
 -keep class com.mmg.manahub.core.domain.model.** { *; }
+# KMP migration — shared pure-Kotlin models (CollectionViewMode/GroupingMode) persisted by enum name.
+-keep class com.mmg.manahub.core.model.** { *; }
 -keep class com.mmg.manahub.feature.game.model.** { *; }
 
 # ── Coil ─────────────────────────────────────────────────────────────────────

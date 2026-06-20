@@ -19,12 +19,13 @@ import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
-import com.mmg.manahub.feature.draft.data.local.DraftSetDao
-import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
-import com.mmg.manahub.feature.news.data.local.NewsDao
-import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
-import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.dao.FriendDao
+import com.mmg.manahub.core.data.local.dao.NewsDao
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -93,6 +94,10 @@ object DatabaseModule {
                 // reason). Additive: adds legality_legacy/vintage/pauper to `cards`
                 // (Deck Doctor Phase 4, D2).
                 MIGRATION_39_40,
+                // v40 → v41 lives as a top-level `val` in Migration_40_41.kt (same
+                // reason). Additive: adds attribution columns to `decks` + the
+                // community_deck_cache table (Community Decks, Batch 1).
+                MIGRATION_40_41,
             )
             .build()
 
@@ -715,4 +720,5 @@ object DatabaseModule {
     @Provides fun provideDraftSessionDao(db: MtgDatabase): DraftSessionDao = db.draftSessionDao()
     @Provides fun provideGamificationDao(db: MtgDatabase): GamificationDao = db.gamificationDao()
     @Provides fun provideGamificationStatsDao(db: MtgDatabase): GamificationStatsDao = db.gamificationStatsDao()
+    @Provides fun provideCommunityDeckCacheDao(db: MtgDatabase): CommunityDeckCacheDao = db.communityDeckCacheDao()
 }

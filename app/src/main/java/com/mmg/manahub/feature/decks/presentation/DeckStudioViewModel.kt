@@ -16,7 +16,7 @@ import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
-import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository

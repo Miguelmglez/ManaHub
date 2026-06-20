@@ -41,22 +41,24 @@ import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyEntity
-import com.mmg.manahub.feature.draft.data.local.DraftSetDao
-import com.mmg.manahub.feature.draft.data.local.DraftSetEntity
-import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
-import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
-import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
-import com.mmg.manahub.feature.friends.data.local.entity.OutgoingFriendRequestEntity
-import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
-import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
-import com.mmg.manahub.feature.news.data.local.NewsDao
-import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
-import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
-import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
-import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
-import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntity
+import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.entity.DraftSetEntity
+import com.mmg.manahub.core.data.local.dao.FriendDao
+import com.mmg.manahub.core.data.local.entity.FriendEntity
+import com.mmg.manahub.core.data.local.entity.FriendRequestEntity
+import com.mmg.manahub.core.data.local.entity.OutgoingFriendRequestEntity
+import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
+import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
+import com.mmg.manahub.core.data.local.dao.NewsDao
+import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
+import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
+import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
 
 @Database(
     entities = [
@@ -94,8 +96,10 @@ import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntit
         QuestInstanceEntity::class,
         StreakEntity::class,
         EntitlementEntity::class,
+        // Community Decks (v41)
+        CommunityDeckCacheEntity::class,
     ],
-    version = 40,
+    version = 41,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -125,4 +129,7 @@ abstract class MtgDatabase : RoomDatabase() {
      * achievement resolvers + backfill. Adds no entities → no schema change (ADR-002, Phase 1).
      */
     abstract fun gamificationStatsDao(): GamificationStatsDao
+
+    /** Cache of fetched community deck (Archidekt) responses (Community Decks, v41). */
+    abstract fun communityDeckCacheDao(): CommunityDeckCacheDao
 }

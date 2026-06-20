@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.carddetail.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.DataResult
@@ -15,9 +16,9 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
@@ -27,12 +28,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -50,6 +53,7 @@ class CardDetailViewModel @Inject constructor(
     private val wishlistRepo: WishlistRepository,
     private val openForTradeRepo: OpenForTradeRepository,
     private val userPrefs: UserPreferencesRepository,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
     private val authRepository: AuthRepository,
     private val helper: AnalyticsHelper,
 ) : ViewModel() {
@@ -58,6 +62,11 @@ class CardDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(CardDetailUiState())
     val uiState: StateFlow<CardDetailUiState> = _uiState.asStateFlow()
+
+    /** Community Decks feature flag — gates the "Find Community Decks" entry point. */
+    val isCommunityDecksEnabled: StateFlow<Boolean> =
+        userPreferencesDataStore.communityDecksEnabledFlow
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     // One-shot UI events (toasts, navigation, etc.)
     private val _events = MutableSharedFlow<CardDetailEvent>(extraBufferCapacity = 8)

@@ -6,10 +6,10 @@ import com.mmg.manahub.feature.auth.data.remote.ProfileFetchResult
 import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
-import com.mmg.manahub.feature.auth.domain.model.AuthError
-import com.mmg.manahub.feature.auth.domain.model.AuthResult
-import com.mmg.manahub.feature.auth.domain.model.AuthUser
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.auth.AuthError
+import com.mmg.manahub.core.domain.auth.AuthResult
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.AuthConfig
 import io.github.jan.supabase.auth.exception.AuthErrorCode

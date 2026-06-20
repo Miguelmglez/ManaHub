@@ -1,11 +1,11 @@
 package com.mmg.manahub.feature.trades.data.repository
 
 import app.cash.turbine.test
-import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
-import com.mmg.manahub.feature.trades.data.local.entity.LocalWishlistEntity
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.feature.trades.data.remote.WishlistRemoteDataSource
 import com.mmg.manahub.feature.trades.data.remote.dto.WishlistEntryDto
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.core.domain.model.WishlistEntry
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

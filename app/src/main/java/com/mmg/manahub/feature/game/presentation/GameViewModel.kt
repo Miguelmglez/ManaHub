@@ -6,8 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.nearby.domain.model.NearbyConnectionEvent
 import com.mmg.manahub.core.nearby.domain.model.NearbyGameMessage
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository

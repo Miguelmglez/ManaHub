@@ -19,6 +19,13 @@ data class DeckEntity(
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
+    // ── Community Decks attribution (v41) ──────────────────────────────────
+    // Populated when a deck is imported from an external community source
+    // (e.g. Archidekt). All nullable so locally-created decks remain unaffected.
+    @ColumnInfo(name = "source_url") val sourceUrl: String? = null,
+    @ColumnInfo(name = "source_author") val sourceAuthor: String? = null,
+    @ColumnInfo(name = "source_service") val sourceService: String? = null,
+    @ColumnInfo(name = "imported_at") val importedAt: Long? = null,
 )
 
 /** Cross-reference: which cards belong to which deck (mainboard + sideboard). */

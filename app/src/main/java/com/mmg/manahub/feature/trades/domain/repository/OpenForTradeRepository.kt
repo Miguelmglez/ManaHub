@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.trades.domain.repository
 
-import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
+import com.mmg.manahub.core.domain.model.OpenForTradeEntry
 import kotlinx.coroutines.flow.Flow
 
 interface OpenForTradeRepository {

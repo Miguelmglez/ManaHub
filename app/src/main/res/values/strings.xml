@@ -2855,4 +2855,47 @@
     <string name="reward_cell_a11y_owned">%1$s, owned. Tap to equip.</string>
     <string name="reward_cell_a11y_locked">%1$s, locked. %2$s.</string>
 
+    <!-- Community Decks -->
+    <string name="community_decks_title">Community Decks</string>
+    <string name="community_deck_detail_title">Deck Details</string>
+    <string name="community_deck_attribution">Created by %1$s on Archidekt</string>
+    <string name="community_deck_view_original">View on Archidekt</string>
+    <string name="community_deck_import">Import Deck</string>
+    <string name="community_deck_importing">Importing deck…</string>
+    <string name="community_deck_import_progress">Resolving cards: %1$d / %2$d</string>
+    <string name="community_deck_import_success">Deck imported successfully</string>
+    <string name="community_deck_import_partial">Deck imported (%1$d of %2$d cards resolved)</string>
+    <string name="community_deck_import_failed">Failed to import deck</string>
+    <string name="community_deck_error_not_found">Deck not found on Archidekt</string>
+    <string name="community_deck_error_network">Could not reach Archidekt. Please try again.</string>
+    <string name="community_deck_error_bot_protection">Archidekt is temporarily unavailable. Please try again later.</string>
+    <string name="community_deck_error_timeout">Request timed out. Please try again.</string>
+    <string name="community_deck_empty_cards">This deck has no cards</string>
+    <string name="community_deck_feature_disabled">Community Decks is not available yet</string>
+    <string name="community_decks_disclaimer">Community deck data is provided by Archidekt. ManaHub is not affiliated with Archidekt. Deck content is user-submitted and does not represent the views of ManaHub.</string>
+    <string name="community_decks_mtg_disclaimer">Magic: The Gathering is a trademark of Wizards of the Coast / Hasbro. ManaHub is unofficial Fan Content permitted under the Fan Content Policy, not approved or endorsed by Wizards of the Coast.</string>
+    <string name="community_deck_cards_mainboard">Mainboard (%1$d)</string>
+    <string name="community_deck_cards_sideboard">Sideboard (%1$d)</string>
+    <string name="community_deck_cards_commander">Commander</string>
+    <string name="community_deck_views">%1$d views</string>
+    <string name="community_deck_format">Format: %1$s</string>
+
+    <!-- Community Decks — Search (Phase 2) -->
+    <string name="community_deck_search_hint">Search by card name…</string>
+    <string name="community_deck_search_button">Search</string>
+    <string name="community_deck_search_empty">No decks found</string>
+    <string name="community_deck_search_empty_with_filter">No decks found with this filter. Try removing the format filter.</string>
+    <string name="community_deck_search_timeout">Search timed out. Try a more specific query or remove the format filter.</string>
+    <string name="community_deck_search_initial">Search for a card to find community decks that include it</string>
+    <string name="community_deck_load_more">Load More</string>
+    <string name="community_deck_result_count">%1$d decks found</string>
+    <string name="community_deck_cards_count">%1$d cards</string>
+    <string name="community_deck_sort_popular">Most Popular</string>
+    <string name="community_deck_sort_recent">Most Recent</string>
+    <string name="community_deck_sort_updated">Recently Updated</string>
+    <string name="community_deck_filter_all_formats">All Formats</string>
+    <string name="community_deck_find_decks">Find Community Decks</string>
+    <string name="community_deck_search_title">Community Decks</string>
+    <string name="community_deck_sort_label">Sort: %1$s</string>
+
 </resources>

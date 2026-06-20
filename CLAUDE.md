@@ -23,8 +23,18 @@ Full file-type / frontmatter / index conventions live in the **`memory-protocol`
 
 ## Project overview
 
-ManaHub is a Magic: The Gathering companion Android app (package `com.mmg.manahub`). Single-module
-Gradle project: Kotlin, Jetpack Compose, Clean Architecture, Hilt DI, Room.
+ManaHub is a Magic: The Gathering companion app (package `com.mmg.manahub`), currently single-module
+Gradle (Kotlin, Jetpack Compose, Clean Architecture, Hilt DI, Room) **migrating to Kotlin
+Multiplatform**.
+
+**DIRECTIVE — KMP-oriented Clean Architecture (effective 2026-06-20).** From now on the app targets
+**Android + Web** and ALL new code MUST be written in **Clean Architecture oriented to KMP**:
+platform-agnostic domain/data/ViewModel/UI in `commonMain` by default, with anything Android- or
+web-specific isolated behind `expect`/`actual` or interfaces in `androidMain`/`wasmJsMain`. Do not
+write new code that hard-couples to Android (`Context`, AndroidX-only APIs, Room/DataStore directly,
+Hilt) unless it genuinely belongs in `androidMain`. DI is **Koin** (not Hilt) for all new/migrated
+code. See the **Kotlin Multiplatform migration** section below + `docs/plans/kmp-migration-plan.md`
+and `docs/plans/kmp-library-and-filesystem-map.md`.
 
 ## Language rules
 
@@ -68,6 +78,37 @@ com.mmg.manahub/
 
 Most features: a `Screen.kt` Composable, a `ViewModel.kt` (`@HiltViewModel`), optional sub-composables.
 Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` sub-packages.
+
+## Kotlin Multiplatform migration (IN PROGRESS — Android + Web)
+
+The project is migrating to **KMP, targeting Android + Web (Compose Multiplatform / `wasmJs`)**.
+iOS/Desktop are out of scope for now but the structure must not preclude them. **DI is moving Hilt →
+Koin.** Full plan: `docs/plans/kmp-migration-plan.md`; library/source-set + file-tree map:
+`docs/plans/kmp-library-and-filesystem-map.md`; spike findings + wasm/library gotchas live in memory
+`project_kmp_spike_findings`. **Read these before any KMP-tagged work.** Until a feature is
+migrated, existing Hilt/Room/androidx-Compose code stays as-is — do not pre-emptively KMP-ify
+unrelated code.
+
+Broadly-applicable rules (feature-specific detail → memory):
+- **Source sets:** `commonMain` (shared) / `androidMain` / `wasmJsMain` (+ `commonTest`). `commonMain`
+  **never** imports an Android/AndroidX or browser API — those go behind `expect`/`actual` or an
+  interface. Target modules: `:shared:{core-model,core-common,core-domain,core-data,core-ui,feature-*}`,
+  `:androidApp`, `:webApp`.
+- **Room has no wasm target** → Room DAOs/entities/migrations stay in `androidMain`; DAO/repository
+  **interfaces in `commonMain`**; web data source (Supabase-remote-first + IndexedDB/`localStorage`
+  cache) in `wasmJsMain` behind the same interface.
+- **No `androidx.paging.PagingData` and no `R.string`/Android resources in shared code** — use a common
+  pagination model and the CMP `Res` resource system.
+- **Networking:** Retrofit → Ktor (js/wasm engine), Gson → kotlinx-serialization. Rate-limit queues
+  (`ScryfallRequestQueue`, `ArchidektRequestQueue`) become pure-coroutine `Mutex` impls in `commonMain`.
+- **DI:** Koin modules per feature; `koinViewModel()` not `hiltViewModel()`. Migrate per-feature (pure
+  features first, platform-heavy last) — never a big-bang swap that breaks compilation between commits.
+- **Definition of done:** Android stays shippable (compiles + tests green vs. the documented baseline),
+  the web target builds (`./gradlew wasmJsBrowserDistribution`), and no Android/browser import leaked
+  into `commonMain`. `.gradle.kts`/KMP build config is owned by `android-kotlin-architect` (build DSL
+  exception to the `.kt`-only delegation rule).
+- → memory: `project_modularization_blockers` (5 blockers are a PREREQUISITE, resolve first),
+  `project_kmp_spike_findings`
 
 ## Key architectural decisions
 

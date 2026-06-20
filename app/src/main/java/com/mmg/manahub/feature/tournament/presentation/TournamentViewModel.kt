@@ -8,8 +8,8 @@ import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
 import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
-import com.mmg.manahub.core.domain.repository.MatchResultOutcome
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.presentation.PlayerConfig

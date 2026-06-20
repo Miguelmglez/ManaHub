@@ -6,9 +6,7 @@ import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import dagger.Binds
@@ -38,12 +36,6 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindStatsRepository(impl: StatsRepositoryImpl): StatsRepository
-
-    @Binds @Singleton
-    abstract fun bindGameSessionRepository(impl: GameSessionRepositoryImpl): GameSessionRepository
-
-    @Binds @Singleton
-    abstract fun bindTournamentRepository(impl: TournamentRepositoryImpl): TournamentRepository
 
     @Binds @Singleton
     abstract fun bindUserPreferencesRepository(impl: com.mmg.manahub.core.data.local.UserPreferencesDataStore): UserPreferencesRepository

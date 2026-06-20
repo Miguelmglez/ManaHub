@@ -3,7 +3,7 @@
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.ComparisonOperator
 import com.mmg.manahub.core.domain.model.SearchCriterion
 import com.mmg.manahub.core.domain.model.UserCardWithCard
@@ -14,8 +14,8 @@ import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
 import com.mmg.manahub.feature.collection.presentation.SortOrder
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository

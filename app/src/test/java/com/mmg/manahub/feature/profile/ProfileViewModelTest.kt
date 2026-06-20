@@ -7,7 +7,7 @@ import com.mmg.manahub.core.domain.model.CardValue
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.Rarity
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.QuestPeriod
 import com.mmg.manahub.core.gamification.domain.QuestWeightClass
@@ -20,8 +20,8 @@ import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.profile.presentation.PlayStyle
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel

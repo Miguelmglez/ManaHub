@@ -1,7 +1,7 @@
 package com.mmg.manahub.core.gamification.domain
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 

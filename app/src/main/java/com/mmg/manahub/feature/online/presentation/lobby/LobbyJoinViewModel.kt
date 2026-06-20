@@ -14,9 +14,9 @@ import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import com.mmg.manahub.core.online.domain.usecase.JoinSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
-import com.mmg.manahub.feature.auth.domain.model.AuthResult
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthResult
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope

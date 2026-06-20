@@ -256,9 +256,11 @@ fun SettingsScreen(
                 collectionPublic = uiState.collectionPublic,
                 wishlistPublic = uiState.wishlistPublic,
                 tradeListPublic = uiState.tradeListPublic,
+                communityDecksEnabled = uiState.communityDecksEnabled,
                 onCollectionPublicChange = { viewModel.setCollectionPublic(it, privacyErrorMsg) },
                 onWishlistPublicChange = { viewModel.setWishlistPublic(it, privacyErrorMsg) },
                 onTradeListPublicChange = { viewModel.setTradeListPublic(it, privacyErrorMsg) },
+                onCommunityDecksEnabledChange = viewModel::setCommunityDecksEnabled,
             )
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
@@ -355,9 +357,11 @@ private fun PrivacySection(
     collectionPublic: Boolean,
     wishlistPublic: Boolean,
     tradeListPublic: Boolean,
+    communityDecksEnabled: Boolean,
     onCollectionPublicChange: (Boolean) -> Unit,
     onWishlistPublicChange: (Boolean) -> Unit,
     onTradeListPublicChange: (Boolean) -> Unit,
+    onCommunityDecksEnabledChange: (Boolean) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     Column(
@@ -387,6 +391,12 @@ private fun PrivacySection(
             subtitle = stringResource(R.string.settings_privacy_trade_list_subtitle),
             checked = tradeListPublic,
             onCheckedChange = onTradeListPublicChange,
+        )
+        SettingsToggleItem(
+            title = "Community Decks",
+            subtitle = "Show Archidekt browse and import tools",
+            checked = communityDecksEnabled,
+            onCheckedChange = onCommunityDecksEnabledChange,
         )
         Spacer(Modifier.height(8.dp))
         Text(

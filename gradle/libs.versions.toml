@@ -45,6 +45,11 @@ play-app-update      = "2.1.0"
 play-review          = "2.0.1"
 vosk                 = "0.3.75"
 
+# Kotlin Multiplatform (KMP) migration — Phase 0, Spike A.
+# compose-multiplatform: JetBrains Compose Multiplatform plugin (wasmJs-capable UI). Added now so
+# later phases can reuse the alias; NOT applied to :shared:core-model (it has no UI yet).
+compose-multiplatform = "1.9.0"
+
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 # opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
@@ -116,6 +121,9 @@ play-review          = { module = "com.google.android.play:review-ktx", version.
 vosk-android         = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.7.3" }
+
+# KMP commonTest assertions (multiplatform-safe; replaces JUnit/MockK in commonMain test source sets).
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
 retrofit-kotlinx-serialization-converter = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit" }
 
 baseline-profile-junit4   = { group = "androidx.benchmark", name = "benchmark-macro-junit4",        version = "1.3.4" }
@@ -132,3 +140,14 @@ hilt                 = { id = "com.google.dagger.hilt.android",                v
 ksp                  = { id = "com.google.devtools.ksp",                       version = "2.3.6" }
 google-services      = { id = "com.google.gms.google-services",                version.ref = "google-services" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics",               version = "3.0.4" }
+
+# ── Kotlin Multiplatform (KMP) migration — Phase 0, Spike A ──────────────────────────────────────
+# kotlin-multiplatform: the KMP Kotlin plugin (commonMain + per-target source sets).
+# android-kmp-library: AGP 9's dedicated KMP Android-target plugin
+#   (com.android.kotlin.multiplatform.library). Chosen over the legacy
+#   `com.android.library` + `kotlin { androidTarget() }` combo because AGP 9 removed the standalone
+#   Kotlin-Android plugin (see root build.gradle.kts note) and the new plugin is the supported way to
+#   add an Android target to a KMP module — the Android config lives under `kotlin { androidLibrary { } }`.
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform",            version.ref = "kotlin" }
+android-kmp-library  = { id = "com.android.kotlin.multiplatform.library",      version.ref = "agp" }
+compose-multiplatform = { id = "org.jetbrains.compose",                        version.ref = "compose-multiplatform" }

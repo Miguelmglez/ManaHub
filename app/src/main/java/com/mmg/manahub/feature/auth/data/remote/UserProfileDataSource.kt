@@ -3,7 +3,7 @@ package com.mmg.manahub.feature.auth.data.remote
 import android.util.Log
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.util.recordSafeNonFatal
-import com.mmg.manahub.feature.auth.domain.model.AuthUser
+import com.mmg.manahub.core.domain.auth.AuthUser
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName

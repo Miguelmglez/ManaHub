@@ -6,10 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.feature.trades.domain.model.TradeError
 import com.mmg.manahub.feature.trades.domain.model.TradeItem
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
