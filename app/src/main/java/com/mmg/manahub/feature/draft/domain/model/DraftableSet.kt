@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.draft.domain.model
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DraftSet
+import com.mmg.manahub.core.model.DraftSet
 
 /**
  * A fully-resolved set ready for simulation: card pool, booster config, and tier-list ratings.

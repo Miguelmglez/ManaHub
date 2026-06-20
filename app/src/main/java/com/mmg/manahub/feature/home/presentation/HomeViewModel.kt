@@ -8,20 +8,20 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.CommunityStats
-import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.domain.model.DraftSet
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.PLAYABLE_SET_TYPES
-import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.QuickStartAction
-import com.mmg.manahub.core.domain.model.Rarity
-import com.mmg.manahub.core.domain.model.WidgetSize
-import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
-import com.mmg.manahub.core.domain.model.news.NewsItem
-import com.mmg.manahub.core.domain.model.news.SourceType
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.CommunityStats
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.Rarity
+import com.mmg.manahub.core.model.WidgetSize
+import com.mmg.manahub.core.model.news.NewsFilterPrefs
+import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
@@ -295,7 +295,7 @@ class HomeViewModel @Inject constructor(
             // Latest sets are cached locally by DraftRepository; failure degrades to empty.
             val sets = runCatching {
                 when (val result = draftRepository.getDraftableSets()) {
-                    is com.mmg.manahub.core.domain.model.DataResult.Success -> result.data.take(LATEST_SETS_LIMIT)
+                    is com.mmg.manahub.core.model.DataResult.Success -> result.data.take(LATEST_SETS_LIMIT)
                     else -> emptyList()
                 }
             }.getOrDefault(emptyList())
@@ -623,7 +623,7 @@ class HomeViewModel @Inject constructor(
             // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
             val outcome = runCatching { cardRepository.searchCards(query, page = 1, bypassCache = true) }
             val result = outcome.getOrNull()
-            val fetched = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
+            val fetched = (result as? com.mmg.manahub.core.model.DataResult.Success)
                 ?.data
                 ?.shuffled()
                 ?.take(DISCOVER_CARD_COUNT)
@@ -680,7 +680,7 @@ class HomeViewModel @Inject constructor(
             // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
             val outcome = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1, bypassCache = true) }
             val result = outcome.getOrNull()
-            val card = (result as? com.mmg.manahub.core.domain.model.DataResult.Success)
+            val card = (result as? com.mmg.manahub.core.model.DataResult.Success)
                 ?.data
                 ?.shuffled()
                 ?.firstOrNull()

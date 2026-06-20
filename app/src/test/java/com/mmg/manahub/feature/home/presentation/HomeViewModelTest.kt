@@ -3,15 +3,15 @@ package com.mmg.manahub.feature.home.presentation
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.domain.model.PersistedWidget
-import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.QuickStartAction
-import com.mmg.manahub.core.domain.model.WidgetSize
-import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
-import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.model.PersistedWidget
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.WidgetSize
+import com.mmg.manahub.core.model.news.NewsFilterPrefs
+import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
@@ -320,7 +320,7 @@ class HomeViewModelTest {
                 id = sid,
                 name = sid,
                 feedUrl = "https://example.com/$sid/feed",
-                type = com.mmg.manahub.core.domain.model.news.SourceType.ARTICLE,
+                type = com.mmg.manahub.core.model.news.SourceType.ARTICLE,
                 isEnabled = true,
                 isDefault = true,
                 iconUrl = null,
@@ -1494,7 +1494,7 @@ class HomeViewModelTest {
     private fun contentSource(id: String, language: String) =
         com.mmg.manahub.feature.news.domain.model.ContentSource(
             id = id, name = id, feedUrl = "https://example.com/$id/feed",
-            type = com.mmg.manahub.core.domain.model.news.SourceType.ARTICLE,
+            type = com.mmg.manahub.core.model.news.SourceType.ARTICLE,
             isEnabled = true, isDefault = true, iconUrl = null, language = language,
         )
 }

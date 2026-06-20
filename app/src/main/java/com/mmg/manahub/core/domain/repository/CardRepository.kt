@@ -2,7 +2,7 @@ package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.model.SuggestedTag
 import kotlinx.coroutines.flow.Flow
 

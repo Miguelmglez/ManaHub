@@ -5,7 +5,7 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.util.TestFixtures

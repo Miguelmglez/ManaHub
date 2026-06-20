@@ -94,6 +94,7 @@ camerax-lifecycle       = { group = "androidx.camera", name = "camera-lifecycle"
 camerax-view            = { group = "androidx.camera", name = "camera-view",               version.ref = "camerax" }
 mockk                   = { group = "io.mockk", name = "mockk",                            version.ref = "mockk" }
 turbine                 = { group = "app.cash.turbine", name = "turbine",                  version.ref = "turbine" }
+coroutines-core         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics-ktx", version.ref = "firebase-crashlytics" }
 foundation          = { group = "androidx.compose.foundation", name = "foundation",           version.ref = "foundation" }

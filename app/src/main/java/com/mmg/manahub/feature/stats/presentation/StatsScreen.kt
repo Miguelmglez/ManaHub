@@ -87,11 +87,11 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.CardValue
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.CardValue
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.CircularDistribution

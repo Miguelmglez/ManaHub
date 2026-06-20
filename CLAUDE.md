@@ -89,6 +89,12 @@ Koin.** Full plan: `docs/plans/kmp-migration-plan.md`; library/source-set + file
 migrated, existing Hilt/Room/androidx-Compose code stays as-is — do not pre-emptively KMP-ify
 unrelated code.
 
+**Sequencing (2026-06-20): get the ANDROID app working on KMP FIRST, then build the web version
+incrementally.** Three platform-heavy features are EXCLUDED from the migration for now and left
+untouched (Hilt + Android Compose, no shared move, no web actuals yet): **online games
+(`feature/online`), voice control (`core/voice` + in-game voice), and the camera card scanner
+(`feature/scanner`).** They migrate in a later wave once the Android-KMP base + core web are working.
+
 Broadly-applicable rules (feature-specific detail → memory):
 - **Source sets:** `commonMain` (shared) / `androidMain` / `wasmJsMain` (+ `commonTest`). `commonMain`
   **never** imports an Android/AndroidX or browser API — those go behind `expect`/`actual` or an

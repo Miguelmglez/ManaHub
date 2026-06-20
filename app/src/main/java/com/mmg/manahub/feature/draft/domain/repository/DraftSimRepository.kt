@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.domain.repository
 
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.draft.domain.model.DraftResult
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftableSet

@@ -1,10 +1,10 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.annotation.StringRes
-import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.domain.model.DraftSet
-import com.mmg.manahub.core.domain.model.QuickStartAction
-import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.news.NewsItem
 // FirstStepItem is defined in the same package — no explicit import needed.
 
 /**
@@ -53,17 +53,17 @@ data class HomeUiState(
     /** Set code the Discover cards row is currently scoped to, or null when unfiltered. */
     val discoverSetCode: String? = null,
     /**
-     * The full [com.mmg.manahub.core.domain.model.MagicSet] the Discover row is scoped to, or null
+     * The full [com.mmg.manahub.core.model.MagicSet] the Discover row is scoped to, or null
      * when unfiltered. Drives the set-icon + code affordance in the widget header.
      */
-    val discoverSet: com.mmg.manahub.core.domain.model.MagicSet? = null,
+    val discoverSet: com.mmg.manahub.core.model.MagicSet? = null,
     val latestSets: List<DraftSet> = emptyList(),
     val wishlistStats: WishlistStats? = null,
     /** All of the user's decks, newest-first. Drives the Your Decks shelf widget. */
     val decks: List<DeckSummary> = emptyList(),
 
     // ── Phase 3 data slices ────────────────────────────────────────────────────
-    val communityStats: com.mmg.manahub.core.domain.model.CommunityStats? = null,
+    val communityStats: com.mmg.manahub.core.model.CommunityStats? = null,
     val tradeSummary: TradeSummary? = null,
     val activeTournamentSummary: TournamentSummary? = null,
 

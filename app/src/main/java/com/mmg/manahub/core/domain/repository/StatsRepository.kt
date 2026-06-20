@@ -1,8 +1,8 @@
 package com.mmg.manahub.core.domain.repository
 
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.PreferredCurrency
 import kotlinx.coroutines.flow.Flow
 
 interface StatsRepository {

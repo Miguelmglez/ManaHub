@@ -10,7 +10,7 @@ import com.mmg.manahub.core.data.local.mapper.toDomainDeck
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckSlot
-import com.mmg.manahub.core.domain.model.DeckSummary
+import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.domain.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus

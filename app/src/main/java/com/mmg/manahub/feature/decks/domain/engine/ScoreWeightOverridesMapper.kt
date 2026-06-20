@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
-import com.mmg.manahub.core.domain.model.ScoreWeightOverrides
+import com.mmg.manahub.core.model.ScoreWeightOverrides
 
 /**
  * Maps the core-level [ScoreWeightOverrides] (seven independent nullable Floats persisted in

@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.draft.domain.usecase
 
 import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.draft.domain.engine.DraftEngine
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository

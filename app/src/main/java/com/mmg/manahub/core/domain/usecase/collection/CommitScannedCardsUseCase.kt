@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.domain.usecase.collection
 
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import java.time.Instant

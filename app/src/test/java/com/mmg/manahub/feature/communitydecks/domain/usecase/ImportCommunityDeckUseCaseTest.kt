@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.communitydecks.domain.usecase
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.CardRepository

@@ -7,9 +7,9 @@ import com.mmg.manahub.core.data.remote.dto.CardIdentifierDto
 import com.mmg.manahub.core.data.remote.dto.SearchResultDto
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.PLAYABLE_SET_TYPES
-import com.mmg.manahub.core.domain.model.SetType
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
+import com.mmg.manahub.core.model.SetType
 import com.mmg.manahub.core.network.ScryfallCache
 import com.mmg.manahub.core.network.ScryfallRequestQueue
 import kotlinx.coroutines.Dispatchers

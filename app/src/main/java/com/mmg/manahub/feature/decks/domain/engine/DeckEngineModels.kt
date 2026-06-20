@@ -27,23 +27,23 @@ enum class GameFormat(
 }
 
 /**
- * Maps the builder's [GameFormat] to the engine's [com.mmg.manahub.core.domain.model.DeckFormat]
+ * Maps the builder's [GameFormat] to the engine's [com.mmg.manahub.core.model.DeckFormat]
  * (Phase 4, D1). 1:1 wherever a matching engine format/legality exists, so Modern/Pioneer/Legacy/
  * Vintage/Pauper each filter by their OWN legality and use their own skeleton instead of collapsing
  * to Standard. There is no Draft entry in [GameFormat]. Lives in the engine package so the engines
  * stay free of a presentation import.
  */
-internal fun GameFormat.toEngineDeckFormat(): com.mmg.manahub.core.domain.model.DeckFormat =
+internal fun GameFormat.toEngineDeckFormat(): com.mmg.manahub.core.model.DeckFormat =
     when (this) {
-        GameFormat.COMMANDER -> com.mmg.manahub.core.domain.model.DeckFormat.COMMANDER
-        /*GameFormat.STANDARD -> com.mmg.manahub.core.domain.model.DeckFormat.STANDARD
-        GameFormat.PIONEER -> com.mmg.manahub.core.domain.model.DeckFormat.PIONEER
-        GameFormat.MODERN -> com.mmg.manahub.core.domain.model.DeckFormat.MODERN
-        GameFormat.LEGACY -> com.mmg.manahub.core.domain.model.DeckFormat.LEGACY
-        GameFormat.VINTAGE -> com.mmg.manahub.core.domain.model.DeckFormat.VINTAGE
-        GameFormat.PAUPER -> com.mmg.manahub.core.domain.model.DeckFormat.PAUPER*/
-        GameFormat.DRAFT -> com.mmg.manahub.core.domain.model.DeckFormat.DRAFT
-        GameFormat.CASUAL -> com.mmg.manahub.core.domain.model.DeckFormat.CASUAL
+        GameFormat.COMMANDER -> com.mmg.manahub.core.model.DeckFormat.COMMANDER
+        /*GameFormat.STANDARD -> com.mmg.manahub.core.model.DeckFormat.STANDARD
+        GameFormat.PIONEER -> com.mmg.manahub.core.model.DeckFormat.PIONEER
+        GameFormat.MODERN -> com.mmg.manahub.core.model.DeckFormat.MODERN
+        GameFormat.LEGACY -> com.mmg.manahub.core.model.DeckFormat.LEGACY
+        GameFormat.VINTAGE -> com.mmg.manahub.core.model.DeckFormat.VINTAGE
+        GameFormat.PAUPER -> com.mmg.manahub.core.model.DeckFormat.PAUPER*/
+        GameFormat.DRAFT -> com.mmg.manahub.core.model.DeckFormat.DRAFT
+        GameFormat.CASUAL -> com.mmg.manahub.core.model.DeckFormat.CASUAL
     }
 
 enum class ManaColor(val symbol: String, val displayName: String) {

@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.domain.usecase.collection
 
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.AddOutcome
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository

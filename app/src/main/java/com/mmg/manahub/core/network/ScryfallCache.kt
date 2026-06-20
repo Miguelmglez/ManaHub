@@ -1,7 +1,7 @@
 package com.mmg.manahub.core.network
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.MagicSet
+import com.mmg.manahub.core.model.MagicSet
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

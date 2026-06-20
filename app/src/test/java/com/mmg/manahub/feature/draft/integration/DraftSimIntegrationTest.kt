@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.integration
 
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder

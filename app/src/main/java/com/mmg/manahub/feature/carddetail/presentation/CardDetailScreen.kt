@@ -102,11 +102,11 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.SuggestedTag
 import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserDefinedTag
+import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity

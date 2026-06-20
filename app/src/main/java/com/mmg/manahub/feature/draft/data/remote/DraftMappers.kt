@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.data.remote
 
-import com.mmg.manahub.core.domain.model.DraftSet
+import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.feature.draft.data.remote.dto.SetIndexEntryDto
 import com.mmg.manahub.feature.draft.data.remote.dto.YouTubeVideoDto

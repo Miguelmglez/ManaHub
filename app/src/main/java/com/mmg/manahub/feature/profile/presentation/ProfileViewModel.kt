@@ -6,8 +6,8 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.DeckStatsRow
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MtgColor
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
@@ -94,7 +94,7 @@ class ProfileViewModel @Inject constructor(
         val recentSessions: List<GameSessionWithPlayers> = emptyList(),
         // Achievements (gamification Phase 1 — rich model from the catalog + persisted progress)
         val achievements: List<AchievementUiModel> = emptyList(),
-        val preferredCurrency: com.mmg.manahub.core.domain.model.PreferredCurrency = com.mmg.manahub.core.domain.model.PreferredCurrency.USD,
+        val preferredCurrency: com.mmg.manahub.core.model.PreferredCurrency = com.mmg.manahub.core.model.PreferredCurrency.USD,
         // Friends
         val friendCount: Int = 0,
         val pendingFriendCount: Int = 0,

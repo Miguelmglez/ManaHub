@@ -3,7 +3,7 @@ package com.mmg.manahub.feature.communitydecks.data
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.repository.CachePolicy
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao

@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.decks.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.domain.model.DeckSummary
+import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,7 +75,7 @@ class DeckViewModel @Inject constructor(
         isSideboard: Boolean,
     ) {
         val result = cardRepo.searchCardByName(line.name)
-        if (result is com.mmg.manahub.core.domain.model.DataResult.Success) {
+        if (result is com.mmg.manahub.core.model.DataResult.Success) {
             deckRepo.addCardToDeck(
                 deckId      = deckId,
                 scryfallId  = result.data.scryfallId,

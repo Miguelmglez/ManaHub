@@ -57,9 +57,9 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.PLAYABLE_SET_TYPES
-import com.mmg.manahub.core.domain.model.SetType
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
+import com.mmg.manahub.core.model.SetType
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 

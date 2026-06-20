@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.news.SourceType
+import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography

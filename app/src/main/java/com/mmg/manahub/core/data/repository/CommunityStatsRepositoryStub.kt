@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.data.repository
 
-import com.mmg.manahub.core.domain.model.CommunityStats
+import com.mmg.manahub.core.model.CommunityStats
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf

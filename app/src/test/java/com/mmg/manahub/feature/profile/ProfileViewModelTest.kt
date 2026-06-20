@@ -3,10 +3,10 @@ package com.mmg.manahub.feature.profile
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
-import com.mmg.manahub.core.domain.model.CardValue
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.Rarity
+import com.mmg.manahub.core.model.CardValue
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.Rarity
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.QuestPeriod

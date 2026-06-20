@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
-import com.mmg.manahub.core.domain.model.PersistedWidget
-import com.mmg.manahub.core.domain.model.WidgetSize
+import com.mmg.manahub.core.model.PersistedWidget
+import com.mmg.manahub.core.model.WidgetSize
 
 /**
  * A single placed widget on the dashboard: its [type] plus the chosen [size].

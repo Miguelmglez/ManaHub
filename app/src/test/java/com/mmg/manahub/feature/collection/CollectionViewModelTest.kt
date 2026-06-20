@@ -2,10 +2,10 @@
 
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.domain.model.ComparisonOperator
-import com.mmg.manahub.core.domain.model.SearchCriterion
+import com.mmg.manahub.core.model.ComparisonOperator
+import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository

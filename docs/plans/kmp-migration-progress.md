@@ -65,18 +65,29 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
 
 ## NEXT STEP (resume here)
-**Spikes D & E are done. Spikes B & C are deferrable (web-runtime validation, fold into Phase 2/web work).**
-Start **Phase 1: KMP build foundation + per-feature Hilt→Koin cutover + extract `:shared:core-model`
-(full) + `:shared:core-common`.** Concretely:
-1. **Per-feature Hilt→Koin cutover, starting with the proven Settings Koin island.** Migrate pure/leaf
-   features first (settings → stats → other Hilt-singleton-only features), each as its own Koin module +
-   `koinViewModel()` swap, replacing bridged `single { hiltInstance }` providers with real Koin
-   providers and deleting the matching Hilt `@Provides/@Binds` as each dep is fully Koin-owned. Platform-
-   heavy features (game/online/scanner/voice) last. Keep the app compiling at every commit (Spike-D rule).
-2. **Extract `:shared:core-model` (full)** — move the remaining pure domain models (no platform deps)
-   into the existing KMP module; keep ProGuard keeps for the new package (enums persisted by `.name`).
-3. **Extract `:shared:core-common`** — `expect/actual` for DispatcherProvider, KeyValueStore (Android
-   DataStore / web localStorage), CrashReporter (web no-op), and a common pagination model.
+⚠️ **Phase 1 foundation slice was INTERRUPTED mid-move by the session limit and committed as a broken
+WIP checkpoint.** The agent started moving pure models out of `core.domain.model` into `:shared:core-model`
+and creating `:shared:core-common`, but left the tree UNCOMPILABLE (stale imports to the moved models;
+`core-common` only half-wired). **FIRST: repair the build, THEN continue in SMALL batches.**
+
+1. **REPAIR (do this first).** `./gradlew :app:assembleDebug` and fix every stale reference to the moved
+   models (they now live in package `com.mmg.manahub.core.model` in `:shared:core-model`; deletions are
+   visible in the WIP commit). Finish wiring `:shared:core-common` (DispatcherProvider, KeyValueStore,
+   CrashReporter, pagination model — with android + wasmJs actuals) so it compiles, or, if it is too
+   half-done to salvage cleanly, REMOVE the partial `core-common` and re-add it as a clean small step.
+   Verify: `:app:assembleDebug` SUCCESSFUL, `:shared:core-model:compileKotlinWasmJs` SUCCESSFUL,
+   `:app:testDebugUnitTest` no NEW failures vs ~122 baseline. Commit+push the GREEN result.
+2. **Then continue Phase 1 in SMALL batches** (≤ ~15 files per run to avoid mid-task session-limit breakage):
+   finish `:shared:core-model` (remaining pure models) → finish/clean `:shared:core-common` → then the
+   per-feature Hilt→Koin cutover (next island = **Stats**, then other Hilt-singleton-only features), each
+   feature its own Koin module + `koinViewModel()` swap, replacing bridged `single { hiltInstance }` with
+   real providers + deleting the matching Hilt `@Provides/@Binds`. Keep the app compiling at EVERY commit.
+
+**SCOPE (per user, 2026-06-20): the goal right now is a working ANDROID app on KMP first, then build the
+web version incrementally.** EXCLUDE these three platform-heavy features from the KMP migration FOR NOW —
+leave them exactly as-is (Hilt + Android Compose, untouched): **online games (`feature/online`), voice
+control (`core/voice` + game voice), camera card scanner (`feature/scanner`).** Do NOT migrate their DI,
+do NOT move their code to shared, do NOT write web actuals for them yet. They migrate in a later wave.
 Update this tracker after each step. Keep Android shippable at every step.
 
 ## DECISIONS LOCKED
@@ -84,6 +95,10 @@ Update this tracker after each step. Keep Android shippable at every step.
 - DI: Hilt → Koin. Persistence: Room stays `androidMain`; web = Supabase-remote + IndexedDB/localStorage cache.
 - Networking: Retrofit→Ktor, Gson→kotlinx-serialization. Images: Coil 2→3.
 - Data-layer-on-web open sub-decision: chose **Room-on-androidMain + web cache** (NOT SQLDelight rewrite).
+- **Sequencing (user, 2026-06-20): Android-on-KMP FIRST, web incrementally AFTER.** Three platform-heavy
+  features are EXCLUDED from the migration for now and left untouched (Hilt + Android Compose): online
+  games, voice control, camera card scanner. They are deferred to a later wave once the Android-KMP base
+  + core web are working.
 - **DI coexistence (Spike D):** Hilt + Koin run side-by-side in `:app`; cutover is **per-feature
   incremental, never big-bang**. Bridge = Koin module re-exposes Hilt-owned singletons via `single {}`;
   `ManaHubApp` `@Inject`s them and feeds `startKoin`. Koin 4.0.2. First island = Settings.

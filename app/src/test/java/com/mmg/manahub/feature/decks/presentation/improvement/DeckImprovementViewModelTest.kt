@@ -5,11 +5,11 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckSlot
 import com.mmg.manahub.core.domain.model.DeckWithCards
-import com.mmg.manahub.core.domain.model.ScoreWeightOverrides
+import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository

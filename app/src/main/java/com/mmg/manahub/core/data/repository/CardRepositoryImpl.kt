@@ -14,7 +14,7 @@ import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.model.SuggestedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase

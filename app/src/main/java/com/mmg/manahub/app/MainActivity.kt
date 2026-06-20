@@ -175,7 +175,7 @@ class MainActivity : ComponentActivity() {
 
             MagicTheme(theme = theme) {
                 CompositionLocalProvider(
-                    LocalPreferredCurrency provides (userPrefs?.preferredCurrency ?: com.mmg.manahub.core.domain.model.PreferredCurrency.USD),
+                    LocalPreferredCurrency provides (userPrefs?.preferredCurrency ?: com.mmg.manahub.core.model.PreferredCurrency.USD),
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         AppNavGraph(isInPiP = isInPiP)

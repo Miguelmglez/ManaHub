@@ -4,10 +4,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.util.PriceFormatter
 
 /** Selectable top-level tabs on the Stats screen. */

@@ -3,10 +3,10 @@ package com.mmg.manahub.feature.settings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.AppLanguage
-import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.NewsLanguage
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.AppLanguage
+import com.mmg.manahub.core.model.CardLanguage
+import com.mmg.manahub.core.model.NewsLanguage
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository

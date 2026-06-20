@@ -55,8 +55,8 @@ enum class Condition(val label: String) {
 
 data class FolderFilters(
     val sets: Set<String> = emptySet(),
-    val rarities: Set<com.mmg.manahub.core.domain.model.Rarity> = emptySet(),
-    val colors: Set<com.mmg.manahub.core.domain.model.MtgColor> = emptySet(),
+    val rarities: Set<com.mmg.manahub.core.model.Rarity> = emptySet(),
+    val colors: Set<com.mmg.manahub.core.model.MtgColor> = emptySet(),
     val foilOnly: Boolean = false,
     val conditions: Set<Condition> = emptySet(),
     val languages: Set<String> = emptySet()
@@ -385,8 +385,8 @@ class FriendDetailViewModel @Inject constructor(
 
     fun toggleFilter(
         sets: Set<String>? = null,
-        rarities: Set<com.mmg.manahub.core.domain.model.Rarity>? = null,
-        colors: Set<com.mmg.manahub.core.domain.model.MtgColor>? = null,
+        rarities: Set<com.mmg.manahub.core.model.Rarity>? = null,
+        colors: Set<com.mmg.manahub.core.model.MtgColor>? = null,
         foilOnly: Boolean? = null,
         conditions: Set<Condition>? = null,
         languages: Set<String>? = null,
