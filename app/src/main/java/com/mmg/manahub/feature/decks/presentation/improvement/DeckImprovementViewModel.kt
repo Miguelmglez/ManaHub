@@ -7,8 +7,8 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository

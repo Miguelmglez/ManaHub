@@ -1,8 +1,8 @@
 package com.mmg.manahub.core.domain.usecase.search
 
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.SearchCriterion
-import com.mmg.manahub.core.domain.model.SearchOrder
+import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.model.SearchOrder
 import javax.inject.Inject
 
 class BuildScryfallQueryUseCase @Inject constructor() {

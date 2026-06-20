@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.draft.engine
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DraftSet
+import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter

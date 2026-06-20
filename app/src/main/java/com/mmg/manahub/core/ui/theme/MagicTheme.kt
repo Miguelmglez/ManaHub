@@ -12,7 +12,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.AncientOakBackground
 import com.mmg.manahub.core.ui.components.ArcaneCosmosBackground
 import com.mmg.manahub.core.ui.components.ForestMurmurBackground

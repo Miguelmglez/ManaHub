@@ -11,12 +11,12 @@ import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
-import com.mmg.manahub.core.domain.model.AppLanguage
-import com.mmg.manahub.core.domain.model.CardLanguage
+import com.mmg.manahub.core.model.AppLanguage
+import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.domain.model.NewsLanguage
-import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.UserPreferences
+import com.mmg.manahub.core.model.NewsLanguage
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase

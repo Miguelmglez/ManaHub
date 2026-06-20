@@ -3,12 +3,12 @@ package com.mmg.manahub.core.data.repository
 import androidx.work.WorkManager
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
-import com.mmg.manahub.core.domain.model.AppLanguage
-import com.mmg.manahub.core.domain.model.CardLanguage
+import com.mmg.manahub.core.model.AppLanguage
+import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.domain.model.NewsLanguage
-import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.UserPreferences
+import com.mmg.manahub.core.model.NewsLanguage
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.core.push.RegisterPushTokenWorker
 import com.mmg.manahub.core.push.UnregisterPushTokenWorker
 import io.mockk.coEvery

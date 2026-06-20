@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.communitydecks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
 import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRepository
 import javax.inject.Inject

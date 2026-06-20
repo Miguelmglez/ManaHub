@@ -104,11 +104,11 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.domain.model.DraftSet
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.QuickStartAction
-import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.DraftSetCard
@@ -2324,10 +2324,10 @@ private fun RulesTipWidget() {
 
 private sealed interface SocialSlide {
     data class FriendsActivity(val text: String) : SocialSlide
-    data class TopCommanders(val entries: List<com.mmg.manahub.core.domain.model.CommunityEntry>) : SocialSlide
-    data class MostWishlisted(val entries: List<com.mmg.manahub.core.domain.model.CommunityEntry>) : SocialSlide
+    data class TopCommanders(val entries: List<com.mmg.manahub.core.model.CommunityEntry>) : SocialSlide
+    data class MostWishlisted(val entries: List<com.mmg.manahub.core.model.CommunityEntry>) : SocialSlide
     data class ActiveTournament(val summary: TournamentSummary) : SocialSlide
-    data class Milestones(val milestones: List<com.mmg.manahub.core.domain.model.CommunityMilestone>) : SocialSlide
+    data class Milestones(val milestones: List<com.mmg.manahub.core.model.CommunityMilestone>) : SocialSlide
 }
 
 @Composable

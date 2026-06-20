@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.util
 
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.PreferredCurrency
 
 object PriceFormatter {
 

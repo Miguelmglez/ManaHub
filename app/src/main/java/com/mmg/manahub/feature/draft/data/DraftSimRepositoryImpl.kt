@@ -9,7 +9,7 @@ import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
 import com.mmg.manahub.feature.draft.data.remote.dto.BoosterConfigDto

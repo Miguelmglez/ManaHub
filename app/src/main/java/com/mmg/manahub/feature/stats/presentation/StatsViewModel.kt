@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.MtgColor
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -209,10 +209,10 @@ class StatsViewModel @Inject constructor(
 
     fun onCurrencyToggle() {
         viewModelScope.launch {
-            val next = if (_uiState.value.currency == com.mmg.manahub.core.domain.model.PreferredCurrency.USD)
-                com.mmg.manahub.core.domain.model.PreferredCurrency.EUR
+            val next = if (_uiState.value.currency == com.mmg.manahub.core.model.PreferredCurrency.USD)
+                com.mmg.manahub.core.model.PreferredCurrency.EUR
             else
-                com.mmg.manahub.core.domain.model.PreferredCurrency.USD
+                com.mmg.manahub.core.model.PreferredCurrency.USD
             userPreferencesDataStore.setPreferredCurrency(next)
         }
     }

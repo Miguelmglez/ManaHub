@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.scanner.data
 
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import kotlinx.coroutines.CoroutineScope

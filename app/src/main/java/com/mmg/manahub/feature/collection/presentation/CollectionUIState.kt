@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.collection.presentation
 
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.domain.auth.SessionState

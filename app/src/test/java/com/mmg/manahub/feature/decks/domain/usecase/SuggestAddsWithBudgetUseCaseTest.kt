@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation

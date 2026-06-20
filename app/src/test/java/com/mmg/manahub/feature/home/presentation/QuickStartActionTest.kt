@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.home.presentation
 
-import com.mmg.manahub.core.domain.model.QuickStartAction
+import com.mmg.manahub.core.model.QuickStartAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

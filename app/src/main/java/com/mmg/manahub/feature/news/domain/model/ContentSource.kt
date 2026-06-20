@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.news.domain.model
 
-import com.mmg.manahub.core.domain.model.news.SourceType
+import com.mmg.manahub.core.model.news.SourceType
 
 data class ContentSource(
     val id: String,

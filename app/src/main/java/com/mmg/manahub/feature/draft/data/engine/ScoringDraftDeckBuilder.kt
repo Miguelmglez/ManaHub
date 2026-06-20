@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.draft.data.engine
 
 import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor

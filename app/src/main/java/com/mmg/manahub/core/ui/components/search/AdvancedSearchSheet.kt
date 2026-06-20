@@ -87,10 +87,10 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.ComparisonOperator
-import com.mmg.manahub.core.domain.model.SearchDirection
-import com.mmg.manahub.core.domain.model.SearchOrder
+import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.ComparisonOperator
+import com.mmg.manahub.core.model.SearchDirection
+import com.mmg.manahub.core.model.SearchOrder
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography

@@ -2,8 +2,8 @@ package com.mmg.manahub.feature.draft.presentation
 
 import androidx.lifecycle.SavedStateHandle
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.DraftSet
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
 import com.mmg.manahub.feature.draft.domain.model.DraftConfig

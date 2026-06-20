@@ -2,8 +2,8 @@ package com.mmg.manahub.feature.news.data
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.domain.model.news.NewsItem
-import com.mmg.manahub.core.domain.model.news.SourceType
+import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.DefaultSources
 import com.mmg.manahub.core.data.local.entity.NewsArticleEntity

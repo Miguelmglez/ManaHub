@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.communitydecks.data
 
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
 import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektApi

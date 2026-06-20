@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckCard
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckOwner

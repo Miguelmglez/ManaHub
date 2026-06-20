@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.addcard.presentation
 
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.PreferredCurrency
 
 data class AddCardUiState(
     val query:             String     = "",

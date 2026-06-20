@@ -1,7 +1,7 @@
 package com.mmg.manahub.core.domain.usecase.decks
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.DeckFormat
 
 /**
  * Centralized validation for adding cards to a deck.
