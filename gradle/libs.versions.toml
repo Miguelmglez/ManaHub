@@ -50,6 +50,10 @@ vosk                 = "0.3.75"
 # later phases can reuse the alias; NOT applied to :shared:core-model (it has no UI yet).
 compose-multiplatform = "1.9.0"
 
+# Koin — KMP-native DI, added in Phase 0 Spike D to run ALONGSIDE Hilt during the per-feature
+# Hilt→Koin cutover (coexistence). Hilt aliases are intentionally kept; Koin is additive.
+koin = "4.0.2"
+
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 # opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
@@ -124,6 +128,13 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # KMP commonTest assertions (multiplatform-safe; replaces JUnit/MockK in commonMain test source sets).
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+
+# Koin (Phase 0 Spike D — Hilt/Koin coexistence). koin-core is KMP-common-safe; koin-android adds
+# androidContext()/androidLogger; koin-androidx-compose provides koinViewModel() for Composables.
+# (koin-compose-viewmodel is the pure-CMP equivalent — reserved for the wasmJs app in Phase 3.)
+koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
+koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = "koin" }
+koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 retrofit-kotlinx-serialization-converter = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit" }
 
 baseline-profile-junit4   = { group = "androidx.benchmark", name = "benchmark-macro-junit4",        version = "1.3.4" }

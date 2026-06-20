@@ -136,6 +136,14 @@
 # (BoosterConfig, BoosterSheet, BoosterVariant, BoosterCardEntry, DraftableSet, …).
 -keepclassmembers class com.mmg.manahub.feature.draft.domain.model.** { *; }
 
+# ── Koin DI (KMP migration — Phase 0 Spike D, coexists with Hilt) ─────────────
+# The Settings "Koin island" constructs SettingsViewModel via an explicit `viewModel { }` lambda
+# (no reflection on the VM itself), but Koin's core uses reflective KClass lookups for scope/
+# definition resolution. Keep Koin's runtime and don't warn on its optional integrations.
+-keep class org.koin.** { *; }
+-keepclassmembers class org.koin.** { *; }
+-dontwarn org.koin.**
+
 # ── Strip all logs in release ─────────────────────────────────────────────────
 -assumenosideeffects class android.util.Log {
     public static int v(...);

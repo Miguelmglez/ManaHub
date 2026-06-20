@@ -30,7 +30,17 @@ import com.mmg.manahub.core.sync.PriceRefreshWorker
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.core.voice.domain.VoiceModelRepository
+import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.settings.di.settingsKoinModule
 import dagger.hilt.android.HiltAndroidApp
+import org.koin.android.ext.koin.androidContext
+import org.koin.android.ext.koin.androidLogger
+import org.koin.core.context.startKoin
+import org.koin.core.logger.Level
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,10 +69,42 @@ class ManaHubApp : Application() {
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
+    // ── KMP migration — Phase 0 Spike D: Hilt→Koin bridge dependencies ──────────────────────────
+    // These eight singletons are still owned by Hilt. ManaHubApp is the bridge: it @Inject's them
+    // from the Hilt graph and hands them to settingsKoinModule(...) when starting Koin, so the
+    // Koin-resolved SettingsViewModel shares the exact same singleton instances (no duplicate graph).
+    @Inject lateinit var userPreferencesRepository: UserPreferencesRepository
+    @Inject lateinit var analyticsHelper: AnalyticsHelper
+    @Inject lateinit var userProfileDataSource: UserProfileDataSource
+    @Inject lateinit var notificationPrefsRepository: NotificationPrefsRepository
+    @Inject lateinit var voiceModelRepository: VoiceModelRepository
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
+
+        // ── KMP migration — Phase 0 Spike D: start Koin ALONGSIDE the Hilt graph ────────────────
+        // Hilt field injection has already run by the time super.onCreate() returns, so the bridged
+        // singletons below are non-null. Koin and Hilt run side-by-side: the Settings "Koin island"
+        // resolves SettingsViewModel via koinViewModel(); every other feature still uses Hilt.
+        // This is the proof that the Hilt→Koin cutover can be incremental, not big-bang.
+        startKoin {
+            androidLogger(if (BuildConfig.DEBUG) Level.INFO else Level.ERROR)
+            androidContext(this@ManaHubApp)
+            modules(
+                settingsKoinModule(
+                    userPrefsDataStore = userPreferencesDataStore,
+                    userPreferencesRepo = userPreferencesRepository,
+                    analyticsHelper = analyticsHelper,
+                    authRepository = authRepository,
+                    userProfileDataSource = userProfileDataSource,
+                    pushTokenRepository = pushTokenRepository,
+                    notificationPrefsRepository = notificationPrefsRepository,
+                    voiceModelRepository = voiceModelRepository,
+                ),
+            )
+        }
 
         createNotificationChannels()
 
