@@ -12,8 +12,15 @@ import coil.decode.SvgDecoder
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.messaging.FirebaseMessaging
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.app.di.coreBridgeKoinModule
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
+import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
+import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
@@ -35,7 +42,9 @@ import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.settings.di.settingsKoinModule
+import com.mmg.manahub.feature.stats.di.statsKoinModule
 import dagger.hilt.android.HiltAndroidApp
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -69,15 +78,26 @@ class ManaHubApp : Application() {
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
-    // ── KMP migration — Phase 0 Spike D: Hilt→Koin bridge dependencies ──────────────────────────
-    // These eight singletons are still owned by Hilt. ManaHubApp is the bridge: it @Inject's them
-    // from the Hilt graph and hands them to settingsKoinModule(...) when starting Koin, so the
-    // Koin-resolved SettingsViewModel shares the exact same singleton instances (no duplicate graph).
-    @Inject lateinit var userPreferencesRepository: UserPreferencesRepository
+    // ── KMP migration — Hilt→Koin bridge dependencies ───────────────────────────────────────────
+    // These singletons are still owned by Hilt. ManaHubApp is the bridge: it @Inject's them from the
+    // Hilt graph and hands them to the per-feature Koin modules when starting Koin, so the
+    // Koin-resolved ViewModels share the exact same singleton instances (no duplicate graph).
+    //
+    // Spike D (Settings island) + Phase 1 (Stats island, the second cutover).
+    @Inject lateinit var userPreferencesRepository: UserPreferencesRepository  // shared: Settings + Stats
     @Inject lateinit var analyticsHelper: AnalyticsHelper
     @Inject lateinit var userProfileDataSource: UserProfileDataSource
     @Inject lateinit var notificationPrefsRepository: NotificationPrefsRepository
     @Inject lateinit var voiceModelRepository: VoiceModelRepository
+
+    // Stats island (Phase 1) bridge deps.
+    @Inject lateinit var getCollectionStatsUseCase: GetCollectionStatsUseCase
+    @Inject lateinit var getCollectionSetCodesUseCase: GetCollectionSetCodesUseCase
+    @Inject lateinit var scryfallRemoteDataSource: ScryfallRemoteDataSource
+    @Inject lateinit var refreshCollectionPricesUseCase: RefreshCollectionPricesUseCase
+    @Inject lateinit var gameSessionDao: GameSessionDao
+    @Inject lateinit var gameSessionRepository: GameSessionRepository
+    @Inject lateinit var deckRepository: DeckRepository
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -93,15 +113,27 @@ class ManaHubApp : Application() {
             androidLogger(if (BuildConfig.DEBUG) Level.INFO else Level.ERROR)
             androidContext(this@ManaHubApp)
             modules(
+                // Shared bridged singletons used by more than one Koin island (Settings + Stats).
+                coreBridgeKoinModule(
+                    userPreferencesRepo = userPreferencesRepository,
+                ),
                 settingsKoinModule(
                     userPrefsDataStore = userPreferencesDataStore,
-                    userPreferencesRepo = userPreferencesRepository,
                     analyticsHelper = analyticsHelper,
                     authRepository = authRepository,
                     userProfileDataSource = userProfileDataSource,
                     pushTokenRepository = pushTokenRepository,
                     notificationPrefsRepository = notificationPrefsRepository,
                     voiceModelRepository = voiceModelRepository,
+                ),
+                statsKoinModule(
+                    getCollectionStats = getCollectionStatsUseCase,
+                    getCollectionSetCodes = getCollectionSetCodesUseCase,
+                    scryfallDataSource = scryfallRemoteDataSource,
+                    refreshPricesUseCase = refreshCollectionPricesUseCase,
+                    gameSessionDao = gameSessionDao,
+                    gameSessionRepository = gameSessionRepository,
+                    deckRepository = deckRepository,
                 ),
             )
         }

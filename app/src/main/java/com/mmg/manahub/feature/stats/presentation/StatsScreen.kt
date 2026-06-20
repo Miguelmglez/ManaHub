@@ -81,8 +81,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
@@ -117,7 +117,9 @@ fun StatsScreen(
     onBackClick:      () -> Unit = {},
     onReviewSurvey:   (sessionId: Long) -> Unit = {},
     onDeckClick:      (deckId: String) -> Unit = {},
-    viewModel:        StatsViewModel = hiltViewModel(),
+    // KMP migration — Phase 1 Hilt→Koin cutover: Stats is the second "Koin island". This ViewModel is
+    // resolved by Koin (koinViewModel()) while every other screen still uses hiltViewModel().
+    viewModel:        StatsViewModel = koinViewModel(),
 ) {
     val uiState    by viewModel.uiState.collectAsStateWithLifecycle()
     val mc          = MaterialTheme.magicColors
