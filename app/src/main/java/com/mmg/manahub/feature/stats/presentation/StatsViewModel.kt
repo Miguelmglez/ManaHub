@@ -13,7 +13,6 @@ import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,11 +24,17 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
+/**
+ * ViewModel for the Stats screen.
+ *
+ * KMP migration — Phase 1 Hilt→Koin cutover: Stats is the second "Koin island". This ViewModel is no
+ * longer `@HiltViewModel`; it is constructed by the `viewModel { }` factory in `statsKoinModule` and
+ * resolved at the call site via `koinViewModel()`. Its dependencies are still Hilt-owned singletons,
+ * bridged into Koin by `ManaHubApp` (see `statsKoinModule` / `coreBridgeKoinModule`).
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class StatsViewModel @Inject constructor(
+class StatsViewModel(
     private val getStats:                 GetCollectionStatsUseCase,
     private val getSetCodes:              GetCollectionSetCodesUseCase,
     private val scryfallDataSource:       ScryfallRemoteDataSource,

@@ -67,7 +67,12 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - `:shared:core-model:compileKotlinWasmJs` + `:shared:core-common:compileKotlinWasmJs` → **SUCCESSFUL**.
   - `:app:testDebugUnitTest` → **1964 tests, 122 failed, 2 skipped** (== baseline, ZERO new failures).
   - commonMain Android/AndroidX/browser-import grep → EMPTY (PASS).
-  - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — NOT started this run.
+  - **Koin islands so far: Settings (Spike D), Stats (Phase 1, 2026-06-20).** Every OTHER feature is
+    still on Hilt (`@HiltViewModel` + `hiltViewModel()`). The bridge now has a shared
+    `app/di/CoreBridgeKoinModule.kt` holding the cross-island singleton (`UserPreferencesRepository`,
+    used by both Settings + Stats) so the two feature modules never double-register it.
+  - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats done; the
+    rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -86,10 +91,19 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    leftovers: `Card`, `CardFace`, `CardTag`, `Deck`, `DeckBuilderState`, `OpenForTradeEntry`,
    `SuggestedTag`, `WishlistEntry` — move only when a shared consumer actually needs them; do NOT move
    eagerly). The `-keep class com.mmg.manahub.core.model.**` ProGuard wildcard already covers new moves.
-2. **Per-feature Hilt→Koin cutover** (the main remaining Phase-1 work, ~300 files). Next island =
-   **Stats**, then other Hilt-singleton-only features. Each feature: its own Koin module + `koinViewModel()`
-   swap, replace the bridged `single { hiltInstance }` with real providers + delete the matching Hilt
-   `@Provides/@Binds`. Keep the app compiling at EVERY commit.
+2. **Per-feature Hilt→Koin cutover** (the main remaining Phase-1 work, ~300 files). DONE: **Settings**
+   (Spike D), **Stats** (2026-06-20). **Next island = `feature/profile`** (`ProfileViewModel`): a pure,
+   leaf, Hilt-singleton-only feature like Stats — it observes auth/progression/achievements/cosmetics
+   repos (all Hilt `@Singleton`s) and has no platform entanglement. Apply the EXACT same pattern: drop
+   `@HiltViewModel`/`@Inject` on the VM, add `feature/profile/di/ProfileKoinModule.kt` with
+   `viewModel { ProfileViewModel(...) }`, swap the `ProfileScreen` default param to `koinViewModel()`,
+   bridge its deps in `ManaHubApp` (reuse `coreBridgeKoinModule` for any already-shared singleton — e.g.
+   `UserPreferencesRepository` — never double-register), and register the module in `startKoin`. Confirm
+   the `Screen.Profile` call-site uses the default `viewModel` param (no nav edit needed) before relying on
+   the contained-island shortcut. After profile, candidates: `home` (heavier — `combine(8)` VM with many
+   repos), `decks`, `collection`. Each feature: its own Koin module + `koinViewModel()` swap, replace the
+   bridged `single { hiltInstance }` with real providers + delete the matching Hilt `@Provides/@Binds` only
+   once the dep is EXCLUSIVELY Koin-owned. Keep the app compiling at EVERY commit.
    **EXCLUDE for now (deferred per user): `feature/online`, `core/voice` + in-game voice, `feature/scanner`** —
    leave their Hilt/Compose untouched.
 3. **(Future) wire call-sites onto `:shared:core-common`** — it builds but nothing uses it yet; migrate
@@ -135,6 +149,20 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-20 — **Phase 1 · Stats Koin island** (second feature cutover, replicating Spike-D Settings).
+  `StatsViewModel` de-Hilt'd (dropped `@HiltViewModel`/`@Inject constructor` → plain class), new
+  `feature/stats/di/StatsKoinModule.kt` (`statsKoinModule(...)` + `viewModel { StatsViewModel(...) }`),
+  `StatsScreen` default param `hiltViewModel()` → `koinViewModel()` (call-site in `AppNavGraph` uses the
+  default param, so NO nav edit). Bridge: 7 of the 8 deps NEWLY bridged via `statsKoinModule`
+  (`GetCollectionStatsUseCase`, `GetCollectionSetCodesUseCase`, `ScryfallRemoteDataSource`,
+  `RefreshCollectionPricesUseCase`, `GameSessionDao`, `GameSessionRepository`, `DeckRepository` — all
+  `@Inject`'d into `ManaHubApp`); the 8th (`UserPreferencesRepository`) is SHARED with Settings, so it was
+  MOVED out of `settingsKoinModule` into a new shared `app/di/CoreBridgeKoinModule.kt`
+  (`coreBridgeKoinModule(...)`) to avoid Koin `DefinitionOverrideException` from double-registering one
+  type across two loaded modules. NO Hilt `@Provides/@Binds` deleted (all deps still shared with Hilt
+  features). Verified: `:app:assembleDebug` SUCCESSFUL; `:app:testDebugUnitTest` 1964/122-fail/2-skip
+  (== baseline, zero new failures); no StatsViewModel test exists (nothing to adjust). Koin islands now =
+  {Settings, Stats}; all other features still Hilt. NEXT = `feature/profile`.
 - 2026-06-20 — Plan + library/FS map written; CLAUDE.md KMP directive added; architect prompt expanded
   with KMP rules. Spike A GREEN. Phase 0.5 launched.
 - 2026-06-20 — Phase 0.5 INTERRUPTED by session limit mid-refactor (~167 files; entity/DAO/auth git

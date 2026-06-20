@@ -1,0 +1,30 @@
+package com.mmg.manahub.app.di
+
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import org.koin.core.module.Module
+import org.koin.dsl.module
+
+/**
+ * KMP migration — Phase 1 Hilt→Koin cutover. Shared "Koin bridge" for Hilt-owned singletons that are
+ * consumed by MORE THAN ONE Koin island (currently Settings and Stats).
+ *
+ * ## Why a shared module
+ * Each Koin island re-exposes its Hilt-owned dependencies as `single { instance }` (the Spike-D bridge
+ * pattern). When two islands depend on the SAME singleton, registering it in both feature modules would
+ * load two `single<T>` definitions for the same type into one Koin container, which throws
+ * `DefinitionOverrideException` at `startKoin`. Bridged singletons that are shared across islands
+ * therefore live here, in ONE place, and each feature module just resolves them via `get()`.
+ *
+ * As features migrate further in Phase 1, a dependency's `single { hiltInstance }` here is replaced by a
+ * real Koin provider and the matching Hilt `@Provides`/`@Binds` is deleted — without ever leaving the
+ * app uncompilable between commits.
+ *
+ * @param userPreferencesRepo the Hilt-owned [UserPreferencesRepository] singleton (used by Settings + Stats).
+ * @return a Koin [Module] exposing the cross-island bridged singletons.
+ */
+fun coreBridgeKoinModule(
+    userPreferencesRepo: UserPreferencesRepository,
+): Module = module {
+    // Shared across the Settings + Stats Koin islands — registered here exactly once.
+    single { userPreferencesRepo }
+}

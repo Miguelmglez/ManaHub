@@ -32,11 +32,14 @@ import org.koin.dsl.module
  * provider, and the corresponding Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to
  * nothing without ever leaving the app uncompilable between commits.
  *
+ * [UserPreferencesRepository] is shared with the Stats island, so it is NOT registered here — it is
+ * bridged once in `coreBridgeKoinModule` (registering it in both feature modules would throw
+ * `DefinitionOverrideException`). This module resolves it via `get()`.
+ *
  * @return a Koin [Module] that provides the bridged singletons and the [SettingsViewModel] factory.
  */
 fun settingsKoinModule(
     userPrefsDataStore: UserPreferencesDataStore,
-    userPreferencesRepo: UserPreferencesRepository,
     analyticsHelper: AnalyticsHelper,
     authRepository: AuthRepository,
     userProfileDataSource: UserProfileDataSource,
@@ -45,8 +48,8 @@ fun settingsKoinModule(
     voiceModelRepository: VoiceModelRepository,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Hilt-owned singletons to Koin (see KDoc above). ──
+    // (UserPreferencesRepository is shared with Stats → bridged in coreBridgeKoinModule, not here.)
     single { userPrefsDataStore }
-    single { userPreferencesRepo }
     single { analyticsHelper }
     single { authRepository }
     single { userProfileDataSource }
