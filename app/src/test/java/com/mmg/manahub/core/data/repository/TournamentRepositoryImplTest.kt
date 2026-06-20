@@ -4,9 +4,11 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
+import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
 import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.feature.tournament.data.repository.TournamentRepositoryImpl
 import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify

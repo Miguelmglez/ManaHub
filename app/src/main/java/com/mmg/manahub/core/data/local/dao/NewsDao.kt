@@ -6,6 +6,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
+import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
+import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
