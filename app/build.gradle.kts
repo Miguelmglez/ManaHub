@@ -177,6 +177,13 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation)
 
+    // Koin — Phase 0 Spike D: runs ALONGSIDE Hilt to enable a per-feature Hilt→Koin cutover
+    // (the Settings feature is the first "Koin island"; the rest stays on Hilt). Additive — no
+    // Hilt dependency removed. koin-androidx-compose supplies koinViewModel() for Composables.
+    implementation(libs.koin.core)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
+
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)

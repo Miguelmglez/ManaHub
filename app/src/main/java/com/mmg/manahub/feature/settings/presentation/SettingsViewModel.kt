@@ -17,7 +17,6 @@ import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -33,10 +32,15 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-import javax.inject.Inject
-
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
+/**
+ * Settings screen ViewModel.
+ *
+ * KMP migration — Phase 0 Spike D: this is the first feature migrated off Hilt. It is no longer
+ * `@HiltViewModel`; it is constructed by Koin via `settingsKoinModule` and resolved in the Composable
+ * with `koinViewModel()`. Its dependencies are bridged from the still-Hilt-owned object graph (see
+ * `SettingsKoinModule`). Every other ViewModel remains `@HiltViewModel` — Hilt and Koin coexist.
+ */
+class SettingsViewModel(
     private val userPrefsDataStore: UserPreferencesDataStore,
     private val userPreferencesRepo: UserPreferencesRepository,
     private val analyticsHelper: AnalyticsHelper,

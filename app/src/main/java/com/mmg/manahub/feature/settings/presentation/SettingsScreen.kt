@@ -58,10 +58,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import org.koin.androidx.compose.koinViewModel
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
@@ -89,7 +89,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onManageNewsSources: () -> Unit = {},
     onManageTagDictionary: () -> Unit = {},
-    viewModel: SettingsViewModel = hiltViewModel(),
+    // KMP migration — Phase 0 Spike D: Settings is the first "Koin island". This ViewModel is
+    // resolved by Koin (koinViewModel()) while every other screen still uses hiltViewModel().
+    viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
