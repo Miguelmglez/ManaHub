@@ -374,6 +374,14 @@ graphify-out/
 # Architecture Decision Records are committed (see comment near docs/*_TODO.md rules).
 !/docs/adr/
 !/docs/adr/**
+# KMP migration is a long-lived, multi-session effort: its plan + library map + living
+# progress tracker MUST be committed so the cloud autopilot routine and any fresh clone can
+# resume. These are durable architecture docs (secret-free, reviewed), not ephemeral task plans.
+!/docs/plans/
+/docs/plans/*
+!/docs/plans/kmp-migration-plan.md
+!/docs/plans/kmp-library-and-filesystem-map.md
+!/docs/plans/kmp-migration-progress.md
 /.claude/skills/compose-ui/SKILL.md
 /.claude/skills/compose-ui/references/visual-loop-setup.md
 /.claude/skills/compose-ui/references/components.md
