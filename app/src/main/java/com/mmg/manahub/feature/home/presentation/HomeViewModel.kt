@@ -1384,5 +1384,10 @@ private fun applyNewsFilters(
                 is NewsItem.Video -> SourceType.VIDEO in filters.types
             }
         }
-        .filter { filters.sourceIds == null || it.sourceId in filters.sourceIds }
+        .filter { item ->
+            // `sourceIds` lives in :shared:core-model, so it cannot be smart-cast across the module
+            // boundary — capture it in a local val before the null check.
+            val allowedSourceIds = filters.sourceIds
+            allowedSourceIds == null || item.sourceId in allowedSourceIds
+        }
 }

@@ -141,6 +141,9 @@ android {
 dependencies {
     // KMP migration — Phase 0, Spike A: shared pure-Kotlin domain models (CollectionViewMode, GroupingMode).
     implementation(project(":shared:core-model"))
+    // KMP migration — Phase 1: shared cross-cutting contracts (DispatcherProvider, KeyValueStore,
+    // CrashReporter, Page). Depended on so it builds with :app; call-sites are NOT migrated onto it yet.
+    implementation(project(":shared:core-common"))
 
     // Supabase Auth & DB
     val supabaseBom = platform(libs.supabase.bom)
