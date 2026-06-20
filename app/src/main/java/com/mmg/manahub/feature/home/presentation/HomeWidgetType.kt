@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.model.WidgetSize
 
 /**
  * The catalog of every widget that can appear on the Home dashboard.

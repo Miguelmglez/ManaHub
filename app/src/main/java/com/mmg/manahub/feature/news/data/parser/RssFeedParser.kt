@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.news.data.parser
 
 import android.util.Xml
-import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
+import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
 import java.security.MessageDigest

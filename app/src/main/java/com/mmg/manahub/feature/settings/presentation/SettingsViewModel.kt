@@ -16,7 +16,7 @@ import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +118,11 @@ class SettingsViewModel @Inject constructor(
 
         userPrefsDataStore.tradeListPublicFlow
             .onEach { value -> _uiState.update { it.copy(tradeListPublic = value) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        userPrefsDataStore.communityDecksEnabledFlow
+            .onEach { value -> _uiState.update { it.copy(communityDecksEnabled = value) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
     }
@@ -254,6 +259,15 @@ class SettingsViewModel @Inject constructor(
      */
     fun setGamificationEnabled(enabled: Boolean) {
         viewModelScope.launch { userPrefsDataStore.setGamificationEnabled(enabled) }
+    }
+
+    /**
+     * Toggles the master Community Decks preference.
+     *
+     * @param enabled `true` to show Community Decks entry points, `false` to hide them.
+     */
+    fun setCommunityDecksEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPrefsDataStore.setCommunityDecksEnabled(enabled) }
     }
 
     /**

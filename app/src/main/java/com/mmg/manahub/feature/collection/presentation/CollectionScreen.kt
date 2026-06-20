@@ -74,7 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
@@ -88,7 +88,7 @@ import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchViewModel
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.decks.presentation.DeckListScreen
 import com.mmg.manahub.feature.trades.presentation.TradesScreen
 import java.util.Locale
@@ -105,6 +105,7 @@ fun CollectionScreen(
     onDeckClick:              (deckId: String) -> Unit,
     onCreateDeck:             () -> Unit = {},
     onPlaytestClick:          (deckId: String) -> Unit = {},
+    onBrowseCommunityDecks:   () -> Unit = {},
     onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     initialTab:               CollectionTab = CollectionTab.CARDS,
@@ -130,6 +131,7 @@ fun CollectionScreen(
         },
         onCreateDeck          = onCreateDeck,
         onPlaytestClick       = onPlaytestClick,
+        onBrowseCommunityDecks = onBrowseCommunityDecks,
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
@@ -167,6 +169,7 @@ private fun CollectionContent(
     onDeckClick:          (String) -> Unit,
     onCreateDeck:         () -> Unit = {},
     onPlaytestClick:      (String) -> Unit = {},
+    onBrowseCommunityDecks: () -> Unit = {},
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
@@ -304,6 +307,7 @@ private fun CollectionContent(
                         onDeckClick     = onDeckClick,
                         onCreateDeck    = onCreateDeck,
                         onPlaytestClick = onPlaytestClick,
+                        onBrowseCommunityDecks = onBrowseCommunityDecks,
                     )
                     CollectionTab.TRADES  -> TradesScreen(
                         onCardClick           = onCardClick,

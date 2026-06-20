@@ -1,19 +1,24 @@
 package com.mmg.manahub.core.util
 
-import com.mmg.manahub.R
-
 object CardConstants {
     /** Exact character count of a valid game tag (format: #XXXXXX). */
     const val GAME_TAG_LENGTH = 7
 
+    /**
+     * Card conditions as `code to English display name` pairs.
+     *
+     * The util layer is resource-free (KMP modularization, Phase 0.5 Blocker 5) so display
+     * names are plain English strings rather than Android string-resource ids; the app is
+     * English-only.
+     */
     val conditions = listOf(
-        "M" to R.string.card_condition_m,
-        "NM" to R.string.card_condition_nm,
-        "EX" to R.string.card_condition_ex,
-        "GD" to R.string.card_condition_gd,
-        "LP" to R.string.card_condition_lp,
-        "PL" to R.string.card_condition_pl,
-        "PO" to R.string.card_condition_p
+        "M" to "Mint",
+        "NM" to "Near Mint",
+        "EX" to "Excellent",
+        "GD" to "Good",
+        "LP" to "Light Played",
+        "PL" to "Played",
+        "PO" to "Poor",
     )
 
     val languages = listOf(
@@ -52,7 +57,7 @@ object CardConstants {
         return languageNames[langCode] ?: langCode.uppercase()
     }
 
-    fun getConditionName(code: String): Int {
-        return conditions.find { it.first == code }?.second ?: R.string.card_condition_nm
+    fun getConditionName(code: String): String {
+        return conditions.find { it.first == code }?.second ?: "Near Mint"
     }
 }

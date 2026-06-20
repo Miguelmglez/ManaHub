@@ -16,15 +16,17 @@ import com.mmg.manahub.core.domain.model.MagicSet
 import com.mmg.manahub.core.domain.model.MtgColor
 import com.mmg.manahub.core.domain.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.model.QuickStartAction
 import com.mmg.manahub.core.domain.model.Rarity
+import com.mmg.manahub.core.domain.model.WidgetSize
 import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.domain.model.news.SourceType
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
@@ -32,8 +34,8 @@ import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.recordSafeNonFatal
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.draft.domain.model.DraftState
 import com.mmg.manahub.feature.draft.domain.model.DraftStatus
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
@@ -224,7 +226,11 @@ class HomeViewModel @Inject constructor(
      */
     private val layoutFlow: Flow<List<WidgetInstance>> =
         isAuthenticatedFlow.flatMapLatest { authed ->
-            userPrefsDataStore.homeLayoutFlow(defaultLayoutFor(authed))
+            userPrefsDataStore
+                .homeLayoutFlow(defaultLayoutFor(authed).map { it.toPersisted() })
+                // Map persisted widgets back to UI instances; drop any whose persistedId
+                // no longer maps to a known widget type (removed in a newer app version).
+                .map { persisted -> persisted.mapNotNull { it.toInstanceOrNull() } }
         }
 
     // ── Stats / discover / social snapshots (catch-isolated) ────────────────────
@@ -834,7 +840,9 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun persistLayout(layout: List<WidgetInstance>) {
-        viewModelScope.launch { userPrefsDataStore.saveHomeLayout(layout) }
+        viewModelScope.launch {
+            userPrefsDataStore.saveHomeLayout(layout.map { it.toPersisted() })
+        }
     }
 
     // ── Reduction ─────────────────────────────────────────────────────────────

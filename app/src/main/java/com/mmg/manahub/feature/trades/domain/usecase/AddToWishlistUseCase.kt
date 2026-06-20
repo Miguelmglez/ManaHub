@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.trades.domain.usecase
 
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import javax.inject.Inject
 

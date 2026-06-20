@@ -50,6 +50,20 @@ sealed class Screen(val route: String) {
         fun createRoute(deckId: String) = "collection/decks/$deckId/improvement"
     }
 
+    // ── Community Decks (Archidekt browse + import) ──────────────────────────
+    /** Community Decks landing / browse screen. */
+    object CommunityDecks : Screen("community/decks")
+
+    /** Detail view for a single community deck, identified by its Archidekt numeric id. */
+    object CommunityDeckDetail : Screen("community/decks/detail/{archidektId}") {
+        fun createRoute(archidektId: Int) = "community/decks/detail/$archidektId"
+    }
+
+    /** Community decks that contain a specific card (deep-linkable from card detail). */
+    object CommunityDecksByCard : Screen("community/decks/bycard/{cardName}") {
+        fun createRoute(cardName: String) = "community/decks/bycard/${Uri.encode(cardName)}"
+    }
+
     // ── Stats (bottom tab 2) ─────────────────────────────────────────────────
     object Stats    : Screen("stats")
     object Settings : Screen("settings")

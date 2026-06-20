@@ -13,7 +13,7 @@ import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserPreferences

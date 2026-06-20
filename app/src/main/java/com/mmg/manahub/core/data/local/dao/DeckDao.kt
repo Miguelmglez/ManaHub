@@ -98,6 +98,28 @@ interface DeckDao {
     @Query("UPDATE decks SET is_deleted = 1, updated_at = :updatedAt WHERE id = :deckId")
     fun softDeleteDeck(deckId: String, updatedAt: Long = System.currentTimeMillis())
 
+    /**
+     * Stamps a deck with external community-source attribution (Community Decks).
+     * Bumps `updated_at` so the change propagates on the next sync push.
+     */
+    @Query("""
+        UPDATE decks SET
+            source_url = :sourceUrl,
+            source_author = :sourceAuthor,
+            source_service = :sourceService,
+            imported_at = :importedAt,
+            updated_at = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun updateDeckAttribution(
+        deckId: String,
+        sourceUrl: String?,
+        sourceAuthor: String?,
+        sourceService: String?,
+        importedAt: Long?,
+        updatedAt: Long = System.currentTimeMillis(),
+    )
+
     // Assigns real userId to all guest-owned decks on login.
     // Returns count of updated rows so caller can decide whether to trigger a sync.
     @Query("UPDATE decks SET user_id = :newUserId, updated_at = :updatedAt WHERE user_id IS NULL OR user_id = ''")

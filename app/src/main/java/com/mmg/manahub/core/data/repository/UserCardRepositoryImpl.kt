@@ -16,8 +16,8 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.repository.AddOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow

@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +55,7 @@ fun DeckListScreen(
     onDeckClick:       (deckId: String) -> Unit,
     onCreateDeck:      () -> Unit,
     onPlaytestClick:   (deckId: String) -> Unit = {},
+    onBrowseCommunityDecks: () -> Unit = {},
     viewModel:         DeckViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -84,6 +89,7 @@ fun DeckListScreen(
 
                 uiState.decks.isEmpty() -> EmptyDecksState(
                     onCreateClick = onCreateDeck,
+                    onBrowseCommunityDecks = onBrowseCommunityDecks,
                     modifier      = Modifier.align(Alignment.Center),
                 )
 
@@ -128,6 +134,7 @@ fun DeckListScreen(
 @Composable
 private fun EmptyDecksState(
     onCreateClick: () -> Unit,
+    onBrowseCommunityDecks: () -> Unit,
     modifier:      Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -176,11 +183,23 @@ private fun EmptyDecksState(
             onClick = onCreateClick,
             colors  = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
             border  = BorderStroke(1.dp, mc.primaryAccent),
-            shape   = RoundedCornerShape(12.dp)
+            shape   = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text(
                 stringResource(R.string.decklist_empty_action),
                 style = ty.labelLarge,
+            )
+        }
+        
+        TextButton(
+            onClick = onBrowseCommunityDecks,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "Browse Community Decks",
+                style = ty.labelLarge,
+                color = mc.textSecondary
             )
         }
     }

@@ -53,7 +53,7 @@ import com.mmg.manahub.core.ui.components.manaColorFor
 import com.mmg.manahub.core.ui.theme.MagicTheme
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.auth.SessionState
 import kotlinx.coroutines.delay
 
 /**

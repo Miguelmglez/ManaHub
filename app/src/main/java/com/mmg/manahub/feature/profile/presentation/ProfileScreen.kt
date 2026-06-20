@@ -88,7 +88,7 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.presentation.AccountSection
 import com.mmg.manahub.feature.auth.presentation.AuthUiState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel

@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.settings.presentation
 
 import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.UserPreferences
@@ -17,6 +17,10 @@ data class SettingsUiState(
     val wishlistPublic: Boolean = true,
     /** Mirrors the `trade_list_public` column in `user_profiles`. Default: true (public). */
     val tradeListPublic: Boolean = true,
+
+    /** Master toggle for Community Decks (Archidekt). */
+    val communityDecksEnabled: Boolean = false,
+
     /** Non-null while a privacy-update toast should be shown; cleared by [SettingsViewModel.clearPrivacyToast]. */
     val privacyToastMessage: String? = null,
     /** True when [privacyToastMessage] represents an error; false for a success message. */

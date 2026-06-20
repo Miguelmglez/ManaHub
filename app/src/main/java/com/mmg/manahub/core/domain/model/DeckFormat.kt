@@ -1,9 +1,14 @@
 package com.mmg.manahub.core.domain.model
 
-import com.mmg.manahub.R
-
+/**
+ * Deck construction format.
+ *
+ * [displayName] is the English label for this format. The domain layer is resource-free
+ * (KMP modularization, Phase 0.5 Blocker 3) so the label is a plain English string rather
+ * than an Android string-resource id; the app is English-only.
+ */
 enum class DeckFormat(
-    val displayNameRes: Int,
+    val displayName: String,
     val targetDeckSize: Int,
     val targetLandCount: Int,
     val maxCopies: Int,
@@ -11,7 +16,7 @@ enum class DeckFormat(
     val uniqueCards: Boolean,
 ) {
     /*STANDARD(
-        displayNameRes    = R.string.format_standard,
+        displayName       = "Standard",
         targetDeckSize    = 60,
         targetLandCount   = 24,
         maxCopies         = 4,
@@ -22,7 +27,7 @@ enum class DeckFormat(
     // as Standard but each filters against its OWN Scryfall legality (see DeckScorer.isLegal)
     // and uses a tighter skeleton/curve (DeckSkeletons.forFormat).
       PIONEER(
-          displayNameRes    = R.string.format_pioneer,
+          displayName       = "Pioneer",
           targetDeckSize    = 60,
           targetLandCount   = 24,
           maxCopies         = 4,
@@ -30,7 +35,7 @@ enum class DeckFormat(
           uniqueCards       = false,
       ),
       MODERN(
-          displayNameRes    = R.string.format_modern,
+          displayName       = "Modern",
           targetDeckSize    = 60,
           targetLandCount   = 24,
           maxCopies         = 4,
@@ -38,7 +43,7 @@ enum class DeckFormat(
           uniqueCards       = false,
       ),
       LEGACY(
-          displayNameRes    = R.string.format_legacy,
+          displayName       = "Legacy",
           targetDeckSize    = 60,
           targetLandCount   = 24,
           maxCopies         = 4,
@@ -46,7 +51,7 @@ enum class DeckFormat(
           uniqueCards       = false,
       ),
       VINTAGE(
-          displayNameRes    = R.string.format_vintage,
+          displayName       = "Vintage",
           targetDeckSize    = 60,
           targetLandCount   = 24,
           maxCopies         = 4,
@@ -56,7 +61,7 @@ enum class DeckFormat(
       // Pauper: 60-card, commons-only. Slightly higher land count (the format runs leaner curves
       // and wants consistent mana). Filtered by legal:pauper.
       PAUPER(
-          displayNameRes    = R.string.format_pauper,
+          displayName       = "Pauper",
           targetDeckSize    = 60,
           targetLandCount   = 23,
           maxCopies         = 4,
@@ -64,7 +69,7 @@ enum class DeckFormat(
           uniqueCards       = false,
       ),*/
     COMMANDER(
-        displayNameRes    = R.string.format_commander,
+        displayName       = "Commander",
         targetDeckSize    = 100,
         targetLandCount   = 37,
         maxCopies         = 1,
@@ -73,7 +78,7 @@ enum class DeckFormat(
     ),
     // Casual: permissive — no legality restriction and no construction validation. Standard shape.
     CASUAL(
-        displayNameRes    = R.string.format_casual,
+        displayName       = "Casual",
         targetDeckSize    = 60,
         targetLandCount   = 24,
         maxCopies         = 4,
@@ -81,7 +86,7 @@ enum class DeckFormat(
         uniqueCards       = false,
     ),
     DRAFT(
-        displayNameRes    = R.string.format_draft,
+        displayName       = "Draft",
         targetDeckSize    = 40,
         targetLandCount   = 17,
         maxCopies         = 99,

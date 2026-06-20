@@ -71,6 +71,21 @@ interface DeckRepository {
     suspend fun clearDeck(deckId: String)
 
     /**
+     * Stamps a deck with external community-source attribution (Community Decks).
+     *
+     * Used after importing a deck from a community service (e.g. Archidekt) to record
+     * the original URL, author, service name, and import timestamp. Bumps [Deck.updatedAt]
+     * so the change is picked up by the next sync push.
+     */
+    suspend fun updateDeckAttribution(
+        deckId: String,
+        sourceUrl: String?,
+        sourceAuthor: String?,
+        sourceService: String?,
+        importedAt: Long?,
+    )
+
+    /**
      * Atomically replaces the entire card list for a deck.
      * Used by [saveDeck] in the ViewModel to flush the in-memory draft to Room in one transaction.
      * @param slots List of (scryfallId, quantity, isSideboard) triples.

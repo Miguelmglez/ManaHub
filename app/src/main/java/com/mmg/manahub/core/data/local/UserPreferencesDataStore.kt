@@ -13,7 +13,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.domain.model.AppLanguage
 import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.domain.model.NewsLanguage
 import com.mmg.manahub.core.domain.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.ScoreWeightOverrides
@@ -26,10 +26,9 @@ import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.Companion.MAX_EQUIPPED_BADGES
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.util.PriceFormatter.isEuropeanLocale
-import com.mmg.manahub.feature.home.presentation.HomeWidgetType
-import com.mmg.manahub.feature.home.presentation.QuickStartAction
-import com.mmg.manahub.feature.home.presentation.WidgetInstance
-import com.mmg.manahub.feature.home.presentation.WidgetSize
+import com.mmg.manahub.core.domain.model.PersistedWidget
+import com.mmg.manahub.core.domain.model.QuickStartAction
+import com.mmg.manahub.core.domain.model.WidgetSize
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -79,6 +78,8 @@ private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hour
 
 // ── Feature flags ─────────────────────────────────────────────────────────
 private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
+/** Master Community Decks switch (Archidekt import/browse). Default: DISABLED until rollout. */
+private val KEY_COMMUNITY_DECKS_ENABLED = booleanPreferencesKey("community_decks_enabled")
 /**
  * Master gamification switch (XP, levels, achievements, quests). Default: DISABLED — the
  * gamification UI is hidden for this release (see docs/gamification-hidden-for-release.md).
@@ -500,6 +501,15 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_PUSH_NOTIFICATIONS_ENABLED] = enabled }
     }
 
+    /** Controls whether the Community Decks feature (Archidekt) is exposed. Default: true (enabled for testing). */
+    val communityDecksEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_COMMUNITY_DECKS_ENABLED] ?: true }
+        .catch { emit(true) }
+
+    suspend fun setCommunityDecksEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_COMMUNITY_DECKS_ENABLED] = enabled }
+    }
+
     /**
      * Master gamification switch. Default: false (OFF) because the gamification UI is hidden
      * for this release (see docs/gamification-hidden-for-release.md). When false, all
@@ -788,10 +798,15 @@ class UserPreferencesDataStore @Inject constructor(
      * Emits the user's persisted dashboard layout, or [defaultLayout] when nothing
      * is stored or every stored token is unrecognisable.
      *
+     * Operates on the presentation-agnostic [PersistedWidget] (persistedId + size); the
+     * presentation layer maps these to/from its UI widget instances. Unknown size names
+     * are skipped on decode; widget-id recognition (against the presentation catalog) is
+     * also the caller's responsibility, so this layer cannot import presentation code.
+     *
      * @param defaultLayout the auth-appropriate default, supplied by the caller so
      *  this DataStore stays unaware of which default applies.
      */
-    fun homeLayoutFlow(defaultLayout: List<WidgetInstance>): Flow<List<WidgetInstance>> =
+    fun homeLayoutFlow(defaultLayout: List<PersistedWidget>): Flow<List<PersistedWidget>> =
         context.userPrefsDataStore.data
             .map { prefs ->
                 val raw = prefs[KEY_HOME_LAYOUT]
@@ -800,16 +815,16 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.mapNotNull { token -> decodeWidgetToken(token) }
                     ?: emptyList()
                 // Deduplicate by persistedId: a corrupt stored string could produce two
-                // WidgetInstances with the same key, crashing the LazyVerticalGrid.
-                parsed.distinctBy { it.type.persistedId }.ifEmpty { defaultLayout }
+                // widgets with the same key, crashing the LazyVerticalGrid.
+                parsed.distinctBy { it.persistedId }.ifEmpty { defaultLayout }
             }
             .catch { emit(defaultLayout) }
 
     /** Persists [layout] as an ordered "persistedId:SIZE_NAME" token string. */
-    suspend fun saveHomeLayout(layout: List<WidgetInstance>) {
+    suspend fun saveHomeLayout(layout: List<PersistedWidget>) {
         context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_HOME_LAYOUT] = layout.joinToString(",") { instance ->
-                "${instance.type.persistedId}:${instance.size.name}"
+            prefs[KEY_HOME_LAYOUT] = layout.joinToString(",") { widget ->
+                "${widget.persistedId}:${widget.size.name}"
             }
         }
     }
@@ -824,13 +839,18 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_HOME_COACHMARK_SEEN] = true }
     }
 
-    /** Decodes a single "persistedId:SIZE_NAME" token, or null when either half is unknown. */
-    private fun decodeWidgetToken(token: String): WidgetInstance? {
+    /**
+     * Decodes a single "persistedId:SIZE_NAME" token into a [PersistedWidget], or null when
+     * malformed or the size name is unknown. Widget-id validity (against the presentation
+     * catalog) is resolved by the caller so this layer stays presentation-free.
+     */
+    private fun decodeWidgetToken(token: String): PersistedWidget? {
         val parts = token.trim().split(":")
         if (parts.size != 2) return null
-        val type = HomeWidgetType.fromPersistedId(parts[0].trim()) ?: return null
+        val persistedId = parts[0].trim()
+        if (persistedId.isEmpty()) return null
         val size = WidgetSize.entries.firstOrNull { it.name == parts[1].trim() } ?: return null
-        return WidgetInstance(type = type, size = size)
+        return PersistedWidget(persistedId = persistedId, size = size)
     }
 
     // ── Home dashboard: First Steps carousel ─────────────────────────────────

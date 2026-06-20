@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.auth.domain.usecase
 
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 

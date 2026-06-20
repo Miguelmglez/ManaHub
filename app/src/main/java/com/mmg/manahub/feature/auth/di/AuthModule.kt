@@ -6,7 +6,7 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

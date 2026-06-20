@@ -139,6 +139,9 @@ android {
 
 
 dependencies {
+    // KMP migration — Phase 0, Spike A: shared pure-Kotlin domain models (CollectionViewMode, GroupingMode).
+    implementation(project(":shared:core-model"))
+
     // Supabase Auth & DB
     val supabaseBom = platform(libs.supabase.bom)
     implementation(supabaseBom)

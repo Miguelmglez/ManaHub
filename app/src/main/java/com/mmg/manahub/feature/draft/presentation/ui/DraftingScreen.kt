@@ -94,7 +94,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.ui.components.CardFullScreenDialog
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState

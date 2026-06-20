@@ -290,16 +290,16 @@ fun AddCardSheet(
                             onDismissRequest = { condExpanded = false },
                             modifier = Modifier.background(mc.surface)
                         ) {
-                            conditions.forEach { (code, resId) ->
+                            conditions.forEach { (code, displayName) ->
                                 DropdownMenuItem(
-                                    text = { 
+                                    text = {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                "($code) ${stringResource(resId)}",
+                                                "($code) $displayName",
                                                 style = ty.bodyLarge,
                                                 color = if (condition == code) mc.primaryAccent else mc.textPrimary
                                             )

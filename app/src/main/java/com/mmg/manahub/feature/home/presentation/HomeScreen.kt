@@ -73,6 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.model.QuickStartAction
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -562,6 +563,7 @@ private val QuickStartAction.label: String
         QuickStartAction.STATS -> "Stats"
         QuickStartAction.FRIENDS -> "Friends"
         QuickStartAction.TRADES -> "Trades"
+        QuickStartAction.COMMUNITY_DECKS -> "Community"
         QuickStartAction.SETTINGS -> "Settings"
     }
 
@@ -577,5 +579,6 @@ private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVect
         QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
+        QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Group
         QuickStartAction.SETTINGS -> Icons.Default.Settings
     }

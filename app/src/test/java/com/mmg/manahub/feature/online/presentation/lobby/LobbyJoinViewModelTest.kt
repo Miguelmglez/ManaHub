@@ -13,7 +13,7 @@ import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import com.mmg.manahub.core.online.domain.usecase.JoinSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

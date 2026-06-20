@@ -1,9 +1,9 @@
 package com.mmg.manahub.feature.collection.presentation
 
 import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.sync.SyncState
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.auth.SessionState
 
 /**
  * Immutable state for the collection screen.

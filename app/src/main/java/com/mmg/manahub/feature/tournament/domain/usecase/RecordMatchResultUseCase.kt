@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.tournament.domain.usecase
 
-import com.mmg.manahub.core.domain.repository.MatchResultOutcome
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 

@@ -218,6 +218,25 @@ class DeckRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updateDeckAttribution(
+        deckId: String,
+        sourceUrl: String?,
+        sourceAuthor: String?,
+        sourceService: String?,
+        importedAt: Long?,
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.updateDeckAttribution(
+                deckId = deckId,
+                sourceUrl = sourceUrl,
+                sourceAuthor = sourceAuthor,
+                sourceService = sourceService,
+                importedAt = importedAt,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
     override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) {
         withContext(ioDispatcher) {
             val entities = slots.map { (scryfallId, quantity, isSideboard) ->

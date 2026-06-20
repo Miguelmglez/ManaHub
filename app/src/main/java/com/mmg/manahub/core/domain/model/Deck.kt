@@ -1,8 +1,5 @@
 package com.mmg.manahub.core.domain.model
 
-import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
-
 data class Deck(
     val id:          String,                                   // UUID, client-generated
     val userId:      String? = null,
@@ -14,6 +11,12 @@ data class Deck(
     val isDeleted:   Boolean = false,
     val createdAt:   Long    = System.currentTimeMillis(),
     val updatedAt:   Long    = System.currentTimeMillis(),
+    // ── Community Decks attribution (v41) ──────────────────────────────────
+    // Set only for decks imported from an external community source (e.g. Archidekt).
+    val sourceUrl:     String? = null,
+    val sourceAuthor:  String? = null,
+    val sourceService: String? = null,
+    val importedAt:    Long?   = null,
 )
 
 data class DeckSlot(

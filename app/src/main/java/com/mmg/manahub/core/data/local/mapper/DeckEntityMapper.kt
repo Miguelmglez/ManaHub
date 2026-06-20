@@ -17,6 +17,10 @@ fun DeckEntity.toDomainDeck(): Deck = Deck(
     isDeleted = isDeleted,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    sourceUrl = sourceUrl,
+    sourceAuthor = sourceAuthor,
+    sourceService = sourceService,
+    importedAt = importedAt,
 )
 
 fun DeckWithCardsEntity.toDomainDeckWithCards(): DeckWithCards = DeckWithCards(
@@ -36,4 +40,8 @@ fun Deck.toEntity(): DeckEntity = DeckEntity(
     isDeleted = isDeleted,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    sourceUrl = sourceUrl,
+    sourceAuthor = sourceAuthor,
+    sourceService = sourceService,
+    importedAt = importedAt,
 )

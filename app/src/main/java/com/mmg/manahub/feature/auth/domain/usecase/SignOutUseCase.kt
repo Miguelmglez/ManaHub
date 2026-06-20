@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.auth.domain.usecase
 
-import com.mmg.manahub.feature.auth.domain.model.AuthResult
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthResult
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import javax.inject.Inject
 
 class SignOutUseCase @Inject constructor(

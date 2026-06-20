@@ -26,3 +26,5 @@ dependencyResolutionManagement {
 rootProject.name = "ManaHub"
 include(":app")
 include(":baseline-profile")
+// KMP migration — Phase 0, Spike A: first shared Kotlin Multiplatform module (android + wasmJs).
+include(":shared:core-model")

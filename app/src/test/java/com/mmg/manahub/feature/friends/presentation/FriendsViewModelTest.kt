@@ -4,9 +4,9 @@ import app.cash.turbine.test
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.util.CardConstants
-import com.mmg.manahub.feature.auth.domain.model.AuthUser
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository

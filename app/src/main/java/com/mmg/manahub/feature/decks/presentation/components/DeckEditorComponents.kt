@@ -69,7 +69,7 @@ import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
-import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
@@ -563,7 +563,7 @@ private fun DeckFormatPill(
             style = ty.bodyMedium,
         )
         Text(
-            text = stringResource(format.displayNameRes),
+            text = format.displayName,
             style = ty.labelLarge,
             color = if (selected) mc.primaryAccent else mc.textPrimary,
             textAlign = TextAlign.Center,

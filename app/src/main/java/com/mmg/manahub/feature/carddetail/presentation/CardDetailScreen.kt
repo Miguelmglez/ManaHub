@@ -126,10 +126,11 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
+import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.core.domain.model.WishlistEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,9 +139,11 @@ fun CardDetailScreen(
     onNavigateToAddCard: () -> Unit,
     onNavigateToDeck: (String) -> Unit = {},
     onNavigateToCard: (scryfallId: String) -> Unit = {},
+    onNavigateToCommunityDecks: (cardName: String) -> Unit = {},
     viewModel: CardDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isCommunityDecksEnabled by viewModel.isCommunityDecksEnabled.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
 
     // Collect one-shot events from the ViewModel
@@ -227,6 +230,8 @@ fun CardDetailScreen(
                     onRequestDelete = viewModel::onRequestDelete,
                     onRequestDeleteWishlist = viewModel::onRequestDeleteWishlist,
                     onNavigateToDeck = onNavigateToDeck,
+                    isCommunityDecksEnabled = isCommunityDecksEnabled,
+                    onFindCommunityDecks = onNavigateToCommunityDecks,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -407,6 +412,8 @@ private fun CardDetailContent(
     onRequestDelete: (UserCard) -> Unit,
     onRequestDeleteWishlist: (WishlistEntry) -> Unit,
     onNavigateToDeck: (String) -> Unit,
+    isCommunityDecksEnabled: Boolean,
+    onFindCommunityDecks: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showBackFace by remember { mutableStateOf(false) }
@@ -719,6 +726,31 @@ private fun CardDetailContent(
                 decks = decksContainingCard,
                 onNavigateToDeck = onNavigateToDeck,
             )
+        }
+
+        // Community Decks entry point (feature-flag gated)
+        if (isCommunityDecksEnabled) {
+            HorizontalDivider()
+            val mc = MaterialTheme.magicColors
+            OutlinedButton(
+                onClick = { onFindCommunityDecks(card.name) },
+                shape = ButtonShape,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Group,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.community_deck_find_decks),
+                    style = MaterialTheme.magicTypography.labelLarge,
+                )
+            }
         }
 
         HorizontalDivider()

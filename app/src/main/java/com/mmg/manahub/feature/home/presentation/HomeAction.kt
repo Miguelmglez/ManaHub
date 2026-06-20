@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
+import com.mmg.manahub.core.domain.model.QuickStartAction
+
 /**
  * All user intents emitted by the Home screen.
  *
@@ -20,6 +22,7 @@ sealed interface HomeAction {
     object OpenStats : HomeAction
     object OpenFriends : HomeAction
     object OpenTrades : HomeAction
+    object OpenCommunityDecks : HomeAction
     object OpenTournaments : HomeAction
     object OpenSettings : HomeAction
     object OpenProfile : HomeAction

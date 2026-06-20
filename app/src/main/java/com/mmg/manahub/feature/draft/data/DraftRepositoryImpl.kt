@@ -14,7 +14,7 @@ import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.model.DraftSet
 import com.mmg.manahub.core.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
-import com.mmg.manahub.feature.draft.data.local.DraftSetDao
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
 import com.mmg.manahub.feature.draft.data.remote.toDomain

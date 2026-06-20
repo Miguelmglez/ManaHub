@@ -16,7 +16,7 @@ import javax.inject.Inject
 class ProfileEditViewModel @Inject constructor(
     private val scryfallRemoteDataSource: ScryfallRemoteDataSource,
     private val userPreferencesDataStore: UserPreferencesDataStore,
-    private val authRepository: com.mmg.manahub.feature.auth.domain.repository.AuthRepository,
+    private val authRepository: com.mmg.manahub.core.domain.auth.AuthRepository,
 ) : ViewModel() {
 
     data class PlaneswalkerArt(
@@ -62,7 +62,7 @@ class ProfileEditViewModel @Inject constructor(
         viewModelScope.launch {
             // Observe session for gameTag
             authRepository.sessionState.collect { session ->
-                if (session is com.mmg.manahub.feature.auth.domain.model.SessionState.Authenticated) {
+                if (session is com.mmg.manahub.core.domain.auth.SessionState.Authenticated) {
                     _uiState.update { it.copy(gameTag = session.user.gameTag) }
                 } else {
                     _uiState.update { it.copy(gameTag = null) }

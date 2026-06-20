@@ -4,11 +4,11 @@ import android.util.Log
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.domain.model.news.SourceType
-import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
+import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.DefaultSources
-import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
-import com.mmg.manahub.feature.news.data.local.NewsDao
-import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
+import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
+import com.mmg.manahub.core.data.local.dao.NewsDao
+import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
 import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
