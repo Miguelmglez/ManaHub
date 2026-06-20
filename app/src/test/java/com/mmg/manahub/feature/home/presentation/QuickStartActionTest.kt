@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.home.presentation
 
+import com.mmg.manahub.core.domain.model.QuickStartAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -83,12 +84,12 @@ class QuickStartActionTest {
     }
 
     @Test
-    fun `defaults contains SCAN_CARD CREATE_DECK DRAFT_GUIDE STATS in order`() {
+    fun `defaults contains SCAN_CARD CREATE_DECK COMMUNITY_DECKS STATS in order`() {
         assertEquals(
             listOf(
                 QuickStartAction.SCAN_CARD,
                 QuickStartAction.CREATE_DECK,
-                QuickStartAction.DRAFT_GUIDE,
+                QuickStartAction.COMMUNITY_DECKS,
                 QuickStartAction.STATS,
             ),
             QuickStartAction.defaults,

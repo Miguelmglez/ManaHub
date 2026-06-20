@@ -6,7 +6,10 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.CollectionStats
 import com.mmg.manahub.core.domain.model.DataResult
 import com.mmg.manahub.core.domain.model.DeckSummary
+import com.mmg.manahub.core.domain.model.PersistedWidget
 import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.domain.model.QuickStartAction
+import com.mmg.manahub.core.domain.model.WidgetSize
 import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.domain.model.news.NewsItem
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
@@ -186,17 +189,17 @@ class HomeViewModelTest {
         // Layout round-trip: homeLayoutFlow decodes the saved tokens (or the supplied
         // default when none are saved); saveHomeLayout writes the tokens.
         every { userPrefsDataStore.homeLayoutFlow(any()) } answers {
-            val default = firstArg<List<WidgetInstance>>()
+            val default = firstArg<List<PersistedWidget>>()
             savedLayoutTokens.map { tokens -> decodeLayout(tokens, default) }
         }
-        val layoutSlot = slot<List<WidgetInstance>>()
+        val layoutSlot = slot<List<PersistedWidget>>()
         coEvery { userPrefsDataStore.saveHomeLayout(capture(layoutSlot)) } answers {
-            savedLayoutTokens.value = layoutSlot.captured.joinToString(",") { "${it.type.persistedId}:${it.size.name}" }
+            savedLayoutTokens.value = layoutSlot.captured.joinToString(",") { "${it.persistedId}:${it.size.name}" }
         }
     }
 
     /** Mirrors UserPreferencesDataStore decode: unknown ids/sizes are skipped; empty → default. */
-    private fun decodeLayout(tokens: String?, default: List<WidgetInstance>): List<WidgetInstance> {
+    private fun decodeLayout(tokens: String?, default: List<PersistedWidget>): List<PersistedWidget> {
         val parsed = tokens
             ?.split(",")
             ?.mapNotNull { token ->
@@ -204,7 +207,7 @@ class HomeViewModelTest {
                 if (parts.size != 2) return@mapNotNull null
                 val type = HomeWidgetType.fromPersistedId(parts[0].trim()) ?: return@mapNotNull null
                 val size = WidgetSize.entries.firstOrNull { it.name == parts[1].trim() } ?: return@mapNotNull null
-                WidgetInstance(type, size)
+                PersistedWidget(persistedId = type.persistedId, size = size)
             }
             ?: emptyList()
         return parsed.ifEmpty { default }
