@@ -102,8 +102,11 @@ fun VideoCard(
                 }
             }
             
-            // Duration badge if available
-            if (video.duration != null) {
+            // Duration badge if available.
+            // `duration` lives in :shared:core-model, so it cannot be smart-cast across the module
+            // boundary — capture it in a local val before the null check.
+            val duration = video.duration
+            if (duration != null) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -113,7 +116,7 @@ fun VideoCard(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = video.duration,
+                        text = duration,
                         style = mt.labelSmall,
                         color = Color.White
                     )

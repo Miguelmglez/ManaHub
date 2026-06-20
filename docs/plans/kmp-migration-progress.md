@@ -56,32 +56,44 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 - ⬜ **Phase 0 · Spikes B & C** — pending: B Supabase/Ktor/Coil on wasmJs, C web auth. **Can be deferred
   or folded into Phase 2 (data-layer commonization) / the web-target work** — they validate web runtime
   libraries, which aren't on the critical path for the Phase-1 Android-side build/DI/model foundation.
-- ⬜ **Phase 1** — KMP build foundation, Hilt→Koin per-feature cutover (~300 files), extract
-  `:shared:core-model` (full) + `:shared:core-common` (expect/actual: DispatcherProvider,
-  KeyValueStore, CrashReporter, pagination model).
+- 🟡 **Phase 1 (foundation) — REPAIRED & GREEN (2026-06-20).** The interrupted model-extraction WIP is
+  fixed: all pure models now live in `com.mmg.manahub.core.model` (`:shared:core-model`) and `:app`
+  compiles against them. `:shared:core-common` SURVIVED (it was coherent/complete) — 4 contracts in
+  commonMain (`DispatcherProvider` expect/actual, `KeyValueStore`, `CrashReporter` expect/actual, `Page`)
+  with real Android actuals (Dispatchers / DataStore / Firebase Crashlytics) and minimal-but-compiling
+  wasmJs actuals (Default-dispatcher fallback, in-memory KV stub, no-op CrashReporter). `:app` now
+  `implementation(project(":shared:core-common"))` and builds; NO call-site migrated onto it yet.
+  - `:app:assembleDebug` → **BUILD SUCCESSFUL** (deprecation warnings only).
+  - `:shared:core-model:compileKotlinWasmJs` + `:shared:core-common:compileKotlinWasmJs` → **SUCCESSFUL**.
+  - `:app:testDebugUnitTest` → **1964 tests, 122 failed, 2 skipped** (== baseline, ZERO new failures).
+  - commonMain Android/AndroidX/browser-import grep → EMPTY (PASS).
+  - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — NOT started this run.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
 
 ## NEXT STEP (resume here)
-⚠️ **Phase 1 foundation slice was INTERRUPTED mid-move by the session limit and committed as a broken
-WIP checkpoint.** The agent started moving pure models out of `core.domain.model` into `:shared:core-model`
-and creating `:shared:core-common`, but left the tree UNCOMPILABLE (stale imports to the moved models;
-`core-common` only half-wired). **FIRST: repair the build, THEN continue in SMALL batches.**
+✅ **The interrupted WIP is REPAIRED and the tree is GREEN** (see Phase 1 STATUS above + the 2026-06-20
+CHANGE LOG repair line). `:shared:core-model` (full model set) and `:shared:core-common` both compile for
+android + wasmJs; `:app` depends on both and `assembleDebug` is SUCCESSFUL; tests at baseline (122/2).
+**`core-common` survived intact** — no re-add needed.
 
-1. **REPAIR (do this first).** `./gradlew :app:assembleDebug` and fix every stale reference to the moved
-   models (they now live in package `com.mmg.manahub.core.model` in `:shared:core-model`; deletions are
-   visible in the WIP commit). Finish wiring `:shared:core-common` (DispatcherProvider, KeyValueStore,
-   CrashReporter, pagination model — with android + wasmJs actuals) so it compiles, or, if it is too
-   half-done to salvage cleanly, REMOVE the partial `core-common` and re-add it as a clean small step.
-   Verify: `:app:assembleDebug` SUCCESSFUL, `:shared:core-model:compileKotlinWasmJs` SUCCESSFUL,
-   `:app:testDebugUnitTest` no NEW failures vs ~122 baseline. Commit+push the GREEN result.
-2. **Then continue Phase 1 in SMALL batches** (≤ ~15 files per run to avoid mid-task session-limit breakage):
-   finish `:shared:core-model` (remaining pure models) → finish/clean `:shared:core-common` → then the
-   per-feature Hilt→Koin cutover (next island = **Stats**, then other Hilt-singleton-only features), each
-   feature its own Koin module + `koinViewModel()` swap, replacing bridged `single { hiltInstance }` with
-   real providers + deleting the matching Hilt `@Provides/@Binds`. Keep the app compiling at EVERY commit.
+Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session-limit breakage):
+
+1. **(Optional, only if needed) finish `:shared:core-model`** — extract any remaining PURE domain models
+   still in `core.domain.model` that have ZERO Android deps and are needed by shared code (current
+   leftovers: `Card`, `CardFace`, `CardTag`, `Deck`, `DeckBuilderState`, `OpenForTradeEntry`,
+   `SuggestedTag`, `WishlistEntry` — move only when a shared consumer actually needs them; do NOT move
+   eagerly). The `-keep class com.mmg.manahub.core.model.**` ProGuard wildcard already covers new moves.
+2. **Per-feature Hilt→Koin cutover** (the main remaining Phase-1 work, ~300 files). Next island =
+   **Stats**, then other Hilt-singleton-only features. Each feature: its own Koin module + `koinViewModel()`
+   swap, replace the bridged `single { hiltInstance }` with real providers + delete the matching Hilt
+   `@Provides/@Binds`. Keep the app compiling at EVERY commit.
+   **EXCLUDE for now (deferred per user): `feature/online`, `core/voice` + in-game voice, `feature/scanner`** —
+   leave their Hilt/Compose untouched.
+3. **(Future) wire call-sites onto `:shared:core-common`** — it builds but nothing uses it yet; migrate
+   dispatcher/KeyValueStore/CrashReporter consumers onto it during Phase 2 data-layer commonization.
 
 **SCOPE (per user, 2026-06-20): the goal right now is a working ANDROID app on KMP first, then build the
 web version incrementally.** EXCLUDE these three platform-heavy features from the KMP migration FOR NOW —
@@ -114,6 +126,13 @@ Update this tracker after each step. Keep Android shippable at every step.
 - Task names under the KMP-library plugin: Android tests = `testAndroidHostTest` (NOT `testDebugUnitTest`);
   wasm = `compileKotlinWasmJs` / `compileTestKotlinWasmJs`; web dist = `wasmJsBrowserDistribution`.
 - A model moved out of a `-keep` ProGuard package that is persisted by `.name` needs a new keep rule.
+  (The `core.model` move is already covered by the `-keep class com.mmg.manahub.core.model.** { *; }`
+  wildcard — future model moves into that package need NO new rule.)
+- **Smart-cast across the module boundary breaks** once a model moves to `:shared:core-model`: a nullable
+  public `val` from another module cannot be smart-cast after a `!= null` / `== null` check (Kotlin: "public
+  API property declared in different module"). Fix = capture into a local `val` before the check (done for
+  `NewsItem.Video.duration` in VideoCard.kt and `NewsFilterPrefs.sourceIds` in HomeViewModel.kt). Expect
+  more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
 - 2026-06-20 — Plan + library/FS map written; CLAUDE.md KMP directive added; architect prompt expanded
@@ -127,6 +146,16 @@ Update this tracker after each step. Keep Android shippable at every step.
   1964/122-fail/2-skip (== 0.5 baseline, zero regressions). **Spike E (decision):** chose JetBrains CMP
   `navigation-compose` over Voyager/Decompose. Findings → `project_kmp_spike_findings`. Spikes B/C deferred
   to Phase 2/web. NEXT = Phase 1 (build foundation + per-feature Hilt→Koin cutover + core-model/core-common).
+- 2026-06-20 — Phase 1 foundation WIP REPAIRED → GREEN. The interrupted model extraction is fixed: the
+  ONLY two compile errors were smart-cast-across-module failures (`NewsItem.Video.duration` in VideoCard.kt,
+  `NewsFilterPrefs.sourceIds` in HomeViewModel.kt) — fixed by capturing each nullable into a local val. The
+  models were already cleanly extracted (no duplicate defs left in `core.domain.model`; ProGuard wildcard
+  `-keep class com.mmg.manahub.core.model.**` already in place — comment refreshed). `:shared:core-common`
+  was coherent & complete, so it was KEPT (not removed); `:app` now depends on it (`implementation
+  project(":shared:core-common")`) and builds, with no call-site migrated yet. Verified: `:app:assembleDebug`
+  SUCCESSFUL; `:shared:core-model` + `:shared:core-common` `compileKotlinWasmJs` SUCCESSFUL;
+  `:app:testDebugUnitTest` 1964/122-fail/2-skip (== baseline, zero new); commonMain forbidden-import grep
+  EMPTY. NEXT = per-feature Hilt→Koin cutover starting at Stats (excl. online/voice/scanner).
 - 2026-06-20 — Phase 0.5 FINISHED & VERIFIED GREEN. Fixed the stale references left by the interrupted
   relocation: added missing entity imports to the moved `NewsDao`/`CommunityDeckCacheDao` and
   `DefaultSources` (entities now in `core.data.local.entity`, DAOs same-package no longer); added the

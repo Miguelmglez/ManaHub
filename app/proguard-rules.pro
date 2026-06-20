@@ -44,7 +44,9 @@
 # ── App models (Room entities, domain models) ────────────────────────────────
 -keep class com.mmg.manahub.core.data.local.entity.** { *; }
 -keep class com.mmg.manahub.core.domain.model.** { *; }
-# KMP migration — shared pure-Kotlin models (CollectionViewMode/GroupingMode) persisted by enum name.
+# KMP migration — all shared pure-Kotlin models extracted to :shared:core-model (Phase 1). Includes
+# enums persisted by name (CollectionViewMode, GroupingMode, QuickStartAction, DeckFormat, WidgetSize,
+# ContentType, SourceType, ...) and the .news subpackage. Wildcard covers the whole package.
 -keep class com.mmg.manahub.core.model.** { *; }
 -keep class com.mmg.manahub.feature.game.model.** { *; }
 
