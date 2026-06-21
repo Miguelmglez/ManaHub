@@ -6,14 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -24,7 +22,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 data class PlaytestSetupUiState(
     val isLoading: Boolean = true,
@@ -43,13 +40,12 @@ sealed class PlaytestSetupEvent {
     data class NavigateToHand(val setup: PlaytestSetup) : PlaytestSetupEvent()
 }
 
-@HiltViewModel
-class PlaytestSetupViewModel @Inject constructor(
+class PlaytestSetupViewModel(
     savedStateHandle: SavedStateHandle,
     private val deckRepository: DeckRepository,
     private val cardDao: CardDao,
     private val canPlaytestDeckUseCase: CanPlaytestDeckUseCase,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val deckId: String = checkNotNull(savedStateHandle["deckId"])

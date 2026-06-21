@@ -48,7 +48,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
@@ -60,13 +59,14 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaytestSetupScreen(
     onBack: () -> Unit,
     onNavigateToHand: (PlaytestSetup) -> Unit,
-    viewModel: PlaytestSetupViewModel = hiltViewModel(),
+    viewModel: PlaytestSetupViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

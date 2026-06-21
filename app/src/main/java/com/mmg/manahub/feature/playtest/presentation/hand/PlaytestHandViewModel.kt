@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.playtest.domain.model.BattlefieldState
 import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
@@ -20,7 +19,6 @@ import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestSurveyUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -32,7 +30,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 data class PlaytestHandUiState(
     val isLoading: Boolean = true,
@@ -69,8 +66,7 @@ sealed class PlaytestHandEvent {
     data class ShowInfo(val stringResName: String) : PlaytestHandEvent()
 }
 
-@HiltViewModel
-class PlaytestHandViewModel @Inject constructor(
+class PlaytestHandViewModel(
     private val deckRepository: DeckRepository,
     private val cardDao: CardDao,
     private val buildLibraryUseCase: BuildLibraryUseCase,
@@ -78,7 +74,7 @@ class PlaytestHandViewModel @Inject constructor(
     private val londonMulliganUseCase: LondonMulliganUseCase,
     private val savePlaytestUseCase: SavePlaytestUseCase,
     private val savePlaytestSurveyUseCase: SavePlaytestSurveyUseCase,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlaytestHandUiState())

@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSurveyAnswers
 import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
-import javax.inject.Inject
 
 /**
  * Saves optional survey answers for a previously saved playtest session.
@@ -10,7 +9,7 @@ import javax.inject.Inject
  * Called after [SavePlaytestUseCase] returns the session id and the user
  * completes or partially fills the survey sheet.
  */
-class SavePlaytestSurveyUseCase @Inject constructor(
+class SavePlaytestSurveyUseCase(
     private val repository: PlaytestRepository,
 ) {
 

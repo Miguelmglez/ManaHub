@@ -5,22 +5,20 @@ import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.entity.PlaytestCardStatEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSessionEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSurveyAnswerEntity
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSurveyAnswers
 import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Implements [PlaytestRepository] by delegating to [PlaytestDao].
  *
- * All suspend functions run on [IoDispatcher] to keep Room off the main thread.
+ * All suspend functions run on the supplied IO dispatcher to keep Room off the main thread.
  */
-class PlaytestRepositoryImpl @Inject constructor(
+class PlaytestRepositoryImpl(
     private val playtestDao: PlaytestDao,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : PlaytestRepository {
 
     override suspend fun saveTest(

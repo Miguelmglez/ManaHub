@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.domain.model.DeckWithCards
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
-import javax.inject.Inject
 
 /**
  * Determines whether a deck is eligible for playtesting.
@@ -15,7 +14,7 @@ import javax.inject.Inject
  *
  * Returns an [PlaytestEligibility] with a human-readable reason when ineligible.
  */
-class CanPlaytestDeckUseCase @Inject constructor() {
+class CanPlaytestDeckUseCase {
 
     /**
      * @param deckWithCards The deck and its card slots (sideboard excluded by caller).

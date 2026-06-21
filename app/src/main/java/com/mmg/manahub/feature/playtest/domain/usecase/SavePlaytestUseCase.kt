@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.playtest.domain.usecase
 import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
-import javax.inject.Inject
 
 /**
  * Saves a completed playtest session to the database.
@@ -22,7 +21,7 @@ import javax.inject.Inject
  *
  * @return The auto-generated session id (needed to attach a survey later).
  */
-class SavePlaytestUseCase @Inject constructor(
+class SavePlaytestUseCase(
     private val repository: PlaytestRepository,
 ) {
 

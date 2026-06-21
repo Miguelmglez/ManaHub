@@ -68,7 +68,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
@@ -98,7 +98,7 @@ import kotlin.math.roundToInt
 fun PlaytestHandScreen(
     setup: PlaytestSetup,
     onBack: () -> Unit,
-    viewModel: PlaytestHandViewModel = hiltViewModel(),
+    viewModel: PlaytestHandViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

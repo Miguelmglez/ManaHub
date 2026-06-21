@@ -18,6 +18,7 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
@@ -81,6 +82,7 @@ import com.mmg.manahub.feature.news.di.newsKoinModule
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
+import com.mmg.manahub.feature.playtest.di.playtestKoinModule
 import com.mmg.manahub.feature.profile.di.profileKoinModule
 import com.mmg.manahub.feature.settings.di.settingsKoinModule
 import com.mmg.manahub.feature.splash.di.splashKoinModule
@@ -233,6 +235,13 @@ class ManaHubApp : Application() {
     @Inject lateinit var getSetVideosUseCase: GetSetVideosUseCase
     @Inject lateinit var botDrafter: BotDrafter
 
+    // Playtest island (Phase 1) bridge dep. The feature-private Hilt PlaytestModule was converted +
+    // DELETED (its @Binds PlaytestRepository is consumed by no Hilt feature) → the repo + the six use
+    // cases are now Koin-owned in playtestKoinModule. Only the Room/DatabaseModule-owned PlaytestDao
+    // (still Hilt-provided, this island only) is bridged here. DeckRepository is reused from
+    // coreBridgeKoinModule and CardDao from surveyKoinModule via get().
+    @Inject lateinit var playtestDao: PlaytestDao
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -327,6 +336,9 @@ class ManaHubApp : Application() {
                     getSetTierList = getSetTierListUseCase,
                     getSetVideos = getSetVideosUseCase,
                     botDrafter = botDrafter,
+                ),
+                playtestKoinModule(
+                    playtestDao = playtestDao,
                 ),
             )
         }
