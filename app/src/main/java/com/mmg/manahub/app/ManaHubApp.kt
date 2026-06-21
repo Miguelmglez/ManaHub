@@ -90,7 +90,10 @@ import com.mmg.manahub.feature.stats.di.statsKoinModule
 import com.mmg.manahub.feature.survey.di.surveyKoinModule
 import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
+import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
+import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
@@ -161,7 +164,7 @@ class ManaHubApp : Application() {
     // gameSessionRepository, statsRepository, deckRepository, scryfallRemoteDataSource,
     // gamificationRepository) are bridged in coreBridgeKoinModule; only the Home-only deps are here.
     @Inject lateinit var draftSimRepository: DraftSimRepository
-    @Inject lateinit var tournamentRepository: TournamentRepository
+    @Inject lateinit var tournamentRepository: TournamentRepository  // shared: Home + Tournament + Hilt GameViewModel (bridged in coreBridge)
     @Inject lateinit var cardRepository: CardRepository  // shared: Home + CommunityDecks (bridged in coreBridge)
     @Inject lateinit var getNewsFeedUseCase: GetNewsFeedUseCase
     @Inject lateinit var refreshNewsFeedUseCase: RefreshNewsFeedUseCase
@@ -242,6 +245,17 @@ class ManaHubApp : Application() {
     // coreBridgeKoinModule and CardDao from surveyKoinModule via get().
     @Inject lateinit var playtestDao: PlaytestDao
 
+    // Tournament island (Phase 1) bridge deps. TournamentRepository is shared with Home + the still-Hilt
+    // GameViewModel → PROMOTED into coreBridgeKoinModule (the existing `tournamentRepository` field above
+    // feeds it there now; the Hilt TournamentModule binding is KEPT for GameViewModel). Only the two
+    // Tournament use cases are here:
+    //  - CalculateStandingsUseCase: used only by TournamentViewModel (kept Hilt-built so its TournamentDao
+    //    + IO-dispatcher deps stay in the Hilt graph — no DAO bridging needed).
+    //  - RecordMatchResultUseCase: the SINGLE finish-and-advance entry point, STILL consumed by the Hilt
+    //    GameViewModel → its Hilt @Inject binding is KEPT and the same singleton is bridged here.
+    @Inject lateinit var calculateStandingsUseCase: CalculateStandingsUseCase
+    @Inject lateinit var recordMatchResultUseCase: RecordMatchResultUseCase
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -272,6 +286,7 @@ class ManaHubApp : Application() {
                     friendRepository = friendRepository,
                     draftRepository = draftRepository,
                     draftSimRepository = draftSimRepository,
+                    tournamentRepository = tournamentRepository,
                 ),
                 settingsKoinModule(
                     userProfileDataSource = userProfileDataSource,
@@ -289,7 +304,6 @@ class ManaHubApp : Application() {
                     surveyAnswerDao = surveyAnswerDao,
                 ),
                 homeKoinModule(
-                    tournamentRepository = tournamentRepository,
                     getNewsFeedUseCase = getNewsFeedUseCase,
                     refreshNewsFeedUseCase = refreshNewsFeedUseCase,
                     manageSourcesUseCase = manageSourcesUseCase,
@@ -339,6 +353,10 @@ class ManaHubApp : Application() {
                 ),
                 playtestKoinModule(
                     playtestDao = playtestDao,
+                ),
+                tournamentKoinModule(
+                    calculateStandings = calculateStandingsUseCase,
+                    recordMatchResult = recordMatchResultUseCase,
                 ),
             )
         }

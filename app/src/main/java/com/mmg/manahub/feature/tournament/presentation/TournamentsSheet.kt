@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -55,6 +54,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * A bottom sheet that provides the entry points for the tournament flow.
@@ -85,7 +85,7 @@ fun TournamentsSheet(
     onOpenTournament: (Long) -> Unit,
     onNavigateToTournamentList: () -> Unit = {},
     onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
-    viewModel: TournamentListViewModel = hiltViewModel(),
+    viewModel: TournamentListViewModel = koinViewModel(),
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography

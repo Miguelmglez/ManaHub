@@ -51,8 +51,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.ui.components.EmptyState
@@ -71,7 +71,7 @@ fun TournamentListScreen(
     onNavigateBack:     () -> Unit,
     onCreateTournament: () -> Unit,
     onOpenTournament:   (Long) -> Unit,
-    viewModel:          TournamentListViewModel = hiltViewModel(),
+    viewModel:          TournamentListViewModel = koinViewModel(),
 ) {
     val tournaments by viewModel.tournaments.collectAsStateWithLifecycle()
     val mc           = MaterialTheme.magicColors

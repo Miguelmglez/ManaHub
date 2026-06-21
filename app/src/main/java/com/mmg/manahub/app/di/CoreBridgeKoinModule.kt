@@ -13,6 +13,7 @@ import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -49,7 +50,10 @@ import org.koin.dsl.module
  *   the Home island when the Draft island also began consuming it.
  * @param draftSimRepository the Hilt-owned [DraftSimRepository] singleton (Home + Draft). Promoted here
  *   from the Home island when the Draft island also began consuming it.
- * @return a Koin [Module] exposing the cross-island bridged singletons (thirteen in total).
+ * @param tournamentRepository the Hilt-owned [TournamentRepository] singleton (Home + Tournament + the
+ *   still-Hilt `GameViewModel`). Promoted here from the Home island when the Tournament island also began
+ *   consuming it; the Hilt `TournamentModule` binding is KEPT because `GameViewModel` still consumes it.
+ * @return a Koin [Module] exposing the cross-island bridged singletons (fourteen in total).
  */
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
@@ -65,9 +69,10 @@ fun coreBridgeKoinModule(
     friendRepository: FriendRepository,
     draftRepository: DraftRepository,
     draftSimRepository: DraftSimRepository,
+    tournamentRepository: TournamentRepository,
 ): Module = module {
     // Shared across the Settings + Stats + Profile + Home + CommunityDecks + CardDetail + Friends +
-    // Draft islands — each registered exactly once.
+    // Draft + Tournament islands — each registered exactly once.
     single { userPreferencesRepo }
     single { userPrefsDataStore }
     single { authRepository }
@@ -81,4 +86,5 @@ fun coreBridgeKoinModule(
     single { friendRepository }
     single { draftRepository }
     single { draftSimRepository }
+    single { tournamentRepository }
 }

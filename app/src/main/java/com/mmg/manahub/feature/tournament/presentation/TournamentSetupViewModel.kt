@@ -7,7 +7,6 @@ import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.feature.tournament.domain.model.PlayerConfig
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,10 +14,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class TournamentSetupViewModel @Inject constructor(
+/**
+ * KMP migration — Phase 1 Hilt→Koin cutover. Plain (non-Hilt) ViewModel resolved by Koin via
+ * `koinViewModel()`; constructed in `tournamentKoinModule`. Behaviour is unchanged from the Hilt
+ * version — only the DI annotations were removed.
+ */
+class TournamentSetupViewModel(
     private val repository: TournamentRepository,
 ) : ViewModel() {
 
