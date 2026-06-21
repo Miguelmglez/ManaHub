@@ -70,8 +70,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
@@ -147,7 +147,7 @@ fun DeckStudioScreen(
     onCardClick: (String) -> Unit,
     onPlaytest: (deckId: String) -> Unit,
     onReviewSurvey: (sessionId: Long) -> Unit,
-    viewModel: DeckStudioViewModel = hiltViewModel(),
+    viewModel: DeckStudioViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()

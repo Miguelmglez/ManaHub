@@ -113,8 +113,18 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     and entry-scoped VMs (TournamentDetail) via `koinViewModel(viewModelStoreOwner = entry)`.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
     Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash + Survey + News +
-    Draft + Playtest + Tournament + Trades + Collection done (SEVENTEEN islands); the rest NOT started
-    (decks / auth, then game last; online/voice/scanner EXCLUDED).
+    Draft + Playtest + Tournament + Trades + Collection + Decks done (EIGHTEEN islands); the rest NOT
+    started (auth, then game last; online/voice/scanner EXCLUDED).
+- ✅ **Decks (Phase 1, 2026-06-21 — the EIGHTEENTH Koin island; a 4-VM island; the FIRST island whose
+  bridged Hilt objects must STAY Hilt because a still-Hilt feature (Draft) shares the SAME engine
+  singleton).** All four decks VMs (`DeckViewModel`, `DeckStudioViewModel`, `DeckImprovementViewModel`,
+  legacy `DeckMagicDetailViewModel`) resolve via `koinViewModel()`. The Deck Doctor engine (`DeckScorer`
+  + its `@Inject` graph) + the feature-private Hilt `DeckDoctorModule` are KEPT (still-Hilt Draft's
+  `ScoringDraftDeckBuilder` consumes the same `DeckScorer`); the 9 engine/use-case singletons +
+  `@ApplicationScope` are BRIDGED from the Hilt graph via `ManaHubApp` (not rebuilt → one shared
+  `DeckScorer`). NOTHING promoted to coreBridge, NO island shrunk. DeckStudio/DeckImprovement
+  `createdFreshDraft`/`isImporting`/free-text-budget/`AnalysisCache`/`GapSignature` logic untouched.
+  Layering grep (`decks/domain` → no `presentation`) still clean. See CHANGE LOG.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -175,11 +185,12 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    **Trades done (2026-06-21 — the SEVENTH multi-VM island, 5 VMs, MOST repo-entangled; see the
    CHANGE LOG).**
    **Collection done (2026-06-21 — a SINGLE-VM island, least-entangled remaining; see the CHANGE LOG).**
-   After that, candidates in rough order of entanglement: **`decks` (recommended next —
-   DeckList/DeckStudio/DeckImprovement, multi-VM; consumes the bridged Wishlist/DeckRepository)** /
-   `auth` (AuthViewModel is consumed inside several still-Hilt + already-Koin screens as
-   `authViewModel = hiltViewModel()` — migrating it is cross-cutting, do it carefully), then `game`
-   (the heaviest + last non-excluded). Apply
+   **Decks done (2026-06-21 — the EIGHTEENTH island, 4 VMs; KEEPS `DeckDoctorModule` + bridges the
+   engine/use cases because still-Hilt Draft shares the SAME `DeckScorer`; see the CHANGE LOG).**
+   After that, candidates in rough order of entanglement: **`auth` (recommended NEXT — `AuthViewModel`
+   is consumed inside several still-Hilt + already-Koin screens as `authViewModel = hiltViewModel()`,
+   migrating it is cross-cutting, do it carefully)**, then `game` (the heaviest + last non-excluded).
+   Apply
    the EXACT
    same pattern proven by
    Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends/Splash/Survey/News/Draft: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
@@ -237,6 +248,75 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Decks Koin island** (eighteenth feature cutover; a 4-ViewModel island; the
+  FIRST island where the bridged Hilt-built objects MUST stay Hilt-owned because a still-Hilt feature
+  shares the SAME engine singleton). De-Hilt'd ALL FOUR decks VMs (dropped `@HiltViewModel`/`@Inject
+  constructor` + the `dagger`/`javax.inject` imports + the `@ApplicationContext`/`@ApplicationScope`
+  qualifiers → plain ctors, zero behaviour change): `DeckViewModel` (2 deps: `DeckRepository`,
+  `CardRepository` — backs the deck list), `DeckStudioViewModel` (17 deps incl. `SavedStateHandle` — the
+  unified create+edit surface), `DeckImprovementViewModel` (10 deps incl. `SavedStateHandle` — inline
+  Deck Doctor), and the legacy fallback `DeckMagicDetailViewModel` (12 deps incl. `SavedStateHandle` +
+  `@ApplicationScope CoroutineScope`). **CRITICAL behaviour preserved (CLAUDE.md):** the DI cutover
+  changed ONLY annotations/wiring — DeckStudio is still THE single create+edit surface, the
+  `createdFreshDraft`-gated discard-if-empty contract, the `isImporting` exit-guard, the free-text budget
+  parse-guard, and the Deck Doctor incremental `AnalysisCache`/`GapSignature` recompute are all
+  byte-for-byte untouched. **Layering rule held:** `feature/decks/domain/**` imports NO
+  `...presentation...` (acceptance grep EMPTY); the DI changes added no such import (the Koin module lives
+  in `feature/decks/di/`). New `feature/decks/di/DecksKoinModule.kt` (`decksKoinModule(suggestTags,
+  evaluateDeck, inferDeckIdentity, suggestCuts, suggestAddsWithBudget, buildDeckFromSeeds,
+  getDeckGameStats, importDeck, deckMagicEngine, applicationScope)`): a `viewModel { }` per VM.
+  **Nav-arg handling:** `DeckStudioViewModel` (optional `"deckId"`, `"" ⇒ fresh draft`),
+  `DeckImprovementViewModel` (`"deckId"`) and `DeckMagicDetailViewModel` (`"deckId"`) each read their nav
+  arg from a Koin-injected `SavedStateHandle` (`savedStateHandle = get()` — identical to Hilt;
+  `koinViewModel()` populates it from the NavBackStackEntry's `CreationExtras`). DeckStudio is reached
+  from MANY entry points (DeckList FAB/empty-state, Collection/Stats/Home/CardDetail deck-open,
+  Home→Build deck, CommunityDeck import) — all are ROUTE navigations to `Screen.DeckStudio`, so none
+  passes an explicit `viewModel =` arg; the one explicit creation was the AppNavGraph
+  `DeckStudioScreen(viewModel = hiltViewModel())` line → swapped to `koinViewModel()` (the import was
+  already present). **NEW gotcha — Deck Doctor engine MUST stay Hilt-owned + bridged, NOT rebuilt in
+  Koin:** `DeckScorer` (and its `@Inject` graph: `RoleClassifier`, `ManaBaseAnalyzer`, `PowerResolver`
+  from the feature-private Hilt `DeckDoctorModule`) is ALSO consumed by the still-Hilt Draft feature
+  (`ScoringDraftDeckBuilder` in `DraftModule`). Rebuilding the scoring use cases in Koin would mint a
+  SECOND `DeckScorer` that could diverge from the one Draft uses. So — exactly like Tournament's use-case
+  bridge — the Hilt `DeckDoctorModule` is KEPT, the engine + use cases keep their `@Inject`/`@Singleton`,
+  and the 9 Hilt-built singletons (`SuggestTagsUseCase`, `EvaluateDeckUseCase`, `InferDeckIdentityUseCase`,
+  `SuggestCutsUseCase`, `SuggestAddsWithBudgetUseCase`, `BuildDeckFromSeedsUseCase`,
+  `GetDeckGameStatsUseCase`, `ImportDeckUseCase`, `DeckMagicEngine`) + the `@ApplicationScope`
+  `CoroutineScope` are BRIDGED from the Hilt graph through `ManaHubApp` into the Koin module → ONE shared
+  `DeckScorer` serves both DI graphs. **Bridge — NOTHING promoted to coreBridge, NO island shrunk:** the
+  shared repos are reused from coreBridge via `get()` (`DeckRepository`, `CardRepository`,
+  `WishlistRepository`, `UserPreferencesRepository`, `UserPreferencesDataStore`, `AuthRepository`,
+  `AnalyticsHelper`); and 4 deps are reused via `get()` from OTHER loaded feature modules WITHOUT
+  re-registration (`UserCardRepository` already a `single` in `cardDetailKoinModule`; `SyncManager` in
+  `collectionKoinModule`; `SearchCardsUseCase` in `addCardKoinModule`; `WorkManager` in
+  `collectionKoinModule` — a `single<T>` is resolvable from any loaded module, so re-registering any would
+  throw `DefinitionOverrideException`). NO Hilt `@Provides`/`@Binds` deleted (the engine/use cases stay
+  Hilt-constructed for the Draft consumer + the bridge). `ManaHubApp` gained 10 new `@Inject` bridge
+  fields (the 9 use cases/engine + `@ApplicationScope applicationScope`) and registers `decksKoinModule(...)`
+  in `startKoin`. **Call-sites:** all 4 screens (`DeckListScreen`, `DeckStudioScreen`, `DeckBuilderScreen`,
+  `DeckImprovementScreen`) swapped their default param `hiltViewModel()` → `koinViewModel()`
+  (each had exactly one `hiltViewModel` use → import swapped too). `DeckListScreen` is nested in
+  `CollectionScreen` (Decks tab) with the default param; `DeckMagicDetailScreen`/`DeckImprovementScreen`
+  in AppNavGraph use the default param → only the DeckStudio explicit creation needed editing. **Koin-graph
+  audit:** the 10 new `single<T>` types appear in NO other loaded module (grep-verified) → no duplicate
+  `single<T>` across the 18 loaded modules → no `DefinitionOverrideException` (and `startKoin` ran clean
+  during the test-suite app init). **Tests:** all decks VM tests already build the VMs via plain named-arg
+  constructors (params/order unchanged after dropping annotations) → NO test edit needed;
+  `DeckStudioViewModelTest` (113), `DeckImprovementViewModelTest` (3), `DeckViewModelSyncTest` (4),
+  `DeckScorerTest` (73), `DeckScoreModelTest` (26), `RoleClassifierTest` (45), `GoldenDeckHarnessTest`
+  (29), `ManaBaseAnalyzerTest` (14), `ClassificationCorpusTest` (14), and all use-case suites
+  (Evaluate/SuggestCuts/SuggestAddsWithBudget/BuildDeckFromSeeds/CandidatePool/BudgetOptimizer/
+  ImportDeck/InferDeckIdentity) — ALL 0 fail / 0 error. Verified: `:app:assembleDebug` SUCCESSFUL
+  (pre-existing deprecation warnings only, none in the new/edited files); `:app:testDebugUnitTest`
+  1964 tests / 123 failed / 0 errors / 2 skipped. The ONE extra vs the 122 baseline is the documented
+  flaky `HomeViewModelTest` (`UncaughtExceptionsBeforeTest`, the leaked-coroutine-between-tests symptom
+  that oscillates 122↔123 run-to-run) — `HomeViewModel`/its test are UNTOUCHED by this cutover
+  (`git status` shows no Home file modified) and ZERO decks classes are among the 123 failures (all
+  pre-existing online/trades/sync/scanner/voice/push assertion failures, all `errors=0`). Inline
+  secret-scan clean. Koin islands now = {Settings, Stats, Profile, Home, TagDictionary, AddCard,
+  CommunityDecks, CardDetail, Friends, Splash, Survey, News, Draft, Playtest, Tournament, Trades,
+  Collection, Decks} (18); all other features still Hilt (incl. auth/game/voice/online/scanner). NEXT =
+  `feature/auth` (cross-cutting `AuthViewModel`), then `game` last; online/voice/scanner still EXCLUDED.
 - 2026-06-21 — **Phase 1 · Collection Koin island** (seventeenth feature cutover; a SINGLE-VM island —
   the least-entangled remaining feature, and the FIRST island that needed NEITHER a coreBridge promotion
   NOR an island shrink). De-Hilt'd the one collection VM `CollectionViewModel` (dropped `@HiltViewModel`/

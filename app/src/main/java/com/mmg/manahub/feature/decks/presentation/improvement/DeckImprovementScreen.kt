@@ -38,8 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -68,7 +68,7 @@ import com.mmg.manahub.feature.decks.presentation.improvement.components.label
 @Composable
 fun DeckImprovementScreen(
     onBack: () -> Unit,
-    viewModel: DeckImprovementViewModel = hiltViewModel()
+    viewModel: DeckImprovementViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

@@ -7,7 +7,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
@@ -29,7 +28,6 @@ import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +45,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class LandDelta(
     val landName: String,
@@ -100,8 +97,7 @@ data class DeckMagicDetailUiState(
 )
 
 @OptIn(FlowPreview::class)
-@HiltViewModel
-class DeckMagicDetailViewModel @Inject constructor(
+class DeckMagicDetailViewModel(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
@@ -111,7 +107,7 @@ class DeckMagicDetailViewModel @Inject constructor(
     private val userPrefsStore: UserPreferencesDataStore,
     private val syncManager: SyncManager,
     private val workManager: WorkManager,
-    @ApplicationScope private val applicationScope: CoroutineScope,
+    private val applicationScope: CoroutineScope,
     savedStateHandle: SavedStateHandle,
     private val getDeckGameStatsUseCase: GetDeckGameStatsUseCase,
 ) : ViewModel() {

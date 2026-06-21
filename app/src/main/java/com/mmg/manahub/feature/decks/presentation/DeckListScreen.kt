@@ -41,8 +41,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -56,7 +56,7 @@ fun DeckListScreen(
     onCreateDeck:      () -> Unit,
     onPlaytestClick:   (deckId: String) -> Unit = {},
     onBrowseCommunityDecks: () -> Unit = {},
-    viewModel:         DeckViewModel = hiltViewModel(),
+    viewModel:         DeckViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

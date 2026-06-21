@@ -29,7 +29,6 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.queryFragment
 import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementViewModel.Companion.MAX_SEED_CARDS
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +39,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * One-shot UI events emitted by [DeckImprovementViewModel]. A buffered [Channel] is used (not a
@@ -62,8 +60,7 @@ sealed interface DeckImprovementEvent {
     data object ExternalPoolFailed : DeckImprovementEvent
 }
 
-@HiltViewModel
-class DeckImprovementViewModel @Inject constructor(
+class DeckImprovementViewModel(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,

@@ -28,10 +28,13 @@ import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
@@ -63,6 +66,14 @@ import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
+import com.mmg.manahub.feature.decks.di.decksKoinModule
+import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
+import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.draft.di.draftKoinModule
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
@@ -287,6 +298,27 @@ class ManaHubApp : Application() {
     @Inject lateinit var syncManager: SyncManager
     @Inject lateinit var migrateLocalTradeListsUseCase: MigrateLocalTradeListsUseCase
 
+    // Decks island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
+    //  - DeckRepository, CardRepository, WishlistRepository, UserPreferencesRepository,
+    //    UserPreferencesDataStore, AuthRepository and AnalyticsHelper are bridged in coreBridgeKoinModule.
+    //  - UserCardRepository is already a single in cardDetailKoinModule, SyncManager in collectionKoinModule,
+    //    SearchCardsUseCase in addCardKoinModule, and WorkManager in collectionKoinModule — all resolved via
+    //    get(), never re-registered.
+    // Only the Decks-only Hilt-built singletons are bridged here. The Deck Doctor engine (DeckScorer +
+    // its @Inject graph) and the feature-private Hilt DeckDoctorModule are KEPT (still-Hilt Draft consumes
+    // the SAME DeckScorer singleton via ScoringDraftDeckBuilder) — these use cases wrap it, so they are
+    // bridged from the Hilt graph rather than rebuilt in Koin to keep ONE shared DeckScorer instance.
+    @Inject lateinit var suggestTagsUseCase: SuggestTagsUseCase
+    @Inject lateinit var evaluateDeckUseCase: EvaluateDeckUseCase
+    @Inject lateinit var inferDeckIdentityUseCase: InferDeckIdentityUseCase
+    @Inject lateinit var suggestCutsUseCase: SuggestCutsUseCase
+    @Inject lateinit var suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase
+    @Inject lateinit var buildDeckFromSeedsUseCase: BuildDeckFromSeedsUseCase
+    @Inject lateinit var getDeckGameStatsUseCase: GetDeckGameStatsUseCase
+    @Inject lateinit var importDeckUseCase: ImportDeckUseCase
+    @Inject lateinit var deckMagicEngine: DeckMagicEngine
+    @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -398,6 +430,18 @@ class ManaHubApp : Application() {
                     syncManager = syncManager,
                     workManager = workManager,
                     migrateLocalTradeLists = migrateLocalTradeListsUseCase,
+                ),
+                decksKoinModule(
+                    suggestTags = suggestTagsUseCase,
+                    evaluateDeck = evaluateDeckUseCase,
+                    inferDeckIdentity = inferDeckIdentityUseCase,
+                    suggestCuts = suggestCutsUseCase,
+                    suggestAddsWithBudget = suggestAddsWithBudgetUseCase,
+                    buildDeckFromSeeds = buildDeckFromSeedsUseCase,
+                    getDeckGameStats = getDeckGameStatsUseCase,
+                    importDeck = importDeckUseCase,
+                    deckMagicEngine = deckMagicEngine,
+                    applicationScope = applicationScope,
                 ),
             )
         }
