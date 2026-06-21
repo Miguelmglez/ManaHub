@@ -23,9 +23,13 @@ import org.koin.dsl.module
  * is the bridge: it `@Inject`s the already-constructed Hilt instances and passes them into
  * [statsKoinModule], which re-exposes the Stats-only ones to Koin as `single { }`.
  *
- * [UserPreferencesRepository] (shared with Settings) and [GameSessionRepository] (shared with Profile)
- * are NOT registered here — they are bridged once in `coreBridgeKoinModule` (registering the same type
- * in two loaded modules would throw `DefinitionOverrideException`). This module resolves them via `get()`.
+ * Several dependencies are SHARED with other islands, so they are NOT registered here — they are bridged
+ * once in `coreBridgeKoinModule` (registering the same type in two loaded modules would throw
+ * `DefinitionOverrideException`), and this module resolves them via `get()`:
+ * - [UserPreferencesRepository] — shared with Settings.
+ * - [GameSessionRepository] — shared with Profile + Home.
+ * - [DeckRepository] — shared with Home.
+ * - [ScryfallRemoteDataSource] — shared with Home.
  *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
@@ -36,20 +40,17 @@ import org.koin.dsl.module
 fun statsKoinModule(
     getCollectionStats: GetCollectionStatsUseCase,
     getCollectionSetCodes: GetCollectionSetCodesUseCase,
-    scryfallDataSource: ScryfallRemoteDataSource,
     refreshPricesUseCase: RefreshCollectionPricesUseCase,
     gameSessionDao: GameSessionDao,
-    deckRepository: DeckRepository,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Stats-only Hilt-owned singletons to Koin. ──
-    // (UserPreferencesRepository [shared with Settings] and GameSessionRepository [shared with Profile]
-    //  are bridged in coreBridgeKoinModule, not here, and resolved below via get().)
+    // (UserPreferencesRepository [Settings], GameSessionRepository [Profile + Home], DeckRepository [Home]
+    //  and ScryfallRemoteDataSource [Home] are bridged in coreBridgeKoinModule, not here, and resolved
+    //  below via get().)
     single { getCollectionStats }
     single { getCollectionSetCodes }
-    single { scryfallDataSource }
     single { refreshPricesUseCase }
     single { gameSessionDao }
-    single { deckRepository }
 
     // ── The Koin island: StatsViewModel is now resolved by Koin, not Hilt. ──
     viewModel {

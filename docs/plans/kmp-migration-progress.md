@@ -68,14 +68,18 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - `:app:testDebugUnitTest` → **1964 tests, 122 failed, 2 skipped** (== baseline, ZERO new failures).
   - commonMain Android/AndroidX/browser-import grep → EMPTY (PASS).
   - **Koin islands so far: Settings (Spike D), Stats (Phase 1, 2026-06-20), Profile (Phase 1,
-    2026-06-21).** Every OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`). The shared
-    `app/di/CoreBridgeKoinModule.kt` now holds FOUR cross-island singletons:
-    `UserPreferencesRepository` (Settings+Stats), `UserPreferencesDataStore` (Settings+Profile),
-    `AuthRepository` (Settings+Profile), `GameSessionRepository` (Stats+Profile) — so no feature module
-    double-registers a shared type (`DefinitionOverrideException` guard). Settings + Stats modules were
-    shrunk: they no longer take/register their now-shared deps; they resolve them via `get()` from the bridge.
-  - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile
-    done; the rest NOT started.
+    2026-06-21), Home (Phase 1, 2026-06-21).** Every OTHER feature is still on Hilt (`@HiltViewModel` +
+    `hiltViewModel()`). The shared `app/di/CoreBridgeKoinModule.kt` now holds EIGHT cross-island
+    singletons: `UserPreferencesRepository` (Settings+Stats), `UserPreferencesDataStore`
+    (Settings+Profile+Home), `AuthRepository` (Settings+Profile+Home), `GameSessionRepository`
+    (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository` (Stats+Home),
+    `ScryfallRemoteDataSource` (Stats+Home), `GamificationRepository` (Profile+Home) — so no feature
+    module double-registers a shared type (`DefinitionOverrideException` guard). Adding Home promoted 4
+    deps into the bridge and SHRUNK the older islands that had declared them: Stats dropped
+    `DeckRepository`+`ScryfallRemoteDataSource`; Profile dropped `StatsRepository`+`GamificationRepository`
+    (both resolve via `get()` now). Home's 17 deps = 7 bridge `get()`s + 10 Home-only `single`s.
+  - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
+    Home done; the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -95,11 +99,13 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    `SuggestedTag`, `WishlistEntry` — move only when a shared consumer actually needs them; do NOT move
    eagerly). The `-keep class com.mmg.manahub.core.model.**` ProGuard wildcard already covers new moves.
 2. **Per-feature Hilt→Koin cutover** (the main remaining Phase-1 work, ~300 files). DONE: **Settings**
-   (Spike D), **Stats** (2026-06-20), **Profile** (2026-06-21). **Next island = `feature/home`** (the
-   `HomeViewModel`, a heavier `combine(8)`-flow VM with many repos) — IF it proves too entangled (too many
-   one-off Hilt singletons or platform deps to bridge cleanly in one ≤15-file batch), fall back to a
-   lighter leaf first: `friends`, `tagdictionary`, or `addcard`. Apply the EXACT same pattern proven by
-   Settings/Stats/Profile: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
+   (Spike D), **Stats** (2026-06-20), **Profile** (2026-06-21), **Home** (2026-06-21 — the heaviest
+   island so far, 17 ctor deps; the `HomeViewModel` `combine(8)`-flow VM migrated cleanly, NO fallback
+   needed). **Next island = `feature/tagdictionary`** (the least-entangled remaining leaf: a single
+   `TagDictionaryViewModel` over the tagging repo, no platform deps, no shared singletons expected — a
+   safe one-batch cutover). After that, candidates in rough order of entanglement: `addcard`, `friends`,
+   `carddetail`, then `decks` / `collection`. Apply the EXACT same pattern proven by
+   Settings/Stats/Profile/Home: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
    deps in `ManaHubApp`, reuse `coreBridgeKoinModule` for ANY already-shared singleton (never double-register
    → `DefinitionOverrideException`; if a dep becomes shared with another island, MOVE it into the bridge and
@@ -154,6 +160,32 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Home Koin island** (fourth feature cutover; the heaviest so far). De-Hilt'd
+  `HomeViewModel` (dropped `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject` imports →
+  plain `class HomeViewModel(...)`, 17 ctor deps), new `feature/home/di/HomeKoinModule.kt`
+  (`homeKoinModule(...)` + `viewModel { HomeViewModel(...) }`: 10 Home-only `single`s + 7 bridge `get()`s),
+  `HomeScreen` default param `hiltViewModel()` → `koinViewModel()`. **Call-site gotcha (new vs.
+  Settings/Stats/Profile):** the `Screen.Home` composable in `AppNavGraph` passed `viewModel =
+  hiltViewModel()` EXPLICITLY (not the default param) — so the nav-graph DID need an edit: removed the
+  explicit arg so the screen uses its new `koinViewModel()` default. (Always grep the call-site; the
+  "default-param contained-island shortcut" does NOT hold for Home.) **Bridge: promoted 4 deps + SHRUNK
+  the older islands that declared them** — `StatsRepository` (was in Profile) + `DeckRepository`,
+  `ScryfallRemoteDataSource` (were in Stats) + `GamificationRepository` (was in Profile) all moved INTO
+  `coreBridgeKoinModule` (now 8 singletons), and `statsKoinModule`/`profileKoinModule` were shrunk to drop
+  them (their `viewModel { }` already used `get()` → no VM edit; their `ManaHubApp` call-sites dropped the
+  removed args). Bridge deps REUSED via `get()` (already present): `UserPreferencesDataStore`,
+  `AuthRepository`, `GameSessionRepository`. Bridge deps NEWLY added (promoted): `StatsRepository`,
+  `DeckRepository`, `ScryfallRemoteDataSource`, `GamificationRepository`. `ManaHubApp` gained 10 Home-only
+  `@Inject` bridge fields + registers `homeKoinModule(...)`; the `coreBridge` call gained 4 args and the
+  stats/profile calls dropped the promoted args. **`HomeViewModelTest` already built the VM via the plain
+  17-arg constructor (`buildViewModel()`, mocks ALL deps incl. `avatarUrlFlow`) → no test edit needed; it
+  PASSES (67 tests / 0 fail / 0 skip).** NO Hilt `@Provides/@Binds` deleted (all deps still shared with
+  Hilt features). Koin-graph audit: all `single<T>` across the 5 loaded modules are unique types → no
+  `DefinitionOverrideException`; Home's 17 deps all resolve (7 bridge + 10 home). Verified:
+  `:app:assembleDebug` SUCCESSFUL; `:app:testDebugUnitTest` 1964 tests / 122 failed / 2 skipped (==
+  baseline, ZERO new failures); inline secret-scan clean. Koin islands now = {Settings, Stats, Profile,
+  Home}; all other features still Hilt. NEXT = `feature/tagdictionary` (least-entangled leaf), still
+  EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · Profile Koin island** (third feature cutover; resumed an interrupted mid-task
   WIP). `ProfileViewModel` de-Hilt'd (dropped `@HiltViewModel`/`@Inject constructor` → plain class), new
   `feature/profile/di/ProfileKoinModule.kt` (`profileKoinModule(...)` + `viewModel { ProfileViewModel(...) }`,

@@ -48,7 +48,6 @@ import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,7 +65,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Drives the customizable Home widget board.
@@ -85,8 +83,7 @@ import javax.inject.Inject
  * screen instead.
  */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class HomeViewModel @Inject constructor(
+class HomeViewModel(
     private val userPrefsDataStore: UserPreferencesDataStore,
     private val statsRepository: StatsRepository,
     private val deckRepository: DeckRepository,
