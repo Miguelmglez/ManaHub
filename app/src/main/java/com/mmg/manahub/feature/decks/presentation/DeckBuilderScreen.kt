@@ -87,7 +87,7 @@ import org.koin.androidx.compose.koinViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry

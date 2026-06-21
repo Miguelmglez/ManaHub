@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
-import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.DeckWithCards
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

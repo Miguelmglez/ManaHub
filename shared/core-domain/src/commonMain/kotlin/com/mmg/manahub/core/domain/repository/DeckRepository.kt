@@ -1,8 +1,8 @@
 package com.mmg.manahub.core.domain.repository
 
-import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckSummary
-import com.mmg.manahub.core.domain.model.DeckWithCards
+import com.mmg.manahub.core.model.DeckWithCards
 import kotlinx.coroutines.flow.Flow
 
 /**

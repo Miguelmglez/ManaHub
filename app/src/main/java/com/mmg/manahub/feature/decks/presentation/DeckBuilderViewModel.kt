@@ -11,7 +11,7 @@ import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry

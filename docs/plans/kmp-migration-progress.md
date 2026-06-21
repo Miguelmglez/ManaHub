@@ -182,60 +182,63 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - `:shared:core-domain:compileKotlinWasmJs` → **SUCCESSFUL** (the 5 moved interfaces are web-compatible).
   - `:app:testDebugUnitTest` → **1964 tests, 122 failed, 0 errors, 2 skipped** (== baseline, ZERO new failures).
   - commonMain Android/AndroidX/browser/Room-import grep → EMPTY (PASS).
-- 🛑 **Phase 2 · Slice 2 — BLOCKED (investigated 2026-06-22, NO code moved; docs-only).** Goal was to
-  extract `Card`/`CardFace`/`CardTag`/`SuggestedTag` + `Deck`/`DeckWithCards` into `:shared:core-model`,
-  then move `CardRepository` + `DeckRepository` into `:shared:core-domain`. Investigation found **NONE of
-  the required models is pure today** → neither interface can move, and the only cleanly-pure type
-  (`CardFace`) unblocks nothing in isolation, so NOTHING was moved (correct per the STOP-and-report rule).
-  Exact blockers:
+- ✅ **Phase 2 · Slice 2a-i — Deck model made KMP-pure + moved + `DeckRepository` moved (DONE & GREEN,
+  2026-06-22).** The cheaper of the two Slice-2 blockers is cleared.
+  - **`Deck.kt` SPLIT:** `DeckSlotEntry` (refs `Card`) + `AddCardRow` (refs `WishlistEntry`/
+    `OpenForTradeEntry`) extracted into a NEW `:app`-only file
+    `app/.../core/domain/model/AddCardRow.kt` (package `com.mmg.manahub.core.domain.model` UNCHANGED →
+    their explicit `core.domain.model.{DeckSlotEntry,AddCardRow}` consumer imports DID NOT change). They
+    stay in `:app` because `Card`/`WishlistEntry`/`OpenForTradeEntry` are still Android-coupled.
+  - **Clock swap:** `Deck`'s two `System.currentTimeMillis()` default args → `kotlin.time.Clock.System
+    .now().toEpochMilliseconds()` (`@OptIn(ExperimentalTime::class)` at the model). NO new dependency
+    (Kotlin 2.3.20 stdlib). Identical epoch-millis semantics; no test asserts a pre-swap constant. The
+    swap compiles on wasmJs (proof `kotlin.time.Clock` is KMP-safe).
+  - **MOVED to `:shared:core-model` `commonMain` (package `com.mmg.manahub.core.model`):** `Deck`,
+    `DeckSlot`, `DeckWithCards`, `BASIC_LAND_NAMES` (one file). Consumer imports rewritten
+    `core.domain.model.{Deck,DeckSlot,DeckWithCards,BASIC_LAND_NAMES}` → `core.model.{...}` across `:app`
+    main + test (sed on `import` lines) + ONE inline FQN in `StatsViewModel.kt:139`
+    (`args[9] as List<…core.domain.model.Deck>` → `core.model.Deck` — sed only caught import lines, so
+    inline FQNs must be grepped separately; this is a recurring gotcha for the `combine`-array cast VMs).
+  - **MOVED to `:shared:core-domain` `commonMain`:** `DeckRepository` (package
+    `com.mmg.manahub.core.domain.repository` UNCHANGED → zero consumer-import edits for the interface
+    itself; only its internal `Deck`/`DeckWithCards` imports were repointed to `core.model`). All three of
+    its referenced types (`Deck`, `DeckWithCards`, `DeckSummary`) are now in core-model. `DeckRepositoryImpl`
+    STAYS in `:app` and keeps implementing the moved interface.
+  - ProGuard wildcard `-keep class com.mmg.manahub.core.model.** { *; }` already covers the new Deck types
+    (no new keep rule). DB stays v41 (no schema/entity touched — `DeckEntityMapper` only swapped imports).
+  - Verified: `:app:assembleDebug` **BUILD SUCCESSFUL**; `:shared:core-model:compileKotlinWasmJs` +
+    `:shared:core-domain:compileKotlinWasmJs` **SUCCESSFUL**; `:app:testDebugUnitTest` **1964 / 122 failed /
+    2 skipped** (== baseline, ZERO new failures) — Deck suites all green (DeckStudioViewModelTest 113/0,
+    DeckScorerTest 73/0, DeckRepositoryImplTest 26/0, DeckImprovementViewModelTest 3/0,
+    BasicLandCalculatorTest 4/0). commonMain forbidden-import grep (`android|androidx|kotlinx.browser|
+    org.w3c|java.|System.currentTimeMillis`) EMPTY for both modules (the only `System.currentTimeMillis`
+    hit is a KDoc comment, not code).
+- 🛑 **Phase 2 · Slice 2b — Card model STILL BLOCKED (the HARDER blocker; NOT touched this run).**
+  `Card`/`CardTag`/`SuggestedTag`/`CardFace` + `CardRepository` cannot move yet:
   - **`CardTag` (`core/domain/model/CardTag.kt`)** — its `label` getter calls
     `com.mmg.manahub.core.tagging.TagDictionary.localize(this)` and the file `import`s `TagDictionary`.
     `TagDictionary` (`core/tagging/TagDictionary.kt`) imports `java.util.Locale` AND `core.util.CardTypeTranslator`,
     and `CardTypeTranslator` itself calls `java.util.Locale.getDefault()` (two sites). `java.util.Locale`
     is JVM-only (absent on wasmJs) → **`CardTag` is deeply JVM-coupled via the tag-localization engine.**
-    Moving it needs an `expect`/`actual` locale/current-language provider + porting (or decoupling) the
-    tagging engine — out of a "small/verifiable" slice; NOT forced.
   - **`SuggestedTag`, `Card`** — BLOCKED transitively (both reference `CardTag`; `Card` also references it
     via `tags`/`userTags`/`suggestedTags`).
-  - **`Deck`, `DeckWithCards` (`core/domain/model/Deck.kt`)** — `Deck` uses `System.currentTimeMillis()`
-    in two default args (`createdAt`/`updatedAt`); `java.lang.System` is JVM-only (absent on wasmJs) and
-    the project has NO `kotlinx-datetime`. `Deck.kt` ALSO co-locates `DeckSlotEntry` (references the blocked
-    `Card`) and `AddCardRow` (references the un-moved `WishlistEntry`/`OpenForTradeEntry`) — so the file
-    must be SPLIT before any part moves. `DeckWithCards`/`DeckSlot` are themselves pure but cannot move
-    while bundled with `Deck` in the same blocked file.
-  - **`CardFace`** — the ONLY cleanly-pure target type. NOT moved this slice: moving it alone unblocks
-    neither interface and would split it from `Card` (cross-module nullable-prop smart-cast churn per the
-    documented gotcha) for zero benefit — it should move TOGETHER with `Card` once `CardTag` is unblocked.
-  - Verified: working tree clean (docs-only change); no `:app`/`:shared` source touched, so the GREEN
-    Slice-1 baseline (`:app:assembleDebug` SUCCESSFUL, 1964/122/2) is unchanged by definition.
+  - **`CardFace`** — the ONLY cleanly-pure target type, but moving it alone unblocks neither interface; it
+    should move TOGETHER with `Card` once `CardTag` is unblocked.
 - ⬜ **Phase 2 (remaining)** — `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
 
 ## NEXT STEP (resume here)
-🛑 **Phase 2 Slice 2 was investigated 2026-06-22 and is BLOCKED — nothing moved (docs-only).** The
-models that gate `CardRepository`/`DeckRepository` are NOT pure today (`CardTag`→`TagDictionary`→
-`java.util.Locale`; `Deck`→`System.currentTimeMillis()` + bundled with blocked types). Full detail in the
-🛑 STATUS bullet above. So Slice 2 must FIRST do the model-purity prework below, THEN the moves.
+✅ **Phase 2 Slice 2a-i (Deck) DONE & GREEN (2026-06-22)** — `Deck`/`DeckSlot`/`DeckWithCards`/
+`BASIC_LAND_NAMES` are now in `:shared:core-model` and `DeckRepository` is in `:shared:core-domain`
+(full detail in the ✅ STATUS bullet above). `DeckSlotEntry`/`AddCardRow` stayed in `:app`.
 
-➡️ **NEXT = Phase 2, Slice 2a — make the gating models KMP-pure, then move them + the 2 interfaces.**
-Keep batches small (≤ ~15 files). Recommended order (each its own commit, Android-green at every step):
+➡️ **NEXT = Phase 2, Slice 2b — make `Card` KMP-pure, then move `Card`/`CardTag`/`SuggestedTag`/
+`CardFace` + `CardRepository`.** This is the HARDER blocker. Keep batches small (≤ ~15 files); each step
+its own commit, Android-green at every step. Order:
 
-**2a-i. Unblock `Deck`/`DeckWithCards` (the CHEAPER blocker — do this first):**
-   - Split `core/domain/model/Deck.kt`: keep `Deck`, `DeckSlot`, `DeckWithCards`, `BASIC_LAND_NAMES` as the
-     movable group; MOVE OUT `DeckSlotEntry` (refs `Card`) and `AddCardRow` (refs `WishlistEntry`/
-     `OpenForTradeEntry`) into a separate `:app`-only file (e.g. `AddCardRow.kt`) so they stay in `:app`.
-   - Replace `Deck`'s `System.currentTimeMillis()` default args with a KMP-safe source. Kotlin is 2.3.20,
-     so `kotlin.time.Clock.System.now().toEpochMilliseconds()` is available (preferred — no new dep). If
-     `Clock` is gated behind `@ExperimentalTime` on this version, EITHER opt-in at the model OR drop the
-     defaults and have callers/repo impls stamp the time (the repo impls already bump `updatedAt`). Verify
-     no behavior change (the timestamps are persisted; keep millis semantics).
-   - Then `git mv` `Deck`/`DeckSlot`/`DeckWithCards`/`BASIC_LAND_NAMES` → `:shared:core-model`
-     `com.mmg.manahub.core.model` and re-package (these are in `core.domain.model` today, so this DOES change
-     consumer imports `core.domain.model.Deck` → `core.model.Deck` — grep + update `:app`). Then `git mv`
-     `DeckRepository` → `:shared:core-domain` (its only other ref `DeckSummary` is already in core-model).
-**2a-ii. Unblock `Card`/`CardTag`/`SuggestedTag`/`CardFace` (the HARDER blocker):**
+**2b. Unblock `Card`/`CardTag`/`SuggestedTag`/`CardFace` (the HARDER blocker):**
    - The real blocker is `CardTag.label` → `TagDictionary.localize()` → `java.util.Locale`. Options:
      (a) **Decouple `CardTag` from `TagDictionary`** — drop the `label` getter from the pure model (move
      label resolution to a `:app`/UI extension `fun CardTag.label()` that calls `TagDictionary`), leaving
@@ -390,6 +393,28 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 · Slice 2a-i — Deck model KMP-pure + moved + `DeckRepository` moved (GREEN).**
+  Cleared the cheaper of the two Slice-2 blockers. (1) SPLIT `core/domain/model/Deck.kt`: extracted
+  `DeckSlotEntry` + `AddCardRow` into a NEW `:app`-only `core/domain/model/AddCardRow.kt` (same package →
+  their consumer imports unchanged; they stay in `:app` because they ref the still-coupled
+  `Card`/`WishlistEntry`/`OpenForTradeEntry`). (2) Swapped `Deck`'s two `System.currentTimeMillis()`
+  default args → `kotlin.time.Clock.System.now().toEpochMilliseconds()` (`@OptIn(ExperimentalTime::class)`,
+  NO new dep, identical epoch-millis; compiles on wasmJs). (3) `git mv` `Deck`/`DeckSlot`/`DeckWithCards`/
+  `BASIC_LAND_NAMES` → `:shared:core-model` `commonMain` package `com.mmg.manahub.core.model`; rewrote
+  consumer imports `core.domain.model.{Deck,DeckSlot,DeckWithCards,BASIC_LAND_NAMES}` → `core.model.{…}`
+  across `:app` main+test, PLUS one inline FQN cast in `StatsViewModel.kt:139` (sed only fixes `import`
+  lines — inline FQNs in `combine`-array casts must be grepped separately). (4) `git mv` `DeckRepository`
+  → `:shared:core-domain` `commonMain` (package `core.domain.repository` unchanged → zero interface-import
+  edits; repointed only its internal `Deck`/`DeckWithCards` imports to `core.model`; all 3 refs —
+  `Deck`/`DeckWithCards`/`DeckSummary` — now in core-model). `DeckRepositoryImpl` stays in `:app`.
+  ProGuard wildcard already covers the new types; DB stays v41 (no entity/schema touched). Verified:
+  `:app:assembleDebug` SUCCESSFUL; both shared modules `compileKotlinWasmJs` SUCCESSFUL;
+  `:app:testDebugUnitTest` 1964/122/2 == baseline (Deck suites all green: DeckStudio 113, DeckScorer 73,
+  DeckRepositoryImpl 26, DeckImprovement 3, BasicLandCalculator 4 — 0 failures); commonMain
+  forbidden-import grep EMPTY (the lone `System.currentTimeMillis` hit is a KDoc comment). Inline
+  secret-scan clean (model/interface moves + 1 doc file). NEXT = Slice 2b (Card purity: decouple
+  `CardTag.label` from `TagDictionary`/Locale, then move Card/CardTag/SuggestedTag/CardFace +
+  CardRepository).
 - 2026-06-22 — **Phase 2 · Slice 2 — INVESTIGATED & BLOCKED (docs-only, no code moved).** Goal: extract
   `Card`/`CardFace`/`CardTag`/`SuggestedTag` + `Deck`/`DeckWithCards` into `:shared:core-model`, then move
   `CardRepository`+`DeckRepository` into `:shared:core-domain`. Read each model + interface and traced
