@@ -87,6 +87,7 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchViewModel
 import com.mmg.manahub.core.ui.theme.magicColors
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.decks.presentation.DeckListScreen
@@ -109,7 +110,7 @@ fun CollectionScreen(
     onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     initialTab:               CollectionTab = CollectionTab.CARDS,
-    viewModel:                CollectionViewModel = hiltViewModel(),
+    viewModel:                CollectionViewModel = koinViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
