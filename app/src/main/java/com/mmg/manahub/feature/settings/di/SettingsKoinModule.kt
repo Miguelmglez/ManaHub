@@ -32,26 +32,26 @@ import org.koin.dsl.module
  * provider, and the corresponding Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to
  * nothing without ever leaving the app uncompilable between commits.
  *
- * [UserPreferencesRepository] is shared with the Stats island, so it is NOT registered here — it is
- * bridged once in `coreBridgeKoinModule` (registering it in both feature modules would throw
- * `DefinitionOverrideException`). This module resolves it via `get()`.
+ * Three dependencies are shared with other islands, so they are NOT registered here — they are bridged
+ * once in `coreBridgeKoinModule` (registering the same type in two loaded modules would throw
+ * `DefinitionOverrideException`) and resolved below via `get()`:
+ * - [UserPreferencesRepository] — shared with Stats.
+ * - [UserPreferencesDataStore] — shared with Profile.
+ * - [AuthRepository] — shared with Profile.
  *
  * @return a Koin [Module] that provides the bridged singletons and the [SettingsViewModel] factory.
  */
 fun settingsKoinModule(
-    userPrefsDataStore: UserPreferencesDataStore,
     analyticsHelper: AnalyticsHelper,
-    authRepository: AuthRepository,
     userProfileDataSource: UserProfileDataSource,
     pushTokenRepository: PushTokenRepository,
     notificationPrefsRepository: NotificationPrefsRepository,
     voiceModelRepository: VoiceModelRepository,
 ): Module = module {
-    // ── Hilt → Koin bridge: re-expose the Hilt-owned singletons to Koin (see KDoc above). ──
-    // (UserPreferencesRepository is shared with Stats → bridged in coreBridgeKoinModule, not here.)
-    single { userPrefsDataStore }
+    // ── Hilt → Koin bridge: re-expose the Settings-only Hilt-owned singletons to Koin (see KDoc). ──
+    // (UserPreferencesRepository [Stats], UserPreferencesDataStore [Profile] and AuthRepository [Profile]
+    //  are shared → bridged in coreBridgeKoinModule, not here, and resolved below via get().)
     single { analyticsHelper }
-    single { authRepository }
     single { userProfileDataSource }
     single { pushTokenRepository }
     single { notificationPrefsRepository }

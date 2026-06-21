@@ -1,12 +1,15 @@
 package com.mmg.manahub.app.di
 
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
  * KMP migration — Phase 1 Hilt→Koin cutover. Shared "Koin bridge" for Hilt-owned singletons that are
- * consumed by MORE THAN ONE Koin island (currently Settings and Stats).
+ * consumed by MORE THAN ONE Koin island (currently Settings, Stats and Profile).
  *
  * ## Why a shared module
  * Each Koin island re-exposes its Hilt-owned dependencies as `single { instance }` (the Spike-D bridge
@@ -19,12 +22,21 @@ import org.koin.dsl.module
  * real Koin provider and the matching Hilt `@Provides`/`@Binds` is deleted — without ever leaving the
  * app uncompilable between commits.
  *
- * @param userPreferencesRepo the Hilt-owned [UserPreferencesRepository] singleton (used by Settings + Stats).
+ * @param userPreferencesRepo the Hilt-owned [UserPreferencesRepository] singleton (Settings + Stats).
+ * @param userPrefsDataStore the Hilt-owned [UserPreferencesDataStore] singleton (Settings + Profile).
+ * @param authRepository the Hilt-owned [AuthRepository] singleton (Settings + Profile).
+ * @param gameSessionRepository the Hilt-owned [GameSessionRepository] singleton (Stats + Profile).
  * @return a Koin [Module] exposing the cross-island bridged singletons.
  */
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
+    userPrefsDataStore: UserPreferencesDataStore,
+    authRepository: AuthRepository,
+    gameSessionRepository: GameSessionRepository,
 ): Module = module {
-    // Shared across the Settings + Stats Koin islands — registered here exactly once.
+    // Shared across the Settings + Stats + Profile Koin islands — registered here exactly once.
     single { userPreferencesRepo }
+    single { userPrefsDataStore }
+    single { authRepository }
+    single { gameSessionRepository }
 }

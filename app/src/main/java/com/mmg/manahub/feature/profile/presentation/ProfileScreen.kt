@@ -96,6 +96,7 @@ import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.gamification.presentation.AvatarFrameRing
 import com.mmg.manahub.feature.gamification.presentation.BadgeEmblem
 import com.mmg.manahub.feature.gamification.presentation.TitleText
+import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 /** Tabs shown under the Profile hero (Phase 2 adds Quests; Phase 3 adds Rewards). */
@@ -104,7 +105,7 @@ enum class ProfileTab { OVERVIEW, ACHIEVEMENTS, QUESTS, REWARDS }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    viewModel: ProfileViewModel = hiltViewModel(),
+    viewModel: ProfileViewModel = koinViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     onSettingsClick: () -> Unit,
     onStatsClick: () -> Unit,
