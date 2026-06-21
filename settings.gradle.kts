@@ -31,3 +31,6 @@ include(":shared:core-model")
 // KMP migration — Phase 1: shared cross-cutting contracts (DispatcherProvider, KeyValueStore,
 // CrashReporter, pagination model) with android + wasmJs actuals.
 include(":shared:core-common")
+// KMP migration — Phase 2 / Slice 1: shared domain contracts (repository interfaces; later pure
+// use cases). commonMain only — pure Kotlin + core-model.
+include(":shared:core-domain")
