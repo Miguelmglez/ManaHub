@@ -59,6 +59,7 @@ import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.feature.profile.di.profileKoinModule
 import com.mmg.manahub.feature.settings.di.settingsKoinModule
 import com.mmg.manahub.feature.stats.di.statsKoinModule
+import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import dagger.hilt.android.HiltAndroidApp
@@ -191,6 +192,9 @@ class ManaHubApp : Application() {
                     draftRepository = draftRepository,
                     wishlistRepository = wishlistRepository,
                     getAccountNudgeUseCase = getAccountNudgeUseCase,
+                ),
+                tagDictionaryKoinModule(
+                    tagDictionaryRepository = tagDictionaryRepo,
                 ),
             )
         }
