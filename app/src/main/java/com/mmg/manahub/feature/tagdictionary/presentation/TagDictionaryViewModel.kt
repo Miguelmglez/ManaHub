@@ -7,7 +7,6 @@ import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.tagging.TagDictionary
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.tagging.TagOverride
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +14,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class TagDictionaryRow(
     val key:      String,
@@ -33,8 +31,13 @@ data class TagDictionaryUiState(
     val query:            String  = "",
 )
 
-@HiltViewModel
-class TagDictionaryViewModel @Inject constructor(
+/**
+ * ViewModel for the Tag Dictionary editor screen.
+ *
+ * KMP migration — Phase 1 Hilt→Koin cutover: this ViewModel is now a plain class resolved by Koin
+ * (`koinViewModel()`) via [com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule], not Hilt.
+ */
+class TagDictionaryViewModel(
     private val dictionaryRepo: TagDictionaryRepository,
     private val prefs:          UserPreferencesDataStore,
 ) : ViewModel() {
