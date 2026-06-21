@@ -113,8 +113,8 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     and entry-scoped VMs (TournamentDetail) via `koinViewModel(viewModelStoreOwner = entry)`.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
     Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash + Survey + News +
-    Draft + Playtest + Tournament + Trades + Collection + Decks done (EIGHTEEN islands); the rest NOT
-    started (auth, then game last; online/voice/scanner EXCLUDED).
+    Draft + Playtest + Tournament + Trades + Collection + Decks + Auth done (NINETEEN islands); the rest
+    NOT started — **`game` is the LAST non-excluded island**; online/voice/scanner EXCLUDED.
 - ✅ **Decks (Phase 1, 2026-06-21 — the EIGHTEENTH Koin island; a 4-VM island; the FIRST island whose
   bridged Hilt objects must STAY Hilt because a still-Hilt feature (Draft) shares the SAME engine
   singleton).** All four decks VMs (`DeckViewModel`, `DeckStudioViewModel`, `DeckImprovementViewModel`,
@@ -125,6 +125,21 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   `DeckScorer`). NOTHING promoted to coreBridge, NO island shrunk. DeckStudio/DeckImprovement
   `createdFreshDraft`/`isImporting`/free-text-budget/`AnalysisCache`/`GapSignature` logic untouched.
   Layering grep (`decks/domain` → no `presentation`) still clean. See CHANGE LOG.
+- ✅ **Auth (Phase 1, 2026-06-21 — the NINETEENTH Koin island; the CROSS-CUTTING island — `AuthViewModel`
+  is consumed inside several screens, both already-Koin and still-Hilt).** `AuthViewModel` (the ONLY VM
+  under `feature/auth/**` — `ProfileEditViewModel` lives in `feature/profile/**`, OUT of scope, left Hilt)
+  resolves via `koinViewModel()` at ALL THREE of its call-sites (`ProfileScreen`, `TradesScreen`,
+  `CreateTradeProposalScreen`). **No shared/Activity-scoped instance existed** — every call-site used the
+  default `hiltViewModel()` (entry-scoped per NavBackStackEntry), so each swap to `koinViewModel()` is an
+  exact 1:1 behavioural equivalent; NO `viewModelStoreOwner` needed. **MainActivity deeplink/PKCE wiring
+  is untouched** — it calls `supabaseClient.handleDeeplinks(intent)` directly, never references
+  `AuthViewModel`. **Self-contained `authKoinModule()` (NO args):** the 10 stateless auth use cases are
+  Koin `single { }`s over the bridged `AuthRepository` (coreBridge) + `PushTokenRepository` (already a
+  `single` in `settingsKoinModule`); `AnalyticsHelper` via coreBridge `get()`; Context via
+  `androidContext()`. NOTHING promoted to coreBridge, NO island shrunk, NO new `ManaHubApp` bridge field.
+  **Hilt `AuthModule` KEPT** (provides `@Named("supabase")` OkHttpClient/Retrofit + `UserProfileDataSource`
+  + `@Binds AuthRepository`, all still consumed broadly by Hilt features); the use cases keep their Hilt
+  `@Inject`/`@Singleton` (Koin builds its own equivalent stateless copies — the Trades pattern). See CHANGE LOG.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -187,9 +202,11 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    **Collection done (2026-06-21 — a SINGLE-VM island, least-entangled remaining; see the CHANGE LOG).**
    **Decks done (2026-06-21 — the EIGHTEENTH island, 4 VMs; KEEPS `DeckDoctorModule` + bridges the
    engine/use cases because still-Hilt Draft shares the SAME `DeckScorer`; see the CHANGE LOG).**
-   After that, candidates in rough order of entanglement: **`auth` (recommended NEXT — `AuthViewModel`
-   is consumed inside several still-Hilt + already-Koin screens as `authViewModel = hiltViewModel()`,
-   migrating it is cross-cutting, do it carefully)**, then `game` (the heaviest + last non-excluded).
+   **Auth done (2026-06-21 — the NINETEENTH island; the CROSS-CUTTING island; see the CHANGE LOG).**
+   The ONLY remaining non-excluded island is **`game` (NEXT — the heaviest + last; still-Hilt today, and
+   it is also the consumer that forced Tournament/Decks to KEEP their Hilt modules + bridge use cases, so
+   migrating it lets those bridges be reconsidered)**. `feature/online`, `core/voice` + in-game voice, and
+   `feature/scanner` remain EXPLICITLY EXCLUDED/DEFERRED (untouched, still Hilt + Android Compose).
    Apply
    the EXACT
    same pattern proven by
@@ -248,6 +265,48 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Auth Koin island** (nineteenth feature cutover; the CROSS-CUTTING island —
+  `AuthViewModel` is consumed inside MANY screens, both already-Koin and still-Hilt, so the call-site
+  sweep was the risk). De-Hilt'd `AuthViewModel` (the ONLY VM under `feature/auth/**`; dropped
+  `@HiltViewModel`/`@Inject constructor` + the `@ApplicationContext` qualifier + the
+  `dagger.hilt`/`javax.inject` imports → plain ctor, constructor param list BYTE-FOR-BYTE unchanged so the
+  existing test's named-arg construction still compiles; zero behaviour change to any auth method). **Scope
+  confirmed by grep:** `ProfileEditViewModel` lives in `feature/profile/**` (NOT auth) and was left Hilt
+  (out of scope). New `feature/auth/di/AuthKoinModule.kt` — `authKoinModule()` takes **NO args** (fully
+  self-contained): the 10 stateless auth use cases are Koin `single { }`s (9 wrap `AuthRepository` via
+  `get()`; `DeleteAccountUseCase(get(), get())` also wraps `PushTokenRepository`, already a `single` in
+  `settingsKoinModule`), `AnalyticsHelper` + `AuthRepository` resolved from coreBridge via `get()`, the
+  app Context via `androidContext()`. **NEW gotcha — cross-cutting shared VM with NO actual sharing:** the
+  prompt flagged a possible Activity-/nav-graph-scoped shared `AuthViewModel`, but investigation showed
+  every call-site used the DEFAULT `hiltViewModel()` (entry-scoped per NavBackStackEntry) — there was NO
+  shared instance to preserve, so each swap to `koinViewModel()` is an exact 1:1 equivalent and NO
+  `koinViewModel(viewModelStoreOwner = …)` was needed. **Call-sites (all 3, swept exhaustively via
+  `grep AuthViewModel` over the whole repo):** `ProfileScreen.kt` (line 108), `TradesScreen.kt` (line 70),
+  `CreateTradeProposalScreen.kt` (line 106) — each `authViewModel: AuthViewModel = hiltViewModel()` →
+  `= koinViewModel()`; in all three `hiltViewModel()` was used ONLY for the auth VM, so the now-unused
+  `androidx.hilt.navigation.compose.hiltViewModel` import was dropped (the Trades/Profile own VMs are
+  already `koinViewModel()`). `LoginSheet.kt` takes `authViewModel` as a plain required param (the 3
+  screens pass their instance to it) — UNCHANGED. **MainActivity NOT touched:** its deeplink/PKCE wiring
+  calls `supabaseClient.handleDeeplinks(intent)` directly and never references `AuthViewModel` — the
+  ADR-003 email-confirmation deeplink flow is intact. `gamesetup` has NO `AuthViewModel` usage. **Hilt
+  `AuthModule` KEPT entirely** (its `@Named("supabase")` OkHttpClient/Retrofit + `UserProfileDataSource` +
+  `@Binds AuthRepository` are consumed broadly by Hilt features); NO `@Provides`/`@Binds` deleted; the 10
+  use cases keep their `@Inject`/`@Singleton` (Hilt still constructs its own copies; Koin builds equivalent
+  stateless copies — the Trades pattern). **Bridge:** NOTHING promoted to coreBridge, NO island shrunk, NO
+  new `ManaHubApp` `@Inject` field — only the import + `authKoinModule(),` line added to `startKoin`.
+  **Koin-graph audit:** grep over all `**/di/*.kt` for the 10 use-case types → 0 matches elsewhere → no
+  duplicate `single<T>` across the 19 loaded modules → no `DefinitionOverrideException` (startKoin ran
+  clean during the test-suite app init). **Tests:** `AuthViewModelTest` (the suite that exercises the
+  de-Hilt'd VM) builds the VM via the plain named-arg ctor with mocks + a mocked `appContext` → NO test
+  edit needed, 62/62 green; `AuthUseCasesTest` 35/35 green; `AuthRepositoryImplTest` had its 1 PRE-EXISTING
+  flaky `sessionState`-collection Turbine-timing failure (a pure repo test, no DI, untouched). Verified:
+  `:app:assembleDebug` BUILD SUCCESSFUL (pre-existing deprecation warnings only); `:app:testDebugUnitTest`
+  1964 tests / 122 failed / 2 skipped — EXACTLY the baseline (not even the +1 flaky `HomeViewModelTest`
+  this run), ZERO new failures, no auth class regressed. Inline secret-scan clean (auth touches
+  credentials — confirmed no secret/token literal added; nonce generation untouched). Koin islands now =
+  {Settings, Stats, Profile, Home, TagDictionary, AddCard, CommunityDecks, CardDetail, Friends, Splash,
+  Survey, News, Draft, Playtest, Tournament, Trades, Collection, Decks, Auth} (19); `game` is the ONLY
+  remaining non-excluded island; online/voice/scanner still EXCLUDED. NEXT = `feature/game` (last).
 - 2026-06-21 — **Phase 1 · Decks Koin island** (eighteenth feature cutover; a 4-ViewModel island; the
   FIRST island where the bridged Hilt-built objects MUST stay Hilt-owned because a still-Hilt feature
   shares the SAME engine singleton). De-Hilt'd ALL FOUR decks VMs (dropped `@HiltViewModel`/`@Inject

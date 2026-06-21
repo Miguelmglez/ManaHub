@@ -26,8 +26,6 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,10 +34,8 @@ import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.regex.Pattern
-import javax.inject.Inject
 
-@HiltViewModel
-class AuthViewModel @Inject constructor(
+class AuthViewModel(
     private val signInWithEmailUseCase: SignInWithEmailUseCase,
     private val signUpWithEmailUseCase: SignUpWithEmailUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
@@ -51,7 +47,7 @@ class AuthViewModel @Inject constructor(
     private val deleteAccountUseCase: DeleteAccountUseCase,
     private val updateNicknameUseCase: UpdateNicknameUseCase,
     private val analyticsHelper: AnalyticsHelper,
-    @ApplicationContext private val appContext: Context,
+    private val appContext: Context,
 ) : ViewModel() {
 
     /** Global session state — observed from MainActivity for navigation routing. */

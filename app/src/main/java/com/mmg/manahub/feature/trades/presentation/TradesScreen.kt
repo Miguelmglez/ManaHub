@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
@@ -68,7 +67,7 @@ fun TradesScreen(
     onNavigateToProposal: (receiverId: String) -> Unit = {},
     onNavigateToThread: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
     viewModel: TradesViewModel = koinViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
