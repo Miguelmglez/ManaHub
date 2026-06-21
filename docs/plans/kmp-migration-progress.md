@@ -68,7 +68,8 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - `:app:testDebugUnitTest` → **1964 tests, 122 failed, 2 skipped** (== baseline, ZERO new failures).
   - commonMain Android/AndroidX/browser-import grep → EMPTY (PASS).
   - **Koin islands so far: Settings (Spike D), Stats (Phase 1, 2026-06-20), Profile (Phase 1,
-    2026-06-21), Home (Phase 1, 2026-06-21), TagDictionary (Phase 1, 2026-06-21).** Every OTHER feature
+    2026-06-21), Home (Phase 1, 2026-06-21), TagDictionary (Phase 1, 2026-06-21), AddCard (Phase 1,
+    2026-06-21).** Every OTHER feature
     is still on Hilt (`@HiltViewModel` + `hiltViewModel()`). The shared `app/di/CoreBridgeKoinModule.kt`
     now holds EIGHT cross-island
     singletons: `UserPreferencesRepository` (Settings+Stats), `UserPreferencesDataStore`
@@ -80,7 +81,7 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     `DeckRepository`+`ScryfallRemoteDataSource`; Profile dropped `StatsRepository`+`GamificationRepository`
     (both resolve via `get()` now). Home's 17 deps = 7 bridge `get()`s + 10 Home-only `single`s.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
-    Home + TagDictionary done; the rest NOT started.
+    Home + TagDictionary + AddCard done; the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -105,12 +106,15 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    needed), **TagDictionary** (2026-06-21 — a tiny 2-dep leaf; `TagDictionaryRepository` bridged in its
    own module, `UserPreferencesDataStore` reused from `coreBridgeKoinModule` via `get()`; the
    `tagDictionaryRepo` `@Inject` field already existed in `ManaHubApp`, so NOTHING was newly bridged into
-   `coreBridge` and no other island shrank). **Next island = `feature/addcard`** (the least-entangled
-   remaining leaf: a single `AddCardViewModel`, ~6 ctor deps — likely all Hilt-owned with at most
-   `UserPreferencesDataStore` / a repo already in the bridge to reuse via `get()`). After that, candidates
-   in rough order of entanglement: `communitydecks` (~6 deps), `carddetail` (~15 deps), `friends` (~24
+   `coreBridge` and no other island shrank), **AddCard** (2026-06-21 — another tiny leaf; `AddCardViewModel`
+   has just 3 ctor deps: `SearchCardsUseCase` + `BuildScryfallQueryUseCase` bridged in its own
+   `addCardKoinModule`, `UserPreferencesRepository` reused from `coreBridgeKoinModule` via `get()`; NO
+   nav-arg/SavedStateHandle despite the prompt's caution — it's a plain search VM; call-site used the
+   default `viewModel` param so NO `AppNavGraph` edit; nothing promoted to the bridge, no island shrank).
+   **Next island = `feature/communitydecks`** (~6 deps). After that, candidates
+   in rough order of entanglement: `carddetail` (~15 deps), `friends` (~24
    deps), then `decks` / `collection`. Apply the EXACT same pattern proven by
-   Settings/Stats/Profile/Home/TagDictionary: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
+   Settings/Stats/Profile/Home/TagDictionary/AddCard: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
    deps in `ManaHubApp`, reuse `coreBridgeKoinModule` for ANY already-shared singleton (never double-register
    → `DefinitionOverrideException`; if a dep becomes shared with another island, MOVE it into the bridge and
@@ -165,6 +169,33 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · AddCard Koin island** (sixth feature cutover; a tiny 3-dep leaf). De-Hilt'd
+  `AddCardViewModel` (dropped `@HiltViewModel`/`@Inject constructor` + the
+  `dagger.hilt.android.lifecycle.HiltViewModel` and `javax.inject.Inject` imports → plain
+  `class AddCardViewModel(searchCards, userPreferences, buildScryfallQuery)`, 3 ctor deps), new
+  `feature/addcard/di/AddCardKoinModule.kt` (`addCardKoinModule(searchCards, buildScryfallQuery)` +
+  `viewModel { AddCardViewModel(searchCards = get(), userPreferences = get(), buildScryfallQuery = get()) }`),
+  `AddCardScreen` default param `hiltViewModel()` → `koinViewModel()`. **No nav-arg / SavedStateHandle
+  despite the task's caution** — `AddCardViewModel` is a plain debounced-search VM that takes NO
+  cardId/scryfallId (the search query is set via `onQueryChange`, not a nav arg), so no `parametersOf`
+  wiring was needed. **Call-site:** the `Screen.CollectionAddCard` composable in `AppNavGraph` calls
+  `AddCardScreen(onNavigateBack=…, onNavigateToScanner=…, onNavigateToCardDetail=…)` with NO explicit
+  `viewModel =` arg (uses the default param) → NO nav edit needed (like Settings/Stats/Profile/TagDictionary,
+  unlike Home). **Bridge — nothing newly promoted, nothing shrunk:** the 2 AddCard-only deps
+  (`SearchCardsUseCase`, `BuildScryfallQueryUseCase`, both `@Inject constructor`-provided, referenced in no
+  other island module) are bridged in `addCardKoinModule` itself via `single { }`; the 3rd dep
+  `UserPreferencesRepository` is already in `coreBridgeKoinModule` (shared with Settings + Stats) → REUSED
+  via `get()`, never re-registered. `ManaHubApp` gained 2 new `@Inject` bridge fields
+  (`searchCardsUseCase`, `buildScryfallQueryUseCase`) + registers `addCardKoinModule(...)` in `startKoin`.
+  NO Hilt `@Provides`/`@Binds` deleted (both use cases are still `@Inject constructor`-provided and may be
+  consumed by Hilt features). **Koin-graph audit:** the new module's two `single<T>` types
+  (`SearchCardsUseCase`, `BuildScryfallQueryUseCase`) appear in no other loaded module → no
+  `DefinitionOverrideException`; the VM's `userPreferences = get()` resolves the bridge's
+  `UserPreferencesRepository`. No `AddCardViewModelTest` exists → no test edit needed. Verified:
+  `:app:assembleDebug` SUCCESSFUL (deprecation warnings only); `:app:testDebugUnitTest` 1964 tests /
+  122 failed / 2 skipped (== baseline, ZERO new failures); inline secret-scan clean. Koin islands now =
+  {Settings, Stats, Profile, Home, TagDictionary, AddCard}; all other features still Hilt. NEXT =
+  `feature/communitydecks` (~6 deps), still EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · TagDictionary Koin island** (fifth feature cutover; the smallest leaf yet).
   De-Hilt'd `TagDictionaryViewModel` (dropped `@HiltViewModel`/`@Inject constructor` + the
   `dagger.hilt.android.lifecycle.HiltViewModel` and `javax.inject.Inject` imports → plain

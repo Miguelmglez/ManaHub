@@ -21,7 +21,9 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
+import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
@@ -46,6 +48,7 @@ import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
+import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
@@ -138,6 +141,11 @@ class ManaHubApp : Application() {
     @Inject lateinit var wishlistRepository: WishlistRepository
     @Inject lateinit var getAccountNudgeUseCase: GetAccountNudgeUseCase
 
+    // AddCard island (Phase 1) bridge deps. UserPreferencesRepository is bridged in
+    // coreBridgeKoinModule (shared with Settings + Stats); only the AddCard-only use cases are here.
+    @Inject lateinit var searchCardsUseCase: SearchCardsUseCase
+    @Inject lateinit var buildScryfallQueryUseCase: BuildScryfallQueryUseCase
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -195,6 +203,10 @@ class ManaHubApp : Application() {
                 ),
                 tagDictionaryKoinModule(
                     tagDictionaryRepository = tagDictionaryRepo,
+                ),
+                addCardKoinModule(
+                    searchCards = searchCardsUseCase,
+                    buildScryfallQuery = buildScryfallQueryUseCase,
                 ),
             )
         }

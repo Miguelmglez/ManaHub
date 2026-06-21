@@ -7,7 +7,6 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,11 +18,9 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class AddCardViewModel @Inject constructor(
+class AddCardViewModel(
     private val searchCards:        SearchCardsUseCase,
     private val userPreferences:    UserPreferencesRepository,
     private val buildScryfallQuery: BuildScryfallQueryUseCase,

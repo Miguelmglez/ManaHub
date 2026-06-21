@@ -68,7 +68,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
@@ -96,7 +96,7 @@ fun AddCardScreen(
     onNavigateBack: () -> Unit,
     onNavigateToScanner: () -> Unit,
     onNavigateToCardDetail: (String) -> Unit,
-    viewModel: AddCardViewModel = hiltViewModel(),
+    viewModel: AddCardViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
