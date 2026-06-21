@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.communitydecks.domain.usecase
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSearchResult
 import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRepository
-import javax.inject.Inject
 
 /**
  * Searches community decks on Archidekt.
@@ -12,7 +11,7 @@ import javax.inject.Inject
  * presentation layer decoupled from the repository contract. Every parameter is
  * optional; omitted (null) parameters are dropped from the request.
  */
-class SearchCommunityDecksUseCase @Inject constructor(
+class SearchCommunityDecksUseCase(
     private val repository: CommunityDecksRepository,
 ) {
     suspend operator fun invoke(

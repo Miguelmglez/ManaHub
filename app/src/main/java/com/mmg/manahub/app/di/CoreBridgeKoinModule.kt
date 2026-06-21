@@ -3,6 +3,7 @@ package com.mmg.manahub.app.di
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -13,7 +14,7 @@ import org.koin.dsl.module
 
 /**
  * KMP migration — Phase 1 Hilt→Koin cutover. Shared "Koin bridge" for Hilt-owned singletons that are
- * consumed by MORE THAN ONE Koin island (currently Settings, Stats, Profile and Home).
+ * consumed by MORE THAN ONE Koin island (currently Settings, Stats, Profile, Home and CommunityDecks).
  *
  * ## Why a shared module
  * Each Koin island re-exposes its Hilt-owned dependencies as `single { instance }` (the Spike-D bridge
@@ -34,6 +35,7 @@ import org.koin.dsl.module
  * @param deckRepository the Hilt-owned [DeckRepository] singleton (Stats + Home).
  * @param scryfallRemoteDataSource the Hilt-owned [ScryfallRemoteDataSource] singleton (Stats + Home).
  * @param gamificationRepository the Hilt-owned [GamificationRepository] singleton (Profile + Home).
+ * @param cardRepository the Hilt-owned [CardRepository] singleton (Home + CommunityDecks).
  * @return a Koin [Module] exposing the cross-island bridged singletons.
  */
 fun coreBridgeKoinModule(
@@ -45,8 +47,9 @@ fun coreBridgeKoinModule(
     deckRepository: DeckRepository,
     scryfallRemoteDataSource: ScryfallRemoteDataSource,
     gamificationRepository: GamificationRepository,
+    cardRepository: CardRepository,
 ): Module = module {
-    // Shared across the Settings + Stats + Profile + Home Koin islands — registered here exactly once.
+    // Shared across the Settings + Stats + Profile + Home + CommunityDecks islands — registered once.
     single { userPreferencesRepo }
     single { userPrefsDataStore }
     single { authRepository }
@@ -55,4 +58,5 @@ fun coreBridgeKoinModule(
     single { deckRepository }
     single { scryfallRemoteDataSource }
     single { gamificationRepository }
+    single { cardRepository }
 }

@@ -7,7 +7,6 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -19,7 +18,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * ViewModel for the Community Decks search / browse screen.
@@ -33,8 +31,7 @@ import javax.inject.Inject
  *
  * One-shot navigation / error effects are delivered through a buffered [Channel].
  */
-@HiltViewModel
-class CommunityDecksSearchViewModel @Inject constructor(
+class CommunityDecksSearchViewModel(
     savedStateHandle: SavedStateHandle,
     private val searchCommunityDecks: SearchCommunityDecksUseCase,
     private val userPreferences: UserPreferencesDataStore,

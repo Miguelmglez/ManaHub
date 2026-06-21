@@ -69,19 +69,22 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - commonMain Android/AndroidX/browser-import grep → EMPTY (PASS).
   - **Koin islands so far: Settings (Spike D), Stats (Phase 1, 2026-06-20), Profile (Phase 1,
     2026-06-21), Home (Phase 1, 2026-06-21), TagDictionary (Phase 1, 2026-06-21), AddCard (Phase 1,
-    2026-06-21).** Every OTHER feature
-    is still on Hilt (`@HiltViewModel` + `hiltViewModel()`). The shared `app/di/CoreBridgeKoinModule.kt`
-    now holds EIGHT cross-island
+    2026-06-21), CommunityDecks (Phase 1, 2026-06-21 — the FIRST multi-ViewModel island).** Every OTHER
+    feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`). The shared
+    `app/di/CoreBridgeKoinModule.kt` now holds NINE cross-island
     singletons: `UserPreferencesRepository` (Settings+Stats), `UserPreferencesDataStore`
     (Settings+Profile+Home), `AuthRepository` (Settings+Profile+Home), `GameSessionRepository`
-    (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository` (Stats+Home),
-    `ScryfallRemoteDataSource` (Stats+Home), `GamificationRepository` (Profile+Home) — so no feature
-    module double-registers a shared type (`DefinitionOverrideException` guard). Adding Home promoted 4
-    deps into the bridge and SHRUNK the older islands that had declared them: Stats dropped
-    `DeckRepository`+`ScryfallRemoteDataSource`; Profile dropped `StatsRepository`+`GamificationRepository`
-    (both resolve via `get()` now). Home's 17 deps = 7 bridge `get()`s + 10 Home-only `single`s.
+    (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository` (Stats+Home+CommunityDecks),
+    `ScryfallRemoteDataSource` (Stats+Home), `GamificationRepository` (Profile+Home), `CardRepository`
+    (Home+CommunityDecks) — so no feature module double-registers a shared type
+    (`DefinitionOverrideException` guard). Adding CommunityDecks promoted `CardRepository` into the bridge
+    and SHRUNK Home (it now resolves `CardRepository` via `get()`). CommunityDecks is also the first island
+    to **convert+delete its Hilt module**: the feature-private `CommunityDecksModule` (Archidekt
+    Retrofit/`ArchidektApi` + the `CommunityDecksRepository` `@Binds`) was ported verbatim into the Koin
+    module and deleted, since none of its types is consumed by any Hilt feature. Both VMs resolve a
+    Koin-injected `SavedStateHandle` carrying their nav args (`cardName` / `archidektId`).
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
-    Home + TagDictionary + AddCard done; the rest NOT started.
+    Home + TagDictionary + AddCard + CommunityDecks done; the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -110,10 +113,18 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    has just 3 ctor deps: `SearchCardsUseCase` + `BuildScryfallQueryUseCase` bridged in its own
    `addCardKoinModule`, `UserPreferencesRepository` reused from `coreBridgeKoinModule` via `get()`; NO
    nav-arg/SavedStateHandle despite the prompt's caution — it's a plain search VM; call-site used the
-   default `viewModel` param so NO `AppNavGraph` edit; nothing promoted to the bridge, no island shrank).
-   **Next island = `feature/communitydecks`** (~6 deps). After that, candidates
-   in rough order of entanglement: `carddetail` (~15 deps), `friends` (~24
-   deps), then `decks` / `collection`. Apply the EXACT same pattern proven by
+   default `viewModel` param so NO `AppNavGraph` edit; nothing promoted to the bridge, no island shrank),
+   **CommunityDecks** (2026-06-21 — the FIRST multi-VM island: BOTH `CommunityDecksSearchViewModel` and
+   `CommunityDeckDetailViewModel` migrated in one `communityDecksKoinModule`; each `viewModel { }` resolves
+   a Koin-injected `SavedStateHandle` carrying its nav arg — `cardName` for search, `archidektId` for
+   detail — so nav behaviour is identical to Hilt; the feature-private Hilt `CommunityDecksModule` was
+   converted to Koin `single { }` and DELETED; `CardRepository` was promoted into `coreBridgeKoinModule`
+   and Home shrunk; the Room-owned `CommunityDeckCacheDao` was bridged via `ManaHubApp`; both screen
+   call-sites used the default `viewModel` param so NO `AppNavGraph` edit; both VM tests already used the
+   plain constructors so NO test edit; 123 communitydecks tests green).
+   **Next island = `feature/carddetail`** (~15 deps). After that, candidates
+   in rough order of entanglement: `friends` (~24 deps), then `decks` / `collection`. Apply the EXACT
+   same pattern proven by
    Settings/Stats/Profile/Home/TagDictionary/AddCard: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
    deps in `ManaHubApp`, reuse `coreBridgeKoinModule` for ANY already-shared singleton (never double-register
@@ -169,6 +180,52 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · CommunityDecks Koin island** (seventh feature cutover; the FIRST island with
+  MULTIPLE ViewModels, and the FIRST to convert+delete a feature-private Hilt module). De-Hilt'd BOTH
+  `CommunityDecksSearchViewModel` (3 deps: `SavedStateHandle`, `SearchCommunityDecksUseCase`,
+  `UserPreferencesDataStore`) and `CommunityDeckDetailViewModel` (4 deps: `SavedStateHandle`,
+  `GetCommunityDeckUseCase`, `ImportCommunityDeckUseCase`, `UserPreferencesDataStore`) — dropped
+  `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject` imports → plain ctors. New
+  `feature/communitydecks/di/CommunityDecksKoinModule.kt` with a `viewModel { }` for EACH VM; each factory
+  resolves a **Koin-injected `SavedStateHandle`** via `get()`, which carries the route nav args
+  (`cardName` for the search/by-card screens, `archidektId` for detail) exactly as Hilt's
+  `SavedStateHandle` did — `koinViewModel()` reads them from the NavBackStackEntry's `CreationExtras`, so
+  the nav-arg behaviour is byte-for-byte unchanged. Both screens (`CommunityDecksScreen`,
+  `CommunityDeckDetailScreen`) swapped their default param `hiltViewModel()` → `koinViewModel()`.
+  **Call-sites:** all 3 `AppNavGraph` composables (`Screen.CommunityDecks`, `Screen.CommunityDecksByCard`,
+  `Screen.CommunityDeckDetail`) call the screens with NO explicit `viewModel =` arg (default param) → NO
+  nav edit needed (like Settings/Stats/Profile/AddCard, unlike Home). **Hilt module converted + DELETED:**
+  the feature-private `CommunityDecksModule` (Archidekt `@Named("archidekt")` Retrofit + `ArchidektApi`
+  `@Provides` + `CommunityDecksRepository` `@Binds`) is consumed by ZERO Hilt features (verified by grep),
+  so its `@Provides` were ported verbatim into the Koin module as `single { }` (the Archidekt OkHttpClient
+  is still built FROM SCRATCH — keeps its dedicated `http_cache_archidekt` disk cache, User-Agent, and 5 MB
+  response guard; `Context` via `androidContext()`) and the Hilt module was deleted. Also de-Hilt'd the
+  feature data/domain classes whose `@Inject constructor` would have failed Hilt validation once the
+  `@Binds` was gone (`CommunityDecksRepositoryImpl` — also dropped the `@IoDispatcher` qualifier, now takes
+  `Dispatchers.IO` directly = the same singleton the binding returned; `ArchidektRequestQueue` — dropped
+  `@Singleton`; all 3 use cases). **Bridge — `CardRepository` PROMOTED + Home SHRUNK:** `CardRepository`
+  (needed by `ImportCommunityDeckUseCase`) was previously a Home-only bridged `single`; since it is now
+  shared with this island it was MOVED into `coreBridgeKoinModule` (now NINE singletons) and `homeKoinModule`
+  was shrunk to drop the `cardRepository` param + `single` (its `viewModel { }` already used `get()` → no VM
+  edit; the `ManaHubApp` home call dropped the arg). Bridge deps REUSED via `get()`:
+  `UserPreferencesDataStore` (Settings+Profile+Home), `DeckRepository` (Stats+Home), `CardRepository`
+  (now bridged). Bridge dep NEWLY bridged in `communityDecksKoinModule` itself (this island only): the
+  Room/`DatabaseModule`-owned `CommunityDeckCacheDao`. `ManaHubApp` gained 1 new `@Inject` field
+  (`communityDeckCacheDao`), added `cardRepository` to the `coreBridgeKoinModule(...)` call, dropped
+  `cardRepository` from the `homeKoinModule(...)` call, and registered `communityDecksKoinModule(...)`.
+  NO Hilt `@Provides`/`@Binds` deleted OUTSIDE the feature (`CommunityDeckCacheDao` is still
+  `DatabaseModule`-provided; `CardRepository`/`DeckRepository`/`UserPreferencesDataStore` still shared with
+  Hilt features). **Koin-graph audit:** all `single<T>` across the 7 loaded modules are unique types — the
+  new feature-private types (`ArchidektApi`, `ArchidektRequestQueue`, `CommunityDecksRepository`, 3 use
+  cases, `CommunityDeckCacheDao`) appear in no other module, and `CardRepository` now lives ONLY in the
+  bridge → no `DefinitionOverrideException`. **Tests:** both VM tests (`CommunityDecksSearchViewModelTest`,
+  `CommunityDeckDetailViewModelTest`) + repo/usecase/format tests already built everything via the plain
+  constructors with a hand-built `SavedStateHandle` → NO test edit needed; all 123 communitydecks tests
+  pass (24+33+22+20+24, 0 fail/0 skip). Verified: `:app:assembleDebug` SUCCESSFUL (deprecation warnings
+  only); `:app:testDebugUnitTest` 1964 tests / 122 failed / 2 skipped (== baseline, ZERO new failures);
+  inline secret-scan clean. Koin islands now = {Settings, Stats, Profile, Home, TagDictionary, AddCard,
+  CommunityDecks}; all other features still Hilt. NEXT = `feature/carddetail` (~15 deps), still EXCLUDING
+  online/voice/scanner.
 - 2026-06-21 — **Phase 1 · AddCard Koin island** (sixth feature cutover; a tiny 3-dep leaf). De-Hilt'd
   `AddCardViewModel` (dropped `@HiltViewModel`/`@Inject constructor` + the
   `dagger.hilt.android.lifecycle.HiltViewModel` and `javax.inject.Inject` imports → plain

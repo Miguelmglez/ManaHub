@@ -39,7 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.EmptyState
@@ -72,7 +72,7 @@ fun CommunityDeckDetailScreen(
     onBack: () -> Unit,
     onNavigateToDeck: (String) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: CommunityDeckDetailViewModel = hiltViewModel(),
+    viewModel: CommunityDeckDetailViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isEnabled by viewModel.isFeatureEnabled.collectAsStateWithLifecycle()

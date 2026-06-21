@@ -5,8 +5,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.util.concurrent.atomic.AtomicLong
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -31,8 +29,7 @@ import kotlin.random.Random
  * After exhausting all retries the last [HttpException] is re-thrown so callers can
  * handle it via their existing `Result`/`DataResult` wrappers.
  */
-@Singleton
-class ArchidektRequestQueue @Inject constructor() {
+class ArchidektRequestQueue {
 
     private val lastRequestTime = AtomicLong(0L)
     private val mutex = Mutex()
