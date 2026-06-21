@@ -9,7 +9,6 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.feature.communitydecks.domain.usecase.GetCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.ImportCommunityDeckUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +19,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * ViewModel for the Community Deck detail screen.
@@ -29,8 +27,7 @@ import javax.inject.Inject
  * resilient import into a new local ManaHub deck. One-shot navigation / toast
  * effects are delivered through a buffered [Channel].
  */
-@HiltViewModel
-class CommunityDeckDetailViewModel @Inject constructor(
+class CommunityDeckDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val getCommunityDeck: GetCommunityDeckUseCase,
     private val importCommunityDeck: ImportCommunityDeckUseCase,

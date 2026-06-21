@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.communitydecks.data
 
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.repository.CachePolicy
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.util.recordSafeNonFatal
@@ -17,7 +16,6 @@ import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRe
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
-import javax.inject.Inject
 
 /**
  * Cache-first implementation of [CommunityDecksRepository].
@@ -30,11 +28,11 @@ import javax.inject.Inject
  *
  * All work runs on the injected [IoDispatcher].
  */
-class CommunityDecksRepositoryImpl @Inject constructor(
+class CommunityDecksRepositoryImpl(
     private val api: ArchidektApi,
     private val requestQueue: ArchidektRequestQueue,
     private val cacheDao: CommunityDeckCacheDao,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : CommunityDecksRepository {
 
     override suspend fun getDeckById(archidektId: Int): DataResult<CommunityDeck> =

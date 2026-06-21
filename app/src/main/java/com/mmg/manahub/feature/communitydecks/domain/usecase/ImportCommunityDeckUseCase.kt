@@ -8,7 +8,6 @@ import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
 import kotlinx.coroutines.flow.first
-import javax.inject.Inject
 
 /**
  * Imports a fetched [CommunityDeck] (Archidekt) into a new local ManaHub deck.
@@ -22,7 +21,7 @@ import javax.inject.Inject
  * On completion the new deck is stamped with community-source attribution
  * (URL / author / service / timestamp) via [DeckRepository.updateDeckAttribution].
  */
-class ImportCommunityDeckUseCase @Inject constructor(
+class ImportCommunityDeckUseCase(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
 ) {

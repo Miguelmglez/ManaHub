@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.home.di
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
@@ -43,6 +42,7 @@ import org.koin.dsl.module
  * - [DeckRepository] — shared with Stats (promoted to the bridge for Home).
  * - [ScryfallRemoteDataSource] — shared with Stats (promoted to the bridge for Home).
  * - [GamificationRepository] — shared with Profile (promoted to the bridge for Home).
+ * - `CardRepository` — shared with CommunityDecks (promoted to the bridge for that island).
  *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
@@ -53,7 +53,6 @@ import org.koin.dsl.module
 fun homeKoinModule(
     draftSimRepository: DraftSimRepository,
     tournamentRepository: TournamentRepository,
-    cardRepository: CardRepository,
     getNewsFeedUseCase: GetNewsFeedUseCase,
     refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
     manageSourcesUseCase: ManageSourcesUseCase,
@@ -64,11 +63,10 @@ fun homeKoinModule(
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Home-only Hilt-owned singletons to Koin. ──
     // (UserPreferencesDataStore, AuthRepository, GameSessionRepository, StatsRepository, DeckRepository,
-    //  ScryfallRemoteDataSource and GamificationRepository are shared → bridged in coreBridgeKoinModule,
-    //  not here, and resolved below via get().)
+    //  ScryfallRemoteDataSource, GamificationRepository and CardRepository are shared → bridged in
+    //  coreBridgeKoinModule, not here, and resolved below via get().)
     single { draftSimRepository }
     single { tournamentRepository }
-    single { cardRepository }
     single { getNewsFeedUseCase }
     single { refreshNewsFeedUseCase }
     single { manageSourcesUseCase }

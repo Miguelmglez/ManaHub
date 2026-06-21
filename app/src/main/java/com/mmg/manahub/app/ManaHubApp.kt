@@ -14,6 +14,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.app.di.coreBridgeKoinModule
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
@@ -50,6 +51,7 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
@@ -132,7 +134,7 @@ class ManaHubApp : Application() {
     // gamificationRepository) are bridged in coreBridgeKoinModule; only the Home-only deps are here.
     @Inject lateinit var draftSimRepository: DraftSimRepository
     @Inject lateinit var tournamentRepository: TournamentRepository
-    @Inject lateinit var cardRepository: CardRepository
+    @Inject lateinit var cardRepository: CardRepository  // shared: Home + CommunityDecks (bridged in coreBridge)
     @Inject lateinit var getNewsFeedUseCase: GetNewsFeedUseCase
     @Inject lateinit var refreshNewsFeedUseCase: RefreshNewsFeedUseCase
     @Inject lateinit var manageSourcesUseCase: ManageSourcesUseCase
@@ -145,6 +147,12 @@ class ManaHubApp : Application() {
     // coreBridgeKoinModule (shared with Settings + Stats); only the AddCard-only use cases are here.
     @Inject lateinit var searchCardsUseCase: SearchCardsUseCase
     @Inject lateinit var buildScryfallQueryUseCase: BuildScryfallQueryUseCase
+
+    // CommunityDecks island (Phase 1) bridge deps. UserPreferencesDataStore + DeckRepository + CardRepository
+    // are all bridged in coreBridgeKoinModule (shared with other islands); the rest of this island's data
+    // layer (ArchidektApi/RequestQueue/Repository/use cases) is now Koin-owned in communityDecksKoinModule.
+    // Only the Room-owned cache DAO (this island only) is bridged here.
+    @Inject lateinit var communityDeckCacheDao: CommunityDeckCacheDao
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -171,6 +179,7 @@ class ManaHubApp : Application() {
                     deckRepository = deckRepository,
                     scryfallRemoteDataSource = scryfallRemoteDataSource,
                     gamificationRepository = gamificationRepository,
+                    cardRepository = cardRepository,
                 ),
                 settingsKoinModule(
                     analyticsHelper = analyticsHelper,
@@ -192,7 +201,6 @@ class ManaHubApp : Application() {
                 homeKoinModule(
                     draftSimRepository = draftSimRepository,
                     tournamentRepository = tournamentRepository,
-                    cardRepository = cardRepository,
                     getNewsFeedUseCase = getNewsFeedUseCase,
                     refreshNewsFeedUseCase = refreshNewsFeedUseCase,
                     manageSourcesUseCase = manageSourcesUseCase,
@@ -207,6 +215,9 @@ class ManaHubApp : Application() {
                 addCardKoinModule(
                     searchCards = searchCardsUseCase,
                     buildScryfallQuery = buildScryfallQueryUseCase,
+                ),
+                communityDecksKoinModule(
+                    cacheDao = communityDeckCacheDao,
                 ),
             )
         }
