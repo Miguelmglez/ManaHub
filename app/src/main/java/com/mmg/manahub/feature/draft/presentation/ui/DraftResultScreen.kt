@@ -60,7 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
@@ -94,7 +94,7 @@ import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 fun DraftResultScreen(
     onDeckSaved: () -> Unit,
     onBack: () -> Unit,
-    viewModel: DraftSimViewModel = hiltViewModel(),
+    viewModel: DraftSimViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

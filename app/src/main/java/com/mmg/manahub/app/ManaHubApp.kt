@@ -58,8 +58,20 @@ import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
+import com.mmg.manahub.feature.draft.di.draftKoinModule
+import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
 import com.mmg.manahub.feature.friends.di.friendsKoinModule
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
@@ -203,6 +215,24 @@ class ManaHubApp : Application() {
     // ViewModels' deps (the 3 news use cases + UserPreferencesDataStore) are already bridged
     // (homeKoinModule + coreBridgeKoinModule), so both modules take no constructor args.
 
+    // Draft island (Phase 1) bridge deps. The feature-private Hilt DraftModule is KEPT (NOT deleted):
+    // the Home island bridges DraftRepository/DraftSimRepository from the Hilt graph, so the whole Draft
+    // Hilt sub-graph (Cloudflare/YouTube Retrofit, engine, repos, use cases) must stay intact. The two
+    // repos are now SHARED with Draft → PROMOTED into coreBridgeKoinModule (the existing draftRepository /
+    // draftSimRepository fields above feed it there now); AnalyticsHelper is also bridged in coreBridge.
+    // Only the Draft-only singletons (the ten use cases + the BotDrafter) are here.
+    @Inject lateinit var startDraftUseCase: StartDraftUseCase
+    @Inject lateinit var makePickUseCase: MakePickUseCase
+    @Inject lateinit var autoPickUseCase: AutoPickUseCase
+    @Inject lateinit var observeDraftUseCase: ObserveDraftUseCase
+    @Inject lateinit var completeDraftUseCase: CompleteDraftUseCase
+    @Inject lateinit var getDraftableSimSetUseCase: GetDraftableSimSetUseCase
+    @Inject lateinit var getDraftableSetsUseCase: GetDraftableSetsUseCase
+    @Inject lateinit var getSetGuideUseCase: GetSetGuideUseCase
+    @Inject lateinit var getSetTierListUseCase: GetSetTierListUseCase
+    @Inject lateinit var getSetVideosUseCase: GetSetVideosUseCase
+    @Inject lateinit var botDrafter: BotDrafter
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -231,6 +261,8 @@ class ManaHubApp : Application() {
                     cardRepository = cardRepository,
                     analyticsHelper = analyticsHelper,
                     friendRepository = friendRepository,
+                    draftRepository = draftRepository,
+                    draftSimRepository = draftSimRepository,
                 ),
                 settingsKoinModule(
                     userProfileDataSource = userProfileDataSource,
@@ -248,13 +280,11 @@ class ManaHubApp : Application() {
                     surveyAnswerDao = surveyAnswerDao,
                 ),
                 homeKoinModule(
-                    draftSimRepository = draftSimRepository,
                     tournamentRepository = tournamentRepository,
                     getNewsFeedUseCase = getNewsFeedUseCase,
                     refreshNewsFeedUseCase = refreshNewsFeedUseCase,
                     manageSourcesUseCase = manageSourcesUseCase,
                     communityStatsRepository = communityStatsRepository,
-                    draftRepository = draftRepository,
                     wishlistRepository = wishlistRepository,
                     getAccountNudgeUseCase = getAccountNudgeUseCase,
                 ),
@@ -285,6 +315,19 @@ class ManaHubApp : Application() {
                     completeSurvey = completeSurveyUseCase,
                 ),
                 newsKoinModule(),
+                draftKoinModule(
+                    startDraft = startDraftUseCase,
+                    makePick = makePickUseCase,
+                    autoPick = autoPickUseCase,
+                    observeDraft = observeDraftUseCase,
+                    completeDraft = completeDraftUseCase,
+                    getDraftableSimSet = getDraftableSimSetUseCase,
+                    getDraftableSets = getDraftableSetsUseCase,
+                    getSetGuide = getSetGuideUseCase,
+                    getSetTierList = getSetTierListUseCase,
+                    getSetVideos = getSetVideosUseCase,
+                    botDrafter = botDrafter,
+                ),
             )
         }
 

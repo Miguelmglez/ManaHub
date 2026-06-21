@@ -12,14 +12,12 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
 
 data class SetDraftDetailUiState(
     val setCode: String = "",
@@ -45,8 +43,13 @@ data class SetDraftDetailUiState(
     val boosterVersion: String? = null,
 )
 
-@HiltViewModel
-class SetDraftDetailViewModel @Inject constructor(
+/**
+ * Drives the Set Draft Detail screen (Guide + Tier List + videos).
+ *
+ * KMP migration — Phase 1: resolved by Koin (`koinViewModel()`), not Hilt. The [SavedStateHandle] is
+ * Koin-injected and carries the route nav args (`setCode`/`setName`/`setIconUri`/`setReleasedAt`).
+ */
+class SetDraftDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val getSetGuideUseCase: GetSetGuideUseCase,
     private val getSetTierListUseCase: GetSetTierListUseCase,

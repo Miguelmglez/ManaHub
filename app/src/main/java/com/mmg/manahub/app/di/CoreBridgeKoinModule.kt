@@ -9,6 +9,8 @@ import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
+import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import org.koin.core.module.Module
@@ -17,7 +19,7 @@ import org.koin.dsl.module
 /**
  * KMP migration — Phase 1 Hilt→Koin cutover. Shared "Koin bridge" for Hilt-owned singletons that are
  * consumed by MORE THAN ONE Koin island (currently Settings, Stats, Profile, Home, CommunityDecks,
- * CardDetail and Friends).
+ * CardDetail, Friends and Draft).
  *
  * ## Why a shared module
  * Each Koin island re-exposes its Hilt-owned dependencies as `single { instance }` (the Spike-D bridge
@@ -43,7 +45,11 @@ import org.koin.dsl.module
  *   here from the Settings island when CardDetail also began consuming it.
  * @param friendRepository the Hilt-owned [FriendRepository] singleton (Profile + Friends). Promoted
  *   here from the Profile island when the Friends island also began consuming it.
- * @return a Koin [Module] exposing the cross-island bridged singletons (eleven in total).
+ * @param draftRepository the Hilt-owned [DraftRepository] singleton (Home + Draft). Promoted here from
+ *   the Home island when the Draft island also began consuming it.
+ * @param draftSimRepository the Hilt-owned [DraftSimRepository] singleton (Home + Draft). Promoted here
+ *   from the Home island when the Draft island also began consuming it.
+ * @return a Koin [Module] exposing the cross-island bridged singletons (thirteen in total).
  */
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
@@ -57,9 +63,11 @@ fun coreBridgeKoinModule(
     cardRepository: CardRepository,
     analyticsHelper: AnalyticsHelper,
     friendRepository: FriendRepository,
+    draftRepository: DraftRepository,
+    draftSimRepository: DraftSimRepository,
 ): Module = module {
-    // Shared across the Settings + Stats + Profile + Home + CommunityDecks + CardDetail + Friends
-    // islands — each registered exactly once.
+    // Shared across the Settings + Stats + Profile + Home + CommunityDecks + CardDetail + Friends +
+    // Draft islands — each registered exactly once.
     single { userPreferencesRepo }
     single { userPrefsDataStore }
     single { authRepository }
@@ -71,4 +79,6 @@ fun coreBridgeKoinModule(
     single { cardRepository }
     single { analyticsHelper }
     single { friendRepository }
+    single { draftRepository }
+    single { draftSimRepository }
 }

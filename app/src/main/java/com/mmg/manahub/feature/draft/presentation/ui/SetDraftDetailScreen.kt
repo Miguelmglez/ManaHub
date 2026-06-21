@@ -66,7 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
@@ -135,7 +135,7 @@ fun SetDraftDetailScreen(
     onBack: () -> Unit,
     onCardClick: (String) -> Unit,
     onSimulateDraft: (String) -> Unit = {},
-    viewModel: SetDraftDetailViewModel = hiltViewModel(),
+    viewModel: SetDraftDetailViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val colors = MaterialTheme.magicColors

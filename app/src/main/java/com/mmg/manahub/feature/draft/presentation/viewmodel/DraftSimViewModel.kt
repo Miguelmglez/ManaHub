@@ -21,7 +21,6 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,7 +29,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Drives the Draft Simulator flow (setup → drafting → result).
@@ -40,9 +38,12 @@ import javax.inject.Inject
  * does not rely on shared in-memory state across instances: instead it collects
  * [ObserveDraftUseCase], which emits the single active [DraftState] persisted by the use cases.
  * Drafting and Result screens therefore reconstruct their UI purely from the observed session.
+ *
+ * KMP migration — Phase 1: resolved by Koin (`koinViewModel()`), not Hilt. The [SavedStateHandle] is
+ * Koin-injected and carries the current `NavBackStackEntry` arguments, so the `setCode`/`sessionId`
+ * routing behaviour is identical to the previous Hilt-scoped instance.
  */
-@HiltViewModel
-class DraftSimViewModel @Inject constructor(
+class DraftSimViewModel(
     savedStateHandle: SavedStateHandle,
     private val startDraft: StartDraftUseCase,
     private val makePick: MakePickUseCase,

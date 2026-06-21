@@ -72,25 +72,30 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     2026-06-21), CommunityDecks (Phase 1, 2026-06-21 — the FIRST multi-ViewModel island), CardDetail
     (Phase 1, 2026-06-21), Friends (Phase 1, 2026-06-21 — the SECOND multi-VM island, 3 VMs, the
     heaviest island so far + the first with an Activity-scoped VM), Splash + Survey + News (Phase 1,
-    2026-06-21 — three leaf islands migrated in one run; News is the THIRD multi-VM island).** Every
+    2026-06-21 — three leaf islands migrated in one run; News is the THIRD multi-VM island), Draft
+    (Phase 1, 2026-06-21 — the FOURTH multi-VM island, 3 VMs).** Every
     OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
-    The shared `app/di/CoreBridgeKoinModule.kt` now holds ELEVEN cross-island
+    The shared `app/di/CoreBridgeKoinModule.kt` now holds THIRTEEN cross-island
     singletons: `UserPreferencesRepository` (Settings+Stats+CardDetail), `UserPreferencesDataStore`
     (Settings+Profile+Home+CardDetail), `AuthRepository` (Settings+Profile+Home+CardDetail+Friends),
     `GameSessionRepository` (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository`
     (Stats+Home+CommunityDecks+CardDetail), `ScryfallRemoteDataSource` (Stats+Home),
     `GamificationRepository` (Profile+Home), `CardRepository` (Home+CommunityDecks+CardDetail),
-    `AnalyticsHelper` (Settings+CardDetail+Friends), `FriendRepository` (Profile+Friends) — so no feature
+    `AnalyticsHelper` (Settings+CardDetail+Friends+Draft), `FriendRepository` (Profile+Friends),
+    `DraftRepository` (Home+Draft), `DraftSimRepository` (Home+Draft) — so no feature
     module double-registers a shared type (`DefinitionOverrideException` guard). Adding CardDetail promoted
     `AnalyticsHelper` into the bridge and SHRUNK Settings; adding Friends promoted `FriendRepository` into
-    the bridge and SHRUNK Profile (it now resolves `FriendRepository` via `get()`). CommunityDecks is the
+    the bridge and SHRUNK Profile (it now resolves `FriendRepository` via `get()`); adding Draft promoted
+    `DraftRepository` + `DraftSimRepository` into the bridge and SHRUNK Home (both resolved via `get()`).
+    CommunityDecks is the
     only island to **convert+delete its Hilt module** so far; Friends KEEPS its Hilt `FriendModule`
     (`@Binds FriendRepository` + `@Provides FriendshipService`) because Hilt features still consume them
     (Trades VMs + `CollectionStatsSyncWorker`). Multi-arg-nav VMs resolve a Koin-injected `SavedStateHandle`
     carrying their nav args (`cardName` / `archidektId` / `scryfallId` / `userId`); Activity-scoped VMs
     (InviteDispatcher) resolve via `koinViewModel(viewModelStoreOwner = activity)`.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
-    Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends done; the rest NOT started.
+    Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash + Survey + News +
+    Draft done (THIRTEEN islands); the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -144,10 +149,13 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    (`@Binds NewsRepository`) KEPT — the 3 news use cases stay Hilt-constructed for the Home island bridge
    and depend on `NewsRepository` (same reason Friends kept `FriendModule`). All 4 screen call-sites used
    the default `viewModel` param → NO `AppNavGraph` edit. `SurveyViewModelTest` already used the plain
-   ctor → no test edit (14/14 green). After that, candidates in rough order of entanglement: `draft` /
-   `playtest` / `tournament` / `trades` / `decks` / `collection` / `game` / `auth`. Apply the EXACT
+   ctor → no test edit (14/14 green).
+   **Draft done (2026-06-21 — the FOURTH multi-VM island, 3 VMs; see the CHANGE LOG).** After that,
+   candidates in rough order of entanglement: `playtest` (recommended next — fairly self-contained:
+   the PlaytestHand/Setup VMs + the explicit-save DAO write path, no shared engine like Draft) /
+   `tournament` / `trades` / `decks` / `collection` / `game` / `auth`. Apply the EXACT
    same pattern proven by
-   Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
+   Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends/Splash/Survey/News/Draft: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
    deps in `ManaHubApp`, reuse `coreBridgeKoinModule` for ANY already-shared singleton (never double-register
    → `DefinitionOverrideException`; if a dep becomes shared with another island, MOVE it into the bridge and
@@ -202,6 +210,51 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Draft Koin island** (thirteenth feature cutover; the FOURTH multi-VM island,
+  3 VMs — finished an interrupted WIP that hit the session limit after compile-check but before commit).
+  De-Hilt'd ALL THREE Draft VMs (dropped `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject`
+  imports → plain ctors, zero behaviour change): `DraftViewModel` (1 dep: `GetDraftableSetsUseCase`),
+  `SetDraftDetailViewModel` (5 deps incl. `SavedStateHandle` for `setCode`/`setName`/`setIconUri`/
+  `setReleasedAt`), `DraftSimViewModel` (11 deps incl. `SavedStateHandle` for `setCode`, the 6 sim use
+  cases, `AnalyticsHelper`, `BotDrafter`, `DraftSimRepository`, and a `@DefaultDispatcher` dispatcher).
+  New `feature/draft/di/DraftKoinModule.kt` (`draftKoinModule(10 use cases + BotDrafter)`) with a
+  `viewModel { }` per VM; `@DefaultDispatcher` → `Dispatchers.Default` directly (the same singleton the
+  Hilt binding returned — Survey/CommunityDecks precedent for `Dispatchers.IO`). **Per-screen VM scoping
+  is preserved & correct:** the DraftSim flow spans THREE separate `composable` routes
+  (`DraftSimSetup`/`DraftSimDrafting`/`DraftSimResult`); under no-arg `hiltViewModel()` each already got
+  its OWN NavBackStackEntry-scoped instance, and `koinViewModel()` scopes identically — `DraftSimViewModel`
+  is designed for this (it holds NO shared in-memory state; each instance reconstructs its UI from the
+  persisted session via `ObserveDraftUseCase`), so there is ZERO behaviour change. All 5 screens
+  (`DraftScreen`, `SetDraftDetailScreen`, `DraftSetupScreen`, `DraftingScreen`, `DraftResultScreen`)
+  swapped their default param `hiltViewModel()` → `koinViewModel()`; all are called in `AppNavGraph` with
+  NO explicit `viewModel =` arg → NO nav edit. **Bridge — `DraftRepository` + `DraftSimRepository`
+  PROMOTED + Home SHRUNK:** both were Home-only bridged `single`s; now shared with Draft, they were MOVED
+  into `coreBridgeKoinModule` (now THIRTEEN singletons) and `homeKoinModule` was shrunk to drop both
+  params + `single`s (its `viewModel { }` already used `get()` → no Home VM edit; the `ManaHubApp` home
+  call dropped both args, the coreBridge call gained both). `AnalyticsHelper` was already in coreBridge →
+  reused via `get()`. **Hilt `DraftModule` KEPT (NOT converted/deleted):** it still `@Binds`
+  `DraftRepository`/`DraftSimRepository`/`DraftDeckBuilder` and `@Provides` the engine threading
+  (`ArchetypeAwareBotDrafter`+`HeuristicBotDrafter` fallback / `DefaultDraftEngine` /
+  `WeightedBoosterGenerator` / `Gson`), the YouTube + Cloudflare-Worker Retrofit clients, and the draft
+  version prefs — and all 14 draft use cases stay `@Inject constructor`. The Home island bridges
+  `DraftRepository`/`DraftSimRepository` from this Hilt graph and `ManaHubApp` `@Inject`s the 10
+  Hilt-built use cases + `BotDrafter` to feed `draftKoinModule`, so the whole Hilt sub-graph MUST stay
+  intact (same reason Friends/News kept their Hilt modules). `ScryfallRequestQueue` in
+  `DraftRepositoryImpl` is untouched → rate-limiting + engine.json/archetype-bot threading keep working.
+  `ManaHubApp` gained 11 new `@Inject` bridge fields (the 10 use cases + `BotDrafter`;
+  `draftRepository`/`draftSimRepository`/`analyticsHelper` were already injected and are REUSED), added
+  both repos to the `coreBridgeKoinModule(...)` call, dropped them from the `homeKoinModule(...)` call,
+  and registers `draftKoinModule(...)`. NO Hilt `@Provides`/`@Binds` deleted. **Koin-graph audit:** the
+  11 new `single<T>` types (10 draft use cases + `BotDrafter`) appear in NO other loaded module; the 2
+  repos now live ONLY in coreBridge (removed from Home) → no duplicate `single<T>` across the 14 loaded
+  modules → no `DefinitionOverrideException`. **Tests:** `DraftSimViewModelTest` (6) already built the VM
+  via the plain 11-arg constructor → NO test edit; all 36 draft tests green (engine 12+2+9+5, integration
+  2, VM 6; 0 fail/0 skip). Verified: forced full `:app:compileDebugKotlin --rerun-tasks` SUCCESSFUL
+  (deprecation warnings only); `:app:assembleDebug` SUCCESSFUL; `:app:testDebugUnitTest` 1964 tests /
+  122 failed / 2 skipped (== baseline, ZERO new failures; no draft class among the 122); inline
+  secret-scan clean. Koin islands now = {Settings, Stats, Profile, Home, TagDictionary, AddCard,
+  CommunityDecks, CardDetail, Friends, Splash, Survey, News, Draft} (13); all other features still Hilt.
+  NEXT = `feature/playtest`, still EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · Splash + Survey + News Koin islands** (tenth/eleventh/twelfth feature
   cutovers — three light leaf islands migrated in ONE run; News is the THIRD multi-VM island). All
   four ViewModels de-Hilt'd (dropped `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject`

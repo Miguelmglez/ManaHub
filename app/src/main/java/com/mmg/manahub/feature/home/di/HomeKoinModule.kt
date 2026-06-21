@@ -7,8 +7,6 @@ import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
-import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.home.presentation.HomeViewModel
@@ -43,6 +41,7 @@ import org.koin.dsl.module
  * - [ScryfallRemoteDataSource] — shared with Stats (promoted to the bridge for Home).
  * - [GamificationRepository] — shared with Profile (promoted to the bridge for Home).
  * - `CardRepository` — shared with CommunityDecks (promoted to the bridge for that island).
+ * - DraftRepository / DraftSimRepository — shared with Draft (promoted to the bridge for that island).
  *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
@@ -51,27 +50,23 @@ import org.koin.dsl.module
  * @return a Koin [Module] that provides the Home-only bridged singletons and the [HomeViewModel] factory.
  */
 fun homeKoinModule(
-    draftSimRepository: DraftSimRepository,
     tournamentRepository: TournamentRepository,
     getNewsFeedUseCase: GetNewsFeedUseCase,
     refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
     manageSourcesUseCase: ManageSourcesUseCase,
     communityStatsRepository: CommunityStatsRepository,
-    draftRepository: DraftRepository,
     wishlistRepository: WishlistRepository,
     getAccountNudgeUseCase: GetAccountNudgeUseCase,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Home-only Hilt-owned singletons to Koin. ──
     // (UserPreferencesDataStore, AuthRepository, GameSessionRepository, StatsRepository, DeckRepository,
-    //  ScryfallRemoteDataSource, GamificationRepository and CardRepository are shared → bridged in
-    //  coreBridgeKoinModule, not here, and resolved below via get().)
-    single { draftSimRepository }
+    //  ScryfallRemoteDataSource, GamificationRepository, CardRepository, DraftRepository and
+    //  DraftSimRepository are shared → bridged in coreBridgeKoinModule, not here, and resolved below via get().)
     single { tournamentRepository }
     single { getNewsFeedUseCase }
     single { refreshNewsFeedUseCase }
     single { manageSourcesUseCase }
     single { communityStatsRepository }
-    single { draftRepository }
     single { wishlistRepository }
     single { getAccountNudgeUseCase }
 
