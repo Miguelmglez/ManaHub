@@ -17,6 +17,8 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
@@ -45,11 +47,20 @@ import com.mmg.manahub.core.gamification.domain.repository.GamificationRepositor
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
+import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.home.di.homeKoinModule
+import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
+import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
+import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.feature.profile.di.profileKoinModule
 import com.mmg.manahub.feature.settings.di.settingsKoinModule
 import com.mmg.manahub.feature.stats.di.statsKoinModule
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import dagger.hilt.android.HiltAndroidApp
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -105,11 +116,26 @@ class ManaHubApp : Application() {
     @Inject lateinit var deckRepository: DeckRepository
 
     // Profile island (Phase 1) bridge deps. (userPreferencesDataStore + authRepository are shared with
-    // Settings and gameSessionRepository is shared with Stats — all bridged in coreBridgeKoinModule.)
-    @Inject lateinit var statsRepository: StatsRepository
+    // Settings and gameSessionRepository is shared with Stats — all bridged in coreBridgeKoinModule.
+    // statsRepository + gamificationRepository are now also shared with Home → bridged in coreBridge.)
+    @Inject lateinit var statsRepository: StatsRepository  // shared: Profile + Home
     @Inject lateinit var surveyAnswerDao: SurveyAnswerDao
     @Inject lateinit var friendRepository: FriendRepository
-    @Inject lateinit var gamificationRepository: GamificationRepository
+    @Inject lateinit var gamificationRepository: GamificationRepository  // shared: Profile + Home
+
+    // Home island (Phase 1) bridge deps. The shared deps (userPreferencesDataStore, authRepository,
+    // gameSessionRepository, statsRepository, deckRepository, scryfallRemoteDataSource,
+    // gamificationRepository) are bridged in coreBridgeKoinModule; only the Home-only deps are here.
+    @Inject lateinit var draftSimRepository: DraftSimRepository
+    @Inject lateinit var tournamentRepository: TournamentRepository
+    @Inject lateinit var cardRepository: CardRepository
+    @Inject lateinit var getNewsFeedUseCase: GetNewsFeedUseCase
+    @Inject lateinit var refreshNewsFeedUseCase: RefreshNewsFeedUseCase
+    @Inject lateinit var manageSourcesUseCase: ManageSourcesUseCase
+    @Inject lateinit var communityStatsRepository: CommunityStatsRepository
+    @Inject lateinit var draftRepository: DraftRepository
+    @Inject lateinit var wishlistRepository: WishlistRepository
+    @Inject lateinit var getAccountNudgeUseCase: GetAccountNudgeUseCase
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -125,12 +151,17 @@ class ManaHubApp : Application() {
             androidLogger(if (BuildConfig.DEBUG) Level.INFO else Level.ERROR)
             androidContext(this@ManaHubApp)
             modules(
-                // Shared bridged singletons used by more than one Koin island (Settings + Stats + Profile).
+                // Shared bridged singletons used by more than one Koin island
+                // (Settings + Stats + Profile + Home).
                 coreBridgeKoinModule(
                     userPreferencesRepo = userPreferencesRepository,
                     userPrefsDataStore = userPreferencesDataStore,
                     authRepository = authRepository,
                     gameSessionRepository = gameSessionRepository,
+                    statsRepository = statsRepository,
+                    deckRepository = deckRepository,
+                    scryfallRemoteDataSource = scryfallRemoteDataSource,
+                    gamificationRepository = gamificationRepository,
                 ),
                 settingsKoinModule(
                     analyticsHelper = analyticsHelper,
@@ -142,16 +173,24 @@ class ManaHubApp : Application() {
                 statsKoinModule(
                     getCollectionStats = getCollectionStatsUseCase,
                     getCollectionSetCodes = getCollectionSetCodesUseCase,
-                    scryfallDataSource = scryfallRemoteDataSource,
                     refreshPricesUseCase = refreshCollectionPricesUseCase,
                     gameSessionDao = gameSessionDao,
-                    deckRepository = deckRepository,
                 ),
                 profileKoinModule(
-                    statsRepository = statsRepository,
                     surveyAnswerDao = surveyAnswerDao,
                     friendRepository = friendRepository,
-                    gamificationRepository = gamificationRepository,
+                ),
+                homeKoinModule(
+                    draftSimRepository = draftSimRepository,
+                    tournamentRepository = tournamentRepository,
+                    cardRepository = cardRepository,
+                    getNewsFeedUseCase = getNewsFeedUseCase,
+                    refreshNewsFeedUseCase = refreshNewsFeedUseCase,
+                    manageSourcesUseCase = manageSourcesUseCase,
+                    communityStatsRepository = communityStatsRepository,
+                    draftRepository = draftRepository,
+                    wishlistRepository = wishlistRepository,
+                    getAccountNudgeUseCase = getAccountNudgeUseCase,
                 ),
             )
         }

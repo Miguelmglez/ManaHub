@@ -238,7 +238,8 @@ fun AppNavGraph(
                 } else null
 
                 HomeScreen(
-                    viewModel = hiltViewModel(),
+                    // HomeViewModel is now resolved by Koin via the screen's koinViewModel() default
+                    // param (KMP migration — Home Koin island). Other features still use hiltViewModel().
                     activeGame = activeGame,
                     onAction = { action ->
                         when (action) {

@@ -68,8 +68,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import coil.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
@@ -95,7 +95,7 @@ import java.util.Calendar
 
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = hiltViewModel(),
+    viewModel: HomeViewModel = koinViewModel(),
     onAction: (HomeAction) -> Unit,
     activeGame: HomeHeroState.ActiveGame? = null,
     modifier: Modifier = Modifier,

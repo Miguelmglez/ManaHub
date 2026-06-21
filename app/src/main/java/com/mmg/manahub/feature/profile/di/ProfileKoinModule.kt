@@ -20,12 +20,14 @@ import org.koin.dsl.module
  * is the bridge: it `@Inject`s the already-constructed Hilt instances and passes them into
  * [profileKoinModule], which re-exposes the Profile-only ones to Koin as `single { }`.
  *
- * Three of the seven dependencies are SHARED with other islands and are therefore NOT registered here —
+ * Five of the seven dependencies are SHARED with other islands and are therefore NOT registered here —
  * they are bridged exactly once in `coreBridgeKoinModule` (registering the same type in two loaded
  * modules would throw `DefinitionOverrideException`), and this module resolves them via `get()`:
- * - `gameSessionRepo` (GameSessionRepository) — shared with the Stats island.
- * - `userPreferencesDataStore` (UserPreferencesDataStore) — shared with the Settings island.
- * - `authRepository` (AuthRepository) — shared with the Settings island.
+ * - [GameSessionRepository] — shared with the Stats + Home islands.
+ * - [UserPreferencesDataStore] — shared with the Settings + Home islands.
+ * - [AuthRepository] — shared with the Settings + Home islands.
+ * - [StatsRepository] — shared with the Home island.
+ * - [GamificationRepository] — shared with the Home island.
  *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
@@ -34,18 +36,15 @@ import org.koin.dsl.module
  * @return a Koin [Module] that provides the Profile-only bridged singletons and the [ProfileViewModel] factory.
  */
 fun profileKoinModule(
-    statsRepository: StatsRepository,
     surveyAnswerDao: SurveyAnswerDao,
     friendRepository: FriendRepository,
-    gamificationRepository: GamificationRepository,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Profile-only Hilt-owned singletons to Koin. ──
-    // (gameSessionRepo, userPreferencesDataStore, authRepository are shared → bridged in
-    //  coreBridgeKoinModule, not here, to avoid DefinitionOverrideException.)
-    single { statsRepository }
+    // (gameSessionRepo, userPreferencesDataStore, authRepository, statsRepository and
+    //  gamificationRepository are shared → bridged in coreBridgeKoinModule, not here, to avoid
+    //  DefinitionOverrideException.)
     single { surveyAnswerDao }
     single { friendRepository }
-    single { gamificationRepository }
 
     // ── The Koin island: ProfileViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
