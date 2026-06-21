@@ -14,6 +14,9 @@ import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
+import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -53,7 +56,16 @@ import org.koin.dsl.module
  * @param tournamentRepository the Hilt-owned [TournamentRepository] singleton (Home + Tournament + the
  *   still-Hilt `GameViewModel`). Promoted here from the Home island when the Tournament island also began
  *   consuming it; the Hilt `TournamentModule` binding is KEPT because `GameViewModel` still consumes it.
- * @return a Koin [Module] exposing the cross-island bridged singletons (fourteen in total).
+ * @param tradesRepository the Hilt-owned [TradesRepository] singleton (Trades + Friends + the still-Hilt
+ *   `HomeViewModel`/`FriendDetailViewModel`). Promoted here from the Friends island when the Trades island
+ *   also began consuming it; the Hilt `TradesModule` is KEPT (its other bindings serve Hilt features).
+ * @param wishlistRepository the Hilt-owned [WishlistRepository] singleton (Trades + Home + CardDetail +
+ *   the still-Hilt Collection/DeckStudio/DeckImprovement). Promoted here from the Home island when the
+ *   Trades island also began consuming it.
+ * @param openForTradeRepository the Hilt-owned [OpenForTradeRepository] singleton (Trades + CardDetail +
+ *   the still-Hilt Collection). Promoted here from the CardDetail island when the Trades island also
+ *   began consuming it.
+ * @return a Koin [Module] exposing the cross-island bridged singletons (seventeen in total).
  */
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
@@ -70,9 +82,12 @@ fun coreBridgeKoinModule(
     draftRepository: DraftRepository,
     draftSimRepository: DraftSimRepository,
     tournamentRepository: TournamentRepository,
+    tradesRepository: TradesRepository,
+    wishlistRepository: WishlistRepository,
+    openForTradeRepository: OpenForTradeRepository,
 ): Module = module {
     // Shared across the Settings + Stats + Profile + Home + CommunityDecks + CardDetail + Friends +
-    // Draft + Tournament islands — each registered exactly once.
+    // Draft + Tournament + Trades islands — each registered exactly once.
     single { userPreferencesRepo }
     single { userPrefsDataStore }
     single { authRepository }
@@ -87,4 +102,7 @@ fun coreBridgeKoinModule(
     single { draftRepository }
     single { draftSimRepository }
     single { tournamentRepository }
+    single { tradesRepository }
+    single { wishlistRepository }
+    single { openForTradeRepository }
 }

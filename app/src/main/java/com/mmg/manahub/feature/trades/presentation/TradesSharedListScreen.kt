@@ -33,7 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -56,7 +56,7 @@ import com.mmg.manahub.feature.trades.domain.model.SharedListResult
 @Composable
 fun TradesSharedListScreen(
     onBack: () -> Unit,
-    viewModel: TradesSharedListViewModel = hiltViewModel(),
+    viewModel: TradesSharedListViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

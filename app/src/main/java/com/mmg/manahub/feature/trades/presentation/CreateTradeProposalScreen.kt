@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
@@ -102,7 +103,7 @@ fun CreateTradeProposalScreen(
     onNavigateToCardDetail: (scryfallId: String) -> Unit = {},
     onNavigateToLogin: () -> Unit = {},
     onNavigateToAddFriends: () -> Unit = {},
-    viewModel: TradeProposalViewModel = hiltViewModel(),
+    viewModel: TradeProposalViewModel = koinViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

@@ -8,7 +8,6 @@ import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import com.mmg.manahub.feature.friends.presentation.FriendsViewModel
 import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailViewModel
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -39,20 +38,19 @@ import org.koin.dsl.module
  *
  * The four use cases all depend only on `FriendRepository` (resolved via the bridge `get()`), so they
  * are simple Koin factories registered as `single { }` here (none appears in any other loaded module).
- * [TradesRepository] and [PendingInviteStore] are Friends-only here too (no other island registers them).
+ * `TradesRepository` was originally a Friends-only `single` here; the Trades island PROMOTED it into
+ * `coreBridgeKoinModule` (shared with Trades + the still-Hilt Home/FriendDetail), so it is now resolved
+ * via `get()` and this module was shrunk accordingly. [PendingInviteStore] is still Friends-only here.
  *
- * @param tradesRepository the Hilt-owned [TradesRepository] singleton (FriendDetail trade history).
  * @param pendingInviteStore the Hilt-owned [PendingInviteStore] singleton (deferred invite codes).
  * @return a Koin [Module] providing the Friends-only bridged singletons + the three ViewModel factories.
  */
 fun friendsKoinModule(
-    tradesRepository: TradesRepository,
     pendingInviteStore: PendingInviteStore,
 ): Module = module {
     // ── Hilt → Koin bridge: Friends-only Hilt-owned singletons. ──
-    // (FriendRepository, AuthRepository and AnalyticsHelper are shared → bridged in
+    // (FriendRepository, AuthRepository, AnalyticsHelper and TradesRepository are shared → bridged in
     //  coreBridgeKoinModule, not here, to avoid DefinitionOverrideException.)
-    single { tradesRepository }
     single { pendingInviteStore }
 
     // ── Friends-only use cases (each depends only on the bridged FriendRepository). ──

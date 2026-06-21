@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -22,7 +21,6 @@ import com.mmg.manahub.feature.trades.domain.usecase.MarkCompletedUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradeThreadUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RevokeAcceptanceUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.UpdateTradeCollectionUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +28,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 sealed class NegotiationError {
     data class CardAlreadyLocked(val cardIds: List<String>) : NegotiationError()
@@ -81,8 +78,7 @@ data class NegotiationUiState(
     val isSyncingCollection: Boolean = false,
 )
 
-@HiltViewModel
-class TradeNegotiationViewModel @Inject constructor(
+class TradeNegotiationViewModel(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val friendRepository: FriendRepository,
@@ -96,7 +92,7 @@ class TradeNegotiationViewModel @Inject constructor(
     private val updateTradeCollection: UpdateTradeCollectionUseCase,
     private val tradeCollectionSyncDao: TradeCollectionSyncDao,
     private val analyticsHelper: AnalyticsHelper,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val rootProposalId: String = savedStateHandle["rootProposalId"] ?: ""

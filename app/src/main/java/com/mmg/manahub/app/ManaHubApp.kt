@@ -21,6 +21,7 @@ import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
@@ -94,7 +95,9 @@ import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
+import com.mmg.manahub.feature.trades.di.tradesKoinModule
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.feature.trades.domain.repository.SharedListsRepository
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
@@ -256,6 +259,19 @@ class ManaHubApp : Application() {
     @Inject lateinit var calculateStandingsUseCase: CalculateStandingsUseCase
     @Inject lateinit var recordMatchResultUseCase: RecordMatchResultUseCase
 
+    // Trades island (Phase 1) bridge deps. The trades data layer is split across five repositories by
+    // concern; three of them are shared with other islands → PROMOTED into coreBridgeKoinModule and the
+    // older islands shrunk: TradesRepository (was Friends-only; shared with Trades + still-Hilt Home/
+    // FriendDetail), WishlistRepository (was Home-only; shared with Trades + CardDetail + still-Hilt
+    // Collection/DeckStudio/DeckImprovement), OpenForTradeRepository (was CardDetail-only; shared with
+    // Trades + still-Hilt Collection) — fed there by the existing tradesRepository / wishlistRepository /
+    // openForTradeRepository fields above. UserCardRepository is reused from cardDetailKoinModule and
+    // AuthRepository/CardRepository/AnalyticsHelper/FriendRepository from coreBridge, all via get(). The
+    // Hilt TradesModule is KEPT (its WishlistRepository/OpenForTradeRepository/TradeSuggestionsRepository
+    // @Binds still serve Hilt features). Only the two trades-only bridged singletons are here.
+    @Inject lateinit var sharedListsRepository: SharedListsRepository
+    @Inject lateinit var tradeCollectionSyncDao: TradeCollectionSyncDao
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -287,6 +303,9 @@ class ManaHubApp : Application() {
                     draftRepository = draftRepository,
                     draftSimRepository = draftSimRepository,
                     tournamentRepository = tournamentRepository,
+                    tradesRepository = tradesRepository,
+                    wishlistRepository = wishlistRepository,
+                    openForTradeRepository = openForTradeRepository,
                 ),
                 settingsKoinModule(
                     userProfileDataSource = userProfileDataSource,
@@ -308,7 +327,6 @@ class ManaHubApp : Application() {
                     refreshNewsFeedUseCase = refreshNewsFeedUseCase,
                     manageSourcesUseCase = manageSourcesUseCase,
                     communityStatsRepository = communityStatsRepository,
-                    wishlistRepository = wishlistRepository,
                     getAccountNudgeUseCase = getAccountNudgeUseCase,
                 ),
                 tagDictionaryKoinModule(
@@ -325,10 +343,8 @@ class ManaHubApp : Application() {
                     userCardRepository = userCardRepository,
                     addToCollection = addCardToCollectionUseCase,
                     addToWishlistUseCase = addToWishlistUseCase,
-                    openForTradeRepository = openForTradeRepository,
                 ),
                 friendsKoinModule(
-                    tradesRepository = tradesRepository,
                     pendingInviteStore = pendingInviteStore,
                 ),
                 splashKoinModule(),
@@ -357,6 +373,10 @@ class ManaHubApp : Application() {
                 tournamentKoinModule(
                     calculateStandings = calculateStandingsUseCase,
                     recordMatchResult = recordMatchResultUseCase,
+                ),
+                tradesKoinModule(
+                    sharedListsRepository = sharedListsRepository,
+                    tradeCollectionSyncDao = tradeCollectionSyncDao,
                 ),
             )
         }

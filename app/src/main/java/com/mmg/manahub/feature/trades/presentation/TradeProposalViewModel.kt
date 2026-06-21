@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.AddCardRow
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.model.DataResult
@@ -29,7 +28,6 @@ import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +37,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
-import javax.inject.Inject
 
 data class TradeItemDraft(
     val id: String = UUID.randomUUID().toString(),
@@ -125,8 +122,7 @@ data class ProposalEditorUiState(
     }
 }
 
-@HiltViewModel
-class TradeProposalViewModel @Inject constructor(
+class TradeProposalViewModel(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val tradesRepository: TradesRepository,
@@ -139,7 +135,7 @@ class TradeProposalViewModel @Inject constructor(
     private val openForTradeRepository: OpenForTradeRepository,
     private val friendRepository: FriendRepository,
     private val analyticsHelper: AnalyticsHelper,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProposalEditorUiState())
