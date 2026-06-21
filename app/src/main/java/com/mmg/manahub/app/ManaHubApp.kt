@@ -63,6 +63,7 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.auth.di.authKoinModule
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
@@ -360,6 +361,7 @@ class ManaHubApp : Application() {
                     notificationPrefsRepository = notificationPrefsRepository,
                     voiceModelRepository = voiceModelRepository,
                 ),
+                authKoinModule(),
                 statsKoinModule(
                     getCollectionStats = getCollectionStatsUseCase,
                     getCollectionSetCodes = getCollectionSetCodesUseCase,
