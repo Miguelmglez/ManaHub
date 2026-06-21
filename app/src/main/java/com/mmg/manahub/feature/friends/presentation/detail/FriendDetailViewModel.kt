@@ -14,7 +14,6 @@ import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
 import com.mmg.manahub.feature.trades.domain.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +32,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** Top-level tabs displayed on the friend detail screen. */
 enum class FriendTab { FOLDER, STATS, HISTORY }
@@ -71,9 +69,13 @@ data class FolderFilters(
  * Reads the friend's auth UUID from [SavedStateHandle] under key `"userId"`, looks up
  * the matching [Friend] domain model from the local friends cache, and reactively
  * loads card lists whenever the selected sub-tab or search query changes.
+ *
+ * KMP migration — Phase 1 Hilt→Koin cutover: this VM is resolved by Koin (`koinViewModel()`) via
+ * [com.mmg.manahub.feature.friends.di.friendsKoinModule]. Its `savedStateHandle` is the Koin-injected
+ * [SavedStateHandle] (`savedStateHandle = get()`), which carries the `"userId"` nav arg exactly as the
+ * Hilt-injected one did — so nav-arg behaviour is unchanged.
  */
-@HiltViewModel
-class FriendDetailViewModel @Inject constructor(
+class FriendDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val friendRepo: FriendRepository,
     private val getFriendCollectionUseCase: GetFriendCollectionUseCase,

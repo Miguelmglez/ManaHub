@@ -15,7 +15,6 @@ import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,10 +25,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class FriendsViewModel @Inject constructor(
+/**
+ * ViewModel for the friends list / search screen.
+ *
+ * KMP migration — Phase 1 Hilt→Koin cutover: this VM is resolved by Koin (`koinViewModel()`) via
+ * [com.mmg.manahub.feature.friends.di.friendsKoinModule], so it is a plain class with a normal
+ * constructor (no `@HiltViewModel`/`@Inject`).
+ */
+class FriendsViewModel(
     private val friendRepo: FriendRepository,
     private val authRepo: AuthRepository,
     private val searchUseCase: SearchUserByGameTagUseCase,

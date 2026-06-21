@@ -13,6 +13,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.messaging.FirebaseMessaging
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.app.di.coreBridgeKoinModule
+import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
@@ -57,6 +58,7 @@ import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.feature.friends.di.friendsKoinModule
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.home.di.homeKoinModule
@@ -70,6 +72,7 @@ import com.mmg.manahub.feature.stats.di.statsKoinModule
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.HiltAndroidApp
@@ -171,6 +174,14 @@ class ManaHubApp : Application() {
     @Inject lateinit var addToWishlistUseCase: AddToWishlistUseCase
     @Inject lateinit var openForTradeRepository: OpenForTradeRepository
 
+    // Friends island (Phase 1) bridge deps. FriendRepository is shared with Profile → PROMOTED into
+    // coreBridgeKoinModule (the existing `friendRepository` field above feeds it there now). AuthRepository
+    // + AnalyticsHelper are also bridged in coreBridge (shared). Only the Friends-only singletons are here:
+    //  - TradesRepository: FriendDetail trade history (also used by Hilt Trades VMs → still Hilt-owned).
+    //  - PendingInviteStore: deferred invite codes for InviteDispatcher.
+    @Inject lateinit var tradesRepository: TradesRepository
+    @Inject lateinit var pendingInviteStore: PendingInviteStore
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -198,6 +209,7 @@ class ManaHubApp : Application() {
                     gamificationRepository = gamificationRepository,
                     cardRepository = cardRepository,
                     analyticsHelper = analyticsHelper,
+                    friendRepository = friendRepository,
                 ),
                 settingsKoinModule(
                     userProfileDataSource = userProfileDataSource,
@@ -213,7 +225,6 @@ class ManaHubApp : Application() {
                 ),
                 profileKoinModule(
                     surveyAnswerDao = surveyAnswerDao,
-                    friendRepository = friendRepository,
                 ),
                 homeKoinModule(
                     draftSimRepository = draftSimRepository,
@@ -241,6 +252,10 @@ class ManaHubApp : Application() {
                     addToCollection = addCardToCollectionUseCase,
                     addToWishlistUseCase = addToWishlistUseCase,
                     openForTradeRepository = openForTradeRepository,
+                ),
+                friendsKoinModule(
+                    tradesRepository = tradesRepository,
+                    pendingInviteStore = pendingInviteStore,
                 ),
             )
         }
