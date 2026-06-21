@@ -117,8 +117,12 @@ fun AppNavGraph(
     val activity = LocalContext.current as ComponentActivity
     val context = LocalContext.current
 
-    // Activity-scoped so game state persists across all navigation
-    val gameVm: GameViewModel = hiltViewModel(activity)
+    // Activity-scoped so game state persists across all navigation.
+    // KMP migration — Phase 1: GameViewModel is now a Koin "island" VM, resolved via
+    // koinViewModel(viewModelStoreOwner = activity) — the exact equivalent of the old
+    // hiltViewModel(activity): same Activity ViewModelStore → same single instance across navigation,
+    // and the activity's CreationExtras carry the mode/playerCount nav args into the SavedStateHandle.
+    val gameVm: GameViewModel = koinViewModel(viewModelStoreOwner = activity)
     val gameUiState by gameVm.uiState.collectAsStateWithLifecycle()
 
     // Activity-scoped so it survives navigation and can process pending invite codes after login.
@@ -949,7 +953,7 @@ fun AppNavGraph(
                 ),
             ) { backStackEntry ->
                 val joinCode = backStackEntry.arguments?.getString("joinCode")?.takeIf { it.isNotBlank() }
-                val setupVm: GameSetupViewModel = hiltViewModel()
+                val setupVm: GameSetupViewModel = koinViewModel()
                 GameSetupScreen(
                     viewModel = setupVm,
                     onBack = { navController.popBackStack() },
