@@ -13,15 +13,12 @@ import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
 import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Data model
@@ -60,11 +57,10 @@ data class GameSetupUiState(
 //  ViewModel
 // ─────────────────────────────────────────────────────────────────────────────
 
-@HiltViewModel
-class GameSetupViewModel @Inject constructor(
+class GameSetupViewModel(
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val voiceModelRepository: VoiceModelRepository,
-    @ApplicationContext private val appContext: Context,
+    private val appContext: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(buildInitialState(GameMode.STANDARD, 2))

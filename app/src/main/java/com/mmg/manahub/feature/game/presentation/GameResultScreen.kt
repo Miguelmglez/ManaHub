@@ -368,7 +368,7 @@ private fun HighlightCard(icon: String, label: String, value: String) {
 @Composable
 private fun GameProgressionStrip(
     sessionId: Long,
-    viewModel: GameResultStripViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
+    viewModel: GameResultStripViewModel = org.koin.androidx.compose.koinViewModel(),
 ) {
     androidx.compose.runtime.LaunchedEffect(sessionId) { viewModel.observe(sessionId) }
     val outcome by viewModel.outcome.collectAsStateWithLifecycle()

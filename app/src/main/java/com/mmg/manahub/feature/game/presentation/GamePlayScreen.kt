@@ -120,7 +120,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -156,7 +156,7 @@ fun GamePlayScreen(
     onExitGame: () -> Unit = {},
     onSurvey: (sessionId: Long) -> Unit = {},
     onTournamentClick: (() -> Unit)? = null,
-    viewModel: GameViewModel = hiltViewModel(),
+    viewModel: GameViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toolsState by viewModel.toolsState.collectAsStateWithLifecycle()

@@ -89,9 +89,23 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
+import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
+import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
+import com.mmg.manahub.core.online.domain.usecase.ConfirmDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
+import com.mmg.manahub.core.online.domain.usecase.NextTurnUseCase
+import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
+import com.mmg.manahub.core.online.domain.usecase.RevokeDefeatUseCase
+import com.mmg.manahub.core.online.domain.usecase.ToggleLandPlayedUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
+import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
+import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
 import com.mmg.manahub.feature.friends.di.friendsKoinModule
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.feature.game.di.gameKoinModule
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
 import com.mmg.manahub.feature.home.di.homeKoinModule
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.di.newsKoinModule
@@ -320,6 +334,31 @@ class ManaHubApp : Application() {
     @Inject lateinit var deckMagicEngine: DeckMagicEngine
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
 
+    // Game island (Phase 1, the LAST non-excluded island) bridge deps. The shared deps are NOT
+    // re-declared here — GameSessionRepository, TournamentRepository, AnalyticsHelper and
+    // UserPreferencesDataStore are bridged in coreBridgeKoinModule; RecordMatchResultUseCase is already a
+    // single in tournamentKoinModule; VoiceModelRepository (GameSetup) is a single in settingsKoinModule;
+    // gamificationEngine is already injected above (Phase 0 field) — all resolved via get(), never
+    // re-registered (a duplicate single<T> would throw DefinitionOverrideException).
+    //
+    // GameViewModel integrates the DEFERRED core/voice + core/online + core/nearby features, which stay
+    // 100% Hilt-owned. Those singletons are bridged here from the Hilt graph (NOT de-Hilt'd) so the one
+    // shared instance serves both DI graphs — exactly the tournament-use-case bridge pattern. Nothing
+    // under core/voice, feature/online, core/nearby or feature/scanner is migrated.
+    @Inject lateinit var observeSessionUseCase: ObserveSessionUseCase
+    @Inject lateinit var updateLifeUseCase: UpdateLifeUseCase
+    @Inject lateinit var advancePhaseUseCase: AdvancePhaseUseCase
+    @Inject lateinit var nextTurnUseCase: NextTurnUseCase
+    @Inject lateinit var updateCounterUseCase: UpdateCounterUseCase
+    @Inject lateinit var updateCommanderDamageUseCase: UpdateCommanderDamageUseCase
+    @Inject lateinit var confirmDefeatUseCase: ConfirmDefeatUseCase
+    @Inject lateinit var revokeDefeatUseCase: RevokeDefeatUseCase
+    @Inject lateinit var leaveSessionUseCase: LeaveSessionUseCase
+    @Inject lateinit var toggleLandPlayedUseCase: ToggleLandPlayedUseCase
+    @Inject lateinit var nearbySessionRepository: NearbySessionRepository
+    @Inject lateinit var voiceCommandRecognizer: VoiceCommandRecognizer
+    @Inject lateinit var evaluatePlayerEliminationUseCase: EvaluatePlayerEliminationUseCase
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -444,6 +483,22 @@ class ManaHubApp : Application() {
                     importDeck = importDeckUseCase,
                     deckMagicEngine = deckMagicEngine,
                     applicationScope = applicationScope,
+                ),
+                gameKoinModule(
+                    observeSession = observeSessionUseCase,
+                    updateLife = updateLifeUseCase,
+                    advancePhase = advancePhaseUseCase,
+                    nextTurn = nextTurnUseCase,
+                    updateCounter = updateCounterUseCase,
+                    updateCommanderDamage = updateCommanderDamageUseCase,
+                    confirmDefeat = confirmDefeatUseCase,
+                    revokeDefeat = revokeDefeatUseCase,
+                    leaveSession = leaveSessionUseCase,
+                    toggleLandPlayed = toggleLandPlayedUseCase,
+                    nearbyRepository = nearbySessionRepository,
+                    voiceCommandRecognizer = voiceCommandRecognizer,
+                    evaluatePlayerElimination = evaluatePlayerEliminationUseCase,
+                    gamificationEngine = gamificationEngine,
                 ),
             )
         }

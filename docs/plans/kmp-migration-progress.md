@@ -111,10 +111,15 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     carrying their nav args (`cardName` / `archidektId` / `scryfallId` / `userId` / `tournamentId`);
     Activity-scoped VMs (InviteDispatcher) resolve via `koinViewModel(viewModelStoreOwner = activity)`,
     and entry-scoped VMs (TournamentDetail) via `koinViewModel(viewModelStoreOwner = entry)`.
-  - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
-    Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash + Survey + News +
-    Draft + Playtest + Tournament + Trades + Collection + Decks + Auth done (NINETEEN islands); the rest
-    NOT started — **`game` is the LAST non-excluded island**; online/voice/scanner EXCLUDED.
+  - **Phase 1 Hilt→Koin cutover COMPLETE except the deferred online/voice/scanner trio.** Settings +
+    Stats + Profile + Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash +
+    Survey + News + Draft + Playtest + Tournament + Trades + Collection + Decks + Auth + **Game** done
+    (TWENTY islands). `game` was the LAST + heaviest non-excluded island (it forced Tournament + Decks to
+    KEEP their Hilt modules + bridge use cases) and is now migrated — its 3 VMs resolve via
+    `koinViewModel()`, with the DEFERRED `core/voice` + `core/online` + `core/nearby` singletons it depends
+    on BRIDGED from the Hilt graph (NOT de-Hilt'd). `feature/online`, `core/voice` + in-game voice, and
+    `feature/scanner` remain EXPLICITLY EXCLUDED (untouched, still Hilt + Android Compose) — they migrate
+    in a later wave. Every non-excluded feature is now Koin.
 - ✅ **Decks (Phase 1, 2026-06-21 — the EIGHTEENTH Koin island; a 4-VM island; the FIRST island whose
   bridged Hilt objects must STAY Hilt because a still-Hilt feature (Draft) shares the SAME engine
   singleton).** All four decks VMs (`DeckViewModel`, `DeckStudioViewModel`, `DeckImprovementViewModel`,
@@ -140,18 +145,61 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   **Hilt `AuthModule` KEPT** (provides `@Named("supabase")` OkHttpClient/Retrofit + `UserProfileDataSource`
   + `@Binds AuthRepository`, all still consumed broadly by Hilt features); the use cases keep their Hilt
   `@Inject`/`@Singleton` (Koin builds its own equivalent stateless copies — the Trades pattern). See CHANGE LOG.
+- ✅ **Game (Phase 1, 2026-06-22 — the TWENTIETH + LAST non-excluded Koin island; the heaviest, and the
+  one that bridges DEFERRED features WITHOUT migrating them).** All three game VMs (`GameViewModel` 19
+  ctor deps incl. voice/online/nearby, `GameSetupViewModel`, `GameResultStripViewModel`) resolve via
+  `koinViewModel()`. `GameViewModel` is Activity-scoped (game state must persist across all in-game
+  navigation): `koinViewModel(viewModelStoreOwner = activity)` at `AppNavGraph` (exact equivalent of the
+  old `hiltViewModel(activity)`); its `mode`/`playerCount` nav args flow through a Koin-injected
+  `SavedStateHandle` (`savedStateHandle = get()`). **The voice/online coupling is the crux: `GameViewModel`
+  integrates the DEFERRED `core/voice` (`VoiceCommandRecognizer`), `core/online` (11 session use cases),
+  and `core/nearby` (`NearbySessionRepository`) features, which MUST stay Hilt.** They are BRIDGED from the
+  Hilt graph through `ManaHubApp` into `gameKoinModule` (the tournament-use-case bridge pattern) → ONE
+  shared instance per DI graph; NOTHING under `core/voice`, `feature/online`, `core/nearby`,
+  `feature/scanner` was de-Hilt'd (`git diff --stat` confirms). The Hilt `GameModule` (`@Binds
+  GameSessionRepository`) is KEPT (the repo is bridged in coreBridge + consumed by still-Hilt online/nearby
+  code). Shared deps reused via `get()`: `GameSessionRepository`/`TournamentRepository`/`AnalyticsHelper`/
+  `UserPreferencesDataStore` (coreBridge), `RecordMatchResultUseCase` (tournamentKoinModule — the SINGLE
+  finish-and-advance write path, identical instance), `VoiceModelRepository` (settingsKoinModule),
+  `gamificationEngine` (already a `ManaHubApp` `@Inject` field). 2 game-only deps bridged new
+  (`EvaluatePlayerEliminationUseCase`, `GamificationEngine`) + the 13 deferred-feature singletons. NOTHING
+  promoted to coreBridge, NO island shrunk. The per-seat-stats `isLocal` win/loss derivation, the
+  tournament single-write-path, the broadcast-first online sync, and the one-voice-language-per-session
+  rule are all byte-for-byte untouched (DI-only change). See CHANGE LOG.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
 
 ## NEXT STEP (resume here)
-✅ **The interrupted WIP is REPAIRED and the tree is GREEN** (see Phase 1 STATUS above + the 2026-06-20
-CHANGE LOG repair line). `:shared:core-model` (full model set) and `:shared:core-common` both compile for
-android + wasmJs; `:app` depends on both and `assembleDebug` is SUCCESSFUL; tests at baseline (122/2).
-**`core-common` survived intact** — no re-add needed.
+✅ **Phase 1 Hilt→Koin cutover is COMPLETE for every non-excluded feature (TWENTY islands, Game last,
+2026-06-22).** The interrupted Game WIP was finished + verified GREEN: `:app:assembleDebug` SUCCESSFUL,
+`:app:testDebugUnitTest` = 1964 tests / 122 failed / 2 skipped (== baseline, ZERO new failures;
+`GameViewModelVoiceTest` 7/7 + `GameResultStripViewModelTest` 5/5 green). `git diff --stat` confirms NO
+`core/voice`/`feature/online`/`feature/scanner`/`core/nearby` file touched. The ONLY features still on
+Hilt are the THREE explicitly-deferred platform-heavy ones (online games, voice control, camera scanner).
 
-Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session-limit breakage):
+➡️ **NEXT = Phase 2: extract `:shared:core-domain` then `:shared:core-data`.**
+1. **`:shared:core-domain`** — move the pure use cases + repository INTERFACES (the contracts, no impls)
+   into `commonMain`. ZERO platform imports: no Android/AndroidX, no Room, no Retrofit/Gson, no
+   `R.string`. Anything platform-bound a use case currently touches goes behind a `commonMain` interface
+   or `expect`/`actual` (reuse `:shared:core-common`'s `DispatcherProvider`/`KeyValueStore`/`CrashReporter`
+   contracts — wire call-sites onto them here, finally consuming the module that already builds but is unused).
+2. **`:shared:core-data`** — repository IMPLs in `commonMain` against those interfaces; **Room DAOs/
+   entities/migrations STAY in `androidMain`** (no wasm target) with the DAO interface in `commonMain` and
+   a web data source (Supabase-remote + IndexedDB/localStorage) in `wasmJsMain`. Migrate **Retrofit → Ktor**
+   (js/wasm engine) and **Gson → kotlinx-serialization**; port the rate-limit queues
+   (`ScryfallRequestQueue`/`ArchidektRequestQueue`) to pure-coroutine `Mutex` impls in `commonMain`.
+3. **Fold in the deferred web spikes B & C here** (Supabase/Ktor/Coil on wasmJs; web auth) — they validate
+   exactly the web-runtime libraries Phase 2's data layer introduces, so they belong in this phase.
+Definition of done per Phase-2 batch: Android stays shippable (compiles + 122/2 baseline), the wasmJs
+target compiles, and no Android/AndroidX/browser import leaked into `commonMain`. Keep batches small
+(≤ ~15 files) to survive session limits.
+
+---
+
+**Phase 1 history (DONE — kept for reference):** the per-feature cutover ran in SMALL batches (≤ ~15
+files per run to avoid mid-task session-limit breakage):
 
 1. **(Optional, only if needed) finish `:shared:core-model`** — extract any remaining PURE domain models
    still in `core.domain.model` that have ZERO Android deps and are needed by shared code (current
@@ -203,10 +251,11 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    **Decks done (2026-06-21 — the EIGHTEENTH island, 4 VMs; KEEPS `DeckDoctorModule` + bridges the
    engine/use cases because still-Hilt Draft shares the SAME `DeckScorer`; see the CHANGE LOG).**
    **Auth done (2026-06-21 — the NINETEENTH island; the CROSS-CUTTING island; see the CHANGE LOG).**
-   The ONLY remaining non-excluded island is **`game` (NEXT — the heaviest + last; still-Hilt today, and
-   it is also the consumer that forced Tournament/Decks to KEEP their Hilt modules + bridge use cases, so
-   migrating it lets those bridges be reconsidered)**. `feature/online`, `core/voice` + in-game voice, and
-   `feature/scanner` remain EXPLICITLY EXCLUDED/DEFERRED (untouched, still Hilt + Android Compose).
+   **Game done (2026-06-22 — the TWENTIETH + LAST non-excluded island, 3 VMs; the heaviest, and the one
+   that BRIDGES the deferred `core/voice`+`core/online`+`core/nearby` singletons WITHOUT migrating them;
+   see the CHANGE LOG).** Phase 1 is now COMPLETE for every non-excluded feature. `feature/online`,
+   `core/voice` + in-game voice, and `feature/scanner` remain EXPLICITLY EXCLUDED/DEFERRED (untouched,
+   still Hilt + Android Compose).
    Apply
    the EXACT
    same pattern proven by
@@ -265,6 +314,55 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 1 · Game Koin island** (TWENTIETH + LAST non-excluded feature cutover; the
+  heaviest island, and the one that BRIDGES three DEFERRED features without migrating them — completing
+  the Phase-1 Hilt→Koin cutover for everything except online/voice/scanner). FINISHED the interrupted WIP
+  (3 de-Hilt'd VMs + a pre-written `GameKoinModule.kt` were on disk; `ManaHubApp`/`AppNavGraph` were NOT
+  yet wired so the tree did not compile). De-Hilt'd VMs were already correct: `GameViewModel` (19 ctor deps
+  incl. voice/online/nearby), `GameSetupViewModel`, `GameResultStripViewModel` all dropped
+  `@HiltViewModel`/`@Inject constructor` + the `@ApplicationContext` qualifier + the `dagger`/`javax.inject`
+  imports → plain ctors, param lists BYTE-FOR-BYTE unchanged. **The voice/online coupling (the hard part):**
+  `GameViewModel` integrates the DEFERRED `core/voice` (`VoiceCommandRecognizer`), `core/online` (the 11
+  session use cases: Observe/UpdateLife/AdvancePhase/NextTurn/UpdateCounter/UpdateCommanderDamage/
+  ConfirmDefeat/RevokeDefeat/LeaveSession/ToggleLandPlayed), and `core/nearby` (`NearbySessionRepository`)
+  features, which MUST stay Hilt. Those 13 Hilt-owned singletons are BRIDGED from the Hilt graph through
+  `ManaHubApp` into `gameKoinModule` (the tournament-use-case bridge pattern) → ONE shared instance per DI
+  graph; NOTHING under `core/voice`, `feature/online`, `core/nearby`, `feature/scanner` was de-Hilt'd
+  (`git diff --stat`: only ManaHubApp + AppNavGraph + 5 game/*.kt files + the new GameKoinModule). **Scoping:**
+  `GameViewModel` is Activity-scoped (game state persists across all in-game navigation) — `AppNavGraph`'s
+  `hiltViewModel(activity)` → `koinViewModel(viewModelStoreOwner = activity)` (exact equivalent; the
+  activity `CreationExtras` carry the `mode`/`playerCount` nav args into the Koin-injected `SavedStateHandle`
+  `= get()`). `GameSetupViewModel` (AppNavGraph, default-param `hiltViewModel()`) → `koinViewModel()`;
+  `GamePlayScreen`'s default param `GameViewModel = hiltViewModel()` → `koinViewModel()` (import swapped;
+  the screen is always rendered with the explicit Activity-scoped `gameVm`, so the default is belt-and-braces);
+  `GameResultScreen`'s `GameProgressionStrip(viewModel: GameResultStripViewModel = …hiltViewModel())` →
+  fully-qualified `org.koin.androidx.compose.koinViewModel()` (this default IS used at runtime — the strip is
+  rendered inside `GamePlayScreen` without an explicit VM); `GameSetupScreen.viewModel` is a required param,
+  no default → untouched. **Reused via `get()` (NOT re-registered):** `GameSessionRepository`/
+  `TournamentRepository`/`AnalyticsHelper`/`UserPreferencesDataStore` (coreBridge), `RecordMatchResultUseCase`
+  (tournamentKoinModule — the SINGLE finish-and-advance write path, identical instance — the game-played
+  tournament-result flow still routes through it), `VoiceModelRepository` (settingsKoinModule, for
+  GameSetup), `gamificationEngine` (already a `ManaHubApp` `@Inject` field from Phase 0). **Bridged NEW via
+  `ManaHubApp`:** the 13 deferred-feature singletons above + `EvaluatePlayerEliminationUseCase` (game-only)
+  + `GamificationEngine` re-exposed for `GameResultStripViewModel` — 14 `single { }`s total in
+  `gameKoinModule`, registered last in `startKoin`. NOTHING promoted to coreBridge, NO island shrunk. **Hilt
+  `GameModule` (`@Binds GameSessionRepository`) KEPT** (the repo is bridged in coreBridge AND consumed by
+  the still-Hilt online/nearby code — must stay Hilt-bound; the same singleton serves both graphs). **CLAUDE.md
+  invariants untouched (DI-only change):** per-seat-stats `isLocal` win/loss derivation, tournament
+  single-write-path, broadcast-first online sync, one-voice-language-per-session — all byte-for-byte
+  unchanged. **Koin-graph audit:** all 14 game `single<T>` types appear in NO other loaded module
+  (grep-verified) → no duplicate `single<T>` across the 20 loaded modules → no `DefinitionOverrideException`
+  (and `startKoin` ran clean during the test-suite app init — all `errors=0`). **Tests:** both game test
+  classes build the VMs via plain named-arg ctors (`GameViewModelVoiceTest` constructs `GameViewModel(...)`
+  directly; it already mocks `FirebaseCrashlytics`) → NO test edit needed; `GameViewModelVoiceTest` 7/7,
+  `GameResultStripViewModelTest` 5/5, both 0 fail/0 error. Verified: `:app:assembleDebug` BUILD SUCCESSFUL
+  (pre-existing deprecation warnings only); `:app:testDebugUnitTest` 1964 tests / 122 failed / 2 skipped —
+  EXACTLY the baseline, ZERO new failures (the 73 online/voice failures among the 122 — OnlineSession=28,
+  CommandGrammar=3, LobbyJoin=42 — are PRE-EXISTING assertion failures in the EXCLUDED features, all
+  `errors=0`, untouched). Inline secret-scan clean (DI wiring only, no credentials). Koin islands now =
+  {Settings, Stats, Profile, Home, TagDictionary, AddCard, CommunityDecks, CardDetail, Friends, Splash,
+  Survey, News, Draft, Playtest, Tournament, Trades, Collection, Decks, Auth, Game} (20) — Phase 1 COMPLETE
+  except online/voice/scanner. NEXT = Phase 2 (`:shared:core-domain` then `:shared:core-data`).
 - 2026-06-21 — **Phase 1 · Auth Koin island** (nineteenth feature cutover; the CROSS-CUTTING island —
   `AuthViewModel` is consumed inside MANY screens, both already-Koin and still-Hilt, so the call-site
   sweep was the risk). De-Hilt'd `AuthViewModel` (the ONLY VM under `feature/auth/**`; dropped

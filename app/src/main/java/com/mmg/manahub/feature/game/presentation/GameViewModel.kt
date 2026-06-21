@@ -42,8 +42,6 @@ import com.mmg.manahub.feature.game.domain.model.Player
 import com.mmg.manahub.feature.game.domain.model.PlayerResult
 import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -61,7 +59,6 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class GameUiState(
     val players:          List<Player>      = emptyList(),
@@ -105,8 +102,7 @@ data class GameUiState(
     val appUserWon:    Boolean get() = winner?.isAppUser == true
 }
 
-@HiltViewModel
-class GameViewModel @Inject constructor(
+class GameViewModel(
     savedStateHandle:                  SavedStateHandle,
     private val gameSessionRepo:       GameSessionRepository,
     private val tournamentRepo:        TournamentRepository,
@@ -125,7 +121,7 @@ class GameViewModel @Inject constructor(
     private val toggleLandPlayedUseCase:           ToggleLandPlayedUseCase,
     private val voiceCommandRecognizer:            VoiceCommandRecognizer,
     private val evaluatePlayerEliminationUseCase:  EvaluatePlayerEliminationUseCase,
-    @ApplicationContext private val appContext: Context,
+    private val appContext: Context,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
