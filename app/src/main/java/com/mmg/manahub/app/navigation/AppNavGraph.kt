@@ -905,7 +905,11 @@ fun AppNavGraph(
                 arguments = listOf(navArgument("tournamentId") { type = NavType.LongType }),
             ) { entry ->
                 val tournamentId = entry.arguments?.getLong("tournamentId") ?: 0L
-                val tournamentVm: TournamentViewModel = hiltViewModel(entry)
+                // KMP migration — Tournament Koin island. The VM is entry-scoped (one instance per
+                // TournamentDetail back-stack entry) and its SavedStateHandle is populated from this
+                // entry's CreationExtras (carrying the `tournamentId` nav arg) — the exact equivalent of
+                // the old hiltViewModel(entry).
+                val tournamentVm: TournamentViewModel = koinViewModel(viewModelStoreOwner = entry)
                 TournamentScreen(
                     tournamentId = tournamentId,
                     onNavigateBack = { navController.popBackStack() },

@@ -74,29 +74,37 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     heaviest island so far + the first with an Activity-scoped VM), Splash + Survey + News (Phase 1,
     2026-06-21 — three leaf islands migrated in one run; News is the THIRD multi-VM island), Draft
     (Phase 1, 2026-06-21 — the FOURTH multi-VM island, 3 VMs), Playtest (Phase 1, 2026-06-21 — the
-    FIFTH multi-VM island, 2 VMs; the SECOND island to convert+delete its feature-private Hilt module).**
+    FIFTH multi-VM island, 2 VMs; the SECOND island to convert+delete its feature-private Hilt module),
+    Tournament (Phase 1, 2026-06-21 — the SIXTH multi-VM island, 3 VMs; the FIRST entry-scoped Koin VM
+    via `koinViewModel(viewModelStoreOwner = entry)`, KEEPS its Hilt module + bridges 2 use cases for the
+    still-Hilt `GameViewModel`).**
     Every OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
-    The shared `app/di/CoreBridgeKoinModule.kt` now holds THIRTEEN cross-island
+    The shared `app/di/CoreBridgeKoinModule.kt` now holds FOURTEEN cross-island
     singletons: `UserPreferencesRepository` (Settings+Stats+CardDetail), `UserPreferencesDataStore`
     (Settings+Profile+Home+CardDetail), `AuthRepository` (Settings+Profile+Home+CardDetail+Friends),
     `GameSessionRepository` (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository`
     (Stats+Home+CommunityDecks+CardDetail), `ScryfallRemoteDataSource` (Stats+Home),
     `GamificationRepository` (Profile+Home), `CardRepository` (Home+CommunityDecks+CardDetail),
     `AnalyticsHelper` (Settings+CardDetail+Friends+Draft), `FriendRepository` (Profile+Friends),
-    `DraftRepository` (Home+Draft), `DraftSimRepository` (Home+Draft) — so no feature
+    `DraftRepository` (Home+Draft), `DraftSimRepository` (Home+Draft),
+    `TournamentRepository` (Home+Tournament+Hilt-GameViewModel) — so no feature
     module double-registers a shared type (`DefinitionOverrideException` guard). Adding CardDetail promoted
     `AnalyticsHelper` into the bridge and SHRUNK Settings; adding Friends promoted `FriendRepository` into
     the bridge and SHRUNK Profile (it now resolves `FriendRepository` via `get()`); adding Draft promoted
-    `DraftRepository` + `DraftSimRepository` into the bridge and SHRUNK Home (both resolved via `get()`).
+    `DraftRepository` + `DraftSimRepository` into the bridge and SHRUNK Home (both resolved via `get()`);
+    adding Tournament promoted `TournamentRepository` into the bridge and SHRUNK Home (resolved via `get()`).
     CommunityDecks and Playtest are the
     only islands to **convert+delete their feature-private Hilt module** so far; Friends KEEPS its Hilt `FriendModule`
     (`@Binds FriendRepository` + `@Provides FriendshipService`) because Hilt features still consume them
-    (Trades VMs + `CollectionStatsSyncWorker`). Multi-arg-nav VMs resolve a Koin-injected `SavedStateHandle`
-    carrying their nav args (`cardName` / `archidektId` / `scryfallId` / `userId`); Activity-scoped VMs
-    (InviteDispatcher) resolve via `koinViewModel(viewModelStoreOwner = activity)`.
+    (Trades VMs + `CollectionStatsSyncWorker`); Tournament likewise KEEPS its Hilt `TournamentModule`
+    (`@Binds TournamentRepository`) because the still-Hilt `GameViewModel` consumes the repo + the record
+    use case. Multi-arg-nav VMs resolve a Koin-injected `SavedStateHandle`
+    carrying their nav args (`cardName` / `archidektId` / `scryfallId` / `userId` / `tournamentId`);
+    Activity-scoped VMs (InviteDispatcher) resolve via `koinViewModel(viewModelStoreOwner = activity)`,
+    and entry-scoped VMs (TournamentDetail) via `koinViewModel(viewModelStoreOwner = entry)`.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
     Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash + Survey + News +
-    Draft + Playtest done (FOURTEEN islands); the rest NOT started.
+    Draft + Playtest + Tournament done (FIFTEEN islands); the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -152,9 +160,11 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    the default `viewModel` param → NO `AppNavGraph` edit. `SurveyViewModelTest` already used the plain
    ctor → no test edit (14/14 green).
    **Draft done (2026-06-21 — the FOURTH multi-VM island, 3 VMs; see the CHANGE LOG).**
-   **Playtest done (2026-06-21 — the FIFTH multi-VM island, 2 VMs; see the CHANGE LOG).** After that,
-   candidates in rough order of entanglement: `tournament` (recommended next) / `trades` / `decks` /
-   `collection` / `game` / `auth`. Apply the EXACT
+   **Playtest done (2026-06-21 — the FIFTH multi-VM island, 2 VMs; see the CHANGE LOG).**
+   **Tournament done (2026-06-21 — the SIXTH multi-VM island, 3 VMs; see the CHANGE LOG).** After that,
+   candidates in rough order of entanglement: `trades` (recommended next — least entangled of the
+   remaining) / `decks` / `collection` / `auth`, then `game` (the heaviest + last non-excluded). Apply
+   the EXACT
    same pattern proven by
    Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends/Splash/Survey/News/Draft: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
@@ -211,6 +221,64 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Tournament Koin island** (fifteenth feature cutover; the SIXTH multi-VM
+  island, 3 VMs; FIRST entry-scoped Koin VM; FIRST island to KEEP its Hilt module AND bridge use cases
+  because a still-Hilt feature shares its write path). De-Hilt'd ALL THREE tournament VMs (dropped
+  `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject` imports → plain ctors, zero behaviour
+  change): `TournamentListViewModel` (1 dep: `TournamentRepository`), `TournamentSetupViewModel` (1 dep:
+  `TournamentRepository`), `TournamentViewModel` (4 deps: `TournamentRepository`,
+  `CalculateStandingsUseCase`, `RecordMatchResultUseCase`, `SavedStateHandle`). **The tournament
+  single finish-and-advance atomic write path is intact:** `RecordMatchResultUseCase` →
+  `TournamentRepository.finishMatch` → `TournamentDao.finishMatchAndAdvanceAtomically` is unchanged;
+  `TournamentViewModel` still imports `PlayerConfig` from `feature.game.presentation` BY DESIGN (left
+  alone); the `tournamentId > 0L` construction guard, the `viewModelScope` create flow, and the tiebreaker/
+  bye logic were untouched — the cutover changed ONLY DI annotations/wiring. New
+  `feature/tournament/di/TournamentKoinModule.kt` (`tournamentKoinModule(calculateStandings,
+  recordMatchResult)`): a `viewModel { }` per VM. **Nav-arg handling:** `TournamentViewModel` reads the
+  `tournamentId` nav arg from a Koin-injected `SavedStateHandle` (`savedStateHandle = get()`).
+  **NEW gotcha — entry-scoped Koin VM:** `TournamentScreen` is the one tournament screen whose
+  AppNavGraph composable created the VM EXPLICITLY (`val tournamentVm = hiltViewModel(entry)`, then
+  passed `viewModel = tournamentVm` AND referenced it in `onStartMatch` for
+  `buildPlayerConfigsForMatch`/`getGameMode`). Its Koin equivalent is
+  `koinViewModel(viewModelStoreOwner = entry)` — the NavBackStackEntry is a `ViewModelStoreOwner` whose
+  `CreationExtras` populate the `SavedStateHandle` (same `tournamentId`), so it stays entry-scoped (one
+  instance per detail destination) and the `onStartMatch` reference keeps working; only that creation line
+  changed. The other two screens (`TournamentListScreen`, `TournamentSetupScreen`) used the default
+  `viewModel` param → swapped the default `hiltViewModel()` → `koinViewModel()`, NO AppNavGraph edit.
+  **`TournamentsSheet` (used INSIDE the still-Hilt `GameSetupScreen`) also resolves
+  `TournamentListViewModel` — its default param was swapped `hiltViewModel()` → `koinViewModel()` too;
+  a Koin VM resolves fine inside a Hilt screen (Koin is started app-wide).** **Bridge —
+  `TournamentRepository` PROMOTED + Home SHRUNK:** it was a Home-only bridged `single`; now shared with
+  Tournament (and the Hilt `GameViewModel`), it was MOVED into `coreBridgeKoinModule` (now FOURTEEN
+  singletons) and `homeKoinModule` was shrunk to drop the param + `single` (its `viewModel { }` already
+  used `get()` → no Home VM edit; the `ManaHubApp` home call dropped the arg, the coreBridge call gained
+  it). **Hilt `TournamentModule` KEPT (NOT converted/deleted):** it `@Binds TournamentRepository`, still
+  consumed by the still-Hilt `GameViewModel` → deleting it would break the Hilt graph (same reason
+  Friends/News/Draft kept their modules). The two use cases (`CalculateStandingsUseCase`,
+  `RecordMatchResultUseCase`) KEEP their `@Singleton @Inject constructor` (Hilt still builds them —
+  `GameViewModel` consumes `RecordMatchResultUseCase` via the game-played result flow) and are BRIDGED
+  from the Hilt graph into Koin via `ManaHubApp` → `tournamentKoinModule` (so the SAME singleton instances
+  serve both DI graphs; no `TournamentDao`/dispatcher bridging needed). `ManaHubApp` gained 2 new `@Inject`
+  bridge fields (`calculateStandingsUseCase`, `recordMatchResultUseCase`; `tournamentRepository` was
+  already injected and is REUSED), added `tournamentRepository` to the `coreBridgeKoinModule(...)` call,
+  dropped it from the `homeKoinModule(...)` call, and registers `tournamentKoinModule(...)`. NO Hilt
+  `@Provides`/`@Binds` deleted. **Koin-graph audit:** the 2 new `single<T>` types
+  (`CalculateStandingsUseCase`, `RecordMatchResultUseCase`) appear in NO other loaded module;
+  `TournamentRepository` now lives ONLY in coreBridge (removed from Home) → no duplicate `single<T>`
+  across the 15 loaded modules → no `DefinitionOverrideException` (and `startKoin` ran clean during the
+  test-suite app init). **Tests:** `TournamentViewModelTest` (36) already built the VM via the plain 4-arg
+  constructor with `mockkStatic(FirebaseCrashlytics)` in `@Before`/`@After` + hand-built `SavedStateHandle`
+  → NO test edit needed; it + `TournamentRepositoryImplTest` (35) + `TournamentEngineTest` (22) +
+  `TournamentIdCodecTest` (14) + `GenerateNextRoundPlanTest` all green. Verified: `:app:assembleDebug`
+  SUCCESSFUL (deprecation warnings only); `:app:testDebugUnitTest` 1964 tests / 123 failed / 2 skipped —
+  the ONE extra vs the 122 baseline is a PRE-EXISTING flaky `HomeViewModelTest` Discover/`order:random`
+  test (`UncaughtExceptionsBeforeTest`, a leaked-coroutine-exception-between-tests symptom): its failing
+  set OSCILLATES run-to-run REGARDLESS of these changes — proven by `git stash` + isolated run on clean
+  HEAD (2 fails) vs isolated run WITH changes (3 DIFFERENT fails) vs full run WITH changes (1 fail); zero
+  tournament classes among the failures, and `HomeViewModel`/its test are untouched by this cutover.
+  Inline secret-scan clean. Koin islands now = {Settings, Stats, Profile, Home, TagDictionary, AddCard,
+  CommunityDecks, CardDetail, Friends, Splash, Survey, News, Draft, Playtest, Tournament} (15); all other
+  features still Hilt (incl. game/voice/online/scanner — still EXCLUDED). NEXT = `feature/trades`.
 - 2026-06-21 — **Phase 1 · Playtest Koin island** (fourteenth feature cutover; the FIFTH multi-VM
   island, 2 VMs; the SECOND island to convert+delete its feature-private Hilt module — after
   CommunityDecks). De-Hilt'd BOTH Deck Playtest VMs (dropped `@HiltViewModel`/`@Inject constructor` +

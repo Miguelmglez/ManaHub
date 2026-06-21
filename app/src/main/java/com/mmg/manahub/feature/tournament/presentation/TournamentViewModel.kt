@@ -15,7 +15,6 @@ import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,10 +23,16 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class TournamentViewModel @Inject constructor(
+/**
+ * KMP migration — Phase 1 Hilt→Koin cutover. Plain (non-Hilt) ViewModel resolved by Koin via
+ * `koinViewModel()`; constructed in `tournamentKoinModule`. The `tournamentId` nav arg flows in via a
+ * Koin-injected [SavedStateHandle] (`savedStateHandle = get()`), populated from the NavBackStackEntry's
+ * `CreationExtras` exactly as Hilt did — so the `> 0L` construction guard, the single finish-and-advance
+ * write path ([RecordMatchResultUseCase] → [TournamentRepository.finishMatch]) and the viewModelScope
+ * create flow are all unchanged. Only the DI annotations were removed.
+ */
+class TournamentViewModel(
     private val repository:             TournamentRepository,
     private val calculateStandings:     CalculateStandingsUseCase,
     private val recordMatchResultUseCase: RecordMatchResultUseCase,
