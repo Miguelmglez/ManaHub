@@ -24,7 +24,6 @@ import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.settings.presentation.PreferencesState
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +39,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -54,8 +52,7 @@ enum class PlayStyle(val label: String, val icon: String) {
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class ProfileViewModel @Inject constructor(
+class ProfileViewModel(
     private val statsRepo: StatsRepository,
     private val gameSessionRepo: GameSessionRepository,
     private val surveyAnswerDao: SurveyAnswerDao,

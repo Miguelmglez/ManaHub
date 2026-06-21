@@ -15,6 +15,7 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.app.di.coreBridgeKoinModule
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
@@ -38,11 +39,15 @@ import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
+import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.profile.di.profileKoinModule
 import com.mmg.manahub.feature.settings.di.settingsKoinModule
 import com.mmg.manahub.feature.stats.di.statsKoinModule
 import dagger.hilt.android.HiltAndroidApp
@@ -96,8 +101,15 @@ class ManaHubApp : Application() {
     @Inject lateinit var scryfallRemoteDataSource: ScryfallRemoteDataSource
     @Inject lateinit var refreshCollectionPricesUseCase: RefreshCollectionPricesUseCase
     @Inject lateinit var gameSessionDao: GameSessionDao
-    @Inject lateinit var gameSessionRepository: GameSessionRepository
+    @Inject lateinit var gameSessionRepository: GameSessionRepository  // shared: Stats + Profile
     @Inject lateinit var deckRepository: DeckRepository
+
+    // Profile island (Phase 1) bridge deps. (userPreferencesDataStore + authRepository are shared with
+    // Settings and gameSessionRepository is shared with Stats — all bridged in coreBridgeKoinModule.)
+    @Inject lateinit var statsRepository: StatsRepository
+    @Inject lateinit var surveyAnswerDao: SurveyAnswerDao
+    @Inject lateinit var friendRepository: FriendRepository
+    @Inject lateinit var gamificationRepository: GamificationRepository
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -113,14 +125,15 @@ class ManaHubApp : Application() {
             androidLogger(if (BuildConfig.DEBUG) Level.INFO else Level.ERROR)
             androidContext(this@ManaHubApp)
             modules(
-                // Shared bridged singletons used by more than one Koin island (Settings + Stats).
+                // Shared bridged singletons used by more than one Koin island (Settings + Stats + Profile).
                 coreBridgeKoinModule(
                     userPreferencesRepo = userPreferencesRepository,
+                    userPrefsDataStore = userPreferencesDataStore,
+                    authRepository = authRepository,
+                    gameSessionRepository = gameSessionRepository,
                 ),
                 settingsKoinModule(
-                    userPrefsDataStore = userPreferencesDataStore,
                     analyticsHelper = analyticsHelper,
-                    authRepository = authRepository,
                     userProfileDataSource = userProfileDataSource,
                     pushTokenRepository = pushTokenRepository,
                     notificationPrefsRepository = notificationPrefsRepository,
@@ -132,8 +145,13 @@ class ManaHubApp : Application() {
                     scryfallDataSource = scryfallRemoteDataSource,
                     refreshPricesUseCase = refreshCollectionPricesUseCase,
                     gameSessionDao = gameSessionDao,
-                    gameSessionRepository = gameSessionRepository,
                     deckRepository = deckRepository,
+                ),
+                profileKoinModule(
+                    statsRepository = statsRepository,
+                    surveyAnswerDao = surveyAnswerDao,
+                    friendRepository = friendRepository,
+                    gamificationRepository = gamificationRepository,
                 ),
             )
         }
