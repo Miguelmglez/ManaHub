@@ -30,6 +30,7 @@ import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
@@ -47,6 +48,7 @@ import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
+import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -59,6 +61,7 @@ import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
+import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.draft.di.draftKoinModule
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
@@ -101,6 +104,7 @@ import com.mmg.manahub.feature.trades.domain.repository.SharedListsRepository
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import dagger.hilt.android.HiltAndroidApp
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -272,6 +276,17 @@ class ManaHubApp : Application() {
     @Inject lateinit var sharedListsRepository: SharedListsRepository
     @Inject lateinit var tradeCollectionSyncDao: TradeCollectionSyncDao
 
+    // Collection island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
+    //  - CardRepository, AuthRepository, UserPreferencesRepository, AnalyticsHelper, WishlistRepository
+    //    and OpenForTradeRepository are all bridged in coreBridgeKoinModule (shared with other islands).
+    //  - GetLocalWishlistUseCase is already a single in tradesKoinModule and UserCardRepository is already
+    //    a single in cardDetailKoinModule — both resolved via get(), not re-registered.
+    //  - WorkManager is already injected above (the same singleton used for global sync scheduling).
+    // Only the three Collection-only singletons are here.
+    @Inject lateinit var getCollectionUseCase: GetCollectionUseCase
+    @Inject lateinit var syncManager: SyncManager
+    @Inject lateinit var migrateLocalTradeListsUseCase: MigrateLocalTradeListsUseCase
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -377,6 +392,12 @@ class ManaHubApp : Application() {
                 tradesKoinModule(
                     sharedListsRepository = sharedListsRepository,
                     tradeCollectionSyncDao = tradeCollectionSyncDao,
+                ),
+                collectionKoinModule(
+                    getCollection = getCollectionUseCase,
+                    syncManager = syncManager,
+                    workManager = workManager,
+                    migrateLocalTradeLists = migrateLocalTradeListsUseCase,
                 ),
             )
         }

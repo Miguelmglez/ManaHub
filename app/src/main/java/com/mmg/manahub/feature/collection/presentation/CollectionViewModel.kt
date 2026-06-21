@@ -23,14 +23,12 @@ import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * ViewModel for the collection screen.
@@ -42,8 +40,7 @@ import javax.inject.Inject
  * All push/pull details, watermarks, and LWW conflict resolution are handled
  * internally by [SyncManager] — this ViewModel only reports the state to the UI.
  */
-@HiltViewModel
-class CollectionViewModel @Inject constructor(
+class CollectionViewModel(
     private val getCollection: GetCollectionUseCase,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,

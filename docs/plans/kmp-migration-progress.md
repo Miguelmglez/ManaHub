@@ -79,7 +79,12 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     via `koinViewModel(viewModelStoreOwner = entry)`, KEEPS its Hilt module + bridges 2 use cases for the
     still-Hilt `GameViewModel`), Trades (Phase 1, 2026-06-21 — the SEVENTH multi-VM island, 5 VMs; the
     MOST repo-entangled island so far — its 5-repo split forced promoting 3 shared repos to coreBridge +
-    shrinking 3 prior islands; KEEPS its Hilt `TradesModule` for still-Hilt consumers).**
+    shrinking 3 prior islands; KEEPS its Hilt `TradesModule` for still-Hilt consumers), Collection
+    (Phase 1, 2026-06-21 — a SINGLE-VM island, the least-entangled remaining; reuses 8 already-bridged
+    deps via `get()` — 6 from coreBridge + `GetLocalWishlistUseCase` from `tradesKoinModule` +
+    `UserCardRepository` from `cardDetailKoinModule` — and bridges only 3 new Collection-only singletons
+    + the already-injected `WorkManager`; NOTHING promoted to coreBridge, NO island shrunk; KEEPS its
+    `AdvancedSearchViewModel = hiltViewModel()` (a core/ui-components VM, out of collection scope)).**
     Every OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
     The shared `app/di/CoreBridgeKoinModule.kt` now holds SEVENTEEN cross-island
     singletons (the 14 below + `TradesRepository`, `WishlistRepository`, `OpenForTradeRepository`
@@ -108,8 +113,8 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     and entry-scoped VMs (TournamentDetail) via `koinViewModel(viewModelStoreOwner = entry)`.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
     Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash + Survey + News +
-    Draft + Playtest + Tournament + Trades done (SIXTEEN islands); the rest NOT started (decks /
-    collection / auth, then game last; online/voice/scanner EXCLUDED).
+    Draft + Playtest + Tournament + Trades + Collection done (SEVENTEEN islands); the rest NOT started
+    (decks / auth, then game last; online/voice/scanner EXCLUDED).
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -168,12 +173,13 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    **Playtest done (2026-06-21 — the FIFTH multi-VM island, 2 VMs; see the CHANGE LOG).**
    **Tournament done (2026-06-21 — the SIXTH multi-VM island, 3 VMs; see the CHANGE LOG).**
    **Trades done (2026-06-21 — the SEVENTH multi-VM island, 5 VMs, MOST repo-entangled; see the
-   CHANGE LOG).** After that, candidates in rough order of entanglement: **`collection` (recommended
-   next — a single `CollectionViewModel`; note it consumes Wishlist/OpenForTrade, both already in
-   coreBridge, so it just resolves them via `get()`)** / `decks` (DeckList/DeckStudio/DeckImprovement —
-   multi-VM, also consumes the bridged Wishlist) / `auth` (AuthViewModel is consumed inside several
-   still-Hilt + already-Koin screens as `authViewModel = hiltViewModel()` — migrating it is cross-cutting,
-   do it carefully), then `game` (the heaviest + last non-excluded). Apply
+   CHANGE LOG).**
+   **Collection done (2026-06-21 — a SINGLE-VM island, least-entangled remaining; see the CHANGE LOG).**
+   After that, candidates in rough order of entanglement: **`decks` (recommended next —
+   DeckList/DeckStudio/DeckImprovement, multi-VM; consumes the bridged Wishlist/DeckRepository)** /
+   `auth` (AuthViewModel is consumed inside several still-Hilt + already-Koin screens as
+   `authViewModel = hiltViewModel()` — migrating it is cross-cutting, do it carefully), then `game`
+   (the heaviest + last non-excluded). Apply
    the EXACT
    same pattern proven by
    Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends/Splash/Survey/News/Draft: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
@@ -231,6 +237,49 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Collection Koin island** (seventeenth feature cutover; a SINGLE-VM island —
+  the least-entangled remaining feature, and the FIRST island that needed NEITHER a coreBridge promotion
+  NOR an island shrink). De-Hilt'd the one collection VM `CollectionViewModel` (dropped `@HiltViewModel`/
+  `@Inject constructor` + the `dagger.hilt`/`javax.inject` imports → plain ctor, zero behaviour change;
+  12 ctor deps, NO `SavedStateHandle`, NO nav args). The Paging note in the prompt was moot —
+  `CollectionViewModel` does NOT use `androidx.paging.PagingData`; it builds its own filtered/sorted
+  `List<CollectionCardGroup>` in `_uiState` (Paging lives in other code, left as-is, NOT commonized). The
+  collection sync logic (the `SyncManager` push/pull, `previouslyAuthenticated` guard, the unsynced-banner
+  reconciliation across collection + wishlist + open-for-trade, the `CollectionSyncWorker` scheduling) is
+  intact — the cutover changed ONLY DI annotations/wiring. New `feature/collection/di/CollectionKoinModule.kt`
+  (`collectionKoinModule(getCollection, syncManager, workManager, migrateLocalTradeLists)`): a single
+  `viewModel { CollectionViewModel(...) }` with all 12 args via `get()`. **Bridge — NOTHING promoted to
+  coreBridge, NO island shrunk:** 6 of the 12 deps are reused from coreBridge via `get()`
+  (`CardRepository`, `AuthRepository`, `UserPreferencesRepository`, `AnalyticsHelper`, `WishlistRepository`,
+  `OpenForTradeRepository` — the last two were already promoted by Trades); 2 more are reused via `get()`
+  from OTHER loaded feature modules WITHOUT re-registration (`GetLocalWishlistUseCase` is already a `single`
+  in `tradesKoinModule`; `UserCardRepository` is already a `single` in `cardDetailKoinModule` — a `single<T>`
+  is resolvable from any loaded module, so re-registering either would throw `DefinitionOverrideException`).
+  Only 3 NEW Collection-only singletons were bridged via `ManaHubApp` (`GetCollectionUseCase`, `SyncManager`
+  [`@Singleton` — same instance whose `syncState` StateFlow the global `ManaHubApp` observer also reads],
+  `MigrateLocalTradeListsUseCase`); the 4th ctor dep `WorkManager` reuses the `workManager` field
+  `ManaHubApp` ALREADY `@Inject`s — no new field for it. NO Hilt `@Provides`/`@Binds` deleted, NO
+  feature-private Hilt module (collection has none). **Call-sites:** `CollectionScreen` has the VM as a
+  default param (`viewModel: CollectionViewModel = hiltViewModel()`) → swapped that ONE default to
+  `koinViewModel()` (added the `org.koin.androidx.compose.koinViewModel` import; KEPT the `hiltViewModel`
+  import because the screen's `AdvancedSearchViewModel = hiltViewModel()` — a `core/ui/components/search` VM,
+  OUT of collection scope — stays Hilt; a Hilt VM resolves fine inside a Koin screen). All THREE AppNavGraph
+  composables that render `CollectionScreen` (the Collection / DeckList / Trades bottom-nav tabs) pass NO
+  explicit `viewModel =` arg → NO AppNavGraph edit. `ManaHubApp` gained 3 `@Inject` bridge fields
+  (`getCollectionUseCase`, `syncManager`, `migrateLocalTradeListsUseCase`) + registers
+  `collectionKoinModule(...)` in `startKoin`. **Koin-graph audit:** the 4 collection-only `single<T>` types
+  (`GetCollectionUseCase`, `SyncManager`, `WorkManager`, `MigrateLocalTradeListsUseCase`) appear in NO other
+  loaded module (grep-verified) → no duplicate `single<T>` across the 17 loaded modules → no
+  `DefinitionOverrideException` (and `startKoin` ran clean during the test-suite app init). **Tests:** both
+  collection VM tests (`CollectionViewModelTest` 33, `CollectionViewModelSyncTest` 10) already build the VM
+  via the plain named-arg constructor (identical param names/order after dropping the annotations) → NO test
+  edit needed; both classes 0 fail / 0 error (verified via their TEST-*.xml). Verified: `:app:assembleDebug`
+  SUCCESSFUL (deprecation warnings only, none in the new/edited files); `:app:testDebugUnitTest` 1964 tests /
+  122 failed / 2 skipped (== baseline, ZERO new failures; no collection class among the 122). Inline
+  secret-scan clean. Koin islands now = {Settings, Stats, Profile, Home, TagDictionary, AddCard,
+  CommunityDecks, CardDetail, Friends, Splash, Survey, News, Draft, Playtest, Tournament, Trades,
+  Collection} (17); all other features still Hilt (incl. game/voice/online/scanner — still EXCLUDED).
+  NEXT = `feature/decks` (multi-VM: DeckList/DeckStudio/DeckImprovement), still EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · Trades Koin island** (sixteenth feature cutover; the SEVENTH multi-VM island,
   5 VMs; the MOST repo-entangled island so far — its data layer is split across FIVE repositories by
   concern). De-Hilt'd ALL FIVE trades VMs (dropped `@HiltViewModel`/`@Inject constructor` +
