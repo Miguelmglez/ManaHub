@@ -6,13 +6,11 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class DraftUiState(
     val sets: List<DraftSet> = emptyList(),
@@ -23,8 +21,12 @@ data class DraftUiState(
     val searchQuery: String = "",
 )
 
-@HiltViewModel
-class DraftViewModel @Inject constructor(
+/**
+ * Lists the draftable sets for the Draft landing screen.
+ *
+ * KMP migration — Phase 1: resolved by Koin (`koinViewModel()`), not Hilt.
+ */
+class DraftViewModel(
     private val getDraftableSetsUseCase: GetDraftableSetsUseCase,
 ) : ViewModel() {
 
