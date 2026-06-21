@@ -3,17 +3,14 @@ package com.mmg.manahub.feature.trades.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.trades.domain.model.SharedListResult
 import com.mmg.manahub.feature.trades.domain.repository.SharedListsRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  UI state
@@ -49,11 +46,10 @@ sealed class SharedListUiState {
  * Reads the [shareId] from the navigation back-stack entry (saved state) and
  * calls [SharedListsRepository.resolveSharedList] to fetch the referenced list.
  */
-@HiltViewModel
-class TradesSharedListViewModel @Inject constructor(
+class TradesSharedListViewModel(
     savedStateHandle: SavedStateHandle,
     private val sharedListsRepository: SharedListsRepository,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SharedListUiState>(SharedListUiState.Loading)

@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.trades.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
@@ -13,7 +12,6 @@ import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +20,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 enum class HistoryFilter { ALL, ACTIVE, COMPLETED, DECLINED }
 
@@ -54,14 +51,13 @@ data class TradesHistoryUiState(
 
 private const val CACHE_TTL_MS = 5 * 60 * 1_000L
 
-@HiltViewModel
-class TradesHistoryViewModel @Inject constructor(
+class TradesHistoryViewModel(
     private val authRepository: AuthRepository,
     private val friendRepository: FriendRepository,
     private val getActive: GetActiveTradesUseCase,
     private val getHistory: GetTradeHistoryUseCase,
     private val refreshTrades: RefreshTradesUseCase,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TradesHistoryUiState())

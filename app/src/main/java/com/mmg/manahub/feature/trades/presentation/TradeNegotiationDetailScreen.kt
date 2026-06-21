@@ -60,7 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
@@ -82,7 +82,7 @@ fun TradeNegotiationDetailScreen(
     onBack: () -> Unit,
     onNavigateToEditor: (EditorNavArgs) -> Unit,
     onNavigateToCardDetail: (String) -> Unit,
-    viewModel: TradeNegotiationViewModel = hiltViewModel(),
+    viewModel: TradeNegotiationViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()

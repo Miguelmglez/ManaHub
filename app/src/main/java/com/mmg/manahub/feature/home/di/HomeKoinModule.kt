@@ -13,7 +13,6 @@ import com.mmg.manahub.feature.home.presentation.HomeViewModel
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -42,6 +41,8 @@ import org.koin.dsl.module
  * - `CardRepository` — shared with CommunityDecks (promoted to the bridge for that island).
  * - DraftRepository / DraftSimRepository — shared with Draft (promoted to the bridge for that island).
  * - TournamentRepository — shared with Tournament (promoted to the bridge for that island).
+ * - WishlistRepository — shared with Trades + CardDetail (promoted to the bridge for the Trades island;
+ *   was a Home-only `single` here until then).
  *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
@@ -54,19 +55,17 @@ fun homeKoinModule(
     refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
     manageSourcesUseCase: ManageSourcesUseCase,
     communityStatsRepository: CommunityStatsRepository,
-    wishlistRepository: WishlistRepository,
     getAccountNudgeUseCase: GetAccountNudgeUseCase,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Home-only Hilt-owned singletons to Koin. ──
     // (UserPreferencesDataStore, AuthRepository, GameSessionRepository, StatsRepository, DeckRepository,
-    //  ScryfallRemoteDataSource, GamificationRepository, CardRepository, DraftRepository, DraftSimRepository
-    //  and TournamentRepository are shared → bridged in coreBridgeKoinModule, not here, and resolved below
-    //  via get().)
+    //  ScryfallRemoteDataSource, GamificationRepository, CardRepository, DraftRepository, DraftSimRepository,
+    //  TournamentRepository and WishlistRepository are shared → bridged in coreBridgeKoinModule, not here,
+    //  and resolved below via get().)
     single { getNewsFeedUseCase }
     single { refreshNewsFeedUseCase }
     single { manageSourcesUseCase }
     single { communityStatsRepository }
-    single { wishlistRepository }
     single { getAccountNudgeUseCase }
 
     // ── The Koin island: HomeViewModel is now resolved by Koin, not Hilt. ──

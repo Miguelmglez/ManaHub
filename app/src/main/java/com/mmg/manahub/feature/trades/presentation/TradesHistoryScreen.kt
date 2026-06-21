@@ -39,7 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
@@ -63,7 +63,7 @@ import java.util.Locale
 fun TradesHistoryScreen(
     onOpenThread: (proposalId: String, rootProposalId: String) -> Unit,
     onLoginClick: () -> Unit = {},
-    viewModel: TradesHistoryViewModel = hiltViewModel(),
+    viewModel: TradesHistoryViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()

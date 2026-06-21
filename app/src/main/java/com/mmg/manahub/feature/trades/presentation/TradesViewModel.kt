@@ -12,7 +12,6 @@ import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.SyncTradeListsFromRemoteUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +20,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  UI state
@@ -60,8 +58,7 @@ data class TradesUiState(
  *
  * Phase 3 will add proposal creation and full trade history.
  */
-@HiltViewModel
-class TradesViewModel @Inject constructor(
+class TradesViewModel(
     private val authRepo: AuthRepository,
     private val getLocalWishlist: GetLocalWishlistUseCase,
     private val getLocalOpenForTrade: GetLocalOpenForTradeUseCase,
