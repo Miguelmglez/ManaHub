@@ -71,8 +71,9 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     2026-06-21), Home (Phase 1, 2026-06-21), TagDictionary (Phase 1, 2026-06-21), AddCard (Phase 1,
     2026-06-21), CommunityDecks (Phase 1, 2026-06-21 — the FIRST multi-ViewModel island), CardDetail
     (Phase 1, 2026-06-21), Friends (Phase 1, 2026-06-21 — the SECOND multi-VM island, 3 VMs, the
-    heaviest island so far + the first with an Activity-scoped VM).** Every OTHER feature is still on
-    Hilt (`@HiltViewModel` + `hiltViewModel()`).
+    heaviest island so far + the first with an Activity-scoped VM), Splash + Survey + News (Phase 1,
+    2026-06-21 — three leaf islands migrated in one run; News is the THIRD multi-VM island).** Every
+    OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
     The shared `app/di/CoreBridgeKoinModule.kt` now holds ELEVEN cross-island
     singletons: `UserPreferencesRepository` (Settings+Stats+CardDetail), `UserPreferencesDataStore`
     (Settings+Profile+Home+CardDetail), `AuthRepository` (Settings+Profile+Home+CardDetail+Friends),
@@ -130,9 +131,20 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    **CardDetail done (2026-06-21). Friends done (2026-06-21 — 3 VMs incl. the Activity-scoped
    InviteDispatcher; `FriendRepository` promoted to coreBridge + Profile shrunk; Hilt `FriendModule`
    KEPT because Trades VMs + `CollectionStatsSyncWorker` still consume `FriendRepository`/`FriendshipService`).**
-   Next island = `feature/splash` (the least-entangled remaining leaf — `SplashViewModel` has a SINGLE
-   ctor dep; verify whether the splash screen even resolves it via a default `viewModel` param or is
-   wired explicitly). After that, candidates in rough order of entanglement: `survey` / `news` / `draft` /
+   **Splash + Survey + News done (2026-06-21 — three leaf islands in one run).** `SplashViewModel`
+   (1 dep, `AuthRepository`) resolves via the bridge → `splashKoinModule()` takes NO args, NO new
+   `ManaHubApp` field. `SurveyViewModel` (8 deps + `SavedStateHandle`): `SurveyAnswerDao` reused via
+   `get()` from `profileKoinModule`, `GameSessionDao` via `get()` from `statsKoinModule`, `DeckRepository`
+   + `UserPreferencesRepository` via coreBridge; only 3 Survey-only deps newly bridged
+   (`SurveyCardImpactDao`, `CardDao`, `CompleteSurveyUseCase`); `@ApplicationContext` Context →
+   `androidContext()`, `@IoDispatcher` → `Dispatchers.IO` directly, `SavedStateHandle` (`sessionId`/`mode`)
+   → `get()`. News is the THIRD multi-VM island: BOTH `NewsViewModel` + `NewsSourcesSettingsViewModel`
+   in one `newsKoinModule()` that takes NO args — ALL their deps (3 news use cases + `UserPreferencesDataStore`)
+   are already `single`s in `homeKoinModule` + coreBridge, reused via `get()`. Hilt `NewsModule`
+   (`@Binds NewsRepository`) KEPT — the 3 news use cases stay Hilt-constructed for the Home island bridge
+   and depend on `NewsRepository` (same reason Friends kept `FriendModule`). All 4 screen call-sites used
+   the default `viewModel` param → NO `AppNavGraph` edit. `SurveyViewModelTest` already used the plain
+   ctor → no test edit (14/14 green). After that, candidates in rough order of entanglement: `draft` /
    `playtest` / `tournament` / `trades` / `decks` / `collection` / `game` / `auth`. Apply the EXACT
    same pattern proven by
    Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
@@ -190,6 +202,48 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Splash + Survey + News Koin islands** (tenth/eleventh/twelfth feature
+  cutovers — three light leaf islands migrated in ONE run; News is the THIRD multi-VM island). All
+  four ViewModels de-Hilt'd (dropped `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject`
+  imports → plain ctors, zero behaviour change): `SplashViewModel` (1 dep), `SurveyViewModel` (8 deps +
+  `SavedStateHandle`), `NewsViewModel` (4 deps), `NewsSourcesSettingsViewModel` (1 dep). Three new Koin
+  modules: `feature/splash/di/SplashKoinModule.kt` (`splashKoinModule()` — NO args),
+  `feature/survey/di/SurveyKoinModule.kt` (`surveyKoinModule(surveyCardImpactDao, cardDao, completeSurvey)`),
+  `feature/news/di/NewsKoinModule.kt` (`newsKoinModule()` — NO args, a `viewModel { }` per VM).
+  **Bridge — NOTHING promoted to coreBridge, NO island shrunk:** every shared dep was already a `single`
+  in a loaded module, so each was reused via `get()` without promotion: Splash's `AuthRepository`
+  (coreBridge); Survey's `SurveyAnswerDao` (already a `single` in `profileKoinModule`), `GameSessionDao`
+  (already a `single` in `statsKoinModule`), `DeckRepository` + `UserPreferencesRepository` (coreBridge);
+  News's 3 use cases (`GetNewsFeedUseCase`/`RefreshNewsFeedUseCase`/`ManageSourcesUseCase` — already
+  `single`s in `homeKoinModule`) + `UserPreferencesDataStore` (coreBridge). Confirms the
+  "a `single<T>` is resolvable via `get()` from ANY loaded module, promotion to coreBridge is only
+  needed to avoid a DUPLICATE `single<T>` registration" rule — none of these islands re-registers a
+  shared type, so coreBridge stays at ELEVEN singletons. **Survey platform-binding handling:**
+  `@ApplicationContext Context` → Koin `androidContext()`; `@IoDispatcher CoroutineDispatcher` →
+  `Dispatchers.IO` directly (the SAME singleton the Hilt binding returned, CommunityDecks precedent);
+  `SavedStateHandle` (`sessionId` + `mode` nav args) → `get()` (byte-for-byte identical nav behaviour).
+  Only 3 Survey-only singletons newly bridged via `ManaHubApp` (`surveyCardImpactDao`, `cardDao`,
+  `completeSurveyUseCase`) — Splash + News needed ZERO new `@Inject` fields. **Hilt `NewsModule` KEPT
+  (NOT converted/deleted):** although `NewsRepository` is consumed by no screen outside `feature/news`,
+  the 3 news use cases are STILL Hilt-constructed (`@Inject constructor`) for the HOME island bridge
+  (`ManaHubApp` `@Inject`s them from the Hilt graph → `homeKoinModule`), and they depend on
+  `NewsRepository`, so deleting its only `@Binds` would break the Hilt graph (same reason Friends kept
+  `FriendModule`). It can be converted+deleted once Home migrates off Hilt. **Call-sites:** all 4 screens
+  (`SplashScreen`, `SurveyScreen`, `NewsScreen`, `NewsSourcesSettingsScreen`) swapped their default param
+  `hiltViewModel()` → `koinViewModel()`; all are called in `AppNavGraph` with NO explicit `viewModel =`
+  arg → NO nav edit. `ManaHubApp` gained 3 `@Inject` bridge fields (`surveyCardImpactDao`, `cardDao`,
+  `completeSurveyUseCase`) + registers `splashKoinModule()`, `surveyKoinModule(...)`, `newsKoinModule()`.
+  NO Hilt `@Provides`/`@Binds` deleted. **Koin-graph audit:** the only NEW `single<T>` types registered
+  are Survey's 3 (`SurveyCardImpactDao`, `CardDao`, `CompleteSurveyUseCase`) — grep confirms each appears
+  in NO other loaded module → no `DefinitionOverrideException`; all 13 loaded modules' `single`s remain
+  unique. **Tests:** only `SurveyViewModelTest` exists (no Splash/News tests); it already built the VM
+  via the plain 10-arg constructor (incl. `context`, `ioDispatcher`, `savedStateHandle`) → NO test edit;
+  14/14 pass. Verified: `:app:assembleDebug` SUCCESSFUL (deprecation warnings only);
+  `:app:testDebugUnitTest` 1964 tests / 122 failed / 2 skipped (== baseline, ZERO new failures; no
+  survey/splash/news class among the 122); inline secret-scan clean. Koin islands now = {Settings, Stats,
+  Profile, Home, TagDictionary, AddCard, CommunityDecks, CardDetail, Friends, Splash, Survey, News}; all
+  other features still Hilt. NEXT = `feature/draft` (the least-entangled remaining leaf among draft /
+  playtest / tournament / trades / decks / collection / game / auth), still EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · Friends Koin island** (ninth feature cutover; the SECOND multi-VM island,
   the heaviest so far, and the FIRST with an Activity-scoped VM). De-Hilt'd ALL THREE Friends VMs —
   `FriendsViewModel` (5 deps: `FriendRepository`, `AuthRepository`, `SearchUserByGameTagUseCase`,
@@ -234,7 +288,8 @@ Update this tracker after each step. Keep Android shippable at every step.
   warnings only); `:app:testDebugUnitTest` 1964 tests / 122 failed / 0 errors / 2 skipped (== baseline,
   ZERO new failures; no friends/profile/invite class among the 122); inline secret-scan clean. Koin islands
   now = {Settings, Stats, Profile, Home, TagDictionary, AddCard, CommunityDecks, CardDetail, Friends}; all
-  other features still Hilt. NEXT = `feature/splash` (single-dep leaf), still EXCLUDING online/voice/scanner.
+  other features still Hilt. NEXT = `feature/splash` + `survey` + `news` (single/light leaves), still
+  EXCLUDING online/voice/scanner. (DONE 2026-06-21 — see the newer change-log entry above.)
 - 2026-06-21 — **Phase 1 · CardDetail Koin island** (eighth feature cutover). De-Hilt'd the single
   `CardDetailViewModel` (12 ctor deps: `SavedStateHandle`, `CardRepository`, `UserCardRepository`,
   `DeckRepository`, `AddCardToCollectionUseCase`, `AddToWishlistUseCase`, `WishlistRepository`,

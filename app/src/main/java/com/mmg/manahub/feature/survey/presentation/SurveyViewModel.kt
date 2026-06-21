@@ -12,14 +12,11 @@ import com.mmg.manahub.core.data.local.entity.SurveyAnswerEntity
 import com.mmg.manahub.core.data.local.entity.SurveyCardImpactEntity
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.Deck
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,7 +27,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 // ── Survey mode ───────────────────────────────────────────────────────────────
 
@@ -123,11 +119,15 @@ data class SurveyUiState(
  * [SurveyAnswerDao] and per-seat card impacts through [SurveyCardImpactDao], and
  * coordinates deck association via [DeckRepository]. Every setter mutates in-memory
  * state immediately and schedules a debounced DRAFT autosave; the result write-back
- * additionally corrects the recorded game outcome. All heavy IO runs on
- * [IoDispatcher]; state updates are posted via [MutableStateFlow.update].
+ * additionally corrects the recorded game outcome. All heavy IO runs on the injected
+ * [ioDispatcher]; state updates are posted via [MutableStateFlow.update].
+ *
+ * KMP migration — Phase 1: resolved by Koin (`koinViewModel()`), not Hilt. The plain constructor lets
+ * `surveyKoinModule` supply the application [Context] via `androidContext()`, the IO dispatcher as
+ * `Dispatchers.IO` directly (the same singleton the old `@IoDispatcher` binding returned), and the
+ * nav-arg-carrying [SavedStateHandle] via `get()`.
  */
-@HiltViewModel
-class SurveyViewModel @Inject constructor(
+class SurveyViewModel(
     private val surveyAnswerDao: SurveyAnswerDao,
     private val surveyCardImpactDao: SurveyCardImpactDao,
     private val gameSessionDao: GameSessionDao,
@@ -135,8 +135,8 @@ class SurveyViewModel @Inject constructor(
     private val cardDao: CardDao,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val completeSurvey: CompleteSurveyUseCase,
-    @ApplicationContext private val context: Context,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 

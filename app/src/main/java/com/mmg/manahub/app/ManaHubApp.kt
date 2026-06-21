@@ -15,9 +15,11 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.app.di.coreBridgeKoinModule
 import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
+import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
@@ -63,12 +65,16 @@ import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.home.di.homeKoinModule
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
+import com.mmg.manahub.feature.news.di.newsKoinModule
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.feature.profile.di.profileKoinModule
 import com.mmg.manahub.feature.settings.di.settingsKoinModule
+import com.mmg.manahub.feature.splash.di.splashKoinModule
 import com.mmg.manahub.feature.stats.di.statsKoinModule
+import com.mmg.manahub.feature.survey.di.surveyKoinModule
+import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
@@ -182,6 +188,21 @@ class ManaHubApp : Application() {
     @Inject lateinit var tradesRepository: TradesRepository
     @Inject lateinit var pendingInviteStore: PendingInviteStore
 
+    // Survey island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
+    //  - SurveyAnswerDao is already injected (above, Profile island field) and bridged by profileKoinModule.
+    //  - GameSessionDao is already injected (above, Stats island field) and bridged by statsKoinModule.
+    //  - DeckRepository + UserPreferencesRepository are bridged in coreBridgeKoinModule.
+    //  - The application Context + IO dispatcher are supplied by Koin (androidContext() / Dispatchers.IO).
+    // Only the Survey-only singletons are here.
+    @Inject lateinit var surveyCardImpactDao: SurveyCardImpactDao
+    @Inject lateinit var cardDao: CardDao
+    @Inject lateinit var completeSurveyUseCase: CompleteSurveyUseCase
+
+    // Splash island (Phase 1) needs NO new bridge field — its only dep (AuthRepository) is already
+    // bridged in coreBridgeKoinModule. News island (Phase 1) likewise needs NO new bridge field — its
+    // ViewModels' deps (the 3 news use cases + UserPreferencesDataStore) are already bridged
+    // (homeKoinModule + coreBridgeKoinModule), so both modules take no constructor args.
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -257,6 +278,13 @@ class ManaHubApp : Application() {
                     tradesRepository = tradesRepository,
                     pendingInviteStore = pendingInviteStore,
                 ),
+                splashKoinModule(),
+                surveyKoinModule(
+                    surveyCardImpactDao = surveyCardImpactDao,
+                    cardDao = cardDao,
+                    completeSurvey = completeSurveyUseCase,
+                ),
+                newsKoinModule(),
             )
         }
 
