@@ -73,8 +73,9 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     (Phase 1, 2026-06-21), Friends (Phase 1, 2026-06-21 — the SECOND multi-VM island, 3 VMs, the
     heaviest island so far + the first with an Activity-scoped VM), Splash + Survey + News (Phase 1,
     2026-06-21 — three leaf islands migrated in one run; News is the THIRD multi-VM island), Draft
-    (Phase 1, 2026-06-21 — the FOURTH multi-VM island, 3 VMs).** Every
-    OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
+    (Phase 1, 2026-06-21 — the FOURTH multi-VM island, 3 VMs), Playtest (Phase 1, 2026-06-21 — the
+    FIFTH multi-VM island, 2 VMs; the SECOND island to convert+delete its feature-private Hilt module).**
+    Every OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
     The shared `app/di/CoreBridgeKoinModule.kt` now holds THIRTEEN cross-island
     singletons: `UserPreferencesRepository` (Settings+Stats+CardDetail), `UserPreferencesDataStore`
     (Settings+Profile+Home+CardDetail), `AuthRepository` (Settings+Profile+Home+CardDetail+Friends),
@@ -87,15 +88,15 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     `AnalyticsHelper` into the bridge and SHRUNK Settings; adding Friends promoted `FriendRepository` into
     the bridge and SHRUNK Profile (it now resolves `FriendRepository` via `get()`); adding Draft promoted
     `DraftRepository` + `DraftSimRepository` into the bridge and SHRUNK Home (both resolved via `get()`).
-    CommunityDecks is the
-    only island to **convert+delete its Hilt module** so far; Friends KEEPS its Hilt `FriendModule`
+    CommunityDecks and Playtest are the
+    only islands to **convert+delete their feature-private Hilt module** so far; Friends KEEPS its Hilt `FriendModule`
     (`@Binds FriendRepository` + `@Provides FriendshipService`) because Hilt features still consume them
     (Trades VMs + `CollectionStatsSyncWorker`). Multi-arg-nav VMs resolve a Koin-injected `SavedStateHandle`
     carrying their nav args (`cardName` / `archidektId` / `scryfallId` / `userId`); Activity-scoped VMs
     (InviteDispatcher) resolve via `koinViewModel(viewModelStoreOwner = activity)`.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
     Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends + Splash + Survey + News +
-    Draft done (THIRTEEN islands); the rest NOT started.
+    Draft + Playtest done (FOURTEEN islands); the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -150,10 +151,10 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    and depend on `NewsRepository` (same reason Friends kept `FriendModule`). All 4 screen call-sites used
    the default `viewModel` param → NO `AppNavGraph` edit. `SurveyViewModelTest` already used the plain
    ctor → no test edit (14/14 green).
-   **Draft done (2026-06-21 — the FOURTH multi-VM island, 3 VMs; see the CHANGE LOG).** After that,
-   candidates in rough order of entanglement: `playtest` (recommended next — fairly self-contained:
-   the PlaytestHand/Setup VMs + the explicit-save DAO write path, no shared engine like Draft) /
-   `tournament` / `trades` / `decks` / `collection` / `game` / `auth`. Apply the EXACT
+   **Draft done (2026-06-21 — the FOURTH multi-VM island, 3 VMs; see the CHANGE LOG).**
+   **Playtest done (2026-06-21 — the FIFTH multi-VM island, 2 VMs; see the CHANGE LOG).** After that,
+   candidates in rough order of entanglement: `tournament` (recommended next) / `trades` / `decks` /
+   `collection` / `game` / `auth`. Apply the EXACT
    same pattern proven by
    Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends/Splash/Survey/News/Draft: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
@@ -210,6 +211,55 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Playtest Koin island** (fourteenth feature cutover; the FIFTH multi-VM
+  island, 2 VMs; the SECOND island to convert+delete its feature-private Hilt module — after
+  CommunityDecks). De-Hilt'd BOTH Deck Playtest VMs (dropped `@HiltViewModel`/`@Inject constructor` +
+  `dagger`/`javax.inject` imports → plain ctors, zero behaviour change): `PlaytestSetupViewModel`
+  (5 deps: `SavedStateHandle`, `DeckRepository`, `CardDao`, `CanPlaytestDeckUseCase`, `@IoDispatcher`),
+  `PlaytestHandViewModel` (8 deps: `DeckRepository`, `CardDao`, 5 use cases —
+  `BuildLibraryUseCase`/`DrawHandUseCase`/`LondonMulliganUseCase`/`SavePlaytestUseCase`/
+  `SavePlaytestSurveyUseCase` — and `@IoDispatcher`). **The same-VM mulligan↔battlefield design is
+  intact:** `PlaytestHandViewModel` drives BOTH the MULLIGAN and PLAY/battlefield phases as conditional
+  content (`PlaytestHandUiState.phase` + ephemeral `battlefield`) — NOT a second nav destination — and
+  the DI cutover touched only the ctor annotations, never the phase logic, the atomic
+  `_uiState.update {}` battlefield mutations, the `instanceId`-keyed LazyRows, or the explicit-save
+  guard. **One-shot events stay on the buffered `Channel` (`receiveAsFlow()`)** in both VMs, collected
+  via `LaunchedEffect(Unit){ vm.events.collect {} }` in the screens (unchanged). **Nav-arg / handoff
+  handling:** `PlaytestSetupViewModel` reads the `"deckId"` nav arg from a Koin-injected
+  `SavedStateHandle` (`savedStateHandle = get()` — `koinViewModel()` populates it from the
+  NavBackStackEntry's `CreationExtras`, byte-for-byte the same as Hilt). `PlaytestHandViewModel` takes
+  NO `SavedStateHandle`: its `PlaytestSetup` arrives via the in-memory `pendingPlaytestSetup` handoff in
+  `AppNavGraph` → `PlaytestHandScreen(setup=…)` → `LaunchedEffect{ viewModel.initWithSetup(setup) }`;
+  that handoff (incl. the process-death `FullErrorState` fallback) is unchanged by the DI cutover. New
+  `feature/playtest/di/PlaytestKoinModule.kt` (`playtestKoinModule(playtestDao)`): a `viewModel { }` per
+  VM + the data layer ported from the deleted Hilt module. **Hilt `PlaytestModule` converted + DELETED**
+  — it only `@Binds PlaytestRepository`, consumed by ZERO Hilt features (grep-verified: repo + impl +
+  all six use cases live exclusively under `feature/playtest`), so its binding became a Koin
+  `single<PlaytestRepository> { PlaytestRepositoryImpl(get(), Dispatchers.IO) }` and the module was
+  deleted; `@Inject`/`@Singleton`/`@IoDispatcher` stripped from `PlaytestRepositoryImpl` + the six use
+  cases (now plain Koin-constructed classes); `@IoDispatcher CoroutineDispatcher` → `Dispatchers.IO`
+  directly (same singleton the Hilt binding returned — Survey/CommunityDecks precedent). **Bridge —
+  NOTHING promoted to coreBridge, NO island shrunk:** `DeckRepository` reused from `coreBridgeKoinModule`
+  via `get()`; `CardDao` reused from `surveyKoinModule` (already a `single` there) via `get()` — NOT
+  re-registered (would `DefinitionOverrideException`). Only ONE singleton newly bridged via `ManaHubApp`:
+  the Room/`DatabaseModule`-owned (still Hilt-provided) `PlaytestDao` (this island only). `ManaHubApp`
+  gained 1 new `@Inject` field (`playtestDao`) + registers `playtestKoinModule(playtestDao = playtestDao)`
+  in `startKoin`. NO Hilt `@Provides`/`@Binds` deleted OUTSIDE the feature (`PlaytestDao` is still
+  `DatabaseModule`-provided; `DeckRepository`/`CardDao` still shared with Hilt features). Both screens
+  (`PlaytestSetupScreen`, `PlaytestHandScreen`) swapped their default param `hiltViewModel()` →
+  `koinViewModel()`; both are constructed in `AppNavGraph` with NO explicit `viewModel =` arg → NO nav
+  edit (the `pendingPlaytestSetup` plumbing is unrelated to VM creation). **Koin-graph audit:** the 8
+  new `single<T>` types (`PlaytestDao`, `PlaytestRepository`, the 6 use cases) appear in NO other loaded
+  module → no `DefinitionOverrideException` (and `startKoin` ran clean during the test-suite app init).
+  **Tests:** both VM tests (`PlaytestHandViewModelTest`, `PlaytestSetupViewModelTest`) already built the
+  VMs via the plain positional constructors with the `mockkStatic(FirebaseCrashlytics::class)` already in
+  `@Before`/`@After` (logs outside runCatching) → NO test edit needed; all playtest tests green.
+  Verified: `:app:assembleDebug` SUCCESSFUL (deprecation warnings only); `:app:testDebugUnitTest`
+  1964 tests / 122 failed / 0 errors / 2 skipped (== baseline, ZERO new failures; no playtest class
+  among the 122 — verified by parsing the JUnit XML); inline secret-scan clean. Koin islands now =
+  {Settings, Stats, Profile, Home, TagDictionary, AddCard, CommunityDecks, CardDetail, Friends, Splash,
+  Survey, News, Draft, Playtest} (14); all other features still Hilt. NEXT = `feature/tournament`, still
+  EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · Draft Koin island** (thirteenth feature cutover; the FOURTH multi-VM island,
   3 VMs — finished an interrupted WIP that hit the session limit after compile-check but before commit).
   De-Hilt'd ALL THREE Draft VMs (dropped `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject`

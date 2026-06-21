@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.DeckSlot
-import javax.inject.Inject
 
 /**
  * Builds and shuffles the library for a playtest session.
@@ -13,7 +12,7 @@ import javax.inject.Inject
  *
  * @see DrawHandUseCase
  */
-class BuildLibraryUseCase @Inject constructor() {
+class BuildLibraryUseCase {
 
     /**
      * Builds a shuffled library from the mainboard slots.

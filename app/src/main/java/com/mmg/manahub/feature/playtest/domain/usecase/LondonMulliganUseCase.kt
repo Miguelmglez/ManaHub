@@ -1,7 +1,6 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.domain.model.Card
-import javax.inject.Inject
 
 /**
  * Applies the London Mulligan rule.
@@ -15,7 +14,7 @@ import javax.inject.Inject
  *
  * The mulligan counter is incremented by 1 each time this use case is invoked.
  */
-class LondonMulliganUseCase @Inject constructor() {
+class LondonMulliganUseCase {
 
     /**
      * Reshuffles the current hand + library and redraws.

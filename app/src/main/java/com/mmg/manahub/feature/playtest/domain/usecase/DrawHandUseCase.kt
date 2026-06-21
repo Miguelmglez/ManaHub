@@ -1,7 +1,6 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.domain.model.Card
-import javax.inject.Inject
 
 /**
  * Draws the top N cards from a given library.
@@ -14,7 +13,7 @@ import javax.inject.Inject
  *   - Redraw after a full reshuffle (ephemeral "Nueva mano").
  *   - Redraw after a London mulligan (reshuffle + draw same count).
  */
-class DrawHandUseCase @Inject constructor() {
+class DrawHandUseCase {
 
     /**
      * @param library The current library in draw order (index 0 = top).
