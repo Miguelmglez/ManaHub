@@ -557,7 +557,7 @@ fun AppNavGraph(
             ) {
                 // The VM reads the optional deckId from SavedStateHandle ("" ⇒ fresh draft).
                 DeckStudioScreen(
-                    viewModel = hiltViewModel(),
+                    viewModel = koinViewModel(),
                     onBack = { navController.popBackStack() },
                     onCardClick = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))

@@ -82,8 +82,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
@@ -118,7 +118,7 @@ fun DeckMagicDetailScreen(
     onImproveDeck: (String) -> Unit,
     onReviewSurvey: (Long) -> Unit = {},
     onPlaytest: (deckId: String) -> Unit = {},
-    viewModel: DeckMagicDetailViewModel = hiltViewModel()
+    viewModel: DeckMagicDetailViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()

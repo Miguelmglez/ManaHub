@@ -48,8 +48,6 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.queryFragment
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.Companion.MAX_SEED_CARDS
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -70,7 +68,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * One-shot side effects emitted by [DeckStudioViewModel].
@@ -232,8 +229,7 @@ data class DeckStudioUiState(
  * manually from the Decks list; there is no `isDraft` column or schema change.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class DeckStudioViewModel @Inject constructor(
+class DeckStudioViewModel(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
@@ -249,7 +245,7 @@ class DeckStudioViewModel @Inject constructor(
     private val deckMagicEngine: DeckMagicEngine,
     private val wishlistRepository: WishlistRepository,
     private val userPreferences: UserPreferencesDataStore,
-    @ApplicationContext private val appContext: Context,
+    private val appContext: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
