@@ -144,6 +144,9 @@ dependencies {
     // KMP migration — Phase 1: shared cross-cutting contracts (DispatcherProvider, KeyValueStore,
     // CrashReporter, Page). Depended on so it builds with :app; call-sites are NOT migrated onto it yet.
     implementation(project(":shared:core-common"))
+    // KMP migration — Phase 2 / Slice 1: shared domain contracts (a first batch of pure repository
+    // interfaces — UserPreferences/Stats/CommunityStats/NotificationPrefs/PushToken — live here now).
+    implementation(project(":shared:core-domain"))
 
     // Supabase Auth & DB
     val supabaseBom = platform(libs.supabase.bom)

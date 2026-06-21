@@ -166,26 +166,54 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   promoted to coreBridge, NO island shrunk. The per-seat-stats `isLocal` win/loss derivation, the
   tournament single-write-path, the broadcast-first online sync, and the one-voice-language-per-session
   rule are all byte-for-byte untouched (DI-only change). See CHANGE LOG.
-- ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
+- 🟡 **Phase 2 — STARTED (Slice 1 DONE & GREEN, 2026-06-22).** `:shared:core-domain` module created
+  (android + wasmJs, mirrors `:shared:core-model`/`:shared:core-common`: `com.android.kotlin.multiplatform.library`,
+  plugins `apply false` in root, `alias` no-version in module; `commonMain` deps = `api(:shared:core-model)`
+  + `coroutines.core`). A FIRST BATCH of **5 already-pure repository INTERFACES** moved into it
+  (`commonMain`, package `com.mmg.manahub.core.domain.repository` UNCHANGED → zero `:app` import edits):
+  `UserPreferencesRepository`, `StatsRepository`, `CommunityStatsRepository`, `NotificationPrefsRepository`,
+  `PushTokenRepository`. Their impls STAY in `:app` (Android side) and keep implementing the moved
+  interfaces. `:app` now `implementation(project(":shared:core-domain"))`. SKIPPED (still in `:app`, future
+  slices): `UserCardRepository` (`androidx.paging.PagingData` + Room `core.data.local.dao.UserCardWithCard`
+  + un-moved `core.domain.model.UserCard`), `CardRepository` (un-moved `core.domain.model.{Card,CardTag,
+  SuggestedTag}`), `DeckRepository` (un-moved `core.domain.model.{Deck,DeckWithCards}`). NO use cases / impls
+  / Retrofit / Ktor / Room touched this slice.
+  - `:app:assembleDebug` → **BUILD SUCCESSFUL** (pre-existing deprecation warnings only).
+  - `:shared:core-domain:compileKotlinWasmJs` → **SUCCESSFUL** (the 5 moved interfaces are web-compatible).
+  - `:app:testDebugUnitTest` → **1964 tests, 122 failed, 0 errors, 2 skipped** (== baseline, ZERO new failures).
+  - commonMain Android/AndroidX/browser/Room-import grep → EMPTY (PASS).
+- ⬜ **Phase 2 (remaining)** — `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
 
 ## NEXT STEP (resume here)
-✅ **Phase 1 Hilt→Koin cutover is COMPLETE for every non-excluded feature (TWENTY islands, Game last,
-2026-06-22).** The interrupted Game WIP was finished + verified GREEN: `:app:assembleDebug` SUCCESSFUL,
-`:app:testDebugUnitTest` = 1964 tests / 122 failed / 2 skipped (== baseline, ZERO new failures;
-`GameViewModelVoiceTest` 7/7 + `GameResultStripViewModelTest` 5/5 green). `git diff --stat` confirms NO
-`core/voice`/`feature/online`/`feature/scanner`/`core/nearby` file touched. The ONLY features still on
-Hilt are the THREE explicitly-deferred platform-heavy ones (online games, voice control, camera scanner).
+✅ **Phase 2 Slice 1 DONE & GREEN (2026-06-22):** `:shared:core-domain` created + the FIRST batch of 5
+pure repository INTERFACES moved (`UserPreferencesRepository`, `StatsRepository`,
+`CommunityStatsRepository`, `NotificationPrefsRepository`, `PushTokenRepository`) — package unchanged,
+zero `:app` import edits, impls stay in `:app`. `:app:assembleDebug` SUCCESSFUL, `:shared:core-domain:compileKotlinWasmJs`
+SUCCESSFUL, `:app:testDebugUnitTest` 1964/122-fail/2-skip (== baseline), commonMain forbidden-import grep EMPTY.
 
-➡️ **NEXT = Phase 2: extract `:shared:core-domain` then `:shared:core-data`.**
-1. **`:shared:core-domain`** — move the pure use cases + repository INTERFACES (the contracts, no impls)
-   into `commonMain`. ZERO platform imports: no Android/AndroidX, no Room, no Retrofit/Gson, no
-   `R.string`. Anything platform-bound a use case currently touches goes behind a `commonMain` interface
-   or `expect`/`actual` (reuse `:shared:core-common`'s `DispatcherProvider`/`KeyValueStore`/`CrashReporter`
-   contracts — wire call-sites onto them here, finally consuming the module that already builds but is unused).
-2. **`:shared:core-data`** — repository IMPLs in `commonMain` against those interfaces; **Room DAOs/
+➡️ **NEXT = Phase 2, Slice 2 — move the NEXT batch of repo interfaces + start moving PURE use cases.**
+Keep batches small (≤ ~15 files) to survive session limits.
+1. **Unblock the 3 SKIPPED core repo interfaces by FIRST extracting their domain models into
+   `:shared:core-model`** (they are pure data classes today, only un-moved): `Card`, `CardFace`, `CardTag`,
+   `SuggestedTag` (unblocks `CardRepository`), `Deck`, `DeckWithCards`, `UserCard`, `UserCardWithCard`
+   (domain variant) (unblocks `DeckRepository` + most of `UserCardRepository`). Verify each has ZERO
+   Android deps before moving; the `-keep class com.mmg.manahub.core.model.**` ProGuard wildcard already
+   covers them. Then move `CardRepository` + `DeckRepository` into `:shared:core-domain` (same package, no
+   `:app` import edits). **`UserCardRepository` stays in `:app` until the PagingData abstraction lands** —
+   its `getCollectionPager(): Flow<PagingData<…>>` + Room `core.data.local.dao.UserCardWithCard` return
+   type are platform-bound; replace `PagingData` with the `:shared:core-common` `Page`/pagination model
+   and the Room row type with the domain `UserCardWithCard` in a dedicated later slice.
+2. **Start moving PURE use cases** into `:shared:core-domain` `commonMain` — pick use cases that depend
+   ONLY on the moved repo interfaces + core-model + kotlinx (no `@Inject`-bound platform deps, no
+   `@ApplicationContext`, no `R.string`). Strip Hilt `@Inject`/`@Singleton` (Koin builds them). Anything
+   platform-bound a use case touches goes behind a `commonMain` interface or `expect`/`actual` (reuse
+   `:shared:core-common`'s `DispatcherProvider`/`KeyValueStore`/`CrashReporter` contracts — finally
+   consuming that module). Add `implementation(project(":shared:core-common"))` to `:shared:core-domain`
+   when the first such use case lands.
+3. **Then `:shared:core-data`** — repository IMPLs in `commonMain` against those interfaces; **Room DAOs/
    entities/migrations STAY in `androidMain`** (no wasm target) with the DAO interface in `commonMain` and
    a web data source (Supabase-remote + IndexedDB/localStorage) in `wasmJsMain`. Migrate **Retrofit → Ktor**
    (js/wasm engine) and **Gson → kotlinx-serialization**; port the rate-limit queues
@@ -314,6 +342,38 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 · Slice 1 — `:shared:core-domain` created + first batch of pure repo interfaces
+  moved.** New KMP module `:shared:core-domain` (android + wasmJs) added to `settings.gradle.kts` and
+  depended on by `:app`. Build setup mirrors `:shared:core-model`/`:shared:core-common` exactly per BUILD
+  GOTCHAS (`alias(libs.plugins.kotlin.multiplatform)` + `alias(libs.plugins.android.kmp.library)`, no
+  version; `androidLibrary { namespace = "com.mmg.manahub.core.domain"; compileSdk 36; minSdk 29;
+  withHostTestBuilder {} }`; `wasmJs { browser() }`; `jvmToolchain(17)`). `commonMain` deps =
+  `api(project(":shared:core-model"))` + `implementation(libs.coroutines.core)`; `:shared:core-common` NOT
+  yet depended on (no current interface needs it — wired in Slice 2 when use cases move). **5 already-pure
+  repository INTERFACES `git mv`'d** (history preserved) from
+  `app/.../core/domain/repository/` into
+  `shared/core-domain/src/commonMain/kotlin/com/mmg/manahub/core/domain/repository/` — package kept
+  IDENTICAL (`com.mmg.manahub.core.domain.repository`) so NOT A SINGLE `:app` import statement changed:
+  `UserPreferencesRepository` (refs core-model `UserPreferences`/`PreferredCurrency`/`AppLanguage`/
+  `CardLanguage`/`NewsLanguage`/`UserDefinedTag`/`CollectionViewMode` + `Flow`), `StatsRepository` (refs
+  `CollectionStats`/`MtgColor`/`PreferredCurrency` + `Flow`), `CommunityStatsRepository` (refs
+  `CommunityStats` + `Flow`), `NotificationPrefsRepository` (`Flow` + primitives), `PushTokenRepository`
+  (primitives only). All 7 referenced core-model types confirmed present in `:shared:core-model`. The
+  concrete impls stay in `:app` (the Android/Room/DataStore side) and keep implementing the moved
+  interfaces — single definition, no duplication. **SKIPPED (kept in `:app`, define future-slice work):**
+  `UserCardRepository` — signature has `androidx.paging.PagingData<UserCardWithCard>` + the Room row type
+  `core.data.local.dao.UserCardWithCard` + the un-moved domain model `core.domain.model.UserCard` (needs
+  both the `Page`/pagination abstraction AND the `UserCard`/domain-`UserCardWithCard` model extraction
+  before it can move); `CardRepository` — refs un-moved `core.domain.model.{Card,CardTag,SuggestedTag}`
+  (DataResult is already in core-model); `DeckRepository` — refs un-moved `core.domain.model.{Deck,
+  DeckWithCards}` (`DeckSummary` is already in core-model). NO use cases, NO impls, NO Retrofit/Ktor/Room
+  touched this slice (per scope). Verified: `:app:assembleDebug` BUILD SUCCESSFUL (pre-existing deprecation
+  warnings only — none in moved files); `:shared:core-domain:compileKotlinWasmJs` BUILD SUCCESSFUL (proves
+  the 5 interfaces are web-compatible); `:app:testDebugUnitTest` 1964 tests / 122 failed / 0 errors / 2
+  skipped — EXACTLY the baseline, ZERO new failures; commonMain `import (android|androidx|kotlinx.browser|
+  org.w3c|androidx.room)` grep EMPTY. Inline secret-scan clean (build DSL + interface moves only). NEXT =
+  Slice 2 (extract `Card`/`Deck`/`UserCard` domain models → move `CardRepository`+`DeckRepository`; start
+  moving pure use cases; `UserCardRepository` deferred until PagingData abstraction).
 - 2026-06-22 — **Phase 1 · Game Koin island** (TWENTIETH + LAST non-excluded feature cutover; the
   heaviest island, and the one that BRIDGES three DEFERRED features without migrating them — completing
   the Phase-1 Hilt→Koin cutover for everything except online/voice/scanner). FINISHED the interrupted WIP
