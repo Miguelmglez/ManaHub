@@ -70,22 +70,26 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - **Koin islands so far: Settings (Spike D), Stats (Phase 1, 2026-06-20), Profile (Phase 1,
     2026-06-21), Home (Phase 1, 2026-06-21), TagDictionary (Phase 1, 2026-06-21), AddCard (Phase 1,
     2026-06-21), CommunityDecks (Phase 1, 2026-06-21 — the FIRST multi-ViewModel island), CardDetail
-    (Phase 1, 2026-06-21).** Every OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
-    The shared `app/di/CoreBridgeKoinModule.kt` now holds TEN cross-island
+    (Phase 1, 2026-06-21), Friends (Phase 1, 2026-06-21 — the SECOND multi-VM island, 3 VMs, the
+    heaviest island so far + the first with an Activity-scoped VM).** Every OTHER feature is still on
+    Hilt (`@HiltViewModel` + `hiltViewModel()`).
+    The shared `app/di/CoreBridgeKoinModule.kt` now holds ELEVEN cross-island
     singletons: `UserPreferencesRepository` (Settings+Stats+CardDetail), `UserPreferencesDataStore`
-    (Settings+Profile+Home+CardDetail), `AuthRepository` (Settings+Profile+Home+CardDetail),
+    (Settings+Profile+Home+CardDetail), `AuthRepository` (Settings+Profile+Home+CardDetail+Friends),
     `GameSessionRepository` (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository`
     (Stats+Home+CommunityDecks+CardDetail), `ScryfallRemoteDataSource` (Stats+Home),
     `GamificationRepository` (Profile+Home), `CardRepository` (Home+CommunityDecks+CardDetail),
-    `AnalyticsHelper` (Settings+CardDetail) — so no feature module double-registers a shared type
-    (`DefinitionOverrideException` guard). Adding CardDetail promoted `AnalyticsHelper` into the bridge
-    and SHRUNK Settings (it now resolves `AnalyticsHelper` via `get()`). CommunityDecks is the first island
-    to **convert+delete its Hilt module**: the feature-private `CommunityDecksModule` (Archidekt
-    Retrofit/`ArchidektApi` + the `CommunityDecksRepository` `@Binds`) was ported verbatim into the Koin
-    module and deleted, since none of its types is consumed by any Hilt feature. Multi-arg-nav VMs resolve a
-    Koin-injected `SavedStateHandle` carrying their nav args (`cardName` / `archidektId` / `scryfallId`).
+    `AnalyticsHelper` (Settings+CardDetail+Friends), `FriendRepository` (Profile+Friends) — so no feature
+    module double-registers a shared type (`DefinitionOverrideException` guard). Adding CardDetail promoted
+    `AnalyticsHelper` into the bridge and SHRUNK Settings; adding Friends promoted `FriendRepository` into
+    the bridge and SHRUNK Profile (it now resolves `FriendRepository` via `get()`). CommunityDecks is the
+    only island to **convert+delete its Hilt module** so far; Friends KEEPS its Hilt `FriendModule`
+    (`@Binds FriendRepository` + `@Provides FriendshipService`) because Hilt features still consume them
+    (Trades VMs + `CollectionStatsSyncWorker`). Multi-arg-nav VMs resolve a Koin-injected `SavedStateHandle`
+    carrying their nav args (`cardName` / `archidektId` / `scryfallId` / `userId`); Activity-scoped VMs
+    (InviteDispatcher) resolve via `koinViewModel(viewModelStoreOwner = activity)`.
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
-    Home + TagDictionary + AddCard + CommunityDecks + CardDetail done; the rest NOT started.
+    Home + TagDictionary + AddCard + CommunityDecks + CardDetail + Friends done; the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -123,11 +127,15 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    and Home shrunk; the Room-owned `CommunityDeckCacheDao` was bridged via `ManaHubApp`; both screen
    call-sites used the default `viewModel` param so NO `AppNavGraph` edit; both VM tests already used the
    plain constructors so NO test edit; 123 communitydecks tests green).
-   **CardDetail done (2026-06-21).** Next island = `feature/friends` (~24 deps). After that, candidates
-   in rough order of entanglement: `decks` / `collection` / `game` / `tournament` / `draft` / `playtest` /
-   `survey` / `splash` / `trades` / `news` / `auth`. Apply the EXACT
+   **CardDetail done (2026-06-21). Friends done (2026-06-21 — 3 VMs incl. the Activity-scoped
+   InviteDispatcher; `FriendRepository` promoted to coreBridge + Profile shrunk; Hilt `FriendModule`
+   KEPT because Trades VMs + `CollectionStatsSyncWorker` still consume `FriendRepository`/`FriendshipService`).**
+   Next island = `feature/splash` (the least-entangled remaining leaf — `SplashViewModel` has a SINGLE
+   ctor dep; verify whether the splash screen even resolves it via a default `viewModel` param or is
+   wired explicitly). After that, candidates in rough order of entanglement: `survey` / `news` / `draft` /
+   `playtest` / `tournament` / `trades` / `decks` / `collection` / `game` / `auth`. Apply the EXACT
    same pattern proven by
-   Settings/Stats/Profile/Home/TagDictionary/AddCard: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
+   Settings/Stats/Profile/Home/TagDictionary/AddCard/CommunityDecks/CardDetail/Friends: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
    deps in `ManaHubApp`, reuse `coreBridgeKoinModule` for ANY already-shared singleton (never double-register
    → `DefinitionOverrideException`; if a dep becomes shared with another island, MOVE it into the bridge and
@@ -182,6 +190,51 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · Friends Koin island** (ninth feature cutover; the SECOND multi-VM island,
+  the heaviest so far, and the FIRST with an Activity-scoped VM). De-Hilt'd ALL THREE Friends VMs —
+  `FriendsViewModel` (5 deps: `FriendRepository`, `AuthRepository`, `SearchUserByGameTagUseCase`,
+  `SendFriendRequestUseCase`, `AnalyticsHelper`), `FriendDetailViewModel` (5 deps: `SavedStateHandle`,
+  `FriendRepository`, `GetFriendCollectionUseCase`, `TradesRepository`, `AuthRepository`),
+  `InviteDispatcherViewModel` (3 deps: `AcceptInviteUseCase`, `PendingInviteStore`, `AuthRepository`) —
+  dropping `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject` imports → plain ctors, zero
+  behaviour change. New `feature/friends/di/FriendsKoinModule.kt` with a `viewModel { }` per VM + the 4
+  Friends-only use cases as `single { UseCase(get()) }` + the 2 Friends-only bridged singletons
+  (`TradesRepository`, `PendingInviteStore`). **Nav-arg handling:** `FriendDetailViewModel` resolves a
+  Koin-injected `SavedStateHandle` (`savedStateHandle = get()`) carrying the `"userId"` nav arg — byte-for-byte
+  the same as Hilt (CommunityDeckDetail/CardDetail precedent). **NEW gotcha — Activity-scoped Koin VM:**
+  `InviteDispatcherViewModel` MUST stay Activity-scoped (it survives the InviteDispatcher→Profile/Login nav
+  to process a pending invite code after login, and its events are collected at the AppNavGraph top level).
+  AppNavGraph created it via `hiltViewModel(activity)`; the Koin equivalent is
+  `koinViewModel(viewModelStoreOwner = activity)` (same Activity `ViewModelStore` → same single instance).
+  `InviteDispatcherScreen` takes `inviteVm` as a REQUIRED param (no default `viewModel()`), so only the
+  AppNavGraph creation line changed — the screen itself needed no edit. **Call-sites:** `FriendsScreen` +
+  `FriendDetailScreen` default param `hiltViewModel()` → `koinViewModel()`; both are called in AppNavGraph
+  with NO explicit `viewModel =` arg → no nav edit for them. AppNavGraph kept its `hiltViewModel` import
+  (still used by `gameVm` + other Hilt screens) and gained an `org.koin.androidx.compose.koinViewModel`
+  import. **Bridge — `FriendRepository` PROMOTED + Profile SHRUNK:** `FriendRepository` was a Profile-only
+  bridged `single` in `profileKoinModule`; since Friends now also needs it, it was MOVED into
+  `coreBridgeKoinModule` (now ELEVEN singletons) and `profileKoinModule` was shrunk to drop the param +
+  `single { friendRepository }` (its `viewModel { }` already used `friendRepository = get()` → no VM edit;
+  the `ManaHubApp` profile call dropped the arg, the coreBridge call gained `friendRepository`). Bridge
+  deps REUSED via `get()` (no re-register): `FriendRepository`, `AuthRepository`, `AnalyticsHelper`.
+  **Hilt `FriendModule` KEPT (NOT deleted)** — unlike CommunityDecks, the feature-private Hilt module
+  `@Binds FriendRepository` + `@Provides FriendshipService` are STILL consumed by Hilt features
+  (`TradeProposalViewModel`/`TradeNegotiationViewModel`/`TradesHistoryViewModel` + `CollectionStatsSyncWorker`),
+  so deleting it would break the Hilt graph. The `FriendRepositoryImpl`/`FriendRemoteDataSource`/use cases
+  keep their `@Inject` annotations (still Hilt-constructed for the Hilt consumers); Koin builds its own
+  copies of the use cases via `single { UseCase(get()) }` over the bridged `FriendRepository` — harmless
+  (use cases are stateless). `ManaHubApp` gained 2 new `@Inject` bridge fields (`tradesRepository`,
+  `pendingInviteStore`; `friendRepository`/`authRepository`/`analyticsHelper` were already injected and are
+  REUSED), added `friendRepository` to the `coreBridgeKoinModule(...)` call, dropped it from the
+  `profileKoinModule(...)` call, and registered `friendsKoinModule(...)`. **Tests:** only
+  `FriendsViewModelTest` exists (no FriendDetail/Invite tests); it already built the VM via the plain
+  5-arg constructor → NO test edit; it passes. **Koin-graph audit:** all `single<T>` across the 10 loaded
+  modules are unique types (grep `single` → every entry count == 1) → no `DefinitionOverrideException`;
+  Friends' deps all resolve (bridge + friends-only). Verified: `:app:assembleDebug` SUCCESSFUL (deprecation
+  warnings only); `:app:testDebugUnitTest` 1964 tests / 122 failed / 0 errors / 2 skipped (== baseline,
+  ZERO new failures; no friends/profile/invite class among the 122); inline secret-scan clean. Koin islands
+  now = {Settings, Stats, Profile, Home, TagDictionary, AddCard, CommunityDecks, CardDetail, Friends}; all
+  other features still Hilt. NEXT = `feature/splash` (single-dep leaf), still EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · CardDetail Koin island** (eighth feature cutover). De-Hilt'd the single
   `CardDetailViewModel` (12 ctor deps: `SavedStateHandle`, `CardRepository`, `UserCardRepository`,
   `DeckRepository`, `AddCardToCollectionUseCase`, `AddToWishlistUseCase`, `WishlistRepository`,

@@ -94,6 +94,7 @@ import com.mmg.manahub.feature.tournament.presentation.TournamentViewModel
 import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
 import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
 import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
+import org.koin.androidx.compose.koinViewModel
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Bottom-bar visibility rules
@@ -120,8 +121,11 @@ fun AppNavGraph(
     val gameVm: GameViewModel = hiltViewModel(activity)
     val gameUiState by gameVm.uiState.collectAsStateWithLifecycle()
 
-    // Activity-scoped so it survives navigation and can process pending invite codes after login
-    val inviteVm: InviteDispatcherViewModel = hiltViewModel(activity)
+    // Activity-scoped so it survives navigation and can process pending invite codes after login.
+    // KMP migration — Phase 1: InviteDispatcherViewModel is now a Koin "island" VM, so it is resolved
+    // via koinViewModel(viewModelStoreOwner = activity) — the exact equivalent of the old
+    // hiltViewModel(activity): same Activity ViewModelStore → same single instance across navigation.
+    val inviteVm: InviteDispatcherViewModel = koinViewModel(viewModelStoreOwner = activity)
 
     val navController = rememberNavController()
 

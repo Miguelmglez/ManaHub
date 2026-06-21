@@ -51,7 +51,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -61,6 +60,7 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.friends.domain.model.Friend
+import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
 
 /**
@@ -71,7 +71,7 @@ import java.util.Locale
  * provides a "Remove Friend" action with a confirmation dialog.
  *
  * @param onNavigateBack Callback invoked when the screen should close.
- * @param viewModel      Hilt-injected ViewModel; [FriendDetailViewModel] reads the
+ * @param viewModel      Koin-injected ViewModel; [FriendDetailViewModel] reads the
  *                       friend's user ID from [androidx.lifecycle.SavedStateHandle].
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,7 +80,7 @@ fun FriendDetailScreen(
     onNavigateBack: () -> Unit,
     onCardClick: (String) -> Unit = {},
     onNavigateToTradeDetail: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
-    viewModel: FriendDetailViewModel = hiltViewModel(),
+    viewModel: FriendDetailViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

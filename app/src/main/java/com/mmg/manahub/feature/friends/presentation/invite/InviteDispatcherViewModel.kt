@@ -6,7 +6,6 @@ import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.usecase.AcceptInviteUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * Activity-scoped ViewModel that processes incoming friend invite deep links.
@@ -26,9 +24,14 @@ import javax.inject.Inject
  * - If not authenticated, persist the code in [PendingInviteStore] and navigate away.
  * - After the user logs in, the [combine] collector in [init] detects both conditions and
  *   processes the pending code automatically without requiring the user to reopen the link.
+ *
+ * KMP migration — Phase 1 Hilt→Koin cutover: this VM is resolved by Koin via
+ * [com.mmg.manahub.feature.friends.di.friendsKoinModule]. It must stay **Activity-scoped** so the
+ * same instance survives the InviteDispatcher → Profile/Login navigation and can process a pending
+ * invite code after the user logs in. `AppNavGraph` therefore resolves it with
+ * `koinViewModel(viewModelStoreOwner = activity)` (the exact equivalent of the old `hiltViewModel(activity)`).
  */
-@HiltViewModel
-class InviteDispatcherViewModel @Inject constructor(
+class InviteDispatcherViewModel(
     private val acceptInviteUseCase: AcceptInviteUseCase,
     private val pendingInviteStore: PendingInviteStore,
     private val authRepo: AuthRepository,
