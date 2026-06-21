@@ -48,7 +48,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.news.NewsItem
@@ -60,12 +59,13 @@ import com.mmg.manahub.feature.news.presentation.components.ArticleCard
 import com.mmg.manahub.feature.news.presentation.components.NewsFilterSheet
 import com.mmg.manahub.feature.news.presentation.components.ShimmerNewsItem
 import com.mmg.manahub.feature.news.presentation.components.VideoCard
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsScreen(
     onVideoClick: (videoId: String, title: String) -> Unit = { _, _ -> },
-    viewModel: NewsViewModel = hiltViewModel(),
+    viewModel: NewsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sources by viewModel.sources.collectAsStateWithLifecycle()

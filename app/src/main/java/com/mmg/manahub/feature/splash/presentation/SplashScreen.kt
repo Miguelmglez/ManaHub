@@ -45,8 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.manaColorFor
@@ -66,12 +66,12 @@ import kotlinx.coroutines.delay
  *
  * @param onSessionResolved Invoked once with `true` if the user is authenticated,
  *   `false` otherwise. The caller is responsible for navigation.
- * @param viewModel Injected by Hilt; observes session state from [AuthRepository].
+ * @param viewModel Resolved by Koin; observes session state from [AuthRepository].
  */
 @Composable
 fun SplashScreen(
     onSessionResolved: (isAuthenticated: Boolean) -> Unit,
-    viewModel: SplashViewModel = hiltViewModel(),
+    viewModel: SplashViewModel = koinViewModel(),
 ) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
 

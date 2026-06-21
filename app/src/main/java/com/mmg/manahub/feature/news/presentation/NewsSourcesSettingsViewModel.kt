@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.feature.news.domain.model.ContentSource
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -13,10 +12,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class NewsSourcesSettingsViewModel @Inject constructor(
+/**
+ * KMP migration — Phase 1: resolved by Koin (`koinViewModel()`), not Hilt. The plain constructor lets
+ * `newsKoinModule` build it from the bridged [ManageSourcesUseCase].
+ */
+class NewsSourcesSettingsViewModel(
     private val manageSources: ManageSourcesUseCase,
 ) : ViewModel() {
 
