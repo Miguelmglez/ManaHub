@@ -5,9 +5,9 @@ import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
-import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.DeckSlot
-import com.mmg.manahub.core.domain.model.DeckWithCards
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckSlot
+import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase

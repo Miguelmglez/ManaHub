@@ -136,7 +136,7 @@ class StatsViewModel(
                 val history      = args[6] as List<com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow>
                 val deckStats    = args[7] as List<com.mmg.manahub.core.data.local.dao.DeckStatsRow>
                 val matchups     = args[8] as List<com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow>
-                val allDecks     = args[9] as List<com.mmg.manahub.core.domain.model.Deck>
+                val allDecks     = args[9] as List<com.mmg.manahub.core.model.Deck>
 
                 val deckNameById = allDecks.associate { it.id to it.name }
 

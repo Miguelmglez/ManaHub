@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DeckSlot
+import com.mmg.manahub.core.model.DeckSlot
 
 /**
  * Builds and shuffles the library for a playtest session.

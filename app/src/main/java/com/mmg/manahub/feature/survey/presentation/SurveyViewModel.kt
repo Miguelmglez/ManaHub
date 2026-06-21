@@ -13,7 +13,7 @@ import com.mmg.manahub.core.data.local.entity.SurveyCardImpactEntity
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase

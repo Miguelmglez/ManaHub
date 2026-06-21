@@ -101,7 +101,7 @@ import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.SuggestedTag
 import com.mmg.manahub.core.domain.model.TagCategory

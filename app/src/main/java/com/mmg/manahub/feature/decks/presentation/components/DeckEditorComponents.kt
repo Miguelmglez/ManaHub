@@ -65,8 +65,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
-import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
