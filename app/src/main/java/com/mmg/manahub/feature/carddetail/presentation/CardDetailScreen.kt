@@ -95,7 +95,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
@@ -140,7 +140,7 @@ fun CardDetailScreen(
     onNavigateToDeck: (String) -> Unit = {},
     onNavigateToCard: (scryfallId: String) -> Unit = {},
     onNavigateToCommunityDecks: (cardName: String) -> Unit = {},
-    viewModel: CardDetailViewModel = hiltViewModel(),
+    viewModel: CardDetailViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isCommunityDecksEnabled by viewModel.isCommunityDecksEnabled.collectAsStateWithLifecycle()

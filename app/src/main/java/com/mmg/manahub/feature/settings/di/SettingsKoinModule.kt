@@ -5,7 +5,6 @@ import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.settings.presentation.SettingsViewModel
@@ -32,26 +31,27 @@ import org.koin.dsl.module
  * provider, and the corresponding Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to
  * nothing without ever leaving the app uncompilable between commits.
  *
- * Three dependencies are shared with other islands, so they are NOT registered here — they are bridged
+ * Four dependencies are shared with other islands, so they are NOT registered here — they are bridged
  * once in `coreBridgeKoinModule` (registering the same type in two loaded modules would throw
  * `DefinitionOverrideException`) and resolved below via `get()`:
- * - [UserPreferencesRepository] — shared with Stats.
- * - [UserPreferencesDataStore] — shared with Profile.
- * - [AuthRepository] — shared with Profile.
+ * - `UserPreferencesRepository` — shared with Stats.
+ * - `UserPreferencesDataStore` — shared with Profile.
+ * - `AuthRepository` — shared with Profile.
+ * - `AnalyticsHelper` — now shared with CardDetail, so it was PROMOTED from this island into
+ *   `coreBridgeKoinModule`; resolved below via `get()` instead of being registered here.
  *
  * @return a Koin [Module] that provides the bridged singletons and the [SettingsViewModel] factory.
  */
 fun settingsKoinModule(
-    analyticsHelper: AnalyticsHelper,
     userProfileDataSource: UserProfileDataSource,
     pushTokenRepository: PushTokenRepository,
     notificationPrefsRepository: NotificationPrefsRepository,
     voiceModelRepository: VoiceModelRepository,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Settings-only Hilt-owned singletons to Koin (see KDoc). ──
-    // (UserPreferencesRepository [Stats], UserPreferencesDataStore [Profile] and AuthRepository [Profile]
-    //  are shared → bridged in coreBridgeKoinModule, not here, and resolved below via get().)
-    single { analyticsHelper }
+    // (UserPreferencesRepository [Stats], UserPreferencesDataStore [Profile], AuthRepository [Profile]
+    //  and AnalyticsHelper [CardDetail] are shared → bridged in coreBridgeKoinModule, not here, and
+    //  resolved below via get().)
     single { userProfileDataSource }
     single { pushTokenRepository }
     single { notificationPrefsRepository }

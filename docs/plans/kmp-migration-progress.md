@@ -69,22 +69,23 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - commonMain Android/AndroidX/browser-import grep → EMPTY (PASS).
   - **Koin islands so far: Settings (Spike D), Stats (Phase 1, 2026-06-20), Profile (Phase 1,
     2026-06-21), Home (Phase 1, 2026-06-21), TagDictionary (Phase 1, 2026-06-21), AddCard (Phase 1,
-    2026-06-21), CommunityDecks (Phase 1, 2026-06-21 — the FIRST multi-ViewModel island).** Every OTHER
-    feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`). The shared
-    `app/di/CoreBridgeKoinModule.kt` now holds NINE cross-island
-    singletons: `UserPreferencesRepository` (Settings+Stats), `UserPreferencesDataStore`
-    (Settings+Profile+Home), `AuthRepository` (Settings+Profile+Home), `GameSessionRepository`
-    (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository` (Stats+Home+CommunityDecks),
-    `ScryfallRemoteDataSource` (Stats+Home), `GamificationRepository` (Profile+Home), `CardRepository`
-    (Home+CommunityDecks) — so no feature module double-registers a shared type
-    (`DefinitionOverrideException` guard). Adding CommunityDecks promoted `CardRepository` into the bridge
-    and SHRUNK Home (it now resolves `CardRepository` via `get()`). CommunityDecks is also the first island
+    2026-06-21), CommunityDecks (Phase 1, 2026-06-21 — the FIRST multi-ViewModel island), CardDetail
+    (Phase 1, 2026-06-21).** Every OTHER feature is still on Hilt (`@HiltViewModel` + `hiltViewModel()`).
+    The shared `app/di/CoreBridgeKoinModule.kt` now holds TEN cross-island
+    singletons: `UserPreferencesRepository` (Settings+Stats+CardDetail), `UserPreferencesDataStore`
+    (Settings+Profile+Home+CardDetail), `AuthRepository` (Settings+Profile+Home+CardDetail),
+    `GameSessionRepository` (Stats+Profile+Home), `StatsRepository` (Profile+Home), `DeckRepository`
+    (Stats+Home+CommunityDecks+CardDetail), `ScryfallRemoteDataSource` (Stats+Home),
+    `GamificationRepository` (Profile+Home), `CardRepository` (Home+CommunityDecks+CardDetail),
+    `AnalyticsHelper` (Settings+CardDetail) — so no feature module double-registers a shared type
+    (`DefinitionOverrideException` guard). Adding CardDetail promoted `AnalyticsHelper` into the bridge
+    and SHRUNK Settings (it now resolves `AnalyticsHelper` via `get()`). CommunityDecks is the first island
     to **convert+delete its Hilt module**: the feature-private `CommunityDecksModule` (Archidekt
     Retrofit/`ArchidektApi` + the `CommunityDecksRepository` `@Binds`) was ported verbatim into the Koin
-    module and deleted, since none of its types is consumed by any Hilt feature. Both VMs resolve a
-    Koin-injected `SavedStateHandle` carrying their nav args (`cardName` / `archidektId`).
+    module and deleted, since none of its types is consumed by any Hilt feature. Multi-arg-nav VMs resolve a
+    Koin-injected `SavedStateHandle` carrying their nav args (`cardName` / `archidektId` / `scryfallId`).
   - REMAINING for Phase 1: the per-feature Hilt→Koin cutover (~300 files) — Settings + Stats + Profile +
-    Home + TagDictionary + AddCard + CommunityDecks done; the rest NOT started.
+    Home + TagDictionary + AddCard + CommunityDecks + CardDetail done; the rest NOT started.
 - ⬜ **Phase 2** — `:shared:core-domain` + `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -122,8 +123,9 @@ Resume Phase 1 in SMALL batches (≤ ~15 files per run to avoid mid-task session
    and Home shrunk; the Room-owned `CommunityDeckCacheDao` was bridged via `ManaHubApp`; both screen
    call-sites used the default `viewModel` param so NO `AppNavGraph` edit; both VM tests already used the
    plain constructors so NO test edit; 123 communitydecks tests green).
-   **Next island = `feature/carddetail`** (~15 deps). After that, candidates
-   in rough order of entanglement: `friends` (~24 deps), then `decks` / `collection`. Apply the EXACT
+   **CardDetail done (2026-06-21).** Next island = `feature/friends` (~24 deps). After that, candidates
+   in rough order of entanglement: `decks` / `collection` / `game` / `tournament` / `draft` / `playtest` /
+   `survey` / `splash` / `trades` / `news` / `auth`. Apply the EXACT
    same pattern proven by
    Settings/Stats/Profile/Home/TagDictionary/AddCard: drop `@HiltViewModel`/`@Inject` on the VM, add `feature/<x>/di/<X>KoinModule.kt`
    with `viewModel { <X>ViewModel(...) }`, swap the screen's default param to `koinViewModel()`, bridge its
@@ -180,6 +182,42 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-21 — **Phase 1 · CardDetail Koin island** (eighth feature cutover). De-Hilt'd the single
+  `CardDetailViewModel` (12 ctor deps: `SavedStateHandle`, `CardRepository`, `UserCardRepository`,
+  `DeckRepository`, `AddCardToCollectionUseCase`, `AddToWishlistUseCase`, `WishlistRepository`,
+  `OpenForTradeRepository`, `UserPreferencesRepository`, `UserPreferencesDataStore`, `AuthRepository`,
+  `AnalyticsHelper`) — dropped `@HiltViewModel`/`@Inject constructor` + `dagger`/`javax.inject` imports →
+  plain ctor, zero behaviour change. New `feature/carddetail/di/CardDetailKoinModule.kt` with a single
+  `viewModel { }` whose `savedStateHandle = get()` resolves a **Koin-injected `SavedStateHandle`** carrying
+  the `scryfallId` nav arg (CommunityDeckDetail precedent — byte-for-byte identical nav behaviour).
+  `CardDetailScreen` default param `hiltViewModel()` → `koinViewModel()`. **Call-site:** the
+  `Screen.CollectionCardDetail` composable in `AppNavGraph` calls the screen with NO explicit `viewModel =`
+  arg (default param) → NO nav edit needed (like Settings/Stats/Profile/AddCard/CommunityDecks, unlike
+  Home). **Bridge — `AnalyticsHelper` PROMOTED + Settings SHRUNK:** `AnalyticsHelper` was previously a
+  Settings-only bridged `single`; since CardDetail now also needs it, it was MOVED into
+  `coreBridgeKoinModule` (now TEN singletons) and `settingsKoinModule` was shrunk to drop the param + the
+  `single { analyticsHelper }` (its `viewModel { }` already used `analyticsHelper = get()` → no VM edit;
+  the `ManaHubApp` settings call dropped the arg, and the coreBridge call gained `analyticsHelper`). Bridge
+  deps REUSED via `get()` (no re-register): `CardRepository`, `DeckRepository`, `UserPreferencesRepository`,
+  `UserPreferencesDataStore`, `AuthRepository`, `AnalyticsHelper`. **WishlistRepository ownership (the
+  subtle one):** `WishlistRepository` is already registered as a `single` in `homeKoinModule` (the Home
+  `wishlistRepository` param) — a `single<T>` is resolvable via `get()` from ANY loaded module, so CardDetail
+  resolves it via `get()` and `cardDetailKoinModule` does NOT re-register it (would `DefinitionOverrideException`).
+  Hence `cardDetailKoinModule` takes only 4 CardDetail-only params (`UserCardRepository`,
+  `AddCardToCollectionUseCase`, `AddToWishlistUseCase`, `OpenForTradeRepository`), each registered as a
+  `single` (none appears in any other module). **New gotcha (memory updated):** a dep can stay bridged in a
+  NON-coreBridge feature module (Wishlist in Home) and another island just resolve it via `get()` without
+  promoting it — promotion to coreBridge is only mandatory to avoid a DUPLICATE `single<T>` across two
+  modules that BOTH register it. `ManaHubApp` gained 4 new `@Inject` bridge fields (`userCardRepository`,
+  `addCardToCollectionUseCase`, `addToWishlistUseCase`, `openForTradeRepository`; `analyticsHelper` and
+  `wishlistRepository` were already injected and are REUSED), and registers `cardDetailKoinModule(...)`.
+  NO Hilt `@Provides`/`@Binds` deleted (all deps still shared with Hilt features); no feature-private Hilt
+  module in carddetail to convert; no `CardDetailViewModelTest` to edit. **Koin-graph audit:** all `single<T>`
+  across the 9 loaded modules are unique types → no `DefinitionOverrideException`. Verified:
+  `:app:assembleDebug` SUCCESSFUL (deprecation warnings only); `:app:testDebugUnitTest` 1964 tests /
+  122 failed / 2 skipped (== baseline, ZERO new failures); inline secret-scan clean. Koin islands now =
+  {Settings, Stats, Profile, Home, TagDictionary, AddCard, CommunityDecks, CardDetail}; all other features
+  still Hilt. NEXT = `feature/friends` (~24 deps), still EXCLUDING online/voice/scanner.
 - 2026-06-21 — **Phase 1 · CommunityDecks Koin island** (seventh feature cutover; the FIRST island with
   MULTIPLE ViewModels, and the FIRST to convert+delete a feature-private Hilt module). De-Hilt'd BOTH
   `CommunityDecksSearchViewModel` (3 deps: `SavedStateHandle`, `SearchCommunityDecksUseCase`,

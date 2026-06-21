@@ -8,13 +8,15 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
  * KMP migration — Phase 1 Hilt→Koin cutover. Shared "Koin bridge" for Hilt-owned singletons that are
- * consumed by MORE THAN ONE Koin island (currently Settings, Stats, Profile, Home and CommunityDecks).
+ * consumed by MORE THAN ONE Koin island (currently Settings, Stats, Profile, Home, CommunityDecks and
+ * CardDetail).
  *
  * ## Why a shared module
  * Each Koin island re-exposes its Hilt-owned dependencies as `single { instance }` (the Spike-D bridge
@@ -35,8 +37,10 @@ import org.koin.dsl.module
  * @param deckRepository the Hilt-owned [DeckRepository] singleton (Stats + Home).
  * @param scryfallRemoteDataSource the Hilt-owned [ScryfallRemoteDataSource] singleton (Stats + Home).
  * @param gamificationRepository the Hilt-owned [GamificationRepository] singleton (Profile + Home).
- * @param cardRepository the Hilt-owned [CardRepository] singleton (Home + CommunityDecks).
- * @return a Koin [Module] exposing the cross-island bridged singletons.
+ * @param cardRepository the Hilt-owned [CardRepository] singleton (Home + CommunityDecks + CardDetail).
+ * @param analyticsHelper the Hilt-owned [AnalyticsHelper] singleton (Settings + CardDetail). Promoted
+ *   here from the Settings island when CardDetail also began consuming it.
+ * @return a Koin [Module] exposing the cross-island bridged singletons (ten in total).
  */
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
@@ -48,8 +52,10 @@ fun coreBridgeKoinModule(
     scryfallRemoteDataSource: ScryfallRemoteDataSource,
     gamificationRepository: GamificationRepository,
     cardRepository: CardRepository,
+    analyticsHelper: AnalyticsHelper,
 ): Module = module {
-    // Shared across the Settings + Stats + Profile + Home + CommunityDecks islands — registered once.
+    // Shared across the Settings + Stats + Profile + Home + CommunityDecks + CardDetail islands —
+    // each registered exactly once.
     single { userPreferencesRepo }
     single { userPrefsDataStore }
     single { authRepository }
@@ -59,4 +65,5 @@ fun coreBridgeKoinModule(
     single { scryfallRemoteDataSource }
     single { gamificationRepository }
     single { cardRepository }
+    single { analyticsHelper }
 }

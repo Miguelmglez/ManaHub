@@ -22,7 +22,9 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
@@ -51,6 +53,7 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
 import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
@@ -66,7 +69,9 @@ import com.mmg.manahub.feature.settings.di.settingsKoinModule
 import com.mmg.manahub.feature.stats.di.statsKoinModule
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.HiltAndroidApp
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -154,6 +159,18 @@ class ManaHubApp : Application() {
     // Only the Room-owned cache DAO (this island only) is bridged here.
     @Inject lateinit var communityDeckCacheDao: CommunityDeckCacheDao
 
+    // CardDetail island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
+    //  - AnalyticsHelper is now bridged in coreBridgeKoinModule (promoted from Settings; shared with it).
+    //  - CardRepository, DeckRepository, UserPreferencesRepository, UserPreferencesDataStore and
+    //    AuthRepository are all bridged in coreBridgeKoinModule (shared with other islands).
+    //  - WishlistRepository is already a Home bridge field (`wishlistRepository`, above) and is bridged
+    //    by homeKoinModule, so CardDetail resolves it via get() — it is NOT re-declared/re-registered.
+    // Only the CardDetail-only deps are here.
+    @Inject lateinit var userCardRepository: UserCardRepository
+    @Inject lateinit var addCardToCollectionUseCase: AddCardToCollectionUseCase
+    @Inject lateinit var addToWishlistUseCase: AddToWishlistUseCase
+    @Inject lateinit var openForTradeRepository: OpenForTradeRepository
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -180,9 +197,9 @@ class ManaHubApp : Application() {
                     scryfallRemoteDataSource = scryfallRemoteDataSource,
                     gamificationRepository = gamificationRepository,
                     cardRepository = cardRepository,
+                    analyticsHelper = analyticsHelper,
                 ),
                 settingsKoinModule(
-                    analyticsHelper = analyticsHelper,
                     userProfileDataSource = userProfileDataSource,
                     pushTokenRepository = pushTokenRepository,
                     notificationPrefsRepository = notificationPrefsRepository,
@@ -218,6 +235,12 @@ class ManaHubApp : Application() {
                 ),
                 communityDecksKoinModule(
                     cacheDao = communityDeckCacheDao,
+                ),
+                cardDetailKoinModule(
+                    userCardRepository = userCardRepository,
+                    addToCollection = addCardToCollectionUseCase,
+                    addToWishlistUseCase = addToWishlistUseCase,
+                    openForTradeRepository = openForTradeRepository,
                 ),
             )
         }
