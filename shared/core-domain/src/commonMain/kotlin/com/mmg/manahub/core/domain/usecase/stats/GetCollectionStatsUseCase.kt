@@ -5,9 +5,8 @@ import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
 
-class GetCollectionStatsUseCase @Inject constructor(
+class GetCollectionStatsUseCase(
     private val repository: StatsRepository
 ) {
     operator fun invoke(
