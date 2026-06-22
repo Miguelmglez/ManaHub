@@ -3,7 +3,10 @@ package com.mmg.manahub.core.data.remote.mapper
 import com.mmg.manahub.core.data.remote.dto.CardDto
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardFace
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 fun CardDto.toDomain(): Card {
     val front = cardFaces?.firstOrNull()
     val back  = cardFaces?.getOrNull(1)
@@ -47,7 +50,7 @@ fun CardDto.toDomain(): Card {
         scryfallUri = scryfallUri,
         isStale = false,
         staleReason = null,
-        cachedAt = System.currentTimeMillis(),
+        cachedAt = Clock.System.now().toEpochMilliseconds(),
         printedName = printedName,
         printedText = printedText,
         printedTypeLine = printedTypeLine,

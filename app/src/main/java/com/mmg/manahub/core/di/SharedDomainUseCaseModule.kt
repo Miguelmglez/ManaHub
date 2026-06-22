@@ -1,8 +1,11 @@
 package com.mmg.manahub.core.di
 
+import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.cache.ManaSymbolStore
+import com.mmg.manahub.core.data.network.ScryfallCache
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.ScryfallClient
+import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -85,4 +88,16 @@ object SharedDomainUseCaseModule {
         store: ManaSymbolStore,
         requestQueue: ScryfallRequestQueue,
     ): SyncManaSymbolsUseCase = SyncManaSymbolsUseCase(api, store, requestQueue)
+
+    @Provides
+    @Singleton
+    fun provideScryfallCache(): ScryfallCache = ScryfallCache()
+
+    @Provides
+    @Singleton
+    fun provideScryfallRemoteDataSource(
+        api: ScryfallClient,
+        requestQueue: ScryfallRequestQueue,
+        cache: ScryfallCache,
+    ): ScryfallRemoteDataSource = ScryfallRemoteDataSource(api, requestQueue, cache, DispatcherProvider())
 }
