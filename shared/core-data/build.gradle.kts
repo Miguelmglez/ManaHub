@@ -61,6 +61,10 @@ kotlin {
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
                 implementation(libs.kotlinx.serialization.json)
+                // Supabase SDK (KMP-compatible: JVM/Android/JS/wasmJs).
+                implementation(project.dependencies.platform(libs.supabase.bom))
+                implementation(libs.supabase.postgrest)
+                implementation(libs.supabase.auth)
             }
         }
         commonTest {

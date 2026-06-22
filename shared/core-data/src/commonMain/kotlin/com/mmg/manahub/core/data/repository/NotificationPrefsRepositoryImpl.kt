@@ -1,12 +1,10 @@
 package com.mmg.manahub.core.data.repository
 
-import android.util.Log
-import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,9 +14,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Supabase-backed implementation of [NotificationPrefsRepository].
@@ -30,10 +25,9 @@ import javax.inject.Singleton
  * Concurrency: [setEventEnabled] performs a read-merge-upsert sequence. A [Mutex] serialises
  * these so two rapid toggles cannot race and clobber each other's merged result.
  */
-@Singleton
-class NotificationPrefsRepositoryImpl @Inject constructor(
+class NotificationPrefsRepositoryImpl(
     private val supabaseClient: SupabaseClient,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val dispatcherProvider: DispatcherProvider,
 ) : NotificationPrefsRepository {
 
     private val _prefsFlow = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -41,24 +35,27 @@ class NotificationPrefsRepositoryImpl @Inject constructor(
     /** Guards the read-merge-upsert critical section against concurrent toggles. */
     private val writeMutex = Mutex()
 
-    /** Ensures the one-shot lazy load runs at most once across subscribers. */
-    private val loaded = AtomicBoolean(false)
+    /** Guards the one-shot lazy-load flag against concurrent first-subscribers. */
+    private val loadMutex = Mutex()
+
+    /** Whether the initial remote load has been triggered. */
+    private var loaded = false
 
     override val prefsFlow: Flow<Map<String, Boolean>> =
         _prefsFlow.asStateFlow().onStart {
             // Load lazily on the first subscriber only; subsequent subscribers reuse the cache.
-            if (loaded.compareAndSet(false, true)) {
+            val shouldLoad = loadMutex.withLock {
+                if (!loaded) { loaded = true; true } else false
+            }
+            if (shouldLoad) {
                 runCatching { refresh() }
-                    .onFailure { Log.w(TAG, "Initial prefs load failed", it) }
+                    .onFailure { }
             }
         }
 
     override suspend fun setEventEnabled(eventType: String, enabled: Boolean) =
-        withContext(ioDispatcher) {
-            val userId = currentUserId() ?: run {
-                Log.w(TAG, "setEventEnabled skipped: no authenticated user")
-                return@withContext
-            }
+        withContext(dispatcherProvider.io) {
+            val userId = currentUserId() ?: return@withContext
             writeMutex.withLock {
                 // Read the freshest server state inside the lock so we merge onto the true
                 // current map, not a stale local cache that a concurrent write may have changed.
@@ -71,7 +68,7 @@ class NotificationPrefsRepositoryImpl @Inject constructor(
         }
 
     override suspend fun isEventEnabled(eventType: String): Boolean =
-        withContext(ioDispatcher) {
+        withContext(dispatcherProvider.io) {
             // A missing key defaults to enabled (opt-out model).
             currentPrefs()[eventType] ?: true
         }
@@ -81,15 +78,16 @@ class NotificationPrefsRepositoryImpl @Inject constructor(
      * fresh remote fetch. Falls back to an empty map (all enabled) on any failure.
      */
     private suspend fun currentPrefs(): Map<String, Boolean> {
-        if (loaded.get()) return _prefsFlow.value
+        val alreadyLoaded = loadMutex.withLock { loaded }
+        if (alreadyLoaded) return _prefsFlow.value
         val userId = currentUserId() ?: return emptyMap()
         return runCatching { fetchRemotePrefs(userId) }
-            .onFailure { Log.w(TAG, "currentPrefs fetch failed", it) }
+            .onFailure { }
             .getOrDefault(emptyMap())
     }
 
     /** Forces a remote read and publishes it to [_prefsFlow]. */
-    private suspend fun refresh() = withContext(ioDispatcher) {
+    private suspend fun refresh() = withContext(dispatcherProvider.io) {
         val userId = currentUserId() ?: return@withContext
         _prefsFlow.value = fetchRemotePrefs(userId)
     }
@@ -115,8 +113,4 @@ class NotificationPrefsRepositoryImpl @Inject constructor(
         @SerialName("user_id") val userId: String,
         @SerialName("prefs") val prefs: Map<String, Boolean>,
     )
-
-    private companion object {
-        const val TAG = "NotificationPrefsRepo"
-    }
 }
