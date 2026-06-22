@@ -3,7 +3,7 @@ package com.mmg.manahub.feature.communitydecks.data.remote
 import com.mmg.manahub.core.data.network.RateLimitConfig
 import com.mmg.manahub.core.data.network.RateLimitedQueue
 import com.mmg.manahub.core.data.network.RetryDecision
-import retrofit2.HttpException
+import io.ktor.client.plugins.ResponseException
 
 /**
  * Serialises and throttles requests to the Archidekt API.
@@ -19,7 +19,7 @@ import retrofit2.HttpException
  * `Retry-After` header (integer seconds), that value overrides the computed back-off for
  * that attempt.
  *
- * After exhausting all retries the last [HttpException] is re-thrown so callers can
+ * After exhausting all retries the last [ResponseException] is re-thrown so callers can
  * handle it via their existing `Result`/`DataResult` wrappers.
  */
 class ArchidektRequestQueue {
@@ -33,10 +33,15 @@ class ArchidektRequestQueue {
             jitterFactor = 0.25
         ),
         shouldRetry = { _, e ->
-            if (e is HttpException && (e.code() == 429 || e.code() == 503)) {
-                val retryAfter = e.response()?.headers()?.get("Retry-After")
-                    ?.trim()?.toLongOrNull()?.let { it * 1_000L }
-                RetryDecision.Retry(serverRetryAfterMs = retryAfter)
+            if (e is ResponseException) {
+                val code = e.response.status.value
+                if (code == 429 || code == 503) {
+                    val retryAfter = e.response.headers["Retry-After"]
+                        ?.trim()?.toLongOrNull()?.let { it * 1_000L }
+                    RetryDecision.Retry(serverRetryAfterMs = retryAfter)
+                } else {
+                    RetryDecision.DoNotRetry
+                }
             } else {
                 RetryDecision.DoNotRetry
             }
@@ -47,7 +52,7 @@ class ArchidektRequestQueue {
      * Executes [block] while honouring Archidekt's conservative rate-limit contract.
      * Retries automatically on 429/503 up to 2 times.
      *
-     * @throws HttpException if all retries are exhausted or a non-retryable HTTP error occurs.
+     * @throws ResponseException if all retries are exhausted or a non-retryable HTTP error occurs.
      * @throws Throwable for any other exception thrown by [block].
      */
     suspend fun <T> execute(block: suspend () -> T): T = delegate.execute(block)

@@ -3,17 +3,19 @@ package com.mmg.manahub.feature.communitydecks.data
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
-import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektApi
-import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektRequestQueue
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektCardDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektCardEntryDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektDeckDetailDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektDeckSummaryDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektOracleCardDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektOwnerDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektSearchResultDto
+import com.mmg.manahub.core.data.remote.ArchidektClient
+import com.mmg.manahub.core.data.remote.dto.ArchidektCardDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektCardEntryDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektDeckSummaryDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektOracleCardDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektOwnerDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektRequestQueue
 import com.mmg.manahub.feature.communitydecks.data.remote.toCacheEntity
+import io.ktor.client.plugins.ResponseException
+import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -22,15 +24,12 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.HttpException
-import retrofit2.Response
 
 /**
  * Unit tests for [CommunityDecksRepositoryImpl].
@@ -43,7 +42,7 @@ import retrofit2.Response
  */
 class CommunityDecksRepositoryImplTest {
 
-    private val api: ArchidektApi = mockk()
+    private val api: ArchidektClient = mockk()
     private val requestQueue: ArchidektRequestQueue = mockk()
     private val cacheDao: CommunityDeckCacheDao = mockk(relaxUnitFun = true)
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -84,9 +83,15 @@ class CommunityDecksRepositoryImplTest {
         cachedAt: Long = System.currentTimeMillis(),
     ): CommunityDeckCacheEntity = buildDto(id).toCacheEntity().copy(cachedAt = cachedAt)
 
-    private fun buildHttpException(code: Int): HttpException {
-        val response = Response.error<Any>(code, "".toResponseBody(null))
-        return HttpException(response)
+    /**
+     * Builds a mock [ResponseException] with the given HTTP status [code].
+     * Ktor's [ResponseException] requires an [io.ktor.client.statement.HttpResponse]; mocking
+     * the response status is the simplest way to simulate HTTP errors in unit tests.
+     */
+    private fun buildResponseException(code: Int): ResponseException {
+        val httpResponse = mockk<io.ktor.client.statement.HttpResponse>(relaxed = true)
+        every { httpResponse.status } returns HttpStatusCode.fromValue(code)
+        return ResponseException(httpResponse, "HTTP $code")
     }
 
     @Before
@@ -197,7 +202,7 @@ class CommunityDecksRepositoryImplTest {
         val staleTime = System.currentTimeMillis() - 48 * 60 * 60 * 1_000L
         val staleEntity = buildCacheEntity(cachedAt = staleTime)
         coEvery { cacheDao.getById(testDeckId) } returns staleEntity
-        coEvery { api.getDeckById(testDeckId) } throws buildHttpException(500)
+        coEvery { api.getDeckById(testDeckId) } throws buildResponseException(500)
 
         // Act
         val result = repository.getDeckById(testDeckId)
@@ -231,7 +236,7 @@ class CommunityDecksRepositoryImplTest {
     fun `given HTTP error with no cache when getDeckById then returns Error`() = runTest {
         // Arrange — no cache at all.
         coEvery { cacheDao.getById(testDeckId) } returns null
-        coEvery { api.getDeckById(testDeckId) } throws buildHttpException(500)
+        coEvery { api.getDeckById(testDeckId) } throws buildResponseException(500)
 
         // Act
         val result = repository.getDeckById(testDeckId)
@@ -275,7 +280,7 @@ class CommunityDecksRepositoryImplTest {
     fun `given HTTP 404 with no cache when getDeckById then returns not found error`() = runTest {
         // Arrange
         coEvery { cacheDao.getById(testDeckId) } returns null
-        coEvery { api.getDeckById(testDeckId) } throws buildHttpException(404)
+        coEvery { api.getDeckById(testDeckId) } throws buildResponseException(404)
 
         // Act
         val result = repository.getDeckById(testDeckId)
@@ -291,7 +296,7 @@ class CommunityDecksRepositoryImplTest {
         val staleTime = System.currentTimeMillis() - 48 * 60 * 60 * 1_000L
         val staleEntity = buildCacheEntity(cachedAt = staleTime)
         coEvery { cacheDao.getById(testDeckId) } returns staleEntity
-        coEvery { api.getDeckById(testDeckId) } throws buildHttpException(404)
+        coEvery { api.getDeckById(testDeckId) } throws buildResponseException(404)
 
         // Act
         val result = repository.getDeckById(testDeckId)
@@ -307,7 +312,7 @@ class CommunityDecksRepositoryImplTest {
     fun `given HTTP 429 with no cache when getDeckById then returns rate limit error`() = runTest {
         // Arrange
         coEvery { cacheDao.getById(testDeckId) } returns null
-        coEvery { api.getDeckById(testDeckId) } throws buildHttpException(429)
+        coEvery { api.getDeckById(testDeckId) } throws buildResponseException(429)
 
         // Act
         val result = repository.getDeckById(testDeckId)
@@ -459,7 +464,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given HTTP 500 when searchDecks then returns search failed error`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws buildHttpException(500)
+        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws buildResponseException(500)
 
         // Act
         val result = repository.searchDecks("Sol Ring", null, null, 1, 20)
@@ -473,7 +478,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given HTTP 429 when searchDecks then returns rate limit error`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws buildHttpException(429)
+        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws buildResponseException(429)
 
         // Act
         val result = repository.searchDecks("Sol Ring", null, null, 1, 20)
