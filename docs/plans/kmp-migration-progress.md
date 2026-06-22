@@ -323,13 +323,21 @@ imports in shared `commonMain` (the 2 `androidx.paging` grep hits are KDoc, not 
 authored by the architect but the agent hit its session limit before committing — the main agent
 verified the uncommitted WIP (full build + tests + leak grep) and committed it.
 
-➡️ **NEXT = Phase 2 §9.6 item 4 — move repository IMPLs to `commonMain`** (one repo per slice). The
-Retrofit→Ktor networking is DONE (all 6 APIs). The next productive work is moving repository
-implementations that can be made platform-agnostic into `:shared:core-data` `commonMain` behind their
-already-shared interfaces. **Room DAOs/entities/migrations STAY in `androidMain`** (no wasm target); the
-DAO interface is exposed to `commonMain` and a `wasmJsMain` web data source (Supabase-remote +
-IndexedDB/localStorage) is added later. Start with the simplest repos (few deps, no Room) and work
-toward the complex ones.
+✅ **Phase 2 §9.6 item 4 — first repo impl: `NotificationPrefsRepositoryImpl` moved (DONE & GREEN,
+2026-06-22, commit `ed6fea5`).** Simplest candidate (no Room, only Supabase SDK). 3 platform deps fixed:
+`android.util.Log` → dropped (non-fatal swallowed errors), `AtomicBoolean` → `Mutex`-guarded boolean,
+`@Inject`/`@Singleton`/`@IoDispatcher` → plain ctor with `DispatcherProvider`. PushModule `@Binds` →
+`@Provides` (companion object). Supabase BOM/postgrest/auth deps added to `:shared:core-data`. Verified:
+`:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` =
+1964/122-fail/2-skip (== baseline); commonMain platform-import grep EMPTY.
+
+➡️ **NEXT = Phase 2 §9.6 item 4 — continue moving repository impls to `commonMain`** (one repo per
+slice). Candidates in approximate order of complexity:
+- `PushTokenRepositoryImpl` (Supabase-only, similar to NotificationPrefs — no Room)
+- `CommunityStatsRepositoryImpl` (stub returning `flowOf(null)`, trivially portable)
+- `CommunityDecksRepositoryImpl` (Ktor-ready ArchidektClient + Room cache — needs DAO interface split)
+- Repos with Room deps: `StatsRepositoryImpl`, `UserCardRepositoryImpl`, `CardRepositoryImpl`,
+  `DeckRepositoryImpl` — need DAO interface in `commonMain` + web data source in `wasmJsMain`.
 
    Still-platform-bound use cases (move only after their deps move): `AddCardToCollectionUseCase`/
    `CommitScannedCardsUseCase` (gamification `ProgressionEventBus` + `java.time`),
@@ -468,6 +476,20 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 §9.6 item 4: `NotificationPrefsRepositoryImpl` → `:shared:core-data` commonMain
+  (GREEN, `ed6fea5`).** First repository implementation shared across Android + Web. The class uses only
+  KMP-compatible Supabase SDK (postgrest + auth) so it moved cleanly. 3 platform deps fixed:
+  `android.util.Log` → dropped (non-fatal swallowed errors, debug-only), `AtomicBoolean` →
+  `Mutex`-guarded boolean (no `java.util.concurrent` in KMP), `@Inject`/`@Singleton`/`@IoDispatcher
+  CoroutineDispatcher` → plain ctor with `DispatcherProvider` from `:shared:core-common`. PushModule
+  `@Binds` → `@Provides` in companion object (impl no longer has `@Inject` ctor; `DispatcherProvider()`
+  instantiated directly — no-arg ctor). Supabase BOM + postgrest + auth deps added to `:shared:core-data`
+  `commonMain`. Package unchanged (`core.data.repository`) → 0 consumer import edits. Koin bridge in
+  `settingsKoinModule` unaffected (receives the interface from Hilt via `ManaHubApp`). Verified:
+  `:app:assembleDebug` GREEN, `:shared:core-data:compileKotlinWasmJs` GREEN, `testDebugUnitTest` =
+  1964/122-fail/2-skip (== baseline), commonMain platform-import grep EMPTY. Files: 1 new
+  (`shared/core-data/.../NotificationPrefsRepositoryImpl.kt`), 1 deleted (old `:app` copy), 2 modified
+  (`PushModule.kt`, `build.gradle.kts`).
 - 2026-06-22 — **Phase 2 · `:shared:core-data` scaffold + RateLimitedQueue (GREEN, `379f89c` + `c9e7e00`).**
   Two commits: (1) `379f89c` stood up the empty `:shared:core-data` KMP module (android + wasmJs, mirrors
   core-domain; `build.gradle.kts` with `api(:shared:core-model)`, `api(:shared:core-domain)`,
