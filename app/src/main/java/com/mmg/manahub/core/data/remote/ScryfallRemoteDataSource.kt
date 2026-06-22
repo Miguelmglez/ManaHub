@@ -19,7 +19,7 @@ import javax.inject.Singleton
 
 @Singleton
 class ScryfallRemoteDataSource @Inject constructor(
-    private val api: ScryfallApi,
+    private val api: ScryfallClient,
     private val requestQueue: ScryfallRequestQueue,
     private val cache: ScryfallCache,
 ) {
@@ -58,7 +58,7 @@ class ScryfallRemoteDataSource @Inject constructor(
      * disk cache also serves `/cards/search` responses (the network interceptor forces
      * `Cache-Control: public, max-age=300` on them), so the identical `order:random` URL would still
      * be replayed from disk for 5 minutes. On the [bypassCache] path the loader therefore calls the
-     * no-cache endpoint [ScryfallApi.searchCardsNoCache] (`Cache-Control: no-cache`) and forces
+     * no-cache endpoint [ScryfallClient.searchCardsNoCache] (`Cache-Control: no-cache`) and forces
      * `order = "random"` so every refresh hits the network and yields genuinely different cards.
      */
     suspend fun searchCards(
