@@ -34,3 +34,6 @@ include(":shared:core-common")
 // KMP migration — Phase 2 / Slice 1: shared domain contracts (repository interfaces; later pure
 // use cases). commonMain only — pure Kotlin + core-model.
 include(":shared:core-domain")
+// KMP migration — Phase 2: shared data layer (repo impls in commonMain, Room stays androidMain,
+// rate-limit queues, later Ktor networking).
+include(":shared:core-data")
