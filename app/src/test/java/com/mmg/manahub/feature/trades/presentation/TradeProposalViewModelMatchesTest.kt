@@ -3,8 +3,8 @@ package com.mmg.manahub.feature.trades.presentation
 import androidx.lifecycle.SavedStateHandle
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.util.AnalyticsHelper

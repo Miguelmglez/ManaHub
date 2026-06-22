@@ -1,18 +1,9 @@
 package com.mmg.manahub.core.domain.repository
 
-import androidx.paging.PagingData
-import com.mmg.manahub.core.data.local.dao.UserCardWithCard
-import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import kotlinx.coroutines.flow.Flow
-import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
 
-/**
- * Contract for all collection (user card) persistence operations.
- *
- * Sync is NOT part of this interface. The [com.mmg.manahub.core.sync.SyncManager]
- * owns the push/pull cycle. This repository is responsible only for local CRUD
- * and exposing observable streams to the UI layer.
- */
 /**
  * Result of [UserCardRepository.addOrIncrement], describing whether the operation created a
  * brand-new unique collection row or incremented an already-present one. Used by the
@@ -26,33 +17,38 @@ enum class AddOutcome {
     INCREMENTED_EXISTING,
 }
 
+/**
+ * Contract for all collection (user card) persistence operations.
+ *
+ * Sync is NOT part of this interface. The `SyncManager` owns the push/pull cycle. This repository
+ * is responsible only for local CRUD and exposing observable streams to the UI layer.
+ *
+ * This is the platform-agnostic surface (KMP `commonMain`). The Android-only `PagingData` pager
+ * lives on a separate `CollectionPagerSource` interface in `:app` so this contract stays free of
+ * `androidx.paging`/Room and can be implemented by both the Android (Room-backed) repository and a
+ * future web data source.
+ */
 interface UserCardRepository {
 
     // ── Observables ───────────────────────────────────────────────────────────
 
     /** Emits the full collection (non-deleted) ordered by most recently added. */
-    fun observeCollection(): Flow<List<DomainUserCardWithCard>>
+    fun observeCollection(): Flow<List<UserCardWithCard>>
 
     /** Emits collection rows filtered by color identity. */
-    fun observeByColor(color: String): Flow<List<DomainUserCardWithCard>>
+    fun observeByColor(color: String): Flow<List<UserCardWithCard>>
 
     /** Emits collection rows filtered by rarity. */
-    fun observeByRarity(rarity: String): Flow<List<DomainUserCardWithCard>>
+    fun observeByRarity(rarity: String): Flow<List<UserCardWithCard>>
 
     /** Full-text search on card name within the local collection. */
-    fun searchInCollection(query: String): Flow<List<DomainUserCardWithCard>>
+    fun searchInCollection(query: String): Flow<List<UserCardWithCard>>
 
     /** Emits all user card rows for a specific scryfall card (all variants). */
     fun observeByScryfallId(scryfallId: String, userId: String?): Flow<List<UserCard>>
 
     /** Total number of (non-deleted) collection entries. */
     fun observeCount(userId: String?): Flow<Int>
-
-    /**
-     * Returns a [Flow] of [PagingData] backed by [CollectionRemoteMediator].
-     * The mediator loads pages from Supabase and caches them in Room automatically.
-     */
-    fun getCollectionPager(userId: String?): Flow<PagingData<UserCardWithCard>>
 
     // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -63,8 +59,7 @@ interface UserCardRepository {
      * (userId, scryfallId, isFoil, condition, language).
      * A new UUID is generated client-side when inserting a new row.
      *
-     * The row's [updatedAt] is set to [System.currentTimeMillis] so the next
-     * sync push picks it up automatically.
+     * The row's `updatedAt` is bumped so the next sync push picks it up automatically.
      *
      * @return [AddOutcome.CREATED_NEW] when a brand-new (or previously soft-deleted)
      *   unique row was created, [AddOutcome.INCREMENTED_EXISTING] when an existing
@@ -84,7 +79,7 @@ interface UserCardRepository {
 
     /**
      * Updates the trade flag and quantity for an existing row.
-     * Also bumps [updatedAt] so the sync engine picks up the change.
+     * Also bumps `updatedAt` so the sync engine picks up the change.
      */
     suspend fun updateAttributes(
         id: String,

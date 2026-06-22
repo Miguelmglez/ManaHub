@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.collection.presentation
 
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.UserCardWithCard
 
 /**
  * A card as it appears in the collection list: all copies of the same

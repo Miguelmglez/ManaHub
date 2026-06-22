@@ -2,8 +2,11 @@ package com.mmg.manahub.core.di
 
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
+import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
@@ -58,4 +61,16 @@ object SharedDomainUseCaseModule {
     fun provideGetCollectionStatsUseCase(
         statsRepository: StatsRepository,
     ): GetCollectionStatsUseCase = GetCollectionStatsUseCase(statsRepository)
+
+    @Provides
+    @Singleton
+    fun provideGetCollectionUseCase(
+        userCardRepository: UserCardRepository,
+    ): GetCollectionUseCase = GetCollectionUseCase(userCardRepository)
+
+    @Provides
+    @Singleton
+    fun provideRemoveCardUseCase(
+        userCardRepository: UserCardRepository,
+    ): RemoveCardUseCase = RemoveCardUseCase(userCardRepository)
 }

@@ -1,8 +1,8 @@
 package com.mmg.manahub.core.data.local.mapper
 
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
-import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.data.local.dao.UserCardWithCard as UserCardWithCardEntity
 
 fun UserCardCollectionEntity.toDomain(): UserCard = UserCard(

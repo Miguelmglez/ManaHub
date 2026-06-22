@@ -9,8 +9,8 @@ import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.TagCategory
-import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserPreferences
 
 /**

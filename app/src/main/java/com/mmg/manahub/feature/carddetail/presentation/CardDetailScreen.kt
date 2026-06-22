@@ -106,7 +106,7 @@ import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.model.TagCategory
-import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
