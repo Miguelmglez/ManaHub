@@ -289,24 +289,28 @@ deferred `UserCardRepository`). `:app:assembleDebug` GREEN; both wasmJs compiles
 ✅ **Phase 2 use-case batch #2 (`DeckCard`/`BasicLandDistribution` + `BasicLandCalculator`/
 `DeckCardValidator`) DONE & GREEN (2026-06-22, commit `7932339`)** — see STATUS + CHANGE LOG.
 
-➡️ **NEXT = Phase 2, use-case batch #3 — PagingData→`Page` abstraction to unblock the collection
-use cases.** The remaining `core/domain/usecase/**` are blocked on UNMOVED deps. Smallest unblock paths,
-in order:
+✅ **Phase 2 use-case batch #3 (`UserCardRepository` interface split) DONE & GREEN (2026-06-22, commit
+`815f169`)** — used the **interface-split** approach (NOT a full `PagingData→Page` swap, to keep the
+Android collection UI's Room→PagingData→LazyPagingItems pipeline intact). `UserCardRepository` moved to
+`:shared:core-domain` `commonMain` with only its platform-agnostic methods; the `PagingData`-backed
+`getCollectionPager()` was split off into a NEW `:app`-only `CollectionPagerSource` interface (in
+`core.domain.repository`); `UserCardRepositoryImpl` now implements BOTH. `UserCard`/`UserCardWithCard`
+model moved to `:shared:core-model` (`core.model`, made wasm-safe). `GetCollectionUseCase` +
+`RemoveCardUseCase` moved to `:shared:core-domain` `commonMain` (standing pattern: `@Inject` stripped,
+`@Provides @Singleton` added to `SharedDomainUseCaseModule`). Verified GREEN: `:app:assembleDebug`,
+both shared wasmJs compiles, `testDebugUnitTest` = 1964/122-fail/2-skip (== baseline), no platform
+imports in shared `commonMain` (the 2 `androidx.paging` grep hits are KDoc, not imports). NOTE: code was
+authored by the architect but the agent hit its session limit before committing — the main agent
+verified the uncommitted WIP (full build + tests + leak grep) and committed it.
 
-1. **Move `UserCardRepository` interface + `UserCardWithCard` model + abstract `androidx.paging.PagingData`
-   into the `:shared:core-common` `Page` model** → unblocks `GetCollectionUseCase` + `RemoveCardUseCase`
-   (both trivially pure once `UserCardRepository` is shared) and later
-   `RefreshCollectionPricesUseCase`. `UserCardRepository` currently sits in `:app`
-   `core.domain.repository` and returns `Flow<PagingData<UserCardWithCard>>` (the `PagingData` is the
-   blocker — abstract it behind the common `Page` model already in `:shared:core-common`).
-   `UserCardWithCard` is in the new `:app` `core/domain/model/UserCard.kt` (kept in `:app` for
-   `System.currentTimeMillis()` — the *interface* can still move while the model stays, OR move both if
-   the model is made wasm-safe via `Clock.System`, the proven Deck/UserCard pattern).
-2. **Then the use cases that touch `:shared:core-common`** — when a moved use case needs a dispatcher,
-   route it through `DispatcherProvider` and add `implementation(project(":shared:core-common"))` to
-   `:shared:core-domain` (first consumer of that module).
+➡️ **NEXT = Phase 2 — begin `:shared:core-data` (the data layer), per the REVISED plan below.** The
+remaining `core/domain/usecase/**` are all platform-bound (Room DAOs / `ScryfallRemoteDataSource` /
+`ProgressionEventBus` / `core.tagging.*` / timestamps) — they unblock only AFTER the data layer + tagging
+engine move, so the cheap use-case-extraction vein is EXHAUSTED. The next productive work is standing up
+`:shared:core-data`: see the **Phase 2 data-layer order** below + the **Sonnet-4.6 execution playbook**
+(`kmp-migration-plan.md` → "Execution playbook for Sonnet 4.6"). Pick the FIRST data-layer slice there.
 
-   EXCLUDED for now (still platform-bound): `AddCardToCollectionUseCase`/`CommitScannedCardsUseCase`
+   Still-platform-bound use cases (move only after their deps move): `AddCardToCollectionUseCase`/`CommitScannedCardsUseCase`
    (gamification `ProgressionEventBus` + `java.time`), `RefreshCollectionPricesUseCase`
    (`ScryfallRemoteDataSource` + `System.currentTimeMillis`), `GetDeckGameStatsUseCase` (Room DAOs +
    `UserPreferencesDataStore` + `toDomainCard` mapper), `SyncManaSymbolsUseCase` (Room DAO + ScryfallApi),
@@ -443,6 +447,16 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 · batch #3 — `UserCardRepository` shared via paging interface split (GREEN, `815f169`).**
+  Split `androidx.paging.PagingData` off the shared surface so the platform-agnostic `UserCardRepository`
+  moved to `:shared:core-domain` `commonMain` WITHOUT dragging Room/paging into shared code: the
+  `getCollectionPager(): Flow<PagingData<UserCardWithCard>>` method went to a NEW `:app`-only
+  `CollectionPagerSource` interface; `UserCardRepositoryImpl` implements both; the Android Collection UI
+  still drives incremental Room paging unchanged. `UserCard`/`UserCardWithCard` → `:shared:core-model`
+  (wasm-safe); `GetCollectionUseCase`/`RemoveCardUseCase` → `:shared:core-domain` (`@Inject` stripped →
+  `@Provides @Singleton` in `SharedDomainUseCaseModule`). Verified GREEN by the MAIN agent (architect hit
+  the session limit pre-commit): `:app:assembleDebug` + both shared wasmJs compiles + `testDebugUnitTest`
+  1964/122/2 (== baseline) + leak grep clean. Cheap use-case vein EXHAUSTED → next is `:shared:core-data`.
 - 2026-06-22 — **Phase 2 · use-case batch #2 — `DeckCard`/`BasicLandDistribution` models + the
   `BasicLandCalculator`/`DeckCardValidator` use cases moved to shared (GREEN, commit `7932339`).**
   Cleared the blocker noted in batch #1's NEXT STEP. (1) Verified purity: `DeckCard` (refs only `Card`),
