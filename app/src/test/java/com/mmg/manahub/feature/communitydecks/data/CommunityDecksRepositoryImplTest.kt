@@ -1,8 +1,10 @@
 package com.mmg.manahub.feature.communitydecks.data
 
-import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.common.DispatcherProvider
+import com.mmg.manahub.core.data.cache.CachedDeckEntry
+import com.mmg.manahub.core.data.cache.CommunityDeckCache
+import com.mmg.manahub.core.data.network.ArchidektRequestQueue
 import com.mmg.manahub.core.data.remote.ArchidektClient
 import com.mmg.manahub.core.data.remote.dto.ArchidektCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektCardEntryDto
@@ -11,22 +13,18 @@ import com.mmg.manahub.core.data.remote.dto.ArchidektDeckSummaryDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektOracleCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektOwnerDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
-import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektRequestQueue
-import com.mmg.manahub.feature.communitydecks.data.remote.toCacheEntity
+import com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl
+import com.mmg.manahub.core.model.DataResult
 import io.ktor.client.plugins.ResponseException
 import io.ktor.http.HttpStatusCode
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -35,17 +33,24 @@ import org.junit.Test
  * Unit tests for [CommunityDecksRepositoryImpl].
  *
  * Verifies the cache-first / stale-fallback strategy, HTTP error mapping, and
- * interaction with the DAO and API.
+ * interaction with the [CommunityDeckCache] and API.
  *
  * The [ArchidektRequestQueue] is mocked so that `execute` simply calls the block
  * directly (no rate-limiting / retry overhead in tests).
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CommunityDecksRepositoryImplTest {
 
     private val api: ArchidektClient = mockk()
     private val requestQueue: ArchidektRequestQueue = mockk()
-    private val cacheDao: CommunityDeckCacheDao = mockk(relaxUnitFun = true)
+    private val cache: CommunityDeckCache = mockk(relaxUnitFun = true)
+    private val crashReporter: CrashReporter = mockk(relaxed = true)
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val dispatcherProvider: DispatcherProvider = mockk {
+        every { io } returns testDispatcher
+        every { default } returns testDispatcher
+        every { main } returns testDispatcher
+    }
 
     private lateinit var repository: CommunityDecksRepositoryImpl
 
@@ -77,11 +82,11 @@ class CommunityDecksRepositoryImplTest {
             ),
         )
 
-    /** Builds a cache entity from a DTO (same mapper the production code uses). */
-    private fun buildCacheEntity(
+    /** Builds a [CachedDeckEntry] from a DTO with the given cache timestamp. */
+    private fun buildCachedEntry(
         id: Int = testDeckId,
         cachedAt: Long = System.currentTimeMillis(),
-    ): CommunityDeckCacheEntity = buildDto(id).toCacheEntity().copy(cachedAt = cachedAt)
+    ): CachedDeckEntry = CachedDeckEntry(dto = buildDto(id), cachedAt = cachedAt)
 
     /**
      * Builds a mock [ResponseException] with the given HTTP status [code].
@@ -96,12 +101,6 @@ class CommunityDecksRepositoryImplTest {
 
     @Before
     fun setUp() {
-        // The repository's catch blocks log telemetry via FirebaseCrashlytics (outside any
-        // runCatching), which throws "Default FirebaseApp is not initialized" without a static mock.
-        mockkStatic(FirebaseCrashlytics::class)
-        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
-        every { FirebaseCrashlytics.getInstance() } returns crashlytics
-
         // Make requestQueue.execute transparent — just call the block.
         coEvery { requestQueue.execute(any<suspend () -> Any>()) } coAnswers {
             firstArg<suspend () -> Any>().invoke()
@@ -110,14 +109,10 @@ class CommunityDecksRepositoryImplTest {
         repository = CommunityDecksRepositoryImpl(
             api = api,
             requestQueue = requestQueue,
-            cacheDao = cacheDao,
-            ioDispatcher = testDispatcher,
+            cache = cache,
+            crashReporter = crashReporter,
+            dispatcherProvider = dispatcherProvider,
         )
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ── Group 1: Cache hit (fresh) ──────────────────────────────────────────
@@ -125,8 +120,8 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given fresh cache when getDeckById then returns cached data without API call`() = runTest {
         // Arrange — cache entry created just now (fresh).
-        val freshEntity = buildCacheEntity(cachedAt = System.currentTimeMillis())
-        coEvery { cacheDao.getById(testDeckId) } returns freshEntity
+        val freshEntry = buildCachedEntry(cachedAt = System.currentTimeMillis())
+        coEvery { cache.getById(testDeckId) } returns freshEntry
 
         // Act
         val result = repository.getDeckById(testDeckId)
@@ -144,14 +139,14 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given fresh cache when getDeckById then does not insert into cache`() = runTest {
         // Arrange
-        val freshEntity = buildCacheEntity(cachedAt = System.currentTimeMillis())
-        coEvery { cacheDao.getById(testDeckId) } returns freshEntity
+        val freshEntry = buildCachedEntry(cachedAt = System.currentTimeMillis())
+        coEvery { cache.getById(testDeckId) } returns freshEntry
 
         // Act
         repository.getDeckById(testDeckId)
 
         // Assert — no re-caching on a hit.
-        coVerify(exactly = 0) { cacheDao.insert(any()) }
+        coVerify(exactly = 0) { cache.insert(any()) }
     }
 
     // ── Group 2: Cache miss (empty) — network success ───────────────────────
@@ -159,7 +154,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given no cache when getDeckById then fetches from API and caches result`() = runTest {
         // Arrange — no cache entry.
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } returns buildDto()
 
         // Act
@@ -173,15 +168,15 @@ class CommunityDecksRepositoryImplTest {
         assertFalse(success.isStale)
 
         // Must cache the fetched response.
-        coVerify(exactly = 1) { cacheDao.insert(any()) }
+        coVerify(exactly = 1) { cache.insert(any()) }
     }
 
     @Test
     fun `given stale cache when getDeckById then fetches from API`() = runTest {
         // Arrange — stale cache entry (well beyond 24h).
         val staleTime = System.currentTimeMillis() - 48 * 60 * 60 * 1_000L
-        val staleEntity = buildCacheEntity(cachedAt = staleTime)
-        coEvery { cacheDao.getById(testDeckId) } returns staleEntity
+        val staleEntry = buildCachedEntry(cachedAt = staleTime)
+        coEvery { cache.getById(testDeckId) } returns staleEntry
         coEvery { api.getDeckById(testDeckId) } returns buildDto()
 
         // Act
@@ -197,11 +192,10 @@ class CommunityDecksRepositoryImplTest {
 
     @Test
     fun `given HTTP error with stale cache when getDeckById then returns stale data`() = runTest {
-        // Arrange — first call returns null (stale cache check),
-        // API throws, then second call returns stale entry.
+        // Arrange — stale cache, API throws.
         val staleTime = System.currentTimeMillis() - 48 * 60 * 60 * 1_000L
-        val staleEntity = buildCacheEntity(cachedAt = staleTime)
-        coEvery { cacheDao.getById(testDeckId) } returns staleEntity
+        val staleEntry = buildCachedEntry(cachedAt = staleTime)
+        coEvery { cache.getById(testDeckId) } returns staleEntry
         coEvery { api.getDeckById(testDeckId) } throws buildResponseException(500)
 
         // Act
@@ -218,9 +212,9 @@ class CommunityDecksRepositoryImplTest {
     fun `given generic exception with stale cache when getDeckById then returns stale data`() = runTest {
         // Arrange
         val staleTime = System.currentTimeMillis() - 48 * 60 * 60 * 1_000L
-        val staleEntity = buildCacheEntity(cachedAt = staleTime)
-        coEvery { cacheDao.getById(testDeckId) } returns staleEntity
-        coEvery { api.getDeckById(testDeckId) } throws java.io.IOException("Network unreachable")
+        val staleEntry = buildCachedEntry(cachedAt = staleTime)
+        coEvery { cache.getById(testDeckId) } returns staleEntry
+        coEvery { api.getDeckById(testDeckId) } throws RuntimeException("Network unreachable")
 
         // Act
         val result = repository.getDeckById(testDeckId)
@@ -235,7 +229,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given HTTP error with no cache when getDeckById then returns Error`() = runTest {
         // Arrange — no cache at all.
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } throws buildResponseException(500)
 
         // Act
@@ -249,7 +243,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given generic exception with no cache when getDeckById then returns Error`() = runTest {
         // Arrange
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } throws RuntimeException("Parse failure")
 
         // Act
@@ -263,7 +257,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given exception with null message and no cache then returns Unknown error`() = runTest {
         // Arrange
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } throws RuntimeException()
 
         // Act
@@ -279,7 +273,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given HTTP 404 with no cache when getDeckById then returns not found error`() = runTest {
         // Arrange
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } throws buildResponseException(404)
 
         // Act
@@ -294,8 +288,8 @@ class CommunityDecksRepositoryImplTest {
     fun `given HTTP 404 with stale cache when getDeckById then returns stale data not error`() = runTest {
         // Arrange — even on 404, stale cache wins.
         val staleTime = System.currentTimeMillis() - 48 * 60 * 60 * 1_000L
-        val staleEntity = buildCacheEntity(cachedAt = staleTime)
-        coEvery { cacheDao.getById(testDeckId) } returns staleEntity
+        val staleEntry = buildCachedEntry(cachedAt = staleTime)
+        coEvery { cache.getById(testDeckId) } returns staleEntry
         coEvery { api.getDeckById(testDeckId) } throws buildResponseException(404)
 
         // Act
@@ -311,7 +305,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given HTTP 429 with no cache when getDeckById then returns rate limit error`() = runTest {
         // Arrange
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } throws buildResponseException(429)
 
         // Act
@@ -327,7 +321,7 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given successful API response then domain model is correctly mapped`() = runTest {
         // Arrange
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } returns buildDto()
 
         // Act
@@ -350,7 +344,7 @@ class CommunityDecksRepositoryImplTest {
     fun `given API response with no owner then owner defaults to Unknown`() = runTest {
         // Arrange
         val dtoNoOwner = buildDto().copy(owner = null)
-        coEvery { cacheDao.getById(testDeckId) } returns null
+        coEvery { cache.getById(testDeckId) } returns null
         coEvery { api.getDeckById(testDeckId) } returns dtoNoOwner
 
         // Act
