@@ -245,8 +245,19 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   `RateLimitedQueue`. Verified: `:shared:core-data:compileKotlinWasmJs` SUCCESSFUL;
   `:app:assembleDebug` SUCCESSFUL; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in
   `commonMain`.
-- ⬜ **Phase 2 (remaining)** — Retrofit→Ktor networking in `commonMain`, Gson→kotlinx-serialization,
-  repository impls, Room stays androidMain. Fold in web spikes B & C (Supabase/Ktor/Coil on wasmJs).
+- ✅ **Phase 2 · Retrofit→Ktor — ALL 6 APIs migrated (DONE & GREEN, 2026-06-22).** Every Retrofit API
+  surface replaced with a KMP-pure Ktor `HttpClient`-based client in `:shared:core-data` `commonMain`:
+  `CloudflareContentClient` (`79a1e0b`), `YouTubeClient` (`3483ff8`), `FriendshipClient` (`1475268`),
+  `UserProfileClient` (`8eb9642`), `ArchidektClient` (`47868dd`), `ScryfallClient` (`7524265`).
+  DTOs moved to shared `core.data.remote.dto` (all `@Serializable`). Gson DTOs deleted. The
+  `@Named("supabase") Retrofit` was the last Retrofit provider and is deleted; the global `OkHttpClient`
+  stays (DraftModule YouTube). Ktor deps (`ktor-client-core`, `content-negotiation`,
+  `serialization-kotlinx-json`, `ktor-client-okhttp` in androidMain, `ktor-client-js` in wasmJsMain)
+  added to version catalog + `:shared:core-data`. `ScryfallRequestQueue` + `ArchidektRequestQueue`
+  updated from `retrofit2.HttpException` to `io.ktor.client.plugins.ResponseException`. Baseline held
+  at 1964/122/2 throughout all 6 migrations; 0 platform imports in `commonMain`.
+- ⬜ **Phase 2 (remaining)** — repository impls to `commonMain` (Room stays androidMain), remaining
+  platform-bound use cases, fold in web spikes B & C (Supabase/Ktor/Coil on wasmJs).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
@@ -312,26 +323,23 @@ imports in shared `commonMain` (the 2 `androidx.paging` grep hits are KDoc, not 
 authored by the architect but the agent hit its session limit before committing — the main agent
 verified the uncommitted WIP (full build + tests + leak grep) and committed it.
 
-➡️ **NEXT = Phase 2 — continue `:shared:core-data` population.** The module scaffold + the first
-shared code (`RateLimitedQueue`) are done. The next productive slices are:
-1. **Ktor networking in `commonMain`** — port the Retrofit `ScryfallApi`/`ArchidektApi` DTOs +
-   request/response contracts to Ktor (js/wasm engine) + kotlinx-serialization. The existing
-   `ScryfallRequestQueue`/`ArchidektRequestQueue` in `:app` already delegate to `RateLimitedQueue`;
-   the Ktor clients will be wrapped by the shared queue.
-2. **Repository impls migration** — move repository impls that can be made platform-agnostic into
-   `commonMain` (their Room-backed data sources stay in `androidMain` behind interfaces).
-3. **Fold in web spikes B & C** (Supabase/Ktor/Coil on wasmJs; web auth) — validate the web-runtime
-   libraries Phase 2's data layer introduces.
+➡️ **NEXT = Phase 2 §9.6 item 4 — move repository IMPLs to `commonMain`** (one repo per slice). The
+Retrofit→Ktor networking is DONE (all 6 APIs). The next productive work is moving repository
+implementations that can be made platform-agnostic into `:shared:core-data` `commonMain` behind their
+already-shared interfaces. **Room DAOs/entities/migrations STAY in `androidMain`** (no wasm target); the
+DAO interface is exposed to `commonMain` and a `wasmJsMain` web data source (Supabase-remote +
+IndexedDB/localStorage) is added later. Start with the simplest repos (few deps, no Room) and work
+toward the complex ones.
 
-   Still-platform-bound use cases (move only after their deps move): `AddCardToCollectionUseCase`/`CommitScannedCardsUseCase`
-   (gamification `ProgressionEventBus` + `java.time`), `RefreshCollectionPricesUseCase`
-   (`ScryfallRemoteDataSource` + `System.currentTimeMillis`), `GetDeckGameStatsUseCase` (Room DAOs +
-   `UserPreferencesDataStore` + `toDomainCard` mapper), `SyncManaSymbolsUseCase` (Room DAO + ScryfallApi),
-   `AutoTagCardUseCase`/`ComputeCardTagsUseCase` (`core.tagging.*` analyzers + `:app` mapper — move the
-   tagging engine first).
+   Still-platform-bound use cases (move only after their deps move): `AddCardToCollectionUseCase`/
+   `CommitScannedCardsUseCase` (gamification `ProgressionEventBus` + `java.time`),
+   `RefreshCollectionPricesUseCase` (`ScryfallRemoteDataSource` + `System.currentTimeMillis`),
+   `GetDeckGameStatsUseCase` (Room DAOs + `UserPreferencesDataStore` + `toDomainCard` mapper),
+   `SyncManaSymbolsUseCase` (Room DAO + ScryfallClient), `AutoTagCardUseCase`/`ComputeCardTagsUseCase`
+   (`core.tagging.*` analyzers + `:app` mapper — move the tagging engine first).
 
-**(former) Phase 2 data-layer order (still upcoming):**
-3. **Then `:shared:core-data`** — repository IMPLs in `commonMain` against those interfaces; **Room DAOs/
+**Phase 2 data-layer order (remaining):**
+4. **Repository impls to `commonMain`** — one repo per slice; **Room DAOs/
    entities/migrations STAY in `androidMain`** (no wasm target) with the DAO interface in `commonMain` and
    a web data source (Supabase-remote + IndexedDB/localStorage) in `wasmJsMain`. Migrate **Retrofit → Ktor**
    (js/wasm engine) and **Gson → kotlinx-serialization**; port the rate-limit queues
@@ -474,6 +482,31 @@ Update this tracker after each step. Keep Android shippable at every step.
   `:app:assembleDebug` SUCCESSFUL; `:app:testDebugUnitTest` 1964/122-fail/2-skip (== baseline); commonMain
   platform-import grep EMPTY (0 leaks). No behaviour change (identical throttle/retry semantics, same
   constants).
+- 2026-06-22 — **Phase 2 · Retrofit→Ktor — ALL 6 APIs migrated (GREEN).** Six commits, one per API
+  (§9.6 item 3). Each created a KMP-pure Ktor client class in `:shared:core-data` `commonMain`,
+  moved DTOs (already `@Serializable` or converted from Gson `@SerializedName`), updated DI + consumers,
+  deleted the old Retrofit interface. Ktor deps added to version catalog + `:shared:core-data` build
+  (`ktor-client-core`, `content-negotiation`, `serialization-kotlinx-json` in commonMain;
+  `ktor-client-okhttp` in androidMain; `ktor-client-js` in wasmJsMain). `kotlin-serialization` plugin
+  added to `:shared:core-data`. Per-API details:
+  - `79a1e0b` **CloudflareContentApi** → `CloudflareContentClient` (5 endpoints; 1 typed `SetsIndexResponse`,
+    4 raw-String; DTOs converted Gson→`@Serializable`; DraftModule Retrofit→Ktor HttpClient(OkHttp);
+    `DraftRepositoryImpl`/`DraftSimRepositoryImpl` adapted String→`Gson().fromJson` at call sites).
+  - `3483ff8` **YouTubeApi** → `YouTubeClient` (1 endpoint; DTOs already `@Serializable`, `git mv`'d;
+    API key as ctor param instead of OkHttp interceptor; `YouTubeApiKeyInterceptor` deleted).
+  - `1475268` **FriendshipService** → `FriendshipClient` (13 endpoints GET/POST/PATCH/DELETE; 12 DTOs
+    converted Gson→`@Serializable`; `@Named("supabaseKtor") HttpClient` added to AuthModule reusing
+    the Supabase OkHttpClient with `encodeDefaults=true`; `FriendRemoteDataSource` void methods simplified
+    to Ktor `expectSuccess` auto-throw).
+  - `8eb9642` **SupabaseUserProfileService** → `UserProfileClient` (7 endpoints; 6 DTOs converted;
+    `updatePrivacySettings` takes `JsonObject` instead of `Map<String,Any>`; `@Named("supabase") Retrofit`
+    DELETED — last consumer; `AuthRepositoryImpl` `HttpException`→`ResponseException`).
+  - `47868dd` **ArchidektApi** → `ArchidektClient` (2 endpoints; DTOs already `@Serializable`, `git mv`'d;
+    Koin module rewritten; `ArchidektRequestQueue` exception type updated; test mocks updated).
+  - `7524265` **ScryfallApi** → `ScryfallClient` (9 endpoints; DTOs already `@Serializable`, `git mv`'d
+    — same package `core.data.remote.dto` so 0 consumer import changes; `NetworkModule` Retrofit deleted,
+    global OkHttpClient kept; `ScryfallRequestQueue` `HttpException`→`ResponseException`).
+  Baseline 1964/122/2 held throughout; 0 platform imports in `commonMain`.
 - 2026-06-22 — **Phase 2 · batch #3 — `UserCardRepository` shared via paging interface split (GREEN, `815f169`).**
   Split `androidx.paging.PagingData` off the shared surface so the platform-agnostic `UserCardRepository`
   moved to `:shared:core-domain` `commonMain` WITHOUT dragging Room/paging into shared code: the
