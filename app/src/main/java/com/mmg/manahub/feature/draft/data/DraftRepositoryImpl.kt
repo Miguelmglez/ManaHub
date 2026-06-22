@@ -16,7 +16,7 @@ import com.mmg.manahub.core.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
-import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
+import com.mmg.manahub.core.data.remote.YouTubeClient
 import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
 import com.mmg.manahub.feature.draft.domain.model.ArchetypeGuide
@@ -60,7 +60,7 @@ class DraftRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val scryfallApi: ScryfallApi,
     private val scryfallQueue: ScryfallRequestQueue,
-    private val youTubeApi: YouTubeApi,
+    private val youTubeClient: YouTubeClient,
     private val cloudflareClient: CloudflareContentClient,
     private val draftSetDao: DraftSetDao,
     private val gson: Gson,
@@ -275,11 +275,11 @@ class DraftRepositoryImpl @Inject constructor(
             try {
                 val query = "$setName MTG draft guide"
                 val enResults = runCatching {
-                    youTubeApi.searchVideos(query = query, language = "en")
+                    youTubeClient.searchVideos(query = query, language = "en")
                 }.getOrNull()?.items ?: emptyList()
 
                 val esResults = runCatching {
-                    youTubeApi.searchVideos(query = query, language = "es")
+                    youTubeClient.searchVideos(query = query, language = "es")
                 }.getOrNull()?.items ?: emptyList()
 
                 val seenIds = mutableSetOf<String>()
