@@ -222,7 +222,21 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   `GetCollectionSetCodesUseCase`, `GetCollectionStatsUseCase`. Still Hilt-owned (bridged into Koin
   islands) → `@Inject` stripped + new Hilt `@Provides` module `SharedDomainUseCaseModule`. (Detail in
   NEXT STEP / CHANGE LOG.)
-- ⬜ **Phase 2 (remaining)** — more PURE use cases (batch #2: unblock `UserCardRepository`/`DeckCard`),
+- ✅ **Phase 2 · use-case batch #2 — `DeckCard`/`BasicLandDistribution` + `BasicLandCalculator`/
+  `DeckCardValidator` MOVED (DONE & GREEN, 2026-06-22).** `DeckCard` + `BasicLandDistribution` (both
+  pure: only ref `Card` from core-model) split out of `:app` `core/domain/model/DeckBuilderState.kt`
+  into a new `:shared:core-model` file `core/model/DeckCard.kt`; `DeckBuilderState`/`BuilderStep`/
+  `BuilderTab`/`ReviewGroupBy` stayed in `:app` (presentation state, out of scope) + now import the two
+  moved types. `BasicLandCalculator` + `DeckCardValidator` (both `object`s, NO `@Inject` → NO Hilt
+  provider needed) `git mv`'d to `:shared:core-domain` `commonMain` package `core.domain.usecase.decks`
+  UNCHANGED → zero consumer-import edits for the use cases. `DeckCard`/`BasicLandDistribution` consumer
+  imports rewritten `core.domain.model.X` → `core.model.X` across `:app` main + test (9 files); NO inline
+  FQN refs (grep clean). Commit `7932339`. Verified: both shared modules `compileKotlinWasmJs` SUCCESSFUL;
+  `:app:assembleDebug` SUCCESSFUL; `testDebugUnitTest` 1964/122-fail/2-skip (== baseline,
+  `BasicLandCalculatorTest` 4/0 green); commonMain forbidden-import grep EMPTY (lone `System.currentTimeMillis`
+  hit is the pre-existing `Deck.kt` KDoc comment).
+- ⬜ **Phase 2 (remaining)** — `UserCardRepository`/`UserCardWithCard` + PagingData→`Page` abstraction
+  (unblock `GetCollectionUseCase`/`RemoveCardUseCase`/`RefreshCollectionPricesUseCase`),
   then `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
@@ -272,18 +286,23 @@ deferred `UserCardRepository`). `:app:assembleDebug` GREEN; both wasmJs compiles
     pre-existing and tests `GetCollectionUseCase`/`RemoveCardUseCase`, which were NOT moved). commonMain
     forbidden-import grep EMPTY. Packages preserved → zero `:app` import edits; zero inline-FQN refs.
 
-➡️ **NEXT = Phase 2, use-case batch #2 — unblock + move the next PURE use cases.** The remaining
-`core/domain/usecase/**` are all currently blocked on UNMOVED deps. Smallest unblock paths, in order:
+✅ **Phase 2 use-case batch #2 (`DeckCard`/`BasicLandDistribution` + `BasicLandCalculator`/
+`DeckCardValidator`) DONE & GREEN (2026-06-22, commit `7932339`)** — see STATUS + CHANGE LOG.
 
-1. **Move `UserCardRepository` interface + `UserCardWithCard` model** → unblocks `GetCollectionUseCase`
-   + `RemoveCardUseCase` (both trivially pure once `UserCardRepository` is shared). `UserCardRepository`
-   currently sits in `:app` `core.domain.repository`; `UserCardWithCard` is in the new `:app`
-   `core/domain/model/UserCard.kt` (kept in `:app` for `System.currentTimeMillis()` — the *interface* can
-   still move while the model stays, OR move both if the model is made wasm-safe via `Clock.System`).
-2. **Move `BasicLandDistribution` + `DeckCard`** (`core.domain.model`) → unblocks `BasicLandCalculator`
-   (pure math on `Card`/`DeckFormat`) + `DeckCardValidator` (must move TOGETHER — it calls
-   `BasicLandCalculator.isBasicLand`). No `@Inject` on either (object/object) so no Hilt provider needed.
-3. **Then the use cases that touch `:shared:core-common`** — when a moved use case needs a dispatcher,
+➡️ **NEXT = Phase 2, use-case batch #3 — PagingData→`Page` abstraction to unblock the collection
+use cases.** The remaining `core/domain/usecase/**` are blocked on UNMOVED deps. Smallest unblock paths,
+in order:
+
+1. **Move `UserCardRepository` interface + `UserCardWithCard` model + abstract `androidx.paging.PagingData`
+   into the `:shared:core-common` `Page` model** → unblocks `GetCollectionUseCase` + `RemoveCardUseCase`
+   (both trivially pure once `UserCardRepository` is shared) and later
+   `RefreshCollectionPricesUseCase`. `UserCardRepository` currently sits in `:app`
+   `core.domain.repository` and returns `Flow<PagingData<UserCardWithCard>>` (the `PagingData` is the
+   blocker — abstract it behind the common `Page` model already in `:shared:core-common`).
+   `UserCardWithCard` is in the new `:app` `core/domain/model/UserCard.kt` (kept in `:app` for
+   `System.currentTimeMillis()` — the *interface* can still move while the model stays, OR move both if
+   the model is made wasm-safe via `Clock.System`, the proven Deck/UserCard pattern).
+2. **Then the use cases that touch `:shared:core-common`** — when a moved use case needs a dispatcher,
    route it through `DispatcherProvider` and add `implementation(project(":shared:core-common"))` to
    `:shared:core-domain` (first consumer of that module).
 
@@ -424,6 +443,28 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 · use-case batch #2 — `DeckCard`/`BasicLandDistribution` models + the
+  `BasicLandCalculator`/`DeckCardValidator` use cases moved to shared (GREEN, commit `7932339`).**
+  Cleared the blocker noted in batch #1's NEXT STEP. (1) Verified purity: `DeckCard` (refs only `Card`),
+  `BasicLandDistribution` (pure Int/Map), `BasicLandCalculator` (`object`, `kotlin.math.roundToInt` +
+  core-model types), `DeckCardValidator` (`object`, calls `BasicLandCalculator.isBasicLand`) — all clean,
+  no `@Inject`/platform/`System.currentTimeMillis()`/`java.util`. (2) SPLIT
+  `core/domain/model/DeckBuilderState.kt`: extracted `DeckCard` + `BasicLandDistribution` into a NEW
+  `:shared:core-model` file `core/model/DeckCard.kt` (package `com.mmg.manahub.core.model`);
+  `DeckBuilderState`/`BuilderStep`/`BuilderTab`/`ReviewGroupBy` stay in `:app` (presentation state) +
+  now `import core.model.{DeckCard,BasicLandDistribution}`. (3) `git mv` `BasicLandCalculator.kt` +
+  `DeckCardValidator.kt` → `:shared:core-domain` `commonMain`, package `core.domain.usecase.decks`
+  UNCHANGED → zero consumer-import edits for the use cases; repointed `BasicLandCalculator`'s internal
+  `core.domain.model.{DeckCard,BasicLandDistribution}` imports → `core.model.{…}`. Both are `object`s so
+  NO Hilt `@Provides` was needed (unlike batch #1's `@Inject` use cases). (4) Rewrote
+  `DeckCard`/`BasicLandDistribution` consumer imports `core.domain.model.X` → `core.model.X` across `:app`
+  main + test (9 files); NO inline FQN refs (grep clean — the recurring `combine`-array-cast gotcha did
+  not bite here). `:shared:core-common` not consumed (no dispatcher). Verified: both shared
+  `compileKotlinWasmJs` SUCCESSFUL; `:app:assembleDebug` SUCCESSFUL; `testDebugUnitTest`
+  1964/122-fail/2-skip (== baseline; `BasicLandCalculatorTest` 4/0 green); commonMain forbidden-import
+  grep EMPTY (lone hit = `Deck.kt` KDoc comment). Inline secret-scan clean (model split + 2 renames +
+  import edits). NEXT = batch #3 (PagingData→`Page` abstraction → unblock `UserCardRepository` +
+  `GetCollectionUseCase`/`RemoveCardUseCase`/`RefreshCollectionPricesUseCase`).
 - 2026-06-22 — **Phase 2 · use-case batch #1 — 5 PURE use cases moved to `:shared:core-domain`
   `commonMain` (GREEN).** `git mv` `SearchCardUseCase`/`SearchCardsUseCase` (`usecase.card`),
   `BuildScryfallQueryUseCase` (`usecase.search`), `GetCollectionSetCodesUseCase`/
