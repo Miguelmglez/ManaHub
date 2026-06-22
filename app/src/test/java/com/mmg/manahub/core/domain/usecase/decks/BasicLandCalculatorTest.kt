@@ -1,7 +1,7 @@
 package com.mmg.manahub.core.domain.usecase.decks
 
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.domain.model.DeckCard
+import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
 import org.junit.Assert.assertEquals
 import org.junit.Test

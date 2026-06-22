@@ -20,7 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.DeckCard
+import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 

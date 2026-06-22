@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.domain.model.DeckCard
+import com.mmg.manahub.core.model.DeckCard
 
 /**
  * Handles parsing and exporting decks in the Moxfield / MTG Arena text format.
