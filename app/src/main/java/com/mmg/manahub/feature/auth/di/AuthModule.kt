@@ -1,9 +1,8 @@
 package com.mmg.manahub.feature.auth.di
 
-import com.google.gson.GsonBuilder
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -21,8 +20,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -80,32 +77,9 @@ abstract class AuthModule {
         }
 
         /**
-         * Provides the [Retrofit] instance scoped to the Supabase REST API base URL.
-         *
-         * Uses the dedicated [OkHttpClient] tagged with `@Named("supabase")` to avoid
-         * sharing authentication headers with the Scryfall client defined in [NetworkModule].
-         */
-        @Provides
-        @Singleton
-        @Named("supabase")
-        fun provideSupabaseRetrofit(
-            @Named("supabase") client: OkHttpClient,
-        ): Retrofit {
-            val gson = GsonBuilder()
-                .serializeNulls()
-                .create()
-
-            return Retrofit.Builder()
-                .baseUrl("${BuildConfig.SUPABASE_URL}/rest/v1/")
-                .client(client)
-                .addConverterFactory(GsonConverterFactory.create(gson))
-                .build()
-        }
-
-        /**
          * Provides a Ktor [HttpClient] backed by the Supabase [OkHttpClient].
          *
-         * This is the Ktor counterpart of the Retrofit instance above — used by
+         * This is the primary HTTP client for Supabase REST calls — used by
          * KMP-migrated API clients (e.g. [com.mmg.manahub.core.data.remote.FriendshipClient])
          * that need the same auth/apikey headers the OkHttp interceptor already provides.
          *
@@ -133,22 +107,26 @@ abstract class AuthModule {
         }
 
         /**
-         * Provides the [SupabaseUserProfileService] for `user_profiles` table and RPC calls.
+         * Provides the [UserProfileClient] for `user_profiles` table and RPC calls
+         * using the Ktor [HttpClient] backed by the Supabase [OkHttpClient].
          */
         @Provides
         @Singleton
-        fun provideSupabaseUserProfileService(
-            @Named("supabase") retrofit: Retrofit,
-        ): SupabaseUserProfileService = retrofit.create(SupabaseUserProfileService::class.java)
+        fun provideUserProfileClient(
+            @Named("supabaseKtor") httpClient: HttpClient,
+        ): UserProfileClient = UserProfileClient(
+            httpClient = httpClient,
+            baseUrl = "${BuildConfig.SUPABASE_URL}/rest/v1/",
+        )
 
         /**
-         * Provides the [UserProfileDataSource] using the Retrofit-based service.
+         * Provides the [UserProfileDataSource] using the Ktor-based client.
          */
         @Provides
         @Singleton
         fun provideUserProfileDataSource(
-            service: SupabaseUserProfileService,
+            client: UserProfileClient,
             @IoDispatcher dispatcher: CoroutineDispatcher,
-        ): UserProfileDataSource = UserProfileDataSource(service, dispatcher)
+        ): UserProfileDataSource = UserProfileDataSource(client, dispatcher)
     }
 }

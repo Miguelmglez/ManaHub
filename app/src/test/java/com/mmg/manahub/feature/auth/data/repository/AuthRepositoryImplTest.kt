@@ -2,9 +2,10 @@ package com.mmg.manahub.feature.auth.data.repository
 
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.remote.UserProfileClient
+import com.mmg.manahub.core.data.remote.dto.UpdateNicknameDto
+import com.mmg.manahub.core.data.remote.dto.UserProfileDto
 import com.mmg.manahub.feature.auth.data.remote.ProfileFetchResult
-import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
-import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthResult
@@ -19,7 +20,10 @@ import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.exceptions.RestException
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.statement.HttpResponse as KtorHttpResponse
+import io.ktor.http.HttpStatusCode
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -44,10 +48,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
 import java.io.IOException
 import okhttp3.Response as OkHttpResponse
-import okhttp3.ResponseBody.Companion.toResponseBody as okHttpToResponseBody
 
 /**
  * Unit tests for [AuthRepositoryImpl].
@@ -55,7 +57,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody as okHttpToResponseBody
  * Strategy:
  * - [Auth] is mocked with MockK.
  * - [UserProfileDataSource] is mocked to isolate repository logic.
- * - [SupabaseUserProfileService] is mocked for RPC-level tests (updateNickname, deleteAccount).
+ * - [UserProfileClient] is mocked for RPC-level tests (updateNickname, deleteAccount).
  * - [UserPreferencesDataStore] is mocked (relaxed) to verify DataStore sync calls.
  * - [UnconfinedTestDispatcher] is used so withContext(ioDispatcher) runs synchronously,
  *   avoiding any need for advanceUntilIdle.
@@ -78,7 +80,7 @@ class AuthRepositoryImplTest {
 
     private val supabaseAuth                = mockk<Auth>(relaxed = true)
     private val userProfileDataSource       = mockk<UserProfileDataSource>(relaxed = true)
-    private val supabaseUserProfileService  = mockk<SupabaseUserProfileService>(relaxed = true)
+    private val userProfileClient            = mockk<UserProfileClient>(relaxed = true)
     private val userPreferencesDataStore    = mockk<UserPreferencesDataStore>(relaxed = true)
     // Relaxed mock: the Edge Function OkHttp call is fire-and-forget; unit tests never
     // exercise it directly. Using relaxed avoids stub boilerplate while keeping the
@@ -147,12 +149,25 @@ class AuthRepositoryImplTest {
         )
     }
 
-    /** Builds a successful Retrofit [Response] with no body. */
-    private fun successResponse(): Response<Unit> = Response.success(Unit)
+    /**
+     * Builds a [ClientRequestException] for test stubs that need to simulate
+     * Ktor 4xx errors (e.g. HTTP 400 for inappropriate nickname).
+     */
+    private fun ktorClientError(statusCode: Int): ClientRequestException {
+        val response = mockk<KtorHttpResponse>(relaxed = true)
+        every { response.status } returns HttpStatusCode.fromValue(statusCode)
+        return ClientRequestException(response, "HTTP $statusCode")
+    }
 
-    /** Builds a failed Retrofit [Response] with the given HTTP status code. */
-    private fun errorResponse(code: Int): Response<Unit> =
-        Response.error(code, "".okHttpToResponseBody(null))
+    /**
+     * Builds a [io.ktor.client.plugins.ServerResponseException] for test stubs
+     * that need to simulate Ktor 5xx errors.
+     */
+    private fun ktorServerError(statusCode: Int): io.ktor.client.plugins.ServerResponseException {
+        val response = mockk<KtorHttpResponse>(relaxed = true)
+        every { response.status } returns HttpStatusCode.fromValue(statusCode)
+        return io.ktor.client.plugins.ServerResponseException(response, "HTTP $statusCode")
+    }
 
     /**
      * Stubs the OkHttp client used by [deleteAccount] to simulate the
@@ -198,8 +213,8 @@ class AuthRepositoryImplTest {
         // Default stub: fetchUserProfile returns null (no enrichment by default).
         coEvery { userProfileDataSource.fetchUserProfile(any()) } returns null
 
-        // Default stub: updateNickname returns success.
-        coEvery { supabaseUserProfileService.updateNickname(any()) } returns successResponse()
+        // Default stub: updateNickname returns success (Ktor void = just runs).
+        coEvery { userProfileClient.updateNickname(any()) } just Runs
 
         // Default stub for deleteAccount: Edge Function returns HTTP 200.
         stubDeleteEdgeFunction(success = true)
@@ -207,7 +222,7 @@ class AuthRepositoryImplTest {
         repository = spyk(AuthRepositoryImpl(
             supabaseAuth               = supabaseAuth,
             userProfileDataSource      = userProfileDataSource,
-            supabaseUserProfileService = supabaseUserProfileService,
+            userProfileClient          = userProfileClient,
             userPreferencesDataStore   = userPreferencesDataStore,
             supabaseOkHttpClient       = supabaseOkHttpClient,
             applicationScope           = testScope,
@@ -414,7 +429,7 @@ class AuthRepositoryImplTest {
         // upsertUserProfile IS called to create the profile row
         coVerify(exactly = 1) { userProfileDataSource.upsertUserProfile(any()) }
         // updateNickname RPC must NOT be called — the trigger handles it
-        coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
+        coVerify(exactly = 0) { userProfileClient.updateNickname(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -437,7 +452,7 @@ class AuthRepositoryImplTest {
         assertTrue(result is AuthResult.Success)
         assertEquals("Gandalf", (result as AuthResult.Success).data.nickname)
         coVerify(exactly = 1) { userProfileDataSource.completeUserProfile(any()) }
-        coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
+        coVerify(exactly = 0) { userProfileClient.updateNickname(any()) }
     }
 
     @Test
@@ -446,7 +461,7 @@ class AuthRepositoryImplTest {
             providerName     = "google",
             nicknameMetadata = "ExistingNick",
         )
-        val existingProfile = com.mmg.manahub.feature.auth.data.remote.UserProfileDto(
+        val existingProfile = UserProfileDto(
             id               = "user-uuid-001",
             nickname         = "ExistingNick",
             gameTag          = "#XYZ1234",
@@ -465,7 +480,7 @@ class AuthRepositoryImplTest {
         assertEquals("ExistingNick", user.nickname)
         assertEquals("#XYZ1234", user.gameTag)
         coVerify(exactly = 0) { userProfileDataSource.upsertUserProfile(any()) }
-        coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
+        coVerify(exactly = 0) { userProfileClient.updateNickname(any()) }
     }
 
     @Test
@@ -489,7 +504,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `given fetch fails once then succeeds when signInWithGoogle then retries and returns Success`() = runTest(testDispatcher) {
         val userInfoMock = buildUserInfoMock(providerName = "google", nicknameMetadata = "ExistingNick")
-        val existingProfile = com.mmg.manahub.feature.auth.data.remote.UserProfileDto(
+        val existingProfile = UserProfileDto(
             id               = "user-uuid-001",
             nickname         = "ExistingNick",
             gameTag          = "#XYZ1234",
@@ -517,7 +532,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `given RPC fails twice but table query succeeds when signInWithGoogle then falls back and returns Success`() = runTest(testDispatcher) {
         val userInfoMock = buildUserInfoMock(providerName = "google", nicknameMetadata = "ExistingNick")
-        val fallbackProfile = com.mmg.manahub.feature.auth.data.remote.UserProfileDto(
+        val fallbackProfile = UserProfileDto(
             id               = "user-uuid-001",
             nickname         = "ExistingNick",
             gameTag          = "#XYZ1234",
@@ -742,7 +757,7 @@ class AuthRepositoryImplTest {
         val repoForTest = AuthRepositoryImpl(
             supabaseAuth               = supabaseAuth,
             userProfileDataSource      = userProfileDataSource,
-            supabaseUserProfileService = supabaseUserProfileService,
+            userProfileClient          = userProfileClient,
             userPreferencesDataStore   = userPreferencesDataStore,
             supabaseOkHttpClient       = supabaseOkHttpClient,
             applicationScope           = backgroundScope,
@@ -862,7 +877,7 @@ class AuthRepositoryImplTest {
     fun `given valid nickname when updateNickname then calls service and returns Success with trimmed nickname`() = runTest {
         val userInfoMock = buildUserInfoMock()
         every { supabaseAuth.currentUserOrNull() } returns userInfoMock
-        coEvery { supabaseUserProfileService.updateNickname(UpdateNicknameDto("Gandalf")) } returns successResponse()
+        coEvery { userProfileClient.updateNickname(UpdateNicknameDto("Gandalf")) } just Runs
 
         val result = repository.updateNickname("  Gandalf  ")
 
@@ -880,7 +895,7 @@ class AuthRepositoryImplTest {
         assertTrue(result is AuthResult.Error)
         assertEquals(AuthError.NicknameTooLong, (result as AuthResult.Error).error)
         // Should not reach the network when local validation already rejects it
-        coVerify(exactly = 0) { supabaseUserProfileService.updateNickname(any()) }
+        coVerify(exactly = 0) { userProfileClient.updateNickname(any()) }
     }
 
     @Test
@@ -897,7 +912,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `given service returns HTTP 400 when updateNickname then returns NicknameInappropriate`() = runTest {
         // HTTP 400 from the profanity trigger → NicknameInappropriate (not InvalidCredentials)
-        coEvery { supabaseUserProfileService.updateNickname(any()) } returns errorResponse(400)
+        coEvery { userProfileClient.updateNickname(any()) } throws ktorClientError(400)
 
         val result = repository.updateNickname("BadWord")
 
@@ -908,7 +923,7 @@ class AuthRepositoryImplTest {
     @Test
     fun `given service returns HTTP 500 when updateNickname then returns Unknown not NicknameInappropriate`() = runTest {
         // Only HTTP 400 maps to NicknameInappropriate; other codes map to Unknown
-        coEvery { supabaseUserProfileService.updateNickname(any()) } returns errorResponse(500)
+        coEvery { userProfileClient.updateNickname(any()) } throws ktorServerError(500)
 
         val result = repository.updateNickname("ValidName")
 
@@ -929,7 +944,7 @@ class AuthRepositoryImplTest {
 
     @Test
     fun `given network failure during updateNickname then returns NetworkError`() = runTest {
-        coEvery { supabaseUserProfileService.updateNickname(any()) } throws IOException("Offline")
+        coEvery { userProfileClient.updateNickname(any()) } throws IOException("Offline")
 
         val result = repository.updateNickname("Gandalf")
 
