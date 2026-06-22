@@ -361,7 +361,21 @@ was already a thin `RateLimitedQueue` wrapper). Repo impl stripped of `@Inject`/
 `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0
 platform imports in `commonMain`.
 
-➡️ **NEXT = assess productive path forward for remaining Phase 2 data-layer work.** The 4 remaining
+✅ **Phase 2 §9.6 — `ScryfallRequestQueue` + `SyncManaSymbolsUseCase` moved to `:shared:core-data`
+commonMain (GREEN, `d51193c`).** `ScryfallRequestQueue` → `core.data.network` (plain class matching
+`ArchidektRequestQueue` pattern; `@Inject`/`@Singleton` stripped, Hilt `@Provides` added in
+`NetworkModule`). `SyncManaSymbolsUseCase` → `core.data.usecase.symbols` (placed in `core-data` NOT
+`core-domain` because it directly orchestrates data-layer types — `ScryfallClient`,
+`ScryfallRequestQueue`, `ManaSymbolStore` — and `core-domain` cannot depend on `core-data`).
+`ManaSymbolDao` abstracted behind `ManaSymbolStore` interface (`core.data.cache`, following
+`CommunityDeckCache` pattern) + `ManaSymbolStoreImpl` (Room-backed, in `:app` `core/data/local/`).
+DI: `SharedDomainUseCaseModule` `@Provides` for the use case; `DatabaseModule` `@Provides` for
+`ManaSymbolStore`. Consumer imports updated: `ScryfallRemoteDataSource`, `DraftRepositoryImpl`,
+`ManaHubApp`. `ScryfallClient.kt` KDoc reference updated. Verified: `:app:assembleDebug` GREEN;
+`:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0
+platform imports in `commonMain`.
+
+➡️ **NEXT = continue Phase 2 data-layer work.** The 4 remaining
 shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
 abstraction in `commonMain` via the `CommunityDeckCache` pattern):
 - `StatsRepositoryImpl` (6 repo methods but StatsDao has ~21 query methods)
@@ -373,7 +387,7 @@ abstraction in `commonMain` via the `CommunityDeckCache` pattern):
 **Three productive paths forward (not mutually exclusive):**
 1. **Move more use cases** — several are NOW UNBLOCKED by existing shared deps (Card/Deck/UserCard repos
    + models are shared) but still platform-bound (`AddCardToCollectionUseCase`, `GetDeckGameStatsUseCase`,
-   `SyncManaSymbolsUseCase`, `AutoTagCardUseCase`/`ComputeCardTagsUseCase`, `RefreshCollectionPricesUseCase`,
+   ~~`SyncManaSymbolsUseCase`~~ (DONE `d51193c`), `AutoTagCardUseCase`/`ComputeCardTagsUseCase`, `RefreshCollectionPricesUseCase`,
    `CommitScannedCardsUseCase`). Each needs its platform deps abstracted first.
 2. **Start web Spikes B & C** (Supabase/Ktor/Coil on wasmJs, web auth) — these validate the runtime
    libraries the remaining repo impls will need on the web side, and were explicitly deferred to Phase 2.
