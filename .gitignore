@@ -382,6 +382,7 @@ graphify-out/
 !/docs/plans/kmp-migration-plan.md
 !/docs/plans/kmp-library-and-filesystem-map.md
 !/docs/plans/kmp-migration-progress.md
+!/docs/plans/kmp-next-session-prompt.md
 /.claude/skills/compose-ui/SKILL.md
 /.claude/skills/compose-ui/references/visual-loop-setup.md
 /.claude/skills/compose-ui/references/components.md
