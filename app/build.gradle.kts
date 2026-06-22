@@ -147,6 +147,8 @@ dependencies {
     // KMP migration — Phase 2 / Slice 1: shared domain contracts (a first batch of pure repository
     // interfaces — UserPreferences/Stats/CommunityStats/NotificationPrefs/PushToken — live here now).
     implementation(project(":shared:core-domain"))
+    // KMP migration — Phase 2: shared data layer (rate-limit queues, later repo impls + Ktor).
+    implementation(project(":shared:core-data"))
 
     // Supabase Auth & DB
     val supabaseBom = platform(libs.supabase.bom)
