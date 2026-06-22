@@ -235,9 +235,18 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   `:app:assembleDebug` SUCCESSFUL; `testDebugUnitTest` 1964/122-fail/2-skip (== baseline,
   `BasicLandCalculatorTest` 4/0 green); commonMain forbidden-import grep EMPTY (lone `System.currentTimeMillis`
   hit is the pre-existing `Deck.kt` KDoc comment).
-- ⬜ **Phase 2 (remaining)** — `UserCardRepository`/`UserCardWithCard` + PagingData→`Page` abstraction
-  (unblock `GetCollectionUseCase`/`RemoveCardUseCase`/`RefreshCollectionPricesUseCase`),
-  then `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
+- ✅ **Phase 2 · `:shared:core-data` scaffold + RateLimitedQueue (DONE & GREEN, 2026-06-22).**
+  `:shared:core-data` module created (android + wasmJs, mirrors core-domain; deps = `api(:shared:core-model)`,
+  `api(:shared:core-domain)`, `impl(:shared:core-common)`, `impl(coroutines.core)`). Rate-limit queues
+  extracted: new `RateLimitedQueue` + `RateLimitConfig` + `RetryDecision` in `commonMain`
+  (`com.mmg.manahub.core.data.network`); platform deps removed (`System.currentTimeMillis()` →
+  `Clock.System`, `AtomicLong` → plain `var` under mutex, `HttpException` → pluggable `shouldRetry` lambda).
+  `:app` `ScryfallRequestQueue` + `ArchidektRequestQueue` are now thin wrappers delegating to
+  `RateLimitedQueue`. Verified: `:shared:core-data:compileKotlinWasmJs` SUCCESSFUL;
+  `:app:assembleDebug` SUCCESSFUL; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in
+  `commonMain`.
+- ⬜ **Phase 2 (remaining)** — Retrofit→Ktor networking in `commonMain`, Gson→kotlinx-serialization,
+  repository impls, Room stays androidMain. Fold in web spikes B & C (Supabase/Ktor/Coil on wasmJs).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
@@ -303,12 +312,16 @@ imports in shared `commonMain` (the 2 `androidx.paging` grep hits are KDoc, not 
 authored by the architect but the agent hit its session limit before committing — the main agent
 verified the uncommitted WIP (full build + tests + leak grep) and committed it.
 
-➡️ **NEXT = Phase 2 — begin `:shared:core-data` (the data layer), per the REVISED plan below.** The
-remaining `core/domain/usecase/**` are all platform-bound (Room DAOs / `ScryfallRemoteDataSource` /
-`ProgressionEventBus` / `core.tagging.*` / timestamps) — they unblock only AFTER the data layer + tagging
-engine move, so the cheap use-case-extraction vein is EXHAUSTED. The next productive work is standing up
-`:shared:core-data`: see the **Phase 2 data-layer order** below + the **Sonnet-4.6 execution playbook**
-(`kmp-migration-plan.md` → "Execution playbook for Sonnet 4.6"). Pick the FIRST data-layer slice there.
+➡️ **NEXT = Phase 2 — continue `:shared:core-data` population.** The module scaffold + the first
+shared code (`RateLimitedQueue`) are done. The next productive slices are:
+1. **Ktor networking in `commonMain`** — port the Retrofit `ScryfallApi`/`ArchidektApi` DTOs +
+   request/response contracts to Ktor (js/wasm engine) + kotlinx-serialization. The existing
+   `ScryfallRequestQueue`/`ArchidektRequestQueue` in `:app` already delegate to `RateLimitedQueue`;
+   the Ktor clients will be wrapped by the shared queue.
+2. **Repository impls migration** — move repository impls that can be made platform-agnostic into
+   `commonMain` (their Room-backed data sources stay in `androidMain` behind interfaces).
+3. **Fold in web spikes B & C** (Supabase/Ktor/Coil on wasmJs; web auth) — validate the web-runtime
+   libraries Phase 2's data layer introduces.
 
    Still-platform-bound use cases (move only after their deps move): `AddCardToCollectionUseCase`/`CommitScannedCardsUseCase`
    (gamification `ProgressionEventBus` + `java.time`), `RefreshCollectionPricesUseCase`
@@ -447,6 +460,20 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 · `:shared:core-data` scaffold + RateLimitedQueue (GREEN, `379f89c` + `c9e7e00`).**
+  Two commits: (1) `379f89c` stood up the empty `:shared:core-data` KMP module (android + wasmJs, mirrors
+  core-domain; `build.gradle.kts` with `api(:shared:core-model)`, `api(:shared:core-domain)`,
+  `impl(:shared:core-common)`, `impl(coroutines.core)`; `settings.gradle.kts` + `:app` dep; empty source
+  sets). (2) `c9e7e00` extracted the rate-limit engine: new `RateLimitedQueue` + `RateLimitConfig` +
+  `RetryDecision` in `commonMain` (`com.mmg.manahub.core.data.network`); 3 platform deps removed
+  (`System.currentTimeMillis()` → `Clock.System.now().toEpochMilliseconds()` via `@OptIn(ExperimentalTime)`,
+  `java.util.concurrent.atomic.AtomicLong` → plain `var` (mutex-guarded), `retrofit2.HttpException` →
+  pluggable `shouldRetry: (Int, Throwable) -> RetryDecision` lambda). `:app` `ScryfallRequestQueue` (100ms/
+  3-retry/200ms) + `ArchidektRequestQueue` (200ms/2-retry/500ms) rewritten as thin Hilt/Retrofit-aware
+  wrappers delegating to `RateLimitedQueue`. Verified: `:shared:core-data:compileKotlinWasmJs` SUCCESSFUL;
+  `:app:assembleDebug` SUCCESSFUL; `:app:testDebugUnitTest` 1964/122-fail/2-skip (== baseline); commonMain
+  platform-import grep EMPTY (0 leaks). No behaviour change (identical throttle/retry semantics, same
+  constants).
 - 2026-06-22 — **Phase 2 · batch #3 — `UserCardRepository` shared via paging interface split (GREEN, `815f169`).**
   Split `androidx.paging.PagingData` off the shared surface so the platform-agnostic `UserCardRepository`
   moved to `:shared:core-domain` `commonMain` WITHOUT dragging Room/paging into shared code: the
