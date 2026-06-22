@@ -12,7 +12,7 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DraftSet
-import com.mmg.manahub.core.network.ScryfallRequestQueue
+import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.remote.CloudflareContentClient

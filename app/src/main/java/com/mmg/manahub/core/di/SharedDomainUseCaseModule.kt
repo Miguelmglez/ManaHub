@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.di
 
+import com.mmg.manahub.core.data.cache.ManaSymbolStore
+import com.mmg.manahub.core.data.network.ScryfallRequestQueue
+import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -10,6 +13,7 @@ import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
+import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -73,4 +77,12 @@ object SharedDomainUseCaseModule {
     fun provideRemoveCardUseCase(
         userCardRepository: UserCardRepository,
     ): RemoveCardUseCase = RemoveCardUseCase(userCardRepository)
+
+    @Provides
+    @Singleton
+    fun provideSyncManaSymbolsUseCase(
+        api: ScryfallClient,
+        store: ManaSymbolStore,
+        requestQueue: ScryfallRequestQueue,
+    ): SyncManaSymbolsUseCase = SyncManaSymbolsUseCase(api, store, requestQueue)
 }

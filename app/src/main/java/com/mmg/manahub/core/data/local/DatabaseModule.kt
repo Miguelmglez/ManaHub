@@ -26,6 +26,7 @@ import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -705,6 +706,7 @@ object DatabaseModule {
     @Provides fun provideDeckDao(db: MtgDatabase): DeckDao = db.deckDao()
     @Provides fun provideStatsDao(db: MtgDatabase): StatsDao = db.statsDao()
     @Provides fun provideManaSymbolDao(db: MtgDatabase): ManaSymbolDao = db.manaSymbolDao()
+    @Provides @Singleton fun provideManaSymbolStore(dao: ManaSymbolDao): ManaSymbolStore = ManaSymbolStoreImpl(dao)
     @Provides fun provideGameSessionDao(db: MtgDatabase): GameSessionDao = db.gameSessionDao()
     @Provides fun provideSurveyAnswerDao(db: MtgDatabase): SurveyAnswerDao = db.surveyAnswerDao()
     @Provides fun provideSurveyCardImpactDao(db: MtgDatabase): SurveyCardImpactDao = db.surveyCardImpactDao()

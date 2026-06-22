@@ -1,11 +1,6 @@
-package com.mmg.manahub.core.network
+package com.mmg.manahub.core.data.network
 
-import com.mmg.manahub.core.data.network.RateLimitConfig
-import com.mmg.manahub.core.data.network.RateLimitedQueue
-import com.mmg.manahub.core.data.network.RetryDecision
 import io.ktor.client.plugins.ResponseException
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Enforces Scryfall's rate-limit guideline of <=10 requests/second.
@@ -24,8 +19,7 @@ import javax.inject.Singleton
  * After exhausting all retries the last [ResponseException] is re-thrown so callers can handle
  * it via their existing `Result`/`DataResult` wrappers.
  */
-@Singleton
-class ScryfallRequestQueue @Inject constructor() {
+class ScryfallRequestQueue {
 
     private val delegate = RateLimitedQueue(
         config = RateLimitConfig(
