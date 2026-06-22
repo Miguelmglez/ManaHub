@@ -5,9 +5,9 @@ import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckOwner
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSearchResult
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSummary
+import com.mmg.manahub.core.model.CommunityDeckOwner
+import com.mmg.manahub.core.model.CommunityDeckSearchResult
+import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify

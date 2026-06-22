@@ -10,9 +10,9 @@ import com.mmg.manahub.core.data.remote.ArchidektClient
 import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektRequestQueue
 import com.mmg.manahub.feature.communitydecks.data.remote.toCacheEntity
 import com.mmg.manahub.feature.communitydecks.data.remote.toDomain
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSearchResult
-import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeckSearchResult
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext

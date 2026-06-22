@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.communitydecks.presentation
 
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeck
 
 /**
  * UI state for the Community Deck detail screen.

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.communitydecks.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Maps Archidekt's numeric `deckFormat` ids to ManaHub's internal format strings

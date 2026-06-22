@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.communitydecks.presentation
 
 import androidx.annotation.StringRes
 import com.mmg.manahub.R
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSummary
+import com.mmg.manahub.core.model.CommunityDeckSummary
 
 /**
  * UI state for the Community Decks search / browse screen.

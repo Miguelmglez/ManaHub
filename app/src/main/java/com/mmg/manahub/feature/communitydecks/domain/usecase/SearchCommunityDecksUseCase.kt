@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.communitydecks.domain.usecase
 
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSearchResult
-import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.core.model.CommunityDeckSearchResult
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 
 /**
  * Searches community decks on Archidekt.

@@ -19,7 +19,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckCard
+import com.mmg.manahub.core.model.CommunityDeckCard
 
 /**
  * Emits a community deck's cards as Commander / Mainboard / Sideboard sections

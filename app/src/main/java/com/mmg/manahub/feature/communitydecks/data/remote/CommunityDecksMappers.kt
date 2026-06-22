@@ -4,12 +4,12 @@ import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckSummaryDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
-import com.mmg.manahub.feature.communitydecks.domain.model.ArchidektFormat
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckCard
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckOwner
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSearchResult
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSummary
+import com.mmg.manahub.core.model.ArchidektFormat
+import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeckCard
+import com.mmg.manahub.core.model.CommunityDeckOwner
+import com.mmg.manahub.core.model.CommunityDeckSearchResult
+import com.mmg.manahub.core.model.CommunityDeckSummary
 import kotlinx.serialization.json.Json
 
 /**
