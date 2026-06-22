@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -84,7 +85,7 @@ internal fun DiscoveryRow(
                 color = mc.textPrimary,
             )
             Text(
-                text = discovery.primaryTag.label,
+                text = discovery.primaryTag.label(),
                 style = ty.labelMedium,
                 color = mc.goldMtg,
             )

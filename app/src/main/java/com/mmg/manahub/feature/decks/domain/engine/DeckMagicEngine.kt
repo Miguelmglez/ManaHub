@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.decks.domain.engine
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -69,7 +70,7 @@ class DeckMagicEngine @Inject constructor(
                 .map { MagicCard(it.card, isOwned = true) }
 
             MagicDiscovery(
-                label = tag.label,
+                label = tag.label(),
                 cards = matchingCards,
                 description = "$count cards with this tag in your collection",
                 primaryTag = tag

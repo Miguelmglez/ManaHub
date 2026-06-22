@@ -1,7 +1,5 @@
 package com.mmg.manahub.core.domain.model
 
-import com.mmg.manahub.core.tagging.TagDictionary
-
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Tag taxonomy
 //
@@ -17,12 +15,6 @@ data class CardTag(
     val key: String,
     val category: TagCategory,
 ) {
-    /** Localized label for the current device locale, falls back to key. */
-    val label: String
-        get() = TagDictionary.localize(this) ?: key
-            .replace('_', ' ')
-            .replaceFirstChar { it.uppercase() }
-
     companion object {
         // ── Archetypes ────────────────────────────────────────────────────────
         val AGGRO     = CardTag("aggro",     TagCategory.ARCHETYPE)

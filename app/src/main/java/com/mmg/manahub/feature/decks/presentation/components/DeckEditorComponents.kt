@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckFormat
@@ -643,7 +644,7 @@ internal fun groupCards(cards: List<DeckSlotEntry>, mode: GroupingMode): List<Pa
                     tagMap.getOrPut("Untagged") { mutableListOf() }.add(entry)
                 } else {
                     tags.forEach { tag ->
-                        tagMap.getOrPut(tag.label) { mutableListOf() }.add(entry)
+                        tagMap.getOrPut(tag.label()) { mutableListOf() }.add(entry)
                     }
                 }
             }
