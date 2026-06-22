@@ -3,13 +3,12 @@ package com.mmg.manahub.core.domain.usecase.card
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
-import javax.inject.Inject
 
 /**
  * Full-text search returning a list of matching cards from Scryfall.
  * Results are cached in Room by the repository.
  */
-class SearchCardsUseCase @Inject constructor(
+class SearchCardsUseCase(
     private val repository: CardRepository,
 ) {
     suspend operator fun invoke(query: String, page: Int = 1): DataResult<List<Card>> =

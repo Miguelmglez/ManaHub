@@ -213,18 +213,17 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     BasicLandCalculatorTest 4/0). commonMain forbidden-import grep (`android|androidx|kotlinx.browser|
     org.w3c|java.|System.currentTimeMillis`) EMPTY for both modules (the only `System.currentTimeMillis`
     hit is a KDoc comment, not code).
-- 🛑 **Phase 2 · Slice 2b — Card model STILL BLOCKED (the HARDER blocker; NOT touched this run).**
-  `Card`/`CardTag`/`SuggestedTag`/`CardFace` + `CardRepository` cannot move yet:
-  - **`CardTag` (`core/domain/model/CardTag.kt`)** — its `label` getter calls
-    `com.mmg.manahub.core.tagging.TagDictionary.localize(this)` and the file `import`s `TagDictionary`.
-    `TagDictionary` (`core/tagging/TagDictionary.kt`) imports `java.util.Locale` AND `core.util.CardTypeTranslator`,
-    and `CardTypeTranslator` itself calls `java.util.Locale.getDefault()` (two sites). `java.util.Locale`
-    is JVM-only (absent on wasmJs) → **`CardTag` is deeply JVM-coupled via the tag-localization engine.**
-  - **`SuggestedTag`, `Card`** — BLOCKED transitively (both reference `CardTag`; `Card` also references it
-    via `tags`/`userTags`/`suggestedTags`).
-  - **`CardFace`** — the ONLY cleanly-pure target type, but moving it alone unblocks neither interface; it
-    should move TOGETHER with `Card` once `CardTag` is unblocked.
-- ⬜ **Phase 2 (remaining)** — `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
+- ✅ **Phase 2 · Slice 2b — Card model + `CardRepository` MOVED (DONE & GREEN, 2026-06-22).**
+  `Card`/`CardTag`+`TagCategory`/`CardFace`/`SuggestedTag` in `:shared:core-model`; `CardRepository` in
+  `:shared:core-domain`. (Unblocked by decoupling `CardTag.label` → `:app` extension; full detail in
+  NEXT STEP / CHANGE LOG.)
+- ✅ **Phase 2 · use-case batch #1 — 5 PURE use cases MOVED to `:shared:core-domain` `commonMain`
+  (DONE & GREEN, 2026-06-22).** `SearchCardUseCase`, `SearchCardsUseCase`, `BuildScryfallQueryUseCase`,
+  `GetCollectionSetCodesUseCase`, `GetCollectionStatsUseCase`. Still Hilt-owned (bridged into Koin
+  islands) → `@Inject` stripped + new Hilt `@Provides` module `SharedDomainUseCaseModule`. (Detail in
+  NEXT STEP / CHANGE LOG.)
+- ⬜ **Phase 2 (remaining)** — more PURE use cases (batch #2: unblock `UserCardRepository`/`DeckCard`),
+  then `:shared:core-data` (Room stays androidMain; Retrofit→Ktor; Gson→serialization).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
@@ -250,17 +249,52 @@ deferred `UserCardRepository`). `:app:assembleDebug` GREEN; both wasmJs compiles
     cross-module smart-cast on public nullable props (`cardFaces`/`manaCost`/`loyalty`/`printedName`/
     `printedTypeLine`) broke — fix per-site with safe-call/`?.let`/local val.
 
-➡️ **NEXT = Phase 2, Step — move PURE use cases into `:shared:core-domain` `commonMain`.** Card +
-Deck models and their repo interfaces are now shared, so the use cases that depend ONLY on those
-moved interfaces + core-model + kotlinx become extractable. Order:
+✅ **Phase 2 use-case batch #1 (5 PURE use cases) DONE & GREEN (2026-06-22)** — moved into
+`:shared:core-domain` `commonMain` (packages preserved): `SearchCardUseCase` + `SearchCardsUseCase`
+(`usecase.card`, dep = `CardRepository`/`Card`/`DataResult`), `BuildScryfallQueryUseCase`
+(`usecase.search`, dep = `AdvancedSearchQuery`/`SearchCriterion`/`SearchOrder`),
+`GetCollectionSetCodesUseCase` + `GetCollectionStatsUseCase` (`usecase.stats`, dep =
+`StatsRepository` + `CollectionStats`/`MtgColor`/`PreferredCurrency`). All five are genuinely pure
+(only moved repo interfaces + core-model + kotlinx Flow).
+  - **KEY GOTCHA — these are NOT yet Koin-owned; Hilt still constructs them** (bridged into the Koin
+    AddCard/Stats islands via `ManaHubApp` `@Inject lateinit var` fields, and `AdvancedSearchViewModel`
+    is still `@HiltViewModel` consuming `BuildScryfallQueryUseCase`). `javax.inject` is JVM-only and
+    cannot live in `commonMain`, so `@Inject` was STRIPPED — which means Hilt can no longer construct
+    them. Fix: stripped `@Inject` + added a new Hilt `@Provides @Singleton` module
+    `app/core/di/SharedDomainUseCaseModule.kt` providing all five (repo args resolved from the existing
+    `RepositoryModule` `@Binds`). The Koin bridges + `@HiltViewModel` site keep getting the Hilt-built
+    singletons unchanged — zero behaviour change, no Koin module edits. This is the standing pattern for
+    moving a still-Hilt-owned `@Inject` use case to `commonMain`: strip `@Inject`, add a `@Provides`.
+  - `:shared:core-common` NOT consumed (none of the five need a dispatcher); core-domain build file
+    unchanged. Verified: `:shared:core-domain:compileKotlinWasmJs` SUCCESSFUL; `:app:assembleDebug`
+    SUCCESSFUL (Hilt aggregate OK); `testDebugUnitTest` = 1964/123-fail/2-skip (== 122 baseline + the
+    1 flaky `HomeViewModelTest`; the failing-class set is unchanged — `CollectionUseCasesTest` failure is
+    pre-existing and tests `GetCollectionUseCase`/`RemoveCardUseCase`, which were NOT moved). commonMain
+    forbidden-import grep EMPTY. Packages preserved → zero `:app` import edits; zero inline-FQN refs.
 
-1. **Start moving PURE use cases** into `:shared:core-domain` `commonMain` — pick use cases that depend
-   ONLY on the moved repo interfaces + core-model + kotlinx (no `@Inject`-bound platform deps, no
-   `@ApplicationContext`, no `R.string`). Strip Hilt `@Inject`/`@Singleton` (Koin builds them). Anything
-   platform-bound a use case touches goes behind a `commonMain` interface or `expect`/`actual` (reuse
-   `:shared:core-common`'s `DispatcherProvider`/`KeyValueStore`/`CrashReporter` contracts — finally
-   consuming that module). Add `implementation(project(":shared:core-common"))` to `:shared:core-domain`
-   when the first such use case lands.
+➡️ **NEXT = Phase 2, use-case batch #2 — unblock + move the next PURE use cases.** The remaining
+`core/domain/usecase/**` are all currently blocked on UNMOVED deps. Smallest unblock paths, in order:
+
+1. **Move `UserCardRepository` interface + `UserCardWithCard` model** → unblocks `GetCollectionUseCase`
+   + `RemoveCardUseCase` (both trivially pure once `UserCardRepository` is shared). `UserCardRepository`
+   currently sits in `:app` `core.domain.repository`; `UserCardWithCard` is in the new `:app`
+   `core/domain/model/UserCard.kt` (kept in `:app` for `System.currentTimeMillis()` — the *interface* can
+   still move while the model stays, OR move both if the model is made wasm-safe via `Clock.System`).
+2. **Move `BasicLandDistribution` + `DeckCard`** (`core.domain.model`) → unblocks `BasicLandCalculator`
+   (pure math on `Card`/`DeckFormat`) + `DeckCardValidator` (must move TOGETHER — it calls
+   `BasicLandCalculator.isBasicLand`). No `@Inject` on either (object/object) so no Hilt provider needed.
+3. **Then the use cases that touch `:shared:core-common`** — when a moved use case needs a dispatcher,
+   route it through `DispatcherProvider` and add `implementation(project(":shared:core-common"))` to
+   `:shared:core-domain` (first consumer of that module).
+
+   EXCLUDED for now (still platform-bound): `AddCardToCollectionUseCase`/`CommitScannedCardsUseCase`
+   (gamification `ProgressionEventBus` + `java.time`), `RefreshCollectionPricesUseCase`
+   (`ScryfallRemoteDataSource` + `System.currentTimeMillis`), `GetDeckGameStatsUseCase` (Room DAOs +
+   `UserPreferencesDataStore` + `toDomainCard` mapper), `SyncManaSymbolsUseCase` (Room DAO + ScryfallApi),
+   `AutoTagCardUseCase`/`ComputeCardTagsUseCase` (`core.tagging.*` analyzers + `:app` mapper — move the
+   tagging engine first).
+
+**(former) Phase 2 data-layer order (still upcoming):**
 3. **Then `:shared:core-data`** — repository IMPLs in `commonMain` against those interfaces; **Room DAOs/
    entities/migrations STAY in `androidMain`** (no wasm target) with the DAO interface in `commonMain` and
    a web data source (Supabase-remote + IndexedDB/localStorage) in `wasmJsMain`. Migrate **Retrofit → Ktor**
@@ -390,6 +424,18 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 · use-case batch #1 — 5 PURE use cases moved to `:shared:core-domain`
+  `commonMain` (GREEN).** `git mv` `SearchCardUseCase`/`SearchCardsUseCase` (`usecase.card`),
+  `BuildScryfallQueryUseCase` (`usecase.search`), `GetCollectionSetCodesUseCase`/
+  `GetCollectionStatsUseCase` (`usecase.stats`) — packages preserved → zero `:app` import/FQN edits.
+  These were still HILT-OWNED (bridged into the Koin AddCard/Stats islands + consumed by the still-Hilt
+  `AdvancedSearchViewModel`), so since `javax.inject` can't live in `commonMain` the fix was: strip
+  `@Inject` + add a Hilt `@Provides @Singleton` for each in the NEW `app/core/di/SharedDomainUseCaseModule.kt`
+  (repo args from `RepositoryModule`). `:shared:core-common` not consumed (no dispatcher needed). Verified:
+  core-domain wasmJs compile SUCCESSFUL; `:app:assembleDebug` SUCCESSFUL; `testDebugUnitTest`
+  1964/123-fail/2-skip (== 122 baseline + flaky HomeViewModelTest; failing-class set unchanged);
+  commonMain forbidden-import grep EMPTY. Standing pattern recorded: moving a still-Hilt `@Inject` use
+  case to `commonMain` = strip `@Inject` + add a `@Provides`.
 - 2026-06-22 — **Phase 2 · Slice 2b — Card model KMP-pure + moved + `CardRepository` moved (GREEN).**
   Cleared the HARDER Slice-2 blocker. (1) `0dc47d1`: decoupled `CardTag.label` (option (a)) — dropped the
   `label` getter from the model, moved resolution to `:app` extension `fun CardTag.label()` in
