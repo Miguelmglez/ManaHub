@@ -4,9 +4,6 @@ import com.mmg.manahub.core.model.CommunityStats
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import javax.inject.Inject
-import javax.inject.Singleton
-
 /**
  * Placeholder [CommunityStatsRepository] that always emits `null`.
  *
@@ -17,7 +14,6 @@ import javax.inject.Singleton
  * TODO(home-community): replace with a real implementation backed by an aggregated
  *  Supabase view / Edge Function once the community-stats pipeline is built.
  */
-@Singleton
-class CommunityStatsRepositoryStub @Inject constructor() : CommunityStatsRepository {
+class CommunityStatsRepositoryStub : CommunityStatsRepository {
     override fun observeCommunityStats(): Flow<CommunityStats?> = flowOf(null)
 }
