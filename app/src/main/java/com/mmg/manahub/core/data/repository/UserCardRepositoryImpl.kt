@@ -13,8 +13,9 @@ import com.mmg.manahub.core.data.local.paging.CollectionRemoteMediator
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.domain.repository.AddOutcome
+import com.mmg.manahub.core.domain.repository.CollectionPagerSource
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -27,7 +28,7 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
+import com.mmg.manahub.core.model.UserCardWithCard as DomainUserCardWithCard
 
 /**
  * Local-first implementation of [UserCardRepository].
@@ -48,7 +49,7 @@ class UserCardRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient,
     private val authRepository: AuthRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) : UserCardRepository {
+) : UserCardRepository, CollectionPagerSource {
 
     // Emits null for unauthenticated/loading, userId for authenticated.
     // Used by all observe methods so they re-subscribe when the user changes.

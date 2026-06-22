@@ -20,7 +20,7 @@ import org.junit.Test
  *
  * The use case ensures the card is cached in Room via [CardRepository.getCardById],
  * then delegates to [UserCardRepository.addOrIncrement] with the individual parameters.
- * It never constructs a [com.mmg.manahub.core.domain.model.UserCard] object — that is
+ * It never constructs a [com.mmg.manahub.core.model.UserCard] object — that is
  * the repository's responsibility.
  */
 class AddCardToCollectionUseCaseTest {

@@ -9,7 +9,7 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.TagCategory
-import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
