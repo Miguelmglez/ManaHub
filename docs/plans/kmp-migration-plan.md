@@ -215,3 +215,161 @@ until volume justifies it). `crashlytics-ux-auditor` is **not** used for web tel
 Phase 0 (spikes A–E) → **0.5 (resolve modularization blockers — prerequisite)** → 1 (build+DI+model)
 → 2 (domain+data) → 3 (CMP UI) → 4 (platform parity) → 5 (release).
 Android stays shippable at every phase. Web becomes shippable end of Phase 3 (core flows) → polished Phase 4–5.
+
+**Done so far (2026-06-22):** Phase 0 (spikes A/D/E; B/C deferred into Phase 2), Phase 0.5 (all 5
+blockers), Phase 1 (build→KMP + DI Hilt→Koin for all 20 non-excluded islands + `:shared:core-model`/
+`-common`/`-domain` foundations). Phase 2 IN PROGRESS: models `Card`/`Deck`/`DeckCard`/`UserCard` (+
+sub-types) and repo interfaces `Card`/`Deck`/`UserCard`/Slice-1 moved to shared; 9 pure use cases moved.
+**Cheap model/use-case extraction is now EXHAUSTED — next productive work is `:shared:core-data`.**
+
+---
+
+## 9. Execution playbook for Sonnet 4.6 (high effort)
+
+This migration is now executed by **Sonnet 4.6 at high effort**, not Opus. Sonnet is fully capable here
+**because the hard architectural decisions are already made** (sections 1–8 + the spike findings) — what
+remains is disciplined, repetitive, verifiable transformation. This section makes every remaining step
+**mechanical**: binary decisions, copy-able recipes, exact verify commands, and a deterministic backlog,
+so no step needs Opus-level judgment. **The progress tracker (`kmp-migration-progress.md`) NEXT STEP
+always wins** over this backlog if they disagree.
+
+### 9.1 Operating rules (non-negotiable)
+- **Roles:** ALL `.kt` + `.gradle.kts` work → delegate to the `android-kotlin-architect` agent (Sonnet).
+  The main/orchestrator session does ONLY: read the tracker, delegate one slice, run the verify gauntlet,
+  commit/push, update the tracker. The main session NEVER edits `.kt`.
+- **Branch:** work only on `feature/kmp-migration`. NEVER merge or push to `master`.
+- **Excluded, untouched (still Hilt + Android Compose):** `feature/online`, `core/voice` + in-game voice,
+  `feature/scanner`. If a slice would touch them → stop and report instead.
+- **Batch size: ≤ ~12 files per slice.** One slice = ONE logical code commit + ONE tracker commit.
+  **Android must be GREEN at every commit** (the verify gauntlet, §9.2, passes).
+- **Small-and-safe beats big-and-broken.** If a slice can't reach green within its batch, leave the tree
+  at the last green commit, write the exact blocker into the tracker NEXT STEP, and STOP. Do not force.
+- **No behaviour change** unless the slice explicitly is one. English-only (CLAUDE.md).
+
+### 9.2 The verify gauntlet (run after EVERY slice, before committing)
+Authoritative baseline: **1964 tests, 122 failed, 2 skipped.** (The older "110 / 140" figures in §2/§5/§7
+predate the test-set compiling as one unit — ignore them; 122 is the live baseline.)
+
+```bash
+./gradlew :app:assembleDebug                              # → BUILD SUCCESSFUL
+./gradlew :shared:core-model:compileKotlinWasmJs \
+          :shared:core-domain:compileKotlinWasmJs          # (+ :shared:core-common / :shared:core-data if touched) → SUCCESSFUL
+./gradlew :app:testDebugUnitTest                          # → 1964 tests, 122 failed, 2 skipped
+# leak check — must print NOTHING but KDoc comment lines (no `import` lines):
+grep -rn -E "import (androidx|android\.|java\.)" shared/*/src/commonMain
+```
+- **122 vs 123:** `HomeViewModelTest` (Discover `order:random`) is flaky and may flip 122↔123 — NOT a
+  regression. The rule is: **the set of failing test CLASSES must not grow.** `CollectionUseCasesTest` is a
+  pre-existing failure (data-driven) — already in the baseline.
+- After ANY model/type move, also run an **inline-FQN grep** (see Recipe 1) — `import`-only sweeps miss
+  fully-qualified refs used inline in casts/generics. This has bitten the migration 3×.
+
+### 9.3 Decision tree — "can this type move to `commonMain`?"
+Answer each. **Any YES (that you can't trivially fix) ⇒ it stays in `:app`/`androidMain` (or defer).**
+1. Imports `android.*` / `androidx.*` (except libs already on CMP)? → **stays** (or interface-split, Recipe 4).
+2. Imports a JVM-only `java.*`: `java.util.Locale`, `java.text.SimpleDateFormat`, `java.time.*`,
+   `java.util.UUID`? → `System.currentTimeMillis()` is **fixable** (Recipe 6); the rest ⇒ **stays/defer**.
+3. Has a Room annotation, or references a Room DAO/entity/`@Dao`/`@Entity` type? → **stays in `androidMain`**.
+4. Has Hilt/`javax.inject` (`@Inject`/`@Singleton`/`@HiltViewModel`)? → **fixable** for use cases (Recipe 2);
+   for ViewModels this is the island cutover (Recipe 3, Phase-1 work — mostly done).
+5. References a type that itself still lives in `:app` and is NOT yet movable? → move that dependency FIRST,
+   or **defer** this one. (Watch **same-package implicit refs** — a sibling in the same file/package using
+   `Card` with no `import` line; after the move it needs an explicit `import com.mmg.manahub.core.model.Card`.)
+6. Touches `@ApplicationContext`/`Context`, `R.string`/Android resources, Firebase/Crashlytics directly,
+   `ProgressionEventBus`, or `core.tagging.*` analyzers? → **stays/defer** (those move in their own phase).
+
+### 9.4 Recipes (the architect copies these — do not re-derive)
+
+**Recipe 1 — move a PURE model to `:shared:core-model`:**
+1. Run §9.3 on it. If clean (or fixable via Recipe 6), proceed.
+2. `git mv app/.../core/domain/model/Foo.kt shared/core-model/src/commonMain/kotlin/com/mmg/manahub/core/model/Foo.kt`;
+   change its `package` to `com.mmg.manahub.core.model`.
+3. Update refs: `grep -rn "core.domain.model.Foo"` for **import lines** AND **inline FQNs**; also
+   `grep -rn "\bFoo\b" app/.../<same old package dir>` for same-package implicit users now needing an import.
+4. Fix any **cross-module smart-cast** breaks: a public nullable `val` from another Gradle module can't be
+   smart-cast — replace `if (x.p != null) x.p.use()` with `x.p?.let { it.use() }` / local `val p = x.p` / `!!`.
+5. ProGuard already covers it (`-keep class com.mmg.manahub.core.model.** { *; }`). Run §9.2.
+
+**Recipe 2 — move a still-Hilt-owned PURE use case to `:shared:core-domain`:**
+1. `git mv` into `shared/core-domain/src/commonMain/kotlin/com/mmg/manahub/core/domain/usecase/<subpkg>/`
+   (preserve the sub-package name → zero `:app` import edits).
+2. **Strip `@Inject` + `@Singleton`** (`javax.inject` is JVM-only, illegal in `commonMain`).
+3. If it was an `object`, nothing else is needed. If it was a `class`, add a `@Provides @Singleton fun`
+   for it in `app/src/main/java/com/mmg/manahub/core/di/SharedDomainUseCaseModule.kt` (ctor args resolve
+   from existing `RepositoryModule` `@Binds`). Hilt keeps building it; existing Koin bridges + any
+   `@HiltViewModel` consumers get the same singleton — zero behaviour change. Run §9.2.
+
+**Recipe 3 — Hilt→Koin island cutover** (Phase-1 pattern; the 20 non-excluded islands are DONE — use only
+if a new feature appears): de-Hilt the VM(s) (remove `@HiltViewModel`/`@Inject`/dagger+javax imports →
+plain ctor), add `feature/<name>/di/<Name>KoinModule.kt` with `viewModel { }`, resolve at call-sites with
+`koinViewModel()` (SavedStateHandle nav-args via `savedStateHandle = get()`; Activity/entry-scoped via
+`koinViewModel(viewModelStoreOwner = …)`). Deps stay Hilt singletons, bridged through `ManaHubApp` into the
+module as `single { thatInstance }`; promote a dep to `app/di/CoreBridgeKoinModule.kt` when ≥2 islands need
+it AND remove the now-duplicate `single {}` from older islands (else runtime `DefinitionOverrideException`).
+Full detail: memory `feedback_kmp_koin_island_cutover_pattern`.
+
+**Recipe 4 — interface-split for a platform-bound return type** (the `PagingData` pattern, commit `815f169`):
+when a repo interface is pure EXCEPT one method returning an Android-only type (`PagingData`, a Room row),
+keep the platform method on a NEW `:app`-only interface (e.g. `CollectionPagerSource`), move the rest of the
+interface to `commonMain`, and have the impl implement BOTH. The Android UI consumes the platform interface
+directly (no behaviour change); the future web data source implements only the shared interface.
+
+**Recipe 5 — Retrofit→Ktor for ONE api** (Phase-2 data layer, per-API sub-task):
+do exactly one API surface per slice. Replace the Retrofit `interface` + Gson DTOs with a Ktor
+`HttpClient` call + `@Serializable` kotlinx DTOs in `commonMain`; keep the Android engine
+(`ktor-client-okhttp`) wiring in `androidMain`; port any rate-limit queue
+(`ScryfallRequestQueue`/`ArchidektRequestQueue`) to a pure-coroutine `Mutex` impl in `commonMain`. Keep the
+old Retrofit path until the new one is green, then delete it in the same slice. Verify §9.2 + that the
+feature's existing tests pass (add MockEngine tests if the architect has bandwidth).
+
+**Recipe 6 — wasm-safe fixes:** `System.currentTimeMillis()` → `kotlin.time.Clock.System.now()
+.toEpochMilliseconds()` with `@OptIn(kotlin.time.ExperimentalTime::class)` (Kotlin 2.3.20 stdlib, NO new
+dep, identical epoch millis). `kotlinx-collections-immutable`, `kotlinx.coroutines`,
+`kotlinx.serialization` are all already common-safe.
+
+### 9.5 Known-gotchas pre-flight (accumulated — check before each slice)
+- **Inline FQN refs** survive an import-only sweep (StatsViewModel cast, batch 2a). Always grep the FQN too.
+- **Same-package implicit refs** break silently and the COMPILE ERROR shows up DOWNSTREAM, not at the model
+  (`AddCardRow`/`DeckBuilderState`/`OpenForTradeEntry`/`WishlistEntry` after the Card move). Add explicit imports.
+- **`.label` / generic-name sed false-positives** — `CardTag.label()` vs `magicTypography.labelLarge` /
+  `TagItem.label` (String field) / `link.label`. Verify the receiver type before any blanket rename.
+- **Cross-module smart-cast** on public nullable `val`s is forbidden — fix per-site (Recipe 1.4).
+- **`DefinitionOverrideException`** is a RUNTIME error (not compile) when two Koin modules register the same
+  `single<T>` — promote-and-shrink (Recipe 3).
+- A WIP-but-uncommitted tree from a dead agent **may already be green** — run §9.2 before assuming it's broken
+  (batch #3 was complete-but-uncommitted; the main agent verified and committed it).
+
+### 9.6 Remaining backlog (deterministic order — do the lowest-numbered unblocked item)
+**Phase 2 — `:shared:core-data` (current phase):**
+1. **Create `:shared:core-data`** KMP module (android + wasmJs source sets) wired into `settings.gradle.kts`
+   + version catalog; `commonMain` depends on `:shared:core-model`/`-domain`/`-common`. Empty but building.
+2. **Port the rate-limit queues** (`ScryfallRequestQueue`, `ArchidektRequestQueue`) to pure-coroutine
+   `Mutex` impls in `:shared:core-data` `commonMain` (no Android deps — should be a clean lift).
+3. **Retrofit→Ktor per API** (one slice each, Recipe 5), simplest first:
+   `CloudflareContentApi` → `YouTubeApi` → `FriendshipService` → `SupabaseUserProfileService` →
+   `ArchidektApi` → **`ScryfallApi`** (most complex: queue + interceptors + large DTO surface, last).
+4. **Move repo IMPLs to `commonMain`** behind their already-shared interfaces, one repo per slice; **Room
+   DAOs/entities/migrations STAY in `androidMain`** with the DAO interface exposed to `commonMain` and a
+   `wasmJsMain` web data source (Supabase-remote + IndexedDB/localStorage) added later (web phase).
+5. **Then the deferred use cases** unblock as their deps land (`RefreshCollectionPricesUseCase` after
+   Scryfall data source; `GetDeckGameStatsUseCase` after the deck-stats DAO interface; `AutoTagCardUseCase`/
+   `ComputeCardTagsUseCase` after the `core.tagging.*` engine moves; gamification use cases after
+   `ProgressionEventBus` moves).
+6. **Fold in web spikes B & C** here (Supabase-kt/Ktor/Coil3 on wasmJs; web auth) — they validate exactly
+   the libraries this phase introduces.
+
+**Phase 3 — `:shared:core-ui` + features to CMP** (after data layer): port MagicTheme + tokens + `core/ui/
+components/*` to CMP first, then features leaf-first (settings/stats → game/decks last); androidx.compose →
+CMP, `painterResource`/`R` → CMP `Res`, Coil 2→3. **Then `:webApp`** entrypoint once core-ui + one feature
+compile on wasmJs. **Phase 4** platform parity (Firebase/WorkManager/camera/voice expect-actual + web
+fallbacks + responsive). **Phase 5** hardening + Cloudflare Pages deploy. Eventually migrate the excluded
+online/voice/scanner trio in a final wave.
+
+### 9.7 Per-slice task template (what the orchestrator hands the architect)
+> Branch `feature/kmp-migration`, last green commit `<sha>`, tree CLEAN. Do NOT touch online/voice/scanner.
+> **Slice:** `<one item from §9.6, ≤ ~12 files>`. **Recipe:** `<§9.4 recipe #>`. **Decision tree:** apply
+> §9.3 first; if a type fails it, defer + report instead of forcing. **Verify (must pass):** the §9.2
+> gauntlet vs the 1964/122/2 baseline + leak grep + inline-FQN grep. **Finish:** commit (logical steps,
+> standard ManaHub trailers), push, then update `kmp-migration-progress.md` (STATUS + NEXT STEP + CHANGE
+> LOG). **Report:** what moved/deferred and why, build+test results vs baseline, commit SHAs. If you hit a
+> hard blocker, STOP at the last green commit and report the exact refactor needed.
