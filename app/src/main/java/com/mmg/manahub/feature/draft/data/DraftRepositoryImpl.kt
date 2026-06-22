@@ -6,7 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.data.remote.ScryfallApi
+import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
@@ -58,7 +58,7 @@ import javax.inject.Singleton
 @Singleton
 class DraftRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val scryfallApi: ScryfallApi,
+    private val scryfallApi: ScryfallClient,
     private val scryfallQueue: ScryfallRequestQueue,
     private val youTubeClient: YouTubeClient,
     private val cloudflareClient: CloudflareContentClient,

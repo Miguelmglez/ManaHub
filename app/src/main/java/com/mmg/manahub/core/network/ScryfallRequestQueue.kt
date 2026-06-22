@@ -3,7 +3,7 @@ package com.mmg.manahub.core.network
 import com.mmg.manahub.core.data.network.RateLimitConfig
 import com.mmg.manahub.core.data.network.RateLimitedQueue
 import com.mmg.manahub.core.data.network.RetryDecision
-import retrofit2.HttpException
+import io.ktor.client.plugins.ResponseException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,7 +21,7 @@ import javax.inject.Singleton
  * `Retry-After` header (integer seconds), that value overrides the computed back-off for
  * that attempt.
  *
- * After exhausting all retries the last [HttpException] is re-thrown so callers can handle
+ * After exhausting all retries the last [ResponseException] is re-thrown so callers can handle
  * it via their existing `Result`/`DataResult` wrappers.
  */
 @Singleton
@@ -36,10 +36,15 @@ class ScryfallRequestQueue @Inject constructor() {
             jitterFactor = 0.25
         ),
         shouldRetry = { _, e ->
-            if (e is HttpException && (e.code() == 429 || e.code() == 503)) {
-                val retryAfter = e.response()?.headers()?.get("Retry-After")
-                    ?.trim()?.toLongOrNull()?.let { it * 1_000L }
-                RetryDecision.Retry(serverRetryAfterMs = retryAfter)
+            if (e is ResponseException) {
+                val code = e.response.status.value
+                if (code == 429 || code == 503) {
+                    val retryAfter = e.response.headers["Retry-After"]
+                        ?.trim()?.toLongOrNull()?.let { it * 1_000L }
+                    RetryDecision.Retry(serverRetryAfterMs = retryAfter)
+                } else {
+                    RetryDecision.DoNotRetry
+                }
             } else {
                 RetryDecision.DoNotRetry
             }
@@ -50,7 +55,7 @@ class ScryfallRequestQueue @Inject constructor() {
      * Executes [block] while honouring Scryfall's rate-limit contract.
      * Retries automatically on 429/503 up to 3 times.
      *
-     * @throws HttpException if all retries are exhausted or a non-retryable
+     * @throws ResponseException if all retries are exhausted or a non-retryable
      *   HTTP error occurs.
      * @throws Throwable for any other exception thrown by [block].
      */

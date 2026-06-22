@@ -2,21 +2,23 @@ package com.mmg.manahub.core.network
 
 import android.content.Context
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.data.remote.ScryfallApi
+import com.mmg.manahub.core.data.remote.ScryfallClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import okhttp3.Cache
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.File
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -24,7 +26,7 @@ import javax.inject.Singleton
 object NetworkModule {
 
     /**
-     * Lenient [Json] instance used for the Scryfall Retrofit converter.
+     * Lenient [Json] instance shared by the Scryfall Ktor [HttpClient].
      * [ignoreUnknownKeys] allows the Scryfall API to add new fields without breaking parsing.
      * [coerceInputValues] handles unexpected null/type mismatches gracefully.
      */
@@ -74,16 +76,26 @@ object NetworkModule {
             }
             .build()
 
+    /**
+     * Dedicated Ktor [HttpClient] for the Scryfall API, backed by the OkHttp engine
+     * with the global [OkHttpClient] (User-Agent, logging, 50 MB disk cache, per-endpoint
+     * Cache-Control network interceptor).
+     *
+     * `expectSuccess = true` makes Ktor throw [io.ktor.client.plugins.ResponseException]
+     * on non-2xx responses so [ScryfallRequestQueue] can inspect the status code for retry.
+     */
     @Provides @Singleton
-    fun provideRetrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
-        .baseUrl("https://api.scryfall.com/")
-        .client(client)
-        .addConverterFactory(
-            scryfallJson.asConverterFactory("application/json".toMediaType()),
-        )
-        .build()
+    @Named("scryfall")
+    fun provideScryfallHttpClient(client: OkHttpClient): HttpClient =
+        HttpClient(OkHttp) {
+            engine { preconfigured = client }
+            install(ContentNegotiation) {
+                json(scryfallJson)
+            }
+            expectSuccess = true
+        }
 
     @Provides @Singleton
-    fun provideScryfallApi(retrofit: Retrofit): ScryfallApi =
-        retrofit.create(ScryfallApi::class.java)
+    fun provideScryfallClient(@Named("scryfall") httpClient: HttpClient): ScryfallClient =
+        ScryfallClient(httpClient, "https://api.scryfall.com/")
 }

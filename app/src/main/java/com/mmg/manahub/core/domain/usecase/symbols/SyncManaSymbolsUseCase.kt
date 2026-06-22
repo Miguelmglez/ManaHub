@@ -2,12 +2,12 @@ package com.mmg.manahub.core.domain.usecase.symbols
 
 import com.mmg.manahub.core.data.local.dao.ManaSymbolDao
 import com.mmg.manahub.core.data.local.entity.ManaSymbolEntity
-import com.mmg.manahub.core.data.remote.ScryfallApi
+import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.network.ScryfallRequestQueue
 import javax.inject.Inject
 
 class SyncManaSymbolsUseCase @Inject constructor(
-    private val api: ScryfallApi,
+    private val api: ScryfallClient,
     private val dao: ManaSymbolDao,
     private val requestQueue: ScryfallRequestQueue,
 ) {
