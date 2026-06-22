@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.domain.model
 
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
 
 /** Card slot inside the deck builder (with quantity and ownership status). */

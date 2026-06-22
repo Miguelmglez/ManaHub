@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.card
@@ -62,7 +62,7 @@ class InferDeckIdentityUseCaseTest {
     fun `strategy is null when seeds carry no recognizable archetype tags`() {
         // KEYWORD/TYPE category tags are not identity categories → no strategy overlap.
         val seeds = listOf(
-            card(id = "a", tags = listOf(CardTag("flying", com.mmg.manahub.core.domain.model.TagCategory.KEYWORD))),
+            card(id = "a", tags = listOf(CardTag("flying", com.mmg.manahub.core.model.TagCategory.KEYWORD))),
         )
 
         val result = useCase(seeds)

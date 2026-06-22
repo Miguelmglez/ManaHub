@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent

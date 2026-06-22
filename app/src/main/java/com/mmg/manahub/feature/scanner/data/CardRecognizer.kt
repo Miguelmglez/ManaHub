@@ -48,7 +48,7 @@ class CardRecognizer(
     private val isProcessing = AtomicBoolean(false)
 
     private var lastOcrName: String?  = null
-    private var lastOcrCard: com.mmg.manahub.core.domain.model.Card? = null
+    private var lastOcrCard: com.mmg.manahub.core.model.Card? = null
     private var lastOcrTimeMs: Long   = 0L
     private val OCR_CACHE_TTL_MS      = 3_000L
 
@@ -138,7 +138,7 @@ class CardRecognizer(
         }
     }
 
-    private suspend fun resolveCard(cardName: String): com.mmg.manahub.core.domain.model.Card? {
+    private suspend fun resolveCard(cardName: String): com.mmg.manahub.core.model.Card? {
         val exactResult = withContext(Dispatchers.IO) {
             cardRepository.getCardByExactName(cardName)
         }

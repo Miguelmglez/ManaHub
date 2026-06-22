@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility

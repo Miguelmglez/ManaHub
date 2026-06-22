@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.tagdictionary
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.feature.tagdictionary.presentation.TagDictionaryRow
 import com.mmg.manahub.feature.tagdictionary.presentation.TagDictionaryViewModel

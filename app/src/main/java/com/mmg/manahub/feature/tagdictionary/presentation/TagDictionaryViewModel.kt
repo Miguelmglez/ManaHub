@@ -3,7 +3,7 @@ package com.mmg.manahub.feature.tagdictionary.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.tagging.TagDictionary
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.tagging.TagOverride

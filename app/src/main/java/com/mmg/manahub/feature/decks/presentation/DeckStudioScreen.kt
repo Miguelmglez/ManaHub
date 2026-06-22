@@ -74,7 +74,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.model.DeckSlotEntry

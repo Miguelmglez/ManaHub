@@ -1,4 +1,4 @@
-package com.mmg.manahub.core.domain.model
+package com.mmg.manahub.core.model
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Tag taxonomy

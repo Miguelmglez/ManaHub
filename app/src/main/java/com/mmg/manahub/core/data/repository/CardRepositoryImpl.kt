@@ -12,10 +12,10 @@ import com.mmg.manahub.core.data.local.mapper.toTagsJson
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.core.domain.model.SuggestedTag
+import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
 import kotlinx.coroutines.CoroutineDispatcher

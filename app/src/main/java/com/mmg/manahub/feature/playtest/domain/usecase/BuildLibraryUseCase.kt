@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckSlot
 
 /**

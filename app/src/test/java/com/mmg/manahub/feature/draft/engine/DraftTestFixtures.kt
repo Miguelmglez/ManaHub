@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.engine
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
 import com.mmg.manahub.feature.draft.domain.model.BoosterConfig

@@ -850,7 +850,7 @@ fun AdvancedSearchSheet(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                com.mmg.manahub.core.domain.model.CardTag.canonical.forEach { tag ->
+                                com.mmg.manahub.core.model.CardTag.canonical.forEach { tag ->
                                     val isSelected = uiState.filterTags.contains(tag.key)
                                     FilterChip(
                                         selected = isSelected,

@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.game.domain.model
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 
 data class Player(

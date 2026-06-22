@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.domain.model
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 
 /**
  * A card inside a draft context: wraps the real [Card] with tier-list rating signals.

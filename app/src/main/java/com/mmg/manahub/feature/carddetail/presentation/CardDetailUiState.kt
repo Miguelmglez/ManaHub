@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.carddetail.presentation
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.model.UserDefinedTag

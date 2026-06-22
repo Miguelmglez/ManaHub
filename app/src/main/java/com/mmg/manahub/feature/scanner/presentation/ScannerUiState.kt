@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.scanner.presentation
 
 import android.graphics.PointF
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Session models

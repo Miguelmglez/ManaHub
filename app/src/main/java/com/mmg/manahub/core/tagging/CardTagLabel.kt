@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.tagging
 
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.CardTag
 
 /**
  * Resolves the localized display label for a [CardTag].

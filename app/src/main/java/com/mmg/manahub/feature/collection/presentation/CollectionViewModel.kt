@@ -471,7 +471,7 @@ class CollectionViewModel(
     }
 
     private fun matchesFormat(
-        card: com.mmg.manahub.core.domain.model.Card,
+        card: com.mmg.manahub.core.model.Card,
         format: String,
         legal: Boolean,
     ): Boolean {

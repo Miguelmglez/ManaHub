@@ -2,7 +2,7 @@ package com.mmg.manahub.core.tagging
 
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.TagCategory
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

@@ -9,7 +9,7 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallApi
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.network.ScryfallRequestQueue

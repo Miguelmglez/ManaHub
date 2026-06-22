@@ -8,8 +8,8 @@ import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.AddCardRow
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.domain.model.DeckCard

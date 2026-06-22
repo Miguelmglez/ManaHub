@@ -53,7 +53,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.BasicLandDistribution
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages

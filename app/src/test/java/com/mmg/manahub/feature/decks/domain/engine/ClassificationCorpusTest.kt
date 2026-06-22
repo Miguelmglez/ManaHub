@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test

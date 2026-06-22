@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.playtest.presentation
 
 import android.content.Context
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.feature.survey.presentation.AnswerOption
 import com.mmg.manahub.feature.survey.presentation.SurveyChoice
 

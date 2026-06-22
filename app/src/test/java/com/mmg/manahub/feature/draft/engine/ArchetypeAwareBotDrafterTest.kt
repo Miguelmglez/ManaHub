@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.engine
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.feature.draft.data.engine.ArchetypeAwareBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.DraftRatingNormalizer
 import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter

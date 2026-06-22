@@ -48,7 +48,7 @@ data class BudgetSelection(
      * [SuggestAddsWithBudgetUseCase] via `externalCardsOverride`. Empty when the deck had no
      * queryable gaps or the external fetch failed.
      */
-    val externalPool: List<com.mmg.manahub.core.domain.model.Card> = emptyList(),
+    val externalPool: List<com.mmg.manahub.core.model.Card> = emptyList(),
 )
 
 /**
@@ -90,7 +90,7 @@ class BudgetOptimizer @Inject constructor() {
     operator fun invoke(
         suggestions: List<AddSuggestion>,
         constraints: BudgetConstraints,
-        externalPool: List<com.mmg.manahub.core.domain.model.Card> = emptyList(),
+        externalPool: List<com.mmg.manahub.core.model.Card> = emptyList(),
     ): BudgetSelection {
         // Annotate each suggestion with its effective cost up front.
         val priced = suggestions.map { it to effectiveCost(it, constraints) }
