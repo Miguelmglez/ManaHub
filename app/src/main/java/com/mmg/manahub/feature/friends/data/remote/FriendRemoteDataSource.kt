@@ -1,5 +1,17 @@
 package com.mmg.manahub.feature.friends.data.remote
 
+import com.mmg.manahub.core.data.remote.FriendshipClient
+import com.mmg.manahub.core.data.remote.dto.AcceptInviteRequestDto
+import com.mmg.manahub.core.data.remote.dto.AcceptInviteResultDto
+import com.mmg.manahub.core.data.remote.dto.FriendCardDto
+import com.mmg.manahub.core.data.remote.dto.FriendMatchHistoryDto
+import com.mmg.manahub.core.data.remote.dto.FriendStatsDto
+import com.mmg.manahub.core.data.remote.dto.GetFriendCollectionRequestDto
+import com.mmg.manahub.core.data.remote.dto.GetFriendMatchHistoryRequestDto
+import com.mmg.manahub.core.data.remote.dto.SendFriendRequestDto
+import com.mmg.manahub.core.data.remote.dto.UpdateFriendshipStatusDto
+import com.mmg.manahub.core.data.remote.dto.UpsertCollectionStatsDto
+import com.mmg.manahub.core.data.remote.dto.UserSearchResultDto
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
 import com.mmg.manahub.feature.friends.data.orNullIfBlank
@@ -8,7 +20,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 class FriendRemoteDataSource @Inject constructor(
-    private val service: FriendshipService,
+    private val client: FriendshipClient,
     @IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) {
 
@@ -16,12 +28,12 @@ class FriendRemoteDataSource @Inject constructor(
         withContext(dispatcher) {
             runCatching {
                 val orFilter = "(user_id_1.eq.$currentUserId,user_id_2.eq.$currentUserId)"
-                val friendships = service.getFriendships(or = orFilter)
+                val friendships = client.getFriendships(or = orFilter)
                 if (friendships.isEmpty()) return@runCatching emptyList()
                 val otherIds = friendships
                     .map { if (it.userId1 == currentUserId) it.userId2 else it.userId1 }
                     .distinct()
-                val profiles = service
+                val profiles = client
                     .getProfilesByIds(idFilter = "in.(${otherIds.joinToString(",")})")
                     .associateBy { it.id }
                 friendships.map { fs ->
@@ -43,10 +55,10 @@ class FriendRemoteDataSource @Inject constructor(
     suspend fun getPendingRequests(currentUserId: String): Result<List<FriendRequestWithProfile>> =
         withContext(dispatcher) {
             runCatching {
-                val requests = service.getPendingRequests(userId2Filter = "eq.$currentUserId")
+                val requests = client.getPendingRequests(userId2Filter = "eq.$currentUserId")
                 if (requests.isEmpty()) return@runCatching emptyList()
                 val senderIds = requests.map { it.userId1 }.distinct()
-                val profiles = service
+                val profiles = client
                     .getProfilesByIds(idFilter = "in.(${senderIds.joinToString(",")})")
                     .associateBy { it.id }
                 requests.map { fs ->
@@ -68,44 +80,47 @@ class FriendRemoteDataSource @Inject constructor(
     suspend fun searchByGameTag(gameTag: String): Result<UserSearchResultDto?> =
         withContext(dispatcher) {
             runCatching {
-                service.searchByGameTag(gameTagFilter = "eq.$gameTag").firstOrNull()
+                client.searchByGameTag(gameTagFilter = "eq.$gameTag").firstOrNull()
             }
         }
 
+    /**
+     * Sends a friend request. With Ktor `expectSuccess = true`, non-2xx responses
+     * throw automatically — the wrapping [runCatching] catches them.
+     */
     suspend fun sendFriendRequest(fromUserId: String, toUserId: String): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                val response = service.sendFriendRequest(
-                    body = SendFriendRequestDto(fromUserId, toUserId)
+                client.sendFriendRequest(
+                    body = SendFriendRequestDto(fromUserId, toUserId),
                 )
-                if (!response.isSuccessful) error("Send request failed: ${response.code()}")
             }
         }
 
+    /**
+     * Accepts a pending friend request by updating its status to ACCEPTED.
+     */
     suspend fun acceptRequest(friendshipId: String): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                val response = service.updateFriendshipStatus(
+                client.updateFriendshipStatus(
                     idFilter = "eq.$friendshipId",
                     body = UpdateFriendshipStatusDto("ACCEPTED"),
                 )
-                if (!response.isSuccessful) error("Accept failed: ${response.code()}")
             }
         }
 
     suspend fun rejectRequest(friendshipId: String): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                val response = service.deleteFriendship(idFilter = "eq.$friendshipId")
-                if (!response.isSuccessful) error("Reject failed: ${response.code()}")
+                client.deleteFriendship(idFilter = "eq.$friendshipId")
             }
         }
 
     suspend fun removeFriend(friendshipId: String): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                val response = service.deleteFriendship(idFilter = "eq.$friendshipId")
-                if (!response.isSuccessful) error("Remove failed: ${response.code()}")
+                client.deleteFriendship(idFilter = "eq.$friendshipId")
             }
         }
 
@@ -118,7 +133,7 @@ class FriendRemoteDataSource @Inject constructor(
             try {
                 // Uses the server-side get_my_referral_code() RPC (SECURITY DEFINER)
                 // so the caller cannot query another user's code by passing a different userId.
-                service.getMyReferralCode().firstOrNull()?.referralCode
+                client.getMyReferralCode().firstOrNull()?.referralCode
             } catch (e: Exception) {
                 null
             }
@@ -127,13 +142,13 @@ class FriendRemoteDataSource @Inject constructor(
     /**
      * Calls the `accept_invite` RPC with the given [referralCode].
      *
-     * @throws retrofit2.HttpException when Supabase returns a PostgreSQL error
-     *   (e.g. INVALID_CODE or SELF_INVITE). The error body contains the message.
+     * @throws io.ktor.client.plugins.ResponseException when Supabase returns a PostgreSQL
+     *   error (e.g. INVALID_CODE or SELF_INVITE). The error body contains the message.
      * @throws Exception on network failures.
      */
     suspend fun acceptInvite(referralCode: String): AcceptInviteResultDto =
         withContext(dispatcher) {
-            service.acceptInvite(AcceptInviteRequestDto(referralCode)).firstOrNull()
+            client.acceptInvite(AcceptInviteRequestDto(referralCode)).firstOrNull()
                 ?: throw IllegalStateException("accept_invite returned empty result")
         }
 
@@ -160,7 +175,7 @@ class FriendRemoteDataSource @Inject constructor(
         offset: Int = 0,
     ): List<FriendCardDto> =
         withContext(dispatcher) {
-            service.getFriendCollection(
+            client.getFriendCollection(
                 GetFriendCollectionRequestDto(
                     pFriendUserId = friendUserId,
                     pList = list,
@@ -185,7 +200,7 @@ class FriendRemoteDataSource @Inject constructor(
      */
     suspend fun getFriendStats(friendUserId: String): FriendStatsDto? =
         withContext(dispatcher) {
-            service.getFriendStats(userIdFilter = "eq.$friendUserId").firstOrNull()
+            client.getFriendStats(userIdFilter = "eq.$friendUserId").firstOrNull()
         }
 
     /**
@@ -194,11 +209,12 @@ class FriendRemoteDataSource @Inject constructor(
      */
     suspend fun getFriendMatchHistory(friendUserId: String): FriendMatchHistoryDto? =
         withContext(dispatcher) {
-            service.getFriendMatchHistory(GetFriendMatchHistoryRequestDto(friendUserId)).firstOrNull()
+            client.getFriendMatchHistory(GetFriendMatchHistoryRequestDto(friendUserId)).firstOrNull()
         }
 
     /**
      * Calls the `upsert_collection_stats` RPC to persist the caller's own stats.
+     * With Ktor `expectSuccess = true`, non-2xx throws automatically.
      *
      * @return [Result.success] on HTTP 2xx; [Result.failure] on any error.
      */
@@ -212,7 +228,7 @@ class FriendRemoteDataSource @Inject constructor(
     ): Result<Unit> =
         withContext(dispatcher) {
             runCatching {
-                val response = service.upsertCollectionStats(
+                client.upsertCollectionStats(
                     UpsertCollectionStatsDto(
                         pUniqueCards = uniqueCards,
                         pTotalCards = totalCards,
@@ -222,17 +238,16 @@ class FriendRemoteDataSource @Inject constructor(
                         pMostValuableColor = mostValuableColor,
                     )
                 )
-                if (!response.isSuccessful) error("upsert_collection_stats failed: ${response.code()}")
             }
         }
 
     suspend fun getOutgoingRequests(currentUserId: String): Result<List<OutgoingRequestWithProfile>> =
         withContext(dispatcher) {
             runCatching {
-                val requests = service.getOutgoingPendingRequests(userId1Filter = "eq.$currentUserId")
+                val requests = client.getOutgoingPendingRequests(userId1Filter = "eq.$currentUserId")
                 if (requests.isEmpty()) return@runCatching emptyList()
                 val receiverIds = requests.map { it.userId2 }.distinct()
-                val profiles = service
+                val profiles = client
                     .getProfilesByIds(idFilter = "in.(${receiverIds.joinToString(",")})")
                     .associateBy { it.id }
                 requests.map { fs ->

@@ -26,7 +26,6 @@ import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import retrofit2.HttpException
 import java.time.Instant
 import javax.inject.Inject
 
@@ -146,11 +145,9 @@ class FriendRepositoryImpl @Inject constructor(
         }.recoverCatching { throwable ->
             // Extract only the known semantic token from the Supabase error body, never the
             // raw PostgreSQL message, to avoid leaking internal schema details.
-            val rawBody = if (throwable is HttpException) {
-                throwable.response()?.errorBody()?.string() ?: ""
-            } else {
-                throwable.message ?: ""
-            }
+            // Ktor's ResponseException.message includes the response body text,
+            // so we can extract the semantic token from it regardless of exception type.
+            val rawBody = throwable.message ?: ""
             val token = when {
                 rawBody.contains("SELF_INVITE", ignoreCase = true) -> "SELF_INVITE"
                 rawBody.contains("INVALID_CODE", ignoreCase = true) -> "INVALID_CODE"
@@ -260,7 +257,7 @@ class FriendRepositoryImpl @Inject constructor(
             mostValuableColor = mostValuableColor,
         )
 
-    private fun com.mmg.manahub.feature.friends.data.remote.FriendMatchHistoryDto.toDomain() =
+    private fun com.mmg.manahub.core.data.remote.dto.FriendMatchHistoryDto.toDomain() =
         FriendMatchHistory(
             myWins = myWins,
             opponentWins = opponentWins,
@@ -270,7 +267,7 @@ class FriendRepositoryImpl @Inject constructor(
             } ?: 0L,
         )
 
-    private fun com.mmg.manahub.feature.friends.data.remote.FriendStatsDto.toDomain() =
+    private fun com.mmg.manahub.core.data.remote.dto.FriendStatsDto.toDomain() =
         FriendStats(
             userId = userId,
             uniqueCards = uniqueCards,

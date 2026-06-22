@@ -13,7 +13,12 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.auth.Auth
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -95,6 +100,36 @@ abstract class AuthModule {
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .build()
+        }
+
+        /**
+         * Provides a Ktor [HttpClient] backed by the Supabase [OkHttpClient].
+         *
+         * This is the Ktor counterpart of the Retrofit instance above — used by
+         * KMP-migrated API clients (e.g. [com.mmg.manahub.core.data.remote.FriendshipClient])
+         * that need the same auth/apikey headers the OkHttp interceptor already provides.
+         *
+         * `encodeDefaults = true` mirrors the old Gson `serializeNulls()` behavior so that
+         * fields with default values (e.g. `pLimit = 50`) are always serialized.
+         */
+        @Provides
+        @Singleton
+        @Named("supabaseKtor")
+        fun provideSupabaseKtorClient(
+            @Named("supabase") okHttpClient: OkHttpClient,
+        ): HttpClient {
+            return HttpClient(OkHttp) {
+                engine {
+                    preconfigured = okHttpClient
+                }
+                install(ContentNegotiation) {
+                    json(Json {
+                        ignoreUnknownKeys = true
+                        encodeDefaults = true
+                    })
+                }
+                expectSuccess = true
+            }
         }
 
         /**
