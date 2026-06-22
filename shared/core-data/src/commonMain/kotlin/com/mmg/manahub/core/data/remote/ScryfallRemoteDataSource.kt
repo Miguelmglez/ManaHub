@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.data.remote
 
+import com.mmg.manahub.core.common.DispatcherProvider
+import com.mmg.manahub.core.data.network.ScryfallCache
+import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.dto.CardCollectionRequestDto
 import com.mmg.manahub.core.data.remote.dto.CardCollectionResponseDto
 import com.mmg.manahub.core.data.remote.dto.CardDto
@@ -10,18 +13,24 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.SetType
-import com.mmg.manahub.core.network.ScryfallCache
-import com.mmg.manahub.core.data.network.ScryfallRequestQueue
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ScryfallRemoteDataSource @Inject constructor(
+/**
+ * Remote data source for the Scryfall API.
+ *
+ * All calls are rate-limited by [ScryfallRequestQueue] and memoised by [ScryfallCache].
+ * Network calls run on [DispatcherProvider.io] (KMP-safe replacement for `Dispatchers.IO`).
+ *
+ * @param api            Ktor-based [ScryfallClient].
+ * @param requestQueue   Rate-limiting queue (max 10 req/s, 100 ms min between requests).
+ * @param cache          In-memory LRU cache with per-resource TTL.
+ * @param dispatcherProvider Platform dispatcher abstraction.
+ */
+class ScryfallRemoteDataSource(
     private val api: ScryfallClient,
     private val requestQueue: ScryfallRequestQueue,
     private val cache: ScryfallCache,
+    private val dispatcherProvider: DispatcherProvider,
 ) {
 
     suspend fun searchCardByName(query: String, set: String? = null): Result<Card> =
@@ -49,12 +58,12 @@ class ScryfallRemoteDataSource @Inject constructor(
      * Searches Scryfall for cards matching [query], page [page].
      *
      * Results are memoised in [ScryfallCache.searches] keyed by `query:page`. When [bypassCache]
-     * is true the memoised path is skipped and the loader always runs — required for queries that
+     * is true the memoised path is skipped and the loader always runs -- required for queries that
      * embed `order:random`, where a stable cache key would otherwise return the same page on every
      * "refresh" (see Home Discover/Random-card widgets). The individual card cache is still
      * populated either way. The request remains rate-limited inside [ScryfallRequestQueue].
      *
-     * NOTE: bypassing the in-memory [ScryfallCache.searches] map alone is NOT enough — the OkHttp
+     * NOTE: bypassing the in-memory [ScryfallCache.searches] map alone is NOT enough -- the OkHttp
      * disk cache also serves `/cards/search` responses (the network interceptor forces
      * `Cache-Control: public, max-age=300` on them), so the identical `order:random` URL would still
      * be replayed from disk for 5 minutes. On the [bypassCache] path the loader therefore calls the
@@ -107,7 +116,7 @@ class ScryfallRemoteDataSource @Inject constructor(
         }
 
     /**
-     * Batch-fetches cards by Scryfall ID. Used for price refresh — intentionally
+     * Batch-fetches cards by Scryfall ID. Used for price refresh -- intentionally
      * bypasses the in-memory cache so that fresh price data is always returned.
      */
     suspend fun getCardCollection(
@@ -214,5 +223,5 @@ class ScryfallRemoteDataSource @Inject constructor(
         }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
-        withContext(Dispatchers.IO) { runCatching { block() } }
+        withContext(dispatcherProvider.io) { runCatching { block() } }
 }

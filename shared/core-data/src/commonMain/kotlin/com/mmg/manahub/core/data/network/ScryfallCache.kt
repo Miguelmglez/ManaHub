@@ -1,52 +1,78 @@
-package com.mmg.manahub.core.network
+package com.mmg.manahub.core.data.network
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Thread-safe in-memory LRU cache with per-entry TTL expiration and
  * in-flight request deduplication.
  *
  * When multiple coroutines request the same key concurrently via [getOrFetch]
- * and it's not cached, only one executes the loader — the others suspend and
+ * and it's not cached, only one executes the loader -- the others suspend and
  * receive the same result, avoiding redundant network calls.
+ *
+ * The LRU eviction is implemented with a [HashMap] + [MutableList] tracking
+ * access order (KMP-safe; replaces the JVM-only `LinkedHashMap(accessOrder=true)`
+ * with `removeEldestEntry` override).
  *
  * @param maxSize Maximum entries before the least-recently-used entry is evicted.
  * @param ttlMs   Time-to-live in milliseconds. Expired entries are evicted on read.
  */
+@OptIn(ExperimentalTime::class)
 class TimedLruCache<K : Any, V : Any>(
     private val maxSize: Int,
     private val ttlMs: Long,
 ) {
-    private data class Entry<V>(val value: V, val timestamp: Long = System.currentTimeMillis())
+    private data class Entry<V>(val value: V, val timestamp: Long)
 
-    // accessOrder = true → LinkedHashMap behaves as LRU
-    private val map = object : LinkedHashMap<K, Entry<V>>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, Entry<V>>): Boolean =
-            size > maxSize
-    }
+    private val map = HashMap<K, Entry<V>>()
+    private val accessOrder = mutableListOf<K>()
     private val mutex = Mutex()
     private val inFlight = mutableMapOf<K, CompletableDeferred<V>>()
+
+    /** Returns the current wall-clock epoch millis (KMP-safe). */
+    private fun now(): Long = Clock.System.now().toEpochMilliseconds()
+
+    /**
+     * Moves [key] to the end of [accessOrder] (most-recently-used position).
+     * If the key is not in the list, it is appended.
+     */
+    private fun touchKey(key: K) {
+        accessOrder.remove(key)
+        accessOrder.add(key)
+    }
+
+    /** Evicts the least-recently-used entry if size exceeds [maxSize]. */
+    private fun evictIfNeeded() {
+        while (accessOrder.size > maxSize) {
+            val eldest = accessOrder.removeFirst()
+            map.remove(eldest)
+        }
+    }
 
     /** Returns the cached value if present and not expired, or null. */
     suspend fun get(key: K): V? = mutex.withLock {
         val entry = map[key] ?: return@withLock null
-        if (System.currentTimeMillis() - entry.timestamp > ttlMs) {
+        if (now() - entry.timestamp > ttlMs) {
             map.remove(key)
+            accessOrder.remove(key)
             null
         } else {
+            touchKey(key)
             entry.value
         }
     }
 
     /** Stores a value in the cache. */
     suspend fun put(key: K, value: V): Unit = mutex.withLock {
-        map[key] = Entry(value)
+        map[key] = Entry(value, now())
+        touchKey(key)
+        evictIfNeeded()
     }
 
     /**
@@ -62,7 +88,8 @@ class TimedLruCache<K : Any, V : Any>(
         val (deferred, isOwner) = mutex.withLock {
             // Double-check inside lock
             val entry = map[key]
-            if (entry != null && System.currentTimeMillis() - entry.timestamp <= ttlMs) {
+            if (entry != null && now() - entry.timestamp <= ttlMs) {
+                touchKey(key)
                 return entry.value
             }
             val existing = inFlight[key]
@@ -91,10 +118,16 @@ class TimedLruCache<K : Any, V : Any>(
     }
 
     /** Removes a specific entry. */
-    suspend fun invalidate(key: K): Unit = mutex.withLock { map.remove(key) }
+    suspend fun invalidate(key: K): Unit = mutex.withLock {
+        map.remove(key)
+        accessOrder.remove(key)
+    }
 
     /** Clears all entries. */
-    suspend fun clear(): Unit = mutex.withLock { map.clear() }
+    suspend fun clear(): Unit = mutex.withLock {
+        map.clear()
+        accessOrder.clear()
+    }
 
     /** Returns the current number of (potentially expired) entries. */
     suspend fun size(): Int = mutex.withLock { map.size }
@@ -114,8 +147,7 @@ class TimedLruCache<K : Any, V : Any>(
  * | Sets          | 24 h  | 1           | New sets are released infrequently |
  * | Art variants  | 24 h  | 50          | Art doesn't change                 |
  */
-@Singleton
-class ScryfallCache @Inject constructor() {
+class ScryfallCache {
 
     /** Individual card lookups keyed by Scryfall ID. */
     val cards = TimedLruCache<String, Card>(MAX_CARDS, TTL_CARDS_MS)
