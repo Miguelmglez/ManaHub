@@ -12,12 +12,11 @@ import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
-import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
+import com.mmg.manahub.core.data.remote.YouTubeClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
-import com.mmg.manahub.feature.draft.data.remote.YouTubeApiKeyInterceptor
 import com.mmg.manahub.feature.draft.domain.engine.BoosterGenerator
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
 import com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder
@@ -32,11 +31,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.Cache
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -94,34 +90,42 @@ abstract class DraftModule {
         ): DraftEngine = DefaultDraftEngine(boosterGenerator, botDrafter)
 
         // -----------------------------------------------------------------------
-        // YouTube
+        // YouTube (Ktor — KMP migration §9.6)
         // -----------------------------------------------------------------------
 
         /**
-         * Dedicated OkHttpClient for YouTube with an API-key interceptor.
-         * The key is injected at the HTTP layer so it never appears in
-         * Retrofit call signatures or Logcat URL logs.
+         * Dedicated Ktor [HttpClient] for the YouTube Data API v3.
+         *
+         * Inherits connection pool and timeouts from the global [OkHttpClient] but
+         * does NOT carry the global network interceptor that forces
+         * `Cache-Control: max-age=86400` (same isolation as Cloudflare above).
+         * The API key is passed to [YouTubeClient] as a constructor parameter
+         * and appended per-request, replacing the old [OkHttp interceptor][YouTubeApiKeyInterceptor].
          */
         @Provides
         @Singleton
         @Named("youtube")
-        fun provideYouTubeRetrofit(client: OkHttpClient): Retrofit {
-            val youtubeClient = client.newBuilder()
-                .addInterceptor(YouTubeApiKeyInterceptor(BuildConfig.YOUTUBE_API_KEY))
-                .build()
-            // YouTubeDto is @Serializable — uses kotlinx.serialization converter.
-            val youtubeJson = Json { ignoreUnknownKeys = true }
-            return Retrofit.Builder()
-                .baseUrl("https://www.googleapis.com/youtube/v3/")
-                .client(youtubeClient)
-                .addConverterFactory(youtubeJson.asConverterFactory("application/json".toMediaType()))
-                .build()
+        fun provideYouTubeHttpClient(client: OkHttpClient): HttpClient {
+            val youtubeOkHttp = client.newBuilder().build()
+            return HttpClient(OkHttp) {
+                engine {
+                    preconfigured = youtubeOkHttp
+                }
+                install(ContentNegotiation) {
+                    json(Json { ignoreUnknownKeys = true })
+                }
+            }
         }
 
         @Provides
         @Singleton
-        fun provideYouTubeApi(@Named("youtube") retrofit: Retrofit): YouTubeApi =
-            retrofit.create(YouTubeApi::class.java)
+        fun provideYouTubeClient(
+            @Named("youtube") httpClient: HttpClient,
+        ): YouTubeClient = YouTubeClient(
+            httpClient = httpClient,
+            baseUrl = "https://www.googleapis.com/youtube/v3/",
+            apiKey = BuildConfig.YOUTUBE_API_KEY,
+        )
 
         // -----------------------------------------------------------------------
         // Cloudflare Worker (Ktor — KMP migration §9.6)
