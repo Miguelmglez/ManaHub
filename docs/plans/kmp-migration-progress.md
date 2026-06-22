@@ -331,10 +331,24 @@ verified the uncommitted WIP (full build + tests + leak grep) and committed it.
 `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` =
 1964/122-fail/2-skip (== baseline); commonMain platform-import grep EMPTY.
 
+✅ **Phase 2 §9.6 item 4 — `CommunityStatsRepositoryStub` moved (DONE & GREEN, 2026-06-22, commit
+`60834c3`).** Trivial stub (`flowOf(null)`, zero platform deps). Stripped `@Inject`/`@Singleton`;
+CommunityModule converted `@Binds` → `@Provides` (abstract class → object). Package unchanged. Verified:
+`:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` =
+1964/122-fail/2-skip (== baseline); commonMain platform-import grep EMPTY.
+
+⬜ **Phase 2 §9.6 item 4 — `PushTokenRepositoryImpl` DEFERRED (too many platform deps for commonMain).**
+Requires 4+ new abstractions: (1) `PushTokenProvider` (wraps `FirebaseMessaging.getInstance().token` —
+Android-only FCM), (2) `BackgroundTokenRegistrar` (wraps `WorkManager` +
+`RegisterPushTokenWorker`/`UnregisterPushTokenWorker` — Android-only), (3) `CrashReporter` integration
+(wraps `FirebaseCrashlytics.getInstance().recordException`), (4) `UserPreferencesDataStore` access for
+locale (Android DataStore). Additionally, `PushTokenRemoteDataSource` uses `BuildConfig.VERSION_NAME`
+(Android-only). The web platform has no FCM equivalent (push notifications out of scope for web v1 per
+the migration plan). Creating 4+ interfaces + expect/actual pairs for a feature that won't exist on web
+is not cost-effective now — defer to Phase 4 (platform parity) when push notification scope is clearer.
+
 ➡️ **NEXT = Phase 2 §9.6 item 4 — continue moving repository impls to `commonMain`** (one repo per
-slice). Candidates in approximate order of complexity:
-- `PushTokenRepositoryImpl` (Supabase-only, similar to NotificationPrefs — no Room)
-- `CommunityStatsRepositoryImpl` (stub returning `flowOf(null)`, trivially portable)
+slice). Remaining candidates in approximate order of complexity:
 - `CommunityDecksRepositoryImpl` (Ktor-ready ArchidektClient + Room cache — needs DAO interface split)
 - Repos with Room deps: `StatsRepositoryImpl`, `UserCardRepositoryImpl`, `CardRepositoryImpl`,
   `DeckRepositoryImpl` — need DAO interface in `commonMain` + web data source in `wasmJsMain`.
