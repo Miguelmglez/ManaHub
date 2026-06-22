@@ -58,6 +58,7 @@ import coil.request.ImageRequest
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.domain.model.DeckSlotEntry
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
@@ -217,7 +218,7 @@ internal fun CardDetailSheet(
                                     border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f)),
                                 ) {
                                     Text(
-                                        text = tag.label,
+                                        text = tag.label(),
                                         style = ty.labelSmall,
                                         color = mc.textSecondary,
                                         modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),

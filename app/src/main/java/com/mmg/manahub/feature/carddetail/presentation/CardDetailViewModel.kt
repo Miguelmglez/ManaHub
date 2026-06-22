@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
@@ -401,11 +402,11 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { cardRepo.updateUserTags(scryfallId, updated) }
                 .onSuccess {
-                    helper.logEvent("add_user_tag", mapOf("tag" to tag.label))
-                    _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label}' added")) }
+                    helper.logEvent("add_user_tag", mapOf("tag" to tag.label()))
+                    _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label()}' added")) }
                 .onFailure { e ->
                     // Roll back on failure
-                    helper.logEvent("error_add_user_tag", mapOf("tag" to tag.label))
+                    helper.logEvent("error_add_user_tag", mapOf("tag" to tag.label()))
                     _uiState.update {
                         it.copy(
                             card = it.card?.copy(userTags = current),
@@ -423,10 +424,10 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { cardRepo.updateUserTags(scryfallId, updated) }
                 .onSuccess {
-                    helper.logEvent("remove_user_tag", mapOf("tag" to tag.label))
+                    helper.logEvent("remove_user_tag", mapOf("tag" to tag.label()))
                 }
                 .onFailure { e ->
-                    helper.logEvent("error_remove_user_tag", mapOf("tag" to tag.label))
+                    helper.logEvent("error_remove_user_tag", mapOf("tag" to tag.label()))
                     _uiState.update {
                         it.copy(
                             card = it.card?.copy(userTags = current),
@@ -505,10 +506,10 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { cardRepo.confirmSuggestedTag(scryfallId, tag) }
                 .onSuccess {
-                    helper.logEvent("confirm_suggested_tag", mapOf("tag" to tag.label))
-                    _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label}' confirmed")) }
+                    helper.logEvent("confirm_suggested_tag", mapOf("tag" to tag.label()))
+                    _events.emit(CardDetailEvent.ShowToast("Tag '${tag.label()}' confirmed")) }
                 .onFailure { e ->
-                    helper.logEvent("error_confirm_suggested_tag", mapOf("tag" to tag.label))
+                    helper.logEvent("error_confirm_suggested_tag", mapOf("tag" to tag.label()))
                     _uiState.update { it.copy(error = e.message) } }
         }
     }
@@ -517,10 +518,10 @@ class CardDetailViewModel(
         viewModelScope.launch {
             runCatching { cardRepo.dismissSuggestedTag(scryfallId, tag) }
                 .onSuccess {
-                    helper.logEvent("dismiss_suggested_tag", mapOf("tag" to tag.label))
+                    helper.logEvent("dismiss_suggested_tag", mapOf("tag" to tag.label()))
                 }
                 .onFailure { e ->
-                    helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.label))
+                    helper.logEvent("error_dismiss_suggested_tag", mapOf("tag" to tag.label()))
                     _uiState.update { it.copy(error = e.message) } }
         }
     }

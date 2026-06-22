@@ -93,6 +93,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.ui.components.CardFullScreenDialog
@@ -1094,7 +1095,7 @@ private fun groupDraftCards(cards: List<DraftCard>, mode: GroupingMode): List<Pa
                     tagMap.getOrPut("Untagged") { mutableListOf() }.add(entry)
                 } else {
                     tags.forEach { tag ->
-                        tagMap.getOrPut(tag.label) { mutableListOf() }.add(entry)
+                        tagMap.getOrPut(tag.label()) { mutableListOf() }.add(entry)
                     }
                 }
             }

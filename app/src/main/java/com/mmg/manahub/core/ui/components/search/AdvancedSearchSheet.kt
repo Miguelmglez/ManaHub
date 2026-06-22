@@ -87,6 +87,7 @@ import coil.compose.AsyncImage
 import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchDirection
@@ -854,7 +855,7 @@ fun AdvancedSearchSheet(
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = { viewModel.toggleFilterTag(tag.key) },
-                                        label = { Text(tag.label, style = ty.labelMedium) },
+                                        label = { Text(tag.label(), style = ty.labelMedium) },
                                     )
                                 }
                             }

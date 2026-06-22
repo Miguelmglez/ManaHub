@@ -101,6 +101,7 @@ import coil.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.model.Card
 import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.domain.model.SuggestedTag
@@ -1345,7 +1346,7 @@ private fun TagsSection(
                                 onClick = {  },
                                 label = {
                                     Text(
-                                        tag.label,
+                                        tag.label(),
                                         style = MaterialTheme.magicTypography.labelSmall
                                     )
                                 }
@@ -1355,7 +1356,7 @@ private fun TagsSection(
                                 onClick = {},
                                 label = {
                                     Text(
-                                        tag.label,
+                                        tag.label(),
                                         style = MaterialTheme.magicTypography.labelSmall
                                     )
                                 },
@@ -1386,7 +1387,7 @@ private fun TagsSection(
                                 onClick = { onRemoveUserTag(tag) },
                                 label = {
                                     Text(
-                                        tag.label,
+                                        tag.label(),
                                         style = MaterialTheme.magicTypography.labelSmall
                                     )
                                 },
@@ -1395,7 +1396,7 @@ private fun TagsSection(
                                         Icons.Default.Close,
                                         contentDescription = stringResource(
                                             R.string.carddetail_tags_remove_description,
-                                            tag.label
+                                            tag.label()
                                         ),
                                         modifier = Modifier.size(14.dp),
                                     )
@@ -1537,7 +1538,7 @@ private fun SuggestedTagCard(
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(suggestion.tag.label, style = ty.bodyMedium, color = mc.textPrimary)
+                    Text(suggestion.tag.label(), style = ty.bodyMedium, color = mc.textPrimary)
                     Text(
                         text = stringResource(R.string.carddetail_tags_confidence_value, pct),
                         style = ty.labelSmall,
@@ -1702,7 +1703,7 @@ private fun TagPickerSheet(
                 item {
                     TagPickerSection(
                         title = stringResource(R.string.carddetail_tags_picker_auto),
-                        tags = cardAutoTags.map { TagItem(it.key, it.label) },
+                        tags = cardAutoTags.map { TagItem(it.key, it.label()) },
                         onAdd = { key ->
                             val tag = cardAutoTags.find { it.key == key } ?: return@TagPickerSection
                             onAddUserTag(tag); onDismiss()
@@ -1720,7 +1721,7 @@ private fun TagPickerSheet(
                         tags = availableSuggestions.map { sug ->
                             TagItem(
                                 sug.tag.key,
-                                "${sug.tag.label}  ${(sug.confidence * 100).toInt()}%"
+                                "${sug.tag.label()}  ${(sug.confidence * 100).toInt()}%"
                             )
                         },
                         onAdd = { key ->
@@ -1738,7 +1739,7 @@ private fun TagPickerSheet(
                     CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
                 val userDefined =
                     userDefinedTags.filter { it.categoryKey == category.name }
-                val items = canonical.map { TagItem(it.key, it.label, isUserDefined = false) } +
+                val items = canonical.map { TagItem(it.key, it.label(), isUserDefined = false) } +
                         userDefined.map {
                             TagItem(
                                 it.key,

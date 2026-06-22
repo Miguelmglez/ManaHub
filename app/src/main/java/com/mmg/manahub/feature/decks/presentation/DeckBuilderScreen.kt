@@ -87,6 +87,7 @@ import org.koin.androidx.compose.koinViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mmg.manahub.R
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.domain.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
@@ -868,7 +869,7 @@ private fun CardDetailSheet(
                                     border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f))
                                 ) {
                                     Text(
-                                        text = tag.label,
+                                        text = tag.label(),
                                         style = ty.labelSmall,
                                         color = mc.textSecondary,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
