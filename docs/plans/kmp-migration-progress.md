@@ -231,33 +231,30 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## NEXT STEP (resume here)
 ✅ **Phase 2 Slice 2a-i (Deck) DONE & GREEN (2026-06-22)** — `Deck`/`DeckSlot`/`DeckWithCards`/
-`BASIC_LAND_NAMES` are now in `:shared:core-model` and `DeckRepository` is in `:shared:core-domain`
-(full detail in the ✅ STATUS bullet above). `DeckSlotEntry`/`AddCardRow` stayed in `:app`.
+`BASIC_LAND_NAMES` are now in `:shared:core-model` and `DeckRepository` is in `:shared:core-domain`.
+`DeckSlotEntry`/`AddCardRow` stayed in `:app`.
 
-➡️ **NEXT = Phase 2, Slice 2b — make `Card` KMP-pure, then move `Card`/`CardTag`/`SuggestedTag`/
-`CardFace` + `CardRepository`.** This is the HARDER blocker. Keep batches small (≤ ~15 files); each step
-its own commit, Android-green at every step. Order:
+✅ **Phase 2 Slice 2b (Card) DONE & GREEN (2026-06-22)** — commits `0dc47d1` (decouple
+`CardTag.label`) + `e8e83b3` (move models + repo). Used **option (a)**: dropped the `label` getter
+from the pure model; label resolution moved to `:app` extension `fun CardTag.label()` in
+`core/tagging/CardTagLabel.kt` (exact fallback precedence preserved). `Card`/`CardTag`+`TagCategory`/
+`CardFace`/`SuggestedTag` now in `:shared:core-model` (`core.model`); `CardRepository` in
+`:shared:core-domain` (`core.domain.repository`). `UserCard`/`UserCardWithCard` extracted to a new
+`:app` `core/domain/model/UserCard.kt` (kept in `:app` — `System.currentTimeMillis()` + gate the
+deferred `UserCardRepository`). `:app:assembleDebug` GREEN; both wasmJs compiles GREEN;
+`testDebugUnitTest` = 1964/122-fail/2-skip (== baseline). 0 platform imports in `commonMain`.
+  - Gotchas (recorded): `.label` sed false-positives (`magicTypography.labelLarge`,
+    `TagItem.label` String field, `link.label`, etc.) — verify receiver type before converting;
+    same-package implicit `Card` refs (`AddCardRow`/`DeckBuilderState`/`OpenForTradeEntry`/
+    `WishlistEntry`) needed explicit `import core.model.Card` (downstream errors masked the cause);
+    cross-module smart-cast on public nullable props (`cardFaces`/`manaCost`/`loyalty`/`printedName`/
+    `printedTypeLine`) broke — fix per-site with safe-call/`?.let`/local val.
 
-**2b. Unblock `Card`/`CardTag`/`SuggestedTag`/`CardFace` (the HARDER blocker):**
-   - The real blocker is `CardTag.label` → `TagDictionary.localize()` → `java.util.Locale`. Options:
-     (a) **Decouple `CardTag` from `TagDictionary`** — drop the `label` getter from the pure model (move
-     label resolution to a `:app`/UI extension `fun CardTag.label()` that calls `TagDictionary`), leaving
-     `CardTag`/`TagCategory` as pure `key`+`category` data. This is the smallest change and keeps the
-     tagging engine in `:app`. Grep all `cardTag.label` usages and repoint them to the extension. OR
-     (b) port `TagDictionary` + `CardTypeTranslator` to `commonMain` behind an `expect`/`actual`
-     current-language/locale provider (bigger; only if many call-sites depend on the inline `.label`).
-     Prefer (a) unless the call-site sweep proves otherwise.
-   - Once `CardTag` is pure: `git mv` `CardTag`/`TagCategory`, `SuggestedTag`, `CardFace`, then `Card`
-     (move `Card` ALONE — keep `UserCard`/`UserCardWithCard` in `:app`; they use `System.currentTimeMillis()`
-     and gate `UserCardRepository` which is deferred anyway) into `:shared:core-model` `core.model` and
-     update `:app` imports (`core.domain.model.Card` → `core.model.Card`, etc.). Then `git mv`
-     `CardRepository` → `:shared:core-domain` (`DataResult` already in core-model).
-   - The `-keep class com.mmg.manahub.core.model.**` ProGuard wildcard already covers all these moves.
-   - **`UserCardRepository` stays in `:app` until the PagingData abstraction lands** —
-   its `getCollectionPager(): Flow<PagingData<…>>` + Room `core.data.local.dao.UserCardWithCard` return
-   type are platform-bound; replace `PagingData` with the `:shared:core-common` `Page`/pagination model
-   and the Room row type with the domain `UserCardWithCard` in a dedicated later slice.
-2. **Start moving PURE use cases** into `:shared:core-domain` `commonMain` — pick use cases that depend
+➡️ **NEXT = Phase 2, Step — move PURE use cases into `:shared:core-domain` `commonMain`.** Card +
+Deck models and their repo interfaces are now shared, so the use cases that depend ONLY on those
+moved interfaces + core-model + kotlinx become extractable. Order:
+
+1. **Start moving PURE use cases** into `:shared:core-domain` `commonMain` — pick use cases that depend
    ONLY on the moved repo interfaces + core-model + kotlinx (no `@Inject`-bound platform deps, no
    `@ApplicationContext`, no `R.string`). Strip Hilt `@Inject`/`@Singleton` (Koin builds them). Anything
    platform-bound a use case touches goes behind a `commonMain` interface or `expect`/`actual` (reuse
@@ -393,6 +390,17 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 · Slice 2b — Card model KMP-pure + moved + `CardRepository` moved (GREEN).**
+  Cleared the HARDER Slice-2 blocker. (1) `0dc47d1`: decoupled `CardTag.label` (option (a)) — dropped the
+  `label` getter from the model, moved resolution to `:app` extension `fun CardTag.label()` in
+  `core/tagging/CardTagLabel.kt` (exact fallback precedence kept), repointed 8 files' `.label` →
+  `.label()` (4 false-positive sed conversions on `magicTypography.labelLarge`/`TagItem.label`/etc.
+  reverted). Android-green independently. (2) `e8e83b3`: `git mv` `Card`/`CardTag`+`TagCategory`/
+  `CardFace`/`SuggestedTag` → `:shared:core-model` (`core.model`) + `CardRepository` →
+  `:shared:core-domain` (`core.domain.repository`); extracted `UserCard`/`UserCardWithCard` to a new `:app`
+  `core/domain/model/UserCard.kt` (stay in `:app`). Fixed same-package implicit `Card` refs (explicit
+  imports) + cross-module smart-cast on public nullable props. `:app:assembleDebug` GREEN; both wasmJs
+  compiles GREEN; tests == 1964/122/2 baseline; 0 platform imports in `commonMain`.
 - 2026-06-22 — **Phase 2 · Slice 2a-i — Deck model KMP-pure + moved + `DeckRepository` moved (GREEN).**
   Cleared the cheaper of the two Slice-2 blockers. (1) SPLIT `core/domain/model/Deck.kt`: extracted
   `DeckSlotEntry` + `AddCardRow` into a NEW `:app`-only `core/domain/model/AddCardRow.kt` (same package →
