@@ -15,7 +15,7 @@ import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
-import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
+import com.mmg.manahub.core.data.remote.CloudflareContentClient
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
 import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
@@ -61,7 +61,7 @@ class DraftRepositoryImpl @Inject constructor(
     private val scryfallApi: ScryfallApi,
     private val scryfallQueue: ScryfallRequestQueue,
     private val youTubeApi: YouTubeApi,
-    private val cloudflareApi: CloudflareContentApi,
+    private val cloudflareClient: CloudflareContentClient,
     private val draftSetDao: DraftSetDao,
     private val gson: Gson,
     @Named("draft_prefs") private val draftPrefs: SharedPreferences,
@@ -103,7 +103,7 @@ class DraftRepositoryImpl @Inject constructor(
                     }
                 }
 
-                val response = cloudflareApi.getSetsIndex()
+                val response = cloudflareClient.getSetsIndex()
                 val entities = response.sets.map { it.toEntity() }
                 draftSetDao.replaceAll(entities)
 
@@ -136,8 +136,8 @@ class DraftRepositoryImpl @Inject constructor(
                         (remoteVersion != null && remoteVersion != storedVersion)
 
                     if (needsRefresh) {
-                        val json = cloudflareApi.getSetGuide(safeCode)
-                        saveJsonToFile(json, localFile)
+                        val jsonString = cloudflareClient.getSetGuide(safeCode)
+                        saveJsonToFile(jsonString, localFile)
                         if (remoteVersion != null) {
                             draftPrefs.edit()
                                 .putString(PREF_GUIDE_VERSION.format(safeCode), remoteVersion)
@@ -175,8 +175,8 @@ class DraftRepositoryImpl @Inject constructor(
                         (remoteVersion != null && remoteVersion != storedVersion)
 
                     if (needsRefresh) {
-                        val json = cloudflareApi.getSetTierList(safeCode)
-                        saveJsonToFile(json, localFile)
+                        val jsonString = cloudflareClient.getSetTierList(safeCode)
+                        saveJsonToFile(jsonString, localFile)
                         if (remoteVersion != null) {
                             draftPrefs.edit()
                                 .putString(PREF_TIER_VERSION.format(safeCode), remoteVersion)
@@ -371,14 +371,14 @@ class DraftRepositoryImpl @Inject constructor(
         File(draftDir(setCode), "tier-list.json")
 
     /**
-     * Writes [json] to [file] atomically: first writes to a sibling `.tmp` file,
+     * Writes [jsonString] to [file] atomically: first writes to a sibling `.tmp` file,
      * then renames it into place. This prevents a partially-written file from being
      * read as valid JSON if the process is killed mid-write.
      */
-    private fun saveJsonToFile(json: JsonObject, file: File) {
+    private fun saveJsonToFile(jsonString: String, file: File) {
         val tmp = File(file.parent, "${file.name}.tmp")
         try {
-            tmp.writeText(gson.toJson(json))
+            tmp.writeText(jsonString)
             if (!tmp.renameTo(file)) {
                 file.writeText(tmp.readText())
             }
