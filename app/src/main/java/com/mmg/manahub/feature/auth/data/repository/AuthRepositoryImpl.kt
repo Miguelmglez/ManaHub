@@ -5,12 +5,12 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.auth.data.remote.SupabaseUserProfileService
-import com.mmg.manahub.feature.auth.data.remote.UpdateAvatarUrlDto
-import com.mmg.manahub.feature.auth.data.remote.UpdateNicknameDto
+import com.mmg.manahub.core.data.remote.UserProfileClient
+import com.mmg.manahub.core.data.remote.dto.UpdateAvatarUrlDto
+import com.mmg.manahub.core.data.remote.dto.UpdateNicknameDto
+import com.mmg.manahub.core.data.remote.dto.UserProfileDto
 import com.mmg.manahub.feature.auth.data.remote.ProfileFetchResult
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
-import com.mmg.manahub.feature.auth.data.remote.UserProfileDto
 import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.AuthUser
@@ -26,7 +26,9 @@ import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.exceptions.RestException
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -51,7 +53,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import retrofit2.Response
 import java.io.IOException
 import java.security.SecureRandom
 import javax.inject.Inject
@@ -62,7 +63,7 @@ import javax.inject.Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val supabaseAuth: Auth,
     private val userProfileDataSource: UserProfileDataSource,
-    private val supabaseUserProfileService: SupabaseUserProfileService,
+    private val userProfileClient: UserProfileClient,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     @Named("supabase") private val supabaseOkHttpClient: OkHttpClient,
     @ApplicationScope private val applicationScope: CoroutineScope,
@@ -404,7 +405,7 @@ class AuthRepositoryImpl @Inject constructor(
     // --- Private helpers ---
 
     /**
-     * Calls the `update_user_nickname` Supabase RPC via Retrofit, then re-fetches
+     * Calls the `update_user_nickname` Supabase RPC via [UserProfileClient], then re-fetches
      * the current user.
      * Must be called from within a [withContext] block using [ioDispatcher].
      *
@@ -416,16 +417,9 @@ class AuthRepositoryImpl @Inject constructor(
             return AuthResult.Error(AuthError.NicknameTooLong)
         }
         return runCatching {
-            val response: Response<Unit> = supabaseUserProfileService.updateNickname(
+            userProfileClient.updateNickname(
                 UpdateNicknameDto(newNickname = nickname.trim())
             )
-            if (!response.isSuccessful) {
-                return if (response.code() == 400) {
-                    AuthResult.Error(AuthError.NicknameInappropriate)
-                } else {
-                    AuthResult.Error(AuthError.Unknown("HTTP ${response.code()}"))
-                }
-            }
             val user = supabaseAuth.currentUserOrNull()
                 ?: return AuthResult.Error(AuthError.SessionExpired)
 
@@ -435,8 +429,8 @@ class AuthRepositoryImpl @Inject constructor(
 
             AuthResult.Success(updatedUser)
         }.getOrElse { e ->
-            // Non-2xx from Retrofit throws HttpException; map it like the old RestException path.
-            if (e is retrofit2.HttpException && e.code() == 400) {
+            // Ktor expectSuccess = true throws ClientRequestException on 4xx.
+            if (e is ClientRequestException && e.response.status.value == 400) {
                 AuthResult.Error(AuthError.NicknameInappropriate)
             } else {
                 AuthResult.Error(e.toAuthError())
@@ -447,14 +441,9 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun updateAvatarUrl(avatarUrl: String?): AuthResult<Unit> =
         withContext(ioDispatcher) {
             runCatching {
-                val response: Response<Unit> = supabaseUserProfileService.updateAvatarUrl(
+                userProfileClient.updateAvatarUrl(
                     UpdateAvatarUrlDto(newAvatarUrl = avatarUrl)
                 )
-                if (!response.isSuccessful) {
-                    return@runCatching AuthResult.Error(
-                        AuthError.Unknown("HTTP ${response.code()}")
-                    )
-                }
 
                 supabaseAuth.currentUserOrNull()?.let { mapUserInfoToAuthUser(it) }?.copy(avatarUrl = avatarUrl)?.let {
                     syncToDataStore(it)
@@ -713,12 +702,12 @@ class AuthRepositoryImpl @Inject constructor(
             else -> AuthError.Unknown(message)
         }
 
-        is retrofit2.HttpException -> when (code()) {
+        is ResponseException -> when (response.status.value) {
             400 -> AuthError.InvalidCredentials
             422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
-            else -> AuthError.Unknown(message())
+            else -> AuthError.Unknown(message)
         }
 
         is HttpRequestTimeoutException,
