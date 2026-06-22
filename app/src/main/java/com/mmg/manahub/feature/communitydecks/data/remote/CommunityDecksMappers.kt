@@ -1,9 +1,9 @@
 package com.mmg.manahub.feature.communitydecks.data.remote
 
 import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektDeckDetailDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektDeckSummaryDto
-import com.mmg.manahub.feature.communitydecks.data.remote.dto.ArchidektSearchResultDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektDeckSummaryDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
 import com.mmg.manahub.feature.communitydecks.domain.model.ArchidektFormat
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckCard

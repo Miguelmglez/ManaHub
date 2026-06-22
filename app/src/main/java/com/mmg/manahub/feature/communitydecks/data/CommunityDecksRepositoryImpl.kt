@@ -6,16 +6,16 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektApi
+import com.mmg.manahub.core.data.remote.ArchidektClient
 import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektRequestQueue
 import com.mmg.manahub.feature.communitydecks.data.remote.toCacheEntity
 import com.mmg.manahub.feature.communitydecks.data.remote.toDomain
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
 import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSearchResult
 import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRepository
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import retrofit2.HttpException
 
 /**
  * Cache-first implementation of [CommunityDecksRepository].
@@ -29,7 +29,7 @@ import retrofit2.HttpException
  * All work runs on the injected [IoDispatcher].
  */
 class CommunityDecksRepositoryImpl(
-    private val api: ArchidektApi,
+    private val api: ArchidektClient,
     private val requestQueue: ArchidektRequestQueue,
     private val cacheDao: CommunityDeckCacheDao,
     private val ioDispatcher: CoroutineDispatcher,
@@ -51,20 +51,21 @@ class CommunityDecksRepositoryImpl(
                 cacheDao.insert(dto.toCacheEntity())
 
                 DataResult.Success(dto.toDomain())
-            } catch (e: HttpException) {
-                // Network error → try stale cache before failing.
+            } catch (e: ResponseException) {
+                // HTTP error → try stale cache before failing.
+                val statusCode = e.response.status.value
                 val stale = cacheDao.getById(archidektId)
                 recordSafeNonFatal("community_deck_fetch", e)
                 FirebaseCrashlytics.getInstance().setCustomKey("community_deck_archidekt_id", archidektId)
-                FirebaseCrashlytics.getInstance().setCustomKey("community_deck_http_code", e.code())
+                FirebaseCrashlytics.getInstance().setCustomKey("community_deck_http_code", statusCode)
                 FirebaseCrashlytics.getInstance().setCustomKey("community_deck_stale_fallback", stale != null)
                 if (stale != null) {
                     DataResult.Success(stale.toDomain(), isStale = true)
                 } else {
-                    val message = when (e.code()) {
+                    val message = when (statusCode) {
                         404 -> "Deck not found on Archidekt"
                         429 -> "Too many requests. Please try again later."
-                        else -> "Network error: ${e.code()}"
+                        else -> "Network error: $statusCode"
                     }
                     DataResult.Error(message)
                 }
@@ -110,12 +111,13 @@ class CommunityDecksRepositoryImpl(
             }
 
             DataResult.Success(dto.toDomain())
-        } catch (e: HttpException) {
+        } catch (e: ResponseException) {
+            val statusCode = e.response.status.value
             recordSafeNonFatal("community_deck_search", e)
-            FirebaseCrashlytics.getInstance().setCustomKey("community_deck_search_http_code", e.code())
-            val message = when (e.code()) {
+            FirebaseCrashlytics.getInstance().setCustomKey("community_deck_search_http_code", statusCode)
+            val message = when (statusCode) {
                 429 -> "Too many requests. Please try again later."
-                else -> "Search failed: ${e.code()}"
+                else -> "Search failed: $statusCode"
             }
             DataResult.Error(message)
         } catch (e: Exception) {
