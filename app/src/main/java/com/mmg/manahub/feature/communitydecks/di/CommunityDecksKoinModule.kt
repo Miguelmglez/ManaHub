@@ -2,13 +2,15 @@ package com.mmg.manahub.feature.communitydecks.di
 
 import android.content.Context
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.cache.CommunityDeckCache
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.network.ArchidektRequestQueue
 import com.mmg.manahub.core.data.remote.ArchidektClient
+import com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.communitydecks.data.CommunityDecksRepositoryImpl
-import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektRequestQueue
 import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.feature.communitydecks.data.CommunityDeckCacheImpl
 import com.mmg.manahub.feature.communitydecks.domain.usecase.GetCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.ImportCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
@@ -18,7 +20,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import okhttp3.Cache
 import okhttp3.logging.HttpLoggingInterceptor
@@ -76,14 +77,19 @@ fun communityDecksKoinModule(
     single { provideArchidektClient(androidContext()) }
     single { ArchidektRequestQueue() }
 
-    // ── Data layer. CommunityDeckCacheDao + DeckRepository + CardRepository resolve via get() ──
-    // (cache DAO from this module; DeckRepository + CardRepository from coreBridgeKoinModule).
+    // ── Cache abstraction (Room-backed on Android). ──
+    single<CommunityDeckCache> { CommunityDeckCacheImpl(cacheDao = get()) }
+
+    // ── Data layer. CommunityDeckCache + DeckRepository + CardRepository resolve via get() ──
+    // (cache from this module; DeckRepository + CardRepository from coreBridgeKoinModule;
+    //  CrashReporter + DispatcherProvider from coreBridgeKoinModule).
     single<CommunityDecksRepository> {
         CommunityDecksRepositoryImpl(
             api = get(),
             requestQueue = get(),
-            cacheDao = get(),
-            ioDispatcher = Dispatchers.IO,
+            cache = get(),
+            crashReporter = get(),
+            dispatcherProvider = get(),
         )
     }
 

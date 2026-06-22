@@ -1,5 +1,8 @@
 package com.mmg.manahub.app.di
 
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.common.DispatcherProvider
+import com.mmg.manahub.core.common.provideCrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -86,6 +89,10 @@ fun coreBridgeKoinModule(
     wishlistRepository: WishlistRepository,
     openForTradeRepository: OpenForTradeRepository,
 ): Module = module {
+    // ── KMP platform abstractions (not Hilt-owned — instantiated directly). ──
+    single<CrashReporter> { provideCrashReporter() }
+    single { DispatcherProvider() }
+
     // Shared across the Settings + Stats + Profile + Home + CommunityDecks + CardDetail + Friends +
     // Draft + Tournament + Trades islands — each registered exactly once.
     single { userPreferencesRepo }

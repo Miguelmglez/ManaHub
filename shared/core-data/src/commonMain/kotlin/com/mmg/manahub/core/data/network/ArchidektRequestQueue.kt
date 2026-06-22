@@ -1,8 +1,5 @@
-package com.mmg.manahub.feature.communitydecks.data.remote
+package com.mmg.manahub.core.data.network
 
-import com.mmg.manahub.core.data.network.RateLimitConfig
-import com.mmg.manahub.core.data.network.RateLimitedQueue
-import com.mmg.manahub.core.data.network.RetryDecision
 import io.ktor.client.plugins.ResponseException
 
 /**
