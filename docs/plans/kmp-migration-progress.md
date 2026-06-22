@@ -347,9 +347,22 @@ locale (Android DataStore). Additionally, `PushTokenRemoteDataSource` uses `Buil
 the migration plan). Creating 4+ interfaces + expect/actual pairs for a feature that won't exist on web
 is not cost-effective now — defer to Phase 4 (platform parity) when push notification scope is clearer.
 
+✅ **Phase 2 §9.6 — CommunityDecks domain models + repo interface + CachePolicy shared (GREEN,
+`c8b48cc`).** Prerequisite for moving `CommunityDecksRepositoryImpl`: all 6 domain models
+(`CommunityDeck`, `CommunityDeckOwner`, `CommunityDeckCard`, `CommunityDeckSearchResult`,
+`CommunityDeckSummary`, `ArchidektFormat`) → `:shared:core-model` (`core.model`);
+`CommunityDecksRepository` interface → `:shared:core-domain` (`core.domain.repository`);
+`CachePolicy` → `:shared:core-data` (`core.data.repository`, same package = 0 consumer import edits)
+with `System.currentTimeMillis()` → `kotlin.time.Clock.System` (KMP-safe, stdlib only). All pure
+Kotlin, no platform deps. 15 consumer imports updated (10 main + 3 test + repo interface + test).
+`DataResult` was already in `:shared:core-model`. Verified: `:app:assembleDebug` GREEN; all 3 shared
+`compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in
+`commonMain`.
+
 ➡️ **NEXT = Phase 2 §9.6 item 4 — continue moving repository impls to `commonMain`** (one repo per
 slice). Remaining candidates in approximate order of complexity:
-- `CommunityDecksRepositoryImpl` (Ktor-ready ArchidektClient + Room cache — needs DAO interface split)
+- `CommunityDecksRepositoryImpl` (Ktor-ready ArchidektClient + Room cache — needs DAO interface split;
+  domain models + interface NOW shared)
 - Repos with Room deps: `StatsRepositoryImpl`, `UserCardRepositoryImpl`, `CardRepositoryImpl`,
   `DeckRepositoryImpl` — need DAO interface in `commonMain` + web data source in `wasmJsMain`.
 
@@ -490,6 +503,15 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-22 — **Phase 2 §9.6: CommunityDecks domain models + repo interface + CachePolicy → shared
+  (GREEN, `c8b48cc`).** 8 files moved via `git mv`: 6 domain models to `:shared:core-model` (package
+  `core.model`), `CommunityDecksRepository` interface to `:shared:core-domain` (package
+  `core.domain.repository`), `CachePolicy` to `:shared:core-data` (same package `core.data.repository`
+  = 0 consumer import edits for CachePolicy). CachePolicy's `System.currentTimeMillis()` →
+  `kotlin.time.Clock.System.now().toEpochMilliseconds()` (`@OptIn(ExperimentalTime::class)`, no new
+  dependency). 15 consumer files updated (import rewrites). `DataResult` already shared. Verified:
+  `:app:assembleDebug` + 3 shared `compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (==
+  baseline); commonMain platform-import grep EMPTY. This unblocks `CommunityDecksRepositoryImpl` move.
 - 2026-06-22 — **Phase 2 §9.6 item 4: `NotificationPrefsRepositoryImpl` → `:shared:core-data` commonMain
   (GREEN, `ed6fea5`).** First repository implementation shared across Android + Web. The class uses only
   KMP-compatible Supabase SDK (postgrest + auth) so it moved cleanly. 3 platform deps fixed:
