@@ -348,37 +348,43 @@ the migration plan). Creating 4+ interfaces + expect/actual pairs for a feature 
 is not cost-effective now — defer to Phase 4 (platform parity) when push notification scope is clearer.
 
 ✅ **Phase 2 §9.6 — CommunityDecks domain models + repo interface + CachePolicy shared (GREEN,
-`c8b48cc`).** Prerequisite for moving `CommunityDecksRepositoryImpl`: all 6 domain models
-(`CommunityDeck`, `CommunityDeckOwner`, `CommunityDeckCard`, `CommunityDeckSearchResult`,
-`CommunityDeckSummary`, `ArchidektFormat`) → `:shared:core-model` (`core.model`);
-`CommunityDecksRepository` interface → `:shared:core-domain` (`core.domain.repository`);
-`CachePolicy` → `:shared:core-data` (`core.data.repository`, same package = 0 consumer import edits)
-with `System.currentTimeMillis()` → `kotlin.time.Clock.System` (KMP-safe, stdlib only). All pure
-Kotlin, no platform deps. 15 consumer imports updated (10 main + 3 test + repo interface + test).
-`DataResult` was already in `:shared:core-model`. Verified: `:app:assembleDebug` GREEN; all 3 shared
-`compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in
-`commonMain`.
+`c8b48cc`).** Prerequisite for moving `CommunityDecksRepositoryImpl` (see next entry).
 
-➡️ **NEXT = Phase 2 §9.6 item 4 — continue moving repository impls to `commonMain`** (one repo per
-slice). Remaining candidates in approximate order of complexity:
-- `CommunityDecksRepositoryImpl` (Ktor-ready ArchidektClient + Room cache — needs DAO interface split;
-  domain models + interface NOW shared)
-- Repos with Room deps: `StatsRepositoryImpl`, `UserCardRepositoryImpl`, `CardRepositoryImpl`,
-  `DeckRepositoryImpl` — need DAO interface in `commonMain` + web data source in `wasmJsMain`.
+✅ **Phase 2 §9.6 — `CommunityDecksRepositoryImpl` → `:shared:core-data` commonMain (GREEN,
+`b97550b`).** Established the **DAO-abstraction pattern** for future repo-impl moves: a
+`CommunityDeckCache` interface in `commonMain` (`core.data.cache`) abstracts the Room cache ops;
+`CommunityDeckCacheImpl` (Room-backed, in `:app` `feature/communitydecks/data/`) implements it and is
+Koin-injected. DTO→domain mappers split: pure mappers moved to shared (`core.data.remote.mapper`);
+Room-entity mapper stays in `:app`. `ArchidektRequestQueue` also moved to shared (`core.data.network`,
+was already a thin `RateLimitedQueue` wrapper). Repo impl stripped of `@Inject`/`@Singleton`/
+`@IoDispatcher` → plain ctor with `DispatcherProvider`. Verified: `:app:assembleDebug` GREEN;
+`:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0
+platform imports in `commonMain`.
 
-   Still-platform-bound use cases (move only after their deps move): `AddCardToCollectionUseCase`/
-   `CommitScannedCardsUseCase` (gamification `ProgressionEventBus` + `java.time`),
-   `RefreshCollectionPricesUseCase` (`ScryfallRemoteDataSource` + `System.currentTimeMillis`),
-   `GetDeckGameStatsUseCase` (Room DAOs + `UserPreferencesDataStore` + `toDomainCard` mapper),
-   `SyncManaSymbolsUseCase` (Room DAO + ScryfallClient), `AutoTagCardUseCase`/`ComputeCardTagsUseCase`
-   (`core.tagging.*` analyzers + `:app` mapper — move the tagging engine first).
+➡️ **NEXT = assess productive path forward for remaining Phase 2 data-layer work.** The 4 remaining
+shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
+abstraction in `commonMain` via the `CommunityDeckCache` pattern):
+- `StatsRepositoryImpl` (6 repo methods but StatsDao has ~21 query methods)
+- `UserCardRepositoryImpl` (14 methods, already interface-split for paging)
+- `DeckRepositoryImpl` (14 methods, DeckDao ~43 annotations)
+- `CardRepositoryImpl` (21 methods, CardDao ~41 annotations) — heaviest
+- `PushTokenRepositoryImpl` — deferred to Phase 4 (FCM/WorkManager, no web equivalent)
+
+**Three productive paths forward (not mutually exclusive):**
+1. **Move more use cases** — several are NOW UNBLOCKED by existing shared deps (Card/Deck/UserCard repos
+   + models are shared) but still platform-bound (`AddCardToCollectionUseCase`, `GetDeckGameStatsUseCase`,
+   `SyncManaSymbolsUseCase`, `AutoTagCardUseCase`/`ComputeCardTagsUseCase`, `RefreshCollectionPricesUseCase`,
+   `CommitScannedCardsUseCase`). Each needs its platform deps abstracted first.
+2. **Start web Spikes B & C** (Supabase/Ktor/Coil on wasmJs, web auth) — these validate the runtime
+   libraries the remaining repo impls will need on the web side, and were explicitly deferred to Phase 2.
+3. **Tackle `StatsRepositoryImpl`** (simplest remaining Room-coupled repo) to prove the DAO-abstraction
+   pattern at scale before the heavier Card/Deck/UserCard repos.
 
 **Phase 2 data-layer order (remaining):**
 4. **Repository impls to `commonMain`** — one repo per slice; **Room DAOs/
    entities/migrations STAY in `androidMain`** (no wasm target) with the DAO interface in `commonMain` and
-   a web data source (Supabase-remote + IndexedDB/localStorage) in `wasmJsMain`. Migrate **Retrofit → Ktor**
-   (js/wasm engine) and **Gson → kotlinx-serialization**; port the rate-limit queues
-   (`ScryfallRequestQueue`/`ArchidektRequestQueue`) to pure-coroutine `Mutex` impls in `commonMain`.
+   a web data source (Supabase-remote + IndexedDB/localStorage) in `wasmJsMain`. Retrofit → Ktor DONE.
+   Rate-limit queues (`ScryfallRequestQueue`/`ArchidektRequestQueue`) already ported to `commonMain`.
 3. **Fold in the deferred web spikes B & C here** (Supabase/Ktor/Coil on wasmJs; web auth) — they validate
    exactly the web-runtime libraries Phase 2's data layer introduces, so they belong in this phase.
 Definition of done per Phase-2 batch: Android stays shippable (compiles + 122/2 baseline), the wasmJs
@@ -503,6 +509,15 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-23 — **Phase 2 §9.6: `CommunityDecksRepositoryImpl` → `:shared:core-data` commonMain (GREEN,
+  `b97550b`).** Established the DAO-abstraction pattern: new `CommunityDeckCache` interface in
+  `commonMain` (`core.data.cache`) with `CommunityDeckCacheImpl` (Room-backed) in `:app`. Pure
+  DTO→domain mappers split to shared (`core.data.remote.mapper`); Room-entity mapper stays `:app`.
+  `ArchidektRequestQueue` moved to shared (`core.data.network`). Repo impl stripped of Hilt/Dagger
+  annotations → plain ctor with `DispatcherProvider`. Koin module updated (injects `CommunityDeckCache`
+  instead of raw DAO). 9 files changed. Verified: `:app:assembleDebug` + `core-data:compileKotlinWasmJs`
+  GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`. Next: assess
+  productive path for remaining heavy Room-coupled repo impls vs. use-case moves vs. web spikes B & C.
 - 2026-06-22 — **Phase 2 §9.6: CommunityDecks domain models + repo interface + CachePolicy → shared
   (GREEN, `c8b48cc`).** 8 files moved via `git mv`: 6 domain models to `:shared:core-model` (package
   `core.model`), `CommunityDecksRepository` interface to `:shared:core-domain` (package
