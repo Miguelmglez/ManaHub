@@ -6,7 +6,7 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.util.recordSafeNonFatal
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeck
 import kotlinx.coroutines.flow.first
 
 /**

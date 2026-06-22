@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.communitydecks.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Domain representation of a community deck fetched from Archidekt.

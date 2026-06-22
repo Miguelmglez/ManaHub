@@ -78,7 +78,7 @@ import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSummary
+import com.mmg.manahub.core.model.CommunityDeckSummary
 
 /**
  * Community Decks search / browse screen.

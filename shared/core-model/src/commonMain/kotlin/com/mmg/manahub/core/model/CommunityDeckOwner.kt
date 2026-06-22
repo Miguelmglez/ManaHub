@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.communitydecks.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * The author/owner of a community deck (Archidekt).

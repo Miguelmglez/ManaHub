@@ -6,9 +6,9 @@ import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckCard
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckOwner
+import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeckCard
+import com.mmg.manahub.core.model.CommunityDeckOwner
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify

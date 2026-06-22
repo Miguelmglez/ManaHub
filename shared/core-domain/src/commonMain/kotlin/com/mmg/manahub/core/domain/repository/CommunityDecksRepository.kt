@@ -1,8 +1,8 @@
-package com.mmg.manahub.feature.communitydecks.domain.repository
+package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeckSearchResult
+import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeckSearchResult
 
 /**
  * Contract for fetching community decks (Archidekt).

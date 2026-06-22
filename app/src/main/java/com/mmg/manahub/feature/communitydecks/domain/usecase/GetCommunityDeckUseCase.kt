@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.communitydecks.domain.usecase
 
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
-import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 
 /**
  * Fetches the full detail of a single community deck (Archidekt) by its numeric id.

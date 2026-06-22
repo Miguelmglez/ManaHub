@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.communitydecks.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * A single card entry inside a [CommunityDeck].

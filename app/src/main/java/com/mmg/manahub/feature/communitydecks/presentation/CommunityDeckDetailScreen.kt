@@ -53,7 +53,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
-import com.mmg.manahub.feature.communitydecks.domain.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.feature.communitydecks.presentation.components.CommunityDeckAttribution
 import com.mmg.manahub.feature.communitydecks.presentation.components.communityDeckCardItems
 

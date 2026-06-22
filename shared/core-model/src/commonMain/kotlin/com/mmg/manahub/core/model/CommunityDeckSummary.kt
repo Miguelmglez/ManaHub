@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.communitydecks.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Lightweight domain model for a community deck shown in search/browse results.

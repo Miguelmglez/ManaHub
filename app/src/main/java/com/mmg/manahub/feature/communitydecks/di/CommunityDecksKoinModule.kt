@@ -8,7 +8,7 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.communitydecks.data.CommunityDecksRepositoryImpl
 import com.mmg.manahub.feature.communitydecks.data.remote.ArchidektRequestQueue
-import com.mmg.manahub.feature.communitydecks.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.feature.communitydecks.domain.usecase.GetCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.ImportCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase

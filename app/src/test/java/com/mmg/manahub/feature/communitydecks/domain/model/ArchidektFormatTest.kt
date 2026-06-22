@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.communitydecks.domain.model
 
+import com.mmg.manahub.core.model.ArchidektFormat
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
