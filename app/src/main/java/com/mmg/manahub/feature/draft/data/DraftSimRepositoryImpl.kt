@@ -11,7 +11,7 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
+import com.mmg.manahub.core.data.remote.CloudflareContentClient
 import com.mmg.manahub.feature.draft.data.remote.dto.BoosterConfigDto
 import com.mmg.manahub.feature.draft.data.remote.dto.EngineConfigDto
 import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
@@ -55,7 +55,7 @@ import javax.inject.Singleton
 @Singleton
 class DraftSimRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val cloudflareApi: CloudflareContentApi,
+    private val cloudflareClient: CloudflareContentClient,
     private val getDraftableSets: GetDraftableSetsUseCase,
     private val getSetTierList: GetSetTierListUseCase,
     private val getSetCardsPage: GetSetCardsPageUseCase,
@@ -153,10 +153,11 @@ class DraftSimRepositoryImpl @Inject constructor(
                 }
 
                 // 4. Fetch and parse booster.json.
-                val boosterConfig = parseBoosterConfig(
-                    cloudflareApi.getSetBooster(setCode.lowercase()),
-                    setCode,
+                val boosterJson = gson.fromJson(
+                    cloudflareClient.getSetBooster(setCode.lowercase()),
+                    JsonObject::class.java,
                 )
+                val boosterConfig = parseBoosterConfig(boosterJson, setCode)
 
                 // 5. Assemble.
                 val draftableSet = DraftableSet(
@@ -196,7 +197,11 @@ class DraftSimRepositoryImpl @Inject constructor(
             // heuristic without re-fetching. A duplicate concurrent fetch of the SAME code is
             // acceptable (idempotent); whichever result is stored first wins.
             val config = try {
-                parseEngineConfig(cloudflareApi.getSetEngine(code), code)
+                val engineJson = gson.fromJson(
+                    cloudflareClient.getSetEngine(code),
+                    JsonObject::class.java,
+                )
+                parseEngineConfig(engineJson, code)
             } catch (e: Exception) {
                 null
             }

@@ -22,6 +22,7 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -55,6 +56,11 @@ kotlin {
                 // Cross-cutting contracts (DispatcherProvider, KeyValueStore, CrashReporter).
                 implementation(project(":shared:core-common"))
                 implementation(libs.coroutines.core)
+                // Ktor (Retrofit→Ktor migration, §9.6 Recipe 5).
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         commonTest {
@@ -64,10 +70,16 @@ kotlin {
         }
         // androidMain / wasmJsMain intentionally have minimal code yet (placeholders for future actuals).
         androidMain {
-            dependencies {}
+            dependencies {
+                // OkHttp engine — reuses the existing OkHttp stack on Android.
+                implementation(libs.ktor.client.okhttp)
+            }
         }
         wasmJsMain {
-            dependencies {}
+            dependencies {
+                // JS/Wasm engine for browser targets.
+                implementation(libs.ktor.client.js)
+            }
         }
     }
 }

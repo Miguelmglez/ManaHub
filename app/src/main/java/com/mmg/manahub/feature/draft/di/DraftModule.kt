@@ -11,8 +11,12 @@ import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
-import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
+import com.mmg.manahub.core.data.remote.CloudflareContentClient
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import com.mmg.manahub.feature.draft.data.remote.YouTubeApiKeyInterceptor
 import com.mmg.manahub.feature.draft.domain.engine.BoosterGenerator
 import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
@@ -32,7 +36,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.File
 import java.io.IOException
@@ -121,72 +124,88 @@ abstract class DraftModule {
             retrofit.create(YouTubeApi::class.java)
 
         // -----------------------------------------------------------------------
-        // Cloudflare Worker
+        // Cloudflare Worker (Ktor — KMP migration §9.6)
         // -----------------------------------------------------------------------
 
         /**
-         * Dedicated OkHttpClient for the Cloudflare Worker.
-         * - 30 s read timeout: tier-list files can be ~70 KB on slow connections.
-         * - 5 MB response-size guard: rejects unexpectedly large bodies before Gson
-         *   allocates memory for them, protecting against OOM on misconfigured or
-         *   tampered responses.
+         * Dedicated Ktor [HttpClient] for the Cloudflare Worker, using the OkHttp
+         * engine so the existing interceptor stack is preserved:
+         * - User-Agent header
+         * - HTTP logging (BODY in debug, NONE in release)
+         * - 10 MB disk cache at `cacheDir/http_cache_cloudflare`
+         * - 5 MB response-size guard (network interceptor)
+         * - 30 s read timeout
+         *
+         * Built from scratch — must NOT inherit the global OkHttpClient whose
+         * network interceptor forces Cache-Control: max-age=86400, which would
+         * silently override the Worker's max-age=300 and break version-based
+         * cache invalidation.
          */
         @Provides
         @Singleton
         @Named("cloudflare")
-        fun provideCloudflareRetrofit(@ApplicationContext context: Context): Retrofit {
-            // Built from scratch — must NOT inherit the global OkHttpClient whose
-            // network interceptor forces Cache-Control: max-age=86400, which would
-            // silently override the Worker's max-age=300 and break version-based cache invalidation.
-            val cloudflareClient = OkHttpClient.Builder()
-                .readTimeout(30, TimeUnit.SECONDS)
-                .addInterceptor { chain ->
-                    val request = chain.request().newBuilder()
-                        .header("User-Agent", "ManaHub/1.0 Android")
-                        .build()
-                    chain.proceed(request)
-                }
-                .addInterceptor(HttpLoggingInterceptor().apply {
-                    level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
-                            else HttpLoggingInterceptor.Level.NONE
-                })
-                .cache(Cache(File(context.cacheDir, "http_cache_cloudflare"), 10L * 1024 * 1024))
-                .addNetworkInterceptor { chain ->
-                    val response = chain.proceed(chain.request())
-                    val contentLength = response.header("Content-Length")?.toLongOrNull()
-                    // Guard 1: reject early if Content-Length already exceeds limit
-                    if (contentLength != null && contentLength > MAX_RESPONSE_BYTES) {
-                        response.close()
-                        throw IOException(
-                            "Cloudflare response too large: ${contentLength / 1024} KB " +
-                                "(limit ${MAX_RESPONSE_BYTES / 1024 / 1024} MB)"
+        fun provideCloudflareHttpClient(
+            @ApplicationContext context: Context,
+        ): HttpClient {
+            return HttpClient(OkHttp) {
+                engine {
+                    config {
+                        readTimeout(30, TimeUnit.SECONDS)
+                        addInterceptor { chain ->
+                            val request = chain.request().newBuilder()
+                                .header("User-Agent", "ManaHub/1.0 Android")
+                                .build()
+                            chain.proceed(request)
+                        }
+                        addInterceptor(HttpLoggingInterceptor().apply {
+                            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                                    else HttpLoggingInterceptor.Level.NONE
+                        })
+                        cache(
+                            Cache(
+                                File(context.cacheDir, "http_cache_cloudflare"),
+                                10L * 1024 * 1024,
+                            ),
                         )
+                        addNetworkInterceptor { chain ->
+                            val response = chain.proceed(chain.request())
+                            val contentLength = response.header("Content-Length")?.toLongOrNull()
+                            // Guard 1: reject early if Content-Length already exceeds limit
+                            if (contentLength != null && contentLength > MAX_RESPONSE_BYTES) {
+                                response.close()
+                                throw IOException(
+                                    "Cloudflare response too large: ${contentLength / 1024} KB " +
+                                        "(limit ${MAX_RESPONSE_BYTES / 1024 / 1024} MB)"
+                                )
+                            }
+                            // Guard 2: for chunked/unknown-length responses, pre-buffer up to
+                            // limit+1 bytes so we can detect overflow before the body is parsed.
+                            val body = response.body
+                            val source = body.source()
+                            source.request(MAX_RESPONSE_BYTES + 1)
+                            if (source.buffer.size > MAX_RESPONSE_BYTES) {
+                                body.close()
+                                throw IOException(
+                                    "Cloudflare response exceeds " +
+                                        "${MAX_RESPONSE_BYTES / 1024 / 1024} MB limit"
+                                )
+                            }
+                            response
+                        }
                     }
-                    // Guard 2: for chunked/unknown-length responses, pre-buffer up to limit+1
-                    // bytes so we can detect overflow before Gson allocates memory for the body.
-                    val body = response.body
-                    val source = body.source()
-                    source.request(MAX_RESPONSE_BYTES + 1)
-                    if (source.buffer.size > MAX_RESPONSE_BYTES) {
-                        body.close()
-                        throw IOException(
-                            "Cloudflare response exceeds ${MAX_RESPONSE_BYTES / 1024 / 1024} MB limit"
-                        )
-                    }
-                    response
                 }
-                .build()
-            return Retrofit.Builder()
-                .baseUrl(BuildConfig.CLOUDFLARE_WORKER_URL)
-                .client(cloudflareClient)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
+                install(ContentNegotiation) {
+                    json(Json { ignoreUnknownKeys = true })
+                }
+            }
         }
 
         @Provides
         @Singleton
-        fun provideCloudflareContentApi(@Named("cloudflare") retrofit: Retrofit): CloudflareContentApi =
-            retrofit.create(CloudflareContentApi::class.java)
+        fun provideCloudflareContentClient(
+            @Named("cloudflare") httpClient: HttpClient,
+        ): CloudflareContentClient =
+            CloudflareContentClient(httpClient, BuildConfig.CLOUDFLARE_WORKER_URL)
 
         // -----------------------------------------------------------------------
         // Draft content version preferences
