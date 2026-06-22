@@ -11,7 +11,7 @@ import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.SetType
 import com.mmg.manahub.core.network.ScryfallCache
-import com.mmg.manahub.core.network.ScryfallRequestQueue
+import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject

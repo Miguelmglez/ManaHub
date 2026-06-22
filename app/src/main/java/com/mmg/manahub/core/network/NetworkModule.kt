@@ -2,6 +2,7 @@ package com.mmg.manahub.core.network
 
 import android.content.Context
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import dagger.Module
 import dagger.Provides
@@ -98,4 +99,7 @@ object NetworkModule {
     @Provides @Singleton
     fun provideScryfallClient(@Named("scryfall") httpClient: HttpClient): ScryfallClient =
         ScryfallClient(httpClient, "https://api.scryfall.com/")
+
+    @Provides @Singleton
+    fun provideScryfallRequestQueue(): ScryfallRequestQueue = ScryfallRequestQueue()
 }

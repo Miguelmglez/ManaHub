@@ -22,7 +22,7 @@ import io.ktor.http.contentType
  * Replaces the Retrofit [ScryfallApi] interface as part of the KMP migration.
  * Lives in `commonMain` so it can be shared across Android and Web targets.
  * All calls are plain suspend functions -- rate-limiting is handled externally by
- * [com.mmg.manahub.core.network.ScryfallRequestQueue].
+ * [com.mmg.manahub.core.data.network.ScryfallRequestQueue].
  *
  * @param httpClient Ktor [HttpClient] preconfigured with content negotiation
  *   (kotlinx.serialization JSON) and, on Android, the OkHttp engine with caching/logging.

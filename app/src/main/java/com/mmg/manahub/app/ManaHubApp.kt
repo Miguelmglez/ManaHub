@@ -38,7 +38,7 @@ import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
-import com.mmg.manahub.core.domain.usecase.symbols.SyncManaSymbolsUseCase
+import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
