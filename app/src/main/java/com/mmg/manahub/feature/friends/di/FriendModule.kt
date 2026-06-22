@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.friends.di
 
-import com.mmg.manahub.feature.friends.data.remote.FriendshipService
+import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.feature.friends.data.repository.FriendRepositoryImpl
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import dagger.Binds
@@ -8,7 +9,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import retrofit2.Retrofit
+import io.ktor.client.HttpClient
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -21,10 +22,18 @@ abstract class FriendModule {
     abstract fun bindFriendRepository(impl: FriendRepositoryImpl): FriendRepository
 
     companion object {
+
+        /**
+         * Provides the [FriendshipClient] (Ktor-based) that replaces the old
+         * Retrofit [FriendshipService] for all friendship/referral/stats PostgREST calls.
+         */
         @Provides
         @Singleton
-        fun provideFriendshipService(
-            @Named("supabase") retrofit: Retrofit,
-        ): FriendshipService = retrofit.create(FriendshipService::class.java)
+        fun provideFriendshipClient(
+            @Named("supabaseKtor") httpClient: HttpClient,
+        ): FriendshipClient = FriendshipClient(
+            httpClient = httpClient,
+            baseUrl = "${BuildConfig.SUPABASE_URL}/rest/v1/",
+        )
     }
 }
