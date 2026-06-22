@@ -41,7 +41,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -67,7 +67,7 @@ fun CardFullScreenDialog(
     )
 
     val displayImage = if (showingBack && card.cardFaces != null) {
-        card.imageBackNormal ?: card.cardFaces.getOrNull(1)?.imageNormal
+        card.imageBackNormal ?: card.cardFaces?.getOrNull(1)?.imageNormal
     } else {
         card.imageNormal
     }
@@ -120,9 +120,9 @@ fun CardFullScreenDialog(
                                 color    = mc.textPrimary,
                                 modifier = Modifier.weight(1f),
                             )
-                            if (card.manaCost != null) {
+                            card.manaCost?.let { manaCost ->
                                 Text(
-                                    text  = card.manaCost,
+                                    text  = manaCost,
                                     style = ty.bodySmall,
                                     color = mc.textSecondary,
                                 )

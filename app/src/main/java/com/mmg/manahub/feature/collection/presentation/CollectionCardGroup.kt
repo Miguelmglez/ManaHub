@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.collection.presentation
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 
 /**

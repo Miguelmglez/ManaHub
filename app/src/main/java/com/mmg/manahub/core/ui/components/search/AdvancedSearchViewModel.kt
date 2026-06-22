@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.SearchCriterion

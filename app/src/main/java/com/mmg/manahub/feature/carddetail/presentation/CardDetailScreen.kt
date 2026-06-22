@@ -99,13 +99,13 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.SuggestedTag
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.SuggestedTag
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.ui.components.AddCardSheet
@@ -587,12 +587,12 @@ private fun CardDetailContent(
                 face != null -> {
                     when {
                         face.power != null && face.toughness != null -> "${face.power}/${face.toughness}"
-                        face.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, face.loyalty)
+                        face.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, face.loyalty!!)
                         else -> null
                     }
                 }
                 card.power != null && card.toughness != null -> "${card.power}/${card.toughness}"
-                card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty)
+                card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty!!)
                 else -> null
             }
 

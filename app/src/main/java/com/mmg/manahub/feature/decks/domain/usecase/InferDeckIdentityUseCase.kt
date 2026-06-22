@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
 import javax.inject.Inject

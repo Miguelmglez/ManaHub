@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.TagCategory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
@@ -264,7 +264,7 @@ class BuildDeckFromSeedsUseCaseTest {
         val duplicateSeed = card(
             id = "dup-seed",
             name = "Clone Seed",
-            tags = listOf(com.mmg.manahub.core.domain.model.CardTag.COUNTERSPELL),
+            tags = listOf(com.mmg.manahub.core.model.CardTag.COUNTERSPELL),
             colorIdentity = listOf("U"),
         )
         coEvery { candidatePool(any(), any(), any(), any()) } returns emptyList()

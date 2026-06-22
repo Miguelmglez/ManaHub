@@ -6,7 +6,7 @@ import com.mmg.manahub.core.data.remote.dto.CardDto
 import com.mmg.manahub.core.data.remote.dto.CardIdentifierDto
 import com.mmg.manahub.core.data.remote.dto.SearchResultDto
 import com.mmg.manahub.core.data.remote.mapper.toDomain
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.SetType

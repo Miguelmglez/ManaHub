@@ -84,7 +84,7 @@ class SuggestAddsWithBudgetUseCaseTest {
                 limit = any(),
             )
         } answers {
-            val candidates = firstArg<List<com.mmg.manahub.core.domain.model.Card>>()
+            val candidates = firstArg<List<com.mmg.manahub.core.model.Card>>()
             val ownedIds = thirdArg<Set<String>>()
             val limit = arg<Int>(4)
             candidates.take(limit).map { c ->

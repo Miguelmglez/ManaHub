@@ -1,9 +1,9 @@
 package com.mmg.manahub.core.tagging
 
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.SuggestedTag
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.SuggestedTag
+import com.mmg.manahub.core.model.TagCategory
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Three independent analyzers feed [SuggestTagsUseCase].

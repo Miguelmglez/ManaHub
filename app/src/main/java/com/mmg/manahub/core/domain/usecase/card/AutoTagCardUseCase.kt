@@ -1,8 +1,8 @@
 package com.mmg.manahub.core.domain.usecase.card
 
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.SuggestedTag
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.tagging.GameChangerAnalyzer
 import com.mmg.manahub.core.tagging.KeywordAnalyzer
 import com.mmg.manahub.core.tagging.StrategyAnalyzer

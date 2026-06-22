@@ -413,7 +413,7 @@ private fun ViewStepContent(
     onAddBasicLands: () -> Unit,
     onChooseCommander: () -> Unit,
     onReviewSurvey: (Long) -> Unit,
-    onReplaceCard: (com.mmg.manahub.core.domain.model.Card) -> Unit,
+    onReplaceCard: (com.mmg.manahub.core.model.Card) -> Unit,
     deckStats: com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase.Result?,
     playerName: String,
     modifier: Modifier = Modifier,
@@ -758,12 +758,12 @@ private fun CardDetailSheet(
      * buttons are shown instead.
      */
     isCommanderSelectionContext: Boolean,
-    tags: List<com.mmg.manahub.core.domain.model.CardTag>,
+    tags: List<com.mmg.manahub.core.model.CardTag>,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onDelete: () -> Unit,
     /** Called with the resolved Card when the user taps "Choose as commander". */
-    onChooseAsCommander: (com.mmg.manahub.core.domain.model.Card) -> Unit,
+    onChooseAsCommander: (com.mmg.manahub.core.model.Card) -> Unit,
     /** Called when the user taps "Remove commander" inside the commander-selection context. */
     onRemoveCommander: () -> Unit,
     onDismiss: () -> Unit,

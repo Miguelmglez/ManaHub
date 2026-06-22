@@ -1,4 +1,4 @@
-package com.mmg.manahub.core.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * A tag that the auto-tagging engine believes *might* apply to a card,

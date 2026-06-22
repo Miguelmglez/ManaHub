@@ -2,13 +2,13 @@ package com.mmg.manahub.util
 
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.model.AppLanguage
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardLanguage
-import com.mmg.manahub.core.domain.model.CardTag
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.domain.model.UserCard
 import com.mmg.manahub.core.domain.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserPreferences

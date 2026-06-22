@@ -5,7 +5,7 @@ import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.SessionSummary
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase.Companion.RECENT_SESSIONS_LIMIT
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase.Companion.TOP_CARDS_LIMIT
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase.Companion.WEAK_CARDS_LIMIT

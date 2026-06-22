@@ -72,7 +72,7 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.MagicProgressBar
@@ -450,8 +450,10 @@ private fun SearchResultItem(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 val frontFace = card.cardFaces?.firstOrNull()
+                val printedName = card.printedName
+                val printedTypeLine = card.printedTypeLine
                 CardName(
-                    name = frontFace?.name ?: if (card.printedName.isNullOrEmpty()) card.name else card.printedName,
+                    name = frontFace?.name ?: if (printedName.isNullOrEmpty()) card.name else printedName,
                     showFrontOnly = true,
                     style = ty.bodyMedium,
                     color = mc.textPrimary,
@@ -459,7 +461,7 @@ private fun SearchResultItem(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = frontFace?.typeLine ?: if (card.printedTypeLine.isNullOrEmpty()) card.typeLine else card.printedTypeLine,
+                    text = frontFace?.typeLine ?: if (printedTypeLine.isNullOrEmpty()) card.typeLine else printedTypeLine,
                     style = ty.bodySmall,
                     color = mc.textSecondary,
                     maxLines = 1,

@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.playtest.domain.model
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 
 // ── Ephemeral state models (never persisted until user taps "Guardar test") ───
 

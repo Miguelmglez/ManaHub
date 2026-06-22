@@ -1155,7 +1155,7 @@ class HomeViewModelTest {
             id = "w1", userId = "u1", cardId = "c1", quantity = 1,
             matchAnyVariant = false, isFoil = false, condition = "NM", language = "en",
             createdAt = 123L,
-            card = com.mmg.manahub.core.domain.model.Card(
+            card = com.mmg.manahub.core.model.Card(
                 scryfallId = "c1", name = "Black Lotus", printedName = null,
                 manaCost = "{0}", cmc = 0.0, colors = emptyList(), colorIdentity = emptyList(),
                 typeLine = "Artifact", printedTypeLine = null, oracleText = null,
@@ -1471,7 +1471,7 @@ class HomeViewModelTest {
         coVerify(exactly = 1) { userPrefsDataStore.resetNewsFilters() }
     }
 
-    private fun discoverCard(id: String) = com.mmg.manahub.core.domain.model.Card(
+    private fun discoverCard(id: String) = com.mmg.manahub.core.model.Card(
         scryfallId = id, name = "Card $id", printedName = null,
         manaCost = "{1}", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList(),
         typeLine = "Creature", printedTypeLine = null, oracleText = null,

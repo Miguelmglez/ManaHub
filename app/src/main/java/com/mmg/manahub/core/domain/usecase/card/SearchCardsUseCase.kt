@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.domain.usecase.card
 
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import javax.inject.Inject

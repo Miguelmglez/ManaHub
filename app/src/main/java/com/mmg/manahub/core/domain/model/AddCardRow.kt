@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.domain.model
+import com.mmg.manahub.core.model.Card
 
 /**
  * Represents a card slot inside a persisted deck with the full card data.

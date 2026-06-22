@@ -1,9 +1,9 @@
 package com.mmg.manahub.core.domain.usecase.card
 
 import com.mmg.manahub.core.data.local.mapper.toTagList
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.SuggestedTag
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.SuggestedTag
 import javax.inject.Inject
 
 /**

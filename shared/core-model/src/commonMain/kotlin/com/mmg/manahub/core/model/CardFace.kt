@@ -1,4 +1,4 @@
-package com.mmg.manahub.core.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Represents one face of a double-faced card (DFC), meld card, or any other

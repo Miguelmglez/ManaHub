@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.scanner.domain.model
 
 import android.graphics.PointF
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 
 /**
  * Represents the outcome of a single frame processed by [CardRecognizer].

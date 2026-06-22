@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
@@ -247,7 +247,7 @@ class CandidatePoolGenerator @Inject constructor(
         const val EXCLUDE_BASICS = "-t:basic"
 
         /**
-         * Fixed allowlist mapping a STRATEGY fingerprint key (a [com.mmg.manahub.core.domain.model.CardTag]
+         * Fixed allowlist mapping a STRATEGY fingerprint key (a [com.mmg.manahub.core.model.CardTag]
          * STRATEGY key) to its Scryfall oracle tag. Only strategies with a well-known, verified oracle
          * tag are included — any other dominant strategy simply produces no extra query (we never guess
          * an `otag:` from an arbitrary key). CONSTANTS only — the query-safety guard depends on this map
