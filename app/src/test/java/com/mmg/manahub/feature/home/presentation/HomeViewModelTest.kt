@@ -38,8 +38,8 @@ import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
-import com.mmg.manahub.core.domain.model.WishlistEntry
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

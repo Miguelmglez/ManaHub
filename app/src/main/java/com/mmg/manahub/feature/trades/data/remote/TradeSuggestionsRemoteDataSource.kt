@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.trades.data.remote
 
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.trades.data.remote.dto.TradeSuggestionDto
+import com.mmg.manahub.core.data.remote.dto.TradeSuggestionDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineDispatcher

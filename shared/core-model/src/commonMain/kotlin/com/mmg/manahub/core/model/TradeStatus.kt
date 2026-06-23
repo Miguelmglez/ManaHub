@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.trades.domain.model
+package com.mmg.manahub.core.model
 
 /** Represents every state a trade proposal can occupy in the server state machine. */
 enum class TradeStatus {

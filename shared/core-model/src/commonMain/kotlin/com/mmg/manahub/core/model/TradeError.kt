@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.trades.domain.model
+package com.mmg.manahub.core.model
 
 /** Typed domain errors raised by the Supabase trade state machine. */
 sealed class TradeError : Exception() {

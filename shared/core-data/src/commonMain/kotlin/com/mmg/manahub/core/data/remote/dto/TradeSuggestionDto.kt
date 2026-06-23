@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.trades.data.remote.dto
+package com.mmg.manahub.core.data.remote.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

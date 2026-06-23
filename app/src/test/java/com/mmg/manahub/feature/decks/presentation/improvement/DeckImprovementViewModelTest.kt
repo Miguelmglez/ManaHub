@@ -64,7 +64,7 @@ class DeckImprovementViewModelTest {
     private val deckRepository = mockk<DeckRepository>(relaxed = true)
     private val cardRepository = mockk<CardRepository>()
     private val userCardRepository = mockk<UserCardRepository>()
-    private val wishlistRepository = mockk<com.mmg.manahub.feature.trades.domain.repository.WishlistRepository>()
+    private val wishlistRepository = mockk<com.mmg.manahub.core.domain.repository.WishlistRepository>()
     private val userPreferences = mockk<UserPreferencesDataStore>()
 
     // Real engine + use cases (the wiring under test).

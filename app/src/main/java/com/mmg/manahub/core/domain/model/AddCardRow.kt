@@ -1,5 +1,8 @@
 package com.mmg.manahub.core.domain.model
+
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.WishlistEntry
 
 /**
  * Represents a card slot inside a persisted deck with the full card data.

@@ -12,7 +12,7 @@ import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
 import com.mmg.manahub.feature.friends.domain.model.FriendStats
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
+import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

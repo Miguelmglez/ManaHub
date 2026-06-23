@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.trades.domain.model
 
+import com.mmg.manahub.core.model.TradeError
+import com.mmg.manahub.core.model.parseTradeError
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

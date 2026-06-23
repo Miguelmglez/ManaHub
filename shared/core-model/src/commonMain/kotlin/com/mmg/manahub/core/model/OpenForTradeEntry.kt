@@ -1,5 +1,4 @@
-package com.mmg.manahub.core.domain.model
-import com.mmg.manahub.core.model.Card
+package com.mmg.manahub.core.model
 
 data class OpenForTradeEntry(
     val id: String,

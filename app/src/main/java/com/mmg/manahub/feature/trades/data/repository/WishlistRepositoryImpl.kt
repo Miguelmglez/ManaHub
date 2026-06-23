@@ -5,9 +5,9 @@ import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistWithCard
 import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.feature.trades.data.remote.WishlistRemoteDataSource
-import com.mmg.manahub.feature.trades.data.remote.dto.WishlistEntryDto
-import com.mmg.manahub.core.domain.model.WishlistEntry
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
+import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex

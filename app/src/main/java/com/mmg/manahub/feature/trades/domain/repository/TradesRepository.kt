@@ -1,10 +1,9 @@
 package com.mmg.manahub.feature.trades.domain.repository
 
-import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
+import com.mmg.manahub.core.data.remote.dto.TradeItemRequestDto
+import com.mmg.manahub.core.model.ReviewFlags
+import com.mmg.manahub.core.model.TradeProposal
 import kotlinx.coroutines.flow.Flow
-
-data class ReviewFlags(val fromProposer: Boolean, val fromReceiver: Boolean)
 
 interface TradesRepository {
     fun observeActiveProposals(): Flow<List<TradeProposal>>

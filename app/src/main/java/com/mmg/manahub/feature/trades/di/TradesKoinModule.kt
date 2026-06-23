@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.trades.di
 
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
-import com.mmg.manahub.feature.trades.domain.repository.SharedListsRepository
+import com.mmg.manahub.core.domain.repository.SharedListsRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase

@@ -17,7 +17,7 @@ import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.H
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.PREF_FILE
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.PREF_KEY_QUEUE
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.STABILITY_FRAMES
-import com.mmg.manahub.core.domain.model.WishlistEntry
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext

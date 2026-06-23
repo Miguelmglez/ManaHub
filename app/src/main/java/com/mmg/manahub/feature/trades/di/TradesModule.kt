@@ -5,11 +5,11 @@ import com.mmg.manahub.feature.trades.data.repository.SharedListsRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.TradeSuggestionsRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.TradesRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.WishlistRepositoryImpl
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.SharedListsRepository
-import com.mmg.manahub.feature.trades.domain.repository.TradeSuggestionsRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.SharedListsRepository
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

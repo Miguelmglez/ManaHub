@@ -1,5 +1,4 @@
-package com.mmg.manahub.core.domain.model
-import com.mmg.manahub.core.model.Card
+package com.mmg.manahub.core.model
 
 /** A card a user wants to acquire via trade. */
 data class WishlistEntry(

@@ -17,9 +17,9 @@ import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import org.koin.core.module.Module
 import org.koin.dsl.module
 

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.trades.domain.model
+package com.mmg.manahub.core.model
 
 /** A versioned trade proposal between two users, containing a list of [TradeItem]s. */
 data class TradeProposal(
