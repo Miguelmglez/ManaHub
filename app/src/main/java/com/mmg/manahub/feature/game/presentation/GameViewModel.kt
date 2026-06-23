@@ -34,9 +34,9 @@ import com.mmg.manahub.feature.game.domain.model.EliminationReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GamePhase
 import com.mmg.manahub.feature.game.domain.model.GameResult
-import com.mmg.manahub.feature.game.domain.model.GridSlotPosition
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
+import com.mmg.manahub.core.model.GridSlotPosition
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.PhaseStop
 import com.mmg.manahub.feature.game.domain.model.Player
 import com.mmg.manahub.feature.game.domain.model.PlayerResult

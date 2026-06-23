@@ -22,7 +22,7 @@ import com.mmg.manahub.core.gamification.domain.repository.GamificationRepositor
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.settings.presentation.PreferencesState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel

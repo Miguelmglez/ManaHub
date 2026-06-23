@@ -56,9 +56,9 @@ import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendRequest
-import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendRequest
+import com.mmg.manahub.core.model.OutgoingFriendRequest
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

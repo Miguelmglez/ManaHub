@@ -38,8 +38,8 @@ import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendMatchHistory
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import java.time.Instant

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.friends.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Result returned by the `accept_invite` Supabase RPC.

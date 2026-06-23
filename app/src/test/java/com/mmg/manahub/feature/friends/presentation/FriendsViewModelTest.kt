@@ -7,9 +7,9 @@ import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.OutgoingFriendRequest
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import io.mockk.coEvery

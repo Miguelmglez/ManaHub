@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.friends.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Domain model representing a single card entry from a friend's list

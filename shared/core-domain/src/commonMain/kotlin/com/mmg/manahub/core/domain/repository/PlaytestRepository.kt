@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.playtest.domain.repository
+package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.PlaytestSurveyAnswers
 import kotlinx.coroutines.flow.Flow

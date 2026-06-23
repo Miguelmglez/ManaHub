@@ -6,7 +6,7 @@ import com.mmg.manahub.core.data.local.entity.PlaytestCardStatEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSessionEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSurveyAnswerEntity
 import com.mmg.manahub.core.model.PlaytestSurveyAnswers
-import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext

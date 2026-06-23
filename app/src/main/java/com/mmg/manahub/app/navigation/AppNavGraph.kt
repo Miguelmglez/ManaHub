@@ -63,8 +63,8 @@ import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.presentation.GamePlayScreen
 import com.mmg.manahub.feature.game.presentation.GameSettings
 import com.mmg.manahub.feature.game.presentation.GameSetupScreen

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.friends.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Domain model representing a snapshot of a friend's collection statistics,

@@ -14,7 +14,7 @@ import com.mmg.manahub.core.gamification.domain.repository.GamificationRepositor
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.repository.DraftRepository
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository

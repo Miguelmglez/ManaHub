@@ -11,9 +11,9 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.model.TradeSide
 import com.mmg.manahub.core.model.WishlistEntry

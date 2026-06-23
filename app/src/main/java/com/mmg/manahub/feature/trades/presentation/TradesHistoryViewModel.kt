@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.toUserFacingMessage

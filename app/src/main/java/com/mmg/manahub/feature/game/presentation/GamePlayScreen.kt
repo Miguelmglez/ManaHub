@@ -132,15 +132,16 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.game.domain.model.CounterIconKey
+import com.mmg.manahub.core.model.CounterIconKey
+import com.mmg.manahub.core.model.PlayerSlot
 import com.mmg.manahub.feature.game.domain.model.CounterType
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.feature.game.domain.model.GridSlotPosition
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
+import com.mmg.manahub.core.model.GridSlotPosition
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.Player
-import com.mmg.manahub.feature.game.domain.model.ScreenedGridSlotPosition
-import com.mmg.manahub.feature.game.domain.model.toDefaultDegrees
+import com.mmg.manahub.core.model.ScreenedGridSlotPosition
+import com.mmg.manahub.core.model.toDefaultDegrees
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -2347,7 +2348,7 @@ private fun MiniGamePlayerGrid(
 
 @Composable
 private fun MiniPlayerSlot(
-    slot: com.mmg.manahub.feature.game.domain.model.PlayerSlot,
+    slot: PlayerSlot,
     players: List<Player>,
     gridAssignment: Map<Int, Int>,
     isSelected: Boolean,

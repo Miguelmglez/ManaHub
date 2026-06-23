@@ -13,7 +13,7 @@ import androidx.work.WorkerParameters
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first

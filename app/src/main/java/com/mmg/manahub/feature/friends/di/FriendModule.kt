@@ -4,7 +4,7 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.feature.friends.data.repository.FriendRepositoryImpl
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
