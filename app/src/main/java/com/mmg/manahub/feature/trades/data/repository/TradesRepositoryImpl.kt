@@ -4,7 +4,7 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.feature.trades.data.remote.TradesRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.TradeItemDto
 import com.mmg.manahub.core.data.remote.dto.TradeItemRequestDto
 import com.mmg.manahub.core.data.remote.dto.TradeProposalDto

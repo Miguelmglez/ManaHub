@@ -3,7 +3,7 @@ package com.mmg.manahub.feature.trades.data.repository
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.feature.trades.data.remote.TradesRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.TradeItemDto
 import com.mmg.manahub.core.data.remote.dto.TradeProposalDto
 import com.mmg.manahub.core.model.TradeError

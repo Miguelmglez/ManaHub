@@ -1,5 +1,10 @@
 package com.mmg.manahub.feature.trades.di
 
+import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.SharedListsRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradeSuggestionsRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.feature.trades.data.repository.OpenForTradeRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.SharedListsRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.TradeSuggestionsRepositoryImpl
@@ -12,8 +17,10 @@ import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.github.jan.supabase.SupabaseClient
 import javax.inject.Singleton
 
 @Module
@@ -34,4 +41,57 @@ abstract class TradesModule {
 
     @Binds @Singleton
     abstract fun bindSharedListsRepository(impl: SharedListsRepositoryImpl): SharedListsRepository
+
+    companion object {
+
+        /**
+         * Provides the [OpenForTradeRemoteDataSource] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@IoDispatcher`; uses [DispatcherProvider]).
+         */
+        @Provides
+        @Singleton
+        fun provideOpenForTradeRemoteDataSource(
+            supabaseClient: SupabaseClient,
+        ): OpenForTradeRemoteDataSource = OpenForTradeRemoteDataSource(supabaseClient)
+
+        /**
+         * Provides the [SharedListsRemoteDataSource] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@IoDispatcher`; uses [DispatcherProvider]).
+         */
+        @Provides
+        @Singleton
+        fun provideSharedListsRemoteDataSource(
+            supabaseClient: SupabaseClient,
+        ): SharedListsRemoteDataSource = SharedListsRemoteDataSource(supabaseClient)
+
+        /**
+         * Provides the [TradeSuggestionsRemoteDataSource] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@IoDispatcher`; uses [DispatcherProvider]).
+         */
+        @Provides
+        @Singleton
+        fun provideTradeSuggestionsRemoteDataSource(
+            supabaseClient: SupabaseClient,
+        ): TradeSuggestionsRemoteDataSource = TradeSuggestionsRemoteDataSource(supabaseClient)
+
+        /**
+         * Provides the [TradesRemoteDataSource] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@IoDispatcher`; uses [DispatcherProvider]).
+         */
+        @Provides
+        @Singleton
+        fun provideTradesRemoteDataSource(
+            supabaseClient: SupabaseClient,
+        ): TradesRemoteDataSource = TradesRemoteDataSource(supabaseClient)
+
+        /**
+         * Provides the [WishlistRemoteDataSource] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@IoDispatcher`; uses [DispatcherProvider]).
+         */
+        @Provides
+        @Singleton
+        fun provideWishlistRemoteDataSource(
+            supabaseClient: SupabaseClient,
+        ): WishlistRemoteDataSource = WishlistRemoteDataSource(supabaseClient)
+    }
 }

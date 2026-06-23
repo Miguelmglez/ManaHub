@@ -1,6 +1,6 @@
-package com.mmg.manahub.feature.trades.data.remote
+package com.mmg.manahub.core.data.remote.trades
 
-import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.remote.dto.TradeItemDto
 import com.mmg.manahub.core.data.remote.dto.TradeItemRequestDto
 import com.mmg.manahub.core.data.remote.dto.TradeProposalDto
@@ -9,19 +9,25 @@ import com.mmg.manahub.core.model.ReviewFlags
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class TradesRemoteDataSource @Inject constructor(
+/**
+ * Remote data source for trade proposals (CRUD + lifecycle actions).
+ *
+ * All calls delegate to [SupabaseClient] PostgREST and run on [DispatcherProvider.io]
+ * (KMP-safe replacement for `Dispatchers.IO`). Trade-specific [RestException]s are mapped to
+ * domain [com.mmg.manahub.core.model.TradeError] via [parseTradeError].
+ *
+ * @param supabaseClient      The Supabase client for PostgREST calls.
+ * @param dispatcherProvider   Platform dispatcher abstraction.
+ */
+class TradesRemoteDataSource(
     private val supabaseClient: SupabaseClient,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val dispatcherProvider: DispatcherProvider = DispatcherProvider(),
 ) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -147,7 +153,7 @@ class TradesRemoteDataSource @Inject constructor(
     }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
-        withContext(ioDispatcher) {
+        withContext(dispatcherProvider.io) {
             try {
                 Result.success(block())
             } catch (e: RestException) {

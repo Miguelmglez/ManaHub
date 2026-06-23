@@ -1,30 +1,35 @@
-package com.mmg.manahub.feature.trades.data.remote
+package com.mmg.manahub.core.data.remote.trades
 
-import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.model.SharedList
 import com.mmg.manahub.core.model.SharedListResult
 import com.mmg.manahub.core.model.SharedListType
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class SharedListsRemoteDataSource @Inject constructor(
+/**
+ * Remote data source for shared lists (wishlist / open-for-trade).
+ *
+ * All calls delegate to [SupabaseClient] PostgREST and run on [DispatcherProvider.io]
+ * (KMP-safe replacement for `Dispatchers.IO`).
+ *
+ * @param supabaseClient      The Supabase client for PostgREST calls.
+ * @param dispatcherProvider   Platform dispatcher abstraction.
+ */
+class SharedListsRemoteDataSource(
     private val supabaseClient: SupabaseClient,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val dispatcherProvider: DispatcherProvider = DispatcherProvider(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun createSharedList(userId: String, listType: SharedListType): Result<SharedList> =
-        withContext(ioDispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 val row = buildJsonObject {
                     put("user_id", userId)
@@ -47,7 +52,7 @@ class SharedListsRemoteDataSource @Inject constructor(
         }
 
     suspend fun resolveSharedList(shareId: String): Result<SharedListResult> =
-        withContext(ioDispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 val raw = supabaseClient.postgrest
                     .rpc("resolve_shared_list", buildJsonObject { put("p_share_id", shareId) })

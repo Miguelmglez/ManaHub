@@ -4,7 +4,7 @@ import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistWithCard
 import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
-import com.mmg.manahub.feature.trades.data.remote.WishlistRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.domain.repository.WishlistRepository
