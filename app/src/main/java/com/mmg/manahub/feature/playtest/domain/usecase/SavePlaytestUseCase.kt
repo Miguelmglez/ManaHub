@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.model.HandSnapshot
 import com.mmg.manahub.core.model.PlaytestSetup
-import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
 
 /**
  * Saves a completed playtest session to the database.

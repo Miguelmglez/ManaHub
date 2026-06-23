@@ -1,12 +1,13 @@
-package com.mmg.manahub.feature.friends.domain.repository
+package com.mmg.manahub.core.domain.repository
 
-import com.mmg.manahub.feature.friends.domain.model.AcceptInviteResult
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
-import com.mmg.manahub.feature.friends.domain.model.FriendRequest
-import com.mmg.manahub.feature.friends.domain.model.FriendStats
-import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
+import com.mmg.manahub.core.model.AcceptInviteResult
+import com.mmg.manahub.core.model.FolderFilters
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.FriendMatchHistory
+import com.mmg.manahub.core.model.FriendRequest
+import com.mmg.manahub.core.model.FriendStats
+import com.mmg.manahub.core.model.OutgoingFriendRequest
 import kotlinx.coroutines.flow.Flow
 
 interface FriendRepository {
@@ -55,7 +56,7 @@ interface FriendRepository {
         friendUserId: String,
         list: String,
         query: String,
-        filters: com.mmg.manahub.feature.friends.presentation.detail.FolderFilters? = null,
+        filters: FolderFilters? = null,
         limit: Int = 50,
         offset: Int = 0,
     ): Result<List<FriendCard>>

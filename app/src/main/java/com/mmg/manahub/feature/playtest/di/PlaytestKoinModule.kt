@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.playtest.di
 
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.feature.playtest.data.repository.PlaytestRepositoryImpl
-import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase

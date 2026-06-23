@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.friends.domain.model
+package com.mmg.manahub.core.model
 
 data class FriendRequest(
     val id: String,

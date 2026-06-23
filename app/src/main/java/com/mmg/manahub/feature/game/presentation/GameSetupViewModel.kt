@@ -11,8 +11,8 @@ import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

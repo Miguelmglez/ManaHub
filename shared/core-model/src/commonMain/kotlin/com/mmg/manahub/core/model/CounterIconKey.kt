@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.game.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * String keys used to identify the icon for a custom counter.

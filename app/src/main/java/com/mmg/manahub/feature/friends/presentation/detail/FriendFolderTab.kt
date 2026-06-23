@@ -32,7 +32,7 @@ import com.mmg.manahub.core.ui.components.MagicLoadingFooter
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
+import com.mmg.manahub.core.model.FriendCard
 
 /**
  * Folder tab composable for the friend detail screen.

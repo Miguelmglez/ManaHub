@@ -103,7 +103,7 @@ import com.mmg.manahub.core.voice.domain.VoiceCommand
 import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplate
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineHostSheet
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
 import com.mmg.manahub.feature.tournament.presentation.TournamentsSheet

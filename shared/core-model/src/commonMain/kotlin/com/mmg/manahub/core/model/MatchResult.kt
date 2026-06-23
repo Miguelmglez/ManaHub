@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.tournament.domain.model
+package com.mmg.manahub.core.model
 
 sealed class MatchResult {
     data class Victory(val winnerId: Long) : MatchResult()

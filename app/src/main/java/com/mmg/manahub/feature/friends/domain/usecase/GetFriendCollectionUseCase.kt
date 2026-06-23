@@ -1,7 +1,8 @@
 package com.mmg.manahub.feature.friends.domain.usecase
 
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.model.FolderFilters
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import javax.inject.Inject
 
 /**
@@ -18,7 +19,7 @@ class GetFriendCollectionUseCase @Inject constructor(
         friendUserId: String,
         list: String,
         query: String = "",
-        filters: com.mmg.manahub.feature.friends.presentation.detail.FolderFilters? = null,
+        filters: FolderFilters? = null,
         limit: Int = 50,
         offset: Int = 0,
     ): Result<List<FriendCard>> = repo.getFriendCollection(friendUserId, list, query, filters, limit, offset)

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.game.domain.model
+package com.mmg.manahub.core.model
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Grid slot position — determines default rotation

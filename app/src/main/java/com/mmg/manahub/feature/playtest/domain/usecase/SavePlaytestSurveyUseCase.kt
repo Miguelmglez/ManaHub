@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.model.PlaytestSurveyAnswers
-import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
 
 /**
  * Saves optional survey answers for a previously saved playtest session.

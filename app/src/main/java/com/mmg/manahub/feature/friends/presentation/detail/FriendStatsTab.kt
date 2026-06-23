@@ -40,7 +40,7 @@ import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.TimeAgoFormatter
-import com.mmg.manahub.feature.friends.domain.model.FriendStats
+import com.mmg.manahub.core.model.FriendStats
 import java.util.Locale
 
 /**
@@ -205,26 +205,28 @@ private fun InventoryValueGrid(stats: FriendStats) {
 @Composable
 private fun ColourAffinityRow(stats: FriendStats) {
     val unknownLabel = stringResource(R.string.friend_stats_color_unknown)
+    val favColor = stats.favouriteColor
+    val mvColor = stats.mostValuableColor
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (stats.favouriteColor != null) {
+        if (favColor != null) {
             ColourTile(
                 modifier = Modifier.weight(1f),
                 label = stringResource(R.string.friend_stats_favourite_color),
-                colorCode = stats.favouriteColor,
+                colorCode = favColor,
                 unknownLabel = unknownLabel,
             )
         }
-        if (stats.mostValuableColor != null) {
+        if (mvColor != null) {
             ColourTile(
                 modifier = Modifier.weight(1f),
                 label = stringResource(R.string.friend_stats_most_valuable_color),
-                colorCode = stats.mostValuableColor,
+                colorCode = mvColor,
                 unknownLabel = unknownLabel,
             )
         }
         // If only one colour field is present, fill the other half with a spacer
         // so the single tile doesn't stretch full-width.
-        if (stats.favouriteColor == null || stats.mostValuableColor == null) {
+        if (favColor == null || mvColor == null) {
             Spacer(modifier = Modifier.weight(1f))
         }
     }

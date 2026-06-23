@@ -3,14 +3,16 @@ package com.mmg.manahub.feature.friends.presentation.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.model.Condition
+import com.mmg.manahub.core.model.FolderFilters
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
-import com.mmg.manahub.feature.friends.domain.model.FriendStats
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.FriendMatchHistory
+import com.mmg.manahub.core.model.FriendStats
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
@@ -45,22 +47,6 @@ enum class FolderSubTab(val listValue: String) {
     COLLECTION("collection"),
     WISHLIST("wishlist"),
     TRADE("trade"),
-}
-
-enum class Condition(val label: String) {
-    NM("NM"), LP("LP"), MP("MP"), HP("HP"), DMG("DMG")
-}
-
-data class FolderFilters(
-    val sets: Set<String> = emptySet(),
-    val rarities: Set<com.mmg.manahub.core.model.Rarity> = emptySet(),
-    val colors: Set<com.mmg.manahub.core.model.MtgColor> = emptySet(),
-    val foilOnly: Boolean = false,
-    val conditions: Set<Condition> = emptySet(),
-    val languages: Set<String> = emptySet()
-) {
-    val hasFilters: Boolean
-        get() = sets.isNotEmpty() || rarities.isNotEmpty() || colors.isNotEmpty() || foilOnly || conditions.isNotEmpty() || languages.isNotEmpty()
 }
 
 /**

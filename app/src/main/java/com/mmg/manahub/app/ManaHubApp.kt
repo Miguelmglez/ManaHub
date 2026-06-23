@@ -102,7 +102,7 @@ import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
 import com.mmg.manahub.feature.friends.di.friendsKoinModule
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.game.di.gameKoinModule
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
