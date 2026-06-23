@@ -429,6 +429,25 @@ Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GR
 ✅ **Phase 2 — auth domain + playtest model + trade repo impls + news domain batched move (GREEN,
 `bcc2cfb`, 2026-06-23).** See STATUS for detail.
 
+✅ **Phase 2 — tagging engine + TradesRepository + SuggestTagsUseCase shared (GREEN,
+`c3b7d7f`, 2026-06-23).** Moved 7 types to shared modules:
+  - `:shared:core-model`: `DetectionRule` (extracted from JVM-only `TagDictionary`), `TagDictionaryEntry`
+    (extracted from `TagDictionary.Entry`).
+  - `:shared:core-data` `core.data.tagging`: `KeywordAnalyzer`, `TypeLineAnalyzer`, `GameChangerAnalyzer`
+    (3 stateless objects, direct move), `StrategyAnalyzer` (converted `object`→`class` with constructor
+    param `entriesProvider: () -> Collection<TagDictionaryEntry>` to sever JVM-only `TagDictionary` dep).
+  - `:shared:core-data` `core.data.usecase.card`: `SuggestTagsUseCase`/`AutoTagCardUseCase` (now takes
+    `StrategyAnalyzer` ctor param; `@Inject` stripped → `@Provides @Singleton` in `SharedDomainUseCaseModule`).
+  - `:shared:core-data` `core.data.repository`: `TradesRepository` interface (all deps already shared).
+  App-side: `TagAnalyzers.kt` replaced with typealiases + convenience `StrategyAnalyzer` wrapper object
+  (backed by `TagDictionary::all`), `createStrategyAnalyzer()` factory for DI. `AutoTagCardUseCase.kt`
+  replaced with typealiases. `TradesRepository.kt` replaced with typealias. `TagDictionary.kt` updated:
+  local `DetectionRule` class + `Entry` inner class deleted, imports from `core-model` added, `Entry`
+  typealias kept for backwards compat. `CardRepositoryImplTest` updated (ctor now needs
+  `createStrategyAnalyzer()`). `CardTagLabel.kt` stays in `:app` (depends on `TagDictionary.localize()`
+  → `java.util.Locale`). Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs`
+  GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
+
 ➡️ **NEXT = continue Phase 2 data-layer work.** The 4 remaining
 shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
 abstraction in `commonMain` via the `CommunityDeckCache` pattern):
@@ -441,7 +460,7 @@ abstraction in `commonMain` via the `CommunityDeckCache` pattern):
 **Three productive paths forward (not mutually exclusive):**
 1. **Move more use cases** — several are NOW UNBLOCKED by existing shared deps (Card/Deck/UserCard repos
    + models are shared) but still platform-bound (`AddCardToCollectionUseCase`, `GetDeckGameStatsUseCase`,
-   ~~`SyncManaSymbolsUseCase`~~ (DONE `d51193c`), `AutoTagCardUseCase`/`ComputeCardTagsUseCase`, ~~`RefreshCollectionPricesUseCase`~~ (DONE),
+   ~~`SyncManaSymbolsUseCase`~~ (DONE `d51193c`), ~~`AutoTagCardUseCase`/`SuggestTagsUseCase`~~ (DONE `c3b7d7f`), `ComputeCardTagsUseCase`, ~~`RefreshCollectionPricesUseCase`~~ (DONE),
    `CommitScannedCardsUseCase`). Each needs its platform deps abstracted first.
 2. **Start web Spikes B & C** (Supabase/Ktor/Coil on wasmJs, web auth) — these validate the runtime
    libraries the remaining repo impls will need on the web side, and were explicitly deferred to Phase 2.
@@ -577,6 +596,15 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-23 — **Phase 2: tagging engine + TradesRepository + SuggestTagsUseCase shared (GREEN,
+  `c3b7d7f`).** 7 types moved: `DetectionRule`/`TagDictionaryEntry` → core-model; 4 tag analyzers +
+  `SuggestTagsUseCase`/`AutoTagCardUseCase` → core-data; `TradesRepository` interface → core-data.
+  Key refactor: `StrategyAnalyzer` converted `object`→`class(entriesProvider)` to decouple from JVM-only
+  `TagDictionary`; app-side wrapper object + `createStrategyAnalyzer()` factory preserve API. Hilt
+  `@Provides` for `StrategyAnalyzer` + `SuggestTagsUseCase` in `SharedDomainUseCaseModule`. 11 files
+  changed (5 new in shared, 6 modified in app). `CardTagLabel.kt` NOT moved (TagDictionary.localize dep).
+  Verified: assembleDebug + compileKotlinWasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline); 0
+  platform imports in commonMain.
 - 2026-06-23 — **Phase 2: auth domain + playtest model + trade repo impls + news domain batched move
   (GREEN, `bcc2cfb`).** 4 parallel batches in one commit (41 files changed, 125 ins, 99 del). Auth
   domain (5 files, same-package move → zero consumer edits, smart-cast fixes). Playtest models (package
