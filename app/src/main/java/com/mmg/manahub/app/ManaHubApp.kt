@@ -33,7 +33,7 @@ import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
-import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
