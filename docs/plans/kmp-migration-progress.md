@@ -322,8 +322,22 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   SPLIT: data class → commonMain; font families (R.font.*) + NeonVoidTypography → stay `:app`. MagicTheme
   gained `typography` param; `MagicThemeAndroid` wrapper in `:app` passes NeonVoidTypography. BLOCKED:
   font families (R.font.*), ThemeBackground (*Background refs), MagicModifiers (BlurMaskFilter).
-- ⬜ **Phase 3 (remaining)** — shared composables (`EmptyState`, `FullErrorState`, `CardGridItem`, etc.)
-  leaf-first, Coil 2→3, leaf screen migrations (Settings/Stats/Profile first).
+- ✅ **Phase 3 · Slice 2 — 12 pure UI composables moved to `:shared:core-ui` `commonMain` (DONE &
+  GREEN, `473dc60`, 2026-06-23).** `EmptyState`, `ErrorState` (`InlineErrorState`+`FullErrorState`),
+  `MagicProgressBar` (+`MagicLoadingFooter`), `MagicToast` (`MagicToastState`/`MagicToastHost`/types),
+  `ManaUtils` (`manaColorFor`/`counterKeyToManaToken`), `PlayerCountStepper`, and 6 theme backgrounds
+  (`AncientOak`, `ArcaneCosmos`, `ForestMurmur`, `HallowedPrint`, `HexGrid`, `MedievalGrimoire`).
+  Package `core.ui.components` UNCHANGED → zero consumer import edits. **Two wasmJs fixes:**
+  (1) `HexGridBackground` `Math.PI` → `kotlin.math.PI` (JVM-only `java.lang.Math`);
+  (2) `MagicToast` `Icons.Default.{Check,Close,Info,Warning}` replaced with inline `ImageVector.Builder`
+  paths in a private `ToastIcons` object (the `material-icons-core` artifact has no CMP wasmJs target as
+  of CMP 1.11). **Skipped (still in `:app`):** `FloatingDelta` (`MulishFontFamily` → `R.font.*`),
+  `ManaColorPicker` (`painterResource(R.drawable.ic_counter)` + `ManaSymbolImage`), `CollectionScreen`
+  (empty stub). Verified: assembleDebug + wasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline);
+  0 platform imports in `commonMain`.
+- ⬜ **Phase 3 (remaining)** — more shared composables (`CardGridItem`, `CardListItem`, `WidgetShell`,
+  etc. — likely blocked on Coil), Coil 2→3 upgrade (unblocks image composables), leaf screen migrations
+  (Settings/Stats/Profile first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive +
   `:webApp`. The deferred Phase-2 items (Room DAO abstractions for web, gamification types, `@StringRes`
   decoupling, `PushTokenRepositoryImpl`) naturally land here alongside the web-platform `actual`
@@ -332,23 +346,27 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## NEXT STEP (resume here)
 
-**Phase 3 Slice 1 DONE.** `:shared:core-ui` module created + MagicTheme design system ported to
-commonMain (9 files, CMP 1.11.0). The typography font families + NeonVoidTypography stay in `:app`
-(R.font.* blocker). ThemeBackground + MagicModifiers stay in `:app` (platform refs).
+**Phase 3 Slices 1+2 DONE.** `:shared:core-ui` module has the MagicTheme design system (9 files) +
+12 shared composables (EmptyState, ErrorState, MagicProgressBar, MagicToast, ManaUtils,
+PlayerCountStepper, 6 theme backgrounds). Typography font families stay in `:app` (R.font.*).
 
-**➡️ NEXT = Phase 3 Slice 2: move shared composables to `:shared:core-ui`.**
+**➡️ NEXT = Phase 3 Slice 3: Coil 2→3 upgrade + image composables.**
 
-Candidates (leaf-first, zero-platform-dep composables):
-1. `EmptyState`, `InlineErrorState`, `FullErrorState` — likely pure Compose (check for R.string/drawable)
-2. `CardGridItem`, `CardListItem` — check for Coil (image loading), R.string refs
-3. `MagicToast`/`MagicToastHost`/`MagicToastState` — check for platform deps
-4. `WidgetShell`, `SectionHeader` — likely pure Compose
+The main blocker for the remaining UI composables is **Coil** (image loading). Coil 2.x is
+Android-only; Coil 3.x has CMP/wasmJs support. Steps:
+1. Upgrade Coil 2→3 (version catalog, API changes — `rememberAsyncImagePainter` → `AsyncImage` etc.)
+2. Add Coil 3 to `:shared:core-ui` deps (commonMain `coil-compose-core`, androidMain `coil-network-okhttp`,
+   wasmJsMain `coil-network-ktor3`)
+3. Move image-dependent composables: `CardGridItem`, `CardListItem`, `ManaSymbolImage`, `ManaCostImage`,
+   `DeckItem`, etc. — these are currently blocked on Coil 2's `coil.compose.AsyncImage`.
+4. Move `ManaColorPicker` (blocked on `ManaSymbolImage` + `R.drawable.ic_counter` — the drawable needs
+   CMP Res or an inline vector).
 
-**Before moving each composable:** read it fully, check for `R.`, `@Preview`, `Context`, Coil, or any
-Android-only API. If blocked by Coil → defer to the Coil 2→3 upgrade step. If blocked by R.string →
-decouple strings (parameter or CMP Res).
-
-**Then:** Coil 2→3 upgrade (wasm-capable), which unblocks image-loading composables.
+**Other Phase 3 remaining:**
+- `FloatingDelta` — blocked on `MulishFontFamily` (R.font.*); unblocked when fonts move to CMP Res.
+- `WidgetShell`, `SectionHeader` — check for platform deps, likely movable.
+- Leaf screen migrations (Settings/Stats/Profile first).
+- `MagicModifiers` — blocked on `BlurMaskFilter` (Android graphics API).
 
 **Phase 2 remaining items (blocked, deferred to Phase 4):**
 - **Room-backed repo impls** (Card, Deck, Stats, UserCard, OpenForTrade, Wishlist, Trades, GameSession,
