@@ -13,6 +13,8 @@
             <option value="$PROJECT_DIR$/baseline-profile" />
             <option value="$PROJECT_DIR$/shared" />
             <option value="$PROJECT_DIR$/shared/core-common" />
+            <option value="$PROJECT_DIR$/shared/core-data" />
+            <option value="$PROJECT_DIR$/shared/core-domain" />
             <option value="$PROJECT_DIR$/shared/core-model" />
           </set>
         </option>

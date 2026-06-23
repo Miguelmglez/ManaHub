@@ -32,7 +32,7 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
-import com.mmg.manahub.core.ui.theme.MagicTheme
+import com.mmg.manahub.core.ui.theme.MagicThemeAndroid
 import com.mmg.manahub.feature.gamification.presentation.GamificationCelebrationHost
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.jan.supabase.SupabaseClient
@@ -173,7 +173,7 @@ class MainActivity : ComponentActivity() {
             val userPrefs by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = null)
 
-            MagicTheme(theme = theme) {
+            MagicThemeAndroid(theme = theme) {
                 CompositionLocalProvider(
                     LocalPreferredCurrency provides (userPrefs?.preferredCurrency ?: com.mmg.manahub.core.model.PreferredCurrency.USD),
                 ) {

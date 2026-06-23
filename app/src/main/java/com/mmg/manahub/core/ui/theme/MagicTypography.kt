@@ -1,13 +1,13 @@
 package com.mmg.manahub.core.ui.theme
 
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 
 // ── Font families loaded from res/font/ ──────────────────────────────────────
+// These stay in :app because they reference Android R.font.* resources.
+// Once the CMP resource system (Res) replaces R.font, they move to :shared:core-ui.
 
 val MarcellusFontFamily = FontFamily(
     Font(R.font.marcellus_regular, FontWeight.Normal),
@@ -29,124 +29,22 @@ val ManaFontFamily = FontFamily(
     Font(R.font.mana, FontWeight.Normal)
 )
 
-// ── Typography scale ─────────────────────────────────────────────────────────
-
-/**
- * Typography scale for the ManaHub design system.
- *
- * Hierarchy:
- *  displayLarge / displayMedium — MarcellusFontFamily Black, section titles, victory screen
- *  lifeNumber / lifeNumberMd   — MarcellusFontFamily Black, main life-total numeral
- *  titleLarge / titleMedium    — MarcellusFontFamily, card titles, feature headers
- *  labelLarge … labelSmall     — MarcellusFontFamily, nav tabs, chips, badges
- *  bodyLarge … bodySmall       — mulishFontFamily, prose, descriptions, metadata
- *  deltaNumber                 — mulishFontFamily, floating +N / −N delta indicator
- */
-data class MagicTypography(
-
-    // ── Display ───────────────────────────────────────────────────────────────
-    val displayLarge: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.Black,
-        fontSize      = 34.sp,
-        lineHeight    = 42.sp,
-        letterSpacing = 1.sp,
-    ),
-    val displayMedium: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.Black,
-        fontSize      = 28.sp,
-        lineHeight    = 36.sp,
-        letterSpacing = 0.5.sp,
-    ),
-
-    // ── Life numerals ─────────────────────────────────────────────────────────
-    val lifeNumber: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.Black,
-        fontSize      = 88.sp,
-        lineHeight    = 88.sp,
-        letterSpacing = (-2).sp,
-    ),
-    val lifeNumberMd: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.Black,
-        fontSize      = 64.sp,
-        lineHeight    = 64.sp,
-        letterSpacing = (-1).sp,
-    ),
-
-    // ── Titles ────────────────────────────────────────────────────────────────
-    val titleLarge: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.Bold,
-        fontSize      = 20.sp,
-        lineHeight    = 28.sp,
-        letterSpacing = 1.sp,
-    ),
-    val titleMedium: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.SemiBold,
-        fontSize      = 16.sp,
-        lineHeight    = 24.sp,
-        letterSpacing = 1.sp,
-    ),
-
-    // ── Labels ────────────────────────────────────────────────────────────────
-    val labelLarge: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.Bold,
-        fontSize      = 14.sp,
-        lineHeight    = 18.sp,
-        letterSpacing = 3.sp,
-    ),
-    val labelMedium: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.SemiBold,
-        fontSize      = 12.sp,
-        lineHeight    = 16.sp,
-        letterSpacing = 2.sp,
-    ),
-    val labelSmall: TextStyle = TextStyle(
-        fontFamily    = MarcellusFontFamily,
-        fontWeight    = FontWeight.Medium,
-        fontSize      = 11.sp,
-        lineHeight    = 14.sp,
-        letterSpacing = 2.sp,
-    ),
-
-    // ── Body ──────────────────────────────────────────────────────────────────
-    val bodyLarge: TextStyle = TextStyle(
-        fontFamily    = MulishFontFamily,
-        fontWeight    = FontWeight.SemiBold,
-        fontSize      = 16.sp,
-        lineHeight    = 24.sp,
-        letterSpacing = 0.sp,
-    ),
-    val bodyMedium: TextStyle = TextStyle(
-        fontFamily    = MulishFontFamily,
-        fontWeight    = FontWeight.Medium,
-        fontSize      = 14.sp,
-        lineHeight    = 20.sp,
-        letterSpacing = 0.sp,
-    ),
-    val bodySmall: TextStyle = TextStyle(
-        fontFamily    = MulishFontFamily,
-        fontWeight    = FontWeight.Medium,
-        fontSize      = 12.sp,
-        lineHeight    = 18.sp,
-        letterSpacing = 0.sp,
-    ),
-
-    // ── Delta indicator ───────────────────────────────────────────────────────
-    val deltaNumber: TextStyle = TextStyle(
-        fontFamily    = MulishFontFamily,
-        fontWeight    = FontWeight.Bold,
-        fontSize      = 22.sp,
-        lineHeight    = 28.sp,
-        letterSpacing = 0.sp,
-    ),
+// ── NeonVoid typography instance (applies Marcellus + Mulish font families) ──
+// The data class MagicTypography is now in :shared:core-ui (commonMain). This
+// instance wires the Android font families into it — the default MagicTypography()
+// uses system fonts; this instance overrides with the project's custom fonts.
+internal val NeonVoidTypography = MagicTypography(
+    displayLarge  = MagicTypography().displayLarge.copy(fontFamily = MarcellusFontFamily),
+    displayMedium = MagicTypography().displayMedium.copy(fontFamily = MarcellusFontFamily),
+    lifeNumber    = MagicTypography().lifeNumber.copy(fontFamily = MarcellusFontFamily),
+    lifeNumberMd  = MagicTypography().lifeNumberMd.copy(fontFamily = MarcellusFontFamily),
+    titleLarge    = MagicTypography().titleLarge.copy(fontFamily = MarcellusFontFamily),
+    titleMedium   = MagicTypography().titleMedium.copy(fontFamily = MarcellusFontFamily),
+    labelLarge    = MagicTypography().labelLarge.copy(fontFamily = MarcellusFontFamily),
+    labelMedium   = MagicTypography().labelMedium.copy(fontFamily = MarcellusFontFamily),
+    labelSmall    = MagicTypography().labelSmall.copy(fontFamily = MarcellusFontFamily),
+    bodyLarge     = MagicTypography().bodyLarge.copy(fontFamily = MulishFontFamily),
+    bodyMedium    = MagicTypography().bodyMedium.copy(fontFamily = MulishFontFamily),
+    bodySmall     = MagicTypography().bodySmall.copy(fontFamily = MulishFontFamily),
+    deltaNumber   = MagicTypography().deltaNumber.copy(fontFamily = MulishFontFamily),
 )
-
-// ── NeonVoid instance (default values, override per theme if needed) ──────────
-internal val NeonVoidTypography = MagicTypography()
