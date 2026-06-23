@@ -19,11 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -38,7 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -148,10 +145,10 @@ private fun MagicToastCard(msg: MagicToastMessage, onClick: () -> Unit) {
 
     data class ToastStyle(val icon: ImageVector, val color: Color)
     val style = when (msg.type) {
-        MagicToastType.SUCCESS -> ToastStyle(Icons.Default.Check,   mc.lifePositive)
-        MagicToastType.INFO    -> ToastStyle(Icons.Default.Info,    mc.primaryAccent)
-        MagicToastType.WARNING -> ToastStyle(Icons.Default.Warning, Color(0xFFF59E0B))
-        MagicToastType.ERROR   -> ToastStyle(Icons.Default.Close,   mc.lifeNegative)
+        MagicToastType.SUCCESS -> ToastStyle(ToastIcons.Check,   mc.lifePositive)
+        MagicToastType.INFO    -> ToastStyle(ToastIcons.Info,    mc.primaryAccent)
+        MagicToastType.WARNING -> ToastStyle(ToastIcons.Warning, Color(0xFFF59E0B))
+        MagicToastType.ERROR   -> ToastStyle(ToastIcons.Close,   mc.lifeNegative)
     }
 
     Surface(
@@ -196,5 +193,104 @@ private fun MagicToastCard(msg: MagicToastMessage, onClick: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Inline Material-style icons (avoids material-icons-core dep, wasm-safe)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Minimal inline icon vectors matching Material Filled Check / Close / Info / Warning.
+ * Defined here so [MagicToastHost] has zero dependency on `material-icons-core`, which has
+ * no Compose Multiplatform (wasmJs) artifact as of CMP 1.11.
+ */
+private object ToastIcons {
+    val Check: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "ToastCheck", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).path(fill = SolidColor(Color.Black)) {
+            // M9 16.17 L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z
+            moveTo(9f, 16.17f)
+            lineTo(4.83f, 12f)
+            lineToRelative(-1.42f, 1.41f)
+            lineTo(9f, 19f)
+            lineTo(21f, 7f)
+            lineToRelative(-1.41f, -1.41f)
+            close()
+        }.build()
+    }
+
+    val Close: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "ToastClose", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).path(fill = SolidColor(Color.Black)) {
+            moveTo(19f, 6.41f)
+            lineTo(17.59f, 5f)
+            lineTo(12f, 10.59f)
+            lineTo(6.41f, 5f)
+            lineTo(5f, 6.41f)
+            lineTo(10.59f, 12f)
+            lineTo(5f, 17.59f)
+            lineTo(6.41f, 19f)
+            lineTo(12f, 13.41f)
+            lineTo(17.59f, 19f)
+            lineTo(19f, 17.59f)
+            lineTo(13.41f, 12f)
+            close()
+        }.build()
+    }
+
+    val Info: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "ToastInfo", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).path(fill = SolidColor(Color.Black)) {
+            moveTo(12f, 2f)
+            curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
+            reflectiveCurveTo(4.48f, 10f, 10f, 10f)
+            reflectiveCurveTo(10f, -4.48f, 10f, -10f)
+            reflectiveCurveTo(-4.48f, -10f, -10f, -10f)
+            close()
+            moveTo(13f, 17f)
+            horizontalLineToRelative(-2f)
+            verticalLineToRelative(-6f)
+            horizontalLineToRelative(2f)
+            verticalLineToRelative(6f)
+            close()
+            moveTo(13f, 9f)
+            horizontalLineToRelative(-2f)
+            lineTo(11f, 7f)
+            horizontalLineToRelative(2f)
+            verticalLineToRelative(2f)
+            close()
+        }.build()
+    }
+
+    val Warning: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "ToastWarning", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).path(fill = SolidColor(Color.Black)) {
+            moveTo(1f, 21f)
+            horizontalLineToRelative(22f)
+            lineTo(12f, 2f)
+            lineTo(1f, 21f)
+            close()
+            moveTo(13f, 18f)
+            horizontalLineToRelative(-2f)
+            verticalLineToRelative(-2f)
+            horizontalLineToRelative(2f)
+            verticalLineToRelative(2f)
+            close()
+            moveTo(13f, 14f)
+            horizontalLineToRelative(-2f)
+            verticalLineToRelative(-4f)
+            horizontalLineToRelative(2f)
+            verticalLineToRelative(4f)
+            close()
+        }.build()
     }
 }
