@@ -6,6 +6,10 @@ import com.mmg.manahub.core.data.network.ScryfallCache
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.tagging.StrategyAnalyzer
+import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
+import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -16,8 +20,7 @@ import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
-import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
-import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
+import com.mmg.manahub.core.tagging.createStrategyAnalyzer
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -99,6 +102,16 @@ object SharedDomainUseCaseModule {
         store: ManaSymbolStore,
         requestQueue: ScryfallRequestQueue,
     ): SyncManaSymbolsUseCase = SyncManaSymbolsUseCase(api, store, requestQueue)
+
+    @Provides
+    @Singleton
+    fun provideStrategyAnalyzer(): StrategyAnalyzer = createStrategyAnalyzer()
+
+    @Provides
+    @Singleton
+    fun provideSuggestTagsUseCase(
+        strategyAnalyzer: StrategyAnalyzer,
+    ): SuggestTagsUseCase = SuggestTagsUseCase(strategyAnalyzer)
 
     @Provides
     @Singleton

@@ -1,7 +1,9 @@
 package com.mmg.manahub.core.tagging
 
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.DetectionRule
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.core.model.TagDictionaryEntry
 import com.mmg.manahub.core.tagging.TagDictionary.applyOverrides
 import com.mmg.manahub.core.util.CardTypeTranslator
 import java.util.Locale
@@ -36,48 +38,27 @@ import java.util.Locale
 //  truth for type translations.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * A single English oracle-text detection rule.
- *
- * A rule matches the normalized oracle text when:
- *  - every [allOf] substring is present, AND
- *  - ([anyOf] is empty OR at least one [anyOf] substring is present), AND
- *  - no [noneOf] substring is present, AND
- *  - ([typeLineAnyOf] is empty OR the lowercased type line contains at least one), AND
- *  - the lowercased type line contains none of [typeLineNoneOf].
- *
- * [confidence], when non-null, overrides the owning [TagDictionary.Entry.baseConfidence]
- * for this specific rule.
- */
-data class DetectionRule(
-    val allOf:          List<String> = emptyList(),
-    val anyOf:          List<String> = emptyList(),
-    val noneOf:         List<String> = emptyList(),
-    val typeLineAnyOf:  List<String> = emptyList(),
-    val typeLineNoneOf: List<String> = emptyList(),
-    val confidence:     Float?       = null,
-)
-
 object TagDictionary {
 
-    /** A single dictionary entry — labels by language plus English detection rules. */
-    data class Entry(
-        val key:            String,
-        val category:       TagCategory,
-        val labels:         Map<String, String>,   // lang → label (only "en" populated today)
-        val rules:          List<DetectionRule>,    // English oracle-text rules (empty = no auto-detection)
-        val baseConfidence: Float = 0.85f,
-    )
+    /**
+     * Backwards-compatible alias for [TagDictionaryEntry].
+     *
+     * The data class moved to `:shared:core-model` (`commonMain`) during the KMP migration so
+     * that the shared tagging analyzers can reference it. This alias keeps existing
+     * `TagDictionary.Entry` references inside `:app` compiling without edits.
+     */
+    @Suppress("unused")
+    typealias Entry = TagDictionaryEntry
 
     /** Mutable map so [applyOverrides] can replace entries at runtime. */
     @Volatile
-    private var entries: Map<String, Entry> = baseEntries.associateBy { it.key }
+    private var entries: Map<String, TagDictionaryEntry> = baseEntries.associateBy { it.key }
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    fun all(): Collection<Entry> = entries.values
+    fun all(): Collection<TagDictionaryEntry> = entries.values
 
-    fun get(key: String): Entry? = entries[key]
+    fun get(key: String): TagDictionaryEntry? = entries[key]
 
     /** Localize a CardTag for the current locale. Returns null if unknown. */
     fun localize(tag: CardTag, lang: String = currentLang()): String? = when (tag.category) {
@@ -128,7 +109,7 @@ object TagDictionary {
                 )
             } else {
                 // Net-new entry from the user.
-                merged[ov.key] = Entry(
+                merged[ov.key] = TagDictionaryEntry(
                     key            = ov.key,
                     category       = ov.category ?: TagCategory.STRATEGY,
                     labels         = ov.labels,
@@ -207,7 +188,7 @@ data class TagOverride(
 //  fragments to avoid false positives.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-private val baseEntries: List<TagDictionary.Entry> = buildList {
+private val baseEntries: List<TagDictionaryEntry> = buildList {
 
     // ── KEYWORD entries (labels only; KeywordAnalyzer reads card.keywords) ─────
     // Evergreen + popular recurring/deciduous keywords Scryfall emits in `keywords`.
@@ -657,7 +638,7 @@ private val baseEntries: List<TagDictionary.Entry> = buildList {
 // (declared in the strategy/role block) are the single source for those keys.
 
 /** Single-language keyword label entry (KeywordAnalyzer reads card.keywords directly). */
-private fun kw(key: String, en: String) = TagDictionary.Entry(
+private fun kw(key: String, en: String) = TagDictionaryEntry(
     key            = key,
     category       = TagCategory.KEYWORD,
     labels         = mapOf("en" to en),
@@ -672,7 +653,7 @@ private fun strat(
     en: String,
     baseConfidence: Float,
     rules: List<DetectionRule>,
-) = TagDictionary.Entry(
+) = TagDictionaryEntry(
     key            = key,
     category       = category,
     labels         = mapOf("en" to en),
@@ -681,7 +662,7 @@ private fun strat(
 )
 
 /** Manual-pick-only entry (no detection rules). */
-private fun plain(key: String, category: TagCategory, en: String) = TagDictionary.Entry(
+private fun plain(key: String, category: TagCategory, en: String) = TagDictionaryEntry(
     key            = key,
     category       = category,
     labels         = mapOf("en" to en),
