@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -130,9 +131,12 @@ private fun HistoryContent(
             if (pullState.headerHeightDp > 0.dp) {
                 item(key = "pull_header") {
                     PullRefreshHeader(
-                        height       = pullState.headerHeightDp,
-                        isRefreshing = uiState.isRefreshing,
-                        dragFraction = pullState.dragFraction,
+                        height              = pullState.headerHeightDp,
+                        isRefreshing        = uiState.isRefreshing,
+                        dragFraction        = pullState.dragFraction,
+                        refreshingText      = stringResource(R.string.trades_history_refreshing),
+                        pullIcon            = Icons.Default.KeyboardArrowDown,
+                        pullHintDescription = stringResource(R.string.trades_history_pull_to_refresh),
                     )
                 }
             }
