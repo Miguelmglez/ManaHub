@@ -7,10 +7,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
 
 enum class CardRarity(val tint: Color) {
@@ -48,14 +50,15 @@ fun SetSymbol(
     modifier: Modifier = Modifier,
 ) {
     val url = "https://svgs.scryfall.io/sets/${setCode.lowercase()}.svg"
+    val fallbackPainter = painterResource(R.drawable.ic_counter)
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(url)
             .crossfade(true)
-            .error(R.drawable.ic_counter)
-            .fallback(R.drawable.ic_counter)
             .build(),
         contentDescription = "$setCode ${rarity.name}",
+        error              = fallbackPainter,
+        fallback           = fallbackPainter,
         colorFilter        = ColorFilter.tint(rarity.tint),
         contentScale       = ContentScale.Fit,
         modifier           = modifier.size(size),
