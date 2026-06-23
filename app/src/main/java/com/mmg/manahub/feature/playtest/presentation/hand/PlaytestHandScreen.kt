@@ -82,9 +82,9 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestPhase
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.HandSnapshot
+import com.mmg.manahub.core.model.PlaytestPhase
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.presentation.battle.BattlefieldContent
 import com.mmg.manahub.feature.playtest.presentation.components.BottomNSelector
 import com.mmg.manahub.feature.playtest.presentation.components.CommandZoneArea
@@ -423,9 +423,10 @@ private fun PortraitHandContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Commander zone strip.
-        if (setup.commanderCard != null) {
+        val commander = setup.commanderCard
+        if (commander != null) {
             CommandZoneArea(
-                commanderCard = setup.commanderCard,
+                commanderCard = commander,
                 librarySize   = snapshot.library.size,
                 modifier      = Modifier.padding(horizontal = sp.md, vertical = sp.xs),
             )
@@ -505,9 +506,10 @@ private fun LandscapeHandContent(
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.Start,
         ) {
-            if (setup.commanderCard != null) {
+            val cmdr = setup.commanderCard
+            if (cmdr != null) {
                 CommandZoneArea(
-                    commanderCard = setup.commanderCard,
+                    commanderCard = cmdr,
                     librarySize   = snapshot.library.size,
                     modifier      = Modifier.fillMaxWidth(),
                 )

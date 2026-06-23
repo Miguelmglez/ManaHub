@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.news.domain.usecase
 
-import com.mmg.manahub.feature.news.domain.repository.NewsRepository
+import com.mmg.manahub.core.domain.repository.NewsRepository
 import javax.inject.Inject
 
 class RefreshNewsFeedUseCase @Inject constructor(

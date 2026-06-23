@@ -1,10 +1,14 @@
-package com.mmg.manahub.feature.news.domain.repository
+package com.mmg.manahub.core.domain.repository
 
+import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.SourceType
-import com.mmg.manahub.feature.news.domain.model.ContentSource
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Repository contract for fetching and managing news/content feeds.
+ * Moved from `:app` feature/news/domain/repository during the KMP migration.
+ */
 interface NewsRepository {
     fun observeNews(): Flow<List<NewsItem>>
     fun observeSources(): Flow<List<ContentSource>>

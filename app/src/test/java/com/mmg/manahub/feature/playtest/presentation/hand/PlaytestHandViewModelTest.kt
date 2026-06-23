@@ -9,9 +9,9 @@ import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.playtest.domain.model.PlayZone
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestPhase
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.PlayZone
+import com.mmg.manahub.core.model.PlaytestPhase
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase

@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.HandSnapshot
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
 import io.mockk.coEvery
 import io.mockk.coVerify

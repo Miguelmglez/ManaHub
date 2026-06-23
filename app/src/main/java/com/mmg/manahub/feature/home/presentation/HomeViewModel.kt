@@ -43,7 +43,7 @@ import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.DISCOVER_RANDOM_QUERY
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MAX_NEWS
-import com.mmg.manahub.feature.news.domain.model.ContentSource
+import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase

@@ -9,8 +9,8 @@ import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.PlaytestEligibility
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel

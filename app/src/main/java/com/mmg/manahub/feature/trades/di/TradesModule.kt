@@ -6,8 +6,8 @@ import com.mmg.manahub.core.data.remote.trades.TradeSuggestionsRemoteDataSource
 import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.feature.trades.data.repository.OpenForTradeRepositoryImpl
-import com.mmg.manahub.feature.trades.data.repository.SharedListsRepositoryImpl
-import com.mmg.manahub.feature.trades.data.repository.TradeSuggestionsRepositoryImpl
+import com.mmg.manahub.core.data.repository.SharedListsRepositoryImpl
+import com.mmg.manahub.core.data.repository.TradeSuggestionsRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.TradesRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.WishlistRepositoryImpl
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
@@ -35,12 +35,6 @@ abstract class TradesModule {
 
     @Binds @Singleton
     abstract fun bindOpenForTradeRepository(impl: OpenForTradeRepositoryImpl): OpenForTradeRepository
-
-    @Binds @Singleton
-    abstract fun bindTradeSuggestionsRepository(impl: TradeSuggestionsRepositoryImpl): TradeSuggestionsRepository
-
-    @Binds @Singleton
-    abstract fun bindSharedListsRepository(impl: SharedListsRepositoryImpl): SharedListsRepository
 
     companion object {
 
@@ -93,5 +87,25 @@ abstract class TradesModule {
         fun provideWishlistRemoteDataSource(
             supabaseClient: SupabaseClient,
         ): WishlistRemoteDataSource = WishlistRemoteDataSource(supabaseClient)
+
+        /**
+         * Provides the [SharedListsRepositoryImpl] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@Singleton`).
+         */
+        @Provides
+        @Singleton
+        fun provideSharedListsRepository(
+            remote: SharedListsRemoteDataSource,
+        ): SharedListsRepository = SharedListsRepositoryImpl(remote)
+
+        /**
+         * Provides the [TradeSuggestionsRepositoryImpl] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@Singleton`).
+         */
+        @Provides
+        @Singleton
+        fun provideTradeSuggestionsRepository(
+            remote: TradeSuggestionsRemoteDataSource,
+        ): TradeSuggestionsRepository = TradeSuggestionsRepositoryImpl(remote)
     }
 }

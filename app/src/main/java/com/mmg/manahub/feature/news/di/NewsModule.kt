@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.news.di
 
 import com.mmg.manahub.feature.news.data.NewsRepositoryImpl
-import com.mmg.manahub.feature.news.domain.repository.NewsRepository
+import com.mmg.manahub.core.domain.repository.NewsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

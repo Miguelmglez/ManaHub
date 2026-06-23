@@ -24,8 +24,8 @@ import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.HandSnapshot
+import com.mmg.manahub.core.model.PlaytestSetup
 
 /**
  * Bottom sheet shown when the user taps "Keep" (with 0 mulligans) or confirms bottom-N.

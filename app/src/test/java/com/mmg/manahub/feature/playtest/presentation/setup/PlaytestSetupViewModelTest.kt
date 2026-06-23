@@ -9,7 +9,7 @@ import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
+import com.mmg.manahub.core.model.PlaytestEligibility
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
 import io.mockk.coEvery
 import io.mockk.every

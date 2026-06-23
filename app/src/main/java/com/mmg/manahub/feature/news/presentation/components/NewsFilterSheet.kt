@@ -56,7 +56,7 @@ import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.news.domain.model.ContentSource
+import com.mmg.manahub.core.model.news.ContentSource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

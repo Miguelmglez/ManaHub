@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.model.DeckWithCards
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
+import com.mmg.manahub.core.model.PlaytestEligibility
 
 /**
  * Determines whether a deck is eligible for playtesting.

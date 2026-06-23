@@ -316,7 +316,7 @@ class HomeViewModelTest {
      */
     private fun stubEnabledEnglishSourcesFor(feed: List<NewsItem>) {
         val sources = feed.map { it.sourceId }.distinct().map { sid ->
-            com.mmg.manahub.feature.news.domain.model.ContentSource(
+            com.mmg.manahub.core.model.news.ContentSource(
                 id = sid,
                 name = sid,
                 feedUrl = "https://example.com/$sid/feed",
@@ -1492,7 +1492,7 @@ class HomeViewModelTest {
     )
 
     private fun contentSource(id: String, language: String) =
-        com.mmg.manahub.feature.news.domain.model.ContentSource(
+        com.mmg.manahub.core.model.news.ContentSource(
             id = id, name = id, feedUrl = "https://example.com/$id/feed",
             type = com.mmg.manahub.core.model.news.SourceType.ARTICLE,
             isEnabled = true, isDefault = true, iconUrl = null, language = language,

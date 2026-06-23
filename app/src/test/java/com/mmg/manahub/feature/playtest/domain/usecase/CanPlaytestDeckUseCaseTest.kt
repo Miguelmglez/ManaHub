@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.playtest.domain.usecase
 
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckWithCards
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
+import com.mmg.manahub.core.model.PlaytestEligibility
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before

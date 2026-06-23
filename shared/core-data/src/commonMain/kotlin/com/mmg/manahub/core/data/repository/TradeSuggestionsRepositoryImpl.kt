@@ -1,14 +1,15 @@
-package com.mmg.manahub.feature.trades.data.repository
+package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.remote.trades.TradeSuggestionsRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.TradeSuggestionDto
 import com.mmg.manahub.core.model.TradeSuggestion
 import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class TradeSuggestionsRepositoryImpl @Inject constructor(
+/**
+ * Platform-agnostic [TradeSuggestionsRepository] implementation that delegates to the
+ * remote data source. Moved from `:app` feature/trades during the KMP migration.
+ */
+class TradeSuggestionsRepositoryImpl(
     private val remote: TradeSuggestionsRemoteDataSource,
 ) : TradeSuggestionsRepository {
 
