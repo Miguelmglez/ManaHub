@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.trades.domain.usecase
 
 import com.mmg.manahub.core.model.TradeError
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

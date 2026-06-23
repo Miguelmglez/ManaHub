@@ -127,7 +127,7 @@ import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCas
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.SharedListsRepository
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase

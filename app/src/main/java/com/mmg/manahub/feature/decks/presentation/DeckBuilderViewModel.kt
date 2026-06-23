@@ -7,14 +7,14 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.AddCardRow
+import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -267,17 +267,19 @@ class DeckMagicDetailViewModel(
             }
             .keys
 
-        val invalidIdentity = if (isCommanderFormat && commanderEntry?.card != null) {
-            val identity = commanderEntry.card.colorIdentity.toSet()
+        val commanderCard = commanderEntry?.card
+        val invalidIdentity = if (isCommanderFormat && commanderCard != null) {
+            val identity = commanderCard.colorIdentity.toSet()
             otherEntries.filter { entry ->
-                entry.card != null && !identity.containsAll(entry.card.colorIdentity)
+                val entryCard = entry.card
+                entryCard != null && !identity.containsAll(entryCard.colorIdentity)
             }.map { it.scryfallId }.toSet()
         } else {
             emptySet()
         }
 
-        val isCommanderInvalid = isCommanderFormat && commanderEntry?.card != null &&
-                !commanderEntry.card.typeLine.contains("Legendary", ignoreCase = true)
+        val isCommanderInvalid = isCommanderFormat && commanderCard != null &&
+                !commanderCard.typeLine.contains("Legendary", ignoreCase = true)
 
         val hasChanges = draftCardsMap != persistedCardsMap || draftDeck != persistedDeck
 

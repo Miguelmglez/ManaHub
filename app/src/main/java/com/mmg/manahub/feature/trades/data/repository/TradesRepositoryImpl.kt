@@ -12,7 +12,7 @@ import com.mmg.manahub.core.model.TradeItem
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.ReviewFlags
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map

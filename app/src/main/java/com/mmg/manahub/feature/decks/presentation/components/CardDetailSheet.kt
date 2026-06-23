@@ -59,7 +59,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.tagging.label
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.OracleText

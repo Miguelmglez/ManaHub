@@ -18,7 +18,7 @@ import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.model.TradeSide
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
