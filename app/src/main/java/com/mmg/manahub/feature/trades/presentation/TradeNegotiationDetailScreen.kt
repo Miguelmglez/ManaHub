@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -214,9 +215,12 @@ fun TradeNegotiationDetailScreen(
                     if (pullState.headerHeightDp > 0.dp) {
                         item(key = "pull_header") {
                             PullRefreshHeader(
-                                height = pullState.headerHeightDp,
-                                isRefreshing = uiState.isRefreshing,
-                                dragFraction = pullState.dragFraction,
+                                height              = pullState.headerHeightDp,
+                                isRefreshing        = uiState.isRefreshing,
+                                dragFraction        = pullState.dragFraction,
+                                refreshingText      = stringResource(R.string.trades_history_refreshing),
+                                pullIcon            = Icons.Default.KeyboardArrowDown,
+                                pullHintDescription = stringResource(R.string.trades_history_pull_to_refresh),
                             )
                         }
                     }

@@ -21,8 +21,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,11 +31,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -60,12 +57,33 @@ import com.mmg.manahub.core.ui.theme.magicTypography
  * @param onThemeSelected Callback when a theme circle is tapped. Does NOT auto-dismiss.
  * @param onDismiss Called when the sheet should be closed.
  */
+/**
+ * A bottom sheet for editing a single player's name and color theme.
+ *
+ * @param playerName Current name for this player.
+ * @param playerTheme Currently selected [PlayerThemeColors] for this player.
+ * @param isAppUser Whether this slot represents the device's own user.
+ * @param title The sheet title text (e.g. "Edit Player").
+ * @param nameLabel The label above the name field (e.g. "Name").
+ * @param namePlaceholder The placeholder shown when the name field is empty (e.g. "Enter name").
+ * @param colorLabel The label above the color grid (e.g. "Choose Color").
+ * @param selectedIcon The icon to display on the currently selected theme circle (e.g. Icons.Default.Check).
+ * @param usedThemes Themes already assigned to other players; these are hidden from the grid.
+ * @param onNameChanged Callback for name field changes.
+ * @param onThemeSelected Callback when a theme circle is tapped.
+ * @param onDismiss Called when the sheet should be closed.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerEditSheet(
     playerName: String,
     playerTheme: PlayerThemeColors,
     isAppUser: Boolean,
+    title: String,
+    nameLabel: String,
+    namePlaceholder: String,
+    colorLabel: String,
+    selectedIcon: ImageVector,
     usedThemes: List<PlayerThemeColors> = emptyList(),
     onNameChanged: (String) -> Unit,
     onThemeSelected: (PlayerThemeColors) -> Unit,
@@ -88,7 +106,7 @@ fun PlayerEditSheet(
                 .navigationBarsPadding(),
         ) {
             Text(
-                text = stringResource(R.string.game_edit_player_title),
+                text = title,
                 style = ty.titleLarge,
                 color = mc.textPrimary,
             )
@@ -96,7 +114,7 @@ fun PlayerEditSheet(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text = stringResource(R.string.game_edit_player_name_label),
+                text = nameLabel,
                 style = ty.labelMedium,
                 color = mc.textSecondary,
             )
@@ -121,7 +139,7 @@ fun PlayerEditSheet(
                         Box {
                             if (playerName.isEmpty()) {
                                 Text(
-                                    text = stringResource(R.string.game_edit_player_name_placeholder),
+                                    text = namePlaceholder,
                                     style = ty.titleMedium,
                                     color = mc.textDisabled,
                                 )
@@ -135,7 +153,7 @@ fun PlayerEditSheet(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text = stringResource(R.string.game_edit_player_color_label),
+                text = colorLabel,
                 style = ty.labelMedium,
                 color = mc.textSecondary,
             )
@@ -172,7 +190,7 @@ fun PlayerEditSheet(
                         ) {
                             if (isSelected) {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
+                                    imageVector = selectedIcon,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp),

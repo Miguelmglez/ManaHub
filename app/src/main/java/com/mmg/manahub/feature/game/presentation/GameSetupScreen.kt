@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
@@ -420,6 +421,11 @@ private fun GameSetupScreenContent(
                     playerName = config.name,
                     playerTheme = config.theme,
                     isAppUser = config.isAppUser,
+                    title = stringResource(R.string.game_edit_player_title),
+                    nameLabel = stringResource(R.string.game_edit_player_name_label),
+                    namePlaceholder = stringResource(R.string.game_edit_player_name_placeholder),
+                    colorLabel = stringResource(R.string.game_edit_player_color_label),
+                    selectedIcon = Icons.Default.Check,
                     usedThemes = uiState.playerConfigs.filter { it.id != config.id }.map { it.theme },
                     onNameChanged = { onUpdatePlayerName(idx, it) },
                     onThemeSelected = { theme -> onUpdatePlayerTheme(idx, theme) },

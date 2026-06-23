@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,14 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.launch
@@ -117,11 +114,24 @@ fun rememberPullRefreshState(
     )
 }
 
+/**
+ * A header composable that shows a pull-to-refresh indicator.
+ *
+ * @param height The current height of the header based on drag distance.
+ * @param isRefreshing Whether a refresh is currently in progress.
+ * @param dragFraction The fraction of the drag threshold reached (0..1).
+ * @param refreshingText The text to display while refreshing (e.g. "Updating...").
+ * @param pullIcon The icon to display as a pull-down hint (e.g. Icons.Default.KeyboardArrowDown).
+ * @param pullHintDescription The content description for the pull-down arrow icon.
+ */
 @Composable
 fun PullRefreshHeader(
     height: Dp,
     isRefreshing: Boolean,
     dragFraction: Float,
+    refreshingText: String,
+    pullIcon: ImageVector,
+    pullHintDescription: String,
 ) {
     val mc = MaterialTheme.magicColors
     val showSpinner = isRefreshing || dragFraction >= 1f
@@ -143,15 +153,15 @@ fun PullRefreshHeader(
                     color       = mc.primaryAccent,
                 )
                 Text(
-                    text  = stringResource(R.string.trades_history_refreshing),
+                    text  = refreshingText,
                     style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.textSecondary,
                 )
             }
         } else {
             Icon(
-                imageVector        = Icons.Default.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.trades_history_pull_to_refresh),
+                imageVector        = pullIcon,
+                contentDescription = pullHintDescription,
                 tint               = mc.textSecondary.copy(alpha = dragFraction.coerceIn(0f, 1f)),
                 modifier           = Modifier
                     .size(20.dp)
