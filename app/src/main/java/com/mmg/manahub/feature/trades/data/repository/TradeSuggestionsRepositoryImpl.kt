@@ -1,9 +1,9 @@
 package com.mmg.manahub.feature.trades.data.repository
 
 import com.mmg.manahub.feature.trades.data.remote.TradeSuggestionsRemoteDataSource
-import com.mmg.manahub.feature.trades.data.remote.dto.TradeSuggestionDto
-import com.mmg.manahub.feature.trades.domain.model.TradeSuggestion
-import com.mmg.manahub.feature.trades.domain.repository.TradeSuggestionsRepository
+import com.mmg.manahub.core.data.remote.dto.TradeSuggestionDto
+import com.mmg.manahub.core.model.TradeSuggestion
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 

@@ -38,7 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.trades.domain.model.SharedListResult
+import com.mmg.manahub.core.model.SharedListResult
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Screen

@@ -4,7 +4,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserDefinedTag
-import com.mmg.manahub.core.domain.model.WishlistEntry
+import com.mmg.manahub.core.model.WishlistEntry
 
 data class CardDetailUiState(
     val card:             Card?          = null,

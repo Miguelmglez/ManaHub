@@ -9,10 +9,10 @@ import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.feature.trades.domain.model.TradeError
-import com.mmg.manahub.feature.trades.domain.model.TradeItem
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
+import com.mmg.manahub.core.model.TradeError
+import com.mmg.manahub.core.model.TradeItem
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.DeclineProposalUseCase

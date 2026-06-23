@@ -72,9 +72,9 @@ import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.TimeAgoFormatter
-import com.mmg.manahub.feature.trades.domain.model.TradeItem
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.model.TradeStatus
+import com.mmg.manahub.core.model.TradeItem
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

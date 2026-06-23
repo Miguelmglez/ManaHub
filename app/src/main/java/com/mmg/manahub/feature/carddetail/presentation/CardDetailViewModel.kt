@@ -19,9 +19,9 @@ import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.domain.model.WishlistEntry
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job

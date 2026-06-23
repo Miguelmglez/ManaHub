@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.trades.domain.model
 
+import com.mmg.manahub.core.model.TradeStatus
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

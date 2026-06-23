@@ -6,9 +6,9 @@ import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.model.TradeStatus
-import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
+import com.mmg.manahub.core.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.trades.domain.model
+package com.mmg.manahub.core.model
 
 /** A single card line within a [TradeProposal], moving from one user to another. */
 data class TradeItem(

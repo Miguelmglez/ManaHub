@@ -1,10 +1,12 @@
-package com.mmg.manahub.feature.trades.data.remote.dto
+package com.mmg.manahub.core.data.remote.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class TradeItemRequestDto(
+data class TradeItemDto(
+    val id: String,
+    @SerialName("trade_proposal_id") val tradeProposalId: String,
     @SerialName("from_user_id") val fromUserId: String,
     @SerialName("to_user_id") val toUserId: String,
     @SerialName("user_card_id_ref") val userCardIdRef: String? = null,

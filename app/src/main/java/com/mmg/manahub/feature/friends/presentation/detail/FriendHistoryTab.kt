@@ -40,8 +40,8 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.model.TradeStatus
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

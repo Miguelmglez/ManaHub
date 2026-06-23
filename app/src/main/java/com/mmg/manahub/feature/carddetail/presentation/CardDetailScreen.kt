@@ -131,7 +131,7 @@ import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.core.domain.model.WishlistEntry
+import com.mmg.manahub.core.model.WishlistEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

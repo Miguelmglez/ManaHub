@@ -47,7 +47,7 @@ import com.mmg.manahub.feature.news.domain.model.ContentSource
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -1,6 +1,6 @@
-package com.mmg.manahub.feature.trades.domain.repository
+package com.mmg.manahub.core.domain.repository
 
-import com.mmg.manahub.feature.trades.domain.model.TradeSuggestion
+import com.mmg.manahub.core.model.TradeSuggestion
 
 interface TradeSuggestionsRepository {
     suspend fun getSuggestions(): Result<List<TradeSuggestion>>

@@ -1,9 +1,9 @@
 package com.mmg.manahub.feature.trades.data.remote
 
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.trades.domain.model.SharedList
-import com.mmg.manahub.feature.trades.domain.model.SharedListResult
-import com.mmg.manahub.feature.trades.domain.model.SharedListType
+import com.mmg.manahub.core.model.SharedList
+import com.mmg.manahub.core.model.SharedListResult
+import com.mmg.manahub.core.model.SharedListType
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineDispatcher

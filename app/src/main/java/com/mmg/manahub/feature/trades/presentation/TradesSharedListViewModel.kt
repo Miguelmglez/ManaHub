@@ -3,8 +3,8 @@ package com.mmg.manahub.feature.trades.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.feature.trades.domain.model.SharedListResult
-import com.mmg.manahub.feature.trades.domain.repository.SharedListsRepository
+import com.mmg.manahub.core.model.SharedListResult
+import com.mmg.manahub.core.domain.repository.SharedListsRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

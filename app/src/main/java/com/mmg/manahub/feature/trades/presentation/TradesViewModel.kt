@@ -6,9 +6,9 @@ import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.friends.domain.model.Friend
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
-import com.mmg.manahub.core.domain.model.OpenForTradeEntry
-import com.mmg.manahub.core.domain.model.WishlistEntry
-import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.model.toUserFacingMessage
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.SyncTradeListsFromRemoteUseCase

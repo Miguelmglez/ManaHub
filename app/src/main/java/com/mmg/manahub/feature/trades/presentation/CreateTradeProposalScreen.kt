@@ -92,7 +92,7 @@ import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.trades.domain.model.TradeSide
+import com.mmg.manahub.core.model.TradeSide
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

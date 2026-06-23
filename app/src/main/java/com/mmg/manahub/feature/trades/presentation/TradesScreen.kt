@@ -56,8 +56,8 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.core.domain.model.OpenForTradeEntry
-import com.mmg.manahub.core.domain.model.WishlistEntry
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.WishlistEntry
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
