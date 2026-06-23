@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -49,7 +50,7 @@ private fun DrawScope.drawHexOutline(
 ) {
     val path = Path()
     for (i in 0..5) {
-        val angle = Math.PI / 180.0 * (60 * i - 30)
+        val angle = PI / 180.0 * (60 * i - 30)
         val x = center.x + size * cos(angle).toFloat()
         val y = center.y + size * sin(angle).toFloat()
         if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
