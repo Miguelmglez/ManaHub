@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.trades.data.repository
 
-import com.mmg.manahub.feature.trades.data.remote.TradeSuggestionsRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradeSuggestionsRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.TradeSuggestionDto
 import com.mmg.manahub.core.model.TradeSuggestion
 import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository

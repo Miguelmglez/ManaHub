@@ -4,7 +4,7 @@ import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeWithCard
 import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
-import com.mmg.manahub.feature.trades.data.remote.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.OpenForTradeEntryDto
 import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository

@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.trades.data.repository
 
-import com.mmg.manahub.feature.trades.data.remote.SharedListsRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.SharedListsRemoteDataSource
 import com.mmg.manahub.core.model.SharedList
 import com.mmg.manahub.core.model.SharedListResult
 import com.mmg.manahub.core.model.SharedListType
