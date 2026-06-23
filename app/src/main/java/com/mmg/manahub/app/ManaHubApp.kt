@@ -6,9 +6,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import androidx.work.WorkManager
-import coil.Coil
-import coil.ImageLoader
-import coil.decode.SvgDecoder
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.svg.SvgDecoder
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.messaging.FirebaseMessaging
 import com.mmg.manahub.BuildConfig
@@ -510,12 +511,14 @@ class ManaHubApp : Application() {
             setCustomKey("app_version_name", BuildConfig.VERSION_NAME)
         }
 
-        Coil.setImageLoader(
+        SingletonImageLoader.setSafe {
             ImageLoader.Builder(this)
-                .okHttpClient(okHttpClient)
-                .components { add(SvgDecoder.Factory()) }
+                .components {
+                    add(SvgDecoder.Factory())
+                    add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
+                }
                 .build()
-        )
+        }
 
         appScope.launch {
             runCatching { syncManaSymbols() }

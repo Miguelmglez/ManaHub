@@ -210,6 +210,7 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
+    implementation(libs.coil.network.okhttp)
 
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
