@@ -375,6 +375,19 @@ DI: `SharedDomainUseCaseModule` `@Provides` for the use case; `DatabaseModule` `
 `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0
 platform imports in `commonMain`.
 
+✅ **Phase 2 §9.6 — `ScryfallCache` + `CardDtoMapper` + `ScryfallRemoteDataSource` moved to
+`:shared:core-data` commonMain (GREEN, `2eebdcf`).** All three tightly coupled: cache → mapper →
+data source. `TimedLruCache` rewritten with `HashMap` + `MutableList<K>` for KMP-safe LRU eviction
+(replaces JVM-only `LinkedHashMap(accessOrder=true)` + `removeEldestEntry` override). Same API
+preserved: `get`/`put`/`getOrFetch` (in-flight dedup via `CompletableDeferred`)/`invalidate`/`clear`.
+`System.currentTimeMillis()` → `kotlin.time.Clock.System.now().toEpochMilliseconds()` in both cache
+and mapper. `Dispatchers.IO` → `DispatcherProvider.io` in `ScryfallRemoteDataSource`. All three
+stripped of `@Inject`/`@Singleton`; Hilt `@Provides` added in `SharedDomainUseCaseModule`. Package
+changes: `ScryfallCache` `core.network` → `core.data.network` (co-located with `ScryfallRequestQueue`);
+mapper and data source packages unchanged (0 consumer import edits for those). 15 consumers in `:app`
+unchanged (same package). Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs`
+GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
+
 ➡️ **NEXT = continue Phase 2 data-layer work.** The 4 remaining
 shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
 abstraction in `commonMain` via the `CommunityDeckCache` pattern):
@@ -523,6 +536,16 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-23 — **Phase 2 §9.6: `ScryfallCache` + `CardDtoMapper` + `ScryfallRemoteDataSource` →
+  `:shared:core-data` commonMain (GREEN, `2eebdcf`).** `TimedLruCache` KMP-safe LRU rewrite (HashMap +
+  MutableList, same API + in-flight dedup). `System.currentTimeMillis()` → `Clock.System` in cache +
+  mapper. `Dispatchers.IO` → `DispatcherProvider.io` in data source. Hilt `@Provides` in
+  `SharedDomainUseCaseModule` for both. `ScryfallCache` relocated to `core.data.network`. 7 files
+  changed (3 new in shared, 3 deleted in app, 1 modified Hilt module). Verified: assembleDebug +
+  compileKotlinWasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline); 0 platform imports in
+  commonMain.
+- 2026-06-23 — **Phase 2 §9.6: `ScryfallRequestQueue` + `SyncManaSymbolsUseCase` moved to
+  `:shared:core-data` commonMain (GREEN, `d51193c`).** (See entry below for details.)
 - 2026-06-23 — **Phase 2 §9.6: `CommunityDecksRepositoryImpl` → `:shared:core-data` commonMain (GREEN,
   `b97550b`).** Established the DAO-abstraction pattern: new `CommunityDeckCache` interface in
   `commonMain` (`core.data.cache`) with `CommunityDeckCacheImpl` (Room-backed) in `:app`. Pure
