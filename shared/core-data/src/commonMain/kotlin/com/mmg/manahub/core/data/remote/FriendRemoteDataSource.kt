@@ -1,6 +1,6 @@
-package com.mmg.manahub.feature.friends.data.remote
+package com.mmg.manahub.core.data.remote
 
-import com.mmg.manahub.core.data.remote.FriendshipClient
+import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteRequestDto
 import com.mmg.manahub.core.data.remote.dto.AcceptInviteResultDto
 import com.mmg.manahub.core.data.remote.dto.FriendCardDto
@@ -12,20 +12,24 @@ import com.mmg.manahub.core.data.remote.dto.SendFriendRequestDto
 import com.mmg.manahub.core.data.remote.dto.UpdateFriendshipStatusDto
 import com.mmg.manahub.core.data.remote.dto.UpsertCollectionStatsDto
 import com.mmg.manahub.core.data.remote.dto.UserSearchResultDto
-import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
-import com.mmg.manahub.feature.friends.data.orNullIfBlank
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
-class FriendRemoteDataSource @Inject constructor(
+/**
+ * Remote data source for the Friends feature.
+ *
+ * All calls delegate to [FriendshipClient] (Ktor-based PostgREST client) and run on
+ * [DispatcherProvider.io] (KMP-safe replacement for `Dispatchers.IO`).
+ *
+ * @param client            Ktor-based [FriendshipClient].
+ * @param dispatcherProvider Platform dispatcher abstraction.
+ */
+class FriendRemoteDataSource(
     private val client: FriendshipClient,
-    @IoDispatcher private val dispatcher: CoroutineDispatcher,
+    private val dispatcherProvider: DispatcherProvider = DispatcherProvider(),
 ) {
 
     suspend fun getFriends(currentUserId: String): Result<List<FriendWithProfile>> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 val orFilter = "(user_id_1.eq.$currentUserId,user_id_2.eq.$currentUserId)"
                 val friendships = client.getFriendships(or = orFilter)
@@ -53,7 +57,7 @@ class FriendRemoteDataSource @Inject constructor(
         }
 
     suspend fun getPendingRequests(currentUserId: String): Result<List<FriendRequestWithProfile>> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 val requests = client.getPendingRequests(userId2Filter = "eq.$currentUserId")
                 if (requests.isEmpty()) return@runCatching emptyList()
@@ -78,7 +82,7 @@ class FriendRemoteDataSource @Inject constructor(
         }
 
     suspend fun searchByGameTag(gameTag: String): Result<UserSearchResultDto?> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 client.searchByGameTag(gameTagFilter = "eq.$gameTag").firstOrNull()
             }
@@ -86,10 +90,10 @@ class FriendRemoteDataSource @Inject constructor(
 
     /**
      * Sends a friend request. With Ktor `expectSuccess = true`, non-2xx responses
-     * throw automatically — the wrapping [runCatching] catches them.
+     * throw automatically -- the wrapping [runCatching] catches them.
      */
     suspend fun sendFriendRequest(fromUserId: String, toUserId: String): Result<Unit> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 client.sendFriendRequest(
                     body = SendFriendRequestDto(fromUserId, toUserId),
@@ -101,7 +105,7 @@ class FriendRemoteDataSource @Inject constructor(
      * Accepts a pending friend request by updating its status to ACCEPTED.
      */
     suspend fun acceptRequest(friendshipId: String): Result<Unit> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 client.updateFriendshipStatus(
                     idFilter = "eq.$friendshipId",
@@ -111,14 +115,14 @@ class FriendRemoteDataSource @Inject constructor(
         }
 
     suspend fun rejectRequest(friendshipId: String): Result<Unit> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 client.deleteFriendship(idFilter = "eq.$friendshipId")
             }
         }
 
     suspend fun removeFriend(friendshipId: String): Result<Unit> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 client.deleteFriendship(idFilter = "eq.$friendshipId")
             }
@@ -129,7 +133,7 @@ class FriendRemoteDataSource @Inject constructor(
      * Returns null if the user has no referral code or on any network error.
      */
     suspend fun getMyReferralCode(@Suppress("UNUSED_PARAMETER") userId: String): String? =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             try {
                 // Uses the server-side get_my_referral_code() RPC (SECURITY DEFINER)
                 // so the caller cannot query another user's code by passing a different userId.
@@ -147,7 +151,7 @@ class FriendRemoteDataSource @Inject constructor(
      * @throws Exception on network failures.
      */
     suspend fun acceptInvite(referralCode: String): AcceptInviteResultDto =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             client.acceptInvite(AcceptInviteRequestDto(referralCode)).firstOrNull()
                 ?: throw IllegalStateException("accept_invite returned empty result")
         }
@@ -174,7 +178,7 @@ class FriendRemoteDataSource @Inject constructor(
         limit: Int = 50,
         offset: Int = 0,
     ): List<FriendCardDto> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             client.getFriendCollection(
                 GetFriendCollectionRequestDto(
                     pFriendUserId = friendUserId,
@@ -199,7 +203,7 @@ class FriendRemoteDataSource @Inject constructor(
      * @throws Exception on network failure; callers should wrap with [runCatching].
      */
     suspend fun getFriendStats(friendUserId: String): FriendStatsDto? =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             client.getFriendStats(userIdFilter = "eq.$friendUserId").firstOrNull()
         }
 
@@ -208,7 +212,7 @@ class FriendRemoteDataSource @Inject constructor(
      * or null if no games have been played between the caller and [friendUserId].
      */
     suspend fun getFriendMatchHistory(friendUserId: String): FriendMatchHistoryDto? =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             client.getFriendMatchHistory(GetFriendMatchHistoryRequestDto(friendUserId)).firstOrNull()
         }
 
@@ -226,7 +230,7 @@ class FriendRemoteDataSource @Inject constructor(
         favouriteColor: String?,
         mostValuableColor: String?,
     ): Result<Unit> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 client.upsertCollectionStats(
                     UpsertCollectionStatsDto(
@@ -242,7 +246,7 @@ class FriendRemoteDataSource @Inject constructor(
         }
 
     suspend fun getOutgoingRequests(currentUserId: String): Result<List<OutgoingRequestWithProfile>> =
-        withContext(dispatcher) {
+        withContext(dispatcherProvider.io) {
             runCatching {
                 val requests = client.getOutgoingPendingRequests(userId1Filter = "eq.$currentUserId")
                 if (requests.isEmpty()) return@runCatching emptyList()
@@ -267,6 +271,7 @@ class FriendRemoteDataSource @Inject constructor(
         }
 }
 
+/** A friend entry enriched with profile details. */
 data class FriendWithProfile(
     val id: String,
     val friendUserId: String,
@@ -275,6 +280,7 @@ data class FriendWithProfile(
     val avatarUrl: String?,
 )
 
+/** An incoming friend request enriched with the sender's profile. */
 data class FriendRequestWithProfile(
     val id: String,
     val fromUserId: String,
@@ -284,6 +290,7 @@ data class FriendRequestWithProfile(
     val createdAt: Long,
 )
 
+/** An outgoing friend request enriched with the recipient's profile. */
 data class OutgoingRequestWithProfile(
     val id: String,
     val toUserId: String,

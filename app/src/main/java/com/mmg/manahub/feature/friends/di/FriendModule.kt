@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.friends.di
 
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.feature.friends.data.repository.FriendRepositoryImpl
 import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
@@ -35,5 +36,15 @@ abstract class FriendModule {
             httpClient = httpClient,
             baseUrl = "${BuildConfig.SUPABASE_URL}/rest/v1/",
         )
+
+        /**
+         * Provides the [FriendRemoteDataSource] now that it lives in `:shared:core-data`
+         * `commonMain` (stripped of `@Inject`/`@IoDispatcher`; uses [DispatcherProvider]).
+         */
+        @Provides
+        @Singleton
+        fun provideFriendRemoteDataSource(
+            client: FriendshipClient,
+        ): FriendRemoteDataSource = FriendRemoteDataSource(client)
     }
 }
