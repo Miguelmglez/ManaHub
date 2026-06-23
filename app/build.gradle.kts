@@ -149,6 +149,9 @@ dependencies {
     implementation(project(":shared:core-domain"))
     // KMP migration — Phase 2: shared data layer (rate-limit queues, later repo impls + Ktor).
     implementation(project(":shared:core-data"))
+    // KMP migration — Phase 3 / Slice 1: shared design system (MagicTheme tokens, colors,
+    // spacing, shapes, Material 3 bridge). Typography/font-loading remain in :app.
+    implementation(project(":shared:core-ui"))
 
     // Supabase Auth & DB
     val supabaseBom = platform(libs.supabase.bom)
