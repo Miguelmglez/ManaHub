@@ -400,6 +400,17 @@ added to `SharedDomainUseCaseModule`. Package changed `core.domain.usecase.colle
 `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline, +1 flaky
 HomeViewModelTest confirmed on re-run); 0 platform imports in `commonMain`.
 
+✅ **Phase 2 §9.6 — `FriendRemoteDataSource` + `DisplayName` helpers moved to `:shared:core-data`
+commonMain (GREEN, 2026-06-23, commit `a6fc5f9`).** `FriendRemoteDataSource` (+ 3 helper data classes
+`FriendWithProfile`/`FriendRequestWithProfile`/`OutgoingRequestWithProfile`) and `DisplayName.kt`
+(`UNKNOWN_DISPLAY_NAME` const + `orNullIfBlank` extension) moved from `:app`
+`feature/friends/data/remote` to `core.data.remote`. 3 platform fixes: `@IoDispatcher
+CoroutineDispatcher` → `DispatcherProvider`, `@Inject` stripped, `javax.inject` removed. Hilt
+`@Provides @Singleton` added in `FriendModule` companion. `FriendRepositoryImpl` consumer imports
+updated (6 imports). No Koin module changes needed (Koin doesn't reference the data source directly).
+Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN;
+`testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
+
 ➡️ **NEXT = continue Phase 2 data-layer work.** The 4 remaining
 shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
 abstraction in `commonMain` via the `CommunityDeckCache` pattern):
