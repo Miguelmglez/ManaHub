@@ -256,6 +256,21 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   added to version catalog + `:shared:core-data`. `ScryfallRequestQueue` + `ArchidektRequestQueue`
   updated from `retrofit2.HttpException` to `io.ktor.client.plugins.ResponseException`. Baseline held
   at 1964/122/2 throughout all 6 migrations; 0 platform imports in `commonMain`.
+- ✅ **Phase 2 §9.6 — auth domain + playtest model + trade repo impls + news domain batched move
+  (GREEN, `bcc2cfb`, 2026-06-23).** Four parallel agent batches landed in one commit:
+  (1) Auth domain (5 files → `:shared:core-domain` `core.domain.auth`): `AuthRepository`, `AuthUser`,
+  `AuthError`, `AuthResult`, `SessionState` — package UNCHANGED, zero consumer import edits; cross-module
+  smart-cast fixes in `AccountSection` + `BattlefieldContent` (local-val pattern).
+  (2) Playtest models (`PlaytestModels.kt` → `:shared:core-model` `core.model`): package CHANGED from
+  `feature.playtest.domain.model` → `core.model`; 20+ consumer imports + 5 test files updated.
+  (3) Trade repo impls (`SharedListsRepositoryImpl` + `TradeSuggestionsRepositoryImpl` →
+  `:shared:core-data` `core.data.repository`): `@Inject`/`@Singleton` stripped, `TradesModule` `@Binds` →
+  `@Provides`.
+  (4) News domain (`ContentSource` → `:shared:core-model` `core.model.news`; `NewsRepository` →
+  `:shared:core-domain` `core.domain.repository`): package-changed `ContentSource` consumers updated
+  (8 production + 2 test FQN refs).
+  Verified: `:app:assembleDebug` GREEN; 3 shared modules `compileKotlinWasmJs` GREEN;
+  `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
 - ⬜ **Phase 2 (remaining)** — repository impls to `commonMain` (Room stays androidMain), remaining
   platform-bound use cases, fold in web spikes B & C (Supabase/Ktor/Coil on wasmJs).
 - ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
@@ -411,6 +426,9 @@ updated (6 imports). No Koin module changes needed (Koin doesn't reference the d
 Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN;
 `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
 
+✅ **Phase 2 — auth domain + playtest model + trade repo impls + news domain batched move (GREEN,
+`bcc2cfb`, 2026-06-23).** See STATUS for detail.
+
 ➡️ **NEXT = continue Phase 2 data-layer work.** The 4 remaining
 shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
 abstraction in `commonMain` via the `CommunityDeckCache` pattern):
@@ -559,6 +577,16 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-23 — **Phase 2: auth domain + playtest model + trade repo impls + news domain batched move
+  (GREEN, `bcc2cfb`).** 4 parallel batches in one commit (41 files changed, 125 ins, 99 del). Auth
+  domain (5 files, same-package move → zero consumer edits, smart-cast fixes). Playtest models (package
+  change → 20+ consumer updates). Trade repo impls (2 files, `@Inject` stripped → `@Provides` in
+  `TradesModule`). News domain (`ContentSource` package-changed, `NewsRepository` same-package). Key
+  gotcha: cross-module smart-cast on nullable `AuthUser.email` and `PlaytestSetup.commanderCard` required
+  local-val captures (Kotlin can't smart-cast public props from a different module). Verified:
+  assembleDebug + 3 shared wasmJs compiles GREEN; testDebugUnitTest 1964/122/2 (== baseline); 0 platform
+  imports in commonMain. NOTE: initial test run from cached partial results showed false 1418/178/2
+  regression — `--rerun-tasks` confirmed actual 1964/122/2.
 - 2026-06-23 — **Phase 2 §9.6: `ScryfallCache` + `CardDtoMapper` + `ScryfallRemoteDataSource` →
   `:shared:core-data` commonMain (GREEN, `2eebdcf`).** `TimedLruCache` KMP-safe LRU rewrite (HashMap +
   MutableList, same API + in-flight dedup). `System.currentTimeMillis()` → `Clock.System` in cache +
