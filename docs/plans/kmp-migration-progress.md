@@ -311,10 +311,19 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - **Remaining use cases** (~95) — mostly feature-level, tightly coupled to Room repos or gamification.
   - **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
   - **EXCLUDED features** (online, voice, scanner) — deferred per plan.
-- ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first). **Can begin in
-  parallel** — it does NOT depend on the remaining Phase 2 blockers (Room DAO abstractions, gamification
-  types, `@StringRes` decoupling). The UI layer migrates Compose imports to CMP equivalents, moves
-  MagicTheme tokens/typography/spacing/shapes to `:shared:core-ui`, and converts leaf screens first.
+- 🟡 **Phase 3 · Slice 1 — `:shared:core-ui` module + MagicTheme design system (DONE & GREEN,
+  2026-06-23, `e852840`+`ec86cdc`).** `:shared:core-ui` KMP module created (kotlin-multiplatform +
+  android-kmp-library + compose-multiplatform + kotlin-compose plugins; deps = core-model + CMP
+  compose.runtime/foundation/material3/ui). **CMP upgraded 1.9.0 → 1.11.0** to fix
+  `NoSuchMethodError` on AGP 9.1.0's `KotlinMultiplatformAndroidComponentsExtension.onVariant()`.
+  9 theme files MOVED to `commonMain` (`core.ui.theme` package UNCHANGED → zero consumer import edits):
+  AppTheme, Color, MagicColors (12 palettes), PlayerTheme, MagicShapes, Spacing, MagicTypography (data
+  class only — system-font defaults), MagicTheme (CompositionLocals + M3 bridge), Type. MagicTypography
+  SPLIT: data class → commonMain; font families (R.font.*) + NeonVoidTypography → stay `:app`. MagicTheme
+  gained `typography` param; `MagicThemeAndroid` wrapper in `:app` passes NeonVoidTypography. BLOCKED:
+  font families (R.font.*), ThemeBackground (*Background refs), MagicModifiers (BlurMaskFilter).
+- ⬜ **Phase 3 (remaining)** — shared composables (`EmptyState`, `FullErrorState`, `CardGridItem`, etc.)
+  leaf-first, Coil 2→3, leaf screen migrations (Settings/Stats/Profile first).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive +
   `:webApp`. The deferred Phase-2 items (Room DAO abstractions for web, gamification types, `@StringRes`
   decoupling, `PushTokenRepositoryImpl`) naturally land here alongside the web-platform `actual`
@@ -323,20 +332,25 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## NEXT STEP (resume here)
 
-**Phase 2 data-layer sharing is SUBSTANTIALLY COMPLETE.** The remaining Phase 2 items are all blocked
-on cross-cutting infrastructure decisions that naturally belong in Phase 3+ (Room DAO abstractions for
-web, `@StringRes` decoupling, `java.time` → `kotlinx-datetime`, gamification types). Continuing to chip
-at them within Phase 2 yields diminishing returns — the productive path forward is Phase 3.
+**Phase 3 Slice 1 DONE.** `:shared:core-ui` module created + MagicTheme design system ported to
+commonMain (9 files, CMP 1.11.0). The typography font families + NeonVoidTypography stay in `:app`
+(R.font.* blocker). ThemeBackground + MagicModifiers stay in `:app` (platform refs).
 
-**➡️ NEXT = Phase 3 (`:shared:core-ui` + Compose Multiplatform).**
+**➡️ NEXT = Phase 3 Slice 2: move shared composables to `:shared:core-ui`.**
 
-Phase 3 is INDEPENDENT of the remaining Phase 2 blockers — it migrates the UI layer (Compose imports →
-CMP equivalents, MagicTheme tokens/typography/spacing/shapes to `:shared:core-ui`, leaf screens first)
-and can start immediately. The Phase 2 blockers (Room DAO abstractions for web, gamification,
-`@StringRes`) naturally land in Phase 4 (platform parity) alongside the web-platform `actual`
-implementations.
+Candidates (leaf-first, zero-platform-dep composables):
+1. `EmptyState`, `InlineErrorState`, `FullErrorState` — likely pure Compose (check for R.string/drawable)
+2. `CardGridItem`, `CardListItem` — check for Coil (image loading), R.string refs
+3. `MagicToast`/`MagicToastHost`/`MagicToastState` — check for platform deps
+4. `WidgetShell`, `SectionHeader` — likely pure Compose
 
-**Phase 2 remaining items (blocked, deferred):**
+**Before moving each composable:** read it fully, check for `R.`, `@Preview`, `Context`, Coil, or any
+Android-only API. If blocked by Coil → defer to the Coil 2→3 upgrade step. If blocked by R.string →
+decouple strings (parameter or CMP Res).
+
+**Then:** Coil 2→3 upgrade (wasm-capable), which unblocks image-loading composables.
+
+**Phase 2 remaining items (blocked, deferred to Phase 4):**
 - **Room-backed repo impls** (Card, Deck, Stats, UserCard, OpenForTrade, Wishlist, Trades, GameSession,
   Tournament) — each needs a 10-40+ method DAO-abstraction interface. For web, fresh Supabase-backed
   impls behind the same repo interface are more practical than abstracting every Room DAO method.
@@ -475,6 +489,27 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-23 — **Phase 3 Slice 1: `:shared:core-ui` module + MagicTheme design system (GREEN,
+  `e852840`+`ec86cdc`).** Two commits: (1) `e852840` scaffolded `:shared:core-ui` KMP module
+  (kotlin-multiplatform + android-kmp-library + compose-multiplatform + kotlin-compose plugins; commonMain
+  deps = core-model + CMP compose.runtime/foundation/material3/ui). **CMP upgraded 1.9.0 → 1.11.0** to
+  fix `NoSuchMethodError` crash — AGP 9.1.0 removed the `onVariant(Function1)` overload that CMP 1.9.0's
+  `AndroidResources.kt` called; CMP 1.9.3 added AGP 9 support, CMP 1.11.0 requires Kotlin 2.3.20 for
+  wasmJs (exact match). (2) `ec86cdc` moved 9 theme files to `commonMain` (package `core.ui.theme`
+  UNCHANGED → zero consumer import edits): AppTheme (sealed class), Color (NeonVoid raw palette),
+  MagicColors (all 12 palettes + PlayerThemeColors), PlayerTheme, MagicShapes, Spacing, MagicTypography
+  (data class ONLY — system-font defaults, no FontFamily), MagicTheme (CompositionLocals +
+  MaterialTheme.magicColors/magicTypography extensions + MagicTheme composable + M3 bridge), Type (empty).
+  **Key split — MagicTypography:** the data class moved to commonMain with system-font defaults (no
+  `fontFamily` in TextStyle defaults). Font families (MarcellusFontFamily/MulishFontFamily/ManaFontFamily
+  referencing `R.font.*`) + NeonVoidTypography instance (applies those fonts via `.copy(fontFamily = ...)`)
+  stay in `:app`. MagicTheme composable gained a `typography: MagicTypography` parameter (default =
+  system fonts). New `MagicThemeAndroid` wrapper in `:app` passes NeonVoidTypography so existing Android
+  call sites get custom fonts. MainActivity + `MtgCollectionTheme` legacy alias updated to
+  `MagicThemeAndroid`. **BLOCKED (stay in `:app`):** font families (R.font.* → needs CMP Res system),
+  ThemeBackground (imports `*Background` composables from core/ui/components/), MagicModifiers
+  (android.graphics.BlurMaskFilter → needs expect/actual). Verified: assembleDebug GREEN,
+  compileKotlinWasmJs GREEN, testDebugUnitTest 1964/122/2 (== baseline), 0 platform imports in commonMain.
 - 2026-06-23 — **Phase 2 cleanup: AddCardRow/DeckSlotEntry → core-model + TradesRepository shim deleted
   (GREEN, `f992cf6`).** `DeckSlotEntry` + `AddCardRow` moved from `:app` `core.domain.model` to
   `:shared:core-model` `core.model` (all deps already shared — Card, WishlistEntry, OpenForTradeEntry;
