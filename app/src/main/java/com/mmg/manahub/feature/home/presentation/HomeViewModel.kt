@@ -36,10 +36,10 @@ import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftStatus
-import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftStatus
+import com.mmg.manahub.core.domain.repository.DraftRepository
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.DISCOVER_RANDOM_QUERY
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MAX_NEWS

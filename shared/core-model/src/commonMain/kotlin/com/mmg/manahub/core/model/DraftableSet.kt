@@ -1,11 +1,8 @@
-package com.mmg.manahub.feature.draft.domain.model
-
-import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.DraftSet
+package com.mmg.manahub.core.model
 
 /**
  * A fully-resolved set ready for simulation: card pool, booster config, and tier-list ratings.
- * Assembled by [com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository].
+ * Assembled by [com.mmg.manahub.core.domain.repository.DraftSimRepository].
  */
 data class DraftableSet(
     val set: DraftSet,

@@ -1,3 +1,3 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.model
 
 data class DraftResult(val seat: DraftSeat, val deck: DraftDeck)

@@ -4,7 +4,7 @@ import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.remote.dto.SetIndexEntryDto
 import com.mmg.manahub.core.data.remote.dto.YouTubeVideoDto
-import com.mmg.manahub.feature.draft.domain.model.DraftVideo
+import com.mmg.manahub.core.model.DraftVideo
 
 /**
  * Maps a [SetIndexEntryDto] from the Cloudflare sets-index.json to a [DraftSetEntity]

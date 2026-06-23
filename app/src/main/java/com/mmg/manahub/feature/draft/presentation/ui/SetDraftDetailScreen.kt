@@ -80,9 +80,9 @@ import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.draft.domain.model.ArchetypeGuide
-import com.mmg.manahub.feature.draft.domain.model.DraftVideo
-import com.mmg.manahub.feature.draft.domain.model.MechanicGuide
+import com.mmg.manahub.core.model.ArchetypeGuide
+import com.mmg.manahub.core.model.DraftVideo
+import com.mmg.manahub.core.model.MechanicGuide
 import com.mmg.manahub.feature.draft.presentation.DraftFeatureFlags
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailViewModel

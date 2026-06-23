@@ -1,10 +1,10 @@
-package com.mmg.manahub.feature.draft.domain.repository
+package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.feature.draft.domain.model.DraftResult
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
-import com.mmg.manahub.feature.draft.domain.model.EngineConfig
+import com.mmg.manahub.core.model.DraftResult
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftableSet
+import com.mmg.manahub.core.model.EngineConfig
 import kotlinx.coroutines.flow.Flow
 
 interface DraftSimRepository {

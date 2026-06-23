@@ -6,10 +6,10 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder.Companion.BASIC_LANDS_TOTAL
-import com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder
-import com.mmg.manahub.feature.draft.domain.model.BasicLandSlot
-import com.mmg.manahub.feature.draft.domain.model.DraftDeck
-import com.mmg.manahub.feature.draft.domain.model.DraftSeat
+import com.mmg.manahub.core.domain.engine.DraftDeckBuilder
+import com.mmg.manahub.core.model.BasicLandSlot
+import com.mmg.manahub.core.model.DraftDeck
+import com.mmg.manahub.core.model.DraftSeat
 import javax.inject.Inject
 
 /**

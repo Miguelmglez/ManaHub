@@ -7,14 +7,14 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
-import com.mmg.manahub.feature.draft.domain.model.BoosterPack
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftError
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftStatus
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.domain.engine.BotDrafter
+import com.mmg.manahub.core.model.BoosterPack
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftError
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftStatus
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
@@ -105,7 +105,7 @@ class DraftSimViewModel(
     }
 
     /**
-     * Resolves the [com.mmg.manahub.feature.draft.domain.model.DraftableSet] for [code] and
+     * Resolves the [com.mmg.manahub.core.model.DraftableSet] for [code] and
      * transitions to [DraftSimUiState.SetupReady] on success.
      */
     fun loadSet(code: String) {

@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Domain model for a set's draft guide, sourced from the Cloudflare Worker.

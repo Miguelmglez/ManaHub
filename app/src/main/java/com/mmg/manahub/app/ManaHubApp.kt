@@ -76,9 +76,9 @@ import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.draft.di.draftKoinModule
-import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
-import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.domain.engine.BotDrafter
+import com.mmg.manahub.core.domain.repository.DraftRepository
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase

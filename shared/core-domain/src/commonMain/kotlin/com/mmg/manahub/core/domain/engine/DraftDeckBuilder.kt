@@ -1,7 +1,7 @@
-package com.mmg.manahub.feature.draft.domain.engine
+package com.mmg.manahub.core.domain.engine
 
-import com.mmg.manahub.feature.draft.domain.model.DraftDeck
-import com.mmg.manahub.feature.draft.domain.model.DraftSeat
+import com.mmg.manahub.core.model.DraftDeck
+import com.mmg.manahub.core.model.DraftSeat
 
 /**
  * Builds the final deck from a completed [DraftSeat] pool.

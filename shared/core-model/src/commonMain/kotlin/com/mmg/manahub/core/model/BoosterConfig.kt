@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Parsed representation of the Worker's booster.json for a set.

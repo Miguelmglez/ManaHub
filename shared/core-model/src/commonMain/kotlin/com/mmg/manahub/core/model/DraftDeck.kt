@@ -1,8 +1,8 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * The final built deck from a draft: 23 non-land picks + 17 basic lands.
- * Produced by [com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder].
+ * Produced by [com.mmg.manahub.core.domain.engine.DraftDeckBuilder].
  */
 data class DraftDeck(
     val mainboard: List<DraftCard>,

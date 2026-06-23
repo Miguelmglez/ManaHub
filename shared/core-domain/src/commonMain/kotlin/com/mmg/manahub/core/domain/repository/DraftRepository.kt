@@ -1,11 +1,11 @@
-package com.mmg.manahub.feature.draft.domain.repository
+package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DraftSet
-import com.mmg.manahub.feature.draft.domain.model.DraftVideo
-import com.mmg.manahub.feature.draft.domain.model.SetDraftGuide
-import com.mmg.manahub.feature.draft.domain.model.SetTierList
+import com.mmg.manahub.core.model.DraftVideo
+import com.mmg.manahub.core.model.SetDraftGuide
+import com.mmg.manahub.core.model.SetTierList
 
 interface DraftRepository {
     suspend fun getDraftableSets(forceRefresh: Boolean = false): DataResult<List<DraftSet>>

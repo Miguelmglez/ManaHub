@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.data.engine
 
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
+import com.mmg.manahub.core.model.DraftCard
 
 /**
  * Shared rating normalisation for the draft bots.
