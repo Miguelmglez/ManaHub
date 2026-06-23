@@ -1,8 +1,6 @@
-package com.mmg.manahub.feature.playtest.domain.model
+package com.mmg.manahub.core.model
 
-import com.mmg.manahub.core.model.Card
-
-// ── Ephemeral state models (never persisted until user taps "Guardar test") ───
+// ── Ephemeral state models (never persisted until user taps "Save test") ─────
 
 /**
  * Represents the configuration chosen by the user on the setup screen.
@@ -47,7 +45,7 @@ data class HandSnapshot(
     val startedAt: Long,
 )
 
-// ── Battlefield ("fake game") ephemeral models ────────────────────────────────
+// ── Battlefield ("fake game") ephemeral models ──────────────────────────────
 // These models are NEVER persisted. They back the in-memory PLAY phase that runs
 // after the user keeps an opening hand. Like every playtest state, they live only
 // in the ViewModel and disappear when the test ends (explicit-save-only applies —
@@ -97,7 +95,7 @@ enum class PlayZone {
  *   every battlefield `LazyRow` keys by, so duplicate copies of the same card never
  *   collide on key (the duplicate-key crash class documented for the survey LazyRow).
  * @param card The hydrated domain card.
- * @param isTapped Whether the card is rotated 90° (tapped). Display-only.
+ * @param isTapped Whether the card is rotated 90 degrees (tapped). Display-only.
  */
 data class PlayCard(
     val instanceId: Long,

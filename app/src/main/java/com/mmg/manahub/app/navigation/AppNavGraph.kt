@@ -77,7 +77,7 @@ import com.mmg.manahub.feature.home.presentation.HomeScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen

@@ -57,8 +57,8 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.PlaytestEligibility
+import com.mmg.manahub.core.model.PlaytestSetup
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

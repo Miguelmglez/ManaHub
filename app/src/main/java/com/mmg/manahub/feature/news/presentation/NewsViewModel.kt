@@ -7,7 +7,7 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.SourceType
-import com.mmg.manahub.feature.news.domain.model.ContentSource
+import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase

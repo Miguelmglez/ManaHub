@@ -73,10 +73,10 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.playtest.domain.model.BattlefieldState
-import com.mmg.manahub.feature.playtest.domain.model.PlayCard
-import com.mmg.manahub.feature.playtest.domain.model.PlayZone
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
+import com.mmg.manahub.core.model.BattlefieldState
+import com.mmg.manahub.core.model.PlayCard
+import com.mmg.manahub.core.model.PlayZone
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.presentation.components.CommandZoneArea
 import kotlin.math.roundToInt
 
@@ -280,9 +280,10 @@ private fun PortraitBattlefield(
     val sp = MaterialTheme.spacing
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (setup.commanderCard != null) {
+        val commander = setup.commanderCard
+        if (commander != null) {
             CommandZoneArea(
-                commanderCard = setup.commanderCard,
+                commanderCard = commander,
                 librarySize   = battlefield.library.size,
                 modifier      = Modifier.padding(horizontal = sp.md, vertical = sp.xs),
             )
@@ -395,9 +396,10 @@ private fun LandscapeBattlefield(
             verticalArrangement = Arrangement.spacedBy(sp.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (setup.commanderCard != null) {
+            val cmdr = setup.commanderCard
+            if (cmdr != null) {
                 CommandZoneArea(
-                    commanderCard = setup.commanderCard,
+                    commanderCard = cmdr,
                     librarySize   = battlefield.library.size,
                     modifier      = Modifier.fillMaxWidth(),
                 )

@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSurveyAnswers
+import com.mmg.manahub.core.model.PlaytestSurveyAnswers
 import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
 
 /**

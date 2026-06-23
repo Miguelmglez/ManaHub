@@ -514,10 +514,11 @@ private fun AuthenticatedCard(
                             }
                         }
                     }
-                    if (user.email != null) {
+                    val email: String? = user.email
+                    if (email != null) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = user.email,
+                            text = email,
                             style = ty.bodySmall,
                             color = mc.textSecondary,
                             maxLines = 1,
