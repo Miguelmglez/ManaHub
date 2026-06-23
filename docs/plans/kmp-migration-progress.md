@@ -271,212 +271,91 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   (8 production + 2 test FQN refs).
   Verified: `:app:assembleDebug` GREEN; 3 shared modules `compileKotlinWasmJs` GREEN;
   `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
-- ⬜ **Phase 2 (remaining)** — repository impls to `commonMain` (Room stays androidMain), remaining
-  platform-bound use cases, fold in web spikes B & C (Supabase/Ktor/Coil on wasmJs).
-- ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first).
-- ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive + `:webApp`.
+- ✅ **Phase 2 — friends/game/tournament/playtest models + repos shared (GREEN, `ef4e98a`, 2026-06-23).**
+  10 pure domain models → `:shared:core-model`: Friends (7: AcceptInviteResult, Friend, FriendCard,
+  FriendMatchHistory, FriendRequest, FriendStats, OutgoingFriendRequest, FolderFilters), Game (2:
+  CounterIconKey, LayoutTemplate + GridSlotPosition/PlayerSlot/LayoutTemplates), Tournament (1:
+  MatchResult). 2 repo interfaces → `:shared:core-domain`: `FriendRepository`, `PlaytestRepository`.
+  Skipped: GameResult/PhaseStop/PlayerConfig (`@StringRes`/`PlayerThemeColors`). 40 consumer files updated.
+  Verified: assembleDebug + wasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline); 0 platform imports.
+- ✅ **Phase 2 — cleanup: AddCardRow/DeckSlotEntry → core-model + TradesRepository shim deleted (GREEN,
+  `f992cf6`, 2026-06-23).** `DeckSlotEntry` + `AddCardRow` moved from `:app` `core.domain.model` to
+  `:shared:core-model` `core.model` (all deps — Card, WishlistEntry, OpenForTradeEntry — already shared;
+  12 consumer imports updated + 2 cross-module smart-cast fixes). The `feature.trades.domain.repository.
+  TradesRepository` typealias shim deleted — 20 consumers (18 production + 2 test) repointed to the
+  canonical `core.data.repository.TradesRepository` in `:shared:core-data`. 32 files changed.
+  Verified: assembleDebug + wasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline); 0 platform imports.
+- 🟢 **Phase 2 data-layer sharing SUBSTANTIALLY COMPLETE (2026-06-23).** Summary:
+  - **165 shared `.kt` files** in `commonMain` across 4 modules (core-model 77, core-common 4,
+    core-domain 36, core-data 48).
+  - **Retrofit completely removed** (0 imports project-wide); ALL 6 API clients replaced with Ktor.
+  - **All DTOs, rate-limit queues, caches, data sources, mappers** shared in `core-data`.
+  - **Domain models shared:** auth (5), draft (23), trade (19), friends (8), game (2), tournament (1),
+    playtest (7), news (2), community decks (6), deck (5), card (4), collection/stats (5), search (3),
+    user card (2) — plus general-purpose types (DataResult, CachePolicy, Page, etc.).
+  - **19 repo interfaces** shared in `core-domain` (incl. AuthRepository) + `TradesRepository` in `core-data`.
+  - **5 repo impls** shared in `core-data` (NotificationPrefs, CommunityStats, CommunityDecks,
+    SharedLists, TradeSuggestions).
+  - **12 use cases / utilities** shared (7 in core-domain, 3+2 in core-data).
+  - Phase 1 Hilt→Koin cutover COMPLETE (20 islands, all non-excluded features).
+  - **Remaining Phase 2 items are ALL blocked on cross-cutting infrastructure — deferred to Phase 3+.**
+- ⬜ **Phase 2 (remaining — blocked, deferred to Phase 3+):**
+  - **Room-backed repo impls** (Card, Deck, Stats, UserCard, OpenForTrade, Wishlist, Trades,
+    GameSession, Tournament) — each needs a 10-40+ method DAO-abstraction interface in `commonMain`.
+    For web, fresh Supabase-backed impls behind the same repo interface are more practical than
+    abstracting every Room DAO method.
+  - **Gamification types** (`ProgressionEvent`, `PlayerProgression`, `GamificationRepository`) — blocked
+    on `java.time.Instant` (needs `kotlinx-datetime`), `@StringRes`.
+  - **Game domain models** (GameMode, GamePhase, Player, PlayerConfig, GameResult, PhaseStop) — blocked
+    on `@StringRes`/`R`/`PlayerThemeColors`.
+  - **Remaining use cases** (~95) — mostly feature-level, tightly coupled to Room repos or gamification.
+  - **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
+  - **EXCLUDED features** (online, voice, scanner) — deferred per plan.
+- ⬜ **Phase 3** — `:shared:core-ui` + features to Compose Multiplatform (leaf-first). **Can begin in
+  parallel** — it does NOT depend on the remaining Phase 2 blockers (Room DAO abstractions, gamification
+  types, `@StringRes` decoupling). The UI layer migrates Compose imports to CMP equivalents, moves
+  MagicTheme tokens/typography/spacing/shapes to `:shared:core-ui`, and converts leaf screens first.
+- ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive +
+  `:webApp`. The deferred Phase-2 items (Room DAO abstractions for web, gamification types, `@StringRes`
+  decoupling, `PushTokenRepositoryImpl`) naturally land here alongside the web-platform `actual`
+  implementations.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
 
 ## NEXT STEP (resume here)
-✅ **Phase 2 Slice 2a-i (Deck) DONE & GREEN (2026-06-22)** — `Deck`/`DeckSlot`/`DeckWithCards`/
-`BASIC_LAND_NAMES` are now in `:shared:core-model` and `DeckRepository` is in `:shared:core-domain`.
-`DeckSlotEntry`/`AddCardRow` stayed in `:app`.
 
-✅ **Phase 2 Slice 2b (Card) DONE & GREEN (2026-06-22)** — commits `0dc47d1` (decouple
-`CardTag.label`) + `e8e83b3` (move models + repo). Used **option (a)**: dropped the `label` getter
-from the pure model; label resolution moved to `:app` extension `fun CardTag.label()` in
-`core/tagging/CardTagLabel.kt` (exact fallback precedence preserved). `Card`/`CardTag`+`TagCategory`/
-`CardFace`/`SuggestedTag` now in `:shared:core-model` (`core.model`); `CardRepository` in
-`:shared:core-domain` (`core.domain.repository`). `UserCard`/`UserCardWithCard` extracted to a new
-`:app` `core/domain/model/UserCard.kt` (kept in `:app` — `System.currentTimeMillis()` + gate the
-deferred `UserCardRepository`). `:app:assembleDebug` GREEN; both wasmJs compiles GREEN;
-`testDebugUnitTest` = 1964/122-fail/2-skip (== baseline). 0 platform imports in `commonMain`.
-  - Gotchas (recorded): `.label` sed false-positives (`magicTypography.labelLarge`,
-    `TagItem.label` String field, `link.label`, etc.) — verify receiver type before converting;
-    same-package implicit `Card` refs (`AddCardRow`/`DeckBuilderState`/`OpenForTradeEntry`/
-    `WishlistEntry`) needed explicit `import core.model.Card` (downstream errors masked the cause);
-    cross-module smart-cast on public nullable props (`cardFaces`/`manaCost`/`loyalty`/`printedName`/
-    `printedTypeLine`) broke — fix per-site with safe-call/`?.let`/local val.
+**Phase 2 data-layer sharing is SUBSTANTIALLY COMPLETE.** The remaining Phase 2 items are all blocked
+on cross-cutting infrastructure decisions that naturally belong in Phase 3+ (Room DAO abstractions for
+web, `@StringRes` decoupling, `java.time` → `kotlinx-datetime`, gamification types). Continuing to chip
+at them within Phase 2 yields diminishing returns — the productive path forward is Phase 3.
 
-✅ **Phase 2 use-case batch #1 (5 PURE use cases) DONE & GREEN (2026-06-22)** — moved into
-`:shared:core-domain` `commonMain` (packages preserved): `SearchCardUseCase` + `SearchCardsUseCase`
-(`usecase.card`, dep = `CardRepository`/`Card`/`DataResult`), `BuildScryfallQueryUseCase`
-(`usecase.search`, dep = `AdvancedSearchQuery`/`SearchCriterion`/`SearchOrder`),
-`GetCollectionSetCodesUseCase` + `GetCollectionStatsUseCase` (`usecase.stats`, dep =
-`StatsRepository` + `CollectionStats`/`MtgColor`/`PreferredCurrency`). All five are genuinely pure
-(only moved repo interfaces + core-model + kotlinx Flow).
-  - **KEY GOTCHA — these are NOT yet Koin-owned; Hilt still constructs them** (bridged into the Koin
-    AddCard/Stats islands via `ManaHubApp` `@Inject lateinit var` fields, and `AdvancedSearchViewModel`
-    is still `@HiltViewModel` consuming `BuildScryfallQueryUseCase`). `javax.inject` is JVM-only and
-    cannot live in `commonMain`, so `@Inject` was STRIPPED — which means Hilt can no longer construct
-    them. Fix: stripped `@Inject` + added a new Hilt `@Provides @Singleton` module
-    `app/core/di/SharedDomainUseCaseModule.kt` providing all five (repo args resolved from the existing
-    `RepositoryModule` `@Binds`). The Koin bridges + `@HiltViewModel` site keep getting the Hilt-built
-    singletons unchanged — zero behaviour change, no Koin module edits. This is the standing pattern for
-    moving a still-Hilt-owned `@Inject` use case to `commonMain`: strip `@Inject`, add a `@Provides`.
-  - `:shared:core-common` NOT consumed (none of the five need a dispatcher); core-domain build file
-    unchanged. Verified: `:shared:core-domain:compileKotlinWasmJs` SUCCESSFUL; `:app:assembleDebug`
-    SUCCESSFUL (Hilt aggregate OK); `testDebugUnitTest` = 1964/123-fail/2-skip (== 122 baseline + the
-    1 flaky `HomeViewModelTest`; the failing-class set is unchanged — `CollectionUseCasesTest` failure is
-    pre-existing and tests `GetCollectionUseCase`/`RemoveCardUseCase`, which were NOT moved). commonMain
-    forbidden-import grep EMPTY. Packages preserved → zero `:app` import edits; zero inline-FQN refs.
+**➡️ NEXT = Phase 3 (`:shared:core-ui` + Compose Multiplatform).**
 
-✅ **Phase 2 use-case batch #2 (`DeckCard`/`BasicLandDistribution` + `BasicLandCalculator`/
-`DeckCardValidator`) DONE & GREEN (2026-06-22, commit `7932339`)** — see STATUS + CHANGE LOG.
+Phase 3 is INDEPENDENT of the remaining Phase 2 blockers — it migrates the UI layer (Compose imports →
+CMP equivalents, MagicTheme tokens/typography/spacing/shapes to `:shared:core-ui`, leaf screens first)
+and can start immediately. The Phase 2 blockers (Room DAO abstractions for web, gamification,
+`@StringRes`) naturally land in Phase 4 (platform parity) alongside the web-platform `actual`
+implementations.
 
-✅ **Phase 2 use-case batch #3 (`UserCardRepository` interface split) DONE & GREEN (2026-06-22, commit
-`815f169`)** — used the **interface-split** approach (NOT a full `PagingData→Page` swap, to keep the
-Android collection UI's Room→PagingData→LazyPagingItems pipeline intact). `UserCardRepository` moved to
-`:shared:core-domain` `commonMain` with only its platform-agnostic methods; the `PagingData`-backed
-`getCollectionPager()` was split off into a NEW `:app`-only `CollectionPagerSource` interface (in
-`core.domain.repository`); `UserCardRepositoryImpl` now implements BOTH. `UserCard`/`UserCardWithCard`
-model moved to `:shared:core-model` (`core.model`, made wasm-safe). `GetCollectionUseCase` +
-`RemoveCardUseCase` moved to `:shared:core-domain` `commonMain` (standing pattern: `@Inject` stripped,
-`@Provides @Singleton` added to `SharedDomainUseCaseModule`). Verified GREEN: `:app:assembleDebug`,
-both shared wasmJs compiles, `testDebugUnitTest` = 1964/122-fail/2-skip (== baseline), no platform
-imports in shared `commonMain` (the 2 `androidx.paging` grep hits are KDoc, not imports). NOTE: code was
-authored by the architect but the agent hit its session limit before committing — the main agent
-verified the uncommitted WIP (full build + tests + leak grep) and committed it.
+**Phase 2 remaining items (blocked, deferred):**
+- **Room-backed repo impls** (Card, Deck, Stats, UserCard, OpenForTrade, Wishlist, Trades, GameSession,
+  Tournament) — each needs a 10-40+ method DAO-abstraction interface. For web, fresh Supabase-backed
+  impls behind the same repo interface are more practical than abstracting every Room DAO method.
+- **Gamification types** (`ProgressionEvent`, `PlayerProgression`, `GamificationRepository`) — blocked
+  on `java.time.Instant` (needs `kotlinx-datetime`), `@StringRes`.
+- **Game domain models** (GameMode, GamePhase, Player, PlayerConfig, GameResult, PhaseStop) — blocked
+  on `@StringRes`/`R`/`PlayerThemeColors`.
+- **Remaining use cases** (~95) — mostly feature-level, tightly coupled to Room repos or gamification.
+- **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
+- **EXCLUDED features** (online, voice, scanner) — deferred per plan.
+- **`PushTokenRepositoryImpl`** — deferred to Phase 4 (FCM/WorkManager, no web equivalent).
 
-✅ **Phase 2 §9.6 item 4 — first repo impl: `NotificationPrefsRepositoryImpl` moved (DONE & GREEN,
-2026-06-22, commit `ed6fea5`).** Simplest candidate (no Room, only Supabase SDK). 3 platform deps fixed:
-`android.util.Log` → dropped (non-fatal swallowed errors), `AtomicBoolean` → `Mutex`-guarded boolean,
-`@Inject`/`@Singleton`/`@IoDispatcher` → plain ctor with `DispatcherProvider`. PushModule `@Binds` →
-`@Provides` (companion object). Supabase BOM/postgrest/auth deps added to `:shared:core-data`. Verified:
-`:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` =
-1964/122-fail/2-skip (== baseline); commonMain platform-import grep EMPTY.
-
-✅ **Phase 2 §9.6 item 4 — `CommunityStatsRepositoryStub` moved (DONE & GREEN, 2026-06-22, commit
-`60834c3`).** Trivial stub (`flowOf(null)`, zero platform deps). Stripped `@Inject`/`@Singleton`;
-CommunityModule converted `@Binds` → `@Provides` (abstract class → object). Package unchanged. Verified:
-`:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` =
-1964/122-fail/2-skip (== baseline); commonMain platform-import grep EMPTY.
-
-⬜ **Phase 2 §9.6 item 4 — `PushTokenRepositoryImpl` DEFERRED (too many platform deps for commonMain).**
-Requires 4+ new abstractions: (1) `PushTokenProvider` (wraps `FirebaseMessaging.getInstance().token` —
-Android-only FCM), (2) `BackgroundTokenRegistrar` (wraps `WorkManager` +
-`RegisterPushTokenWorker`/`UnregisterPushTokenWorker` — Android-only), (3) `CrashReporter` integration
-(wraps `FirebaseCrashlytics.getInstance().recordException`), (4) `UserPreferencesDataStore` access for
-locale (Android DataStore). Additionally, `PushTokenRemoteDataSource` uses `BuildConfig.VERSION_NAME`
-(Android-only). The web platform has no FCM equivalent (push notifications out of scope for web v1 per
-the migration plan). Creating 4+ interfaces + expect/actual pairs for a feature that won't exist on web
-is not cost-effective now — defer to Phase 4 (platform parity) when push notification scope is clearer.
-
-✅ **Phase 2 §9.6 — CommunityDecks domain models + repo interface + CachePolicy shared (GREEN,
-`c8b48cc`).** Prerequisite for moving `CommunityDecksRepositoryImpl` (see next entry).
-
-✅ **Phase 2 §9.6 — `CommunityDecksRepositoryImpl` → `:shared:core-data` commonMain (GREEN,
-`b97550b`).** Established the **DAO-abstraction pattern** for future repo-impl moves: a
-`CommunityDeckCache` interface in `commonMain` (`core.data.cache`) abstracts the Room cache ops;
-`CommunityDeckCacheImpl` (Room-backed, in `:app` `feature/communitydecks/data/`) implements it and is
-Koin-injected. DTO→domain mappers split: pure mappers moved to shared (`core.data.remote.mapper`);
-Room-entity mapper stays in `:app`. `ArchidektRequestQueue` also moved to shared (`core.data.network`,
-was already a thin `RateLimitedQueue` wrapper). Repo impl stripped of `@Inject`/`@Singleton`/
-`@IoDispatcher` → plain ctor with `DispatcherProvider`. Verified: `:app:assembleDebug` GREEN;
-`:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0
-platform imports in `commonMain`.
-
-✅ **Phase 2 §9.6 — `ScryfallRequestQueue` + `SyncManaSymbolsUseCase` moved to `:shared:core-data`
-commonMain (GREEN, `d51193c`).** `ScryfallRequestQueue` → `core.data.network` (plain class matching
-`ArchidektRequestQueue` pattern; `@Inject`/`@Singleton` stripped, Hilt `@Provides` added in
-`NetworkModule`). `SyncManaSymbolsUseCase` → `core.data.usecase.symbols` (placed in `core-data` NOT
-`core-domain` because it directly orchestrates data-layer types — `ScryfallClient`,
-`ScryfallRequestQueue`, `ManaSymbolStore` — and `core-domain` cannot depend on `core-data`).
-`ManaSymbolDao` abstracted behind `ManaSymbolStore` interface (`core.data.cache`, following
-`CommunityDeckCache` pattern) + `ManaSymbolStoreImpl` (Room-backed, in `:app` `core/data/local/`).
-DI: `SharedDomainUseCaseModule` `@Provides` for the use case; `DatabaseModule` `@Provides` for
-`ManaSymbolStore`. Consumer imports updated: `ScryfallRemoteDataSource`, `DraftRepositoryImpl`,
-`ManaHubApp`. `ScryfallClient.kt` KDoc reference updated. Verified: `:app:assembleDebug` GREEN;
-`:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0
-platform imports in `commonMain`.
-
-✅ **Phase 2 §9.6 — `ScryfallCache` + `CardDtoMapper` + `ScryfallRemoteDataSource` moved to
-`:shared:core-data` commonMain (GREEN, `2eebdcf`).** All three tightly coupled: cache → mapper →
-data source. `TimedLruCache` rewritten with `HashMap` + `MutableList<K>` for KMP-safe LRU eviction
-(replaces JVM-only `LinkedHashMap(accessOrder=true)` + `removeEldestEntry` override). Same API
-preserved: `get`/`put`/`getOrFetch` (in-flight dedup via `CompletableDeferred`)/`invalidate`/`clear`.
-`System.currentTimeMillis()` → `kotlin.time.Clock.System.now().toEpochMilliseconds()` in both cache
-and mapper. `Dispatchers.IO` → `DispatcherProvider.io` in `ScryfallRemoteDataSource`. All three
-stripped of `@Inject`/`@Singleton`; Hilt `@Provides` added in `SharedDomainUseCaseModule`. Package
-changes: `ScryfallCache` `core.network` → `core.data.network` (co-located with `ScryfallRequestQueue`);
-mapper and data source packages unchanged (0 consumer import edits for those). 15 consumers in `:app`
-unchanged (same package). Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs`
-GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
-
-✅ **Phase 2 §9.6 — `RefreshCollectionPricesUseCase` moved to `:shared:core-data` commonMain (GREEN,
-2026-06-23).** Placed in `core.data.usecase.collection` (NOT `core-domain` — depends on
-`ScryfallRemoteDataSource` which is in `core-data`; `core-domain` cannot depend on `core-data`). Same
-rationale as `SyncManaSymbolsUseCase`. 3 platform fixes: `System.currentTimeMillis()` →
-`kotlin.time.Clock.System.now().toEpochMilliseconds()` (`@OptIn(ExperimentalTime::class)`),
-`Dispatchers.IO` → `DispatcherProvider.io` (new ctor param), `@Inject` stripped + `@Provides @Singleton`
-added to `SharedDomainUseCaseModule`. Package changed `core.domain.usecase.collection` →
-`core.data.usecase.collection` → 4 consumer import updates (`ManaHubApp`, `StatsViewModel`,
-`StatsKoinModule`, `PriceRefreshWorker`). No tests existed. Verified: `:app:assembleDebug` GREEN;
-`:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline, +1 flaky
-HomeViewModelTest confirmed on re-run); 0 platform imports in `commonMain`.
-
-✅ **Phase 2 §9.6 — `FriendRemoteDataSource` + `DisplayName` helpers moved to `:shared:core-data`
-commonMain (GREEN, 2026-06-23, commit `a6fc5f9`).** `FriendRemoteDataSource` (+ 3 helper data classes
-`FriendWithProfile`/`FriendRequestWithProfile`/`OutgoingRequestWithProfile`) and `DisplayName.kt`
-(`UNKNOWN_DISPLAY_NAME` const + `orNullIfBlank` extension) moved from `:app`
-`feature/friends/data/remote` to `core.data.remote`. 3 platform fixes: `@IoDispatcher
-CoroutineDispatcher` → `DispatcherProvider`, `@Inject` stripped, `javax.inject` removed. Hilt
-`@Provides @Singleton` added in `FriendModule` companion. `FriendRepositoryImpl` consumer imports
-updated (6 imports). No Koin module changes needed (Koin doesn't reference the data source directly).
-Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs` GREEN;
-`testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
-
-✅ **Phase 2 — auth domain + playtest model + trade repo impls + news domain batched move (GREEN,
-`bcc2cfb`, 2026-06-23).** See STATUS for detail.
-
-✅ **Phase 2 — tagging engine + TradesRepository + SuggestTagsUseCase shared (GREEN,
-`c3b7d7f`, 2026-06-23).** Moved 7 types to shared modules:
-  - `:shared:core-model`: `DetectionRule` (extracted from JVM-only `TagDictionary`), `TagDictionaryEntry`
-    (extracted from `TagDictionary.Entry`).
-  - `:shared:core-data` `core.data.tagging`: `KeywordAnalyzer`, `TypeLineAnalyzer`, `GameChangerAnalyzer`
-    (3 stateless objects, direct move), `StrategyAnalyzer` (converted `object`→`class` with constructor
-    param `entriesProvider: () -> Collection<TagDictionaryEntry>` to sever JVM-only `TagDictionary` dep).
-  - `:shared:core-data` `core.data.usecase.card`: `SuggestTagsUseCase`/`AutoTagCardUseCase` (now takes
-    `StrategyAnalyzer` ctor param; `@Inject` stripped → `@Provides @Singleton` in `SharedDomainUseCaseModule`).
-  - `:shared:core-data` `core.data.repository`: `TradesRepository` interface (all deps already shared).
-  App-side: `TagAnalyzers.kt` replaced with typealiases + convenience `StrategyAnalyzer` wrapper object
-  (backed by `TagDictionary::all`), `createStrategyAnalyzer()` factory for DI. `AutoTagCardUseCase.kt`
-  replaced with typealiases. `TradesRepository.kt` replaced with typealias. `TagDictionary.kt` updated:
-  local `DetectionRule` class + `Entry` inner class deleted, imports from `core-model` added, `Entry`
-  typealias kept for backwards compat. `CardRepositoryImplTest` updated (ctor now needs
-  `createStrategyAnalyzer()`). `CardTagLabel.kt` stays in `:app` (depends on `TagDictionary.localize()`
-  → `java.util.Locale`). Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs`
-  GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
-
-➡️ **NEXT = continue Phase 2 data-layer work.** The 4 remaining
-shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
-abstraction in `commonMain` via the `CommunityDeckCache` pattern):
-- `StatsRepositoryImpl` (6 repo methods but StatsDao has ~21 query methods)
-- `UserCardRepositoryImpl` (14 methods, already interface-split for paging)
-- `DeckRepositoryImpl` (14 methods, DeckDao ~43 annotations)
-- `CardRepositoryImpl` (21 methods, CardDao ~41 annotations) — heaviest
-- `PushTokenRepositoryImpl` — deferred to Phase 4 (FCM/WorkManager, no web equivalent)
-
-**Three productive paths forward (not mutually exclusive):**
-1. **Move more use cases** — several are NOW UNBLOCKED by existing shared deps (Card/Deck/UserCard repos
-   + models are shared) but still platform-bound (`AddCardToCollectionUseCase`, `GetDeckGameStatsUseCase`,
-   ~~`SyncManaSymbolsUseCase`~~ (DONE `d51193c`), ~~`AutoTagCardUseCase`/`SuggestTagsUseCase`~~ (DONE `c3b7d7f`), `ComputeCardTagsUseCase`, ~~`RefreshCollectionPricesUseCase`~~ (DONE),
-   `CommitScannedCardsUseCase`). Each needs its platform deps abstracted first.
-2. **Start web Spikes B & C** (Supabase/Ktor/Coil on wasmJs, web auth) — these validate the runtime
-   libraries the remaining repo impls will need on the web side, and were explicitly deferred to Phase 2.
-3. **Tackle `StatsRepositoryImpl`** (simplest remaining Room-coupled repo) to prove the DAO-abstraction
-   pattern at scale before the heavier Card/Deck/UserCard repos.
-
-**Phase 2 data-layer order (remaining):**
-4. **Repository impls to `commonMain`** — one repo per slice; **Room DAOs/
-   entities/migrations STAY in `androidMain`** (no wasm target) with the DAO interface in `commonMain` and
-   a web data source (Supabase-remote + IndexedDB/localStorage) in `wasmJsMain`. Retrofit → Ktor DONE.
-   Rate-limit queues (`ScryfallRequestQueue`/`ArchidektRequestQueue`) already ported to `commonMain`.
-3. **Fold in the deferred web spikes B & C here** (Supabase/Ktor/Coil on wasmJs; web auth) — they validate
-   exactly the web-runtime libraries Phase 2's data layer introduces, so they belong in this phase.
-Definition of done per Phase-2 batch: Android stays shippable (compiles + 122/2 baseline), the wasmJs
-target compiles, and no Android/AndroidX/browser import leaked into `commonMain`. Keep batches small
-(≤ ~15 files) to survive session limits.
+**Phase 3 entry plan (to be refined in a planning session):**
+1. Create `:shared:core-ui` module with CMP deps (JetBrains Compose Multiplatform).
+2. Move MagicTheme (colors/typography/spacing/shapes) to `core-ui` `commonMain`.
+3. Move shared composables (`EmptyState`, `FullErrorState`, `CardGridItem`, etc.) leaf-first.
+4. Migrate `androidx.compose.*` imports → CMP equivalents in moved composables.
+5. Upgrade Coil 2 → Coil 3 (wasm-capable).
+6. Begin leaf screen migrations (Settings, Stats, Profile first — already Koin).
 
 ---
 
@@ -596,6 +475,24 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-23 — **Phase 2 cleanup: AddCardRow/DeckSlotEntry → core-model + TradesRepository shim deleted
+  (GREEN, `f992cf6`).** `DeckSlotEntry` + `AddCardRow` moved from `:app` `core.domain.model` to
+  `:shared:core-model` `core.model` (all deps already shared — Card, WishlistEntry, OpenForTradeEntry;
+  stale "stays in :app" KDoc removed; imports removed since all types now same-package). 12 consumer
+  imports updated + 2 cross-module smart-cast fixes (DeckSlotEntry.card nullable, local-val pattern in
+  DeckBuilderViewModel + DeckStudioViewModel). The `feature.trades.domain.repository.TradesRepository`
+  typealias shim deleted — 20 consumers (18 production + 2 test) repointed to the canonical
+  `core.data.repository.TradesRepository` in `:shared:core-data`. 32 files changed. Verified:
+  assembleDebug + compileKotlinWasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline); 0 platform
+  imports in commonMain.
+- 2026-06-23 — **Phase 2: friends/game/tournament/playtest models + repos shared (GREEN, `ef4e98a`).**
+  10 pure domain models → `:shared:core-model`: Friends (7: AcceptInviteResult, Friend, FriendCard,
+  FriendMatchHistory, FriendRequest, FriendStats, OutgoingFriendRequest + FolderFilters new file), Game
+  (2: CounterIconKey, LayoutTemplate incl. GridSlotPosition/PlayerSlot/LayoutTemplates), Tournament (1:
+  MatchResult). 2 repo interfaces → `:shared:core-domain`: FriendRepository, PlaytestRepository.
+  Skipped: GameResult/PhaseStop/PlayerConfig (`@StringRes`/`PlayerThemeColors`). 53 files changed
+  (40 consumer import updates). Verified: assembleDebug + wasmJs GREEN; testDebugUnitTest 1964/122/2
+  (== baseline); 0 platform imports in commonMain.
 - 2026-06-23 — **Phase 2: tagging engine + TradesRepository + SuggestTagsUseCase shared (GREEN,
   `c3b7d7f`).** 7 types moved: `DetectionRule`/`TagDictionaryEntry` → core-model; 4 tag analyzers +
   `SuggestTagsUseCase`/`AutoTagCardUseCase` → core-data; `TradesRepository` interface → core-data.
