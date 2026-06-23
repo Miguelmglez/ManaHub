@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.model
 
 data class DraftState(
     val config: DraftConfig,

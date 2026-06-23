@@ -80,8 +80,8 @@ import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftState
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 

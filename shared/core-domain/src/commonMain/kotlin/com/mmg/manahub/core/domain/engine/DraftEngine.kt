@@ -1,9 +1,9 @@
-package com.mmg.manahub.feature.draft.domain.engine
+package com.mmg.manahub.core.domain.engine
 
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
-import com.mmg.manahub.feature.draft.domain.model.EngineConfig
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftableSet
+import com.mmg.manahub.core.model.EngineConfig
 
 /**
  * Pure, synchronous draft state machine. No IO; all operations return a new [DraftState].

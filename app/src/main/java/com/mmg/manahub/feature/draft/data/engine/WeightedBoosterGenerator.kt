@@ -1,13 +1,13 @@
 package com.mmg.manahub.feature.draft.data.engine
 
-import com.mmg.manahub.feature.draft.domain.engine.BoosterGenerator
-import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
-import com.mmg.manahub.feature.draft.domain.model.BoosterPack
-import com.mmg.manahub.feature.draft.domain.model.BoosterSheet
-import com.mmg.manahub.feature.draft.domain.model.BoosterVariant
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
+import com.mmg.manahub.core.domain.engine.BoosterGenerator
+import com.mmg.manahub.core.model.BoosterCardEntry
+import com.mmg.manahub.core.model.BoosterPack
+import com.mmg.manahub.core.model.BoosterSheet
+import com.mmg.manahub.core.model.BoosterVariant
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftableSet
 import java.util.UUID
 import kotlin.random.Random
 

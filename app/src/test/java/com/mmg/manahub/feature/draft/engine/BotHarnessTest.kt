@@ -3,12 +3,12 @@ package com.mmg.manahub.feature.draft.engine
 import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
-import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
-import com.mmg.manahub.feature.draft.domain.model.BoosterPack
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import com.mmg.manahub.feature.draft.domain.model.DraftStatus
+import com.mmg.manahub.core.domain.engine.BotDrafter
+import com.mmg.manahub.core.model.BoosterPack
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftSeat
+import com.mmg.manahub.core.model.DraftStatus
 import com.mmg.manahub.feature.draft.engine.BotHarnessTest.Companion.SEEDS
 import com.mmg.manahub.feature.draft.engine.BotHarnessTest.Companion.SHARE_BAR
 import org.junit.Assert.assertTrue
@@ -40,7 +40,7 @@ class BotHarnessTest {
             pack: BoosterPack,
             round: Int,
             pickNumber: Int,
-            engine: com.mmg.manahub.feature.draft.domain.model.EngineConfig?,
+            engine: com.mmg.manahub.core.model.EngineConfig?,
         ): DraftCard =
             pack.cards.maxByOrNull { rank(it.card.rarity) } ?: pack.cards.first()
     }

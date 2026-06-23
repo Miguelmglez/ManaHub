@@ -5,13 +5,13 @@ import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
 import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftMode
-import com.mmg.manahub.feature.draft.domain.model.DraftResult
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftStatus
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftMode
+import com.mmg.manahub.core.model.DraftResult
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftStatus
+import com.mmg.manahub.core.model.DraftableSet
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.engine.DraftTestFixtures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -109,7 +109,7 @@ private class FakeDraftSimRepository : DraftSimRepository {
 
     override suspend fun getEngineConfig(
         setCode: String,
-    ): com.mmg.manahub.feature.draft.domain.model.EngineConfig? = null
+    ): com.mmg.manahub.core.model.EngineConfig? = null
 
     override fun observeActiveSession(): Flow<DraftState?> = sessionFlow
 

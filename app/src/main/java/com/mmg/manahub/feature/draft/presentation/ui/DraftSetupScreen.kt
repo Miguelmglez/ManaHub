@@ -57,9 +57,9 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftError
-import com.mmg.manahub.feature.draft.domain.model.DraftMode
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftError
+import com.mmg.manahub.core.model.DraftMode
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 

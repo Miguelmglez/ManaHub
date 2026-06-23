@@ -1,11 +1,11 @@
 package com.mmg.manahub.feature.draft.data.engine
 
 import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter.Companion.COMMITMENT_MARGIN
-import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
-import com.mmg.manahub.feature.draft.domain.model.BoosterPack
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import com.mmg.manahub.feature.draft.domain.model.EngineConfig
+import com.mmg.manahub.core.domain.engine.BotDrafter
+import com.mmg.manahub.core.model.BoosterPack
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftSeat
+import com.mmg.manahub.core.model.EngineConfig
 
 /**
  * Heuristic two-phase bot drafter.

@@ -9,7 +9,7 @@ import androidx.room.PrimaryKey
  * Room entity for a Draft Simulator session.
  *
  * One row per active or completed draft/sealed session. The full in-progress
- * [com.mmg.manahub.feature.draft.domain.model.DraftState] is serialised to JSON in
+ * [com.mmg.manahub.core.model.DraftState] is serialised to JSON in
  * [stateJson] rather than normalised into child tables, because the state is a
  * deeply nested, fast-changing graph (packs in flight, per-seat pools, pending
  * packs) that is only ever read/written as a whole.
@@ -25,7 +25,7 @@ import androidx.room.PrimaryKey
  * @property createdAt Epoch millis when the session was first saved.
  * @property updatedAt Epoch millis of the last save.
  * @property stateSchemaVersion Version of the serialised state shape (see CURRENT_SCHEMA_VERSION).
- * @property stateJson Gson-serialised [com.mmg.manahub.feature.draft.domain.model.DraftState].
+ * @property stateJson Gson-serialised [com.mmg.manahub.core.model.DraftState].
  * @property resultDeckId UUID of the deck created on completion, or null while in progress.
  */
 @Entity(

@@ -5,9 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.feature.draft.domain.model.DraftVideo
-import com.mmg.manahub.feature.draft.domain.model.SetDraftGuide
-import com.mmg.manahub.feature.draft.domain.model.SetTierList
+import com.mmg.manahub.core.model.DraftVideo
+import com.mmg.manahub.core.model.SetDraftGuide
+import com.mmg.manahub.core.model.SetTierList
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase

@@ -2,12 +2,12 @@ package com.mmg.manahub.feature.draft.engine
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DraftSet
-import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
-import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
-import com.mmg.manahub.feature.draft.domain.model.BoosterSheet
-import com.mmg.manahub.feature.draft.domain.model.BoosterVariant
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
-import com.mmg.manahub.feature.draft.domain.model.TierCard
+import com.mmg.manahub.core.model.BoosterCardEntry
+import com.mmg.manahub.core.model.BoosterConfig
+import com.mmg.manahub.core.model.BoosterSheet
+import com.mmg.manahub.core.model.BoosterVariant
+import com.mmg.manahub.core.model.DraftableSet
+import com.mmg.manahub.core.model.TierCard
 import com.mmg.manahub.feature.draft.engine.DraftTestFixtures.fakeDraftableSet
 import com.mmg.manahub.feature.draft.engine.DraftTestFixtures.fakeRatedDraftableSet
 

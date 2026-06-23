@@ -5,16 +5,16 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftError
-import com.mmg.manahub.feature.draft.domain.model.DraftMode
-import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftStatus
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
-import com.mmg.manahub.feature.draft.domain.model.PassDirection
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.model.BoosterConfig
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftError
+import com.mmg.manahub.core.model.DraftMode
+import com.mmg.manahub.core.model.DraftSeat
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftStatus
+import com.mmg.manahub.core.model.DraftableSet
+import com.mmg.manahub.core.model.PassDirection
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
@@ -61,7 +61,7 @@ class DraftSimViewModelTest {
     private val completeDraft: CompleteDraftUseCase = mockk()
     private val getDraftableSimSet: GetDraftableSimSetUseCase = mockk()
     private val analytics: AnalyticsHelper = mockk(relaxed = true)
-    private val botDrafter: com.mmg.manahub.feature.draft.domain.engine.BotDrafter = mockk(relaxed = true)
+    private val botDrafter: com.mmg.manahub.core.domain.engine.BotDrafter = mockk(relaxed = true)
 
     /** Fake repository backing [ObserveDraftUseCase] with a real, controllable Flow. */
     private val fakeRepository = FakeDraftSimRepository()
@@ -247,14 +247,14 @@ class DraftSimViewModelTest {
 
         override suspend fun getEngineConfig(
             setCode: String,
-        ): com.mmg.manahub.feature.draft.domain.model.EngineConfig? = null
+        ): com.mmg.manahub.core.model.EngineConfig? = null
 
         override fun observeActiveSession() = sessionFlow
 
         override suspend fun saveSession(state: DraftState) = Unit
 
         override suspend fun completeAndSaveDeck(
-            result: com.mmg.manahub.feature.draft.domain.model.DraftResult,
+            result: com.mmg.manahub.core.model.DraftResult,
         ): DataResult<String> = DataResult.Error("not used")
     }
 }

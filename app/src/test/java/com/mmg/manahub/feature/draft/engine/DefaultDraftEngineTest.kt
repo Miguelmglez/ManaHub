@@ -4,20 +4,20 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
-import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
-import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
-import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
-import com.mmg.manahub.feature.draft.domain.model.BoosterPack
-import com.mmg.manahub.feature.draft.domain.model.BoosterSheet
-import com.mmg.manahub.feature.draft.domain.model.BoosterVariant
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftMode
-import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import com.mmg.manahub.feature.draft.domain.model.DraftStatus
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
-import com.mmg.manahub.feature.draft.domain.model.PassDirection
-import com.mmg.manahub.feature.draft.domain.model.TierCard
+import com.mmg.manahub.core.domain.engine.BotDrafter
+import com.mmg.manahub.core.model.BoosterCardEntry
+import com.mmg.manahub.core.model.BoosterConfig
+import com.mmg.manahub.core.model.BoosterPack
+import com.mmg.manahub.core.model.BoosterSheet
+import com.mmg.manahub.core.model.BoosterVariant
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftMode
+import com.mmg.manahub.core.model.DraftSeat
+import com.mmg.manahub.core.model.DraftStatus
+import com.mmg.manahub.core.model.DraftableSet
+import com.mmg.manahub.core.model.PassDirection
+import com.mmg.manahub.core.model.TierCard
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -81,7 +81,7 @@ class DefaultDraftEngineTest {
             pack: BoosterPack,
             round: Int,
             pickNumber: Int,
-            engine: com.mmg.manahub.feature.draft.domain.model.EngineConfig?,
+            engine: com.mmg.manahub.core.model.EngineConfig?,
         ) = pack.cards.minByOrNull { it.pickOrderRank ?: Int.MAX_VALUE } ?: pack.cards.first()
     }
 
@@ -90,7 +90,7 @@ class DefaultDraftEngineTest {
     private val set = fakeDraftableSet()
     private val config = DraftConfig("TST", DraftMode.DRAFT, seatCount = 8, packCount = 3)
 
-    private fun runFullDraft(): com.mmg.manahub.feature.draft.domain.model.DraftState {
+    private fun runFullDraft(): com.mmg.manahub.core.model.DraftState {
         var state = engine.start(set, config)
         while (!engine.isComplete(state)) {
             val humanIndex = state.seats.indexOfFirst { it.isHuman }

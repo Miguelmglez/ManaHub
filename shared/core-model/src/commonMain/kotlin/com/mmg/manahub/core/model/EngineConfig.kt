@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.model
 
 /**
  * Per-set draft decision engine, sourced from the Cloudflare Worker

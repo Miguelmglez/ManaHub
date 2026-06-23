@@ -1,3 +1,3 @@
-package com.mmg.manahub.feature.draft.domain.model
+package com.mmg.manahub.core.model
 
 enum class DraftStatus { SETUP, DRAFTING, BUILDING, COMPLETE }

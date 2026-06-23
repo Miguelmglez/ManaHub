@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.draft.di
 
-import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
+import com.mmg.manahub.core.domain.engine.BotDrafter
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
