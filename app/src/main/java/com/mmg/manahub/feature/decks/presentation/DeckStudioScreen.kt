@@ -77,7 +77,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase

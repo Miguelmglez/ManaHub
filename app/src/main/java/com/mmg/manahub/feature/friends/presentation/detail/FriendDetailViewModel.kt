@@ -15,7 +15,7 @@ import com.mmg.manahub.core.model.FriendStats
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
 import com.mmg.manahub.core.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

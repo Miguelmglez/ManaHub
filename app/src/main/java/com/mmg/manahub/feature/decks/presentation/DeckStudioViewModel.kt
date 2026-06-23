@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.AddCardRow
+import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
@@ -15,7 +15,7 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -448,10 +448,14 @@ class DeckStudioViewModel(
             .keys
 
         // C5: cards outside the commander's color identity (Commander format only).
-        val commanderColorIdentity = commanderEntry?.card?.colorIdentity?.toSet()
+        val commanderCard = commanderEntry?.card
+        val commanderColorIdentity = commanderCard?.colorIdentity?.toSet()
         val invalidIdentity = if (isCommanderFormat && commanderColorIdentity != null) {
             otherEntries
-                .filter { entry -> entry.card != null && !commanderColorIdentity.containsAll(entry.card.colorIdentity) }
+                .filter { entry ->
+                    val entryCard = entry.card
+                    entryCard != null && !commanderColorIdentity.containsAll(entryCard.colorIdentity)
+                }
                 .map { it.scryfallId }
                 .toSet()
         } else {
@@ -459,8 +463,8 @@ class DeckStudioViewModel(
         }
 
         // C5: a Commander format with a non-legendary commander card.
-        val isCommanderInvalid = isCommanderFormat && commanderEntry?.card != null &&
-            !commanderEntry.card.typeLine.contains("Legendary", ignoreCase = true)
+        val isCommanderInvalid = isCommanderFormat && commanderCard != null &&
+            !commanderCard.typeLine.contains("Legendary", ignoreCase = true)
 
         _uiState.update { s ->
             s.copy(

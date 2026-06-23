@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.model.AddCardRow
+import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -23,7 +23,7 @@ import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.model.toUserFacingMessage
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.model.ReviewFlags
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase

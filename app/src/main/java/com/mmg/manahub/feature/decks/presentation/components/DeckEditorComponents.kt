@@ -69,7 +69,7 @@ import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardName
