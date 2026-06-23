@@ -10,7 +10,7 @@ import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi

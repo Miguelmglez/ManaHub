@@ -1,31 +1,45 @@
-package com.mmg.manahub.core.domain.usecase.collection
+package com.mmg.manahub.core.data.usecase.collection
 
+import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import javax.inject.Inject
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
-class RefreshCollectionPricesUseCase @Inject constructor(
-    private val userCardRepository:  UserCardRepository,
-    private val cardRepository:      CardRepository,
-    private val scryfallDataSource:  ScryfallRemoteDataSource,
+/**
+ * Refreshes the prices of every card in the user's collection by batch-fetching
+ * from Scryfall and writing updated prices to the local card repository.
+ *
+ * Emits [Result.Progress] per chunk, then [Result.Success] or [Result.Error].
+ *
+ * @param userCardRepository provides the list of Scryfall IDs in the collection.
+ * @param cardRepository     the target for price updates.
+ * @param scryfallDataSource rate-limited Scryfall API access.
+ * @param dispatcherProvider KMP-safe dispatcher abstraction (replaces `Dispatchers.IO`).
+ */
+@OptIn(ExperimentalTime::class)
+class RefreshCollectionPricesUseCase(
+    private val userCardRepository: UserCardRepository,
+    private val cardRepository: CardRepository,
+    private val scryfallDataSource: ScryfallRemoteDataSource,
+    private val dispatcherProvider: DispatcherProvider,
 ) {
     sealed class Result {
         data class Success(
-            val updatedCount:  Int,
+            val updatedCount: Int,
             val notFoundCount: Int,
-            val durationMs:    Long,
+            val durationMs: Long,
         ) : Result()
         data class Error(val message: String) : Result()
         data class Progress(val current: Int, val total: Int) : Result()
     }
 
     fun invoke(): Flow<Result> = flow {
-        val startTime = System.currentTimeMillis()
+        val startTime = Clock.System.now().toEpochMilliseconds()
         try {
             val scryfallIds = userCardRepository.getScryfallIds().distinct()
 
@@ -34,9 +48,9 @@ class RefreshCollectionPricesUseCase @Inject constructor(
                 return@flow
             }
 
-            val chunks      = scryfallIds.chunked(CHUNK_SIZE)
+            val chunks = scryfallIds.chunked(CHUNK_SIZE)
             val totalChunks = chunks.size
-            var updatedCount  = 0
+            var updatedCount = 0
             var notFoundCount = 0
 
             chunks.forEachIndexed { index, chunk ->
@@ -47,12 +61,12 @@ class RefreshCollectionPricesUseCase @Inject constructor(
                 response.data.forEach { cardDto ->
                     val prices = cardDto.prices
                     cardRepository.updatePrices(
-                        scryfallId   = cardDto.id,
-                        priceUsd     = prices.usd?.toDoubleOrNull(),
+                        scryfallId = cardDto.id,
+                        priceUsd = prices.usd?.toDoubleOrNull(),
                         priceUsdFoil = prices.usdFoil?.toDoubleOrNull(),
-                        priceEur     = prices.eur?.toDoubleOrNull(),
+                        priceEur = prices.eur?.toDoubleOrNull(),
                         priceEurFoil = prices.eurFoil?.toDoubleOrNull(),
-                        updatedAt    = System.currentTimeMillis(),
+                        updatedAt = Clock.System.now().toEpochMilliseconds(),
                     )
                     updatedCount++
                 }
@@ -61,14 +75,14 @@ class RefreshCollectionPricesUseCase @Inject constructor(
             }
 
             emit(Result.Success(
-                updatedCount  = updatedCount,
+                updatedCount = updatedCount,
                 notFoundCount = notFoundCount,
-                durationMs    = System.currentTimeMillis() - startTime,
+                durationMs = Clock.System.now().toEpochMilliseconds() - startTime,
             ))
         } catch (e: Exception) {
             emit(Result.Error(e.message ?: "Unknown error"))
         }
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(dispatcherProvider.io)
 
     companion object {
         private const val CHUNK_SIZE = 75

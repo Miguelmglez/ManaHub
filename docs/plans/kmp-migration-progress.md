@@ -388,6 +388,18 @@ mapper and data source packages unchanged (0 consumer import edits for those). 1
 unchanged (same package). Verified: `:app:assembleDebug` GREEN; `:shared:core-data:compileKotlinWasmJs`
 GREEN; `testDebugUnitTest` 1964/122/2 (== baseline); 0 platform imports in `commonMain`.
 
+✅ **Phase 2 §9.6 — `RefreshCollectionPricesUseCase` moved to `:shared:core-data` commonMain (GREEN,
+2026-06-23).** Placed in `core.data.usecase.collection` (NOT `core-domain` — depends on
+`ScryfallRemoteDataSource` which is in `core-data`; `core-domain` cannot depend on `core-data`). Same
+rationale as `SyncManaSymbolsUseCase`. 3 platform fixes: `System.currentTimeMillis()` →
+`kotlin.time.Clock.System.now().toEpochMilliseconds()` (`@OptIn(ExperimentalTime::class)`),
+`Dispatchers.IO` → `DispatcherProvider.io` (new ctor param), `@Inject` stripped + `@Provides @Singleton`
+added to `SharedDomainUseCaseModule`. Package changed `core.domain.usecase.collection` →
+`core.data.usecase.collection` → 4 consumer import updates (`ManaHubApp`, `StatsViewModel`,
+`StatsKoinModule`, `PriceRefreshWorker`). No tests existed. Verified: `:app:assembleDebug` GREEN;
+`:shared:core-data:compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/122/2 (== baseline, +1 flaky
+HomeViewModelTest confirmed on re-run); 0 platform imports in `commonMain`.
+
 ➡️ **NEXT = continue Phase 2 data-layer work.** The 4 remaining
 shared-interface repo impls are ALL heavy Room-DAO-coupled (each needs a 20-40+ method DAO-interface
 abstraction in `commonMain` via the `CommunityDeckCache` pattern):
@@ -400,7 +412,7 @@ abstraction in `commonMain` via the `CommunityDeckCache` pattern):
 **Three productive paths forward (not mutually exclusive):**
 1. **Move more use cases** — several are NOW UNBLOCKED by existing shared deps (Card/Deck/UserCard repos
    + models are shared) but still platform-bound (`AddCardToCollectionUseCase`, `GetDeckGameStatsUseCase`,
-   ~~`SyncManaSymbolsUseCase`~~ (DONE `d51193c`), `AutoTagCardUseCase`/`ComputeCardTagsUseCase`, `RefreshCollectionPricesUseCase`,
+   ~~`SyncManaSymbolsUseCase`~~ (DONE `d51193c`), `AutoTagCardUseCase`/`ComputeCardTagsUseCase`, ~~`RefreshCollectionPricesUseCase`~~ (DONE),
    `CommitScannedCardsUseCase`). Each needs its platform deps abstracted first.
 2. **Start web Spikes B & C** (Supabase/Ktor/Coil on wasmJs, web auth) — these validate the runtime
    libraries the remaining repo impls will need on the web side, and were explicitly deferred to Phase 2.
@@ -544,6 +556,12 @@ Update this tracker after each step. Keep Android shippable at every step.
   changed (3 new in shared, 3 deleted in app, 1 modified Hilt module). Verified: assembleDebug +
   compileKotlinWasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline); 0 platform imports in
   commonMain.
+- 2026-06-23 — **Phase 2 §9.6: `RefreshCollectionPricesUseCase` → `:shared:core-data` commonMain
+  (GREEN).** `core.data.usecase.collection` (same layer placement rationale as `SyncManaSymbolsUseCase` —
+  depends on `ScryfallRemoteDataSource`). `System.currentTimeMillis()` → `Clock.System`,
+  `Dispatchers.IO` → `DispatcherProvider.io`, `@Inject` → `@Provides` in `SharedDomainUseCaseModule`.
+  Package change required 4 consumer import updates. Verified: assembleDebug + compileKotlinWasmJs GREEN;
+  testDebugUnitTest 1964/122/2 (== baseline); 0 platform imports in commonMain.
 - 2026-06-23 — **Phase 2 §9.6: `ScryfallRequestQueue` + `SyncManaSymbolsUseCase` moved to
   `:shared:core-data` commonMain (GREEN, `d51193c`).** (See entry below for details.)
 - 2026-06-23 — **Phase 2 §9.6: `CommunityDecksRepositoryImpl` → `:shared:core-data` commonMain (GREEN,

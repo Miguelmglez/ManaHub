@@ -16,6 +16,7 @@ import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
+import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import dagger.Module
 import dagger.Provides
@@ -80,6 +81,16 @@ object SharedDomainUseCaseModule {
     fun provideRemoveCardUseCase(
         userCardRepository: UserCardRepository,
     ): RemoveCardUseCase = RemoveCardUseCase(userCardRepository)
+
+    @Provides
+    @Singleton
+    fun provideRefreshCollectionPricesUseCase(
+        userCardRepository: UserCardRepository,
+        cardRepository: CardRepository,
+        scryfallRemoteDataSource: ScryfallRemoteDataSource,
+    ): RefreshCollectionPricesUseCase = RefreshCollectionPricesUseCase(
+        userCardRepository, cardRepository, scryfallRemoteDataSource, DispatcherProvider(),
+    )
 
     @Provides
     @Singleton
