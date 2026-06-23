@@ -37,3 +37,7 @@ include(":shared:core-domain")
 // KMP migration — Phase 2: shared data layer (repo impls in commonMain, Room stays androidMain,
 // rate-limit queues, later Ktor networking).
 include(":shared:core-data")
+// KMP migration — Phase 3 / Slice 1: shared design system (MagicTheme tokens, MagicColors,
+// Spacing, Shapes, Material 3 bridge). Uses CMP compose plugin. Typography stays in :app
+// until font loading is abstracted via the CMP resource system.
+include(":shared:core-ui")

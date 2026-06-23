@@ -48,7 +48,7 @@ vosk                 = "0.3.75"
 # Kotlin Multiplatform (KMP) migration — Phase 0, Spike A.
 # compose-multiplatform: JetBrains Compose Multiplatform plugin (wasmJs-capable UI). Added now so
 # later phases can reuse the alias; NOT applied to :shared:core-model (it has no UI yet).
-compose-multiplatform = "1.9.0"
+compose-multiplatform = "1.11.0"
 
 # Koin — KMP-native DI, added in Phase 0 Spike D to run ALONGSIDE Hilt during the per-feature
 # Hilt→Koin cutover (coexistence). Hilt aliases are intentionally kept; Koin is additive.
