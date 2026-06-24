@@ -5,6 +5,7 @@ import com.mmg.manahub.core.gamification.data.remote.SupabaseGamificationDataSou
 import com.mmg.manahub.core.gamification.data.repository.GamificationRepositoryImpl
 import com.mmg.manahub.core.gamification.di.GamificationModule.Companion.provideTimeZone
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.engine.GamificationEngineImpl
 import dagger.Binds
@@ -46,6 +47,16 @@ abstract class GamificationModule {
     ): GamificationRemoteDataSource
 
     companion object {
+
+        /**
+         * Provides the singleton [ProgressionEventBus].
+         *
+         * Previously constructor-injected via `@Inject`; the annotation was removed when the class
+         * moved to `:shared:core-domain` `commonMain` (javax.inject is JVM-only).
+         */
+        @Provides
+        @Singleton
+        fun provideProgressionEventBus(): ProgressionEventBus = ProgressionEventBus()
 
         /** System clock; XpGranter combines it with [provideTimeZone] for local windows. */
         @Provides

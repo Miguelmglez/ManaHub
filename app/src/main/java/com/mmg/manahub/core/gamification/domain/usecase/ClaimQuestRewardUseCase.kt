@@ -3,27 +3,11 @@ package com.mmg.manahub.core.gamification.domain.usecase
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
-
-/**
- * The result of attempting to claim a completed quest's reward.
- */
-sealed interface ClaimResult {
-    /** XP was granted and the quest moved to CLAIMED. */
-    data class Claimed(val xpAwarded: Int, val newLevel: Int, val leveledUp: Boolean) : ClaimResult
-
-    /** The instance does not exist. */
-    data object NotFound : ClaimResult
-
-    /** The quest is not yet COMPLETED (still ACTIVE or already EXPIRED). */
-    data object NotCompleted : ClaimResult
-
-    /** The reward was already claimed (idempotent — no XP granted again). */
-    data object AlreadyClaimed : ClaimResult
-}
 
 /**
  * Claims the XP reward of a COMPLETED quest instance (ADR-002, Phase 2).

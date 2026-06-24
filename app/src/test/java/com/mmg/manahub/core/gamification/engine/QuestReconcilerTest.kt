@@ -4,7 +4,7 @@ import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.QuestInstanceEntity
 import com.mmg.manahub.core.gamification.domain.QuestStableIdProvider
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
-import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
