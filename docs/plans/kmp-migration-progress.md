@@ -407,14 +407,24 @@ target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready
   QuestProgressDelta, ProgressionOutcome (+XpLineItem), ProcessedOutcome, RewardsBoard (+RewardUiModel).
 - ✅ `@StringRes` stripped from 6 gamification files (lint annotation only, no runtime impact).
 
+**Phase 4 completed (2026-06-24, continued):**
+- ✅ Game domain models decoupled — `GameMode`/`GamePhase` `@StringRes`+`R.string` → hardcoded
+  English strings. 3 models moved to core-model (GameMode, GamePhase, PhaseStop). GameResult/Player
+  stay (PlayerThemeColors dep).
+- ✅ GamificationEngine + GamificationRepository + ProgressionEventBus → `:shared:core-domain`.
+  EventBus stripped of `@Inject`/`@Singleton`, Hilt module gains `@Provides`. `ClaimResult` extracted
+  to core-model. **22 gamification types shared** (20 core-model + 3 core-domain).
+- **228 shared `.kt` files** across 5 modules (core-model ~100, core-domain ~39, core-data ~48,
+  core-ui ~35, core-common ~4).
+
 **Phase 4 remaining work (Android KMP-readiness):**
-1. **Game domain models `@StringRes`+`R` decoupling** — `GameMode`, `GamePhase` use `R.string.*`
-   directly in enum entries (not just annotations). Need to decouple display names from resource IDs.
-2. **GamificationEngine → `:shared:core-domain`** — blocked on coroutines dep (needs core-domain module).
-3. **Gamification catalogs** (`AchievementCatalog`, `QuestCatalog`, `UnlockableCatalog`) — still `R.*`.
-4. **ManaSymbolImage KMP approach** — key blocker for DeckItem/ManaCostImage/ManaColorPicker.
-5. **CMP Res system** — unblocks all `stringResource()` composables + catalogs.
-6. **Remaining composables** — unblocked incrementally as above items land.
+1. **Gamification catalogs** (`AchievementCatalog`, `QuestCatalog`, `UnlockableCatalog`) — `R.*`
+   string resources. Need CMP Res or string-key approach.
+2. **ManaSymbolImage KMP approach** — key blocker for DeckItem/ManaCostImage/ManaColorPicker.
+   Options: URL-based loading from Scryfall CDN, expect/actual with Android drawable + web SVG.
+3. **CMP Res system** — unblocks all `stringResource()` composables + catalogs.
+4. **Remaining composables** — incrementally unblocked as above items land.
+5. **Feature-level use cases / repo impls** — ~95 use cases + Room-backed repos still in `:app`.
 
 **Phase 2 remaining items (deferred to Phase 4):**
 - Room-backed repo impls, gamification types (`java.time.Instant`/`@StringRes`), game domain models
