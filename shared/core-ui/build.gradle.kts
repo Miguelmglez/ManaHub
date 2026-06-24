@@ -47,7 +47,8 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                // Theme references core-model types (PreferredCurrency).
+                // Theme references core-model types (PreferredCurrency, CollectionCardGroup).
+                // Also provides PriceFormatter (moved here from core-data to avoid heavy transitive deps).
                 implementation(project(":shared:core-model"))
                 // CMP compose artifacts — resolve to JetBrains multiplatform compose on all targets,
                 // binary-compatible with AndroidX Compose on Android.

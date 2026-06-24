@@ -4,15 +4,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import com.mmg.manahub.R
 
 /**
  * Renders a set symbol SVG from Scryfall tinted with the card's rarity colour.
@@ -29,12 +25,9 @@ fun SetSymbol(
     modifier: Modifier = Modifier,
 ) {
     val url = "https://svgs.scryfall.io/sets/${setCode.lowercase()}.svg"
-    val fallbackPainter = painterResource(R.drawable.ic_counter)
+    val fallbackPainter = rememberVectorPainter(SetSymbolFallbackIcon)
     AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(url)
-            .crossfade(true)
-            .build(),
+        model = url,
         contentDescription = "$setCode ${rarity.name}",
         error              = fallbackPainter,
         fallback           = fallbackPainter,

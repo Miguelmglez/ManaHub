@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -24,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,11 +35,15 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.model.CollectionCardGroup
 
+/**
+ * Convenience overload that renders a [CollectionCardGroup] as a list row.
+ */
 @Composable
 fun CardListItem(
     item:     CollectionCardGroup,
     onClick:  () -> Unit,
-    modifier: Modifier = Modifier,) {
+    modifier: Modifier = Modifier,
+) {
     CardListItem(
         name = item.card.name,
         imageUrl = item.card.imageNormal,
@@ -61,7 +65,7 @@ fun CardListItem(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Style,
+                        imageVector = StackedCardsIcon,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.magicColors.primaryAccent
@@ -77,6 +81,9 @@ fun CardListItem(
     )
 }
 
+/**
+ * General-purpose card list item with price, badges, and metadata.
+ */
 @Composable
 fun CardListItem(
     name: String,
@@ -95,7 +102,7 @@ fun CardListItem(
     rarity: String? = null,
     typeLine: String? = null,
     containerColor: Color = Color.Transparent,
-    shape: androidx.compose.ui.graphics.Shape = androidx.compose.ui.graphics.RectangleShape,
+    shape: Shape = RectangleShape,
     extraSupportingContent: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
@@ -122,8 +129,6 @@ fun CardListItem(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-
-                    // Enhanced Foil Representation: Subtle holographic edge
                 }
             },
             headlineContent = {
@@ -181,7 +186,7 @@ fun CardListItem(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                language?.let { LanguageBadge(langCode = it) }
+                                language?.let { CopyBadge(label = it.uppercase()) }
                                 condition?.let { CopyBadge(label = it) }
                                 if (hasFoil) FoilBadge()
                                 extraSupportingContent?.invoke(this@Row)
@@ -215,5 +220,3 @@ fun CardListItem(
         )
     }
 }
-
-
