@@ -387,10 +387,20 @@ composables in `:app` have deep platform deps (bitmap resources, `java.time`, `a
 User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
 target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
 
+**Phase 4 completed so far (2026-06-24):**
+- ✅ `kotlinx-datetime` 0.6.2 added to all shared modules + `:app`
+- ✅ `java.time` completely eliminated from app source (0 imports remain)
+  - Gamification: 14 prod files + 13 test files + 9 external callers migrated (149 tests green)
+  - Remaining 4 files (trades/friends/draft) also migrated
+  - New `FixedClock` test helper replaces `java.time.Clock.fixed()`
+  - `QuestPeriodKeys` ISO week reimplemented with Thursday-pivot algorithm
+- ✅ `TimeAgoFormatter` shared (core-model, English-only, Clock.System)
+- ✅ `DraftSetCard` + `NewsItemCard` moved to shared core-ui (35 files total)
+
 **Phase 4 remaining work (Android KMP-readiness):**
-1. **`kotlinx-datetime` swap in gamification types** — `ProgressionEvent` (`Instant`/`ZoneId`),
-   `PlayerProgression` (`Instant`), `QuestPeriodKeys` (`LocalDate`/`IsoFields`), etc. Unblocks
-   sharing gamification domain types.
+1. **Gamification domain types → shared** — now unblocked by kotlinx-datetime swap. Move
+   `ProgressionEvent`, `PlayerProgression`, `QuestPeriodKeys`, `LevelCurve`, achievement/quest
+   catalogs to `:shared:core-model` or a new `:shared:core-gamification` module.
 2. **`@StringRes` decoupling** — game domain models (`GameMode`/`GameResult`/`PhaseStop`/
    `PlayerConfig`) use `@StringRes Int` for display names. Replace with enum `displayName: String`
    or CMP Res when ready.
@@ -399,7 +409,6 @@ target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready
 4. **Remaining composables** — unblocked incrementally as above items land.
 5. **CMP Res system** — when ready, migrate `strings.xml` → CMP resources, unblocking all
    `stringResource()` composables.
-6. **Gamification types → shared** — after kotlinx-datetime swap.
 
 **Phase 2 remaining items (deferred to Phase 4):**
 - Room-backed repo impls, gamification types (`java.time.Instant`/`@StringRes`), game domain models
@@ -524,14 +533,16 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
-- 2026-06-24 — **Phase 4: kotlinx-datetime + TimeAgoFormatter + DraftSetCard + NewsItemCard (GREEN,
-  `57ff46f`→`2941f90`).** (1) `kotlinx-datetime` 0.6.2 added to version catalog + core-ui + core-model.
-  (2) `DraftSetCard` → shared (java.time.LocalDate → kotlinx.datetime, LocalContext+ImageRequest.Builder
-  +SvgDecoder removed — raw URL to AsyncImage, SVG via global ImageLoader). (3) `TimeAgoFormatter` →
-  core-model (English-only, es/de dead branches stripped, System.currentTimeMillis → Clock.System; 2
-  callers updated to drop locale arg). (4) `NewsItemCard` → shared (R.drawable.mtg_card_back → hoisted
-  `placeholderPainter: Painter?` param, Icons.Default.PlayArrow → inline PlayArrowIcon; HomeWidgets
-  caller updated). **35 files in core-ui commonMain.** 8 internal ImageVectors in InlineIcons.kt.
+- 2026-06-24 — **Phase 4: kotlinx-datetime + java.time elimination + shared composables (GREEN,
+  `57ff46f`→`5d7ad9b`).** (1) `kotlinx-datetime` 0.6.2 added to version catalog + core-ui + core-model +
+  `:app`. (2) `DraftSetCard` → shared (java.time → kotlinx-datetime, LocalContext removed). (3)
+  `TimeAgoFormatter` → core-model (English-only, Clock.System). (4) `NewsItemCard` → shared
+  (placeholderPainter param, inline PlayArrowIcon). (5) **Complete java.time elimination from
+  gamification** — 14 prod + 13 test files migrated (Instant/Clock/LocalDate/ZoneId/IsoFields →
+  kotlinx-datetime; QuestPeriodKeys ISO week → Thursday-pivot algorithm; new FixedClock test helper);
+  9 external callers also migrated; 149 gamification tests pass. (6) Last 4 java.time files (trades/
+  friends/draft) also migrated. **Result: ZERO java.time imports in app/src/main/java/.** 35 files in
+  core-ui commonMain, 8 internal ImageVectors.
 - 2026-06-24 — **Phase 3 Slice 4: CardSearchField + CardFullScreenDialog (GREEN, `ddeadf7`).** Both
   decoupled from Android and moved to shared core-ui. `CardSearchField`: `stringResource` defaults →
   hardcoded English, `Icons.Default.Search/Clear` → inline `SearchIcon`/`ClearIcon`, `searchCards`
