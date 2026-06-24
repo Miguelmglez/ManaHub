@@ -1,7 +1,5 @@
 package com.mmg.manahub.core.gamification.domain.model
 
-import androidx.annotation.StringRes
-
 /**
  * The change applied to ONE quest instance while processing a progression event (ADR-002, Phase 2).
  *
@@ -20,7 +18,7 @@ import androidx.annotation.StringRes
 data class QuestProgressDelta(
     val instanceId: String,
     val templateId: String,
-    @StringRes val titleRes: Int,
+    val titleRes: Int,
     val emoji: String,
     val newProgress: Int,
     val target: Int,

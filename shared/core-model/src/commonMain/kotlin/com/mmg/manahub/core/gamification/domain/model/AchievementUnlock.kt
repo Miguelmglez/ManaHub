@@ -1,7 +1,5 @@
 package com.mmg.manahub.core.gamification.domain.model
 
-import androidx.annotation.StringRes
-
 /**
  * A single achievement-tier unlock produced while processing one event (ADR-002, Phase 1).
  *
@@ -17,7 +15,7 @@ import androidx.annotation.StringRes
  */
 data class AchievementUnlock(
     val id: String,
-    @StringRes val titleRes: Int,
+    val titleRes: Int,
     val emoji: String,
     val tier: Int,
     val xpReward: Int,
