@@ -87,9 +87,7 @@ import com.mmg.manahub.core.model.MechanicGuide
 import com.mmg.manahub.feature.draft.presentation.DraftFeatureFlags
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailViewModel
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import kotlinx.datetime.LocalDate
 
 private val VALID_YOUTUBE_VIDEO_ID = Regex("^[a-zA-Z0-9_-]{11}$")
 
@@ -1057,9 +1055,13 @@ private fun PlaceholderMessage(message: String) {
 }
 
 private fun formatDate(dateStr: String): String = try {
-    LocalDate.parse(dateStr).format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH))
+    val date = LocalDate.parse(dateStr)
+    val month = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+    "$month ${date.year}"
 } catch (_: Exception) { dateStr }
 
 private fun formatVideoDate(isoDate: String): String = try {
-    LocalDate.parse(isoDate.take(10)).format(DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH))
+    val date = LocalDate.parse(isoDate.take(10))
+    val month = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+    "$month ${date.dayOfMonth}, ${date.year}"
 } catch (_: Exception) { isoDate }
