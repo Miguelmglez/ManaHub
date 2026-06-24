@@ -355,20 +355,20 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   inline vectors (Search/Clear/Close/Flip in `InlineIcons.kt`). `CardSearchField.searchCards` param
   changed from `SearchCardsUseCase` to `suspend (String) -> DataResult<List<Card>>` lambda (avoids
   core-ui→core-domain dep). MagicToast deduped onto shared `CloseIcon`. **33 files** in core-ui.
-- 🟢 **Phase 3 composable moves SUBSTANTIALLY COMPLETE (2026-06-24).** All remaining composables in
-  `:app` `core/ui/components/` have deep platform deps that can't be trivially decoupled:
-  - **Bitmap resources** (`R.drawable.mtg_card_back`): DeckItem, NewsItemCard → need CMP Res system.
+- 🟢 **Phase 3 composable moves SUBSTANTIALLY COMPLETE (2026-06-24).** Then Phase 4 unblocked more:
+  `kotlinx-datetime` 0.6.2 added → `DraftSetCard` moved (java.time→kotlinx-datetime);
+  `TimeAgoFormatter` shared (English-only, Clock.System) → `NewsItemCard` moved
+  (`R.drawable.mtg_card_back` hoisted as `Painter?` param, `Icons.Default.PlayArrow` → inline vector).
+  **35 files in `:shared:core-ui` commonMain** (10 theme + 25 components, 8 inline ImageVectors).
+  Remaining composables in `:app` still have deep platform deps:
   - **ManaSymbolImage** (LocalContext + R.drawable SVG per symbol): DeckItem, ManaCostImage,
-    ManaColorPicker, CircularDistribution → need per-platform image loading.
-  - **java.time / java.text**: DeckItem (`SimpleDateFormat`), DraftSetCard (`LocalDate`) → need
-    `kotlinx-datetime`.
+    ManaColorPicker, CircularDistribution → need per-platform image loading or URL-based approach.
+  - **Bitmap resources** (`R.drawable.mtg_card_back`): DeckItem (+ `SimpleDateFormat`/6 strings).
   - **android.graphics**: ManaCurveChart (`Paint`/`Typeface`) → need expect/actual Canvas.
   - **Heavy string resources**: VariantSelectorSheet, AddCardSheet, TradeSelectionSheet, DeckItem (6+
     strings each) + CardSearchSheet (`android.app.Activity`).
   - **Feature-layer deps**: GameModeSelector (`GameMode`), MagicBottomBar (`Screen`/`R.drawable`),
     ParticipantListRow/RoomCodeDisplay/RoomCodeField (online-excluded).
-  These will naturally migrate alongside Phase 4 web-platform work (CMP Res, `kotlinx-datetime`,
-  expect/actual Canvas). Next: leaf screen migrations or Phase 4 platform parity.
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive +
   `:webApp`. The deferred Phase-2 items (Room DAO abstractions for web, gamification types, `@StringRes`
   decoupling, `PushTokenRepositoryImpl`) naturally land here alongside the web-platform `actual`
@@ -382,19 +382,24 @@ components). Coil 3.3.0 upgraded. PriceFormatter in core-model with expect/actua
 composables in `:app` have deep platform deps (bitmap resources, `java.time`, `android.graphics`,
 `ManaSymbolImage`, heavy string resources) — they migrate with Phase 4 platform work.
 
-**➡️ NEXT = Phase 3 Slice 5: leaf screen migrations OR Phase 4 platform parity.**
+**➡️ NEXT = Continue Phase 4 platform parity (Android KMP-readiness focus).**
 
-Two possible directions (user should decide):
+User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
+target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
 
-**Option A — Leaf screen migrations (Phase 3 continued):** Move Settings/Stats/Profile screens to
-`:shared:core-ui` or `:shared:feature-*` modules. These are already Koin. Requires: separating
-screen composables from Android-only bits (ViewModels stay `androidMain` or use `expect`/`actual`,
-navigation needs CMP nav integration). High effort, high reward (full screens shared).
-
-**Option B — Phase 4 platform parity:** Start building the web target — `:webApp` module, web
-`actual` implementations (IndexedDB/localStorage for KeyValueStore, Supabase-direct for repos,
-no-op for Firebase), CMP Res for string/drawable resources, `kotlinx-datetime` for date formatting.
-Unblocks the remaining composables AND enables running the web app.
+**Phase 4 remaining work (Android KMP-readiness):**
+1. **`kotlinx-datetime` swap in gamification types** — `ProgressionEvent` (`Instant`/`ZoneId`),
+   `PlayerProgression` (`Instant`), `QuestPeriodKeys` (`LocalDate`/`IsoFields`), etc. Unblocks
+   sharing gamification domain types.
+2. **`@StringRes` decoupling** — game domain models (`GameMode`/`GameResult`/`PhaseStop`/
+   `PlayerConfig`) use `@StringRes Int` for display names. Replace with enum `displayName: String`
+   or CMP Res when ready.
+3. **ManaSymbolImage KMP approach** — key blocker for DeckItem/ManaCostImage/ManaColorPicker.
+   Options: URL-based loading from Scryfall CDN, or expect/actual with Android drawable + web SVG.
+4. **Remaining composables** — unblocked incrementally as above items land.
+5. **CMP Res system** — when ready, migrate `strings.xml` → CMP resources, unblocking all
+   `stringResource()` composables.
+6. **Gamification types → shared** — after kotlinx-datetime swap.
 
 **Phase 2 remaining items (deferred to Phase 4):**
 - Room-backed repo impls, gamification types (`java.time.Instant`/`@StringRes`), game domain models
@@ -519,6 +524,14 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-24 — **Phase 4: kotlinx-datetime + TimeAgoFormatter + DraftSetCard + NewsItemCard (GREEN,
+  `57ff46f`→`2941f90`).** (1) `kotlinx-datetime` 0.6.2 added to version catalog + core-ui + core-model.
+  (2) `DraftSetCard` → shared (java.time.LocalDate → kotlinx.datetime, LocalContext+ImageRequest.Builder
+  +SvgDecoder removed — raw URL to AsyncImage, SVG via global ImageLoader). (3) `TimeAgoFormatter` →
+  core-model (English-only, es/de dead branches stripped, System.currentTimeMillis → Clock.System; 2
+  callers updated to drop locale arg). (4) `NewsItemCard` → shared (R.drawable.mtg_card_back → hoisted
+  `placeholderPainter: Painter?` param, Icons.Default.PlayArrow → inline PlayArrowIcon; HomeWidgets
+  caller updated). **35 files in core-ui commonMain.** 8 internal ImageVectors in InlineIcons.kt.
 - 2026-06-24 — **Phase 3 Slice 4: CardSearchField + CardFullScreenDialog (GREEN, `ddeadf7`).** Both
   decoupled from Android and moved to shared core-ui. `CardSearchField`: `stringResource` defaults →
   hardcoded English, `Icons.Default.Search/Clear` → inline `SearchIcon`/`ClearIcon`, `searchCards`
