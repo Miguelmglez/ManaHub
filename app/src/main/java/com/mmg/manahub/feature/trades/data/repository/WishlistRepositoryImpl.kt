@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -106,7 +106,7 @@ class WishlistRepositoryImpl @Inject constructor(
                 condition = dto.condition,
                 language = dto.language,
                 synced = true,
-                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilli() }
+                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilliseconds() }
                     .getOrDefault(System.currentTimeMillis()),
             )
         }
@@ -211,7 +211,7 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        createdAt = Instant.ofEpochMilli(createdAt).toString(),
+        createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
     )
 
     private fun WishlistEntryDto.toDomain() = WishlistEntry(
@@ -223,7 +223,7 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil ?: false,
         condition = condition,
         language = language,
-        createdAt = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrDefault(0L),
+        createdAt = runCatching { Instant.parse(createdAt).toEpochMilliseconds() }.getOrDefault(0L),
     )
 
     private fun WishlistEntry.toDto() = WishlistEntryDto(
@@ -235,6 +235,6 @@ class WishlistRepositoryImpl @Inject constructor(
         isFoil = isFoil,
         condition = condition,
         language = language,
-        createdAt = Instant.ofEpochMilli(createdAt).toString(),
+        createdAt = Instant.fromEpochMilliseconds(createdAt).toString(),
     )
 }

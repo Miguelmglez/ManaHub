@@ -10,7 +10,7 @@ import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.time.Instant
+import kotlinx.datetime.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -178,7 +178,7 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                 condition = dto.condition ?: "NM",
                 language = dto.language ?: "en",
                 synced = true,
-                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilli() }
+                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilliseconds() }
                     .getOrDefault(System.currentTimeMillis()),
             )
         }
@@ -217,6 +217,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         isFoil = isFoil ?: false,
         condition = condition ?: "NM",
         language = language ?: "en",
-        createdAt = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrDefault(0L),
+        createdAt = runCatching { Instant.parse(createdAt).toEpochMilliseconds() }.getOrDefault(0L),
     )
 }
