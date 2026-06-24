@@ -2166,6 +2166,7 @@ private fun NewsWidget(
                     NewsItemCard(
                         item = item,
                         orientation = NewsItemOrientation.VERTICAL,
+                        placeholderPainter = painterResource(R.drawable.mtg_card_back),
                         modifier = Modifier.width(220.dp),
                         onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
                     )

@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,12 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.mmg.manahub.R
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -47,6 +44,10 @@ import com.mmg.manahub.core.util.TimeAgoFormatter
 /**
  * Unified component for News items (Articles and Videos).
  * Supports both [NewsItemOrientation.HORIZONTAL] (list style) and [NewsItemOrientation.VERTICAL] (grid/widget style).
+ *
+ * @param placeholderPainter Optional painter used as placeholder, error, and fallback for the
+ *   thumbnail [AsyncImage]. On Android callers typically pass `painterResource(R.drawable.mtg_card_back)`;
+ *   on web (or when `null`) the image simply shows nothing while loading.
  */
 @Composable
 fun NewsItemCard(
@@ -54,6 +55,7 @@ fun NewsItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     orientation: NewsItemOrientation = NewsItemOrientation.HORIZONTAL,
+    placeholderPainter: Painter? = null,
     languageBadge: String? = null,
     showDescription: Boolean = true,
 ) {
@@ -79,6 +81,7 @@ fun NewsItemCard(
     if (orientation == NewsItemOrientation.HORIZONTAL) {
         HorizontalNewsLayout(
             item = item,
+            placeholderPainter = placeholderPainter,
             languageBadge = languageBadge,
             showDescription = showDescription,
             modifier = containerModifier.padding(12.dp)
@@ -86,6 +89,7 @@ fun NewsItemCard(
     } else {
         VerticalNewsLayout(
             item = item,
+            placeholderPainter = placeholderPainter,
             languageBadge = languageBadge,
             modifier = containerModifier
         )
@@ -95,6 +99,7 @@ fun NewsItemCard(
 @Composable
 private fun HorizontalNewsLayout(
     item: NewsItem,
+    placeholderPainter: Painter?,
     languageBadge: String?,
     showDescription: Boolean,
     modifier: Modifier = Modifier,
@@ -108,6 +113,7 @@ private fun HorizontalNewsLayout(
                 imageUrl = item.imageUrl,
                 isVideo = item is NewsItem.Video,
                 duration = (item as? NewsItem.Video)?.duration,
+                placeholderPainter = placeholderPainter,
                 modifier = Modifier
                     .size(96.dp)
                     .clip(RoundedCornerShape(8.dp))
@@ -156,6 +162,7 @@ private fun HorizontalNewsLayout(
 @Composable
 private fun VerticalNewsLayout(
     item: NewsItem,
+    placeholderPainter: Painter?,
     languageBadge: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -167,6 +174,7 @@ private fun VerticalNewsLayout(
             imageUrl = item.imageUrl,
             isVideo = item is NewsItem.Video,
             duration = (item as? NewsItem.Video)?.duration,
+            placeholderPainter = placeholderPainter,
             languageBadge = languageBadge,
             modifier = Modifier
                 .fillMaxWidth()
@@ -198,22 +206,20 @@ private fun ThumbnailBox(
     imageUrl: String?,
     isVideo: Boolean,
     modifier: Modifier = Modifier,
+    placeholderPainter: Painter? = null,
     duration: String? = null,
     languageBadge: String? = null,
 ) {
     val mt = MaterialTheme.magicTypography
-    // Card-back placeholder so items with no image (fallback) or a failed load (error),
-    // and the brief loading window (placeholder), render the card back instead of blank.
-    val cardBack = painterResource(R.drawable.mtg_card_back)
     Box(modifier = modifier) {
         AsyncImage(
             model = imageUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = Alignment.TopCenter,
-            placeholder = cardBack,
-            error = cardBack,
-            fallback = cardBack,
+            placeholder = placeholderPainter,
+            error = placeholderPainter,
+            fallback = placeholderPainter,
             modifier = Modifier.fillMaxSize(),
         )
         if (isVideo) {
@@ -226,14 +232,14 @@ private fun ThumbnailBox(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Default.PlayArrow,
+                    imageVector = PlayArrowIcon,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(if (modifier.toString().contains("96.dp")) 20.dp else 28.dp),
                 )
             }
         }
-        
+
         if (languageBadge != null) {
             Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 LanguageBadge(languageBadge)
@@ -275,4 +281,5 @@ private fun LanguageBadge(code: String) {
     }
 }
 
+/** Layout orientation for [NewsItemCard]. */
 enum class NewsItemOrientation { HORIZONTAL, VERTICAL }
