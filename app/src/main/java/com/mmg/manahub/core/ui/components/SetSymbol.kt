@@ -3,7 +3,6 @@ package com.mmg.manahub.core.ui.components
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -14,26 +13,6 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
-
-enum class CardRarity(val tint: Color) {
-    COMMON(Color(0xFFC0C0C0)),
-    UNCOMMON(Color(0xFFB0C4DE)),
-    RARE(Color(0xFFC9A84C)),
-    MYTHIC(Color(0xFFE8A030)),
-    SPECIAL(Color(0xFF9B6EFF)),
-    BONUS(Color(0xFFE8A030));
-
-    companion object {
-        fun fromString(rarity: String) = when (rarity.lowercase()) {
-            "uncommon" -> UNCOMMON
-            "rare"     -> RARE
-            "mythic"   -> MYTHIC
-            "special"  -> SPECIAL
-            "bonus"    -> BONUS
-            else       -> COMMON
-        }
-    }
-}
 
 /**
  * Renders a set symbol SVG from Scryfall tinted with the card's rarity colour.
