@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextStyle
@@ -19,8 +18,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 
 // ── Scryfall SVG base URL ─────────────────────────────────────────────────────
 private const val SVG_BASE = "https://svgs.scryfall.io/card-symbols/"
@@ -53,10 +50,7 @@ fun ManaSymbolImage(
     modifier: Modifier = Modifier,
 ) {
     AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(tokenToSvgUrl(token))
-            .crossfade(true)
-            .build(),
+        model              = tokenToSvgUrl(token),
         contentDescription = token,
         contentScale       = ContentScale.Fit,
         modifier           = modifier.size(size),
