@@ -12,7 +12,7 @@ import com.mmg.manahub.core.gamification.domain.catalog.Family
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.AchievementUnlock
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
-import java.time.Clock
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.floor
@@ -85,7 +85,7 @@ class AchievementEvaluator @Inject constructor(
         }
 
         val newTier = def.tierReachedFor(newValue)
-        val nowMillis = clock.millis()
+        val nowMillis = clock.now().toEpochMilliseconds()
 
         // unlocked_at: set ONCE on the first time any tier is reached; NEVER overwrite an existing
         // value (the regression fix). A backfill may have already stamped it.
@@ -185,7 +185,7 @@ class AchievementEvaluator @Inject constructor(
         val key = "achievement:$achievementId:tier:$tier"
         if (dao.hasTransaction(key)) return
 
-        val nowMillis = clock.millis()
+        val nowMillis = clock.now().toEpochMilliseconds()
         // Delta-based grant: the new total/level are computed inside the transaction (race-safe).
         dao.grantXpAtomically(
             txn = XpTransactionEntity(

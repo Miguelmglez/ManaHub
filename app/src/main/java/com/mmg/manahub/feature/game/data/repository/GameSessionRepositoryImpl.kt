@@ -17,7 +17,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.time.Instant
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -71,7 +71,7 @@ class GameSessionRepositoryImpl @Inject constructor(
                 durationMs     = result.durationMs,
                 winTurn        = result.totalTurns.takeIf { it > 0 },
                 localFinalLife = localPlayerEntity?.finalLife,
-                occurredAt     = Instant.now(),
+                occurredAt     = Clock.System.now(),
             )
         )
 

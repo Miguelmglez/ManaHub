@@ -15,7 +15,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import java.time.Instant
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 
 /**
@@ -90,7 +90,7 @@ class EvaluateDeckUseCase @Inject constructor(
         progressionEventBus.emit(
             ProgressionEvent.FeatureExplored(
                 featureKey = FEATURE_DECK_DOCTOR,
-                occurredAt = Instant.now(),
+                occurredAt = Clock.System.now(),
             )
         )
 

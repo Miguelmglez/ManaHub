@@ -1,7 +1,8 @@
 package com.mmg.manahub.core.gamification.domain.event
 
-import java.time.Instant
-import java.time.ZoneId
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * A domain event emitted on the canonical write path of a user action that may grant
@@ -94,7 +95,7 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String
-            get() = "cards_added:${occurredAt.toEpochMilli()}:$addedUnique:$addedCopies"
+            get() = "cards_added:${occurredAt.toEpochMilliseconds()}:$addedUnique:$addedCopies"
         // Local emission timestamp — device-local origin; device-scope it for cross-device safety.
         override val isDeviceScoped: Boolean get() = true
     }
@@ -202,7 +203,7 @@ sealed interface ProgressionEvent {
         override val occurredAt: Instant,
     ) : ProgressionEvent {
         override val idempotencyKey: String
-            get() = "explore:$featureKey:${occurredAt.atZone(ZoneId.systemDefault()).toLocalDate()}"
+            get() = "explore:$featureKey:${occurredAt.toLocalDateTime(TimeZone.currentSystemDefault()).date}"
         // Never reaches the ledger (0 XP, advances quests only) — scoping is irrelevant; false.
         override val isDeviceScoped: Boolean get() = false
     }

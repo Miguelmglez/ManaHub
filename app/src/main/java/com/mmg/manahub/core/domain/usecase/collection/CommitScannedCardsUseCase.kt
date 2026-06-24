@@ -3,7 +3,7 @@ package com.mmg.manahub.core.domain.usecase.collection
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import java.time.Instant
+import kotlinx.datetime.Clock
 import java.util.UUID
 import javax.inject.Inject
 
@@ -71,7 +71,7 @@ class CommitScannedCardsUseCase @Inject constructor(
                 ProgressionEvent.CardScanned(
                     scanBatchId = UUID.randomUUID().toString(),
                     count = committedCopies,
-                    occurredAt = Instant.now(),
+                    occurredAt = Clock.System.now(),
                 )
             )
         }

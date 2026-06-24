@@ -17,7 +17,7 @@ import com.mmg.manahub.feature.tournament.domain.usecase.NextRoundResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import java.time.Instant
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -332,7 +332,7 @@ class TournamentRepositoryImpl @Inject constructor(
                 tournamentId = tournamentId,
                 type = structure,
                 isLocalWinner = false,
-                occurredAt = Instant.now(),
+                occurredAt = Clock.System.now(),
             )
         )
     }

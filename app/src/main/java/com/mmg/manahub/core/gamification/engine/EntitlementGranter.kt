@@ -7,7 +7,7 @@ import com.mmg.manahub.core.gamification.domain.catalog.Unlockable
 import com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.UnlockableId
 import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
-import java.time.Clock
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -83,7 +83,7 @@ class EntitlementGranter @Inject constructor(
         currentLevel: Int,
         unlockedAchievementIds: Set<String>,
     ): List<UnlockableId> {
-        val nowMillis = clock.millis()
+        val nowMillis = clock.now().toEpochMilliseconds()
         val granted = mutableListOf<UnlockableId>()
 
         for (unlockable in UnlockableCatalog.all) {

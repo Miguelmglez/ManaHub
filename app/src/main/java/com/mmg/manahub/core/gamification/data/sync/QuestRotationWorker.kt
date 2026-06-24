@@ -10,8 +10,12 @@ import androidx.work.WorkerParameters
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import java.time.Clock
-import java.time.ZoneId
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import java.util.concurrent.TimeUnit
 
 /**
@@ -55,23 +59,24 @@ class QuestRotationWorker @AssistedInject constructor(
          */
         fun scheduleDaily(
             workManager: WorkManager,
-            clock: Clock = Clock.systemDefaultZone(),
-            zoneId: ZoneId = ZoneId.systemDefault(),
+            clock: Clock = Clock.System,
+            timeZone: TimeZone = TimeZone.currentSystemDefault(),
         ) {
             workManager.enqueueUniquePeriodicWork(
                 WORK_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 PeriodicWorkRequestBuilder<QuestRotationWorker>(1, TimeUnit.DAYS)
-                    .setInitialDelay(initialDelayToNextMidnightMillis(clock, zoneId), TimeUnit.MILLISECONDS)
+                    .setInitialDelay(initialDelayToNextMidnightMillis(clock, timeZone), TimeUnit.MILLISECONDS)
                     .build(),
             )
         }
 
-        /** Milliseconds from "now" (per [clock]) until the next local midnight in [zoneId]. */
-        internal fun initialDelayToNextMidnightMillis(clock: Clock, zoneId: ZoneId): Long {
-            val now = clock.instant().atZone(zoneId)
-            val nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay(zoneId)
-            return (nextMidnight.toInstant().toEpochMilli() - now.toInstant().toEpochMilli())
+        /** Milliseconds from "now" (per [clock]) until the next local midnight in [timeZone]. */
+        internal fun initialDelayToNextMidnightMillis(clock: Clock, timeZone: TimeZone): Long {
+            val now = clock.now()
+            val today = now.toLocalDateTime(timeZone).date
+            val nextMidnight = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
+            return (nextMidnight.toEpochMilliseconds() - now.toEpochMilliseconds())
                 .coerceAtLeast(0L)
         }
     }

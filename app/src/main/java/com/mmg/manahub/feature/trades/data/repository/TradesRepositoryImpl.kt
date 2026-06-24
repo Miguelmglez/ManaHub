@@ -16,7 +16,7 @@ import com.mmg.manahub.core.data.repository.TradesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
-import java.time.Instant
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -116,7 +116,7 @@ class TradesRepositoryImpl @Inject constructor(
                 progressionEventBus.emit(
                     ProgressionEvent.TradeCompleted(
                         tradeId = proposalId,
-                        occurredAt = Instant.now(),
+                        occurredAt = Clock.System.now(),
                     )
                 )
             }
@@ -186,5 +186,5 @@ class TradesRepositoryImpl @Inject constructor(
         isReviewCollectionPlaceholder = isReviewCollectionPlaceholder,
     )
 
-    private fun String.parseIso(): Long? = runCatching { Instant.parse(this).toEpochMilli() }.getOrNull()
+    private fun String.parseIso(): Long? = runCatching { kotlinx.datetime.Instant.parse(this).toEpochMilliseconds() }.getOrNull()
 }

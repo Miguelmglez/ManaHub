@@ -16,9 +16,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 /**
  * Unit tests for [QuestReconciler]: it generates the current daily + weekly periods when missing,
@@ -35,7 +35,7 @@ class QuestReconcilerTest {
     private lateinit var reconciler: QuestReconciler
 
     private val fixedInstant: Instant = Instant.parse("2026-06-12T10:00:00Z")
-    private val now: Long get() = fixedInstant.toEpochMilli()
+    private val now: Long get() = fixedInstant.toEpochMilliseconds()
     private val dailyKey = "2026-06-12"
     private val weeklyKey = "2026-W24"
 
@@ -46,7 +46,7 @@ class QuestReconcilerTest {
         claimUseCase = mockk()
         reconciler = QuestReconciler(
             dao, stableIdProvider, claimUseCase,
-            Clock.fixed(fixedInstant, ZoneId.of("UTC")), ZoneId.of("UTC"),
+            FixedClock(fixedInstant), TimeZone.UTC,
         )
         coEvery { stableIdProvider.stableId() } returns "device-A"
         coEvery { dao.getStaleQuests(any()) } returns emptyList()

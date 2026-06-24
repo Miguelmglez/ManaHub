@@ -3,7 +3,7 @@ package com.mmg.manahub.core.gamification.di
 import com.mmg.manahub.core.gamification.data.remote.GamificationRemoteDataSource
 import com.mmg.manahub.core.gamification.data.remote.SupabaseGamificationDataSource
 import com.mmg.manahub.core.gamification.data.repository.GamificationRepositoryImpl
-import com.mmg.manahub.core.gamification.di.GamificationModule.Companion.provideZoneId
+import com.mmg.manahub.core.gamification.di.GamificationModule.Companion.provideTimeZone
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.engine.GamificationEngineImpl
@@ -12,8 +12,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import java.time.Clock
-import java.time.ZoneId
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
 import javax.inject.Singleton
 
 /**
@@ -47,14 +47,14 @@ abstract class GamificationModule {
 
     companion object {
 
-        /** System UTC-anchored clock; XpGranter combines it with [provideZoneId] for local windows. */
+        /** System clock; XpGranter combines it with [provideTimeZone] for local windows. */
         @Provides
         @Singleton
-        fun provideClock(): Clock = Clock.systemDefaultZone()
+        fun provideClock(): Clock = Clock.System
 
         /** The device's default time zone, used to compute local day/week cap windows. */
         @Provides
         @Singleton
-        fun provideZoneId(): ZoneId = ZoneId.systemDefault()
+        fun provideTimeZone(): TimeZone = TimeZone.currentSystemDefault()
     }
 }

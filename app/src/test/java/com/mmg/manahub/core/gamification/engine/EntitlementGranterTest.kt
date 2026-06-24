@@ -15,9 +15,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 /**
  * Unit tests for [EntitlementGranter]: per-event level-up grants, achievement-unlock grants, idempotent
@@ -35,12 +35,12 @@ class EntitlementGranterTest {
     private lateinit var granter: EntitlementGranter
 
     private val fixedInstant: Instant = Instant.parse("2026-06-13T10:00:00Z")
-    private val now: Long get() = fixedInstant.toEpochMilli()
+    private val now: Long get() = fixedInstant.toEpochMilliseconds()
 
     @Before
     fun setUp() {
         dao = mockk(relaxed = true)
-        granter = EntitlementGranter(dao, Clock.fixed(fixedInstant, ZoneId.of("UTC")))
+        granter = EntitlementGranter(dao, FixedClock(fixedInstant))
 
         // Default: own nothing, every insert succeeds (rowId 1 = newly inserted), no progression row.
         coEvery { dao.hasEntitlement(any()) } returns false

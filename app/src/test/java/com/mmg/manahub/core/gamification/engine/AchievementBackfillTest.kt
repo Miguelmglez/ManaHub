@@ -10,9 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 /**
  * Unit tests for the PURE backfill computation [AchievementBackfill.computeBackfillRows]: backfilled
@@ -21,13 +21,13 @@ import java.time.ZoneId
  */
 class AchievementBackfillTest {
 
-    private val now = Instant.parse("2026-06-12T10:00:00Z").toEpochMilli()
+    private val now = Instant.parse("2026-06-12T10:00:00Z").toEpochMilliseconds()
 
     // The pure function needs no DAO/clock interaction; mocks satisfy the constructor only.
     private val backfill = AchievementBackfill(
         dao = mockk<GamificationDao>(relaxed = true),
         statsDao = mockk<GamificationStatsDao>(relaxed = true),
-        clock = Clock.fixed(Instant.ofEpochMilli(now), ZoneId.of("UTC")),
+        clock = FixedClock(Instant.fromEpochMilliseconds(now)),
         defaultDispatcher = Dispatchers.Unconfined,
     )
 

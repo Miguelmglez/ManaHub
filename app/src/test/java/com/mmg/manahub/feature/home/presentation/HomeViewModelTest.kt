@@ -97,7 +97,7 @@ class HomeViewModelTest {
     private val progressionFlow = MutableStateFlow(
         PlayerProgression(
             totalXp = 0L, level = 1, xpIntoLevel = 0L, xpForNextLevel = 100L,
-            updatedAt = java.time.Instant.EPOCH,
+            updatedAt = kotlinx.datetime.Instant.fromEpochMilliseconds(0L),
         ),
     )
     private val questBoardFlow = MutableStateFlow(QuestBoard.empty)
@@ -1214,7 +1214,7 @@ class HomeViewModelTest {
     fun `given gamification enabled then gamification snapshot is populated`() = runTest(testDispatcher) {
         progressionFlow.value = PlayerProgression(
             totalXp = 250L, level = 4, xpIntoLevel = 40L, xpForNextLevel = 120L,
-            updatedAt = java.time.Instant.EPOCH,
+            updatedAt = kotlinx.datetime.Instant.fromEpochMilliseconds(0L),
         )
 
         val vm = buildViewModel()
