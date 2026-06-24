@@ -1,9 +1,7 @@
 package com.mmg.manahub.core.gamification.domain
 
-import com.mmg.manahub.core.gamification.domain.LevelCurve.MIN_LEVEL
-import com.mmg.manahub.core.gamification.domain.LevelCurve.PRECOMPUTED_LEVELS
-import com.mmg.manahub.core.gamification.domain.LevelCurve.cumulativeXpForLevel
-import com.mmg.manahub.core.gamification.domain.LevelCurve.xpToAdvance
+import kotlin.math.pow
+import kotlin.math.roundToLong
 
 
 /**
@@ -31,7 +29,7 @@ object LevelCurve {
     /** XP required to advance FROM [level] to [level] + 1. `level` is clamped to >= [MIN_LEVEL]. */
     fun xpToAdvance(level: Int): Long {
         val effectiveLevel = level.coerceAtLeast(MIN_LEVEL)
-        return Math.round(100.0 * Math.pow(effectiveLevel.toDouble(), 1.5))
+        return (100.0 * effectiveLevel.toDouble().pow(1.5)).roundToLong()
     }
 
     /**
