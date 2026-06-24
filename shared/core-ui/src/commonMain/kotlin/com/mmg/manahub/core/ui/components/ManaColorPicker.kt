@@ -85,7 +85,7 @@ fun ManaColorItem(
     ) {
         if (color == "All") {
             androidx.compose.material3.Icon(
-                painter = androidx.compose.ui.res.painterResource(id = com.mmg.manahub.R.drawable.ic_counter),
+                painter = androidx.compose.ui.graphics.vector.rememberVectorPainter(SetSymbolFallbackIcon),
                 contentDescription = "All",
                 modifier = Modifier.size(symbolSize),
                 tint = mc.goldMtg
