@@ -44,7 +44,10 @@ kotlin {
 
     sourceSets {
         commonMain {
-            // Pure Kotlin only — no dependencies needed for the moved domain enums.
+            dependencies {
+                // kotlinx-datetime for Clock.System (used by TimeAgoFormatter, CachePolicy, etc.)
+                implementation(libs.kotlinx.datetime)
+            }
         }
         commonTest {
             dependencies {

@@ -276,7 +276,7 @@ private fun ColourTile(
 @Composable
 private fun SnapshotCard(updatedAt: Long) {
     val mc = MaterialTheme.magicColors
-    val timeAgo = TimeAgoFormatter.format(updatedAt, Locale.getDefault())
+    val timeAgo = TimeAgoFormatter.format(updatedAt)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),

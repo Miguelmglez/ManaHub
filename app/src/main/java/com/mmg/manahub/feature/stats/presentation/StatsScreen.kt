@@ -1469,7 +1469,6 @@ private fun SessionHistoryRow(
 ) {
     val ty          = MaterialTheme.magicTypography
     var menuExpanded by remember { mutableStateOf(false) }
-    val locale       = Locale.getDefault()
 
     Row(
         modifier          = Modifier
@@ -1514,7 +1513,7 @@ private fun SessionHistoryRow(
 
             // Date
             Text(
-                text  = TimeAgoFormatter.format(item.playedAt, locale),
+                text  = TimeAgoFormatter.format(item.playedAt),
                 style = ty.labelSmall,
                 color = mc.textDisabled,
             )
