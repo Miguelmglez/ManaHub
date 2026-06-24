@@ -9,5 +9,5 @@ package com.mmg.manahub.core.gamification.domain.catalog
  *
  * @param value stable string id of the unlockable (will key the Phase-3 `entitlements` table).
  */
-@JvmInline
+@kotlin.jvm.JvmInline
 value class UnlockableId(val value: String)

@@ -45,7 +45,7 @@ object QuestPeriodKeys {
         val jan1 = LocalDate(weekYear, 1, 1)
         val ordinal = thursday.toEpochDays() - jan1.toEpochDays() + 1
         val week = (ordinal + 6) / 7
-        return "%04d-W%02d".format(weekYear, week)
+        return "${weekYear.toString().padStart(4, '0')}-W${week.toString().padStart(2, '0')}"
     }
 
     /** Daily key for the previous local day (used by the no-repeat-yesterday rule). */
