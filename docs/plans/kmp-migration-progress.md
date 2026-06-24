@@ -397,18 +397,24 @@ target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready
 - ✅ `TimeAgoFormatter` shared (core-model, English-only, Clock.System)
 - ✅ `DraftSetCard` + `NewsItemCard` moved to shared core-ui (35 files total)
 
+**Phase 4 completed (2026-06-24, continued):**
+- ✅ Gamification domain types shared — **19 types** moved to `:shared:core-model` in 2 batches:
+  Batch 1 (10): ProgressionEvent, PlayerProgression, QuestPeriodKeys, LevelCurve, XpConfig,
+  QuestPeriod, AchievementCategory, EquippedCosmetics, XpSourceCategory, UnlockableId.
+  Batch 2 (9, after @StringRes strip): AchievementDef (+Family/Resolver/Tier), Unlockable
+  (+UnlockableKind/CosmeticColorToken/RenderSpec/UnlockRule + shape/style types),
+  AchievementUnlock, AchievementUiModel, QuestUiModel (+QuestBoard/StreakUiModel),
+  QuestProgressDelta, ProgressionOutcome (+XpLineItem), ProcessedOutcome, RewardsBoard (+RewardUiModel).
+- ✅ `@StringRes` stripped from 6 gamification files (lint annotation only, no runtime impact).
+
 **Phase 4 remaining work (Android KMP-readiness):**
-1. **Gamification domain types → shared** — now unblocked by kotlinx-datetime swap. Move
-   `ProgressionEvent`, `PlayerProgression`, `QuestPeriodKeys`, `LevelCurve`, achievement/quest
-   catalogs to `:shared:core-model` or a new `:shared:core-gamification` module.
-2. **`@StringRes` decoupling** — game domain models (`GameMode`/`GameResult`/`PhaseStop`/
-   `PlayerConfig`) use `@StringRes Int` for display names. Replace with enum `displayName: String`
-   or CMP Res when ready.
-3. **ManaSymbolImage KMP approach** — key blocker for DeckItem/ManaCostImage/ManaColorPicker.
-   Options: URL-based loading from Scryfall CDN, or expect/actual with Android drawable + web SVG.
-4. **Remaining composables** — unblocked incrementally as above items land.
-5. **CMP Res system** — when ready, migrate `strings.xml` → CMP resources, unblocking all
-   `stringResource()` composables.
+1. **Game domain models `@StringRes`+`R` decoupling** — `GameMode`, `GamePhase` use `R.string.*`
+   directly in enum entries (not just annotations). Need to decouple display names from resource IDs.
+2. **GamificationEngine → `:shared:core-domain`** — blocked on coroutines dep (needs core-domain module).
+3. **Gamification catalogs** (`AchievementCatalog`, `QuestCatalog`, `UnlockableCatalog`) — still `R.*`.
+4. **ManaSymbolImage KMP approach** — key blocker for DeckItem/ManaCostImage/ManaColorPicker.
+5. **CMP Res system** — unblocks all `stringResource()` composables + catalogs.
+6. **Remaining composables** — unblocked incrementally as above items land.
 
 **Phase 2 remaining items (deferred to Phase 4):**
 - Room-backed repo impls, gamification types (`java.time.Instant`/`@StringRes`), game domain models
