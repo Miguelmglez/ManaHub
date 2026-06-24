@@ -17,9 +17,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,12 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
-import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -147,8 +142,8 @@ fun CardFullScreenDialog(
                     .background(mc.surface.copy(alpha = 0.85f), CircleShape),
             ) {
                 Icon(
-                    imageVector        = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.action_close),
+                    imageVector        = CloseIcon,
+                    contentDescription = "Close",
                     tint               = mc.textPrimary,
                 )
             }
@@ -168,10 +163,10 @@ fun CardFullScreenDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier          = Modifier.padding(horizontal = 8.dp),
                     ) {
-                        Icon(Icons.Default.Flip, contentDescription = null)
+                        Icon(FlipIcon, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text  = stringResource(R.string.playtest_flip),
+                            text  = "Flip",
                             style = ty.labelLarge,
                         )
                     }
