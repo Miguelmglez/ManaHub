@@ -22,24 +22,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import coil3.svg.SvgDecoder
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import kotlinx.datetime.LocalDate
 
 /**
  * Shared component representing an MTG set in a draft context.
  * Used in both the full Draft screen and the Home dashboard widget.
+ *
+ * SVG set icons are decoded by the global ImageLoader configuration
+ * (SvgDecoder on Android, native browser rendering on web).
  */
 @Composable
 fun DraftSetCard(
@@ -63,11 +60,7 @@ fun DraftSetCard(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(set.iconSvgUri)
-                    .decoderFactory(SvgDecoder.Factory())
-                    .crossfade(true)
-                    .build(),
+                model = set.iconSvgUri,
                 contentDescription = set.name,
                 modifier = Modifier.size(48.dp),
                 contentScale = ContentScale.Fit,
@@ -113,10 +106,15 @@ fun DraftSetCard(
     }
 }
 
+/**
+ * Formats an ISO-8601 date string (e.g. "2025-07-25") into "Jul 2025" for display.
+ * Falls back to the raw string on any parse failure.
+ */
 private fun formatReleaseDate(dateStr: String): String {
     return try {
         val date = LocalDate.parse(dateStr)
-        date.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.ENGLISH))
+        val month = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+        "$month ${date.year}"
     } catch (_: Exception) {
         dateStr
     }

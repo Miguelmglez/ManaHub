@@ -54,6 +54,9 @@ compose-multiplatform = "1.11.0"
 # Hilt→Koin cutover (coexistence). Hilt aliases are intentionally kept; Koin is additive.
 koin = "4.0.2"
 
+# kotlinx-datetime — KMP date/time library replacing java.time in shared code (Phase 4).
+kotlinx-datetime = "0.6.2"
+
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 # opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
@@ -132,6 +135,7 @@ play-review          = { module = "com.google.android.play:review-ktx", version.
 vosk-android         = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.7.3" }
+kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinx-datetime" }
 
 # KMP commonTest assertions (multiplatform-safe; replaces JUnit/MockK in commonMain test source sets).
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
