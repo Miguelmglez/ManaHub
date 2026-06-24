@@ -178,6 +178,28 @@ internal val ClearIcon: ImageVector by lazy {
 internal val CloseIcon: ImageVector get() = ClearIcon
 
 /**
+ * Right-pointing triangle (Material "PlayArrow").
+ * Replaces `Icons.Default.PlayArrow` which requires material-icons-core (no wasmJs artifact).
+ * Used as a video play overlay in [NewsItemCard].
+ */
+internal val PlayArrowIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "PlayArrow",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(8f, 5f)
+            verticalLineToRelative(14f)
+            lineToRelative(11f, -7f)
+            close()
+        }
+    }.build()
+}
+
+/**
  * Two curved arrows forming a cycle (Material "Sync" / "Loop").
  * Used as a card-flip icon. Replaces `Icons.Default.Flip` (no wasmJs artifact).
  */
