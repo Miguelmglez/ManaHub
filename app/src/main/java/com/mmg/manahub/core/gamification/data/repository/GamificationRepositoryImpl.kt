@@ -26,7 +26,7 @@ import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
-import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import com.mmg.manahub.core.gamification.engine.StreakTracker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine

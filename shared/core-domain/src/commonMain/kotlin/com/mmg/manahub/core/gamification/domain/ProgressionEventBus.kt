@@ -5,9 +5,6 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import javax.inject.Inject
-import javax.inject.Singleton
-
 /**
  * Application-wide bus carrying [ProgressionEvent]s from feature write-paths to the
  * gamification engine (ADR-002 §1).
@@ -19,8 +16,7 @@ import javax.inject.Singleton
  * suspending the emitter, so a slow consumer can never back-pressure a repository's
  * commit path.
  */
-@Singleton
-class ProgressionEventBus @Inject constructor() {
+class ProgressionEventBus {
 
     private val _events = MutableSharedFlow<ProgressionEvent>(
         replay = 0,

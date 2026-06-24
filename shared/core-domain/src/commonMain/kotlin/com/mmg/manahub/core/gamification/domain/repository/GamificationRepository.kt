@@ -6,7 +6,7 @@ import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
 import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
-import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import kotlinx.coroutines.flow.Flow
 
 /**
