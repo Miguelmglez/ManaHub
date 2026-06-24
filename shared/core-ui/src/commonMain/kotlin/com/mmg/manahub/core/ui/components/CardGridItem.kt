@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -35,6 +33,9 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.model.CollectionCardGroup
 
+/**
+ * Grid card item showing a card image, quantity badge, name, set symbol and price.
+ */
 @Composable
 fun CardGridItem(
     item: CollectionCardGroup,
@@ -55,7 +56,6 @@ fun CardGridItem(
             BorderStroke(0.5.dp, mc.surfaceVariant),
     ) {
         Column {
-            // Card image
             Box {
                 AsyncImage(
                     model = card.imageArtCrop ?: card.imageNormal,
@@ -66,7 +66,6 @@ fun CardGridItem(
                         .aspectRatio(4f / 3f)
                         .clip(MaterialTheme.shapes.small),
                 )
-                // Quantity badge (total across all copies)
                 Surface(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -84,7 +83,7 @@ fun CardGridItem(
                     )
                     if (item.distinctCopies > 1) {
                             Icon(
-                                imageVector = Icons.Default.Style,
+                                imageVector = StackedCardsIcon,
                                 contentDescription = null,
                                 modifier = Modifier.size(12.dp),
                                 tint = mc.primaryAccent
@@ -101,7 +100,6 @@ fun CardGridItem(
                 }
 
             }
-            // Card name + price
             Column(
                 modifier = Modifier.padding(6.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -138,7 +136,6 @@ fun CardGridItem(
                         rarity = CardRarity.fromString(card.rarity),
                         size = 14.dp,
                     )
-
 
                     Spacer(modifier = Modifier.weight(1f))
 
