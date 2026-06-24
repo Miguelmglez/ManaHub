@@ -6,7 +6,7 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import java.time.Instant
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 
 /**
@@ -66,7 +66,7 @@ class AddCardToCollectionUseCase @Inject constructor(
                 ProgressionEvent.CardsAdded(
                     addedCopies = quantity,
                     addedUnique = if (outcome == AddOutcome.CREATED_NEW) 1 else 0,
-                    occurredAt = Instant.now(),
+                    occurredAt = Clock.System.now(),
                 )
             )
         }

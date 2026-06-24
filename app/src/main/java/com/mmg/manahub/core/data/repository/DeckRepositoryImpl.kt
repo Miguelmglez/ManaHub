@@ -19,7 +19,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.time.Instant
+import kotlinx.datetime.Clock
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -108,7 +108,7 @@ class DeckRepositoryImpl @Inject constructor(
             ProgressionEvent.DeckCreated(
                 deckId = id,
                 format = format,
-                occurredAt = Instant.now(),
+                occurredAt = Clock.System.now(),
             )
         )
         id
@@ -132,7 +132,7 @@ class DeckRepositoryImpl @Inject constructor(
             ProgressionEvent.DeckSaved(
                 deckId = deck.id,
                 cardCount = 0,
-                occurredAt = Instant.now(),
+                occurredAt = Clock.System.now(),
             )
         )
     }

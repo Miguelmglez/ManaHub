@@ -33,9 +33,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,7 +51,7 @@ import javax.inject.Singleton
 class GamificationRepositoryImpl @Inject constructor(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    private val timeZone: TimeZone,
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : GamificationRepository {
@@ -75,14 +76,14 @@ class GamificationRepositoryImpl @Inject constructor(
         }
 
     override suspend fun markCelebrated(id: String) {
-        dao.markCelebrated(id = id, celebratedAt = clock.millis())
+        dao.markCelebrated(id = id, celebratedAt = clock.now().toEpochMilliseconds())
     }
 
     override fun observeActiveQuests(): Flow<QuestBoard> =
         // Recompute the current period keys at collection time (cold `flow`), then observe the daily +
         // weekly instance flows for those keys and join them with the catalog into a [QuestBoard].
         flow {
-            val today = clock.instant().atZone(zoneId).toLocalDate()
+            val today = clock.now().toLocalDateTime(timeZone).date
             val dailyKey = QuestPeriodKeys.dailyKey(today)
             val weeklyKey = QuestPeriodKeys.weeklyKey(today)
             emitAll(
@@ -239,7 +240,7 @@ class GamificationRepositoryImpl @Inject constructor(
             level = LevelCurve.levelForTotalXp(totalXp),
             xpIntoLevel = into,
             xpForNextLevel = needed,
-            updatedAt = Instant.ofEpochMilli(this?.updatedAt ?: 0L),
+            updatedAt = Instant.fromEpochMilliseconds(this?.updatedAt ?: 0L),
         )
     }
 

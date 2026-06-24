@@ -7,8 +7,10 @@ import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.QuestTemplate
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.QuestProgressDelta
-import java.time.Clock
-import java.time.ZoneId
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,7 +30,7 @@ import javax.inject.Singleton
 class QuestEvaluator @Inject constructor(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    private val timeZone: TimeZone,
 ) {
 
     /**
@@ -38,7 +40,7 @@ class QuestEvaluator @Inject constructor(
      */
     suspend fun process(event: ProgressionEvent): List<QuestProgressDelta> {
         val templates = QuestCatalog.templatesByEventType[event::class] ?: return emptyList()
-        val today = clock.instant().atZone(zoneId).toLocalDate()
+        val today = clock.now().toLocalDateTime(timeZone).date
 
         val deltas = mutableListOf<QuestProgressDelta>()
         for (template in templates) {
@@ -74,7 +76,7 @@ class QuestEvaluator @Inject constructor(
         return deltas
     }
 
-    private fun periodKeyFor(template: QuestTemplate, today: java.time.LocalDate): String =
+    private fun periodKeyFor(template: QuestTemplate, today: LocalDate): String =
         when (template.period) {
             QuestPeriod.DAILY -> QuestPeriodKeys.dailyKey(today)
             QuestPeriod.WEEKLY -> QuestPeriodKeys.weeklyKey(today)

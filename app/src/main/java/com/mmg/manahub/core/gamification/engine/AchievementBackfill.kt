@@ -13,7 +13,7 @@ import com.mmg.manahub.core.gamification.domain.catalog.Family
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import java.time.Clock
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.floor
@@ -57,7 +57,7 @@ class AchievementBackfill @Inject constructor(
      * `unlocked_at` values are preserved and tier XP is ledger-deduped.
      */
     suspend fun run(): Int = withContext(defaultDispatcher) {
-        val now = clock.millis()
+        val now = clock.now().toEpochMilliseconds()
         val derivedDefs = AchievementCatalog.all.filter { it.family == Family.DERIVED }
 
         val resolved: Map<String, Int> = derivedDefs.associate { def ->

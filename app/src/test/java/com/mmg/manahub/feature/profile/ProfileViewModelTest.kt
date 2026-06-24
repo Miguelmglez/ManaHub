@@ -98,7 +98,7 @@ class ProfileViewModelTest {
             level = 1,
             xpIntoLevel = 0L,
             xpForNextLevel = 100L,
-            updatedAt = java.time.Instant.EPOCH,
+            updatedAt = kotlinx.datetime.Instant.fromEpochMilliseconds(0L),
         )
     )
     private val achievementsFlow = MutableStateFlow<List<AchievementUiModel>>(emptyList())
@@ -637,7 +637,7 @@ class ProfileViewModelTest {
             level = 3,
             xpIntoLevel = 40L,
             xpForNextLevel = 120L,
-            updatedAt = java.time.Instant.EPOCH,
+            updatedAt = kotlinx.datetime.Instant.fromEpochMilliseconds(0L),
         )
         viewModel = buildViewModel()
         advanceUntilIdle()

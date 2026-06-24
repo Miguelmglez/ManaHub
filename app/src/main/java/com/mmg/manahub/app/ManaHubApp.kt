@@ -143,8 +143,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
-import java.time.Instant
-import java.time.LocalDate
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.todayIn
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -552,8 +553,8 @@ class ManaHubApp : Application() {
             runCatching {
                 progressionEventBus.emit(
                     ProgressionEvent.AppOpenedToday(
-                        localDate = LocalDate.now().toString(),
-                        occurredAt = Instant.now(),
+                        localDate = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString(),
+                        occurredAt = Clock.System.now(),
                     )
                 )
             }

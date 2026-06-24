@@ -17,9 +17,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 /**
  * Unit tests for [ClaimQuestRewardUseCase]: a COMPLETED claim grants XP through the ledger key and
@@ -32,7 +32,7 @@ class ClaimQuestRewardUseCaseTest {
     private lateinit var useCase: ClaimQuestRewardUseCase
 
     private val fixedInstant: Instant = Instant.parse("2026-06-12T10:00:00Z")
-    private val now: Long get() = fixedInstant.toEpochMilli()
+    private val now: Long get() = fixedInstant.toEpochMilliseconds()
 
     private fun instance(status: String, xpReward: Int = 50, id: String = "daily_play_game:2026-06-12") =
         QuestInstanceEntity(
@@ -44,7 +44,7 @@ class ClaimQuestRewardUseCaseTest {
     @Before
     fun setUp() {
         dao = mockk(relaxed = true)
-        useCase = ClaimQuestRewardUseCase(dao, Clock.fixed(fixedInstant, ZoneId.of("UTC")))
+        useCase = ClaimQuestRewardUseCase(dao, FixedClock(fixedInstant))
         coEvery { dao.getProgression() } returns null // 0 XP baseline
         coEvery { dao.upsertQuest(any()) } just Runs
         // The use case reads result.newLevel/previousLevel, so the levels must be real: derive the

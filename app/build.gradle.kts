@@ -206,6 +206,7 @@ dependencies {
     implementation(libs.retrofit.gson)  // Kept for DraftModule (Cloudflare/YouTube manual JSON parsing)
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.datetime)
     implementation(libs.retrofit.kotlinx.serialization.converter)
 
     implementation(libs.coil.compose)

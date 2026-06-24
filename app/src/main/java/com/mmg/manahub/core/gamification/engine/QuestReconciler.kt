@@ -6,9 +6,10 @@ import com.mmg.manahub.core.gamification.domain.QuestPeriod
 import com.mmg.manahub.core.gamification.domain.QuestPeriodKeys
 import com.mmg.manahub.core.gamification.domain.QuestStableIdProvider
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
-import java.time.Clock
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,13 +36,13 @@ class QuestReconciler @Inject constructor(
     private val stableIdProvider: QuestStableIdProvider,
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    private val timeZone: TimeZone,
 ) {
 
     /** Settles stale quests, then ensures the current daily + weekly periods are generated. */
     suspend fun reconcile() {
-        val now = clock.millis()
-        val today = clock.instant().atZone(zoneId).toLocalDate()
+        val now = clock.now().toEpochMilliseconds()
+        val today = clock.now().toLocalDateTime(timeZone).date
 
         settleStale(now)
         ensurePeriodGenerated(QuestPeriod.DAILY, today)
@@ -97,8 +98,8 @@ class QuestReconciler @Inject constructor(
     }
 
     private fun expiresAt(period: QuestPeriod, today: LocalDate): Long = when (period) {
-        QuestPeriod.DAILY -> QuestPeriodKeys.dailyExpiresAt(today, zoneId)
-        QuestPeriod.WEEKLY -> QuestPeriodKeys.weeklyExpiresAt(today, zoneId)
+        QuestPeriod.DAILY -> QuestPeriodKeys.dailyExpiresAt(today, timeZone)
+        QuestPeriod.WEEKLY -> QuestPeriodKeys.weeklyExpiresAt(today, timeZone)
     }
 
     private companion object {

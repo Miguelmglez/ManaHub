@@ -18,9 +18,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 /**
  * Unit tests for [AchievementEvaluator]: tier transitions, Family-A retroactive unlock, idempotent
@@ -36,7 +36,7 @@ class AchievementEvaluatorTest {
     private lateinit var evaluator: AchievementEvaluator
 
     private val fixedInstant: Instant = Instant.parse("2026-06-12T10:00:00Z")
-    private val now: Long get() = fixedInstant.toEpochMilli()
+    private val now: Long get() = fixedInstant.toEpochMilliseconds()
 
     private fun gameEvent(sessionId: Long = 1L, isLocalWin: Boolean = false) =
         ProgressionEvent.GameFinished(
@@ -48,7 +48,7 @@ class AchievementEvaluatorTest {
     fun setUp() {
         dao = mockk(relaxed = true)
         statsDao = mockk(relaxed = true)
-        evaluator = AchievementEvaluator(dao, statsDao, Clock.fixed(fixedInstant, ZoneId.of("UTC")))
+        evaluator = AchievementEvaluator(dao, statsDao, FixedClock(fixedInstant))
 
         // Default: no prior progress, no prior ledger txns, all stats 0.
         coEvery { dao.getAchievement(any()) } returns null

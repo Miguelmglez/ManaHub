@@ -25,7 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Unit tests for [GameResultStripViewModel] (ADR-002 §8.3, Phase 1, Chunk B).
@@ -69,7 +69,7 @@ class GameResultStripViewModelTest {
         durationMs = 1000L,
         winTurn = 5,
         localFinalLife = 20,
-        occurredAt = Instant.EPOCH,
+        occurredAt = Instant.fromEpochMilliseconds(0L),
     )
 
     private fun outcome(xp: Int) = ProgressionOutcome(

@@ -9,10 +9,13 @@ import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
 import com.mmg.manahub.core.gamification.domain.model.XpLineItem
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
-import java.time.Clock
-import java.time.DayOfWeek
-import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
+import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,7 +40,7 @@ import javax.inject.Singleton
 class XpGranter @Inject constructor(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    private val timeZone: TimeZone,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) {
 
@@ -56,7 +59,7 @@ class XpGranter @Inject constructor(
         val plan = planGrant(event) ?: return ProgressionOutcome.none
         if (plan.amount <= 0) return ProgressionOutcome.none
 
-        val nowMillis = clock.millis()
+        val nowMillis = clock.now().toEpochMilliseconds()
 
         // The new total/level are computed INSIDE grantXpAtomically from the row read in the same
         // transaction (lost-update-safe); we pass the delta, never a precomputed total.
@@ -207,8 +210,10 @@ class XpGranter @Inject constructor(
     )
 
     /** Epoch-millis at local midnight today. */
-    private fun startOfTodayMillis(): Long =
-        clock.instant().atZone(zoneId).toLocalDate().atStartOfDay(zoneId).toInstant().toEpochMilli()
+    private fun startOfTodayMillis(): Long {
+        val today = clock.now().toLocalDateTime(timeZone).date
+        return today.atStartOfDayIn(timeZone).toEpochMilliseconds()
+    }
 
     /**
      * Epoch-millis at local midnight on the Monday of the current ISO week.
@@ -219,8 +224,9 @@ class XpGranter @Inject constructor(
      * `Locale.getDefault()` and therefore unit-testable.
      */
     private fun startOfThisWeekMillis(): Long {
-        val today = clock.instant().atZone(zoneId).toLocalDate()
-        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        return weekStart.atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val today = clock.now().toLocalDateTime(timeZone).date
+        // ISO day-of-week: Monday = 1 .. Sunday = 7
+        val weekStart = today.minus(today.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
+        return weekStart.atStartOfDayIn(timeZone).toEpochMilliseconds()
     }
 }

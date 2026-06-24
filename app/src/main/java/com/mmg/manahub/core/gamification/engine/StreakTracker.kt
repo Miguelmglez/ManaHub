@@ -6,10 +6,11 @@ import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.engine.StreakTracker.Companion.MAX_FREEZE_TOKENS
 import com.mmg.manahub.core.gamification.engine.StreakTracker.Companion.TYPE_DAILY_ACTIVITY
 import com.mmg.manahub.core.gamification.engine.StreakTracker.Companion.WEEK_LENGTH
-import java.time.Clock
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.temporal.ChronoUnit
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,7 +29,7 @@ import javax.inject.Singleton
 class StreakTracker @Inject constructor(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    private val timeZone: TimeZone,
 ) {
 
     /**
@@ -37,7 +38,7 @@ class StreakTracker @Inject constructor(
      */
     suspend fun process(event: ProgressionEvent) {
         if (event !is ProgressionEvent.AppOpenedToday) return
-        val today = clock.instant().atZone(zoneId).toLocalDate()
+        val today = clock.now().toLocalDateTime(timeZone).date
         val existing = dao.getStreak(TYPE_DAILY_ACTIVITY)
         dao.upsertStreak(advance(existing, today))
     }
@@ -79,7 +80,7 @@ class StreakTracker @Inject constructor(
                 freezeTokens = existing.freezeTokens.coerceIn(0, MAX_FREEZE_TOKENS),
             )
 
-        val dayDelta = ChronoUnit.DAYS.between(lastDate, today)
+        val dayDelta = lastDate.daysUntil(today).toLong()
 
         return when {
             // Same day (or a clock that moved backwards) — no change.

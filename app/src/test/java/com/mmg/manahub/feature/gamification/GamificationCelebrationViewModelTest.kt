@@ -26,7 +26,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Unit tests for [GamificationCelebrationViewModel] (ADR-002, Phase 1, Chunk B).
@@ -52,7 +52,7 @@ class GamificationCelebrationViewModelTest {
         level = level,
         xpIntoLevel = 0L,
         xpForNextLevel = 100L,
-        updatedAt = Instant.EPOCH,
+        updatedAt = Instant.fromEpochMilliseconds(0L),
     )
 
     @Before

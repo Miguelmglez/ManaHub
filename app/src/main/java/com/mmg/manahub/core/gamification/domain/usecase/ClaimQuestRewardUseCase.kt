@@ -4,7 +4,7 @@ import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
-import java.time.Clock
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,7 +52,7 @@ class ClaimQuestRewardUseCase @Inject constructor(
             else -> return ClaimResult.NotCompleted
         }
 
-        val now = clock.millis()
+        val now = clock.now().toEpochMilliseconds()
         // Delta-based grant: the new total/level are computed inside the transaction (race-safe).
         val result = dao.grantXpAtomically(
             txn = XpTransactionEntity(

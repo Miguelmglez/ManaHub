@@ -27,7 +27,7 @@ import com.mmg.manahub.core.model.OutgoingFriendRequest
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.time.Instant
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 
 class FriendRepositoryImpl @Inject constructor(
@@ -97,7 +97,7 @@ class FriendRepositoryImpl @Inject constructor(
                 progressionEventBus.emit(
                     ProgressionEvent.FriendAdded(
                         friendId = friendshipId,
-                        occurredAt = Instant.now(),
+                        occurredAt = Clock.System.now(),
                     )
                 )
             }

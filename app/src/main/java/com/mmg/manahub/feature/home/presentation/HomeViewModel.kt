@@ -1263,7 +1263,7 @@ class HomeViewModel(
             level = 1,
             xpIntoLevel = 0L,
             xpForNextLevel = 0L,
-            updatedAt = java.time.Instant.EPOCH,
+            updatedAt = kotlinx.datetime.Instant.fromEpochMilliseconds(0L),
         )
 
         /** Zeroed streak used when the streak flow errors. */

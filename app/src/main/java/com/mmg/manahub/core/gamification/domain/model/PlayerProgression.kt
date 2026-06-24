@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.gamification.domain.model
 
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * The player's current progression state, derived from the singleton
