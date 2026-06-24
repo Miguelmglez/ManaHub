@@ -148,7 +148,7 @@ private fun MagicToastCard(msg: MagicToastMessage, onClick: () -> Unit) {
         MagicToastType.SUCCESS -> ToastStyle(ToastIcons.Check,   mc.lifePositive)
         MagicToastType.INFO    -> ToastStyle(ToastIcons.Info,    mc.primaryAccent)
         MagicToastType.WARNING -> ToastStyle(ToastIcons.Warning, Color(0xFFF59E0B))
-        MagicToastType.ERROR   -> ToastStyle(ToastIcons.Close,   mc.lifeNegative)
+        MagicToastType.ERROR   -> ToastStyle(CloseIcon,           mc.lifeNegative)
     }
 
     Surface(
@@ -201,7 +201,7 @@ private fun MagicToastCard(msg: MagicToastMessage, onClick: () -> Unit) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Minimal inline icon vectors matching Material Filled Check / Close / Info / Warning.
+ * Minimal inline icon vectors matching Material Filled Check / Info / Warning.
  * Defined here so [MagicToastHost] has zero dependency on `material-icons-core`, which has
  * no Compose Multiplatform (wasmJs) artifact as of CMP 1.11.
  */
@@ -218,27 +218,6 @@ private object ToastIcons {
             lineTo(9f, 19f)
             lineTo(21f, 7f)
             lineToRelative(-1.41f, -1.41f)
-            close()
-        }.build()
-    }
-
-    val Close: ImageVector by lazy {
-        ImageVector.Builder(
-            name = "ToastClose", defaultWidth = 24.dp, defaultHeight = 24.dp,
-            viewportWidth = 24f, viewportHeight = 24f,
-        ).path(fill = SolidColor(Color.Black)) {
-            moveTo(19f, 6.41f)
-            lineTo(17.59f, 5f)
-            lineTo(12f, 10.59f)
-            lineTo(6.41f, 5f)
-            lineTo(5f, 6.41f)
-            lineTo(10.59f, 12f)
-            lineTo(5f, 17.59f)
-            lineTo(6.41f, 19f)
-            lineTo(12f, 13.41f)
-            lineTo(17.59f, 19f)
-            lineTo(19f, 17.59f)
-            lineTo(13.41f, 12f)
             close()
         }.build()
     }

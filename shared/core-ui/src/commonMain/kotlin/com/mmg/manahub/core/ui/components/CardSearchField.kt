@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,26 +31,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import coil3.compose.AsyncImage
-import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
-import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.delay
 
+/**
+ * Self-contained card search field with debounced autocomplete suggestions.
+ *
+ * The caller supplies a [searchCards] suspend lambda (typically wired to
+ * `SearchCardsUseCase::invoke`) so this composable stays in `:shared:core-ui`
+ * without depending on `:shared:core-domain`.
+ *
+ * @param searchCards suspend function that takes a query string and returns search results.
+ * @param onCardSelected callback when the user taps a suggestion.
+ * @param modifier optional [Modifier].
+ * @param label text-field label (defaults to "Search cards...").
+ */
 @Composable
 fun CardSearchField(
-    searchCards: SearchCardsUseCase,
+    searchCards: suspend (String) -> DataResult<List<Card>>,
     onCardSelected: (Card) -> Unit,
     modifier: Modifier = Modifier,
-    label: String = stringResource(R.string.addcard_search_hint),
+    label: String = "Search cards...",
 ) {
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Card>>(emptyList()) }
@@ -97,7 +103,7 @@ fun CardSearchField(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
+                Icon(SearchIcon, contentDescription = null, tint = mc.textDisabled)
             },
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -111,8 +117,8 @@ fun CardSearchField(
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { query = "" }) {
                             Icon(
-                                Icons.Default.Clear,
-                                contentDescription = stringResource(R.string.action_close),
+                                ClearIcon,
+                                contentDescription = "Clear",
                                 tint = mc.textDisabled
                             )
                         }
