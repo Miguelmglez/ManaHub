@@ -311,7 +311,7 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   - **Remaining use cases** (~95) — mostly feature-level, tightly coupled to Room repos or gamification.
   - **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
   - **EXCLUDED features** (online, voice, scanner) — deferred per plan.
-- 🟡 **Phase 3 · Slice 1 — `:shared:core-ui` module + MagicTheme design system (DONE & GREEN,
+- ✅ **Phase 3 · Slice 1 — `:shared:core-ui` module + MagicTheme design system (DONE & GREEN,
   2026-06-23, `e852840`+`ec86cdc`).** `:shared:core-ui` KMP module created (kotlin-multiplatform +
   android-kmp-library + compose-multiplatform + kotlin-compose plugins; deps = core-model + CMP
   compose.runtime/foundation/material3/ui). **CMP upgraded 1.9.0 → 1.11.0** to fix
@@ -335,9 +335,26 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   `ManaColorPicker` (`painterResource(R.drawable.ic_counter)` + `ManaSymbolImage`), `CollectionScreen`
   (empty stub). Verified: assembleDebug + wasmJs GREEN; testDebugUnitTest 1964/122/2 (== baseline);
   0 platform imports in `commonMain`.
-- ⬜ **Phase 3 (remaining)** — more shared composables (`CardGridItem`, `CardListItem`, `WidgetShell`,
-  etc. — likely blocked on Coil), Coil 2→3 upgrade (unblocks image composables), leaf screen migrations
-  (Settings/Stats/Profile first).
+- ✅ **Phase 3 · Slice 3 — Coil 2→3 upgrade + image composables (DONE & GREEN, 2026-06-24,
+  `8c34442`→`71026d7`).** **Coil 2.7.0 → 3.3.0** upgraded (53 files, `coil.*`→`coil3.*`, pinned at 3.3.0
+  for Hilt metadata compat). `coil-compose` added to `:shared:core-ui` commonMain, `coil-network-okhttp`
+  to `:app`. PlayerEditSheet + PullToRefresh moved (`7a4f31d`). Then 4 commits for Slice 3 proper:
+  (1) `CollectionCardGroup` → `:shared:core-model`, `PriceFormatter` → `:shared:core-data` (then relocated
+  core-data→core-model to avoid Supabase/Ktor transitive deps in core-ui) with expect/actual for
+  platform-specific number formatting (android: `java.util.Locale`, wasmJs: pure Kotlin arithmetic).
+  (2) `CardRarity` enum + `CopyBadge`/`FoilBadge`/`RarityDot` + `MagicSegmentedControl` extracted from
+  `:app` SharedComponents.kt/SetSymbol.kt into own shared files (pure, zero platform deps).
+  (3) `SetSymbol` decoupled from Android (Coil 3 raw URL, inline fallback vector), `CardName` decoupled
+  (inline alchemy vector), `CardGridItem`+`CardListItem` decoupled (`Icons.Default.Style` → inline
+  `StackedCardsIcon`). All 4 moved to shared core-ui. `InlineIcons.kt` holds 3 internal KMP vector
+  replacements. `ManaCostImage.kt` retained in `:app` (`ManaSymbolImage`/`ManaCostImages` still Android-only).
+  **31 files** in `:shared:core-ui` commonMain (10 theme + 21 components). Verified: assembleDebug GREEN
+  (--rerun-tasks), core-ui+core-model wasmJs GREEN, 0 platform imports in commonMain.
+- ⬜ **Phase 3 (remaining)** — more shared composables (`DeckItem`, `DraftSetCard`, `NewsItemCard`,
+  `WidgetShell`, `SectionHeader` etc.), leaf screen migrations (Settings/Stats/Profile first).
+  **Still blocked:** `FloatingDelta` (R.font.*), `ManaColorPicker`/`ManaCostImage`/`ManaSymbolImage`
+  (LocalContext + R.drawable), `MagicModifiers` (BlurMaskFilter), `LanguageBadge`/`StaleBadge`/
+  `StaleWarningBanner`/`GroupingFlowSelector`/`AvatarImage` (R.string/R.drawable/CardConstants).
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive +
   `:webApp`. The deferred Phase-2 items (Room DAO abstractions for web, gamification types, `@StringRes`
   decoupling, `PushTokenRepositoryImpl`) naturally land here alongside the web-platform `actual`
@@ -346,48 +363,28 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## NEXT STEP (resume here)
 
-**Phase 3 Slices 1+2 DONE.** `:shared:core-ui` module has the MagicTheme design system (9 files) +
-12 shared composables (EmptyState, ErrorState, MagicProgressBar, MagicToast, ManaUtils,
-PlayerCountStepper, 6 theme backgrounds). Typography font families stay in `:app` (R.font.*).
+**Phase 3 Slices 1+2+3 DONE.** `:shared:core-ui` has 31 files in commonMain (10 theme + 21
+components including CardGridItem, CardListItem, SetSymbol, CardName, badges, backgrounds, toast,
+progress, error/empty states). Coil 3.3.0 upgraded. PriceFormatter in core-model with expect/actual.
 
-**➡️ NEXT = Phase 3 Slice 3: Coil 2→3 upgrade + image composables.**
+**➡️ NEXT = Phase 3 Slice 4: more shared composables + assess leaf screen readiness.**
 
-The main blocker for the remaining UI composables is **Coil** (image loading). Coil 2.x is
-Android-only; Coil 3.x has CMP/wasmJs support. Steps:
-1. Upgrade Coil 2→3 (version catalog, API changes — `rememberAsyncImagePainter` → `AsyncImage` etc.)
-2. Add Coil 3 to `:shared:core-ui` deps (commonMain `coil-compose-core`, androidMain `coil-network-okhttp`,
-   wasmJsMain `coil-network-ktor3`)
-3. Move image-dependent composables: `CardGridItem`, `CardListItem`, `ManaSymbolImage`, `ManaCostImage`,
-   `DeckItem`, etc. — these are currently blocked on Coil 2's `coil.compose.AsyncImage`.
-4. Move `ManaColorPicker` (blocked on `ManaSymbolImage` + `R.drawable.ic_counter` — the drawable needs
-   CMP Res or an inline vector).
+Remaining composables to assess for moving:
+1. **Likely movable (check deps):** `DeckItem`, `DraftSetCard`, `NewsItemCard`, `WidgetShell`,
+   `SectionHeader`, `AddToCollectionSheet`, `TradeSelectionSheet`, `CardSearchField`,
+   `CardSearchSheet`, `CardFullScreenDialog`, `AddCardSheet`, `VariantSelectorSheet`.
+2. **Known blocked (stay in `:app`):** `FloatingDelta` (R.font.*), `ManaColorPicker` + `ManaCostImage`
+   + `ManaSymbolImage` (LocalContext + R.drawable), `MagicModifiers` (BlurMaskFilter), `LanguageBadge` +
+   `StaleBadge` + `StaleWarningBanner` + `GroupingFlowSelector` + `AvatarImage` (R.string/R.drawable/
+   CardConstants).
 
-**Other Phase 3 remaining:**
-- `FloatingDelta` — blocked on `MulishFontFamily` (R.font.*); unblocked when fonts move to CMP Res.
-- `WidgetShell`, `SectionHeader` — check for platform deps, likely movable.
-- Leaf screen migrations (Settings/Stats/Profile first).
-- `MagicModifiers` — blocked on `BlurMaskFilter` (Android graphics API).
+After composable moves are exhausted, begin **leaf screen migrations** (Settings/Stats/Profile first —
+already Koin, minimal platform deps).
 
 **Phase 2 remaining items (blocked, deferred to Phase 4):**
-- **Room-backed repo impls** (Card, Deck, Stats, UserCard, OpenForTrade, Wishlist, Trades, GameSession,
-  Tournament) — each needs a 10-40+ method DAO-abstraction interface. For web, fresh Supabase-backed
-  impls behind the same repo interface are more practical than abstracting every Room DAO method.
-- **Gamification types** (`ProgressionEvent`, `PlayerProgression`, `GamificationRepository`) — blocked
-  on `java.time.Instant` (needs `kotlinx-datetime`), `@StringRes`.
-- **Game domain models** (GameMode, GamePhase, Player, PlayerConfig, GameResult, PhaseStop) — blocked
-  on `@StringRes`/`R`/`PlayerThemeColors`.
-- **Remaining use cases** (~95) — mostly feature-level, tightly coupled to Room repos or gamification.
-- **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
-- **EXCLUDED features** (online, voice, scanner) — deferred per plan.
-- **`PushTokenRepositoryImpl`** — deferred to Phase 4 (FCM/WorkManager, no web equivalent).
-
-**Phase 3 entry plan (to be refined in a planning session):**
-1. Create `:shared:core-ui` module with CMP deps (JetBrains Compose Multiplatform).
-2. Move MagicTheme (colors/typography/spacing/shapes) to `core-ui` `commonMain`.
-3. Move shared composables (`EmptyState`, `FullErrorState`, `CardGridItem`, etc.) leaf-first.
-4. Migrate `androidx.compose.*` imports → CMP equivalents in moved composables.
-5. Upgrade Coil 2 → Coil 3 (wasm-capable).
-6. Begin leaf screen migrations (Settings, Stats, Profile first — already Koin).
+- Room-backed repo impls, gamification types (`java.time.Instant`/`@StringRes`), game domain models
+  (`@StringRes`/`R`/`PlayerThemeColors`), ~95 feature-level use cases, `ComputeCardTagsUseCase` (Gson),
+  `PushTokenRepositoryImpl` (FCM/WorkManager). EXCLUDED features (online, voice, scanner) deferred.
 
 ---
 
@@ -507,6 +504,21 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-24 — **Phase 3 Slice 3: Coil 2→3 + image composables (GREEN, `8c34442`→`71026d7`).** Six
+  commits total. (1) `8c34442` Coil 2.7.0→3.3.0 upgrade (53 files, `coil.*`→`coil3.*`, pinned 3.3.0
+  for Hilt metadata compat; `coil-compose` in core-ui commonMain, `coil-network-okhttp` in `:app`).
+  (2) `7a4f31d` PlayerEditSheet + PullToRefresh moved to shared (R.string hoisted to caller params).
+  (3) `1e4a8aa` `CollectionCardGroup` → core-model + `PriceFormatter` → core-data with expect/actual
+  (android: `java.util.Locale`, wasmJs: pure Kotlin arithmetic). (4) `739b8b6` `CardRarity` enum +
+  `CopyBadge`/`FoilBadge`/`RarityDot` + `MagicSegmentedControl` extracted to shared (pure, no platform
+  deps). (5) `71026d7` SetSymbol decoupled (Coil 3 raw URL + inline fallback vector), CardName
+  decoupled (inline alchemy vector), CardGridItem+CardListItem decoupled (`Icons.Default.Style` →
+  inline `StackedCardsIcon`). `PriceFormatter` relocated core-data→core-model to avoid Supabase/Ktor
+  transitive deps in core-ui. New `InlineIcons.kt` (3 internal ImageVector constants). LanguageBadge
+  in CardListItem replaced with CopyBadge (minor: loses flag-emoji mapping, acceptable).
+  **Result: 31 files in `:shared:core-ui` commonMain (10 theme + 21 components).** Verified:
+  assembleDebug GREEN (--rerun-tasks), core-ui+core-model wasmJs GREEN, testDebugUnitTest 1964/122/2
+  (== baseline), 0 platform imports in commonMain.
 - 2026-06-23 — **Phase 3 Slice 1: `:shared:core-ui` module + MagicTheme design system (GREEN,
   `e852840`+`ec86cdc`).** Two commits: (1) `e852840` scaffolded `:shared:core-ui` KMP module
   (kotlin-multiplatform + android-kmp-library + compose-multiplatform + kotlin-compose plugins; commonMain
