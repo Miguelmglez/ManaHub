@@ -2,13 +2,26 @@ package com.mmg.manahub.core.util
 
 import com.mmg.manahub.core.model.PreferredCurrency
 
+/**
+ * Formats card prices for display, supporting USD and EUR currencies.
+ * Uses platform-specific number formatting via [formatCurrencyAmount].
+ */
 object PriceFormatter {
 
     /**
-     * Returns true when the device locale uses European number formatting.
-     * Delegates to [LocaleLanguageProvider.isEuropeanLocale].
+     * Supported number format locales for currency display.
      */
-    fun isEuropeanLocale(): Boolean = LocaleLanguageProvider.isEuropeanLocale()
+    enum class NumberLocale {
+        /** US format: comma thousands, dot decimal, symbol prefix ($1,234.56) */
+        US,
+        /** European format: dot thousands, comma decimal, symbol suffix (1.234,56 EUR) */
+        EUROPEAN,
+    }
+
+    /**
+     * Returns true when the device locale uses European number formatting.
+     */
+    fun isEuropeanLocale(): Boolean = platformIsEuropeanLocale()
 
     /**
      * Formats a price for the given [currency].
@@ -41,14 +54,12 @@ object PriceFormatter {
     }
 
     private fun formatEur(amount: Double, showSymbol: Boolean): String {
-        // European format: thousands separator = dot, decimal separator = comma, symbol at the end.
-        val formatted = String.format(java.util.Locale.GERMAN, "%,.2f", amount)
+        val formatted = formatCurrencyAmount(amount, NumberLocale.EUROPEAN)
         return if (showSymbol) "$formatted €" else formatted
     }
 
     private fun formatUsd(amount: Double, showSymbol: Boolean): String {
-        // US format: thousands separator = comma, decimal separator = dot, symbol at the front.
-        val formatted = String.format(java.util.Locale.US, "%,.2f", amount)
+        val formatted = formatCurrencyAmount(amount, NumberLocale.US)
         return if (showSymbol) "\$$formatted" else formatted
     }
 
@@ -89,7 +100,7 @@ object PriceFormatter {
         return format(amount, currency, showSymbol)
     }
 
-    /** Formats a price directly from the [Double?] fields on the [Card] domain model. */
+    /** Formats a price directly from the [Double?] fields on the Card domain model. */
     fun formatFromScryfall(
         priceUsd: Double?,
         priceEur: Double?,
@@ -100,3 +111,14 @@ object PriceFormatter {
         return format(amount, currency, showSymbol)
     }
 }
+
+/**
+ * Platform-specific: formats a [Double] amount with thousands separators and 2 decimal places
+ * according to the given [locale].
+ */
+internal expect fun formatCurrencyAmount(amount: Double, locale: PriceFormatter.NumberLocale): String
+
+/**
+ * Platform-specific: returns true when the device/browser locale uses European number formatting.
+ */
+internal expect fun platformIsEuropeanLocale(): Boolean

@@ -33,7 +33,7 @@ import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.feature.collection.presentation.CollectionCardGroup
+import com.mmg.manahub.core.model.CollectionCardGroup
 
 @Composable
 fun CardListItem(
