@@ -350,11 +350,25 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   replacements. `ManaCostImage.kt` retained in `:app` (`ManaSymbolImage`/`ManaCostImages` still Android-only).
   **31 files** in `:shared:core-ui` commonMain (10 theme + 21 components). Verified: assembleDebug GREEN
   (--rerun-tasks), core-ui+core-model wasmJs GREEN, 0 platform imports in commonMain.
-- ⬜ **Phase 3 (remaining)** — more shared composables (`DeckItem`, `DraftSetCard`, `NewsItemCard`,
-  `WidgetShell`, `SectionHeader` etc.), leaf screen migrations (Settings/Stats/Profile first).
-  **Still blocked:** `FloatingDelta` (R.font.*), `ManaColorPicker`/`ManaCostImage`/`ManaSymbolImage`
-  (LocalContext + R.drawable), `MagicModifiers` (BlurMaskFilter), `LanguageBadge`/`StaleBadge`/
-  `StaleWarningBanner`/`GroupingFlowSelector`/`AvatarImage` (R.string/R.drawable/CardConstants).
+- ✅ **Phase 3 · Slice 4 — CardSearchField + CardFullScreenDialog moved (DONE & GREEN, 2026-06-24,
+  `ddeadf7`).** Both decoupled from Android: stringResource → hardcoded English, Icons.Default →
+  inline vectors (Search/Clear/Close/Flip in `InlineIcons.kt`). `CardSearchField.searchCards` param
+  changed from `SearchCardsUseCase` to `suspend (String) -> DataResult<List<Card>>` lambda (avoids
+  core-ui→core-domain dep). MagicToast deduped onto shared `CloseIcon`. **33 files** in core-ui.
+- 🟢 **Phase 3 composable moves SUBSTANTIALLY COMPLETE (2026-06-24).** All remaining composables in
+  `:app` `core/ui/components/` have deep platform deps that can't be trivially decoupled:
+  - **Bitmap resources** (`R.drawable.mtg_card_back`): DeckItem, NewsItemCard → need CMP Res system.
+  - **ManaSymbolImage** (LocalContext + R.drawable SVG per symbol): DeckItem, ManaCostImage,
+    ManaColorPicker, CircularDistribution → need per-platform image loading.
+  - **java.time / java.text**: DeckItem (`SimpleDateFormat`), DraftSetCard (`LocalDate`) → need
+    `kotlinx-datetime`.
+  - **android.graphics**: ManaCurveChart (`Paint`/`Typeface`) → need expect/actual Canvas.
+  - **Heavy string resources**: VariantSelectorSheet, AddCardSheet, TradeSelectionSheet, DeckItem (6+
+    strings each) + CardSearchSheet (`android.app.Activity`).
+  - **Feature-layer deps**: GameModeSelector (`GameMode`), MagicBottomBar (`Screen`/`R.drawable`),
+    ParticipantListRow/RoomCodeDisplay/RoomCodeField (online-excluded).
+  These will naturally migrate alongside Phase 4 web-platform work (CMP Res, `kotlinx-datetime`,
+  expect/actual Canvas). Next: leaf screen migrations or Phase 4 platform parity.
 - ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive +
   `:webApp`. The deferred Phase-2 items (Room DAO abstractions for web, gamification types, `@StringRes`
   decoupling, `PushTokenRepositoryImpl`) naturally land here alongside the web-platform `actual`
@@ -363,25 +377,26 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## NEXT STEP (resume here)
 
-**Phase 3 Slices 1+2+3 DONE.** `:shared:core-ui` has 31 files in commonMain (10 theme + 21
-components including CardGridItem, CardListItem, SetSymbol, CardName, badges, backgrounds, toast,
-progress, error/empty states). Coil 3.3.0 upgraded. PriceFormatter in core-model with expect/actual.
+**Phase 3 composable moves DONE.** `:shared:core-ui` has **33 files** in commonMain (10 theme + 23
+components). Coil 3.3.0 upgraded. PriceFormatter in core-model with expect/actual. All remaining
+composables in `:app` have deep platform deps (bitmap resources, `java.time`, `android.graphics`,
+`ManaSymbolImage`, heavy string resources) — they migrate with Phase 4 platform work.
 
-**➡️ NEXT = Phase 3 Slice 4: more shared composables + assess leaf screen readiness.**
+**➡️ NEXT = Phase 3 Slice 5: leaf screen migrations OR Phase 4 platform parity.**
 
-Remaining composables to assess for moving:
-1. **Likely movable (check deps):** `DeckItem`, `DraftSetCard`, `NewsItemCard`, `WidgetShell`,
-   `SectionHeader`, `AddToCollectionSheet`, `TradeSelectionSheet`, `CardSearchField`,
-   `CardSearchSheet`, `CardFullScreenDialog`, `AddCardSheet`, `VariantSelectorSheet`.
-2. **Known blocked (stay in `:app`):** `FloatingDelta` (R.font.*), `ManaColorPicker` + `ManaCostImage`
-   + `ManaSymbolImage` (LocalContext + R.drawable), `MagicModifiers` (BlurMaskFilter), `LanguageBadge` +
-   `StaleBadge` + `StaleWarningBanner` + `GroupingFlowSelector` + `AvatarImage` (R.string/R.drawable/
-   CardConstants).
+Two possible directions (user should decide):
 
-After composable moves are exhausted, begin **leaf screen migrations** (Settings/Stats/Profile first —
-already Koin, minimal platform deps).
+**Option A — Leaf screen migrations (Phase 3 continued):** Move Settings/Stats/Profile screens to
+`:shared:core-ui` or `:shared:feature-*` modules. These are already Koin. Requires: separating
+screen composables from Android-only bits (ViewModels stay `androidMain` or use `expect`/`actual`,
+navigation needs CMP nav integration). High effort, high reward (full screens shared).
 
-**Phase 2 remaining items (blocked, deferred to Phase 4):**
+**Option B — Phase 4 platform parity:** Start building the web target — `:webApp` module, web
+`actual` implementations (IndexedDB/localStorage for KeyValueStore, Supabase-direct for repos,
+no-op for Firebase), CMP Res for string/drawable resources, `kotlinx-datetime` for date formatting.
+Unblocks the remaining composables AND enables running the web app.
+
+**Phase 2 remaining items (deferred to Phase 4):**
 - Room-backed repo impls, gamification types (`java.time.Instant`/`@StringRes`), game domain models
   (`@StringRes`/`R`/`PlayerThemeColors`), ~95 feature-level use cases, `ComputeCardTagsUseCase` (Gson),
   `PushTokenRepositoryImpl` (FCM/WorkManager). EXCLUDED features (online, voice, scanner) deferred.
@@ -504,6 +519,16 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-24 — **Phase 3 Slice 4: CardSearchField + CardFullScreenDialog (GREEN, `ddeadf7`).** Both
+  decoupled from Android and moved to shared core-ui. `CardSearchField`: `stringResource` defaults →
+  hardcoded English, `Icons.Default.Search/Clear` → inline `SearchIcon`/`ClearIcon`, `searchCards`
+  param changed `SearchCardsUseCase` → `suspend (String) -> DataResult<List<Card>>` lambda (avoids
+  core-ui→core-domain dep). `CardFullScreenDialog`: strings hardcoded, `Icons.Default.Close/Flip` →
+  inline `CloseIcon`/`FlipIcon`. 4 new ImageVectors in `InlineIcons.kt`. `MagicToast` deduped onto
+  shared `CloseIcon`. **33 files in `:shared:core-ui` commonMain.** All remaining composables have
+  deep platform deps (bitmap resources, `java.time`, `android.graphics`, ManaSymbolImage, heavy string
+  resources) — composable migration paused until Phase 4 platform parity work unblocks them.
+  Verified: assembleDebug GREEN (--rerun-tasks), core-ui wasmJs GREEN.
 - 2026-06-24 — **Phase 3 Slice 3: Coil 2→3 + image composables (GREEN, `8c34442`→`71026d7`).** Six
   commits total. (1) `8c34442` Coil 2.7.0→3.3.0 upgrade (53 files, `coil.*`→`coil3.*`, pinned 3.3.0
   for Hilt metadata compat; `coil-compose` in core-ui commonMain, `coil-network-okhttp` in `:app`).
