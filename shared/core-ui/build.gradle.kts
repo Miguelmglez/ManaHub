@@ -57,6 +57,7 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.ui)
                 implementation(libs.coil.compose)
+                implementation(libs.kotlinx.datetime)
             }
         }
         commonTest {
