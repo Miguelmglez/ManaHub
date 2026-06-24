@@ -8,7 +8,7 @@ package com.mmg.manahub.feature.game.domain.model
  * @param forTurnOf Whose turn this stop triggers on.
  */
 data class PhaseStop(
-    val playerId:  Int,
-    val phase:     GamePhase,
+    val playerId: Int,
+    val phase: GamePhase,
     val forTurnOf: Int,
 )

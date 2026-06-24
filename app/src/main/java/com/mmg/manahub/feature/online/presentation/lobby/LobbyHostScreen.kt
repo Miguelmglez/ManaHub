@@ -543,7 +543,7 @@ private fun GameModeSelector(
                 onClick = { onModeSelected(mode) },
                 label = {
                     Text(
-                        text = stringResource(mode.displayNameRes),
+                        text = mode.displayName,
                         style = ty.labelMedium,
                     )
                 },
@@ -796,7 +796,7 @@ private fun ActiveSessionCard(
                 }
             }
             Text(
-                text = "${modeDisplay?.let { stringResource(it.displayNameRes) } ?: session.gameMode} · ${session.playerCount} ${stringResource(R.string.lobby_player_count_suffix)}",
+                text = "${modeDisplay?.displayName ?: session.gameMode} · ${session.playerCount} ${stringResource(R.string.lobby_player_count_suffix)}",
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )

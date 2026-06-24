@@ -198,7 +198,7 @@ fun OnlineHostSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    text = "${stringResource(initialMode.displayNameRes)} · $initialPlayerCount ${stringResource(R.string.lobby_player_count_suffix)}",
+                                    text = "${initialMode.displayName} · $initialPlayerCount ${stringResource(R.string.lobby_player_count_suffix)}",
                                     style = ty.bodyMedium,
                                     color = mc.textSecondary,
                                 )
@@ -271,7 +271,7 @@ fun OnlineHostSheet(
                         }
 
                         Text(
-                            text = "${stringResource(uiState.gameMode.displayNameRes)} · ${uiState.playerCount} ${stringResource(R.string.lobby_player_count_suffix)}",
+                            text = "${uiState.gameMode.displayName} · ${uiState.playerCount} ${stringResource(R.string.lobby_player_count_suffix)}",
                             style = ty.bodyMedium,
                             color = mc.textSecondary,
                         )
@@ -410,7 +410,7 @@ private fun HostActiveSessionCard(
                 }
             }
             Text(
-                text = "${modeDisplay?.let { stringResource(it.displayNameRes) } ?: session.gameMode} · ${session.playerCount} ${stringResource(R.string.lobby_player_count_suffix)}",
+                text = "${modeDisplay?.displayName ?: session.gameMode} · ${session.playerCount} ${stringResource(R.string.lobby_player_count_suffix)}",
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )

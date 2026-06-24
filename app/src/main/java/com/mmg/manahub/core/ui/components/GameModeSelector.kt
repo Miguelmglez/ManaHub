@@ -114,7 +114,7 @@ private fun GameModePill(
             style = ty.displayMedium,
         )
         Text(
-            text = stringResource(mode.displayNameRes),
+            text = mode.displayName,
             style = ty.titleMedium,
             color = if (selected) mc.primaryAccent else mc.textPrimary,
         )
