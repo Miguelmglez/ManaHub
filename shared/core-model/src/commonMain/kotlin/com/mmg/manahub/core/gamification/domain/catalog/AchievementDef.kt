@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.gamification.domain.catalog
 
-import androidx.annotation.StringRes
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.AchievementCategory
 import kotlin.reflect.KClass
@@ -122,8 +121,8 @@ data class AchievementTier(
 data class AchievementDef(
     val id: String,
     val category: AchievementCategory,
-    @StringRes val titleRes: Int,
-    @StringRes val descRes: Int,
+    val titleRes: Int,
+    val descRes: Int,
     val emoji: String,
     val tiers: List<AchievementTier>,
     val reactsTo: Set<KClass<out ProgressionEvent>>,

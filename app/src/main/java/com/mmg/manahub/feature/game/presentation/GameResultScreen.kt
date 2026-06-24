@@ -396,10 +396,11 @@ private fun GameProgressionStrip(
                         style = MaterialTheme.magicTypography.labelLarge,
                         color = mc.goldMtg,
                     )
-                    if (shown.leveledUp && shown.newLevel != null) {
+                    val newLevel = shown.newLevel
+                    if (shown.leveledUp && newLevel != null) {
                         Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.20f)) {
                             Text(
-                                text = stringResource(R.string.progression_strip_level_up, shown.newLevel),
+                                text = stringResource(R.string.progression_strip_level_up, newLevel),
                                 style = MaterialTheme.magicTypography.labelMedium,
                                 color = mc.primaryAccent,
                                 modifier = Modifier.padding(

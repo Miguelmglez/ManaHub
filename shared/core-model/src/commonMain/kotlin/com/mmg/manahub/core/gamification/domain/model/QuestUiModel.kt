@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.gamification.domain.model
 
-import androidx.annotation.StringRes
 import com.mmg.manahub.core.gamification.domain.QuestPeriod
 import com.mmg.manahub.core.gamification.domain.QuestWeightClass
 
@@ -26,8 +25,8 @@ import com.mmg.manahub.core.gamification.domain.QuestWeightClass
 data class QuestUiModel(
     val instanceId: String,
     val templateId: String,
-    @StringRes val titleRes: Int,
-    @StringRes val descRes: Int,
+    val titleRes: Int,
+    val descRes: Int,
     val emoji: String,
     val period: QuestPeriod,
     val weightClass: QuestWeightClass,

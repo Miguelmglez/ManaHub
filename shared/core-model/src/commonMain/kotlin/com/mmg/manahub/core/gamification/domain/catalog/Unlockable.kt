@@ -1,7 +1,5 @@
 package com.mmg.manahub.core.gamification.domain.catalog
 
-import androidx.annotation.StringRes
-
 /**
  * Cosmetic domain models for the Phase-3 unlockables system (ADR-002 §10).
  *
@@ -165,7 +163,7 @@ data class RenderSpec(
 data class Unlockable(
     val id: UnlockableId,
     val kind: UnlockableKind,
-    @StringRes val displayNameRes: Int,
+    val displayNameRes: Int,
     val renderSpec: RenderSpec,
     val unlockRule: UnlockRule,
     val sortOrder: Int = 0,

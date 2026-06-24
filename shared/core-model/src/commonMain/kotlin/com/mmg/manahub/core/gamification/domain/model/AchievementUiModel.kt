@@ -1,7 +1,5 @@
 package com.mmg.manahub.core.gamification.domain.model
 
-import androidx.annotation.StringRes
-
 /**
  * The rich, UI-ready view of one achievement (ADR-002, Phase 1).
  *
@@ -26,8 +24,8 @@ import androidx.annotation.StringRes
 data class AchievementUiModel(
     val id: String,
     val category: AchievementCategory,
-    @StringRes val titleRes: Int,
-    @StringRes val descRes: Int,
+    val titleRes: Int,
+    val descRes: Int,
     val emoji: String,
     val tierThresholds: List<Int>,
     val currentValue: Int,
