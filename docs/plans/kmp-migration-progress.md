@@ -377,59 +377,65 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## NEXT STEP (resume here)
 
-**Phase 3 composable moves DONE.** `:shared:core-ui` has **33 files** in commonMain (10 theme + 23
-components). Coil 3.3.0 upgraded. PriceFormatter in core-model with expect/actual. All remaining
-composables in `:app` have deep platform deps (bitmap resources, `java.time`, `android.graphics`,
-`ManaSymbolImage`, heavy string resources) — they migrate with Phase 4 platform work.
-
 **➡️ NEXT = Continue Phase 4 platform parity (Android KMP-readiness focus).**
 
 User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
 target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
 
-**Phase 4 completed so far (2026-06-24):**
+**304 shared `.kt` files** across 5 modules as of 2026-06-25.
+
+**Phase 4 completed (2026-06-24):**
 - ✅ `kotlinx-datetime` 0.6.2 added to all shared modules + `:app`
 - ✅ `java.time` completely eliminated from app source (0 imports remain)
-  - Gamification: 14 prod files + 13 test files + 9 external callers migrated (149 tests green)
-  - Remaining 4 files (trades/friends/draft) also migrated
-  - New `FixedClock` test helper replaces `java.time.Clock.fixed()`
-  - `QuestPeriodKeys` ISO week reimplemented with Thursday-pivot algorithm
 - ✅ `TimeAgoFormatter` shared (core-model, English-only, Clock.System)
-- ✅ `DraftSetCard` + `NewsItemCard` moved to shared core-ui (35 files total)
+- ✅ `DraftSetCard` + `NewsItemCard` moved to shared core-ui
+- ✅ Gamification domain types: 22 types shared (19 core-model + 3 core-domain)
+- ✅ `@StringRes` stripped from 6 gamification + 2 game model files
+- ✅ Game models: GameMode/GamePhase/PhaseStop → core-model (hardcoded English strings)
+- ✅ GamificationEngine + GamificationRepository + ProgressionEventBus → core-domain
 
-**Phase 4 completed (2026-06-24, continued):**
-- ✅ Gamification domain types shared — **19 types** moved to `:shared:core-model` in 2 batches:
-  Batch 1 (10): ProgressionEvent, PlayerProgression, QuestPeriodKeys, LevelCurve, XpConfig,
-  QuestPeriod, AchievementCategory, EquippedCosmetics, XpSourceCategory, UnlockableId.
-  Batch 2 (9, after @StringRes strip): AchievementDef (+Family/Resolver/Tier), Unlockable
-  (+UnlockableKind/CosmeticColorToken/RenderSpec/UnlockRule + shape/style types),
-  AchievementUnlock, AchievementUiModel, QuestUiModel (+QuestBoard/StreakUiModel),
-  QuestProgressDelta, ProgressionOutcome (+XpLineItem), ProcessedOutcome, RewardsBoard (+RewardUiModel).
-- ✅ `@StringRes` stripped from 6 gamification files (lint annotation only, no runtime impact).
+**Phase 4 completed (2026-06-25):**
+- ✅ ManaCostImage + ManaColorPicker → `:shared:core-ui` commonMain (`cc99c7d`). ManaSymbolImage
+  switched from `ImageRequest.Builder(LocalContext.current)` to plain URL string (SetSymbol pattern).
+  ManaColorPicker `R.drawable.ic_counter` → `SetSymbolFallbackIcon` (already in InlineIcons.kt).
+  **37 files** in core-ui (was 35).
+- ✅ **55 use cases moved to shared** in 2 commits:
+  - `ff7560c`: 15 draft/playtest use cases → core-domain (9 draft @Inject-stripped + 6 playtest pure)
+  - `2f377cb`: 40 use cases → shared (auth 10, friends 7, news 3, communitydecks 2, trades 18).
+    Trades split: 5 → core-domain (WishlistRepo/OpenForTradeRepo deps), 13 → core-data
+    (TradesRepository dep lives in core-data; can't go core-domain without circular dep).
+    `ImportCommunityDeckUseCase` skipped (Firebase Crashlytics dep).
+    `UpdateTradeCollectionUseCase` skipped (Room DAO dep).
+- ✅ Game domain models → `:shared:core-ui` commonMain (`3bb9334`): Player/CustomCounter/CounterType,
+  PlayerConfig, GameResult/PlayerResult/EliminationReason. Went to core-ui (not core-model) because
+  they depend on `PlayerThemeColors` which contains Compose `Color`. Decoupling to an index would
+  require changes across ~44 `.theme` usages — disproportionate for this phase.
+- ✅ DeckBuilderState/BuilderStep/BuilderTab/ReviewGroupBy → `:shared:core-model` (pure, all deps shared).
+- ✅ 3 more use cases → core-domain: CompleteSurveyUseCase (@Inject stripped),
+  AddCardToCollectionUseCase + CollectionAddSource (@Inject stripped),
+  CommitScannedCardsUseCase + ScannedCardCommit (`java.util.UUID` → `kotlin.uuid.Uuid`).
+- ✅ Deck Doctor engine → `:shared:core-domain`: DeckEngineModels, DeckScoreModel,
+  DeckImportExportHelper, ScoreWeightOverridesMapper, RoleClassifier+TribeDeriver,
+  ManaBaseAnalyzer, DeckScorer (7 files, @Inject stripped, Hilt @Provides added to DeckDoctorModule).
+- ✅ 5 draft use cases with dispatcher qualifiers → core-domain: GetDraftableSimSetUseCase,
+  StartDraftUseCase, MakePickUseCase, AutoPickUseCase, CompleteDraftUseCase
+  (`@IoDispatcher`/`@DefaultDispatcher` → `Dispatchers.IO`/`Dispatchers.Default` directly).
 
-**Phase 4 completed (2026-06-24, continued):**
-- ✅ Game domain models decoupled — `GameMode`/`GamePhase` `@StringRes`+`R.string` → hardcoded
-  English strings. 3 models moved to core-model (GameMode, GamePhase, PhaseStop). GameResult/Player
-  stay (PlayerThemeColors dep).
-- ✅ GamificationEngine + GamificationRepository + ProgressionEventBus → `:shared:core-domain`.
-  EventBus stripped of `@Inject`/`@Singleton`, Hilt module gains `@Provides`. `ClaimResult` extracted
-  to core-model. **22 gamification types shared** (20 core-model + 3 core-domain).
-- **228 shared `.kt` files** across 5 modules (core-model ~100, core-domain ~39, core-data ~48,
-  core-ui ~35, core-common ~4).
-
-**Phase 4 remaining work (Android KMP-readiness):**
-1. **Gamification catalogs** (`AchievementCatalog`, `QuestCatalog`, `UnlockableCatalog`) — `R.*`
-   string resources. Need CMP Res or string-key approach.
-2. **ManaSymbolImage KMP approach** — key blocker for DeckItem/ManaCostImage/ManaColorPicker.
-   Options: URL-based loading from Scryfall CDN, expect/actual with Android drawable + web SVG.
-3. **CMP Res system** — unblocks all `stringResource()` composables + catalogs.
-4. **Remaining composables** — incrementally unblocked as above items land.
-5. **Feature-level use cases / repo impls** — ~95 use cases + Room-backed repos still in `:app`.
-
-**Phase 2 remaining items (deferred to Phase 4):**
-- Room-backed repo impls, gamification types (`java.time.Instant`/`@StringRes`), game domain models
-  (`@StringRes`/`R`/`PlayerThemeColors`), ~95 feature-level use cases, `ComputeCardTagsUseCase` (Gson),
-  `PushTokenRepositoryImpl` (FCM/WorkManager). EXCLUDED features (online, voice, scanner) deferred.
+**Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
+1. **Gamification catalogs** (`AchievementCatalog`, `QuestCatalog`, `UnlockableCatalog`) — ~87
+   `R.string.*` refs total. Need CMP Res migration or expect/actual split. All three should move together.
+2. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
+   Needs tagging module shared first, or the `label` call extracted.
+3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
+4. **Remaining composables in `:app`** — deep platform deps (bitmap resources, `android.graphics`,
+   heavy string resources). Migrate with CMP Res.
+5. **Room-backed repo impls** (Card, Deck, Stats, UserCard, GameSession, Tournament) — each needs
+   DAO-abstraction interfaces in commonMain. For web, fresh Supabase-backed impls behind same interface.
+6. **Repository interfaces with Room types** (`GameSessionRepository`, `TournamentRepository`) —
+   Room entities/projections in interface signatures. Need domain model equivalents.
+7. **~25 blocked use cases** — Room DAOs, Firebase, Deck Doctor `DeckMagicEngine`, tournament engine.
+8. **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
+9. **EXCLUDED features** (online, voice, scanner) — deferred per plan.
 
 ---
 
