@@ -3,11 +3,10 @@ package com.mmg.manahub.feature.draft.domain.usecase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.DraftRepository
-import javax.inject.Inject
 
-class GetCardByNameUseCase @Inject constructor(
+class GetSetCardsUseCase(
     private val repository: DraftRepository,
 ) {
-    suspend operator fun invoke(name: String, setCode: String): DataResult<Card> =
-        repository.getCardByName(name, setCode)
+    suspend operator fun invoke(setCode: String, page: Int = 1): DataResult<List<Card>> =
+        repository.getSetCards(setCode, page)
 }
