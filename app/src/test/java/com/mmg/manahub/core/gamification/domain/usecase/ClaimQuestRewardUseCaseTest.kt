@@ -5,6 +5,7 @@ import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity
 import com.mmg.manahub.core.data.local.entity.QuestInstanceEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
 import com.mmg.manahub.core.gamification.domain.LevelCurve
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
