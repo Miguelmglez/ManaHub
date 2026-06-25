@@ -1,17 +1,21 @@
 package com.mmg.manahub.feature.draft.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DraftableSet
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
-class GetDraftableSimSetUseCase @Inject constructor(
+/**
+ * Fetches a single draftable set by [setCode] from the repository.
+ *
+ * @param repository the draft simulation repository.
+ * @param ioDispatcher dispatcher for IO work (injected by the DI layer).
+ */
+class GetDraftableSimSetUseCase(
     private val repository: DraftSimRepository,
-    @IoDispatcher private val dispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) {
     suspend operator fun invoke(setCode: String): DataResult<DraftableSet> =
-        withContext(dispatcher) { repository.getDraftableSimSet(setCode) }
+        withContext(ioDispatcher) { repository.getDraftableSimSet(setCode) }
 }

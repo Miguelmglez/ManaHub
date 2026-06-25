@@ -48,6 +48,8 @@ kotlin {
                 // Moved repository interfaces reference core-model types (UserPreferences, CollectionStats…).
                 api(project(":shared:core-model"))
                 implementation(libs.coroutines.core)
+                // Use cases use Clock.System.now() for event timestamps.
+                implementation(libs.kotlinx.datetime)
             }
         }
         commonTest {

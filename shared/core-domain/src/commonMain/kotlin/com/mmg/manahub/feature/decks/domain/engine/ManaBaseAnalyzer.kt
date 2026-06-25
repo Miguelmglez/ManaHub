@@ -4,8 +4,6 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer.Companion.CHEAP_RAMP_CMC
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer.Companion.RAMP_PIECES_PER_LAND
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -34,8 +32,7 @@ import kotlin.math.roundToInt
 //  All numbers are documented constants below so the heuristics are auditable.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-@Singleton
-class ManaBaseAnalyzer @Inject constructor() {
+class ManaBaseAnalyzer {
 
     // ── Public result ────────────────────────────────────────────────────────────
 
@@ -242,7 +239,7 @@ class ManaBaseAnalyzer @Inject constructor() {
             ADD_CLAUSE_REGEX.findAll(oracle).forEach { match ->
                 val clause = match.groupValues[1]
                 if (ANY_COLOR_REGEX.containsMatchIn(clause)) {
-                    val pool = deckIdentity.ifEmpty { ManaColor.values().filter { it != ManaColor.C }.toSet() }
+                    val pool = deckIdentity.ifEmpty { ManaColor.entries.filter { it != ManaColor.C }.toSet() }
                     result += pool.filter { it != ManaColor.C }
                 } else {
                     symbolsOf(clause).forEach { sym ->

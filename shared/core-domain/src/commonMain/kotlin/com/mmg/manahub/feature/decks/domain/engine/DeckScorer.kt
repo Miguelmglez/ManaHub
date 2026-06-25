@@ -8,8 +8,7 @@ import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer.Companion.FULL_BUCKET_FLOOR
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer.Companion.TRIBE_ABS_THRESHOLD
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer.Companion.TRIBE_SHARE_THRESHOLD
-import javax.inject.Inject
-import javax.inject.Singleton
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -27,8 +26,7 @@ import kotlin.math.sqrt
 //   · evaluate()   — deck health report (coverage, curve, warnings).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-@Singleton
-class DeckScorer @Inject constructor(
+class DeckScorer(
     private val roleClassifier: RoleClassifier,
     private val power: PowerResolver = NeutralPowerResolver,
     private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
@@ -250,11 +248,11 @@ class DeckScorer @Inject constructor(
         val coverage = profile.skeleton.slots.map { slot ->
             RoleCoverage(
                 role = slot.role,
-                current = Math.round(profile.roleCounts[slot.role] ?: 0f),
+                current = (profile.roleCounts[slot.role] ?: 0f).roundToInt(),
                 ideal = slot.ideal,
             )
         }
-        val landCount = Math.round(profile.roleCounts[DeckRole.LAND] ?: 0f)
+        val landCount = (profile.roleCounts[DeckRole.LAND] ?: 0f).roundToInt()
         // Phase 5 (C3): the land target is DYNAMIC — the skeleton's flat ideal shifted down
         // by cheap ramp, a low avg CMC and draw density, bounded to the skeleton's land band.
         // So 8 cheap ramp pieces lower the "aim for" land count fed into the land warnings.
@@ -439,7 +437,7 @@ class DeckScorer @Inject constructor(
             val current = profile.roleCounts[role] ?: 0f
             if (current > max) {
                 val overflow = ((current - max) / max).coerceIn(0f, 1f)
-                if (overflow > worst) { worst = overflow; reasons += ScoreReason.OverCovered(role, Math.round(current), ideal) }
+                if (overflow > worst) { worst = overflow; reasons += ScoreReason.OverCovered(role, current.roundToInt(), ideal) }
             }
         }
         return worst

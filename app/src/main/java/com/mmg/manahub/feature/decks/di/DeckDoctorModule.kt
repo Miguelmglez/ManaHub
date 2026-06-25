@@ -1,7 +1,10 @@
 package com.mmg.manahub.feature.decks.di
 
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.PowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -11,13 +14,10 @@ import javax.inject.Singleton
 /**
  * Hilt bindings for the Deck Doctor scoring engine.
  *
- * `DeckScorer` declares `power: PowerResolver = NeutralPowerResolver` as a Kotlin
- * default, but Hilt does NOT honor constructor defaults — without an explicit binding
- * any injection of `DeckScorer` fails the build. This module supplies the production
- * [PowerResolver].
- *
- * `RoleClassifier` and `DeckScorer` are `@Inject constructor`, so they need no explicit
- * `@Provides`.
+ * After the KMP migration moved `RoleClassifier`, `ManaBaseAnalyzer` and `DeckScorer` to
+ * `:shared:core-domain` `commonMain` (stripping `@Inject`/`@Singleton`), Hilt can no longer
+ * auto-discover them. This module provides them explicitly so all still-Hilt consumers
+ * (e.g. `ScoringDraftDeckBuilder`, `DeckImprovementViewModel`) keep working.
  *
  * Now that `edhrec_rank` is persisted on `Card`, the recommended [EdhrecPowerResolver]
  * replaces the temporary `NeutralPowerResolver`: it derives the power signal from each
@@ -31,4 +31,20 @@ object DeckDoctorModule {
     @Singleton
     fun providePowerResolver(): PowerResolver =
         EdhrecPowerResolver(rankOf = { it.edhrecRank })
+
+    @Provides
+    @Singleton
+    fun provideRoleClassifier(): RoleClassifier = RoleClassifier()
+
+    @Provides
+    @Singleton
+    fun provideManaBaseAnalyzer(): ManaBaseAnalyzer = ManaBaseAnalyzer()
+
+    @Provides
+    @Singleton
+    fun provideDeckScorer(
+        roleClassifier: RoleClassifier,
+        power: PowerResolver,
+        manaBaseAnalyzer: ManaBaseAnalyzer,
+    ): DeckScorer = DeckScorer(roleClassifier, power, manaBaseAnalyzer)
 }

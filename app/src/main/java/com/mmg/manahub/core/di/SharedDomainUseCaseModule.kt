@@ -12,6 +12,7 @@ import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCa
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.domain.repository.DraftRepository
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.core.domain.repository.NewsRepository
@@ -27,18 +28,29 @@ import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import com.mmg.manahub.core.tagging.createStrategyAnalyzer
+import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetCardByNameUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.LookupCardIdUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
+import com.mmg.manahub.core.domain.engine.DraftDeckBuilder
+import com.mmg.manahub.core.domain.engine.DraftEngine
+import kotlinx.coroutines.Dispatchers
+import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
+import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import dagger.Module
@@ -201,6 +213,40 @@ object SharedDomainUseCaseModule {
         draftSimRepository: DraftSimRepository,
     ): ObserveDraftUseCase = ObserveDraftUseCase(draftSimRepository)
 
+    @Provides
+    @Singleton
+    fun provideGetDraftableSimSetUseCase(
+        draftSimRepository: DraftSimRepository,
+    ): GetDraftableSimSetUseCase = GetDraftableSimSetUseCase(draftSimRepository, Dispatchers.IO)
+
+    @Provides
+    @Singleton
+    fun provideStartDraftUseCase(
+        draftSimRepository: DraftSimRepository,
+        engine: DraftEngine,
+    ): StartDraftUseCase = StartDraftUseCase(draftSimRepository, engine, Dispatchers.IO, Dispatchers.Default)
+
+    @Provides
+    @Singleton
+    fun provideMakePickUseCase(
+        draftSimRepository: DraftSimRepository,
+        engine: DraftEngine,
+    ): MakePickUseCase = MakePickUseCase(draftSimRepository, engine, Dispatchers.IO, Dispatchers.Default)
+
+    @Provides
+    @Singleton
+    fun provideAutoPickUseCase(
+        draftSimRepository: DraftSimRepository,
+        engine: DraftEngine,
+    ): AutoPickUseCase = AutoPickUseCase(draftSimRepository, engine, Dispatchers.IO, Dispatchers.Default)
+
+    @Provides
+    @Singleton
+    fun provideCompleteDraftUseCase(
+        draftSimRepository: DraftSimRepository,
+        deckBuilder: DraftDeckBuilder,
+    ): CompleteDraftUseCase = CompleteDraftUseCase(draftSimRepository, deckBuilder, Dispatchers.IO, Dispatchers.Default)
+
     // -- Trades use cases (consumed by still-Hilt ScannerViewModel + ManaHubApp field injection). --
 
     @Provides
@@ -236,4 +282,31 @@ object SharedDomainUseCaseModule {
     fun provideRefreshNewsFeedUseCase(
         newsRepository: NewsRepository,
     ): RefreshNewsFeedUseCase = RefreshNewsFeedUseCase(newsRepository)
+
+    // -- Collection / survey use cases (moved from :app to :shared:core-domain, Phase 4). --
+
+    @Provides
+    @Singleton
+    fun provideCompleteSurveyUseCase(
+        progressionEventBus: ProgressionEventBus,
+    ): CompleteSurveyUseCase = CompleteSurveyUseCase(progressionEventBus)
+
+    @Provides
+    @Singleton
+    fun provideAddCardToCollectionUseCase(
+        cardRepository: CardRepository,
+        userCardRepository: UserCardRepository,
+        progressionEventBus: ProgressionEventBus,
+    ): AddCardToCollectionUseCase = AddCardToCollectionUseCase(
+        cardRepository, userCardRepository, progressionEventBus,
+    )
+
+    @Provides
+    @Singleton
+    fun provideCommitScannedCardsUseCase(
+        addCardToCollectionUseCase: AddCardToCollectionUseCase,
+        progressionEventBus: ProgressionEventBus,
+    ): CommitScannedCardsUseCase = CommitScannedCardsUseCase(
+        addCardToCollectionUseCase, progressionEventBus,
+    )
 }

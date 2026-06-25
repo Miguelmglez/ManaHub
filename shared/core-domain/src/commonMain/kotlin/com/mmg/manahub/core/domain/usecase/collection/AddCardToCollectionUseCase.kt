@@ -7,7 +7,6 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import kotlinx.datetime.Clock
-import javax.inject.Inject
 
 /**
  * Identifies where a collection add originated, so the gamification layer can attribute the
@@ -33,7 +32,7 @@ enum class CollectionAddSource {
  * batched [ProgressionEvent.CardScanned] instead). The emission happens strictly after the
  * write succeeds and never blocks the caller (see ADR-002 §1).
  */
-class AddCardToCollectionUseCase @Inject constructor(
+class AddCardToCollectionUseCase(
     private val cardRepository:     CardRepository,
     private val userCardRepository: UserCardRepository,
     private val progressionEventBus: ProgressionEventBus,
