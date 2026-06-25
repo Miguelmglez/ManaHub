@@ -382,7 +382,8 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
 target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
 
-**304 shared `.kt` files** across 5 modules as of 2026-06-25.
+**308 shared `.kt` files** across 5 modules as of 2026-06-25.
+Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 errors, 0 skipped.
 
 **Phase 4 completed (2026-06-24):**
 - ✅ `kotlinx-datetime` 0.6.2 added to all shared modules + `:app`
@@ -420,11 +421,15 @@ target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready
 - ✅ 5 draft use cases with dispatcher qualifiers → core-domain: GetDraftableSimSetUseCase,
   StartDraftUseCase, MakePickUseCase, AutoPickUseCase, CompleteDraftUseCase
   (`@IoDispatcher`/`@DefaultDispatcher` → `Dispatchers.IO`/`Dispatchers.Default` directly).
+- ✅ Gamification catalogs: **87 `R.string.*` refs inlined** as English strings (app is English-only).
+  Model fields renamed: `titleRes: Int` → `title: String`, `descRes: Int` → `description: String`,
+  `displayNameRes: Int` → `displayName: String` across 7 core-model types. `QuestTemplate` extracted
+  to core-model. 3 catalogs (AchievementCatalog, QuestCatalog, UnlockableCatalog) moved to
+  `:shared:core-domain`. 7 UI files + 4 tests updated. (`e23acdd`)
+- fix: `ClaimQuestRewardUseCaseTest` missing `ClaimResult` import after package move (`cbdeec4`).
 
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
-1. **Gamification catalogs** (`AchievementCatalog`, `QuestCatalog`, `UnlockableCatalog`) — ~87
-   `R.string.*` refs total. Need CMP Res migration or expect/actual split. All three should move together.
-2. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
+1. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
    Needs tagging module shared first, or the `label` call extracted.
 3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
 4. **Remaining composables in `:app`** — deep platform deps (bitmap resources, `android.graphics`,
