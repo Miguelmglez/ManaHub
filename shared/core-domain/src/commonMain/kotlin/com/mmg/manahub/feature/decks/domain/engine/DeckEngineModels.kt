@@ -33,7 +33,7 @@ enum class GameFormat(
  * to Standard. There is no Draft entry in [GameFormat]. Lives in the engine package so the engines
  * stay free of a presentation import.
  */
-internal fun GameFormat.toEngineDeckFormat(): com.mmg.manahub.core.model.DeckFormat =
+fun GameFormat.toEngineDeckFormat(): com.mmg.manahub.core.model.DeckFormat =
     when (this) {
         GameFormat.COMMANDER -> com.mmg.manahub.core.model.DeckFormat.COMMANDER
         /*GameFormat.STANDARD -> com.mmg.manahub.core.model.DeckFormat.STANDARD

@@ -7,8 +7,6 @@ import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier.Companion.STAR_POWER
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier.Companion.TAG_CONFIDENCE
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver.normalizeTribeWord
-import javax.inject.Inject
-import javax.inject.Singleton
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  RoleClassifier (v2 — pattern bank + weighted roles)
@@ -30,8 +28,7 @@ import javax.inject.Singleton
 //  lang are never read.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-@Singleton
-class RoleClassifier @Inject constructor() {
+class RoleClassifier {
 
     /**
      * Weighted classification: every functional [DeckRole] the card covers, mapped to

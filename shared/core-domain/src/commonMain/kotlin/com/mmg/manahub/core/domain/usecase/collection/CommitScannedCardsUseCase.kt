@@ -3,9 +3,9 @@ package com.mmg.manahub.core.domain.usecase.collection
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.datetime.Clock
-import java.util.UUID
-import javax.inject.Inject
 
 /**
  * A single card entry queued by the scanner, ready to be committed to the collection.
@@ -33,7 +33,8 @@ data class ScannedCardCommit(
  * Emission lives here (a use case), not in the ViewModel, and uses a freshly generated
  * `scanBatchId` per commit so the ledger dedupes accidental re-commits of the same batch.
  */
-class CommitScannedCardsUseCase @Inject constructor(
+@OptIn(ExperimentalUuidApi::class)
+class CommitScannedCardsUseCase(
     private val addCardToCollection: AddCardToCollectionUseCase,
     private val progressionEventBus: ProgressionEventBus,
 ) {
@@ -69,7 +70,7 @@ class CommitScannedCardsUseCase @Inject constructor(
         if (committedCopies > 0) {
             progressionEventBus.emit(
                 ProgressionEvent.CardScanned(
-                    scanBatchId = UUID.randomUUID().toString(),
+                    scanBatchId = Uuid.random().toString(),
                     count = committedCopies,
                     occurredAt = Clock.System.now(),
                 )

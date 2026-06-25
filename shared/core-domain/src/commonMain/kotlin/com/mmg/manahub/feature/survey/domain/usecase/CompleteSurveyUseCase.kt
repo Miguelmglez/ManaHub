@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.survey.domain.usecase
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import kotlinx.datetime.Clock
-import javax.inject.Inject
 
 /**
  * Signals that a post-game survey has transitioned to COMPLETED and emits the corresponding
@@ -18,7 +17,7 @@ import javax.inject.Inject
  * the survey id. The event's idempotency key is `survey:{surveyId}`, so re-submitting a survey
  * (or re-opening a COMPLETED one and saving again) grants XP at most once.
  */
-class CompleteSurveyUseCase @Inject constructor(
+class CompleteSurveyUseCase(
     private val progressionEventBus: ProgressionEventBus,
 ) {
     /**

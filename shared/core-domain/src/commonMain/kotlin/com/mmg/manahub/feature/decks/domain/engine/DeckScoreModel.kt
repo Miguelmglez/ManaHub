@@ -77,7 +77,7 @@ class EdhrecPowerResolver(
         val base = if (rank == null || rank <= 0) 0.35f // unknown/invalid rank = slightly below average
         else {
             val r = rank.coerceIn(1, maxRank)
-            (1f - (Math.log(r.toDouble()) / Math.log(maxRank.toDouble())).toFloat()).coerceIn(0f, 1f)
+            (1f - (kotlin.math.ln(r.toDouble()) / kotlin.math.ln(maxRank.toDouble())).toFloat()).coerceIn(0f, 1f)
         }
         // A Game Changer never scores below "very good".
         val withFloor = if (card.gameChanger) maxOf(base, 0.85f) else base
