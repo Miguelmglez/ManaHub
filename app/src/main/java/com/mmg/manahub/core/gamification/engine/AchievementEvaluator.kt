@@ -111,7 +111,7 @@ class AchievementEvaluator @Inject constructor(
             grantTierXp(def.id, tier, tierDef.xpReward)
             unlocks += AchievementUnlock(
                 id = def.id,
-                titleRes = def.titleRes,
+                title = def.title,
                 emoji = def.emoji,
                 tier = tier,
                 xpReward = tierDef.xpReward,

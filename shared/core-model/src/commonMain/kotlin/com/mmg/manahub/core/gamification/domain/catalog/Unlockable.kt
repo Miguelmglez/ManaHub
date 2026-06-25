@@ -155,7 +155,7 @@ data class RenderSpec(
  * @param id STABLE catalog id (the [UnlockableId.value] string). This is the persisted PK in
  *   `entitlements` AND the Phase-4 sync key — NEVER rename a shipped id.
  * @param kind which cosmetic family this is.
- * @param displayNameRes English display name (string resource).
+ * @param displayName English display name (inline text).
  * @param renderSpec procedural render description for Chunk B.
  * @param unlockRule the condition that grants this item.
  * @param sortOrder display order within its [kind] (ascending); ties broken by id.
@@ -163,7 +163,7 @@ data class RenderSpec(
 data class Unlockable(
     val id: UnlockableId,
     val kind: UnlockableKind,
-    val displayNameRes: Int,
+    val displayName: String,
     val renderSpec: RenderSpec,
     val unlockRule: UnlockRule,
     val sortOrder: Int = 0,

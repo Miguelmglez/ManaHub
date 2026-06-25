@@ -233,7 +233,7 @@ class HomeViewModelTest {
         gamificationRepository = gamificationRepository,
     )
 
-    /** Builds a quest UI model for tests (titleRes/descRes are irrelevant for VM logic). */
+    /** Builds a quest UI model for tests (title/description are irrelevant for VM logic). */
     private fun quest(
         instanceId: String,
         period: QuestPeriod = QuestPeriod.DAILY,
@@ -244,8 +244,8 @@ class HomeViewModelTest {
     ) = QuestUiModel(
         instanceId = instanceId,
         templateId = "tmpl_$instanceId",
-        titleRes = 0,
-        descRes = 0,
+        title = "",
+        description = "",
         emoji = "⚔",
         period = period,
         weightClass = QuestWeightClass.ACCESSIBLE,

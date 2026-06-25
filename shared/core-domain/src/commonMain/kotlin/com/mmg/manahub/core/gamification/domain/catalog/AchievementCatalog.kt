@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.gamification.domain.catalog
 
-import com.mmg.manahub.R
 import com.mmg.manahub.core.gamification.domain.XpConfig
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog.defsByEventType
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -52,7 +51,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "CARDS_OWNED", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_hoarder, descRes = R.string.achievement_hoarder_desc,
+                title = "Hoarder", description = "Own 100 / 1,000 / 5,000 cards",
                 emoji = "📦", // 📦
                 tiers = listOf(
                     AchievementTier(100, XpConfig.achievementTier1),
@@ -68,7 +67,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "COLLECTOR_50", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_collector_1, descRes = R.string.achievement_collector_1_desc,
+                title = "Collector I", description = "Add 50 cards to your collection",
                 emoji = "📚", // 📚
                 tiers = listOf(AchievementTier(50, XpConfig.achievementTier1)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -78,7 +77,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "COLLECTOR_500", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_collector_3, descRes = R.string.achievement_collector_3_desc,
+                title = "Collector III", description = "Add 500 cards to your collection",
                 emoji = "📖", // 📖
                 tiers = listOf(AchievementTier(500, XpConfig.achievementTier2)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -88,7 +87,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "UNIQUE_CARDS_2000", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_completionist, descRes = R.string.achievement_completionist_desc,
+                title = "Completionist", description = "Own 50 / 500 / 2,000 unique cards",
                 emoji = "🏛", // 🏛
                 tiers = listOf(AchievementTier(2_000, XpConfig.achievementTier3)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -98,7 +97,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "FOIL_COLLECTOR", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_foil_fan, descRes = R.string.achievement_foil_fan_desc,
+                title = "Foil Fan", description = "Own 10 / 50 foil cards",
                 emoji = "✨", // ✨
                 tiers = listOf(
                     AchievementTier(10, XpConfig.achievementTier1),
@@ -111,7 +110,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "RAINBOW_COLLECTOR", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_five_colors, descRes = R.string.achievement_five_colors_desc,
+                title = "Five Colors", description = "Have cards of all 5 colors",
                 emoji = "🌈", // 🌈
                 tiers = listOf(AchievementTier(5, XpConfig.achievementOneShot)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -121,7 +120,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "MYTHIC_OWNER", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_mythic_hunter, descRes = R.string.achievement_mythic_hunter_desc,
+                title = "Mythic Hunter", description = "Own a mythic rare card",
                 emoji = "🌟", // 🌟
                 tiers = listOf(
                     AchievementTier(1, XpConfig.achievementTier1),
@@ -134,7 +133,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "HIGH_VALUE_COLLECTION", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_high_roller, descRes = R.string.achievement_high_roller_desc,
+                title = "High Roller", description = "Own a card worth more than %s",
                 emoji = "💎", // 💎
                 // Threshold in whole USD (resolver floors the max card price to an Int).
                 tiers = listOf(AchievementTier(60, XpConfig.achievementOneShot)),
@@ -155,7 +154,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "FIRST_WIN", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_first_blood, descRes = R.string.achievement_first_blood_desc,
+                title = "First Blood", description = "Win your first game",
                 emoji = "⚔️", // ⚔️
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -165,7 +164,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "WINS_TIERED", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_victor, descRes = R.string.achievement_victor_desc,
+                title = "Victor", description = "Win 10 / 50 / 200 games",
                 emoji = "🏆", // 🏆
                 tiers = listOf(
                     AchievementTier(10, XpConfig.achievementTier1),
@@ -180,7 +179,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "WIN_STREAK_3", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_on_fire, descRes = R.string.achievement_on_fire_desc,
+                title = "On Fire", description = "Win 3 games in a row",
                 emoji = "🔥", // 🔥
                 tiers = listOf(AchievementTier(3, XpConfig.achievementTier1)),
                 reactsTo = setOf(GAME), family = Family.COUNTER,
@@ -189,7 +188,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "WIN_STREAK_5", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_on_fire, descRes = R.string.achievement_on_fire_desc,
+                title = "On Fire", description = "Win 3 games in a row",
                 emoji = "🔥", // 🔥
                 tiers = listOf(AchievementTier(5, XpConfig.achievementTier2)),
                 reactsTo = setOf(GAME), family = Family.COUNTER,
@@ -198,7 +197,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "WIN_STREAK_10", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_on_fire, descRes = R.string.achievement_on_fire_desc,
+                title = "On Fire", description = "Win 3 games in a row",
                 emoji = "🔥", // 🔥
                 tiers = listOf(AchievementTier(10, XpConfig.achievementTier3)),
                 reactsTo = setOf(GAME), family = Family.COUNTER,
@@ -207,7 +206,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "COMEBACK_WIN", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_comeback_kid, descRes = R.string.achievement_comeback_kid_desc,
+                title = "Comeback Kid", description = "Win a game from 5 or less life",
                 emoji = "🛡", // 🛡
                 tiers = listOf(AchievementTier(1, XpConfig.achievementOneShot)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -217,7 +216,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "MARATHON", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_marathoner, descRes = R.string.achievement_marathoner_desc,
+                title = "Marathoner", description = "Play a game lasting 90 minutes or more",
                 emoji = "⏱", // ⏱
                 tiers = listOf(AchievementTier(1, XpConfig.achievementOneShot)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -227,7 +226,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "COMMANDER_KILLER", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_commander_wrath, descRes = R.string.achievement_commander_wrath_desc,
+                title = "Commander's Wrath", description = "Eliminate a player with commander damage",
                 emoji = "👑", // 👑
                 tiers = listOf(AchievementTier(10, XpConfig.achievementTier2)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -237,7 +236,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "MULTIPLAYER", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_full_house, descRes = R.string.achievement_full_house_desc,
+                title = "Full House", description = "Play a game with 4 or more players",
                 emoji = "🎲", // 🎲
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -247,7 +246,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "QUICK_VICTORY", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_aggro_master, descRes = R.string.achievement_aggro_master_desc,
+                title = "Aggro Master", description = "Win a game in less than 8 turns",
                 emoji = "⚡", // ⚡
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -260,7 +259,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "DECK_BUILDER", category = AchievementCategory.DECKS,
-                titleRes = R.string.achievement_deck_builder, descRes = R.string.achievement_deck_builder_desc,
+                title = "Deck Builder", description = "Create your first deck",
                 emoji = "🛠️", // 🛠️
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
                 reactsTo = setOf(DECK_CREATED), family = Family.DERIVED,
@@ -270,7 +269,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "DECKS_TIERED", category = AchievementCategory.DECKS,
-                titleRes = R.string.achievement_master_builder, descRes = R.string.achievement_master_builder_desc,
+                title = "Master Builder", description = "Build 1 / 5 / 20 decks",
                 emoji = "🔧", // 🔧
                 tiers = listOf(
                     AchievementTier(5, XpConfig.achievementTier2),
@@ -283,7 +282,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "FORMAT_EXPLORER", category = AchievementCategory.DECKS,
-                titleRes = R.string.achievement_format_explorer, descRes = R.string.achievement_format_explorer_desc,
+                title = "Format Explorer", description = "Build decks in 3 different formats",
                 emoji = "🗺", // 🗺
                 tiers = listOf(AchievementTier(3, XpConfig.achievementTier2)),
                 reactsTo = setOf(DECK_CREATED), family = Family.DERIVED,
@@ -296,7 +295,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "SURVEY_VETERAN", category = AchievementCategory.SURVEYS,
-                titleRes = R.string.achievement_analyst, descRes = R.string.achievement_analyst_desc,
+                title = "Analyst", description = "Complete 5 / 25 / 100 surveys",
                 emoji = "📊", // 📊
                 tiers = listOf(
                     AchievementTier(5, XpConfig.achievementTier1),
@@ -313,7 +312,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "TOURNAMENT_FIRST", category = AchievementCategory.TOURNAMENTS,
-                titleRes = R.string.achievement_competitor, descRes = R.string.achievement_competitor_desc,
+                title = "Competitor", description = "Complete your first tournament",
                 emoji = "🎯", // 🎯
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
                 reactsTo = setOf(TOURNEY), family = Family.COUNTER,
@@ -322,7 +321,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "TOURNAMENT_5", category = AchievementCategory.TOURNAMENTS,
-                titleRes = R.string.achievement_circuit_regular, descRes = R.string.achievement_circuit_regular_desc,
+                title = "Circuit Regular", description = "Complete 5 tournaments",
                 emoji = "🏅", // 🏅
                 tiers = listOf(AchievementTier(5, XpConfig.achievementTier2)),
                 reactsTo = setOf(TOURNEY), family = Family.COUNTER,
@@ -335,7 +334,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "TOURNAMENT_WIN", category = AchievementCategory.TOURNAMENTS,
-                titleRes = R.string.achievement_tournament_champion, descRes = R.string.achievement_tournament_champion_desc,
+                title = "Tournament Champion", description = "Win a tournament",
                 emoji = "👑", // 👑
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier3)),
                 reactsTo = setOf(TOURNEY), family = Family.COUNTER,
@@ -346,7 +345,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "FIRST_FRIEND", category = AchievementCategory.SOCIAL,
-                titleRes = R.string.achievement_first_friend, descRes = R.string.achievement_first_friend_desc,
+                title = "Companion", description = "Add your first friend",
                 emoji = "🤝", // 🤝
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
                 reactsTo = setOf(FRIEND), family = Family.COUNTER,
@@ -355,7 +354,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "FRIENDS_5", category = AchievementCategory.SOCIAL,
-                titleRes = R.string.achievement_social_butterfly, descRes = R.string.achievement_social_butterfly_desc,
+                title = "Social Butterfly", description = "Add 5 friends",
                 emoji = "🦋", // 🦋
                 tiers = listOf(AchievementTier(5, XpConfig.achievementTier2)),
                 reactsTo = setOf(FRIEND), family = Family.COUNTER,
@@ -364,7 +363,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "FIRST_TRADE", category = AchievementCategory.SOCIAL,
-                titleRes = R.string.achievement_first_trade, descRes = R.string.achievement_first_trade_desc,
+                title = "Dealmaker", description = "Complete your first trade",
                 emoji = "🔄", // 🔄
                 tiers = listOf(AchievementTier(1, XpConfig.achievementTier1)),
                 reactsTo = setOf(TRADE), family = Family.COUNTER,
@@ -373,7 +372,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "TRADES_10", category = AchievementCategory.SOCIAL,
-                titleRes = R.string.achievement_trade_baron, descRes = R.string.achievement_trade_baron_desc,
+                title = "Trade Baron", description = "Complete 10 trades",
                 emoji = "💰", // 💰
                 tiers = listOf(AchievementTier(10, XpConfig.achievementTier3)),
                 reactsTo = setOf(TRADE), family = Family.COUNTER,
@@ -388,7 +387,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "STREAK_3", category = AchievementCategory.DEDICATION,
-                titleRes = R.string.achievement_dedicated, descRes = R.string.achievement_dedicated_desc,
+                title = "Dedicated", description = "Open the app 3 / 7 / 30 days in a row",
                 emoji = "📅", // 📅
                 tiers = listOf(AchievementTier(3, XpConfig.achievementTier1)),
                 reactsTo = setOf(APP_OPEN), family = Family.COUNTER,
@@ -397,7 +396,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "STREAK_7", category = AchievementCategory.DEDICATION,
-                titleRes = R.string.achievement_dedicated, descRes = R.string.achievement_dedicated_desc,
+                title = "Dedicated", description = "Open the app 3 / 7 / 30 days in a row",
                 emoji = "📅", // 📅
                 tiers = listOf(AchievementTier(7, XpConfig.achievementTier2)),
                 reactsTo = setOf(APP_OPEN), family = Family.COUNTER,
@@ -406,7 +405,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "STREAK_30", category = AchievementCategory.DEDICATION,
-                titleRes = R.string.achievement_dedicated, descRes = R.string.achievement_dedicated_desc,
+                title = "Dedicated", description = "Open the app 3 / 7 / 30 days in a row",
                 emoji = "📅", // 📅
                 tiers = listOf(AchievementTier(30, XpConfig.achievementTier3)),
                 reactsTo = setOf(APP_OPEN), family = Family.COUNTER,
@@ -417,7 +416,7 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "SECRET_ONE_LIFE_WIN", category = AchievementCategory.GAMES,
-                titleRes = R.string.achievement_secret_one_life, descRes = R.string.achievement_secret_one_life_desc,
+                title = "Against All Odds", description = "Win a game with exactly 1 life remaining",
                 emoji = "💀", // 💀
                 tiers = listOf(AchievementTier(1, XpConfig.achievementSecret)),
                 reactsTo = setOf(GAME), family = Family.DERIVED,
@@ -429,8 +428,8 @@ object AchievementCatalog {
         add(
             AchievementDef(
                 id = "SECRET_PERFECT_RAINBOW", category = AchievementCategory.COLLECTION,
-                titleRes = R.string.achievement_secret_perfect_rainbow,
-                descRes = R.string.achievement_secret_perfect_rainbow_desc,
+                title = "Prismatic Devotion",
+                description = "Own 20+ cards in every one of the five colors",
                 emoji = "🔮", // 🔮
                 tiers = listOf(AchievementTier(5, XpConfig.achievementSecret)),
                 reactsTo = COLLECTION_EVENTS, family = Family.DERIVED,
@@ -461,7 +460,7 @@ object AchievementCatalog {
     /** Shared builder for the (non-tiered, single-threshold) games-played stable entries. */
     private fun gamesPlayed(id: String, threshold: Int, xp: Int): AchievementDef = AchievementDef(
         id = id, category = AchievementCategory.GAMES,
-        titleRes = R.string.achievement_seasoned, descRes = R.string.achievement_seasoned_desc,
+        title = "Seasoned Player", description = "Play 10 / 50 / 100 / 500 games",
         emoji = "🎮", // 🎮
         tiers = listOf(AchievementTier(threshold, xp)),
         reactsTo = setOf(GAME), family = Family.DERIVED,

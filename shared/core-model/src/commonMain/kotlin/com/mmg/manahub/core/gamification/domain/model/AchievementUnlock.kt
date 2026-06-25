@@ -8,14 +8,14 @@ package com.mmg.manahub.core.gamification.domain.model
  * already granted to the ledger by the evaluator; this is purely informational for the UI).
  *
  * @param id stable catalog id.
- * @param titleRes English title resource.
+ * @param title English title text.
  * @param emoji glyph.
  * @param tier the tier index (1-based) that was just unlocked.
  * @param xpReward XP that tier granted.
  */
 data class AchievementUnlock(
     val id: String,
-    val titleRes: Int,
+    val title: String,
     val emoji: String,
     val tier: Int,
     val xpReward: Int,

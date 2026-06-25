@@ -107,8 +107,8 @@ data class AchievementTier(
  * @param id STABLE catalog id (the 15 migrated achievements keep their old `AchievementId` enum-name
  *   strings). NEVER rename a shipped id — it is the persisted PK in `achievement_progress`.
  * @param category catalog grouping.
- * @param titleRes UI title (English string resource).
- * @param descRes UI description (English string resource).
+ * @param title UI title (inline English text).
+ * @param description UI description (inline English text).
  * @param emoji glyph shown in the UI.
  * @param tiers 1..3 ascending tiers; the last tier's threshold is the achievement's "max".
  * @param reactsTo event types that can advance this achievement. MUST be non-empty (every def is
@@ -121,8 +121,8 @@ data class AchievementTier(
 data class AchievementDef(
     val id: String,
     val category: AchievementCategory,
-    val titleRes: Int,
-    val descRes: Int,
+    val title: String,
+    val description: String,
     val emoji: String,
     val tiers: List<AchievementTier>,
     val reactsTo: Set<KClass<out ProgressionEvent>>,

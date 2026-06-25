@@ -12,11 +12,12 @@ import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
  * rendered (driven off the catalog) so the player can see what's available; [unlockRule] is exposed so
  * Chunk B can format a localized "how to unlock" hint (e.g. "Reach level 10" / "Unlock the Collector
  * achievement"). Formatting the hint in the UI layer keeps the domain free of string/`Context`
- * concerns.
+ * concerns. Display names are inline English strings (no Android string resources) so the domain
+ * layer stays platform-agnostic.
  *
  * @param id stable unlockable id.
  * @param kind the cosmetic family.
- * @param displayNameRes English display name resource.
+ * @param displayName English display name text.
  * @param renderSpec procedural render description (Chunk B draws from this).
  * @param isOwned true when the player has an entitlement for [id].
  * @param isEquipped true when [id] is currently equipped in its slot.
@@ -25,7 +26,7 @@ import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
 data class RewardUiModel(
     val id: String,
     val kind: UnlockableKind,
-    val displayNameRes: Int,
+    val displayName: String,
     val renderSpec: RenderSpec,
     val isOwned: Boolean,
     val isEquipped: Boolean,

@@ -256,7 +256,7 @@ private fun CelebrationOverlay(
             ?: 0
     }
 
-    val title = stringResource(achievement.titleRes)
+    val title = achievement.title
     val a11y = stringResource(R.string.celebration_a11y, title, tier, xpReward)
     val dismissLabel = stringResource(R.string.celebration_dismiss_action)
 

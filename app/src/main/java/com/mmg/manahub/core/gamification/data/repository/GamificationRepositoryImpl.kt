@@ -162,7 +162,7 @@ class GamificationRepositoryImpl @Inject constructor(
         RewardUiModel(
             id = id.value,
             kind = kind,
-            displayNameRes = displayNameRes,
+            displayName = displayName,
             renderSpec = renderSpec,
             isOwned = owned,
             isEquipped = isEquipped(equipped),
@@ -197,8 +197,8 @@ class GamificationRepositoryImpl @Inject constructor(
         QuestUiModel(
             instanceId = id,
             templateId = templateId,
-            titleRes = template.titleRes,
-            descRes = template.descRes,
+            title = template.title,
+            description = template.description,
             emoji = template.emoji,
             period = template.period,
             weightClass = template.weightClass,
@@ -221,8 +221,8 @@ class GamificationRepositoryImpl @Inject constructor(
         AchievementUiModel(
             id = id,
             category = category,
-            titleRes = titleRes,
-            descRes = descRes,
+            title = title,
+            description = description,
             emoji = emoji,
             tierThresholds = tiers.map { it.threshold },
             currentValue = progress?.currentValue ?: 0,
