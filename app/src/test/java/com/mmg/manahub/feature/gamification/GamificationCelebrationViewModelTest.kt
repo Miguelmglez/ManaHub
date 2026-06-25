@@ -76,8 +76,8 @@ class GamificationCelebrationViewModelTest {
     private fun model(id: String, unlockedAt: Long) = AchievementUiModel(
         id = id,
         category = AchievementCategory.GAMES,
-        titleRes = 0,
-        descRes = 0,
+        title = "",
+        description = "",
         emoji = "⚔️",
         tierThresholds = listOf(1),
         currentValue = 1,

@@ -1274,7 +1274,7 @@ class HomeViewModel(
 /** Projects a [QuestUiModel] down to the compact [HomeQuest] preview model. */
 private fun QuestUiModel.toHomeQuest(): HomeQuest = HomeQuest(
     instanceId = instanceId,
-    titleRes = titleRes,
+    title = title,
     emoji = emoji,
     progress = progress,
     target = target,

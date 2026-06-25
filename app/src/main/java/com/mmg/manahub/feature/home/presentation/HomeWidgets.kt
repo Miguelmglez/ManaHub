@@ -1057,7 +1057,7 @@ private fun HomeQuestRow(quest: HomeQuest) {
                 verticalArrangement = Arrangement.spacedBy(spacing.xxs),
             ) {
                 Text(
-                    text = stringResourceSafe(quest.titleRes),
+                    text = quest.title,
                     style = ty.labelMedium,
                     color = mc.textPrimary,
                     maxLines = 1,

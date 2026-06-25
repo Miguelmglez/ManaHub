@@ -8,12 +8,12 @@ import com.mmg.manahub.core.gamification.domain.QuestWeightClass
  *
  * Produced by `GamificationRepository.observeActiveQuests()` by joining each persisted
  * `quest_instances` row with its [com.mmg.manahub.core.gamification.domain.catalog.QuestTemplate]
- * metadata. Titles/descriptions are string resources (resolved in the Composable) so the domain layer
- * stays `android.content.Context`-free. Chunk B's Quests tab + Home widgets consume this directly.
+ * metadata. Titles/descriptions are inline English strings (no Android string resources) so the
+ * domain layer stays platform-agnostic. Chunk B's Quests tab + Home widgets consume this directly.
  *
  * @param instanceId persisted instance id (`{templateId}:{periodKey}`).
  * @param templateId catalog template id.
- * @param titleRes / descRes English string resources.
+ * @param title / description inline English text.
  * @param emoji glyph.
  * @param period DAILY / WEEKLY.
  * @param weightClass difficulty band (for grouping/visual treatment).
@@ -25,8 +25,8 @@ import com.mmg.manahub.core.gamification.domain.QuestWeightClass
 data class QuestUiModel(
     val instanceId: String,
     val templateId: String,
-    val titleRes: Int,
-    val descRes: Int,
+    val title: String,
+    val description: String,
     val emoji: String,
     val period: QuestPeriod,
     val weightClass: QuestWeightClass,

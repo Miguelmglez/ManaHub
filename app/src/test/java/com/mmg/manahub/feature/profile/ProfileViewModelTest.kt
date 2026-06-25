@@ -116,8 +116,8 @@ class ProfileViewModelTest {
     ) = QuestUiModel(
         instanceId = instanceId,
         templateId = "tmpl_$instanceId",
-        titleRes = 0,
-        descRes = 0,
+        title = "",
+        description = "",
         emoji = "⚔",
         period = QuestPeriod.DAILY,
         weightClass = QuestWeightClass.ACCESSIBLE,
@@ -437,8 +437,8 @@ class ProfileViewModelTest {
             AchievementUiModel(
                 id = "FIRST_WIN",
                 category = com.mmg.manahub.core.gamification.domain.model.AchievementCategory.GAMES,
-                titleRes = 0,
-                descRes = 0,
+                title = "",
+                description = "",
                 emoji = "⚔️",
                 tierThresholds = listOf(1),
                 currentValue = 1,
@@ -465,8 +465,8 @@ class ProfileViewModelTest {
             AchievementUiModel(
                 id = "SECRET_ONE_LIFE_WIN",
                 category = com.mmg.manahub.core.gamification.domain.model.AchievementCategory.GAMES,
-                titleRes = 0,
-                descRes = 0,
+                title = "",
+                description = "",
                 emoji = "💀",
                 tierThresholds = listOf(1),
                 currentValue = 0,

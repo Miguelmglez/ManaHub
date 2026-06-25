@@ -7,12 +7,12 @@ package com.mmg.manahub.core.gamification.domain.model
  * [com.mmg.manahub.core.gamification.domain.catalog.AchievementDef] with its persisted
  * `achievement_progress` row. Chunk B's Achievements tab + celebration overlay consume this directly.
  *
- * Titles/descriptions are exposed as string resources (resolved in the Composable) to keep the
- * domain layer free of `android.content.Context`.
+ * Titles/descriptions are exposed as inline English strings (no Android string resources) so the
+ * domain layer stays platform-agnostic.
  *
  * @param id stable catalog id.
  * @param category catalog grouping.
- * @param titleRes / descRes English string resources.
+ * @param title / description inline English text.
  * @param emoji glyph.
  * @param tierThresholds ascending thresholds (one per tier).
  * @param currentValue current progress value toward the next tier.
@@ -24,8 +24,8 @@ package com.mmg.manahub.core.gamification.domain.model
 data class AchievementUiModel(
     val id: String,
     val category: AchievementCategory,
-    val titleRes: Int,
-    val descRes: Int,
+    val title: String,
+    val description: String,
     val emoji: String,
     val tierThresholds: List<Int>,
     val currentValue: Int,

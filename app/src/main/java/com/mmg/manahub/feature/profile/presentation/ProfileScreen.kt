@@ -684,7 +684,7 @@ private fun ProfileHeroSection(
         val resolvedName = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) }
         val badgeCount = equippedBadges.size
             .coerceAtMost(com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.MAX_EQUIPPED_BADGES)
-        val equippedTitleName = equippedTitle?.let { stringResource(it.displayNameRes) }
+        val equippedTitleName = equippedTitle?.displayName
         val badgesEquippedText = if (badgeCount > 0) {
             pluralStringResource(R.plurals.profile_hero_badges_equipped, badgeCount, badgeCount)
         } else {
@@ -726,7 +726,7 @@ private fun ProfileHeroSection(
                 if (equippedTitle != null) {
                     TitleText(
                         renderSpec = equippedTitle.renderSpec,
-                        text = stringResource(equippedTitle.displayNameRes),
+                        text = equippedTitle.displayName,
                         style = MaterialTheme.magicTypography.labelLarge,
                         modifier = Modifier.padding(top = 2.dp),
                     )

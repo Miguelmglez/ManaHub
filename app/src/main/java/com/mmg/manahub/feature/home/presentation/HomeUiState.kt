@@ -108,7 +108,7 @@ data class HomeGamification(
 /** A single quest preview row for the Home Quests widget. */
 data class HomeQuest(
     val instanceId: String,
-    @StringRes val titleRes: Int,
+    val title: String,
     val emoji: String,
     val progress: Int,
     val target: Int,

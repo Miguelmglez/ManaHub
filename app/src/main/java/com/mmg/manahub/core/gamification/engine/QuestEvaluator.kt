@@ -65,7 +65,7 @@ class QuestEvaluator @Inject constructor(
                 QuestProgressDelta(
                     instanceId = instanceId,
                     templateId = template.id,
-                    titleRes = template.titleRes,
+                    title = template.title,
                     emoji = template.emoji,
                     newProgress = newProgress,
                     target = instance.target,

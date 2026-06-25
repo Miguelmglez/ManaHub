@@ -135,12 +135,12 @@ fun AchievementRow(
     val title = if (masked) {
         stringResource(R.string.achievement_masked_title)
     } else {
-        stringResource(achievement.titleRes)
+        achievement.title
     }
     val description = if (masked) {
         stringResource(R.string.achievement_masked_desc)
     } else {
-        stringResource(achievement.descRes)
+        achievement.description
     }
     val emoji = if (masked) "🔒" else achievement.emoji
 

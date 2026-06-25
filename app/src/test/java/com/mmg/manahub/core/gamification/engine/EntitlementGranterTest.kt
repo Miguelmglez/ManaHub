@@ -63,7 +63,7 @@ class EntitlementGranterTest {
         breakdown = emptyList(),
         newLevel = null,
         leveledUp = false,
-        achievementUnlocks = listOf(AchievementUnlock(id = id, titleRes = 0, emoji = "", tier = 1, xpReward = 0)),
+        achievementUnlocks = listOf(AchievementUnlock(id = id, title = "", emoji = "", tier = 1, xpReward = 0)),
     )
 
     // ── Per-event level-up grants ──────────────────────────────────────────────────

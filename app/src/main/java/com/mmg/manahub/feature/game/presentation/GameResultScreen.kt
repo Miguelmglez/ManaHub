@@ -473,7 +473,7 @@ private fun GameProgressionStrip(
                                 ) {
                                     Text(text = unlock.emoji, style = MaterialTheme.magicTypography.bodyMedium)
                                     Text(
-                                        text = stringResource(unlock.titleRes),
+                                        text = unlock.title,
                                         style = MaterialTheme.magicTypography.labelMedium,
                                         color = mc.textPrimary,
                                     )
@@ -494,7 +494,7 @@ private fun GameProgressionStrip(
                         ) {
                             Text(text = delta.emoji, style = MaterialTheme.magicTypography.bodyMedium)
                             Text(
-                                text = stringResource(delta.titleRes),
+                                text = delta.title,
                                 style = MaterialTheme.magicTypography.bodyMedium,
                                 color = mc.textSecondary,
                                 modifier = Modifier.weight(1f),

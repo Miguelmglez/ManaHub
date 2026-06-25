@@ -185,7 +185,7 @@ private fun RewardCell(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val name = stringResource(reward.displayNameRes)
+    val name = reward.displayName
     val locked = !reward.isOwned
     val equipped = reward.isEquipped
 
@@ -316,9 +316,9 @@ private fun LockedMarker(hint: String, modifier: Modifier = Modifier) {
 private fun unlockHint(rule: UnlockRule): String = when (rule) {
     is UnlockRule.LevelAtLeast -> stringResource(R.string.reward_unlock_hint_level, rule.level)
     is UnlockRule.AchievementUnlocked -> {
-        val titleRes = AchievementCatalog.byId(rule.achievementId)?.titleRes
-        if (titleRes != null) {
-            stringResource(R.string.reward_unlock_hint_achievement, stringResource(titleRes))
+        val title = AchievementCatalog.byId(rule.achievementId)?.title
+        if (title != null) {
+            stringResource(R.string.reward_unlock_hint_achievement, title)
         } else {
             stringResource(R.string.reward_unlock_hint_generic)
         }

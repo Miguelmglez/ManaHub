@@ -4,12 +4,12 @@ package com.mmg.manahub.core.gamification.domain.model
  * The change applied to ONE quest instance while processing a progression event (ADR-002, Phase 2).
  *
  * Returned by `QuestEvaluator.process` and folded into the [ProgressionOutcome] so Chunk B's UI can
- * surface "+1 toward <quest>" / "Quest complete!" feedback. Title is a string resource (resolved in the
- * Composable) to keep the domain layer Context-free.
+ * surface "+1 toward <quest>" / "Quest complete!" feedback. Title is inline English text (no Android
+ * string resources) to keep the domain layer platform-agnostic.
  *
  * @param instanceId the persisted quest instance id (`{templateId}:{periodKey}`).
  * @param templateId the catalog template id.
- * @param titleRes English title string resource.
+ * @param title English title text.
  * @param emoji glyph for the UI.
  * @param newProgress the progress AFTER this event (clamped to [target]).
  * @param target the completion target.
@@ -18,7 +18,7 @@ package com.mmg.manahub.core.gamification.domain.model
 data class QuestProgressDelta(
     val instanceId: String,
     val templateId: String,
-    val titleRes: Int,
+    val title: String,
     val emoji: String,
     val newProgress: Int,
     val target: Int,
