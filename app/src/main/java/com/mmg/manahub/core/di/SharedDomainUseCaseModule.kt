@@ -11,10 +11,14 @@ import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.DraftRepository
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.domain.repository.NewsRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
@@ -32,6 +36,11 @@ import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.LookupCardIdUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
+import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
+import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
+import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -191,4 +200,40 @@ object SharedDomainUseCaseModule {
     fun provideObserveDraftUseCase(
         draftSimRepository: DraftSimRepository,
     ): ObserveDraftUseCase = ObserveDraftUseCase(draftSimRepository)
+
+    // -- Trades use cases (consumed by still-Hilt ScannerViewModel + ManaHubApp field injection). --
+
+    @Provides
+    @Singleton
+    fun provideAddToWishlistUseCase(
+        wishlistRepository: WishlistRepository,
+        authRepository: AuthRepository,
+    ): AddToWishlistUseCase = AddToWishlistUseCase(wishlistRepository, authRepository)
+
+    @Provides
+    @Singleton
+    fun provideMigrateLocalTradeListsUseCase(
+        wishlistRepository: WishlistRepository,
+        openForTradeRepository: OpenForTradeRepository,
+    ): MigrateLocalTradeListsUseCase = MigrateLocalTradeListsUseCase(wishlistRepository, openForTradeRepository)
+
+    // -- News use cases (consumed by ManaHubApp Hilt field injection). --
+
+    @Provides
+    @Singleton
+    fun provideGetNewsFeedUseCase(
+        newsRepository: NewsRepository,
+    ): GetNewsFeedUseCase = GetNewsFeedUseCase(newsRepository)
+
+    @Provides
+    @Singleton
+    fun provideManageSourcesUseCase(
+        newsRepository: NewsRepository,
+    ): ManageSourcesUseCase = ManageSourcesUseCase(newsRepository)
+
+    @Provides
+    @Singleton
+    fun provideRefreshNewsFeedUseCase(
+        newsRepository: NewsRepository,
+    ): RefreshNewsFeedUseCase = RefreshNewsFeedUseCase(newsRepository)
 }
