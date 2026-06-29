@@ -61,7 +61,10 @@ output; do not restore `es`/`de` locale branches. → memory: `feedback_language
 
 ## Architecture
 
-**MVVM + Clean Architecture** within a single Gradle module (`:app`).
+**MVVM + Clean Architecture.** The tree below is the **current/legacy** single-module (`:app`) layout.
+**New code is KMP-first** (Koin DI, `commonMain` by default) per the directive above and the "Kotlin
+Multiplatform migration" section below — do not add new Hilt/single-module code; follow the KMP source-set
+rules. The legacy structure stays as-is until each feature is migrated.
 
 ```
 com.mmg.manahub/
@@ -164,9 +167,11 @@ Routes are a sealed class in `Screen.kt`; forward-slash hierarchy (e.g. `"collec
 Bottom tabs: Collection, Stats, [central FAB = Game], Profile.
 
 ### DI
-All ViewModels `@HiltViewModel`. `RepositoryModule` binds interfaces→impls (singleton).
-`DispatcherModule` provides named dispatchers. Feature modules are separate
-`@InstallIn(SingletonComponent::class)` modules.
+**New/migrated code uses Koin** (`koinViewModel()`, Koin modules per feature) — this is the default for
+all new work (see the KMP migration section). The Hilt setup below is **legacy/unmigrated only**: existing
+ViewModels are `@HiltViewModel`, `RepositoryModule` binds interfaces→impls (singleton), `DispatcherModule`
+provides named dispatchers, feature modules are separate `@InstallIn(SingletonComponent::class)` modules.
+Do not add new Hilt modules for new code; bridge Koin↔Hilt during the transition rather than expanding Hilt.
 
 ### Utilities
 `core/util/TimeAgoFormatter` for relative dates (English only) — don't write inline `SimpleDateFormat`.
@@ -702,8 +707,20 @@ file path + line, the exact problem/feature, the proposed solution logic, and an
 Non-Kotlin work (Python `scripts/draftsim_py/`, Worker JS, Gradle, docs, memory) is handled directly.
 → memory: `feedback_delegate_kotlin_to_architect`
 
+**All WEB-target work (implement / translate / fix) goes through the `kmp-web-fullstack-dev` agent** —
+this is the web-side counterpart to `android-kotlin-architect`. Any agent or process that is going to
+write, port, or fix web code MUST delegate to it. Its domain: the `wasmJsMain` source set, web `actual`
+implementations behind `commonMain` interfaces, Compose Multiplatform / `wasmJs` rendering + bundle, the
+`:webApp` target, Ktor js/wasm engine wiring, and any `commonMain` change with web implications.
+**Boundary:** `android-kotlin-architect` owns Android (`androidMain`) + pure shared `commonMain`;
+`kmp-web-fullstack-dev` owns the web target + web-implicating shared code. When a `commonMain` change is
+driven by a web need (a new web actual, Ktor/wasm, a web-side interface), route it to
+`kmp-web-fullstack-dev`. The main agent must not edit web `.kt` directly — delegate (passing file path +
+line, the exact problem/feature, the proposed solution logic, and any CLAUDE.md constraints).
+
 When an agent identifies a bug or required fix in Android/Kotlin code, it MUST likewise **delegate the
-fix to the `android-kotlin-architect` agent** rather than implementing it directly.
+fix to the `android-kotlin-architect` agent** (or `kmp-web-fullstack-dev` for web-target code) rather
+than implementing it directly.
 
 After any bug fix, security finding, or architectural/design decision, the agent MUST record the
 learning per the **`memory-protocol` skill** (memory-file-first; update CLAUDE.md only when the rule is

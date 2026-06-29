@@ -227,7 +227,11 @@ class HomeViewModel(
                 .homeLayoutFlow(defaultLayoutFor(authed).map { it.toPersisted() })
                 // Map persisted widgets back to UI instances; drop any whose persistedId
                 // no longer maps to a known widget type (removed in a newer app version).
-                .map { persisted -> persisted.mapNotNull { it.toInstanceOrNull() } }
+                // Deduplicate by type.persistedId at the end to guarantee unique Lazy keys.
+                .map { persisted ->
+                    persisted.mapNotNull { it.toInstanceOrNull() }
+                        .distinctBy { it.type.persistedId }
+                }
         }
 
     // ── Stats / discover / social snapshots (catch-isolated) ────────────────────
@@ -838,7 +842,10 @@ class HomeViewModel(
 
     private fun persistLayout(layout: List<WidgetInstance>) {
         viewModelScope.launch {
-            userPrefsDataStore.saveHomeLayout(layout.map { it.toPersisted() })
+            // Guarantee uniqueness by persistedId before saving to avoid crashing the Lazy keys contract
+            // if rapid-fire add/remove actions create a race condition in the mutable list.
+            val unique = layout.distinctBy { it.type.persistedId }
+            userPrefsDataStore.saveHomeLayout(unique.map { it.toPersisted() })
         }
     }
 

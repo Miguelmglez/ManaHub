@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.playtest.presentation.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -33,6 +35,7 @@ fun CommandZoneArea(
     commanderCard: Card,
     librarySize: Int,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -41,6 +44,7 @@ fun CommandZoneArea(
         modifier = modifier
             .fillMaxWidth()
             .background(mc.surface.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -60,8 +64,8 @@ fun CommandZoneArea(
                 style = ty.labelSmall,
                 color = mc.primaryAccent,
             )
-            Text(
-                text  = commanderCard.name,
+            CardName(
+                name  = commanderCard.name,
                 style = ty.bodyMedium,
                 color = mc.textPrimary,
             )

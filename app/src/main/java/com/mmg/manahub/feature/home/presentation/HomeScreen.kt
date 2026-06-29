@@ -211,7 +211,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
-            item(key = "topbar", span = { GridItemSpan(maxLineSpan) }) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 HomeTopBar(
                     uiState = uiState,
                     onAvatarClick = { onAction(HomeAction.OpenProfile) },
@@ -219,9 +219,11 @@ fun HomeScreen(
             }
 
             // Every widget is MEDIUM (full width) after the consolidation.
+            // Defensive distinctBy to prevent fatal key collisions if a race condition
+            // occurs during rapid add/remove/move actions.
             items(
-                items = uiState.layout,
-                key = { it.type.persistedId },
+                items = uiState.layout.distinctBy { it.type.persistedId },
+                key = { "widget_${it.type.persistedId}" },
                 span = { GridItemSpan(maxLineSpan) },
             ) { widget ->
                 HomeWidgetContainer(
@@ -234,7 +236,7 @@ fun HomeScreen(
             }
 
             if (uiState.layout.isEmpty() && !uiState.isLoading) {
-                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
                         title = stringResource(R.string.home_empty_title),
                         subtitle = stringResource(R.string.home_empty_message),
@@ -245,7 +247,7 @@ fun HomeScreen(
             }
 
             uiState.accountNudge?.let { nudge ->
-                item(key = "nudge", span = { GridItemSpan(maxLineSpan) }) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     AccountNudgeCard(
                         nudge = nudge,
                         onCreateAccount = { onAction(HomeAction.CreateAccount) },
@@ -255,7 +257,7 @@ fun HomeScreen(
             }
 
             // Entry point to the widget gallery (add / remove / reorder) at the bottom.
-            item(key = "edit_widgets_btn", span = { GridItemSpan(maxLineSpan) }) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 EditWidgetsButton(onClick = { onAction(HomeAction.OpenWidgetGallery) })
             }
         }

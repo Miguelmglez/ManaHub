@@ -1,5 +1,11 @@
 package com.mmg.manahub.core.ui.components
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,11 +42,14 @@ import com.mmg.manahub.core.model.CollectionCardGroup
 /**
  * Grid card item showing a card image, quantity badge, name, set symbol and price.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CardGridItem(
     item: CollectionCardGroup,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val card = item.card
     val mc = MaterialTheme.magicColors
@@ -57,14 +66,32 @@ fun CardGridItem(
     ) {
         Column {
             Box {
+                val imageModifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(4f / 3f)
+                    .clip(MaterialTheme.shapes.small)
+
+                val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                    with(sharedTransitionScope) {
+                        imageModifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = { _, _ ->
+                                tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                            },
+                            placeholderSize = SharedTransitionScope.PlaceholderSize.AnimatedSize,
+                            renderInOverlayDuringTransition = true,
+                        )
+                    }
+                } else {
+                    imageModifier
+                }
+
                 AsyncImage(
                     model = card.imageArtCrop ?: card.imageNormal,
                     contentDescription = card.name,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(4f / 3f)
-                        .clip(MaterialTheme.shapes.small),
+                    modifier = finalImageModifier,
                 )
                 Surface(
                     modifier = Modifier

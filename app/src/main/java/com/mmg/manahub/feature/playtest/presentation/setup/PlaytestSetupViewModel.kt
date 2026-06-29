@@ -6,12 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
+import com.mmg.manahub.core.data.local.mapper.toDomainCardList
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.PlaytestEligibility
 import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -28,9 +31,10 @@ data class PlaytestSetupUiState(
     val deckName: String = "",
     val deckFormat: String = "",
     val drawCount: Int = 7,
-    val isOnThePlay: Boolean = true,
     val eligibility: PlaytestEligibility? = null,
     val commanderCard: Card? = null,
+    val deckImageUrl: String? = null,
+    val colorIdentitySymbols: List<String> = emptyList(),
     val mainboardCount: Int = 0,
     val errorMessage: String? = null,
 )
@@ -45,6 +49,7 @@ class PlaytestSetupViewModel(
     private val deckRepository: DeckRepository,
     private val cardDao: CardDao,
     private val canPlaytestDeckUseCase: CanPlaytestDeckUseCase,
+    private val inferDeckIdentityUseCase: InferDeckIdentityUseCase,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -78,7 +83,12 @@ class PlaytestSetupViewModel(
 
     private fun loadDeck() {
         viewModelScope.launch {
-            deckRepository.observeDeckWithCards(deckId).collect { deckWithCards ->
+            combine(
+                deckRepository.observeDeckWithCards(deckId),
+                deckRepository.observeAllDeckSummaries()
+            ) { deckWithCards, summaries ->
+                deckWithCards to summaries.find { it.id == deckId }
+            }.collect { (deckWithCards, summary) ->
                 if (deckWithCards == null) {
                     _uiState.update {
                         it.copy(isLoading = false, errorMessage = "Deck not found")
@@ -95,18 +105,24 @@ class PlaytestSetupViewModel(
                     setCustomKey("playtest_format", deckWithCards.deck.format)
                 }
 
-                // Resolve commander card if needed.
-                // Invariant: for commander format, the commanderCardId must be present
-                // in the mainboard slots. If it is set but missing from the mainboard,
-                // the deck is misconfigured (BuildLibraryUseCase would build a 100-card
-                // library while the command zone still shows the commander — double count).
-                // Treat this as Ineligible rather than silently producing a corrupt session.
-                val commanderCard = withContext(ioDispatcher) {
+                // Resolve commander card and identity if needed.
+                val identityAndCommander = withContext(ioDispatcher) {
                     val commanderId = deckWithCards.deck.commanderCardId
-                    if (commanderId != null) {
+                    val commander = if (commanderId != null) {
                         cardDao.getById(commanderId)?.toDomainCard()
                     } else null
+
+                    // Resolve all mainboard cards for identity.
+                    val mainboardIds = deckWithCards.mainboard.map { it.scryfallId }
+                    val mainboardCards = cardDao.getByIds(mainboardIds).toDomainCardList()
+
+                    val identity = inferDeckIdentityUseCase(mainboardCards)
+
+                    identity to commander
                 }
+
+                val (identity, commanderCard) = identityAndCommander
+                val deckImageUrl = summary?.coverImageUrl
 
                 val commanderId = deckWithCards.deck.commanderCardId
                 val commanderInMainboard = commanderId == null ||
@@ -133,24 +149,26 @@ class PlaytestSetupViewModel(
                 resolvedCommanderCard = commanderCard
                 _uiState.update {
                     it.copy(
-                        isLoading      = false,
-                        deckName       = deckWithCards.deck.name,
-                        deckFormat     = deckWithCards.deck.format,
-                        eligibility    = adjustedEligibility,
-                        commanderCard  = commanderCard,
-                        mainboardCount = mainboardCount,
+                        isLoading             = false,
+                        deckName              = deckWithCards.deck.name,
+                        deckFormat            = deckWithCards.deck.format,
+                        eligibility           = adjustedEligibility,
+                        commanderCard         = commanderCard,
+                        deckImageUrl          = deckImageUrl,
+                        colorIdentitySymbols  = identity.colorIdentity.map { c -> c.symbol },
+                        mainboardCount        = mainboardCount,
                     )
                 }
             }
         }
     }
 
-    fun setDrawCount(count: Int) {
-        _uiState.update { it.copy(drawCount = count.coerceIn(1, 10)) }
+    fun resetNavigation() {
+        isNavigating = false
     }
 
-    fun setOnThePlay(onThePlay: Boolean) {
-        _uiState.update { it.copy(isOnThePlay = onThePlay) }
+    fun setDrawCount(count: Int) {
+        _uiState.update { it.copy(drawCount = count.coerceIn(1, 10)) }
     }
 
     fun onDrawHand() {
@@ -161,18 +179,17 @@ class PlaytestSetupViewModel(
         val deck = resolvedDeckWithCards?.deck ?: return
         isNavigating = true
         FirebaseCrashlytics.getInstance().apply {
-            log("playtest_draw_hand_initiated: deckId=$deckId format=${deck.format} drawCount=${state.drawCount} onThePlay=${state.isOnThePlay}")
+            log("playtest_draw_hand_initiated: deckId=$deckId format=${deck.format} drawCount=${state.drawCount}")
             setCustomKey("playtest_deck_id", deckId)
             setCustomKey("playtest_format", deck.format)
             setCustomKey("playtest_draw_count", state.drawCount)
-            setCustomKey("playtest_on_the_play", state.isOnThePlay)
         }
         val setup = PlaytestSetup(
             deckId         = deckId,
             deckName       = deck.name,
             deckFormat     = deck.format,
             drawCount      = state.drawCount,
-            isOnThePlay    = state.isOnThePlay,
+            isOnThePlay    = true,
             commanderCard  = resolvedCommanderCard,
         )
         viewModelScope.launch { _events.send(PlaytestSetupEvent.NavigateToHand(setup)) }

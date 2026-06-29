@@ -816,7 +816,7 @@ class UserPreferencesDataStore @Inject constructor(
                     ?: emptyList()
                 // Deduplicate by persistedId: a corrupt stored string could produce two
                 // widgets with the same key, crashing the LazyVerticalGrid.
-                parsed.distinctBy { it.persistedId }.ifEmpty { defaultLayout }
+                parsed.distinctBy { it.persistedId }.ifEmpty { defaultLayout.distinctBy { it.persistedId } }
             }
             .catch { emit(defaultLayout) }
 

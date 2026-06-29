@@ -1,3 +1,4 @@
+@file:JvmName("MagicThemeAndroid")
 package com.mmg.manahub.core.ui.theme
 
 import androidx.compose.runtime.Composable

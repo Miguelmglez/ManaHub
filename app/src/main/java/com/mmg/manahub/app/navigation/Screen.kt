@@ -11,8 +11,14 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
 
     // ── Collection (bottom tab 1) ────────────────────────────────────────────
-    /** Bottom-tab root — also hosts the Cards/Decks sub-tab row. */
-    object Collection : Screen("collection")
+    /** Bottom-tab root — also hosts the Cards/Decks/Trades sub-tab row. */
+    object Collection : Screen("collection?tab={tab}") {
+        /** Base route for the bottom-tab destination. */
+        const val baseRoute = "collection"
+
+        /** Builds a route that opens the collection with a specific tab selected. */
+        fun routeWithTab(tab: String) = "collection?tab=$tab"
+    }
     object CollectionAddCard  : Screen("collection/add")
     object CollectionScanner  : Screen("collection/scanner")
     object CollectionCardDetail : Screen("collection/detail/{scryfallId}") {
@@ -20,7 +26,6 @@ sealed class Screen(val route: String) {
     }
 
     // ── Decks (sub-section of Collection) ────────────────────────────────────
-    object DeckList    : Screen("collection/decks")
     object DeckDetail  : Screen("collection/deckmagic/{deckId}") {
         fun createRoute(deckId: String) = "collection/deckmagic/$deckId"
     }
@@ -198,9 +203,6 @@ sealed class Screen(val route: String) {
     object Puzzle : Screen("puzzle")
 
     // ── Trades (sub-section of Collection, also handles deep links) ───────────
-    /** Root trades route — rendered as a sub-tab inside CollectionScreen. */
-    object Trades : Screen("trades")
-
     /**
      * Deep link target for shared wishlist / open-for-trade lists.
      * App Link pattern: https://miguelmglez.github.io/list/{shareId}

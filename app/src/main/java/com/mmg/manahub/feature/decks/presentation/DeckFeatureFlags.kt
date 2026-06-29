@@ -8,7 +8,7 @@ package com.mmg.manahub.feature.decks.presentation
  */
 object DeckFeatureFlags {
     /** Deck Playtest entry points (DeckList per-deck button + Deck Studio top-bar button). */
-    const val PLAYTEST_ENABLED = false
+    const val PLAYTEST_ENABLED = true
 
     /** Deck Studio "Suggestions" tab (inline Deck Doctor). */
     const val DECK_STUDIO_SUGGESTIONS_TAB_ENABLED = false

@@ -320,6 +320,7 @@ class CollectionViewModel(
     }
 
     fun onTabSelected(tab: CollectionTab) {
+        if (_uiState.value.selectedTab == tab) return
         _uiState.update { it.copy(selectedTab = tab) }
     }
 

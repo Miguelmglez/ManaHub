@@ -85,6 +85,12 @@ enum class PlayZone {
 
     /** Discarded / dead cards. */
     GRAVEYARD,
+    
+    /** Exiled cards. */
+    EXILE,
+
+    /** The library (only for tracking its position in UI). */
+    LIBRARY,
 }
 
 /**
@@ -101,6 +107,8 @@ data class PlayCard(
     val instanceId: Long,
     val card: Card,
     val isTapped: Boolean = false,
+    val xOffset: Float = 0f,
+    val yOffset: Float = 0f,
 )
 
 /**
@@ -112,6 +120,7 @@ data class PlayCard(
  * @param graveyard Discarded cards.
  * @param library Remaining library in draw order (top = index 0). Held as plain
  *   [Card]s; a [PlayCard] with a fresh instanceId is minted only when a card is drawn.
+ * @param exile Exiled cards.
  */
 data class BattlefieldState(
     val hand: List<PlayCard>,
@@ -119,6 +128,7 @@ data class BattlefieldState(
     val permanents: List<PlayCard>,
     val graveyard: List<PlayCard>,
     val library: List<Card>,
+    val exile: List<PlayCard> = emptyList(),
 )
 
 /**

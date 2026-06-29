@@ -10,6 +10,7 @@ import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.PlaytestEligibility
+import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
 import io.mockk.coEvery
 import io.mockk.every
@@ -146,6 +147,8 @@ class PlaytestSetupViewModelTest {
         deckId: String = "deck-test",
     ) {
         every { deckRepository.observeDeckWithCards(deckId) } returns flowOf(deckWithCards)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
+        coEvery { cardDao.getByIds(any()) } returns emptyList()
         val commanderId = deckWithCards.deck.commanderCardId
         if (commanderId != null) {
             coEvery { cardDao.getById(commanderId) } returns makeCardEntity(commanderId)
@@ -159,8 +162,9 @@ class PlaytestSetupViewModelTest {
             savedStateHandle      = savedStateFor(deckId),
             deckRepository        = deckRepository,
             cardDao               = cardDao,
-            canPlaytestDeckUseCase = canPlaytestDeckUseCase,
-            ioDispatcher          = testDispatcher,
+            canPlaytestDeckUseCase   = canPlaytestDeckUseCase,
+            inferDeckIdentityUseCase = InferDeckIdentityUseCase(),
+            ioDispatcher             = testDispatcher,
         )
 
     @Before
@@ -201,7 +205,7 @@ class PlaytestSetupViewModelTest {
 
     @Test
     fun `given unsupported format when onDrawHand called then NavigateToHand is NOT emitted`() = runTest {
-        val deckWithCards = makeDeckWithCards(format = "casual", cardCount = 60)
+        val deckWithCards = makeDeckWithCards(format = "sealed", cardCount = 60)
         stubDeck(deckWithCards)
         viewModel = buildViewModel()
         advanceUntilIdle()
@@ -244,6 +248,8 @@ class PlaytestSetupViewModelTest {
             sideboard = emptyList(),
         )
         every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
+        coEvery { cardDao.getByIds(any()) } returns emptyList()
         coEvery { cardDao.getById(commanderId) } returns makeCardEntity(commanderId)
 
         viewModel = buildViewModel()
@@ -275,6 +281,8 @@ class PlaytestSetupViewModelTest {
             sideboard = emptyList(),
         )
         every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
+        coEvery { cardDao.getByIds(any()) } returns emptyList()
         coEvery { cardDao.getById(commanderId) } returns makeCardEntity(commanderId)
 
         viewModel = buildViewModel()
@@ -405,6 +413,8 @@ class PlaytestSetupViewModelTest {
             sideboard = emptyList(),
         )
         every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
+        coEvery { cardDao.getByIds(any()) } returns emptyList()
         coEvery { cardDao.getById(commanderId) } returns makeCardEntity(commanderId)
 
         viewModel = buildViewModel()
@@ -418,6 +428,8 @@ class PlaytestSetupViewModelTest {
         // commanderCardId is null (no commander assigned) — 99-card deck.
         val deckWithCards = makeDeckWithCards(format = "commander", cardCount = 99, commanderCardId = null)
         every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
+        coEvery { cardDao.getByIds(any()) } returns emptyList()
         coEvery { cardDao.getById(any()) } returns null
 
         viewModel = buildViewModel()
@@ -430,6 +442,8 @@ class PlaytestSetupViewModelTest {
     fun `given commander deck with 101 cards total then eligibility is Ineligible`() = runTest {
         val deckWithCards = makeDeckWithCards(format = "commander", cardCount = 101, commanderCardId = null)
         every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
+        coEvery { cardDao.getByIds(any()) } returns emptyList()
         coEvery { cardDao.getById(any()) } returns null
 
         viewModel = buildViewModel()
@@ -479,6 +493,7 @@ class PlaytestSetupViewModelTest {
     @Test
     fun `given deck not found when loaded then errorMessage is set`() = runTest {
         every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(null)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
         viewModel = buildViewModel()
         advanceUntilIdle()
 

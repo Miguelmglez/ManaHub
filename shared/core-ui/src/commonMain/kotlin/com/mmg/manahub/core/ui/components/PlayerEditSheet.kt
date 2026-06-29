@@ -35,6 +35,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -98,43 +110,75 @@ fun PlayerEditSheet(
         onDismissRequest = onDismiss,
         containerColor = mc.backgroundSecondary,
         contentWindowInsets = { WindowInsets(0) },
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .size(width = 40.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(mc.surfaceVariant)
+            )
+        }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
                 .navigationBarsPadding(),
         ) {
             Text(
                 text = title,
                 style = ty.titleLarge,
                 color = mc.textPrimary,
+                modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            Spacer(Modifier.height(16.dp))
-
+            // Name Field Section
             Text(
-                text = nameLabel,
+                text = nameLabel.uppercase(),
                 style = ty.labelMedium,
                 color = mc.textSecondary,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            Spacer(Modifier.height(8.dp))
+            val interactionSource = remember { MutableInteractionSource() }
+            val isFocused by interactionSource.collectIsFocusedAsState()
+            
+            val fieldBgColor by animateColorAsState(
+                targetValue = if (isFocused) mc.primaryAccent.copy(alpha = 0.05f) else mc.surface,
+                animationSpec = tween(300), label = "fieldBg"
+            )
+            val fieldBorderColor by animateColorAsState(
+                targetValue = if (isFocused) mc.primaryAccent else mc.surfaceVariant.copy(alpha = 0.5f),
+                animationSpec = tween(300), label = "fieldBorder"
+            )
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(mc.surface)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(fieldBgColor)
+                    .border(1.dp, fieldBorderColor, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = if (isFocused) mc.primaryAccent else mc.textDisabled,
+                    modifier = Modifier.size(24.dp)
+                )
+                
+                Spacer(Modifier.width(12.dp))
+
                 BasicTextField(
                     value = playerName,
                     onValueChange = onNameChanged,
                     singleLine = true,
                     textStyle = ty.titleMedium.copy(color = mc.textPrimary),
-                    modifier = Modifier.fillMaxWidth(),
+                    interactionSource = interactionSource,
+                    modifier = Modifier.weight(1f),
                     decorationBox = { innerTextField ->
                         Box {
                             if (playerName.isEmpty()) {
@@ -148,17 +192,29 @@ fun PlayerEditSheet(
                         }
                     },
                 )
+
+                if (playerName.isNotEmpty()) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = "Clear",
+                        tint = mc.textSecondary,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .clickable { onNameChanged("") }
+                    )
+                }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
 
+            // Color Grid Section
             Text(
-                text = colorLabel,
+                text = colorLabel.uppercase(),
                 style = ty.labelMedium,
                 color = mc.textSecondary,
+                modifier = Modifier.padding(bottom = 12.dp)
             )
-
-            Spacer(Modifier.height(8.dp))
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
@@ -168,17 +224,33 @@ fun PlayerEditSheet(
             ) {
                 items(availableThemes, key = { it.name }) { theme ->
                     val isSelected = theme == playerTheme
+                    
+                    val scale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.1f else 1.0f,
+                        animationSpec = tween(300), label = "scale"
+                    )
+                    
+                    val bgAlpha by animateFloatAsState(
+                        targetValue = if (isSelected) 0.1f else 0.0f,
+                        animationSpec = tween(300), label = "bgAlpha"
+                    )
+
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(theme.accent.copy(alpha = bgAlpha))
                             .clickable { onThemeSelected(theme) }
                             .padding(8.dp),
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
                                 .clip(CircleShape)
                                 .background(theme.accent)
                                 .border(
@@ -193,14 +265,14 @@ fun PlayerEditSheet(
                                     imageVector = selectedIcon,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(24.dp),
+                                    modifier = Modifier.size(28.dp),
                                 )
                             }
                         }
                         Text(
                             text = theme.name,
                             style = ty.labelSmall,
-                            color = mc.textSecondary,
+                            color = if (isSelected) mc.textPrimary else mc.textSecondary,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -208,8 +280,6 @@ fun PlayerEditSheet(
                     }
                 }
             }
-
-            Spacer(Modifier.height(24.dp))
         }
     }
 }

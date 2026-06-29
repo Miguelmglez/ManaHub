@@ -471,7 +471,7 @@ private fun PlayerAvatarStrip(
     val ty = MaterialTheme.magicTypography
 
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         contentPadding = PaddingValues(horizontal = 4.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -667,6 +667,10 @@ private fun SettingsSection(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            LifeControlSelector(
+                selectedMode = gameSettings.lifeControlMode,
+                onModeChange = onLifeControlModeChange,
+            )
             LandReminderToggle(
                 enabled = gameSettings.landReminderEnabled,
                 onToggle = onToggleLandReminder,
@@ -677,10 +681,6 @@ private fun SettingsSection(
                 onToggleLandVoice = onToggleVoiceLandReminder,
                 onToggleEndTurnVoice = onToggleVoiceEndTurn,
                 onOpenVoiceLanguages = onOpenVoiceLanguages,
-            )
-            LifeControlSelector(
-                selectedMode = gameSettings.lifeControlMode,
-                onModeChange = onLifeControlModeChange,
             )
         }
     }
@@ -750,17 +750,17 @@ private fun LifeControlSelector(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             LifeControlOptionTile(
-                mode = LifeControlMode.SCROLL,
-                label = stringResource(R.string.gamesetup_life_control_swipe),
-                selected = selectedMode == LifeControlMode.SCROLL,
-                onClick = { onModeChange(LifeControlMode.SCROLL) },
-                modifier = Modifier.weight(1f),
-            )
-            LifeControlOptionTile(
                 mode = LifeControlMode.TAP,
                 label = stringResource(R.string.gamesetup_life_control_tap),
                 selected = selectedMode == LifeControlMode.TAP,
                 onClick = { onModeChange(LifeControlMode.TAP) },
+                modifier = Modifier.weight(1f),
+            )
+            LifeControlOptionTile(
+                mode = LifeControlMode.SCROLL,
+                label = stringResource(R.string.gamesetup_life_control_swipe),
+                selected = selectedMode == LifeControlMode.SCROLL,
+                onClick = { onModeChange(LifeControlMode.SCROLL) },
                 modifier = Modifier.weight(1f),
             )
         }
