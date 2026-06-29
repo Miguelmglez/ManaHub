@@ -15,6 +15,18 @@ data class CardTag(
     val key: String,
     val category: TagCategory,
 ) {
+
+    /**
+     * Platform-agnostic human-readable label derived from [key].
+     * Underscores become spaces and the first character is capitalized.
+     *
+     * This is the fallback used in `commonMain` (e.g. [DeckMagicEngine]).
+     * Android-specific dictionary lookup with locale support lives in
+     * `core/tagging/CardTagLabel.kt` (`:app`) via the `CardTag.label()` extension.
+     */
+    val displayLabel: String
+        get() = key.replace('_', ' ').replaceFirstChar { it.uppercase() }
+
     companion object {
         // ── Archetypes ────────────────────────────────────────────────────────
         val AGGRO     = CardTag("aggro",     TagCategory.ARCHETYPE)

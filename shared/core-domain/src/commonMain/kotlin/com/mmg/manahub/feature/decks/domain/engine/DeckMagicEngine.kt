@@ -1,14 +1,10 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
-import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.UserCardWithCard
-import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Representation of a card within the Magic Engine, abstracted to support
@@ -41,12 +37,13 @@ data class MagicDiscovery(
 
 /**
  * Unified engine for collection analysis (Discovery) and deck creation (Creator).
- * This is a singleton-friendly logic class, not a ViewModel.
+ *
+ * Platform-agnostic — no `@Inject`/`@Singleton` annotations (stripped for KMP `commonMain`).
+ * Provide via Hilt `@Provides` in `DeckDoctorModule` (still-Hilt consumers) or Koin factory
+ * (migrated islands). On non-JVM targets `Dispatchers.Default` falls back to `Dispatchers.Default`.
  */
-@Singleton
-class DeckMagicEngine @Inject constructor(
+class DeckMagicEngine(
     private val deckScorer: DeckScorer,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
     /**
@@ -55,7 +52,7 @@ class DeckMagicEngine @Inject constructor(
      */
     suspend fun discoverSynergies(
         collection: List<UserCardWithCard>
-    ): List<MagicDiscovery> = withContext(ioDispatcher) {
+    ): List<MagicDiscovery> = withContext(Dispatchers.Default) {
         val allTags = collection.flatMap { it.card.tags + it.card.userTags }
             .groupingBy { it }
             .eachCount()
@@ -70,7 +67,7 @@ class DeckMagicEngine @Inject constructor(
                 .map { MagicCard(it.card, isOwned = true) }
 
             MagicDiscovery(
-                label = tag.label(),
+                label = tag.displayLabel,
                 cards = matchingCards,
                 description = "$count cards with this tag in your collection",
                 primaryTag = tag
@@ -88,8 +85,10 @@ class DeckMagicEngine @Inject constructor(
         selectedColors: Set<ManaColor>,
         mainboard: List<MagicCard>,
         format: GameFormat
-    ): List<MagicSuggestion> = withContext(ioDispatcher) {
-        val mainboardEntries = mainboard.map { DeckEntry(card = it.card, quantity = it.quantity, isOwned = it.isOwned) }
+    ): List<MagicSuggestion> = withContext(Dispatchers.Default) {
+        val mainboardEntries = mainboard.map {
+            DeckEntry(card = it.card, quantity = it.quantity, isOwned = it.isOwned)
+        }
         val profile = deckScorer.profile(
             mainboard = mainboardEntries,
             // Phase 4 (D1): 1:1 GameFormat → DeckFormat so the right legality/skeleton is used.

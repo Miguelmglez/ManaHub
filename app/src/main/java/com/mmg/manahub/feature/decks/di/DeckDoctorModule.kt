@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.di
 
+import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
@@ -47,4 +48,10 @@ object DeckDoctorModule {
         power: PowerResolver,
         manaBaseAnalyzer: ManaBaseAnalyzer,
     ): DeckScorer = DeckScorer(roleClassifier, power, manaBaseAnalyzer)
+
+    @Provides
+    @Singleton
+    fun provideDeckMagicEngine(
+        deckScorer: DeckScorer,
+    ): DeckMagicEngine = DeckMagicEngine(deckScorer)
 }
