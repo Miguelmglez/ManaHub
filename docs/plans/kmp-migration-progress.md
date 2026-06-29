@@ -428,6 +428,15 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
   `:shared:core-domain`. 7 UI files + 4 tests updated. (`e23acdd`)
 - fix: `ClaimQuestRewardUseCaseTest` missing `ClaimResult` import after package move (`cbdeec4`).
 
+**Phase 4 completed (2026-06-29):**
+- ✅ 3 new core-ui composables → commonMain (`c5feba3`): MagicAlertDialog, MagicCard,
+  MagicCardInspectionOverlay. CardGridItem + CardListItem + PlayerEditSheet updated for shared use.
+  PlaytestCardInfo model added to PlaytestModels. core-ui now ~45 shared composables.
+- ✅ CanPlaytestDeckUseCase: casual format added (60-card min).
+- ✅ PlaytestSetupViewModel: InferDeckIdentityUseCase + color identity + deckImageUrl + observeAllDeckSummaries combine.
+- ✅ Playtest screens (Setup/Hand/Battlefield), CardDetailScreen, GamePlayScreen, AppNavGraph
+  migrated to use shared composables (screens stay in `:app` androidMain — only their composable deps moved).
+
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
 1. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
    Needs tagging module shared first, or the `label` call extracted.
