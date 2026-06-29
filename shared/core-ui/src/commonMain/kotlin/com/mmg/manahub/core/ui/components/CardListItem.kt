@@ -1,5 +1,11 @@
 package com.mmg.manahub.core.ui.components
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,11 +44,14 @@ import com.mmg.manahub.core.model.CollectionCardGroup
 /**
  * Convenience overload that renders a [CollectionCardGroup] as a list row.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CardListItem(
     item:     CollectionCardGroup,
     onClick:  () -> Unit,
     modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     CardListItem(
         name = item.card.name,
@@ -58,6 +67,9 @@ fun CardListItem(
         typeLine = item.card.typeLine,
         onClick = onClick,
         modifier = modifier,
+        sharedTransitionScope = sharedTransitionScope,
+        animatedVisibilityScope = animatedVisibilityScope,
+        scryfallId = item.card.scryfallId,
         extraSupportingContent = {
             if (item.distinctCopies > 1) {
                 Row(
@@ -84,6 +96,7 @@ fun CardListItem(
 /**
  * General-purpose card list item with price, badges, and metadata.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CardListItem(
     name: String,
@@ -103,6 +116,9 @@ fun CardListItem(
     typeLine: String? = null,
     containerColor: Color = Color.Transparent,
     shape: Shape = RectangleShape,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    scryfallId: String? = null,
     extraSupportingContent: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
@@ -118,11 +134,27 @@ fun CardListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.heightIn(min = 72.dp),
             leadingContent = {
-                Box(
-                    modifier = Modifier
-                        .size(width = 56.dp, height = 80.dp)
-                        .clip(MaterialTheme.shapes.small)
-                ) {
+                val imageModifier = Modifier
+                    .size(width = 56.dp, height = 80.dp)
+                    .clip(MaterialTheme.shapes.small)
+
+                val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && scryfallId != null) {
+                    with(sharedTransitionScope) {
+                        imageModifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "card-image-$scryfallId"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = { _, _ ->
+                                tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                            },
+                            placeholderSize = SharedTransitionScope.PlaceholderSize.AnimatedSize,
+                            renderInOverlayDuringTransition = true,
+                        )
+                    }
+                } else {
+                    imageModifier
+                }
+
+                Box(modifier = finalImageModifier) {
                     AsyncImage(
                         model = imageUrl,
                         contentDescription = name,

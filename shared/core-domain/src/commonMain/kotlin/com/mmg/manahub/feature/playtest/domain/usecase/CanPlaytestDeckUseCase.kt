@@ -24,6 +24,7 @@ class CanPlaytestDeckUseCase {
         val format = deckWithCards.deck.format.lowercase()
         return when (format) {
             "standard" -> checkMinSize(mainboardCount, minSize = 60, format = "Standard")
+            "casual" -> checkMinSize(mainboardCount, minSize = 60, format = "Casual")
             "draft"    -> checkMinSize(mainboardCount, minSize = 40, format = "Draft")
             "commander" -> checkExactSize(mainboardCount, exactSize = 100, format = "Commander")
             else -> PlaytestEligibility.Ineligible(

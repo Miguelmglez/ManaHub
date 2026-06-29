@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.playtest.di
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.feature.playtest.data.repository.PlaytestRepositoryImpl
 import com.mmg.manahub.core.domain.repository.PlaytestRepository
+import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.CanPlaytestDeckUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
@@ -81,6 +82,7 @@ fun playtestKoinModule(
             deckRepository = get(),
             cardDao = get(),
             canPlaytestDeckUseCase = get(),
+            inferDeckIdentityUseCase = get(),
             ioDispatcher = Dispatchers.IO,
         )
     }

@@ -52,6 +52,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -192,11 +193,26 @@ fun DeckMagicDetailScreen(
 
                     // Playtest button — launches setup screen for this deck.
                     uiState.deck?.id?.let { deckId ->
-                        IconButton(onClick = { onPlaytest(deckId) }) {
+                        FilledTonalButton(
+                            onClick = { onPlaytest(deckId) },
+                            modifier = Modifier.padding(end = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = mc.primaryAccent.copy(alpha = 0.15f),
+                                contentColor = mc.primaryAccent
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
                             Icon(
                                 Icons.Default.PlayArrow,
-                                contentDescription = "Playtest deck",
-                                tint = mc.primaryAccent,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "PLAYTEST",
+                                style = ty.labelLarge,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }

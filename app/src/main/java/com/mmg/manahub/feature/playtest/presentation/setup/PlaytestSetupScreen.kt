@@ -5,12 +5,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,8 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,22 +42,41 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.mmg.manahub.core.ui.theme.spacing
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
 import com.mmg.manahub.core.ui.components.MagicToastHost
-import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.PlaytestEligibility
 import com.mmg.manahub.core.model.PlaytestSetup
 import org.koin.androidx.compose.koinViewModel
@@ -84,7 +104,21 @@ fun PlaytestSetupScreen(
         }
     }
 
-    Box {
+    // Reset the navigation flag whenever we resume this screen (e.g., returning from a playtest).
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.resetNavigation()
+    }
+
+    var inspectionCard by remember { mutableStateOf<Card?>(null) }
+    var inspectionRect by remember { mutableStateOf(Rect.Zero) }
+    var isDismissingInspection by remember { mutableStateOf(false) }
+    var boxCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { boxCoords = it }
+    ) {
         Scaffold(
             containerColor      = mc.background,
             contentWindowInsets = WindowInsets(0),
@@ -130,10 +164,14 @@ fun PlaytestSetupScreen(
                     )
 
                     else -> SetupContent(
-                        uiState  = uiState,
+                        uiState            = uiState,
                         onDrawCountChange  = viewModel::setDrawCount,
-                        onOnThePlayChange  = viewModel::setOnThePlay,
                         onDrawHand         = viewModel::onDrawHand,
+                        onInspectCommander = { card, rect ->
+                            inspectionCard = card
+                            inspectionRect = rect
+                        },
+                        boxCoords          = boxCoords,
                     )
                 }
             }
@@ -143,206 +181,350 @@ fun PlaytestSetupScreen(
             state    = toastState,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        inspectionCard?.let { card ->
+            MagicCardInspectionOverlay(
+                card             = card,
+                initialRect      = inspectionRect,
+                isVisible        = true,
+                isDismissing     = isDismissingInspection,
+                onDismissRequest = { isDismissingInspection = true },
+                onDismiss        = {
+                    inspectionCard = null
+                    isDismissingInspection = false
+                },
+            )
+        }
     }
 
     // Surface ineligibility reason as a toast on first load.
-    LaunchedEffect(uiState.eligibility) {
-        val ineligible = uiState.eligibility as? PlaytestEligibility.Ineligible ?: return@LaunchedEffect
-        toastState.show(ineligible.reason, MagicToastType.INFO)
-    }
+    // Removed: redundant with UI fixed error state.
 }
 
 @Composable
 private fun SetupContent(
     uiState: PlaytestSetupUiState,
     onDrawCountChange: (Int) -> Unit,
-    onOnThePlayChange: (Boolean) -> Unit,
     onDrawHand: () -> Unit,
+    onInspectCommander: (Card, Rect) -> Unit,
+    boxCoords: LayoutCoordinates?,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     val isEligible = uiState.eligibility is PlaytestEligibility.Eligible
 
     Column(
         modifier            = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(sp.xl),
     ) {
-        Spacer(Modifier.height(8.dp))
-
-        // Deck header card.
-        Surface(
-            color  = mc.surface,
-            shape  = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth(),
+        // Deck Hero Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
         ) {
-            Row(
-                modifier          = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            // Background Image with Gradient Overlay
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(uiState.deckImageUrl ?: R.drawable.mtg_card_back)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale      = ContentScale.Crop,
+                alignment         = Alignment.TopCenter,
+                modifier          = Modifier.fillMaxSize()
+            )
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                mc.background.copy(alpha = 0.6f),
+                                mc.background
+                            )
+                        )
+                    )
+            )
+
+            // Deck Info Overlay
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(sp.xl)
             ) {
-                if (uiState.commanderCard?.imageNormal != null) {
-                    AsyncImage(
-                        model             = uiState.commanderCard.imageNormal,
-                        contentDescription = uiState.commanderCard.name,
-                        contentScale      = ContentScale.Crop,
-                        modifier          = Modifier
-                            .size(width = 48.dp, height = 67.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text  = uiState.deckName,
-                        style = ty.titleMedium,
-                        color = mc.textPrimary,
-                    )
+                Text(
+                    text     = uiState.deckName,
+                    style    = ty.displayMedium.copy(fontWeight = FontWeight.Bold),
+                    color    = mc.textPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Spacer(modifier = Modifier.height(sp.xs))
+
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(sp.sm)
+                ) {
                     Text(
                         text  = uiState.deckFormat.replaceFirstChar { it.uppercase() },
-                        style = ty.bodySmall,
+                        style = ty.titleMedium,
                         color = mc.textSecondary,
                     )
-                    Text(
-                        text  = stringResource(R.string.playtest_card_count, uiState.mainboardCount),
-                        style = ty.bodySmall,
-                        color = if (isEligible) mc.textSecondary else mc.lifeNegative,
-                    )
+                    
+                    // Color Identity Symbols
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        uiState.colorIdentitySymbols.forEach { symbol ->
+                            ManaSymbolImage(token = symbol, size = 20.dp)
+                        }
+                    }
                 }
             }
         }
 
-        // Eligibility warning.
-        if (!isEligible && uiState.eligibility != null) {
-            val ineligible = uiState.eligibility as PlaytestEligibility.Ineligible
+        Column(
+            modifier            = Modifier
+                .padding(horizontal = sp.xl)
+                .padding(bottom = sp.xl),
+            verticalArrangement = Arrangement.spacedBy(sp.xl)
+        ) {
+            // Stats Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(sp.md)
+            ) {
+                Surface(
+                    color    = mc.surface,
+                    shape    = RoundedCornerShape(16.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(sp.md),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text  = uiState.mainboardCount.toString(),
+                            style = ty.titleLarge,
+                            color = mc.textPrimary
+                        )
+                        Text(
+                            text  = stringResource(R.string.stats_total_cards).uppercase(),
+                            style = ty.labelSmall,
+                            color = mc.textSecondary
+                        )
+                    }
+                }
+
+                if (uiState.commanderCard != null) {
+                    Surface(
+                        color    = mc.surface,
+                        shape    = RoundedCornerShape(16.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(sp.md),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text  = "1",
+                                style = ty.titleLarge,
+                                color = mc.textPrimary
+                            )
+                            Text(
+                                text  = stringResource(R.string.carddetail_deck).uppercase(),
+                                style = ty.labelSmall,
+                                color = mc.textSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Commander Section
+            if (uiState.commanderCard != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
+                    Text(
+                        text  = stringResource(R.string.playtest_command_zone_label),
+                        style = ty.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        color = mc.textPrimary,
+                    )
+                    
+                    Surface(
+                        color = mc.surface,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // Calculated when layout is ready
+                            }
+                    ) {
+                        var cardRect by remember { mutableStateOf(Rect.Zero) }
+
+                        Row(
+                            modifier = Modifier
+                                .clickable { onInspectCommander(uiState.commanderCard, cardRect) }
+                                .padding(sp.lg),
+                            horizontalArrangement = Arrangement.spacedBy(sp.lg),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = uiState.commanderCard.imageNormal,
+                                contentDescription = uiState.commanderCard.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .width(120.dp)
+                                    .aspectRatio(63f / 88f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .onGloballyPositioned { coords ->
+                                        if (boxCoords != null && boxCoords.isAttached && coords.isAttached) {
+                                            cardRect = boxCoords.localBoundingBoxOf(coords)
+                                        }
+                                    }
+                            )
+                            
+                            Column(verticalArrangement = Arrangement.spacedBy(sp.xs)) {
+                                CardName(
+                                    name = uiState.commanderCard.name,
+                                    style = ty.titleMedium,
+                                    color = mc.textPrimary
+                                )
+                                Text(
+                                    text = uiState.commanderCard.typeLine,
+                                    style = ty.bodySmall,
+                                    color = mc.textSecondary
+                                )
+                                Spacer(modifier = Modifier.height(sp.xs))
+                                Surface(
+                                    color = mc.goldMtg.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "COMMANDER",
+                                        style = ty.labelSmall,
+                                        color = mc.goldMtg,
+                                        modifier = Modifier.padding(horizontal = sp.sm, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Eligibility warning.
+            if (!isEligible && uiState.eligibility != null) {
+                val ineligible = uiState.eligibility as PlaytestEligibility.Ineligible
+                Surface(
+                    color    = mc.lifeNegative.copy(alpha = 0.12f),
+                    shape    = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier          = Modifier.padding(sp.md),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(sp.sm)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Remove, // Better than nothing, ideally an Error icon
+                            contentDescription = null,
+                            tint = mc.lifeNegative,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text     = ineligible.reason,
+                            style    = ty.bodySmall,
+                            color    = mc.lifeNegative,
+                        )
+                    }
+                }
+            }
+
+            // Settings Section
             Surface(
-                color    = mc.lifeNegative.copy(alpha = 0.12f),
-                shape    = RoundedCornerShape(8.dp),
+                color = mc.surface,
+                shape = RoundedCornerShape(24.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    text     = ineligible.reason,
-                    style    = ty.bodySmall,
-                    color    = mc.lifeNegative,
-                    modifier = Modifier.padding(12.dp),
-                )
-            }
-        }
-
-        // Commander info strip.
-        if (uiState.commanderCard != null && uiState.deckFormat == "commander") {
-            Surface(
-                color  = mc.primaryAccent.copy(alpha = 0.08f),
-                shape  = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text     = stringResource(R.string.playtest_commander_library_note),
-                    style    = ty.bodySmall,
-                    color    = mc.primaryAccent,
-                    modifier = Modifier.padding(12.dp),
-                )
-            }
-        }
-
-        // Cards to draw stepper.
-        Text(
-            text  = stringResource(R.string.playtest_draw_count_label),
-            style = ty.labelMedium,
-            color = mc.textSecondary,
-        )
-        Row(
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier              = Modifier.fillMaxWidth(),
-        ) {
-            IconButton(
-                onClick  = { onDrawCountChange(uiState.drawCount - 1) },
-                enabled  = uiState.drawCount > 1,
-            ) {
-                Icon(Icons.Default.Remove, contentDescription = null, tint = mc.primaryAccent)
-            }
-
-            Spacer(Modifier.width(8.dp))
-
-            AnimatedContent(
-                targetState  = uiState.drawCount,
-                transitionSpec = {
-                    fadeIn(tween(150)) togetherWith fadeOut(tween(150))
-                },
-                label = "DrawCountTransition",
-            ) { count ->
-                Text(
-                    text      = count.toString(),
-                    style     = ty.titleMedium,
-                    color     = mc.textPrimary,
-                    textAlign = TextAlign.Center,
-                    modifier  = Modifier.width(48.dp),
-                )
+                Column(
+                    modifier = Modifier.padding(sp.lg),
+                    verticalArrangement = Arrangement.spacedBy(sp.lg)
+                ) {
+                    Text(
+                        text  = stringResource(R.string.playtest_draw_count_label),
+                        style = ty.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        color = mc.textPrimary,
+                    )
+                    
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier              = Modifier.fillMaxWidth()
+                    ) {
+                        IconButton(
+                            onClick  = { onDrawCountChange(uiState.drawCount - 1) },
+                            enabled  = uiState.drawCount > 1,
+                        ) {
+                            Icon(
+                                Icons.Default.Remove, 
+                                contentDescription = null, 
+                                tint = if (uiState.drawCount > 1) mc.primaryAccent else mc.textDisabled,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        
+                        AnimatedContent(
+                            targetState  = uiState.drawCount,
+                            transitionSpec = {
+                                fadeIn(tween(150)) togetherWith fadeOut(tween(150))
+                            },
+                            label = "DrawCountTransition",
+                        ) { count ->
+                            Text(
+                                text      = count.toString(),
+                                style     = ty.displayLarge.copy(fontWeight = FontWeight.Black),
+                                color     = mc.primaryAccent,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        
+                        IconButton(
+                            onClick = { onDrawCountChange(uiState.drawCount + 1) },
+                            enabled = uiState.drawCount < 10,
+                        ) {
+                            Icon(
+                                Icons.Default.Add, 
+                                contentDescription = null, 
+                                tint = if (uiState.drawCount < 10) mc.primaryAccent else mc.textDisabled,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                }
             }
 
-            Spacer(Modifier.width(8.dp))
-
-            IconButton(
-                onClick = { onDrawCountChange(uiState.drawCount + 1) },
-                enabled = uiState.drawCount < 10,
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = mc.primaryAccent)
-            }
-        }
-
-        // On the play / on the draw selector.
-        Text(
-            text  = stringResource(R.string.playtest_play_draw_label),
-            style = ty.labelMedium,
-            color = mc.textSecondary,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = uiState.isOnThePlay,
-                onClick  = { onOnThePlayChange(true) },
-                label    = { Text(stringResource(R.string.playtest_on_the_play), style = ty.labelSmall) },
-                colors   = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                    selectedLabelColor     = mc.primaryAccent,
-                    containerColor         = mc.surface,
-                    labelColor             = mc.textSecondary,
+            // Primary CTA.
+            Button(
+                onClick  = onDrawHand,
+                enabled  = isEligible,
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+                shape    = RoundedCornerShape(16.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor         = mc.primaryAccent,
+                    disabledContainerColor = mc.primaryAccent.copy(alpha = 0.35f),
                 ),
-            )
-            FilterChip(
-                selected = !uiState.isOnThePlay,
-                onClick  = { onOnThePlayChange(false) },
-                label    = { Text(stringResource(R.string.playtest_on_the_draw), style = ty.labelSmall) },
-                colors   = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                    selectedLabelColor     = mc.primaryAccent,
-                    containerColor         = mc.surface,
-                    labelColor             = mc.textSecondary,
-                ),
-            )
+            ) {
+                Text(
+                    text  = stringResource(R.string.playtest_draw_hand_cta),
+                    style = ty.titleMedium,
+                    color = mc.onAccent,
+                )
+            }
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Primary CTA.
-        Button(
-            onClick  = onDrawHand,
-            enabled  = isEligible,
-            modifier = Modifier.fillMaxWidth(),
-            shape    = RoundedCornerShape(12.dp),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor         = mc.primaryAccent,
-                disabledContainerColor = mc.primaryAccent.copy(alpha = 0.35f),
-            ),
-        ) {
-            Text(
-                text  = stringResource(R.string.playtest_draw_hand_cta),
-                style = ty.labelLarge,
-                color = mc.background,
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
     }
 }

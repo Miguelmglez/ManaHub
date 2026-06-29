@@ -1283,8 +1283,8 @@
     <!-- Battlefield (PLAY phase) -->
     <string name="playtest_battle_title">Battlefield</string>
     <string name="playtest_battle_action_end_test">End Test</string>
-    <string name="playtest_battle_confirm_end_title">End this test?</string>
-    <string name="playtest_battle_confirm_end_body">Your progress won\'t be saved.</string>
+    <string name="playtest_battle_confirm_end_title">End playtest?</string>
+    <string name="playtest_battle_confirm_end_body">All progress will be lost.</string>
     <string name="playtest_battle_confirm_end_confirm">End Test</string>
     <string name="playtest_battle_confirm_end_cancel">Keep Playing</string>
     <string name="playtest_battle_zone_lands">Lands</string>

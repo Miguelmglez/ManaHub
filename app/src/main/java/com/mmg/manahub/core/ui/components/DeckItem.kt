@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -37,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -52,8 +52,11 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -87,11 +90,11 @@ fun DeckItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                horizontal = if (reduced) 0.dp else 16.dp, 
-                vertical = if (reduced) 0.dp else 6.dp
+                horizontal = if (reduced) 0.dp else MaterialTheme.spacing.lg, 
+                vertical = if (reduced) 0.dp else MaterialTheme.spacing.sm
             ),
         colors = CardDefaults.cardColors(containerColor = mc.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         border = BorderStroke(0.5.dp, mc.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
@@ -100,8 +103,7 @@ fun DeckItem(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                    .aspectRatio(16f / 9f),
             ) {
                 if (deck.coverImageUrl != null) {
                     AsyncImage(
@@ -149,6 +151,29 @@ fun DeckItem(
                     )
                 }
                 
+                // ── Play Button Overlay ──────────────────────────────────────────
+                if (onPlaytest != null && !reduced) {
+                    Surface(
+                        onClick = onPlaytest,
+                        color = mc.primaryAccent,
+                        shape = CircleShape,
+                        shadowElevation = 4.dp,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(MaterialTheme.spacing.sm)
+                            .size(44.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = stringResource(R.string.playtest_action_start),
+                                tint = mc.background,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
+                }
+
                 // Format badge — top-right overlay
                 val formatLower = deck.format.lowercase()
                 val formatColor = when (formatLower) {
@@ -162,7 +187,7 @@ fun DeckItem(
 
                 Surface(
                     color = formatColor,
-                    shape = RoundedCornerShape(bottomStart = 8.dp),
+                    shape = RoundedCornerShape(bottomStart = MaterialTheme.spacing.sm),
                     modifier = Modifier.align(Alignment.TopEnd),
                 ) {
                     Text(
@@ -170,8 +195,8 @@ fun DeckItem(
                         style = if (reduced) ty.labelSmall else ty.labelLarge,
                         color = if (formatLower == "draft" || formatLower == "casual") mc.onAccent else mc.background,
                         modifier = Modifier.padding(
-                            horizontal = if (reduced) 6.dp else 10.dp, 
-                            vertical = if (reduced) 2.dp else 4.dp
+                            horizontal = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.md, 
+                            vertical = if (reduced) MaterialTheme.spacing.xxs else MaterialTheme.spacing.xs
                         ),
                     )
                 }
@@ -182,16 +207,16 @@ fun DeckItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
-                        start = if (reduced) 8.dp else 12.dp,
-                        end = if (reduced) 4.dp else 4.dp,
-                        top = if (reduced) 6.dp else 8.dp,
-                        bottom = if (reduced) 6.dp else 8.dp
+                        start = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.md,
+                        end = if (reduced) MaterialTheme.spacing.xs else MaterialTheme.spacing.xs,
+                        top = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.sm,
+                        bottom = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.sm
                     ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
                 ) {
                     // Deck name
                     Text(
@@ -203,11 +228,11 @@ fun DeckItem(
                     )
                     
                     if (!reduced) {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(MaterialTheme.spacing.xs))
 
                         // Card count + updated date
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             CardCountBadge(count = deck.cardCount)
@@ -220,7 +245,7 @@ fun DeckItem(
                         }
 
                         // Mana identity symbols
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         if (deck.colorIdentity.isNotEmpty()) {
                             ColorIdentityRow(
                                 colorIdentity = deck.colorIdentity, 
@@ -230,7 +255,7 @@ fun DeckItem(
                             Spacer(Modifier.height(18.dp))
                         }
                     } else {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -239,7 +264,7 @@ fun DeckItem(
                             // Card count with icon
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Style,
@@ -269,21 +294,6 @@ fun DeckItem(
                 }
 
                 if (!reduced) {
-                    // Playtest button
-                    if (onPlaytest != null) {
-                        IconButton(
-                            onClick = onPlaytest,
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = stringResource(R.string.playtest_action_start),
-                                tint = mc.primaryAccent,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-
                     // Delete button
                     if (onDelete != null) {
                         IconButton(onClick = { showDeleteDialog = true }) {
@@ -345,13 +355,16 @@ private fun CardCountBadge(count: Int) {
     val mc = MaterialTheme.magicColors
     Surface(
         color = mc.secondaryAccent.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(4.dp),
+        shape = ChipShape,
     ) {
         Text(
             text = stringResource(R.string.decklist_card_count, count),
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.secondaryAccent,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(
+                horizontal = MaterialTheme.spacing.sm, 
+                vertical = MaterialTheme.spacing.xxs
+            ),
         )
     }
 }

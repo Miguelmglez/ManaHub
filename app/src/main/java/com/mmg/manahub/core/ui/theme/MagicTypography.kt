@@ -1,3 +1,4 @@
+@file:JvmName("NeonVoidTypography")
 package com.mmg.manahub.core.ui.theme
 
 import androidx.compose.ui.text.font.Font

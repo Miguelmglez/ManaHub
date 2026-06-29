@@ -38,11 +38,11 @@ data class PlayerConfig(
 enum class LifeControlMode { SCROLL, TAP }
 
 data class GameSettings(
-    val landReminderEnabled: Boolean     = true,
+    val landReminderEnabled: Boolean     = false,
     val voiceLandReminderEnabled: Boolean = false,
     val voiceEndTurnEnabled: Boolean = false,
     val voiceLanguage: VoiceLanguage = VoiceLanguage.ENGLISH,
-    val lifeControlMode:     LifeControlMode = LifeControlMode.SCROLL,
+    val lifeControlMode:     LifeControlMode = LifeControlMode.TAP,
 )
 
 data class GameSetupUiState(

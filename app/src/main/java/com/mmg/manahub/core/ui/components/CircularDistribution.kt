@@ -8,12 +8,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +33,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
+import com.mmg.manahub.core.ui.theme.MagicThemeAndroid
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -64,20 +70,23 @@ fun CircularDistribution(
     }
 
     // Dimension configuration based on mode
-    val ringSize = if (isCompact) 80.dp else 120.dp
-    val strokeWidth = if (isCompact) 10.dp else 16.dp
-    val spacingBetween = if (isCompact) 16.dp else 24.dp
-    val legendSpacing = if (isCompact) 4.dp else 10.dp
+    val ringSize = if (isCompact) 140.dp else 240.dp
+    val strokeWidth = if (isCompact) 18.dp else 32.dp
+    val legendSpacing = if (isCompact) MaterialTheme.spacing.xxs else MaterialTheme.spacing.sm
     val symbolSize = if (isCompact) 14.dp else 18.dp
     val outerStrokeWidth = if (isCompact) 0.5.dp else 1.dp
 
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (isCompact) Arrangement.Center else Arrangement.spacedBy(spacingBetween)
+        horizontalArrangement = Arrangement.Center
     ) {
         // The Ring Chart
-        Box(modifier = Modifier.size(ringSize), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(ringSize),
+            contentAlignment = Alignment.Center
+        ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val strokePx = strokeWidth.toPx()
                 val ringDiameter = size.minDimension - strokePx
@@ -169,8 +178,8 @@ fun CircularDistribution(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = total.toInt().toString(),
-                    style = if (isCompact) ty.labelMedium.copy(fontWeight = FontWeight.Bold)
-                            else ty.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 24.sp),
+                    style = if (isCompact) ty.labelLarge.copy(fontWeight = FontWeight.Bold)
+                            else ty.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 36.sp),
                     color = mc.textPrimary
                 )
                 if (!isCompact) {
@@ -183,11 +192,11 @@ fun CircularDistribution(
             }
         }
 
-        if (isCompact) Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(if (isCompact) MaterialTheme.spacing.md else MaterialTheme.spacing.xl))
 
         // Legend
         Column(
-            modifier = if (isCompact) Modifier else Modifier.weight(1f),
+            modifier = Modifier.width(IntrinsicSize.Max),
             verticalArrangement = Arrangement.spacedBy(legendSpacing)
         ) {
             val whiteName = stringResource(R.string.stats_color_white)
@@ -216,7 +225,7 @@ fun CircularDistribution(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)
                 ) {
                     if (colorCode != null) {
                         ManaSymbolImage(token = colorCode, size = symbolSize)
@@ -232,17 +241,76 @@ fun CircularDistribution(
                         text = label,
                         style = if (isCompact) ty.labelSmall else ty.labelMedium,
                         color = mc.textPrimary,
-                        modifier = if (isCompact) Modifier.weight(1f) else Modifier.weight(1f),
+                        modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "$percentage%",
                         style = (if (isCompact) ty.labelSmall else ty.labelMedium).copy(fontWeight = FontWeight.Bold),
-                        color = mc.textPrimary
+                        color = mc.textPrimary,
+                        modifier = Modifier.width(42.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End
                     )
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun CircularDistributionPreview() {
+    MagicThemeAndroid {
+        CircularDistribution(
+            data = mapOf(
+                "White" to 45,
+                "Blue" to 30,
+                "Black" to 25,
+                "Red" to 20,
+                "Green" to 15,
+                "Colorless" to 10
+            ),
+            colorMapper = {
+                when (it) {
+                    "White" -> Color(0xFFF9FAF4)
+                    "Blue" -> Color(0xFF0E68AB)
+                    "Black" -> Color(0xFF150B00)
+                    "Red" -> Color(0xFFD3202A)
+                    "Green" -> Color(0xFF00733E)
+                    else -> Color(0xFF90ADBB)
+                }
+            },
+            modifier = Modifier.background(MaterialTheme.magicColors.background)
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun CircularDistributionCompactPreview() {
+    MagicThemeAndroid {
+        CircularDistribution(
+            data = mapOf(
+                "White" to 45,
+                "Blue" to 30,
+                "Black" to 25,
+                "Red" to 20,
+                "Green" to 15,
+                "Colorless" to 10
+            ),
+            colorMapper = {
+                when (it) {
+                    "White" -> Color(0xFFF9FAF4)
+                    "Blue" -> Color(0xFF0E68AB)
+                    "Black" -> Color(0xFF150B00)
+                    "Red" -> Color(0xFFD3202A)
+                    "Green" -> Color(0xFF00733E)
+                    else -> Color(0xFF90ADBB)
+                }
+            },
+            isCompact = true,
+            modifier = Modifier.background(MaterialTheme.magicColors.background)
+        )
     }
 }

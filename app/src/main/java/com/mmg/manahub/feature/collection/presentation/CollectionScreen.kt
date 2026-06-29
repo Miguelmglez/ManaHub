@@ -1,5 +1,8 @@
 package com.mmg.manahub.feature.collection.presentation
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -100,6 +103,7 @@ private const val TAB_CARDS  = 0
 private const val TAB_DECKS  = 1
 private const val TAB_TRADES = 2
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CollectionScreen(
     onCardClick:              (scryfallId: String) -> Unit,
@@ -113,6 +117,8 @@ fun CollectionScreen(
     initialTab:               CollectionTab = CollectionTab.CARDS,
     viewModel:                CollectionViewModel = koinViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
+    sharedTransitionScope:    SharedTransitionScope? = null,
+    animatedVisibilityScope:  AnimatedVisibilityScope? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
@@ -149,6 +155,8 @@ fun CollectionScreen(
         onSnackbarDismissed        = viewModel::onSnackbarDismissed,
         onNavigateToTradeProposal  = onNavigateToTradeProposal,
         onNavigateToTradeThread    = onNavigateToTradeThread,
+        sharedTransitionScope      = sharedTransitionScope,
+        animatedVisibilityScope    = animatedVisibilityScope,
     )
 
     if (showAdvancedSearch) {
@@ -163,6 +171,7 @@ fun CollectionScreen(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CollectionContent(
     uiState:              CollectionUiState,
@@ -184,6 +193,8 @@ private fun CollectionContent(
     onSnackbarDismissed:  () -> Unit,
     onNavigateToTradeProposal: (String) -> Unit = {},
     onNavigateToTradeThread:   (String, String) -> Unit = { _, _ -> },
+    sharedTransitionScope:    SharedTransitionScope? = null,
+    animatedVisibilityScope:  AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val toastState = rememberMagicToastState()
@@ -304,6 +315,8 @@ private fun CollectionContent(
                         onShowAdvancedSearch  = onShowAdvancedSearch,
                         onViewModeToggle      = onViewModeToggle,
                         onSortChange          = onSortChange,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
                     )
                     CollectionTab.DECKS   -> DeckListScreen(
                         onDeckClick     = onDeckClick,
@@ -333,6 +346,7 @@ private fun CollectionContent(
 //  Cards tab content
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CardsTabContent(
     uiState:              CollectionUiState,
@@ -343,6 +357,8 @@ private fun CardsTabContent(
     onShowAdvancedSearch: () -> Unit,
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val filterCount = uiState.activeFilterCount
@@ -506,10 +522,14 @@ private fun CardsTabContent(
             CollectionViewMode.GRID -> CardGrid(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
             )
             CollectionViewMode.LIST -> CardList(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
             )
         }
     }
@@ -572,10 +592,13 @@ private fun SearchBar(
     )
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CardGrid(
     cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     LazyVerticalGrid(
         columns               = GridCells.Adaptive(minSize = 100.dp),
@@ -592,16 +615,24 @@ private fun CardGrid(
                 enter   = fadeIn(tween(300, delayMillis = delay)) +
                           scaleIn(tween(300, delayMillis = delay), initialScale = 0.92f),
             ) {
-                CardGridItem(item = item, onClick = { onCardClick(item.card.scryfallId) })
+                CardGridItem(
+                    item = item,
+                    onClick = { onCardClick(item.card.scryfallId) },
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CardList(
     cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     androidx.compose.foundation.lazy.LazyColumn(
         contentPadding      = PaddingValues(top = 4.dp, bottom = 80.dp),
@@ -614,6 +645,8 @@ private fun CardList(
             CardListItem(
                 item    = item,
                 onClick = { onCardClick(item.card.scryfallId) },
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
             )
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
         }

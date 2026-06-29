@@ -111,7 +111,15 @@ fun WidgetGallerySheet(
     val localCategoryOrder = remember { mutableStateListOf<WidgetCategory>() }
     LaunchedEffect(initialCategories) {
         if (localCategoryOrder.isEmpty()) {
-            localCategoryOrder.addAll(initialCategories)
+            localCategoryOrder.addAll(initialCategories.distinct())
+        } else {
+            // Defensive: ensure any new categories added to the app are picked up,
+            // but never introduce duplicates.
+            val current = localCategoryOrder.toSet()
+            val missing = initialCategories.filter { it !in current }
+            if (missing.isNotEmpty()) {
+                localCategoryOrder.addAll(missing)
+            }
         }
     }
 
@@ -128,7 +136,9 @@ fun WidgetGallerySheet(
         // Sync from source-of-truth only when NOT actively dragging an item.
         if (draggedId == null) {
             localLayout.clear()
-            localLayout.addAll(currentLayout)
+            // Defensive: ensure we don't pick up duplicates from the source of truth
+            // if a race condition occurs in the ViewModel's state emission.
+            localLayout.addAll(currentLayout.distinctBy { it.type.persistedId })
         }
     }
 
@@ -137,7 +147,9 @@ fun WidgetGallerySheet(
 
     // No remember(key) — localLayout is snapshot state, so Compose tracks reads here automatically.
     // Recomputing map{}.toSet() over a ~15-item list each recomposition is trivial.
-    val addedTypes = localLayout.map { it.type }.toSet()
+    // Use currentLayout (source of truth) for added status to ensure UI responsiveness 
+    // when adding/removing, as localLayout is primarily for drag reordering.
+    val addedTypes = remember(currentLayout) { currentLayout.map { it.type }.toSet() }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -194,13 +206,14 @@ fun WidgetGallerySheet(
                         .filter { it.type.category == category }
                         .map { it.type }
                         .filter { gamificationEnabled || !it.isGamification }
+                        .distinct()
 
                     val notAdded = HomeWidgetType.entries
                         .filter { it.category == category }
                         .filter { gamificationEnabled || !it.isGamification }
                         .filter { it !in addedTypes }
 
-                    val widgets = addedInOrder + notAdded
+                    val widgets = (addedInOrder + notAdded).distinctBy { it.persistedId }
                     // Skip categories with no visible widget types (e.g. TOURNAMENT / COMMUNITY have
                     // no types assigned, and gamification-only categories vanish when the toggle is off)
                     // so we never render an orphaned header.
@@ -256,7 +269,7 @@ fun WidgetGallerySheet(
                         )
                     }
 
-                    items(widgets, key = { it.persistedId }) { type ->
+                    items(widgets, key = { "gallery_${it.persistedId}" }) { type ->
                         val isAdded = type in addedTypes
                         val isFixed = type.isAlwaysPresent
                         val isDraggingItem = draggedId == type.persistedId
@@ -271,7 +284,7 @@ fun WidgetGallerySheet(
                             isDragging = isDraggingItem || isDraggingInBlock,
                             modifier = Modifier
                                 .then(if (isDraggingItem || isDraggingInBlock) Modifier else Modifier.animateItem())
-                                .zIndex(if (isDraggingItem) 11f else categoryZIndex)
+                                .zIndex(if (isDraggingItem) 11f else (if (draggedCategory == category) 10f else 1f))
                                 .graphicsLayer {
                                     translationY = if (isDraggingItem || isDraggingInBlock) dragAccumY else 0f
                                 },

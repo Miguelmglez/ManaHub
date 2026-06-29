@@ -62,7 +62,7 @@ fun DeckListScreen(
     val mc = MaterialTheme.magicColors
 
     Scaffold(
-        containerColor = Color.Transparent,
+        containerColor = mc.background,
         contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
             if (uiState.decks.isNotEmpty()) {
@@ -79,6 +79,7 @@ fun DeckListScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(mc.background)
                 .padding(padding)
         ) {
             when {

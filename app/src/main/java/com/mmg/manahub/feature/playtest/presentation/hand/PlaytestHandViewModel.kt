@@ -263,7 +263,20 @@ class PlaytestHandViewModel(
     // ── Drag-and-drop reorder ─────────────────────────────────────────────────
 
     fun onReorderHand(fromIndex: Int, toIndex: Int) {
-        val snapshot = _uiState.value.snapshot ?: return
+        val ui = _uiState.value
+        if (ui.phase == PlaytestPhase.PLAY) {
+            val bf = ui.battlefield ?: return
+            if (fromIndex == toIndex) return
+            // Guard against out-of-range drag indices delivered by gesture callbacks.
+            if (fromIndex !in bf.hand.indices || toIndex !in 0..bf.hand.lastIndex) return
+            val newHand = bf.hand.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+            _uiState.update { it.copy(battlefield = bf.copy(hand = newHand)) }
+            return
+        }
+
+        val snapshot = ui.snapshot ?: return
         if (fromIndex == toIndex) return
         // Guard against out-of-range drag indices delivered by gesture callbacks.
         if (fromIndex !in snapshot.hand.indices || toIndex !in 0..snapshot.hand.lastIndex) return
@@ -452,9 +465,12 @@ class PlaytestHandViewModel(
                 return@update state
             }
             val newCard = PlayCard(instanceId = ++instanceIdCounter, card = bf.library.first())
+            val newHand = bf.hand.toMutableList().apply {
+                add(size / 2, newCard)
+            }
             state.copy(
                 battlefield = bf.copy(
-                    hand    = bf.hand + newCard,
+                    hand    = newHand,
                     library = bf.library.drop(1),
                 ),
             )
@@ -472,6 +488,7 @@ class PlaytestHandViewModel(
      * not found in any zone.
      */
     fun moveCard(instanceId: Long, toZone: PlayZone) {
+        Log.d("PlaytestViewModel", "moveCard: instanceId=$instanceId toZone=$toZone")
         // Read AND write the same atomic snapshot to avoid stale-capture races (two rapid
         // moves operating on the same base state would lose one of the mutations).
         _uiState.update { state ->
@@ -487,6 +504,8 @@ class PlaytestHandViewModel(
                 PlayZone.LANDS      -> battlefield.copy(lands = battlefield.lands.filterNot { it.instanceId == instanceId })
                 PlayZone.PERMANENTS -> battlefield.copy(permanents = battlefield.permanents.filterNot { it.instanceId == instanceId })
                 PlayZone.GRAVEYARD  -> battlefield.copy(graveyard = battlefield.graveyard.filterNot { it.instanceId == instanceId })
+                PlayZone.EXILE      -> battlefield.copy(exile = battlefield.exile.filterNot { it.instanceId == instanceId })
+                PlayZone.LIBRARY    -> battlefield
             }
 
             // Returning a card to hand untaps it; otherwise preserve tap state.
@@ -498,6 +517,8 @@ class PlaytestHandViewModel(
                 PlayZone.LANDS      -> withoutCard.copy(lands = withoutCard.lands + moved)
                 PlayZone.PERMANENTS -> withoutCard.copy(permanents = withoutCard.permanents + moved)
                 PlayZone.GRAVEYARD  -> withoutCard.copy(graveyard = withoutCard.graveyard + moved)
+                PlayZone.EXILE      -> withoutCard.copy(exile = withoutCard.exile + moved)
+                PlayZone.LIBRARY    -> withoutCard
             }
             state.copy(battlefield = updated)
         }
@@ -530,6 +551,31 @@ class PlaytestHandViewModel(
         }
     }
 
+    /**
+     * Updates the free-form drop coordinates of a card.
+     */
+    fun updateCardOffset(instanceId: Long, x: Float, y: Float) {
+        _uiState.update { state ->
+            val battlefield = state.battlefield ?: return@update state
+            val (_, zone) = findCard(battlefield, instanceId) ?: return@update state
+            if (zone != PlayZone.LANDS && zone != PlayZone.PERMANENTS) return@update state
+
+            val updated = when (zone) {
+                PlayZone.LANDS -> battlefield.copy(
+                    lands = battlefield.lands.map {
+                        if (it.instanceId == instanceId) it.copy(xOffset = x, yOffset = y) else it
+                    },
+                )
+                else -> battlefield.copy(
+                    permanents = battlefield.permanents.map {
+                        if (it.instanceId == instanceId) it.copy(xOffset = x, yOffset = y) else it
+                    },
+                )
+            }
+            state.copy(battlefield = updated)
+        }
+    }
+
     /** Locates a [PlayCard] across all zones, returning it with its current zone. */
     private fun findCard(
         battlefield: BattlefieldState,
@@ -539,6 +585,7 @@ class PlaytestHandViewModel(
         battlefield.lands.find { it.instanceId == instanceId }?.let { return it to PlayZone.LANDS }
         battlefield.permanents.find { it.instanceId == instanceId }?.let { return it to PlayZone.PERMANENTS }
         battlefield.graveyard.find { it.instanceId == instanceId }?.let { return it to PlayZone.GRAVEYARD }
+        battlefield.exile.find { it.instanceId == instanceId }?.let { return it to PlayZone.EXILE }
         return null
     }
 

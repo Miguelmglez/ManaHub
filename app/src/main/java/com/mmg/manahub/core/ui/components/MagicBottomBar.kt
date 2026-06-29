@@ -129,7 +129,7 @@ fun MagicBottomBar(
             BottomBarTab(
                 label    = "LIBRARY",
                 icon     = Icons.Default.CollectionsBookmark,
-                selected = currentRoute == Screen.Collection.route,
+                selected = currentRoute?.startsWith(Screen.Collection.baseRoute) == true,
                 onClick  = onLibraryClick,
                 modifier = Modifier.weight(1f),
             )
