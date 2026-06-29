@@ -20,9 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.game.domain.model.GameMode
@@ -119,7 +117,7 @@ private fun GameModePill(
             color = if (selected) mc.primaryAccent else mc.textPrimary,
         )
         Text(
-            text = "${mode.startingLife} ${stringResource(R.string.gamesetup_mode_standard_life).substringAfter(' ')}",
+            text = "${mode.startingLife} life",
             style = ty.bodySmall,
             color = mc.textSecondary,
         )
