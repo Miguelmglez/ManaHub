@@ -3,9 +3,9 @@ package com.mmg.manahub.feature.profile.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.local.dao.DeckStatsRow
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
-import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
+import com.mmg.manahub.feature.game.domain.model.DeckStats
+import com.mmg.manahub.feature.game.domain.model.SessionDetail
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
@@ -87,8 +87,8 @@ class ProfileViewModel(
         val avgHandRating: Double = 0.0,
         val favoriteWinStyle: String = "",
         // Decks + sessions
-        val deckStats: List<DeckStatsRow> = emptyList(),
-        val recentSessions: List<GameSessionWithPlayers> = emptyList(),
+        val deckStats: List<DeckStats> = emptyList(),
+        val recentSessions: List<SessionDetail> = emptyList(),
         // Achievements (gamification Phase 1 — rich model from the catalog + persisted progress)
         val achievements: List<AchievementUiModel> = emptyList(),
         val preferredCurrency: com.mmg.manahub.core.model.PreferredCurrency = com.mmg.manahub.core.model.PreferredCurrency.USD,

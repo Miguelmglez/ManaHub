@@ -1,17 +1,20 @@
 package com.mmg.manahub.feature.game.data.repository
 
-import com.mmg.manahub.core.data.local.dao.DeckStatsRow
-import com.mmg.manahub.core.data.local.dao.EliminationCount
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
-import com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow
-import com.mmg.manahub.core.data.local.dao.ModeCount
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.feature.game.domain.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.DeckStats
+import com.mmg.manahub.feature.game.domain.model.EliminationStats
+import com.mmg.manahub.feature.game.domain.model.GameModeCount
+import com.mmg.manahub.feature.game.domain.model.GameSessionData
+import com.mmg.manahub.feature.game.domain.model.PlayerSummaryData
+import com.mmg.manahub.feature.game.domain.model.SessionDetail
+import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
+import com.mmg.manahub.feature.game.domain.model.SessionSummaryData
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -28,17 +31,17 @@ class GameSessionRepositoryImpl @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : GameSessionRepository {
 
-    override suspend fun saveGameSession(result: GameResult): Long = withContext(ioDispatcher) {
+    override suspend fun saveGameSession(data: GameSessionData): Long = withContext(ioDispatcher) {
         val sessionEntity = GameSessionEntity(
-            durationMs  = result.durationMs,
-            mode        = result.gameMode.name,
-            totalTurns  = result.totalTurns,
-            playerCount = result.allPlayers.size,
-            winnerId    = result.winner.id,
-            winnerName  = result.winner.name,
+            durationMs  = data.durationMs,
+            mode        = data.gameMode.name,
+            totalTurns  = data.totalTurns,
+            playerCount = data.allPlayerCount,
+            winnerId    = data.winner.id,
+            winnerName  = data.winner.name,
         )
-        // Players are passed without sessionId=0; insertSessionWithPlayers sets the real id.
-        val playerEntities = result.playerResults.map { pr ->
+        // Players are passed without sessionId = 0; insertSessionWithPlayers sets the real id atomically.
+        val playerEntities = data.playerResults.map { pr ->
             PlayerSessionEntity(
                 sessionId               = 0L,  // filled atomically inside insertSessionWithPlayers
                 playerId                = pr.player.id,
@@ -48,7 +51,7 @@ class GameSessionRepositoryImpl @Inject constructor(
                 eliminationReason       = pr.eliminationReason?.name,
                 commanderDamageDealt    = pr.totalCommanderDamageDealt,
                 commanderDamageReceived = pr.totalCommanderDamageReceived,
-                isWinner                = pr.player.id == result.winner.id,
+                isWinner                = pr.player.id == data.winner.id,
                 // Persist the app user's seat so the post-game survey can determine
                 // win/loss reliably (see ADR-001). isWinner alone is insufficient —
                 // every finished game has a winner.
@@ -66,10 +69,10 @@ class GameSessionRepositoryImpl @Inject constructor(
             ProgressionEvent.GameFinished(
                 sessionId      = sessionId,
                 isLocalWin     = localPlayerEntity?.isWinner == true,
-                mode           = result.gameMode.name,
+                mode           = data.gameMode.name,
                 playerCount    = playerEntities.size,
-                durationMs     = result.durationMs,
-                winTurn        = result.totalTurns.takeIf { it > 0 },
+                durationMs     = data.durationMs,
+                winTurn        = data.totalTurns.takeIf { it > 0 },
                 localFinalLife = localPlayerEntity?.finalLife,
                 occurredAt     = Clock.System.now(),
             )
@@ -78,11 +81,11 @@ class GameSessionRepositoryImpl @Inject constructor(
         sessionId
     }
 
-    override suspend fun getSessionById(sessionId: Long): GameSessionWithPlayers? =
-        withContext(ioDispatcher) { dao.getSessionById(sessionId) }
+    override suspend fun getSessionById(sessionId: Long): SessionDetail? =
+        withContext(ioDispatcher) { dao.getSessionById(sessionId)?.toDomain() }
 
-    override fun observeRecentSessions(limit: Int): Flow<List<GameSessionWithPlayers>> =
-        dao.observeRecentSessions(limit)
+    override fun observeRecentSessions(limit: Int): Flow<List<SessionDetail>> =
+        dao.observeRecentSessions(limit).map { list -> list.map { it.toDomain() } }
 
     override fun observeTotalGames(): Flow<Int> =
         dao.observeTotalGames()
@@ -93,8 +96,23 @@ class GameSessionRepositoryImpl @Inject constructor(
     override fun observeLocalWins(): Flow<Int> =
         dao.observeLocalWins()
 
-    override fun observeLocalSessionHistory(limit: Int): Flow<List<LocalSessionHistoryRow>> =
-        dao.observeLocalSessionHistory(limit)
+    override fun observeLocalSessionHistory(limit: Int): Flow<List<SessionHistoryEntry>> =
+        dao.observeLocalSessionHistory(limit).map { rows ->
+            rows.map { row ->
+                SessionHistoryEntry(
+                    sessionId     = row.sessionId,
+                    mode          = row.mode,
+                    totalTurns    = row.totalTurns,
+                    durationMs    = row.durationMs,
+                    playedAt      = row.playedAt,
+                    winnerName    = row.winnerName,
+                    surveyStatus  = row.surveyStatus,
+                    localIsWinner = row.localIsWinner,
+                    localDeckId   = row.localDeckId,
+                    localDeckName = row.localDeckName,
+                )
+            }
+        }
 
     override fun observeAvgLifeOnWin(): Flow<Double?> =
         dao.observeAvgLifeOnWin()
@@ -102,17 +120,28 @@ class GameSessionRepositoryImpl @Inject constructor(
     override fun observeAvgLifeOnLoss(): Flow<Double?> =
         dao.observeAvgLifeOnLoss()
 
-    override fun observeDeckStats(): Flow<List<DeckStatsRow>> =
-        dao.observeDeckStats()
+    override fun observeDeckStats(): Flow<List<DeckStats>> =
+        dao.observeDeckStats().map { rows ->
+            rows.map { row ->
+                DeckStats(
+                    deckId     = row.deckId,
+                    deckName   = row.deckName,
+                    totalGames = row.totalGames,
+                    wins       = row.wins,
+                )
+            }
+        }
 
-    override fun observeFavoriteMode(): Flow<ModeCount?> =
-        dao.observeFavoriteMode()
+    override fun observeFavoriteMode(): Flow<GameModeCount?> =
+        dao.observeFavoriteMode().map { mc -> mc?.let { GameModeCount(it.mode, it.count) } }
 
     override fun observeAvgDurationMs(): Flow<Double?> =
         dao.observeAvgDurationMs()
 
-    override fun observeMostFrequentElimination(): Flow<EliminationCount?> =
-        dao.observeMostFrequentElimination()
+    override fun observeMostFrequentElimination(): Flow<EliminationStats?> =
+        dao.observeMostFrequentElimination().map { ec ->
+            ec?.let { EliminationStats(it.eliminationReason, it.count) }
+        }
 
     override fun observeAvgWinTurn(playerName: String): Flow<Double?> =
         dao.observeAvgWinTurn(playerName)
@@ -128,4 +157,38 @@ class GameSessionRepositoryImpl @Inject constructor(
 
     override suspend fun deleteSession(sessionId: Long) =
         withContext(ioDispatcher) { dao.deleteSession(sessionId) }
+
+    // ── Private mapping helpers ───────────────────────────────────────────────
+
+    /** Maps a Room [GameSessionWithPlayers] to the domain [SessionDetail]. */
+    private fun GameSessionWithPlayers.toDomain(): SessionDetail = SessionDetail(
+        session = SessionSummaryData(
+            id           = session.id,
+            playedAt     = session.playedAt,
+            durationMs   = session.durationMs,
+            mode         = session.mode,
+            totalTurns   = session.totalTurns,
+            playerCount  = session.playerCount,
+            winnerName   = session.winnerName,
+            surveyStatus = session.surveyStatus,
+        ),
+        players = players.map { p ->
+            PlayerSummaryData(
+                id                      = p.id,
+                sessionId               = p.sessionId,
+                playerId                = p.playerId,
+                playerName              = p.playerName,
+                finalLife               = p.finalLife,
+                finalPoison             = p.finalPoison,
+                eliminationReason       = p.eliminationReason,
+                commanderDamageDealt    = p.commanderDamageDealt,
+                commanderDamageReceived = p.commanderDamageReceived,
+                deckId                  = p.deckId,
+                deckName                = p.deckName,
+                isWinner                = p.isWinner,
+                isLocal                 = p.isLocal,
+                archetype               = p.archetype,
+            )
+        },
+    )
 }
