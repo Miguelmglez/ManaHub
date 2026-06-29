@@ -34,10 +34,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.mmg.manahub.R
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -104,7 +102,7 @@ fun TradeSelectionSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_cancel),
+                        contentDescription = "Cancel",
                         tint = mc.textSecondary
                     )
                 }
@@ -114,14 +112,14 @@ fun TradeSelectionSheet(
 
             // Title
             Text(
-                text = stringResource(R.string.carddetail_trade_sheet_title),
+                text = "Select copies to mark for trade",
                 style = ty.titleMedium,
                 color = mc.textPrimary,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = stringResource(R.string.carddetail_trade_sheet_subtitle),
+                text = "Choose which copies you want to mark for trade. They will remain in your collection.",
                 style = ty.bodySmall,
                 color = mc.textSecondary,
             )
@@ -129,7 +127,7 @@ fun TradeSelectionSheet(
 
             if (userCards.isEmpty()) {
                 Text(
-                    text = stringResource(R.string.carddetail_no_copies_for_trade),
+                    text = "You have no collection copies to mark for trade.",
                     style = ty.bodySmall,
                     color = mc.textDisabled,
                     modifier = Modifier.padding(vertical = 24.dp),
@@ -146,7 +144,7 @@ fun TradeSelectionSheet(
                         val availableCount =
                             availableCards.sumOf { it.quantity - (editQty[it.id] ?: 0) }
                         SectionHeader(
-                            title = stringResource(R.string.carddetail_trade_available_header),
+                            title = "Available in Collection",
                             count = availableCount,
                         )
                     }
@@ -162,14 +160,14 @@ fun TradeSelectionSheet(
                             onAction = { editQty[uc.id] = (tradeQty + 1).coerceAtMost(uc.quantity) }
                         )
                     }
-                    
+
 
                     // ── Section 2: Offered for Trade ────────────────────────
                     val offeredCards = userCards.filter { (editQty[it.id] ?: 0) > 0 }
 
                     item(key = "offered_header") {
                         SectionHeader(
-                            title = stringResource(R.string.carddetail_trade_offered_header),
+                            title = "Offered for Trade",
                             count = offeredCards.sumOf { editQty[it.id] ?: 0 },
                         )
                     }
@@ -206,7 +204,7 @@ fun TradeSelectionSheet(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(
-                        text = stringResource(R.string.action_save),
+                        text = "Save",
                         style = ty.labelLarge,
                         fontWeight = FontWeight.Bold,
                     )

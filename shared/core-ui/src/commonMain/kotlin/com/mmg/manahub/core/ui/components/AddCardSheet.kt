@@ -55,13 +55,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -80,7 +78,7 @@ fun AddCardSheet(
     initialCondition: String = "NM",
     initialLanguage: String = "en",
     initialQty: Int = 1,
-    confirmButtonText: String = stringResource(R.string.scanner_add_to_collection),
+    confirmButtonText: String = "Add to collection",
     setCode: String? = null,
     setName: String? = null,
     rarity: String? = null,
@@ -88,7 +86,7 @@ fun AddCardSheet(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    
+
     val conditions = CardConstants.conditions
     val languages = CardConstants.languages
 
@@ -132,13 +130,13 @@ fun AddCardSheet(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = stringResource(R.string.action_cancel),
+                            contentDescription = "Cancel",
                             tint = mc.textSecondary
                         )
                     }
                 }
             }
-            
+
             // ── Card Preview Section ──────────────────────────────────────────
             Column(
                 modifier = Modifier
@@ -183,7 +181,7 @@ fun AddCardSheet(
                             )
                         }
                     }
-                    
+
                     manaCost?.let {
                         Spacer(Modifier.height(4.dp))
                         ManaCostImages(manaCost = it, symbolSize = 20.dp, spacing = 4.dp)
@@ -236,13 +234,13 @@ fun AddCardSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                stringResource(R.string.addcard_confirm_foil),
+                                "Foil",
                                 Modifier.weight(1f),
                                 style = ty.bodyLarge,
                                 color = if (isFoil) mc.primaryAccent else mc.textPrimary
                             )
                             Switch(
-                                checked = isFoil, 
+                                checked = isFoil,
                                 onCheckedChange = { isFoil = it },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = mc.background,
@@ -271,7 +269,7 @@ fun AddCardSheet(
                             value = condition,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text(stringResource(R.string.addcard_confirm_condition), style = ty.labelMedium) },
+                            label = { Text("Condition", style = ty.labelMedium) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(condExpanded) },
                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                             textStyle = ty.bodyLarge.copy(fontWeight = FontWeight.Bold),
@@ -322,7 +320,7 @@ fun AddCardSheet(
                             value = language.uppercase(),
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text(stringResource(R.string.addcard_confirm_language), style = ty.labelMedium) },
+                            label = { Text("Language", style = ty.labelMedium) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                             textStyle = ty.bodyLarge.copy(fontWeight = FontWeight.Bold),
@@ -343,12 +341,12 @@ fun AddCardSheet(
                         ) {
                             languages.forEach { (lang, _) ->
                                 DropdownMenuItem(
-                                    text = { 
+                                    text = {
                                         Text(
                                             lang.uppercase(),
                                             style = ty.bodyLarge,
                                             color = if (language == lang) mc.primaryAccent else mc.textPrimary
-                                        ) 
+                                        )
                                     },
                                     onClick = { language = lang; langExpanded = false },
                                 )
@@ -367,12 +365,12 @@ fun AddCardSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        stringResource(R.string.addcard_confirm_quantity),
+                        "Quantity",
                         Modifier.weight(1f),
                         style = ty.bodyLarge,
                         color = mc.textPrimary
                     )
-                    
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(24.dp)
@@ -383,12 +381,12 @@ fun AddCardSheet(
                         ) {
                             Icon(
                                 Icons.Default.Remove,
-                                contentDescription = stringResource(R.string.action_remove),
+                                contentDescription = "Remove",
                                 modifier = Modifier.size(24.dp),
                                 tint = if (qty > 1) mc.primaryAccent else mc.textDisabled
                             )
                         }
-                        
+
                         Text(
                             qty.toString(),
                             style = ty.titleLarge,
@@ -396,14 +394,14 @@ fun AddCardSheet(
                             modifier = Modifier.width(32.dp),
                             textAlign = TextAlign.Center
                         )
-                        
+
                         IconButton(
                             onClick = { qty++ },
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
-                                contentDescription = stringResource(R.string.action_add),
+                                contentDescription = "Add",
                                 modifier = Modifier.size(24.dp),
                                 tint = mc.primaryAccent
                             )
@@ -423,14 +421,14 @@ fun AddCardSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(12.dp)
-                ) { 
+                ) {
                     Text(
-                        stringResource(R.string.action_cancel).uppercase(),
+                        "Cancel".uppercase(),
                         style = ty.labelMedium,
                         color = mc.textSecondary
-                    ) 
+                    )
                 }
-                
+
                 Button(
                     onClick = {
                         onConfirm(

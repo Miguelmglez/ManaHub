@@ -40,14 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
-import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -105,7 +103,7 @@ fun VariantSelectorSheet(
                 IconButton(onClick = onDismiss) {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_close),
+                        contentDescription = "Close",
                         tint = mc.textSecondary,
                     )
                 }
@@ -118,7 +116,7 @@ fun VariantSelectorSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = stringResource(R.string.scanner_variant_selector_title),
+                    text = "Select variant",
                     style = ty.titleMedium,
                     color = mc.textPrimary,
                 )
@@ -144,7 +142,7 @@ fun VariantSelectorSheet(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = stringResource(R.string.scanner_variant_no_results),
+                            text = "No variants found",
                             style = ty.bodyMedium,
                             color = mc.textSecondary,
                         )
@@ -200,7 +198,7 @@ private fun VariantCardItem(
             Box {
                 AsyncImage(
                     model = imageUrl,
-                    contentDescription = stringResource(R.string.variant_tap_to_expand, card.name),
+                    contentDescription = "Tap to expand ${card.name}",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .width(80.dp)
@@ -333,7 +331,7 @@ fun FullScreenImageViewer(
             ) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = stringResource(R.string.action_close),
+                    contentDescription = "Close",
                     // White is intentional for maximum contrast against the black photo-viewer scrim.
                     tint = Color.White,
                 )
