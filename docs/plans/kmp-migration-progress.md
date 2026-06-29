@@ -474,14 +474,32 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
   `CalculateStandingsUseCase`/`GenerateNextRoundUseCase` (Room entities), `EvaluatePlayerEliminationUseCase`
   (`Player` in core-ui → core-domain can't dep), `GetAccountNudgeUseCase` (presentation dep), online-excluded.
 
+- ✅ **`GameSessionRepository` interface → `:shared:core-domain` `commonMain` (2026-06-30).** The
+  interface's Room-projection return types (`DeckStatsRow`, `ModeCount`, `EliminationCount`,
+  `LocalSessionHistoryRow`, `GameSessionWithPlayers`) were the blocker — they can't go to `commonMain`.
+  **Strategy:** domain equivalents (`DeckStats`, `GameModeCount`, `EliminationStats`,
+  `SessionHistoryEntry`, `SessionDetail`/`SessionSummaryData`/`PlayerSummaryData`) added to
+  `shared/core-model/commonMain` (package `com.mmg.manahub.feature.game.domain.model`); `EliminationReason`
+  extracted from `core-ui` `GameResult.kt` into `core-model`. New `GameResultMapper.kt` in `core-ui`
+  (`GameResult.toSessionData(): GameSessionData`). Interface moved to `shared/core-domain/commonMain`
+  (package `com.mmg.manahub.feature.game.domain.repository` PRESERVED → zero consumer import edits).
+  `GameSessionRepositoryImpl` rewritten: takes `GameSessionData`, maps DAO projections to domain types.
+  `GameViewModel` calls `result.toSessionData()`. `HomeViewModel`/`ProfileViewModel` field types updated
+  to domain equivalents (identical field names → zero logic change). `GameSessionRepositoryImplTest`
+  updated (`toSessionData()` call). DAO projection types (`DeckStatsRow`, etc.) STAY in `:app`.
+  Verified: `:app:assembleDebug` GREEN; shared modules `compileKotlinWasmJs` GREEN;
+  `testDebugUnitTest` 1964/122/2 (== baseline, `GameSessionRepositoryImplTest` 0/0 failures);
+  0 platform imports in `commonMain`.
+
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
 3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
 4. **Remaining composables in `:app`** — deep platform deps (bitmap resources, `android.graphics`,
    heavy string resources). Migrate with CMP Res.
 5. **Room-backed repo impls** (Card, Deck, Stats, UserCard, GameSession, Tournament) — each needs
    DAO-abstraction interfaces in commonMain. For web, fresh Supabase-backed impls behind same interface.
-6. **Repository interfaces with Room types** (`GameSessionRepository`, `TournamentRepository`) —
+6. **Repository interfaces with Room types** (`TournamentRepository`) —
    Room entities/projections in interface signatures. Need domain model equivalents.
+   (`GameSessionRepository` DONE 2026-06-30.)
 7. **~16 blocked use cases** — Room DAOs, Firebase, tournament engine. *(Deck Doctor use cases
    migrated 2026-06-29; ~9 deck use cases done, leaves Room-DAO-coupled and Firebase-coupled ones.)*
 8. **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.

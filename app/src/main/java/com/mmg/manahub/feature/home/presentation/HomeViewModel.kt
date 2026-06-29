@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow
+import com.mmg.manahub.feature.game.domain.model.DeckStats
+import com.mmg.manahub.feature.game.domain.model.EliminationStats
+import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.CommunityStats
@@ -241,7 +243,7 @@ class HomeViewModel(
      * [statsSnapshotFlow] (property init order) so both consumers can reference it
      * without subscribing to the same Room live-query twice.
      */
-    private val historyFlow: StateFlow<List<LocalSessionHistoryRow>> =
+    private val historyFlow: StateFlow<List<SessionHistoryEntry>> =
         gameSessionRepository.observeLocalSessionHistory(HISTORY_LIMIT)
             .catch {
                 crashlytics.setCustomKey("home_flow_error_source", "session_history")
@@ -1197,9 +1199,9 @@ class HomeViewModel(
 
     private data class StatsSnapshot(
         val localWins: Int,
-        val history: List<LocalSessionHistoryRow>,
-        val deckStats: List<com.mmg.manahub.core.data.local.dao.DeckStatsRow>,
-        val nemesis: com.mmg.manahub.core.data.local.dao.EliminationCount?,
+        val history: List<SessionHistoryEntry>,
+        val deckStats: List<DeckStats>,
+        val nemesis: EliminationStats?,
         val performance: PerformanceDetails,
     )
 
@@ -1294,7 +1296,7 @@ private fun QuestUiModel.toHomeQuest(): HomeQuest = HomeQuest(
 
 // Mapping helper removed — Home now uses rich NewsItem directly.
 
-private fun LocalSessionHistoryRow.toRecap(): LastGameRecap = LastGameRecap(
+private fun SessionHistoryEntry.toRecap(): LastGameRecap = LastGameRecap(
     won = localIsWinner,
     deckName = localDeckName,
     mode = mode,
@@ -1303,7 +1305,7 @@ private fun LocalSessionHistoryRow.toRecap(): LastGameRecap = LastGameRecap(
 )
 
 /** Streak from most-recent-first history: counts the leading run of wins; longest run anywhere. */
-private fun List<LocalSessionHistoryRow>.toPlayStreak(): PlayStreak? {
+private fun List<SessionHistoryEntry>.toPlayStreak(): PlayStreak? {
     if (isEmpty()) return null
     val current = takeWhile { it.localIsWinner }.size
     var longest = 0

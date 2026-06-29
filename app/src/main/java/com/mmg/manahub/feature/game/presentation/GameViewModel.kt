@@ -34,6 +34,7 @@ import com.mmg.manahub.feature.game.domain.model.EliminationReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GamePhase
 import com.mmg.manahub.feature.game.domain.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.toSessionData
 import com.mmg.manahub.core.model.GridSlotPosition
 import com.mmg.manahub.core.model.LayoutTemplate
 import com.mmg.manahub.core.model.LayoutTemplates
@@ -173,7 +174,7 @@ class GameViewModel(
                 .distinctUntilChanged()
                 .collect { result ->
                     launch(Dispatchers.IO) {
-                        runCatching { gameSessionRepo.saveGameSession(result) }
+                        runCatching { gameSessionRepo.saveGameSession(result.toSessionData()) }
                             .onSuccess { id ->
                                 _uiState.update { it.copy(lastSessionId = id, isGameRunning = false) }
                                 recordTournamentResultIfNeeded(id, result)
