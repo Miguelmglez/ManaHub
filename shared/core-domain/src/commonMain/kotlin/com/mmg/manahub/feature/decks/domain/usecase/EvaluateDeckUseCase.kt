@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
@@ -14,9 +13,9 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
-import javax.inject.Inject
 
 /**
  * Computes the read-only "Health" evaluation of a deck's mainboard using the new
@@ -35,10 +34,10 @@ import javax.inject.Inject
  * self-referential. Callers that have no seeds (e.g. an empty-strategy preview) simply pass the
  * default empty list.
  */
-class EvaluateDeckUseCase @Inject constructor(
+class EvaluateDeckUseCase(
     private val deckScorer: DeckScorer,
     private val progressionEventBus: ProgressionEventBus,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     /** Stable, code-side slug identifying the Deck Doctor feature for exploration quests. */

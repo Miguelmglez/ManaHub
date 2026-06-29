@@ -1,7 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
-import javax.inject.Inject
 
 /**
  * User-facing budget filters applied to the ADD suggestions.
@@ -78,7 +77,7 @@ data class BudgetSelection(
  * user makes the final call. The per-role grouping only influences tie ordering, ensuring we don't
  * spend the whole budget over-filling a single role before touching the others.
  */
-class BudgetOptimizer @Inject constructor() {
+class BudgetOptimizer {
 
     /**
      * @param suggestions ranked add suggestions (typically already sorted by fit, best first).

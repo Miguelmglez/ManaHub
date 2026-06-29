@@ -1,14 +1,13 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Where an add suggestion came from. Phase 5 only ever produces [COLLECTION] candidates;
@@ -56,9 +55,9 @@ data class AddSuggestion(
  * Phase 6 will extend this with wishlist + external (Scryfall) candidates by appending more
  * [AddSuggestion]s with the corresponding [AddOrigin]; the engine call and ranking stay the same.
  */
-class SuggestAddsUseCase @Inject constructor(
+class SuggestAddsUseCase(
     private val deckScorer: DeckScorer,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     /**

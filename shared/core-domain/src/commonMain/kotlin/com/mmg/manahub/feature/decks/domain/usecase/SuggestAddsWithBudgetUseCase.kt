@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -10,8 +9,8 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Phase 6 add pipeline: composes THREE candidate sources into a single ranked, budget-filtered list.
@@ -31,12 +30,12 @@ import javax.inject.Inject
  * down / offline), the pipeline falls back to collection + wishlist only and never crashes. The whole
  * call is suspendable and cancellable via [withContext].
  */
-class SuggestAddsWithBudgetUseCase @Inject constructor(
+class SuggestAddsWithBudgetUseCase(
     private val deckScorer: DeckScorer,
     private val candidatePoolGenerator: CandidatePoolGenerator,
     private val budgetOptimizer: BudgetOptimizer,
     private val cardRepository: CardRepository,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     /**
@@ -105,13 +104,13 @@ class SuggestAddsWithBudgetUseCase @Inject constructor(
         // Track each card's origin so we can re-attach it after the engine drops the concept.
         val originById = HashMap<String, AddOrigin>()
         collectionCards.forEach { originById[it.scryfallId] = AddOrigin.COLLECTION }
-        wishlistCards.forEach { originById.putIfAbsent(it.scryfallId, AddOrigin.WISHLIST) }
-        externalCards.forEach { originById.putIfAbsent(it.scryfallId, AddOrigin.NEW) }
+        wishlistCards.forEach { originById.getOrPut(it.scryfallId) { AddOrigin.WISHLIST } }
+        externalCards.forEach { originById.getOrPut(it.scryfallId) { AddOrigin.NEW } }
 
         // De-dup the union by id with COLLECTION > WISHLIST > NEW priority (LinkedHashMap keeps order).
         val unionById = LinkedHashMap<String, Card>()
         (collectionCards + wishlistCards + externalCards).forEach { card ->
-            unionById.putIfAbsent(card.scryfallId, card)
+            unionById.getOrPut(card.scryfallId) { card }
         }
 
         val ranked: List<CardFit> = deckScorer.rankAdds(

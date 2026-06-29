@@ -4,7 +4,6 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
-import javax.inject.Inject
 
 /**
  * Imports a Moxfield / MTG Arena text deck list INTO an already-existing deck.
@@ -19,7 +18,7 @@ import javax.inject.Inject
  * Note: [DeckImportExportHelper.ParsedDeckList] exposes no deck name, so this use case
  * does NOT rename the target deck — the caller keeps the live deck's existing name.
  */
-class ImportDeckUseCase @Inject constructor(
+class ImportDeckUseCase(
     private val cardRepository: CardRepository,
     private val deckRepository: DeckRepository,
 ) {

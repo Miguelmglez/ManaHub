@@ -5,7 +5,6 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
-import javax.inject.Inject
 
 /**
  * Inferred deck identity derived purely from a set of seed cards.
@@ -38,7 +37,7 @@ data class InferredIdentity(
  *
  * Empty seeds yield an empty identity, null strategy and empty seedTags — a safe no-op.
  */
-class InferDeckIdentityUseCase @Inject constructor() {
+class InferDeckIdentityUseCase {
 
     operator fun invoke(seeds: List<Card>): InferredIdentity {
         if (seeds.isEmpty()) {
@@ -67,8 +66,8 @@ class InferDeckIdentityUseCase @Inject constructor() {
         // ARCHETYPE / TRIBAL tags (the identity categories the scorer fingerprints on), de-duped by key.
         val seedIdentityTags = allSeedTags.filter { it.category in IDENTITY_CATEGORIES }
         val seedTags = LinkedHashMap<String, CardTag>()
-        strategy?.primaryTags?.forEach { seedTags.putIfAbsent(it.key, it) }
-        seedIdentityTags.forEach { seedTags.putIfAbsent(it.key, it) }
+        strategy?.primaryTags?.forEach { seedTags.getOrPut(it.key) { it } }
+        seedIdentityTags.forEach { seedTags.getOrPut(it.key) { it } }
 
         return InferredIdentity(
             colorIdentity = colorIdentity,

@@ -1,19 +1,19 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.MagicCard
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Result of [BuildDeckFromSeedsUseCase].
@@ -63,12 +63,12 @@ data class SeedDeckResult(
  *
  * The result is heuristic and deterministic given the same inputs (no randomness).
  */
-class BuildDeckFromSeedsUseCase @Inject constructor(
+class BuildDeckFromSeedsUseCase(
     private val deckScorer: DeckScorer,
     private val roleClassifier: RoleClassifier,
     private val candidatePoolGenerator: CandidatePoolGenerator,
     private val budgetOptimizer: BudgetOptimizer,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     /**
@@ -118,7 +118,7 @@ class BuildDeckFromSeedsUseCase @Inject constructor(
 
         // De-dup the union by id, owned first so an owned printing wins over an external one.
         val unionById = LinkedHashMap<String, Card>()
-        (ownedCandidates + externalCards).forEach { unionById.putIfAbsent(it.scryfallId, it) }
+        (ownedCandidates + externalCards).forEach { unionById.getOrPut(it.scryfallId) { it } }
 
         // ── 3. Rank ────────────────────────────────────────────────────────────────
         val ranked: List<CardFit> = deckScorer.rankAdds(
@@ -190,10 +190,7 @@ class BuildDeckFromSeedsUseCase @Inject constructor(
         (format.targetDeckSize - format.targetLandCount).coerceAtLeast(0)
 
     /** Land slots reserved for the mana base: skeleton LAND ideal, fallback to the format target. */
-    private fun reservedLandSlots(
-        profile: com.mmg.manahub.feature.decks.domain.engine.DeckProfile,
-        format: DeckFormat,
-    ): Int {
+    private fun reservedLandSlots(profile: DeckProfile, format: DeckFormat): Int {
         val skeletonIdeal = profile.skeleton.idealFor(DeckRole.LAND)
         return if (skeletonIdeal > 0) skeletonIdeal else format.targetLandCount
     }

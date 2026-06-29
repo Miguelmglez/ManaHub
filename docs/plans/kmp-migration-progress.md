@@ -445,6 +445,29 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
   (`ac787c6`). MulishFontFamily → magicTypography; LocalContext/ImageRequest → plain URL; strings inlined.
 - ✅ CardConstants → :shared:core-model (pure Kotlin; was blocking SharedComponents).
   core-ui now ~51 shared composables.
+- ✅ AddCardSheet + TradeSelectionSheet + VariantSelectorSheet → shared core-ui (`996b0ff`).
+  9/6/4 stringResource → English literals; coloredShadow split to expect/actual (Android:
+  BlurMaskFilter, wasmJs: no-op; defaults on expect only — KMP rule). core-ui now ~54 shared composables.
+  Remaining in :app/core/ui/components/: CardSearchSheet (Activity/Context hard blockers),
+  ManaCurveChart (android.graphics), ParticipantListRow/RoomCodeDisplay/RoomCodeField (online-excluded).
+- ✅ **9 deck use cases → `:shared:core-domain` `commonMain` (2026-06-29).** Full package
+  `com.mmg.manahub.feature.decks.domain.usecase` moved — all 9 files that were in `:app`:
+  `BudgetOptimizer`, `BudgetConstraints`, `BudgetSelection` (in BudgetOptimizer.kt),
+  `CandidatePoolGenerator` (+ `DeckRole.queryFragment/fallbackQueryFragment` top-level extensions),
+  `EvaluateDeckUseCase` + `DeckHealth`,
+  `InferDeckIdentityUseCase` + `InferredIdentity`,
+  `SuggestAddsUseCase` + `AddOrigin` + `AddSuggestion`,
+  `SuggestAddsWithBudgetUseCase`,
+  `SuggestCutsUseCase`,
+  `BuildDeckFromSeedsUseCase` + `SeedDeckResult`,
+  `ImportDeckUseCase`.
+  **Key changes:** `@Inject`/`@Singleton`/`javax.inject.*`/`core.di.IoDispatcher` stripped;
+  dispatcher params → `CoroutineDispatcher = Dispatchers.Default`. **KMP fix:**
+  `CandidatePoolGenerator.formatCap` replaced `String.format(java.util.Locale.US, "%.2f", value)`
+  with pure Kotlin integer arithmetic (`kotlin.math.round`/`abs` + `padStart`) — JVM-only
+  `java.util.Locale` eliminated. `DeckDoctorModule` updated with explicit `@Provides @Singleton` for
+  all 9 new types (+ `BudgetOptimizer` no-arg + `CandidatePoolGenerator` with `CardRepository` dep).
+  Package UNCHANGED → zero consumer import edits. Platform-leak grep: EMPTY (PASS).
 
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
 3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
@@ -454,7 +477,8 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
    DAO-abstraction interfaces in commonMain. For web, fresh Supabase-backed impls behind same interface.
 6. **Repository interfaces with Room types** (`GameSessionRepository`, `TournamentRepository`) —
    Room entities/projections in interface signatures. Need domain model equivalents.
-7. **~25 blocked use cases** — Room DAOs, Firebase, Deck Doctor `DeckMagicEngine`, tournament engine.
+7. **~16 blocked use cases** — Room DAOs, Firebase, tournament engine. *(Deck Doctor use cases
+   migrated 2026-06-29; ~9 deck use cases done, leaves Room-DAO-coupled and Firebase-coupled ones.)*
 8. **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
 9. **EXCLUDED features** (online, voice, scanner) — deferred per plan.
 
