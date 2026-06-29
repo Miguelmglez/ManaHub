@@ -468,6 +468,11 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
   `java.util.Locale` eliminated. `DeckDoctorModule` updated with explicit `@Provides @Singleton` for
   all 9 new types (+ `BudgetOptimizer` no-arg + `CandidatePoolGenerator` with `CardRepository` dep).
   Package UNCHANGED → zero consumer import edits. Platform-leak grep: EMPTY (PASS).
+  **Additional KMP fixes (2026-06-30, `1328a6a`):** `putIfAbsent` (JVM-only MutableMap) → `getOrPut`
+  in 4 files; `queryFragment`/`fallbackQueryFragment` visibility `internal` → `public` (cross-module).
+  Remaining blocked use cases: `GetDeckGameStatsUseCase` (Room DAO), `ClaimQuestRewardUseCase` (Room DAO),
+  `CalculateStandingsUseCase`/`GenerateNextRoundUseCase` (Room entities), `EvaluatePlayerEliminationUseCase`
+  (`Player` in core-ui → core-domain can't dep), `GetAccountNudgeUseCase` (presentation dep), online-excluded.
 
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
 3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
