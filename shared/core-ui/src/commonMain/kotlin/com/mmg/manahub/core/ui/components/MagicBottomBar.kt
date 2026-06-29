@@ -32,14 +32,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.mmg.manahub.R
-import com.mmg.manahub.app.navigation.Screen
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -53,19 +51,33 @@ import com.mmg.manahub.core.ui.theme.spacing
 //  The FAB overflows the top of the bar by 8 dp.
 //  The outer Box does NOT clip, so the overflow is visible.
 //
-//  Home redesign (free-first/account-enhanced): the bar surfaces only the two
-//  always-relevant destinations plus the centered Game action. Draft, News,
-//  Profile, etc. are reachable from Home modules and the Library sub-tabs, not
-//  as permanent tabs.
+//  Route comparison is done externally so the composable stays platform-agnostic:
+//  callers pass [homeRoute] and [collectionBaseRoute] as plain strings.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Custom 3-slot bottom navigation bar with a centred gradient Play FAB.
+ *
+ * @param currentRoute          The currently active navigation route (or null if unknown).
+ * @param homeRoute             The route string for the Home tab, used to determine selection.
+ * @param collectionBaseRoute   The base-route prefix for the Library/Collection tab.
+ * @param gamePainter           Painter for the battle/game icon displayed in the centre FAB.
+ *                              Pass `painterResource(R.drawable.ic_battle)` from the Android call site.
+ * @param onHomeClick           Callback when the Home slot is tapped.
+ * @param onPlayClick           Callback when the Play FAB is tapped.
+ * @param onLibraryClick        Callback when the Library slot is tapped.
+ * @param modifier              Optional [Modifier].
+ */
 @Composable
 fun MagicBottomBar(
-    currentRoute:   String?,
-    onHomeClick:    () -> Unit,
-    onPlayClick:    () -> Unit,
+    currentRoute: String?,
+    homeRoute: String,
+    collectionBaseRoute: String,
+    gamePainter: Painter,
+    onHomeClick: () -> Unit,
+    onPlayClick: () -> Unit,
     onLibraryClick: () -> Unit,
-    modifier:       Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.magicColors
 
@@ -86,9 +98,9 @@ fun MagicBottomBar(
                 .background(colors.backgroundSecondary)
                 .drawBehind {
                     drawLine(
-                        color       = borderColor,
-                        start       = Offset(0f, 0f),
-                        end         = Offset(size.width, 0f),
+                        color = borderColor,
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, 0f),
                         strokeWidth = 0.5.dp.toPx(),
                     )
                 },
@@ -100,37 +112,38 @@ fun MagicBottomBar(
                 .fillMaxWidth()
                 .height(barHeight)
                 .align(Alignment.BottomCenter),
-            verticalAlignment    = Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             // Slot 1 — Home
             BottomBarTab(
-                label    = "HOME",
-                icon     = Icons.Default.Home,
-                selected = currentRoute == Screen.Home.route,
-                onClick  = onHomeClick,
+                label = "HOME",
+                icon = Icons.Default.Home,
+                selected = currentRoute == homeRoute,
+                onClick = onHomeClick,
                 modifier = Modifier.weight(1f),
             )
 
             // Slot 2 — Play FAB (overflows upward by 8 dp)
             Box(
-                modifier         = Modifier
+                modifier = Modifier
                     .weight(1f)
                     .height(barHeight),
                 contentAlignment = Alignment.Center,
             ) {
                 PlayFab(
-                    onClick  = onPlayClick,
+                    painter = gamePainter,
+                    onClick = onPlayClick,
                     modifier = Modifier.offset(y = -MaterialTheme.spacing.sm),
                 )
             }
 
             // Slot 3 — Library (reuses the existing Collection destination)
             BottomBarTab(
-                label    = "LIBRARY",
-                icon     = Icons.Default.CollectionsBookmark,
-                selected = currentRoute?.startsWith(Screen.Collection.baseRoute) == true,
-                onClick  = onLibraryClick,
+                label = "LIBRARY",
+                icon = Icons.Default.CollectionsBookmark,
+                selected = currentRoute?.startsWith(collectionBaseRoute) == true,
+                onClick = onLibraryClick,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -143,15 +156,15 @@ fun MagicBottomBar(
 
 @Composable
 private fun BottomBarTab(
-    label:    String,
-    icon:     ImageVector,
+    label: String,
+    icon: ImageVector,
     selected: Boolean,
-    onClick:  () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors        = MaterialTheme.magicColors
-    val typography    = MaterialTheme.magicTypography
-    val contentColor  = if (selected) colors.primaryAccent else colors.textDisabled
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+    val contentColor = if (selected) colors.primaryAccent else colors.textDisabled
     val interactionSource = remember { MutableInteractionSource() }
 
     val accessibleLabel = label.lowercase().replaceFirstChar { it.uppercase() }
@@ -160,28 +173,27 @@ private fun BottomBarTab(
             .fillMaxHeight()
             .clickable(
                 interactionSource = interactionSource,
-                indication        = ripple(bounded = true),
-                onClick           = onClick,
+                indication = ripple(bounded = true),
+                onClick = onClick,
             )
             .semantics(mergeDescendants = true) { contentDescription = accessibleLabel },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            imageVector        = icon,
+            imageVector = icon,
             contentDescription = null,
-            tint               = contentColor,
-            modifier           = Modifier.size(24.dp),
+            tint = contentColor,
+            modifier = Modifier.size(24.dp),
         )
         Spacer(Modifier.height(MaterialTheme.spacing.xs))
         Text(
-            text      = label,
-            style     = typography.labelSmall,
-            color     = contentColor,
+            text = label,
+            style = typography.labelSmall,
+            color = contentColor,
             textAlign = TextAlign.Center,
-            maxLines  = 1,
+            maxLines = 1,
         )
-        
     }
 }
 
@@ -191,16 +203,17 @@ private fun BottomBarTab(
 
 @Composable
 private fun PlayFab(
-    onClick:  () -> Unit,
+    painter: Painter,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors    = MaterialTheme.magicColors
-    val spacing   = MaterialTheme.spacing
+    val colors = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     val glowColor = colors.primaryAccent.copy(alpha = 0.35f)
-    val gradient  = Brush.linearGradient(
+    val gradient = Brush.linearGradient(
         colors = listOf(colors.primaryAccent, colors.secondaryAccent),
-        start  = Offset(0f, Float.POSITIVE_INFINITY),
-        end    = Offset(Float.POSITIVE_INFINITY, 0f),
+        start = Offset(0f, Float.POSITIVE_INFINITY),
+        end = Offset(Float.POSITIVE_INFINITY, 0f),
     )
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -209,7 +222,7 @@ private fun PlayFab(
             .size(60.dp)
             .drawBehind {
                 drawCircle(
-                    color  = glowColor,
+                    color = glowColor,
                     radius = size.minDimension / 2f + spacing.sm.toPx(),
                 )
             }
@@ -217,16 +230,16 @@ private fun PlayFab(
             .background(gradient)
             .clickable(
                 interactionSource = interactionSource,
-                indication        = ripple(bounded = true, color = colors.primaryAccent),
-                onClick           = onClick,
+                indication = ripple(bounded = true, color = colors.primaryAccent),
+                onClick = onClick,
             ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter            = painterResource(R.drawable.ic_battle),
+            painter = painter,
             contentDescription = "Play Game",
-            tint               = colors.background,
-            modifier           = Modifier.size(28.dp),
+            tint = colors.background,
+            modifier = Modifier.size(28.dp),
         )
     }
 }

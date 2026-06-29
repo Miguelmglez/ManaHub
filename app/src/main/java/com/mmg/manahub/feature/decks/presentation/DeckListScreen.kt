@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -102,10 +103,11 @@ fun DeckListScreen(
                     ) {
                         items(uiState.decks, key = { it.id }) { deck ->
                             DeckItem(
-                                deck        = deck,
-                                onClick     = { onDeckClick(deck.id) },
-                                onDelete    = { viewModel.deleteDeck(deck.id) },
-                                onPlaytest  = if (DeckFeatureFlags.PLAYTEST_ENABLED) ({ onPlaytestClick(deck.id) }) else null,
+                                deck             = deck,
+                                onClick          = { onDeckClick(deck.id) },
+                                onDelete         = { viewModel.deleteDeck(deck.id) },
+                                onPlaytest       = if (DeckFeatureFlags.PLAYTEST_ENABLED) ({ onPlaytestClick(deck.id) }) else null,
+                                cardBackPainter  = painterResource(R.drawable.mtg_card_back),
                             )
                         }
                     }

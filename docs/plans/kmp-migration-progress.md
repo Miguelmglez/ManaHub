@@ -437,9 +437,10 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
 - ✅ Playtest screens (Setup/Hand/Battlefield), CardDetailScreen, GamePlayScreen, AppNavGraph
   migrated to use shared composables (screens stay in `:app` androidMain — only their composable deps moved).
 
+- ✅ `DeckMagicEngine` → `:shared:core-domain` (`d94e8b6`). `CardTag.displayLabel` added to shared.
+  `@IoDispatcher` → `Dispatchers.Default`. `DeckDoctorModule` @Provides added.
+
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
-1. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
-   Needs tagging module shared first, or the `label` call extracted.
 3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
 4. **Remaining composables in `:app`** — deep platform deps (bitmap resources, `android.graphics`,
    heavy string resources). Migrate with CMP Res.

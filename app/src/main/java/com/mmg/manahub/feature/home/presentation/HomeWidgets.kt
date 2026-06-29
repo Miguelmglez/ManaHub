@@ -1892,10 +1892,11 @@ private fun DecksShelfWidget(decks: List<DeckSummary>, onAction: (HomeAction) ->
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             items(decks, key = { it.id }) { deck ->
                 DeckItem(
-                    deck = deck,
-                    onClick = { onAction(HomeAction.OpenDeck(deck.id)) },
-                    reduced = true,
-                    modifier = Modifier.width(160.dp),
+                    deck            = deck,
+                    onClick         = { onAction(HomeAction.OpenDeck(deck.id)) },
+                    reduced         = true,
+                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    modifier        = Modifier.width(160.dp),
                 )
             }
         }

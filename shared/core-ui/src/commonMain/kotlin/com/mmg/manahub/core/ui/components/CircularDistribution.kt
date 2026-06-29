@@ -28,17 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
-import com.mmg.manahub.core.ui.theme.MagicThemeAndroid
-import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -46,6 +43,17 @@ import kotlin.math.sin
 /**
  * A reusable circular distribution (ring) chart with a legend.
  * Supports both a full version (for stats screens) and a compact version (for home widgets).
+ *
+ * When [isColor] is true the legend uses mana-symbol icons for the standard MTG color labels
+ * ("White", "Blue", "Black", "Red", "Green", "Colorless"). Callers that use color keys are
+ * expected to pass those exact English label strings as map keys (the app is English-only).
+ *
+ * @param data         Map of label → count. Labels are arbitrary strings; for MTG colors use
+ *                     the canonical English names ("White", "Blue", etc.).
+ * @param colorMapper  Maps a label string to its display [Color].
+ * @param modifier     Optional [Modifier].
+ * @param isColor      If true, renders mana-symbol icons for known MTG color labels in the legend.
+ * @param isCompact    If true, renders a smaller ring suitable for widget tiles.
  */
 @Composable
 fun CircularDistribution(
@@ -59,7 +67,7 @@ fun CircularDistribution(
     val total = data.values.sum().toFloat().coerceAtLeast(1f)
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    
+
     val animationProgress = remember { Animatable(0f) }
     LaunchedEffect(data) {
         animationProgress.snapTo(0f)
@@ -81,10 +89,9 @@ fun CircularDistribution(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        // The Ring Chart
+        // ── Ring chart ───────────────────────────────────────────────────────────
         Box(
-            modifier = Modifier
-                .size(ringSize),
+            modifier = Modifier.size(ringSize),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -99,8 +106,8 @@ fun CircularDistribution(
 
                 var startAngle = -90f
                 val sortedData = data.entries.sortedByDescending { it.value }
-                
-                // Draw Background Segments (Alpha)
+
+                // Draw background segments (alpha fill)
                 sortedData.forEach { (label, count) ->
                     val sweepAngle = (count / total) * 360f * animationProgress.value
                     if (sweepAngle <= 0f) return@forEach
@@ -116,15 +123,15 @@ fun CircularDistribution(
                     )
                     startAngle += sweepAngle
                 }
-                
-                // Draw Strokes and Dividers (Solid)
+
+                // Draw strokes and dividers (solid)
                 startAngle = -90f
                 sortedData.forEach { (label, count) ->
                     val sweepAngle = (count / total) * 360f * animationProgress.value
                     if (sweepAngle <= 0f) return@forEach
                     val baseColor = colorMapper(label)
-                    
-                    // 1. Outer Stroke
+
+                    // Outer stroke
                     val outerDiameter = ringDiameter + strokePx
                     drawArc(
                         color = baseColor,
@@ -139,7 +146,7 @@ fun CircularDistribution(
                         style = Stroke(width = outerStrokeWidth.toPx())
                     )
 
-                    // 2. Inner Stroke
+                    // Inner stroke
                     val innerDiameter = ringDiameter - strokePx
                     drawArc(
                         color = baseColor,
@@ -154,11 +161,11 @@ fun CircularDistribution(
                         style = Stroke(width = outerStrokeWidth.toPx())
                     )
 
-                    // 3. Radial Separator
+                    // Radial separator line
                     val startAngleRad = (startAngle * PI / 180f)
                     val innerR = innerDiameter / 2
                     val outerR = outerDiameter / 2
-                    
+
                     drawLine(
                         color = mc.surface,
                         start = androidx.compose.ui.geometry.Offset(
@@ -175,6 +182,7 @@ fun CircularDistribution(
                     startAngle += sweepAngle
                 }
             }
+
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = total.toInt().toString(),
@@ -184,7 +192,7 @@ fun CircularDistribution(
                 )
                 if (!isCompact) {
                     Text(
-                        text = stringResource(R.string.stats_label_total),
+                        text = "Total",
                         style = ty.labelSmall,
                         color = mc.textSecondary
                     )
@@ -194,17 +202,19 @@ fun CircularDistribution(
 
         Spacer(Modifier.width(if (isCompact) MaterialTheme.spacing.md else MaterialTheme.spacing.xl))
 
-        // Legend
+        // ── Legend ───────────────────────────────────────────────────────────────
         Column(
             modifier = Modifier.width(IntrinsicSize.Max),
             verticalArrangement = Arrangement.spacedBy(legendSpacing)
         ) {
-            val whiteName = stringResource(R.string.stats_color_white)
-            val blueName = stringResource(R.string.stats_color_blue)
-            val blackName = stringResource(R.string.stats_color_black)
-            val redName = stringResource(R.string.stats_color_red)
-            val greenName = stringResource(R.string.stats_color_green)
-            val colorlessName = stringResource(R.string.stats_color_colorless)
+            // Canonical English color names used to identify MTG mana colors in the legend.
+            // These must match the keys that callers place in [data] when [isColor] = true.
+            val whiteName = "White"
+            val blueName = "Blue"
+            val blackName = "Black"
+            val redName = "Red"
+            val greenName = "Green"
+            val colorlessName = "Colorless"
 
             val items = if (isCompact) data.entries.sortedByDescending { it.value }.take(6)
                         else data.entries.sortedByDescending { it.value }
@@ -213,13 +223,13 @@ fun CircularDistribution(
                 val percentage = (count / total * 100).toInt()
                 val colorCode = if (isColor) {
                     when (label) {
-                        whiteName -> "W"
-                        blueName -> "U"
-                        blackName -> "B"
-                        redName -> "R"
-                        greenName -> "G"
+                        whiteName     -> "W"
+                        blueName      -> "U"
+                        blackName     -> "B"
+                        redName       -> "R"
+                        greenName     -> "G"
                         colorlessName -> "C"
-                        else -> null
+                        else          -> null
                     }
                 } else null
 
@@ -231,12 +241,13 @@ fun CircularDistribution(
                         ManaSymbolImage(token = colorCode, size = symbolSize)
                     } else {
                         Box(
-                            modifier = Modifier.size(if (isCompact) 8.dp else 10.dp)
+                            modifier = Modifier
+                                .size(if (isCompact) 8.dp else 10.dp)
                                 .clip(CircleShape)
                                 .background(colorMapper(label))
                         )
                     }
-                    
+
                     Text(
                         text = label,
                         style = if (isCompact) ty.labelSmall else ty.labelMedium,
@@ -249,68 +260,11 @@ fun CircularDistribution(
                         text = "$percentage%",
                         style = (if (isCompact) ty.labelSmall else ty.labelMedium).copy(fontWeight = FontWeight.Bold),
                         color = mc.textPrimary,
-                        modifier = Modifier.width(42.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        modifier = Modifier.widthIn(min = 42.dp),
+                        textAlign = TextAlign.End
                     )
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun CircularDistributionPreview() {
-    MagicThemeAndroid {
-        CircularDistribution(
-            data = mapOf(
-                "White" to 45,
-                "Blue" to 30,
-                "Black" to 25,
-                "Red" to 20,
-                "Green" to 15,
-                "Colorless" to 10
-            ),
-            colorMapper = {
-                when (it) {
-                    "White" -> Color(0xFFF9FAF4)
-                    "Blue" -> Color(0xFF0E68AB)
-                    "Black" -> Color(0xFF150B00)
-                    "Red" -> Color(0xFFD3202A)
-                    "Green" -> Color(0xFF00733E)
-                    else -> Color(0xFF90ADBB)
-                }
-            },
-            modifier = Modifier.background(MaterialTheme.magicColors.background)
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun CircularDistributionCompactPreview() {
-    MagicThemeAndroid {
-        CircularDistribution(
-            data = mapOf(
-                "White" to 45,
-                "Blue" to 30,
-                "Black" to 25,
-                "Red" to 20,
-                "Green" to 15,
-                "Colorless" to 10
-            ),
-            colorMapper = {
-                when (it) {
-                    "White" -> Color(0xFFF9FAF4)
-                    "Blue" -> Color(0xFF0E68AB)
-                    "Black" -> Color(0xFF150B00)
-                    "Red" -> Color(0xFFD3202A)
-                    "Green" -> Color(0xFF00733E)
-                    else -> Color(0xFF90ADBB)
-                }
-            },
-            isCompact = true,
-            modifier = Modifier.background(MaterialTheme.magicColors.background)
-        )
     }
 }
