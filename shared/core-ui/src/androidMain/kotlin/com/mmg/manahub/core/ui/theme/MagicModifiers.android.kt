@@ -9,13 +9,18 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-fun Modifier.coloredShadow(
+/**
+ * Android actual: renders a colored shadow using [android.graphics.BlurMaskFilter] and
+ * [android.graphics.Paint.setShadowLayer], which are Android-framework APIs unavailable on
+ * other targets.
+ */
+actual fun Modifier.coloredShadow(
     color: Color,
-    borderRadius: Dp = 0.dp,
-    blurRadius: Dp = 20.dp,
-    offsetX: Dp = 0.dp,
-    offsetY: Dp = 0.dp,
-    spread: Float = 1f,
+    borderRadius: Dp,
+    blurRadius: Dp,
+    offsetX: Dp,
+    offsetY: Dp,
+    spread: Float,
 ): Modifier = this.drawBehind {
     drawIntoCanvas {
         val paint = Paint()
