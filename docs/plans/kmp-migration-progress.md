@@ -439,6 +439,9 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
 
 - ✅ `DeckMagicEngine` → `:shared:core-domain` (`d94e8b6`). `CardTag.displayLabel` added to shared.
   `@IoDispatcher` → `Dispatchers.Default`. `DeckDoctorModule` @Provides added.
+- ✅ CircularDistribution + DeckItem + MagicBottomBar → shared core-ui (`5d4da24`). Painters hoisted
+  as params; SimpleDateFormat → kotlinx-datetime; strings inlined; MagicBottomBar routes parameterized.
+  core-ui now ~48 shared composables.
 
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
 3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.

@@ -6,13 +6,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.mmg.manahub.core.ui.theme.MulishFontFamily
+import com.mmg.manahub.core.ui.theme.magicTypography
 
 @Composable
 fun FloatingDelta(
@@ -32,7 +33,7 @@ fun FloatingDelta(
         delta?.let { d ->
             Text(
                 text       = if (d > 0) "+$d" else "$d",
-                fontFamily = MulishFontFamily,
+                fontFamily = MaterialTheme.magicTypography.bodyMedium.fontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize   = 22.sp,
                 color      = if (d > 0) positiveColor else negativeColor,

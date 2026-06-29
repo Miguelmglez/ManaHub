@@ -32,15 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import com.mmg.manahub.R
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -126,16 +121,16 @@ fun GroupingFlowSelector(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = stringResource(R.string.deckbuilder_group_label),
+                    text = "Group by:",
                     style = ty.labelLarge,
                     color = mc.textSecondary
                 )
                 Text(
                     text = when (selected) {
-                        GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
-                        GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
-                        GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
-                        GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
+                        GroupingMode.TYPE -> "Type"
+                        GroupingMode.COLOR -> "Color"
+                        GroupingMode.COST -> "CMC"
+                        GroupingMode.TAG -> "Tags"
                     },
                     style = ty.labelLarge,
                     color = mc.primaryAccent
@@ -157,10 +152,10 @@ fun GroupingFlowSelector(
         ) {
             GroupingMode.entries.forEachIndexed { index, mode ->
                 val label = when (mode) {
-                    GroupingMode.TYPE -> stringResource(R.string.deckbuilder_group_type)
-                    GroupingMode.COLOR -> stringResource(R.string.deckbuilder_group_color)
-                    GroupingMode.COST -> stringResource(R.string.deckbuilder_group_cmc)
-                    GroupingMode.TAG -> stringResource(R.string.carddetail_tags_section)
+                    GroupingMode.TYPE -> "Type"
+                    GroupingMode.COLOR -> "Color"
+                    GroupingMode.COST -> "CMC"
+                    GroupingMode.TAG -> "Tags"
                 }
                 DropdownMenuItem(
                     text = {
@@ -198,10 +193,7 @@ fun AvatarImage(avatarUrl: String?, initials: String, size: Int, modifier: Modif
     ) {
         if (avatarUrl != null) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarUrl)
-                    .crossfade(true)
-                    .build(),
+                model = avatarUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().clip(CircleShape),
@@ -217,4 +209,3 @@ fun AvatarImage(avatarUrl: String?, initials: String, size: Int, modifier: Modif
         }
     }
 }
-
