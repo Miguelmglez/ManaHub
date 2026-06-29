@@ -40,43 +40,43 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * A standard card representing a deck summary.
- * Used in [com.mmg.manahub.feature.decks.presentation.DeckListScreen] and 
- * [com.mmg.manahub.feature.home.presentation.HomeWidgets].
+ * Used in deck-list screens and home widgets.
  *
- * @param deck       The deck summary data.
- * @param onClick    Callback when the whole card is tapped.
- * @param onDelete   Optional callback for deletion (shows a confirmation dialog).
- * @param onPlaytest Optional callback to start a playtest session.
- * @param reduced    If true, renders a more compact version suitable for widgets/grids.
+ * @param deck            The deck summary data.
+ * @param onClick         Callback when the whole card is tapped.
+ * @param modifier        Optional [Modifier].
+ * @param cardBackPainter Optional painter for the MTG card-back placeholder shown when
+ *                        [DeckSummary.coverImageUrl] is null. Pass `painterResource(R.drawable.mtg_card_back)`
+ *                        from the Android call site. When null, a solid [magicColors.surfaceVariant]
+ *                        box is shown instead.
+ * @param onDelete        Optional callback for deletion (shows a confirmation dialog).
+ * @param onPlaytest      Optional callback to start a playtest session.
+ * @param reduced         If true, renders a more compact version suitable for widgets/grids.
  */
 @Composable
 fun DeckItem(
     deck: DeckSummary,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    cardBackPainter: Painter? = null,
     onDelete: (() -> Unit)? = null,
     onPlaytest: (() -> Unit)? = null,
     reduced: Boolean = false,
@@ -90,7 +90,7 @@ fun DeckItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(
-                horizontal = if (reduced) 0.dp else MaterialTheme.spacing.lg, 
+                horizontal = if (reduced) 0.dp else MaterialTheme.spacing.lg,
                 vertical = if (reduced) 0.dp else MaterialTheme.spacing.sm
             ),
         colors = CardDefaults.cardColors(containerColor = mc.surface),
@@ -105,53 +105,45 @@ fun DeckItem(
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f),
             ) {
+                // Background image (cover art, card back, or solid fill)
                 if (deck.coverImageUrl != null) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(deck.coverImageUrl)
-                            .crossfade(true)
-                            .build(),
+                        model = deck.coverImageUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         alignment = Alignment.TopCenter,
                         modifier = Modifier.fillMaxSize(),
                     )
-                    // Bottom gradient to blend into the card surface
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.6f)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, mc.surface.copy(alpha = 0.9f)),
-                                ),
-                            ),
+                } else if (cardBackPainter != null) {
+                    Image(
+                        painter = cardBackPainter,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    // MTG Card Back Placeholder
-                    Image(
-                        painter = painterResource(id = R.drawable.mtg_card_back),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        alignment = Alignment.TopCenter,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    // Bottom gradient to blend into the card surface
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.6f)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, mc.surface.copy(alpha = 0.9f)),
-                                ),
-                            ),
+                            .fillMaxSize()
+                            .background(mc.surfaceVariant)
                     )
                 }
-                
-                // ── Play Button Overlay ──────────────────────────────────────────
+
+                // Bottom gradient — always shown to blend art into the card surface
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.6f)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, mc.surface.copy(alpha = 0.9f)),
+                            ),
+                        ),
+                )
+
+                // ── Play button overlay ──────────────────────────────────────────
                 if (onPlaytest != null && !reduced) {
                     Surface(
                         onClick = onPlaytest,
@@ -166,7 +158,7 @@ fun DeckItem(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
-                                contentDescription = stringResource(R.string.playtest_action_start),
+                                contentDescription = "Start Playtest",
                                 tint = mc.background,
                                 modifier = Modifier.size(24.dp),
                             )
@@ -174,15 +166,15 @@ fun DeckItem(
                     }
                 }
 
-                // Format badge — top-right overlay
+                // ── Format badge — top-right overlay ────────────────────────────
                 val formatLower = deck.format.lowercase()
                 val formatColor = when (formatLower) {
                     "commander" -> mc.goldMtg.copy(alpha = 0.9f)
-                    "casual" -> mc.primaryAccent.copy(alpha = 0.9f)
-                    "draft" -> mc.secondaryAccent.copy(alpha = 0.9f)
-                    "standard" -> mc.lifePositive.copy(alpha = 0.9f)
-                    "modern" -> mc.lifeNegative.copy(alpha = 0.9f)
-                    else -> mc.surfaceVariant.copy(alpha = 0.9f)
+                    "casual"    -> mc.primaryAccent.copy(alpha = 0.9f)
+                    "draft"     -> mc.secondaryAccent.copy(alpha = 0.9f)
+                    "standard"  -> mc.lifePositive.copy(alpha = 0.9f)
+                    "modern"    -> mc.lifeNegative.copy(alpha = 0.9f)
+                    else        -> mc.surfaceVariant.copy(alpha = 0.9f)
                 }
 
                 Surface(
@@ -195,7 +187,7 @@ fun DeckItem(
                         style = if (reduced) ty.labelSmall else ty.labelLarge,
                         color = if (formatLower == "draft" || formatLower == "casual") mc.onAccent else mc.background,
                         modifier = Modifier.padding(
-                            horizontal = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.md, 
+                            horizontal = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.md,
                             vertical = if (reduced) MaterialTheme.spacing.xxs else MaterialTheme.spacing.xs
                         ),
                     )
@@ -208,9 +200,9 @@ fun DeckItem(
                     .fillMaxWidth()
                     .padding(
                         start = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.md,
-                        end = if (reduced) MaterialTheme.spacing.xs else MaterialTheme.spacing.xs,
-                        top = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.sm,
-                        bottom = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.sm
+                        end = MaterialTheme.spacing.xs,
+                        top = MaterialTheme.spacing.sm,
+                        bottom = MaterialTheme.spacing.sm,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -226,19 +218,18 @@ fun DeckItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    
+
                     if (!reduced) {
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
 
-                        // Card count + updated date
+                        // Card count + last-updated date
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             CardCountBadge(count = deck.cardCount)
                             Text(
-                                text = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-                                    .format(Date(deck.updatedAt)),
+                                text = formatEpochMillis(deck.updatedAt),
                                 style = ty.bodyMedium,
                                 color = mc.textDisabled,
                             )
@@ -247,10 +238,7 @@ fun DeckItem(
                         // Mana identity symbols
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         if (deck.colorIdentity.isNotEmpty()) {
-                            ColorIdentityRow(
-                                colorIdentity = deck.colorIdentity, 
-                                size = 18.dp
-                            )
+                            ColorIdentityRow(colorIdentity = deck.colorIdentity, size = 18.dp)
                         } else {
                             Spacer(Modifier.height(18.dp))
                         }
@@ -282,10 +270,7 @@ fun DeckItem(
 
                             // Mana identity symbols
                             if (deck.colorIdentity.isNotEmpty()) {
-                                ColorIdentityRow(
-                                    colorIdentity = deck.colorIdentity, 
-                                    size = 14.dp
-                                )
+                                ColorIdentityRow(colorIdentity = deck.colorIdentity, size = 14.dp)
                             } else {
                                 Spacer(Modifier.height(14.dp))
                             }
@@ -294,12 +279,11 @@ fun DeckItem(
                 }
 
                 if (!reduced) {
-                    // Delete button
                     if (onDelete != null) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(
                                 Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
+                                contentDescription = "Delete",
                                 tint = mc.textDisabled,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -315,14 +299,14 @@ fun DeckItem(
             onDismissRequest = { showDeleteDialog = false },
             title = {
                 Text(
-                    text = stringResource(R.string.decklist_delete_title),
+                    text = "Delete deck",
                     style = ty.titleMedium,
                     color = mc.textPrimary,
                 )
             },
             text = {
                 Text(
-                    text = stringResource(R.string.decklist_delete_message, deck.name),
+                    text = "Delete \"${deck.name}\"? This cannot be undone.",
                     style = ty.bodyMedium,
                     color = mc.textSecondary,
                 )
@@ -330,7 +314,7 @@ fun DeckItem(
             confirmButton = {
                 TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
                     Text(
-                        text = stringResource(R.string.action_delete),
+                        text = "Delete",
                         style = ty.labelLarge,
                         color = mc.lifeNegative,
                     )
@@ -339,7 +323,7 @@ fun DeckItem(
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text(
-                        text = stringResource(R.string.action_cancel),
+                        text = "Cancel",
                         style = ty.labelLarge,
                         color = mc.primaryAccent,
                     )
@@ -350,6 +334,22 @@ fun DeckItem(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Internal helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Formats an epoch-millis timestamp as a short date string, e.g. "Jun 29, 2026".
+ * Uses [kotlinx.datetime] so it compiles on all KMP targets without JVM-only APIs.
+ */
+private fun formatEpochMillis(epochMillis: Long): String {
+    val local = Instant.fromEpochMilliseconds(epochMillis)
+        .toLocalDateTime(TimeZone.currentSystemDefault())
+    val monthAbbr = local.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+    return "$monthAbbr ${local.dayOfMonth}, ${local.year}"
+}
+
+/** Chip showing the number of cards in a deck. */
 @Composable
 private fun CardCountBadge(count: Int) {
     val mc = MaterialTheme.magicColors
@@ -358,11 +358,11 @@ private fun CardCountBadge(count: Int) {
         shape = ChipShape,
     ) {
         Text(
-            text = stringResource(R.string.decklist_card_count, count),
+            text = "$count cards",
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.secondaryAccent,
             modifier = Modifier.padding(
-                horizontal = MaterialTheme.spacing.sm, 
+                horizontal = MaterialTheme.spacing.sm,
                 vertical = MaterialTheme.spacing.xxs
             ),
         )
@@ -373,11 +373,10 @@ private fun CardCountBadge(count: Int) {
 @Composable
 private fun ColorIdentityRow(colorIdentity: Set<String>, size: Dp = 18.dp) {
     val wubrgOrder = listOf("W", "U", "B", "R", "G")
-    val sorted = colorIdentity
-        .sortedBy { code ->
-            val idx = wubrgOrder.indexOf(code.uppercase())
-            if (idx >= 0) idx else 99
-        }
+    val sorted = colorIdentity.sortedBy { code ->
+        val idx = wubrgOrder.indexOf(code.uppercase())
+        if (idx >= 0) idx else 99
+    }
 
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         sorted.forEach { code ->
@@ -385,63 +384,6 @@ private fun ColorIdentityRow(colorIdentity: Set<String>, size: Dp = 18.dp) {
         }
         if (sorted.isEmpty()) {
             ManaSymbolImage(token = "C", size = size)
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Previews
-// ─────────────────────────────────────────────────────────────────────────────
-
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Full Deck Item")
-@Composable
-private fun DeckItemPreview() {
-    val deck = DeckSummary(
-        id = "1",
-        name = "Sauron's Shadow",
-        description = "A powerful Grixis deck.",
-        format = "commander",
-        coverCardId = null,
-        createdAt = 0L,
-        updatedAt = System.currentTimeMillis(),
-        cardCount = 100,
-        colorIdentity = setOf("U", "B", "R"),
-        coverImageUrl = null
-    )
-    MaterialTheme {
-        Box(Modifier.padding(16.dp)) {
-            DeckItem(
-                deck = deck,
-                onClick = {},
-                onDelete = {},
-                onPlaytest = {}
-            )
-        }
-    }
-}
-
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Reduced Deck Item")
-@Composable
-private fun DeckItemReducedPreview() {
-    val deck = DeckSummary(
-        id = "2",
-        name = "Mono Red Aggro",
-        description = null,
-        format = "standard",
-        coverCardId = null,
-        createdAt = 0L,
-        updatedAt = System.currentTimeMillis(),
-        cardCount = 60,
-        colorIdentity = setOf("R"),
-        coverImageUrl = null
-    )
-    MaterialTheme {
-        Box(Modifier.padding(16.dp).width(160.dp)) {
-            DeckItem(
-                deck = deck,
-                onClick = {},
-                reduced = true
-            )
         }
     }
 }

@@ -43,6 +43,8 @@ import androidx.navigation.navDeepLink
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.push.ForegroundScreenTracker
 import com.mmg.manahub.core.push.PushDeeplinkRouter
+import androidx.compose.ui.res.painterResource
+import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -207,6 +209,9 @@ fun AppNavGraph(
                 if (currentRoute in bottomBarRoutes && !isInPiP) {
                     MagicBottomBar(
                         currentRoute = currentRoute,
+                        homeRoute = Screen.Home.route,
+                        collectionBaseRoute = Screen.Collection.baseRoute,
+                        gamePainter = painterResource(R.drawable.ic_battle),
                         onHomeClick = { navController.navigateTab(Screen.Home.route) },
                         onPlayClick = {
                             if (hasActiveGame) {
@@ -220,7 +225,7 @@ fun AppNavGraph(
                                 navController.navigate(Screen.GameSetup.baseRoute)
                             }
                         },
-                        onLibraryClick = { 
+                        onLibraryClick = {
                             navController.navigate(Screen.Collection.baseRoute) {
                                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                                 launchSingleTop = true
