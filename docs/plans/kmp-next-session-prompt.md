@@ -32,65 +32,83 @@ git log --oneline -5               # local HEAD
   gauntlet** on it FIRST — it may already be green. If green → commit it as its slice + update the
   tracker. If red → repair via the architect, or `git stash` and report. Do NOT discard work blindly.
 
-### Step 3 — Current state (as of 2026-06-25)
+### Step 3 — Current state (as of 2026-06-30)
 
-**308 shared `.kt` files** in `commonMain` across 5 modules:
-- `:shared:core-model` ~105 types (domain models, gamification, game, deck, trade, friend, draft, playtest)
-- `:shared:core-domain` ~70 files (repo interfaces, use cases, gamification catalogs, deck engine)
+**~330 shared `.kt` files** in `commonMain` across 5 modules:
+- `:shared:core-model` ~115 types (domain models, gamification, game, deck, trade, friend, draft,
+  playtest; + `EliminationReason`, `GameSessionData`/`PlayerSaveData`/`PlayerResultData`,
+  `DeckStats`, `GameModeCount`, `EliminationStats`, `SessionHistoryEntry`, `SessionDetail`,
+  `CardConstants`)
+- `:shared:core-domain` ~85 files (repo interfaces + use cases + gamification catalogs + deck engine;
+  + `GameSessionRepository` [pure, no Room types], + 9 deck use cases + `BudgetOptimizer` +
+  `CandidatePoolGenerator`)
 - `:shared:core-data` ~65 files (Ktor clients, DTOs, rate-limit queues, trade use cases, repo impls)
-- `:shared:core-ui` ~42 files (theme, 27+ composables incl. ManaCostImage/ManaColorPicker, InlineIcons)
+- `:shared:core-ui` ~50 files (theme, 33+ composables; + `FloatingDelta`, `GameModeSelector`,
+  `SharedComponents`, `AddCardSheet`, `TradeSelectionSheet`, `VariantSelectorSheet`;
+  + `coloredShadow` expect/actual; + `GameResultMapper`)
 - `:shared:core-common` ~4 files (DispatcherProvider, KeyValueStore, CrashReporter, Page)
 
-**Phase 1 (Hilt→Koin):** COMPLETE — 20 Koin islands, all non-excluded features.
-**Phase 2 (data layer):** SUBSTANTIALLY COMPLETE — Retrofit fully removed, 6 Ktor clients, 19 repo
-interfaces shared, ~75 use cases shared.
-**Phase 3 (UI):** SUBSTANTIALLY COMPLETE — 42 composables in core-ui, design system fully shared.
-**Phase 4 (platform parity):** LARGELY COMPLETE — `java.time` eliminated, `@StringRes`/`R.string`
-eliminated from gamification + game models, Deck Doctor engine shared, all low-hanging fruit picked.
+**Phase 1 (Hilt→Koin):** COMPLETE.
+**Phase 2 (data layer):** SUBSTANTIALLY COMPLETE — Retrofit removed, 6 Ktor clients, 20 repo
+interfaces shared (incl. `GameSessionRepository` now pure in core-domain), ~85 use cases shared.
+**Phase 3 (UI):** SUBSTANTIALLY COMPLETE — 33+ composables in core-ui, design system fully shared.
+**Phase 4 (platform parity):** IN PROGRESS — `java.time` eliminated, `@StringRes`/`R.string`
+eliminated from all shared code, Deck Doctor engine shared, `GameSessionRepository` domain projections
+extracted and interface moved to core-domain. Remaining: `TournamentRepository`, blocked use cases,
+remaining composables.
 
-Test baseline: **1964 tests, 123 failed** (122 pre-existing + 1 noise), 0 skipped.
+Test baseline: **1964 tests, 122 failed** (pre-existing), 2 skipped.
+
+Recent commits (most recent first):
+- `17f62a6` KMP Phase 4: GameSessionRepository → shared core-domain
+- `b49d68d` docs(kmp): update progress tracker
+- `1328a6a` KMP Phase 4: 9 deck use cases + BudgetOptimizer + CandidatePoolGenerator → core-domain
+- `996b0ff` KMP Phase 4: AddCardSheet/TradeSelectionSheet/VariantSelectorSheet + coloredShadow expect/actual
+- `ac787c6` KMP Phase 4: FloatingDelta/GameModeSelector/SharedComponents/CardConstants → shared
 
 ### Step 4 — Remaining work (Tier 3/4 — deeper infrastructure)
 
-These are the items left. Work them in priority order, delegating each to `android-kotlin-architect`:
+Work in priority order, delegating each to `android-kotlin-architect`:
 
-1. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
-   Approach: extract the `CardTag.label` extension to a shared file (it maps `TagCategory` → String,
-   both already shared), then strip `@IoDispatcher` and move the engine. ~2 files to share first.
+1. **`TournamentRepository` domain projection extraction** — same pattern as `GameSessionRepository`
+   (just completed). Interface is in `:app` and uses `TournamentEntity`, `TournamentMatchEntity`,
+   `TournamentPlayerEntity`, `TournamentStanding` (all Room types). Extract pure domain equivalents
+   to `core-model`, move interface to `core-domain`. This unblocks tournament use cases.
+   Files to read first:
+   - `app/.../feature/tournament/domain/repository/TournamentRepository.kt`
+   - `app/.../core/data/local/entity/TournamentEntity.kt` (+ Match, Player, Standing variants)
+   - Callers: `TournamentViewModel`, `GenerateNextRoundUseCase`, `CalculateStandingsUseCase`,
+     `RecordMatchResultUseCase`
 
-2. **Remaining composables in `:app`** — each has specific blockers:
-   - `CircularDistribution` — `ManaSymbolImage` (DONE), but still has `stringResource(R.string.*)`.
-   - `DeckItem` — `painterResource(R.drawable.mtg_card_back)` + `SimpleDateFormat` + 6 string resources.
-   - `VariantSelectorSheet`, `AddCardSheet`, `TradeSelectionSheet` — heavy string resources (6+ each).
-   - `ManaCurveChart` — `android.graphics.Paint`/`Typeface` → need expect/actual Canvas.
-   - `MagicBottomBar` — `Screen` sealed class + `R.drawable` icons.
-   - `CardSearchSheet` — `android.app.Activity` reference.
-   Approach: for string-heavy composables, inline English strings (proven pattern). For drawables,
-   hoist as `Painter?` params (proven with NewsItemCard). For android.graphics, use expect/actual.
+2. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
+   Extract `CardTag.label` extension to shared file (maps `TagCategory` → String, both shared), then
+   strip `@IoDispatcher` and move the engine.
 
-3. **Room-backed repository impls** — Card, Deck, Stats, UserCard, GameSession, Tournament repos
-   have Android-only Room implementations. For KMP: the repo INTERFACES are already shared; the Room
-   impls stay in `androidMain`. For web, fresh Supabase-backed impls behind the same interface go in
-   `wasmJsMain`. This is a Phase 4/5 task — define the DAO-abstraction approach first.
+3. **Remaining composables in `:app`** — blockers per composable:
+   - `CircularDistribution` — still has `stringResource(R.string.*)` (inline English, proven pattern).
+   - `DeckItem` — `painterResource(R.drawable.mtg_card_back)` (hoist as `Painter?` param) +
+     `SimpleDateFormat` (replace with pure Kotlin date arithmetic) + string resources (inline).
+   - `ManaCurveChart` — `android.graphics.Paint`/`Typeface` → expect/actual (same pattern as
+     `coloredShadow` which was completed this session).
+   - `MagicBottomBar` — `Screen` sealed class (`:app`) + `R.drawable` icons (hoist as params).
+   - `CardSearchSheet` — `android.app.Activity` reference (hardblocked; defer).
 
-4. **Repository interfaces with Room types** — `GameSessionRepository` and `TournamentRepository`
-   use Room entities/projections in their interface signatures. Need domain model equivalents extracted
-   to replace the Room types in the interface, then the interface can move to core-domain.
+4. **`StatsViewModel` DAO-direct violation** — imports `GameSessionDao` directly (bypasses
+   `GameSessionRepository`). Route `observeFavoriteMode()` through the repo interface.
+   File: `app/.../feature/stats/presentation/StatsViewModel.kt` line ~133.
 
-5. **~25 blocked use cases** — depend on Room DAOs, Firebase Crashlytics, tournament engine types,
-   or `DeckMagicEngine`. Unblocked incrementally as their deps move.
+5. **~20 blocked use cases** — `GetDeckGameStatsUseCase` (Room DAOs), tournament use cases
+   (unblocked by item 1), `ClaimQuestRewardUseCase` (GamificationDao), `ComputeCardTagsUseCase`
+   (Gson tag mapper — replace with kotlinx-serialization or manual parser).
 
-6. **`ComputeCardTagsUseCase`** — blocked on Gson-based tag mapper. Replace with
-   kotlinx-serialization or a manual parser.
-
-7. **EXCLUDED features** (online/voice/scanner) — deferred per user directive. Do NOT touch.
+6. **EXCLUDED features** (online/voice/scanner) — deferred. Do NOT touch.
 
 ### Step 5 — Hard rules (non-negotiable)
 - Work **only** on `feature/kmp-migration`. **Never** merge or push to `master`.
 - **Excluded & untouched** (still Hilt + Android Compose): `feature/online`, `core/voice` + in-game
   voice, `feature/scanner`. If a slice would touch them → stop and report instead.
 - **One slice = one logical code commit + one tracker commit. Android GREEN at every commit.**
-- Verify gauntlet baseline: **1964 tests, 123 failed** (pre-existing; the failing-test-CLASS set must
+- Verify gauntlet baseline: **1964 tests, 122 failed** (pre-existing; the failing-test-CLASS set must
   not grow). Leak grep over `shared/*/src/commonMain` must show no `import androidx`/`android.`/`java.`
   lines (except `java.util.UUID` → use `kotlin.uuid.Uuid`).
 - **`--rerun-tasks`** on build verification — Gradle stale cache causes false `Unresolved reference`
