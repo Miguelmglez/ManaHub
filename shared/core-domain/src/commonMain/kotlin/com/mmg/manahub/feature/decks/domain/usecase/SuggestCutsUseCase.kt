@@ -1,14 +1,13 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Ranks the deck's mainboard cards as cut candidates (worst fit first).
@@ -21,9 +20,9 @@ import javax.inject.Inject
  * mainboard slots to a [DeckEntry] list and reuses the [DeckProfile] already built by
  * [EvaluateDeckUseCase] for the Health view. This keeps it trivially testable.
  */
-class SuggestCutsUseCase @Inject constructor(
+class SuggestCutsUseCase(
     private val deckScorer: DeckScorer,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     /**

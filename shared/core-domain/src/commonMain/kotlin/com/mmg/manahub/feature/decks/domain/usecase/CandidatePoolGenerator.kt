@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
@@ -11,8 +10,10 @@ import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator.Companion.MAX_QUERIES
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator.Companion.STRATEGY_OTAGS
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
+import kotlin.math.abs
+import kotlin.math.round
 
 /**
  * Builds an EXTERNAL (Scryfall) candidate pool of cards the deck does not yet own, targeted at the
@@ -55,9 +56,9 @@ import javax.inject.Inject
  * re-query per role whose otag came back empty), keeping the burst well within the queue's ≤10 req/s
  * budget. Results are merged, de-duplicated by `scryfallId` and sorted by `edhrecRank` (nulls last).
  */
-class CandidatePoolGenerator @Inject constructor(
+class CandidatePoolGenerator(
     private val cardRepository: CardRepository,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
     /**
@@ -132,7 +133,7 @@ class CandidatePoolGenerator @Inject constructor(
                 primaryCards
             }
 
-            cards.take(perRoleLimit).forEach { card -> merged.putIfAbsent(card.scryfallId, card) }
+            cards.take(perRoleLimit).forEach { card -> merged.getOrPut(card.scryfallId) { card } }
         }
 
         // D4 — pool ordering. Commander keeps the EDHREC pre-sort (a meaningful popularity signal
@@ -226,9 +227,22 @@ class CandidatePoolGenerator @Inject constructor(
         com.mmg.manahub.core.model.DeckFormat.DRAFT -> null
     }
 
-    /** Renders a numeric cap without locale decimal separators (Scryfall expects a dot). */
-    private fun formatCap(value: Double): String =
-        if (value % 1.0 == 0.0) value.toInt().toString() else String.format(java.util.Locale.US, "%.2f", value)
+    /**
+     * Renders a numeric cap to at most 2 decimal places without [java.util.Locale] (KMP-safe).
+     *
+     * Whole numbers are rendered without a decimal point (e.g. `5.0` → `"5"`). Non-integer values
+     * are rounded to the nearest cent via pure integer arithmetic and formatted with exactly 2
+     * decimal digits (e.g. `5.755` → `"5.76"`, `3.5` → `"3.50"`). Scryfall expects a dot as the
+     * decimal separator, which this function guarantees by construction — no [java.util.Locale] needed.
+     */
+    private fun formatCap(value: Double): String {
+        if (value % 1.0 == 0.0) return value.toLong().toString()
+        // Round to nearest cent using integer arithmetic to avoid Locale-dependent formatting.
+        val cents = round(value * 100.0).toLong()
+        val intPart = cents / 100L
+        val fracPart = abs(cents % 100L)
+        return "$intPart.${fracPart.toString().padStart(2, '0')}"
+    }
 
     private fun ManaColor.wubrgSymbolOrNull(): String? = when (this) {
         ManaColor.W, ManaColor.U, ManaColor.B, ManaColor.R, ManaColor.G -> symbol
@@ -276,7 +290,7 @@ class CandidatePoolGenerator @Inject constructor(
  *
  * The fragments below are CONSTANTS — never interpolate dynamic text here.
  */
-internal fun DeckRole.queryFragment(): String? = when (this) {
+fun DeckRole.queryFragment(): String? = when (this) {
     DeckRole.BOARD_WIPE -> "otag:board-wipe"
     DeckRole.SPOT_REMOVAL -> "otag:removal"
     DeckRole.CARD_ADVANTAGE -> "otag:card-advantage"
@@ -296,7 +310,7 @@ internal fun DeckRole.queryFragment(): String? = when (this) {
  * Scryfall's documented grammar, so this substring net catches the case where a tag is rejected or
  * renamed server-side. Mirrors the role set of [queryFragment]; CONSTANTS only.
  */
-internal fun DeckRole.fallbackQueryFragment(): String? = when (this) {
+fun DeckRole.fallbackQueryFragment(): String? = when (this) {
     DeckRole.BOARD_WIPE -> "(o:\"destroy all\" OR o:\"each player sacrifices\")"
     DeckRole.SPOT_REMOVAL -> "(o:\"destroy target\" OR o:\"exile target\")"
     DeckRole.CARD_ADVANTAGE -> "o:\"draw a card\""
