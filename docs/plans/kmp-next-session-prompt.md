@@ -34,41 +34,39 @@ git log --oneline -5               # local HEAD
 
 ### Step 3 — Current state (as of 2026-06-30)
 
-**~332 shared `.kt` files** in `commonMain` across 5 modules:
+**~340 shared `.kt` files** in `commonMain` across 5 modules:
 - `:shared:core-model` ~120 types (domain models, gamification, game, deck, trade, friend, draft,
   playtest; + `EliminationReason`, `GameSessionData`/`PlayerSaveData`/`PlayerResultData`,
   `DeckStats`, `GameModeCount`, `EliminationStats`, `SessionHistoryEntry`, `SessionDetail`,
   `CardConstants`; + `Tournament`, `TournamentMatch`, `TournamentPlayer`, `TournamentStanding`;
   + `ArchetypeMatchupData`)
-- `:shared:core-domain` ~89 files (repo interfaces + use cases + gamification catalogs + deck engine;
-  + `GameSessionRepository` [pure, no Room types — 3 new methods added: `observePendingSurveyCount`,
-  `observeLocalDeckGameStats`, `observeArchetypeMatchups`]; + `TournamentRepository` +
-  `MatchResultOutcome` [pure, no Room types]; + 9 deck use cases + `BudgetOptimizer` +
-  `CandidatePoolGenerator`; + `CalculateStandingsUseCase` + `RecordMatchResultUseCase`)
-- `:shared:core-data` ~65 files (Ktor clients, DTOs, rate-limit queues, trade use cases, repo impls)
-- `:shared:core-ui` ~50 files (theme, 33+ composables; + `FloatingDelta`, `GameModeSelector`,
-  `SharedComponents`, `AddCardSheet`, `TradeSelectionSheet`, `VariantSelectorSheet`;
-  + `coloredShadow` expect/actual; + `GameResultMapper`)
+- `:shared:core-domain` ~95 files (repo interfaces + use cases + gamification catalogs + deck engine;
+  + `GameSessionRepository` [pure, no Room types]; + `TournamentRepository` + `MatchResultOutcome`;
+  + 9 deck use cases + `BudgetOptimizer` + `CandidatePoolGenerator`;
+  + `CalculateStandingsUseCase` + `RecordMatchResultUseCase`;
+  + `TournamentIdCodec` + `StandingsCalculator` + `SwissEngine` + `SingleEliminationEngine`
+  + `GenerateNextRoundUseCase` [all pure, domain types only, wasmJs clean])
+- `:shared:core-data` ~68 files (Ktor clients, DTOs, rate-limit queues, trade use cases, repo impls;
+  + `ComputeCardTagsUseCase` + `TagJsonMapper` [kotlinx-serialization, Gson fully removed from use case])
+- `:shared:core-ui` ~54 files (theme, 33+ composables; + `coloredShadow` expect/actual; + `GameResultMapper`)
 - `:shared:core-common` ~4 files (DispatcherProvider, KeyValueStore, CrashReporter, Page)
 
 **Phase 1 (Hilt→Koin):** COMPLETE.
-**Phase 2 (data layer):** SUBSTANTIALLY COMPLETE — Retrofit removed, 6 Ktor clients, 21 repo
-interfaces shared (incl. `GameSessionRepository` + `TournamentRepository` now pure in core-domain),
-~89 use cases shared.
-**Phase 3 (UI):** SUBSTANTIALLY COMPLETE — 33+ composables in core-ui, design system fully shared.
+**Phase 2 (data layer):** SUBSTANTIALLY COMPLETE — Retrofit removed, 6 Ktor clients, all repo
+interfaces + use cases that can be shared are shared.
+**Phase 3 (UI):** SUBSTANTIALLY COMPLETE — 50+ composables in core-ui, design system fully shared.
 **Phase 4 (platform parity):** IN PROGRESS — `java.time` eliminated, `@StringRes`/`R.string`
-eliminated from all shared code, Deck Doctor engine shared. `GameSessionRepository` now complete
-(no Room types; `StatsViewModel` DAO-direct violation fixed). `TournamentRepository` + 2 tournament
-use cases (`CalculateStandingsUseCase`, `RecordMatchResultUseCase`) in core-domain.
+eliminated from all shared code. Tournament engine cluster fully shared (5 engine files + use case).
+`ComputeCardTagsUseCase` now kotlinx-serialization (no Gson in shared code).
 
 Test baseline: **1964 tests, 123 failed** (pre-existing), 2 skipped.
 
 Recent commits (most recent first):
-- (latest) KMP Phase 4: Stats DAO violation + tournament use cases → core-domain
+- `06ac4a0` KMP Phase 4: ComputeCardTagsUseCase Gson→kotlinx-serialization → shared core-data
+- `97e665f` KMP Phase 4: tournament engine cluster + GenerateNextRoundUseCase → shared core-domain
+- (prior) KMP Phase 4: Stats DAO violation + tournament use cases → core-domain
 - `f8db684` KMP Phase 4: TournamentRepository → shared core-domain + CalculateStandingsUseCase fix
 - `17f62a6` KMP Phase 4: GameSessionRepository → shared core-domain
-- `b49d68d` docs(kmp): update progress tracker
-- `1328a6a` KMP Phase 4: 9 deck use cases + BudgetOptimizer + CandidatePoolGenerator → core-domain
 
 ### Step 4 — Remaining work (Tier 3/4 — deeper infrastructure)
 
@@ -80,15 +78,11 @@ Work in priority order, delegating each to `android-kotlin-architect`:
    - `CardSearchSheet` — `android.app.Activity` reference (hardblocked; defer).
 
 2. **Blocked use cases:**
-   - ❌ `GenerateNextRoundUseCase` — `plan()` takes `TournamentDao`/`TournamentEntity`/
-     `TournamentMatchEntity`/`TournamentPlayerEntity` as params (Room types in signature); needs
-     domain model equivalents of those Room entities first.
    - ❌ `GetDeckGameStatsUseCase` — injects `GameSessionDao` + `SurveyAnswerDao` + `CardDao`
      directly; needs 3+ new repo methods + domain types first.
    - `EvaluatePlayerEliminationUseCase` — `Player` in core-ui → core-domain can't dep on core-ui.
    - `GetAccountNudgeUseCase` — presentation dep.
    - `ClaimQuestRewardUseCase` — GamificationDao dep.
-   - `ComputeCardTagsUseCase` — Gson tag mapper.
 
 3. **Repository interfaces still carrying Room types** — `CardRepository`, `DeckRepository`,
    `UserCardRepository`, `StatsRepository` interfaces carry entity/DAO types. Extract domain

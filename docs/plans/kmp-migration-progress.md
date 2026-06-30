@@ -521,9 +521,10 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
      `TournamentModule.provideCalculateStandingsUseCase` added, package UNCHANGED).
    - ✅ `RecordMatchResultUseCase` → `:shared:core-domain` DONE 2026-06-30 (`@Inject` stripped,
      `TournamentModule.provideRecordMatchResultUseCase` added, package UNCHANGED).
-   - ❌ BLOCKER: `GenerateNextRoundUseCase` — `plan()` takes `TournamentDao`/`TournamentEntity`/
-     `TournamentMatchEntity`/`TournamentPlayerEntity` as parameters (Room types in signature);
-     needs domain model equivalents of those Room entities first.
+   - ✅ `GenerateNextRoundUseCase` → `:shared:core-domain` DONE 2026-06-30 (domain types as params
+     replacing Room entities; `TournamentMatch.toEntity()` reverse mapper added to
+     `TournamentRepositoryImpl`; `toSortedSet()` JVM-only → `distinct().sorted()` for wasmJs;
+     dead `invoke()` deleted; `TournamentModule.provideGenerateNextRoundUseCase` added).
    - ❌ BLOCKER: `GetDeckGameStatsUseCase` — injects `GameSessionDao` + `SurveyAnswerDao` +
      `CardDao` directly + takes a DAO-type `SessionSummary` result; needs 3+ new repo methods and
      domain types before it can move.
@@ -533,7 +534,9 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
    - `UpdateTradeCollectionUseCase` — Room DAO dep.
    - `ClaimQuestRewardUseCase` — Room DAO dep.
    - Online/excluded use cases — deferred per plan.
-8. **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
+8. ✅ **`ComputeCardTagsUseCase`** — DONE 2026-06-30 (Gson mapper → `TagJsonMapper.kt` with
+   kotlinx-serialization in `:shared:core-data` commonMain; `@Inject` stripped;
+   `SharedDomainUseCaseModule.provideComputeCardTagsUseCase` added).
 9. **EXCLUDED features** (online, voice, scanner) — deferred per plan.
 
 ---
@@ -654,6 +657,32 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-30 — **Phase 4: tournament engine cluster + GenerateNextRoundUseCase → `:shared:core-domain`
+  + ComputeCardTagsUseCase Gson→kotlinx-serialization → `:shared:core-data` (GREEN, `97e665f`+`06ac4a0`).**
+  **Slice 1 (tournament engines):** `TournamentIdCodec`, `StandingsCalculator`, `SwissEngine`,
+  `SingleEliminationEngine`, `GenerateNextRoundUseCase` `git mv`'d to `:shared:core-domain` `commonMain`.
+  All 5 engine files decoupled from Room entity types — `TournamentMatch`/`Player`/`Tournament` domain
+  models replace `TournamentMatchEntity`/`TournamentPlayerEntity`/`TournamentEntity` throughout. Key
+  changes: `TournamentMatch.toEntity()` reverse mapper added to `TournamentRepositoryImpl` so the
+  DAO lambda boundary (`finishMatchAndAdvanceAtomically buildAdvancement: (List<TournamentMatchEntity>) ->
+  Pair<List<TournamentMatchEntity>, AdvanceKind>`) remains UNCHANGED — entity↔domain conversion happens
+  only inside the lambda. `StandingsCalculator.calculate()` + `SwissEngine.generateNextRound()` +
+  `SingleEliminationEngine.generateNextRound()/isFinalRoundComplete()` all take domain types now.
+  `GenerateNextRoundUseCase`: plain class (no `@Inject`/`@Singleton`), dead `invoke()` DELETED,
+  `AdvancementPlan.matchesToInsert` is `List<TournamentMatch>`, `TournamentModule.provideGenerateNextRoundUseCase`
+  added. **KMP fix:** `toSortedSet()` (JVM-only `TreeSet`) → `distinct().sorted()` + `.toSet()` (stdlib,
+  all targets). Self-referential import + dead `var order` removed from `SingleEliminationEngine`.
+  Test fixtures in `TournamentEngineTest` + `GenerateNextRoundPlanTest` updated to domain types;
+  no-arg useCase construction. Verified: assembleDebug GREEN; `compileKotlinWasmJs` GREEN;
+  testDebugUnitTest 1964/123/2 (== baseline); 0 platform imports in commonMain.
+  **Slice 2 (ComputeCardTagsUseCase):** `ComputeCardTagsUseCase` `git mv`'d to `:shared:core-data`
+  `commonMain` (already relocated by Slice 1 rename detection; content changes in Slice 2 commit).
+  New `TagJsonMapper.kt` in same package — file-private `TagRecord @Serializable` DTO + `internal
+  String.toTagList()` with `Json { ignoreUnknownKeys = true }`; unrecognised `TagCategory` falls back
+  to `CUSTOM`; blank/malformed → empty list (never throws). `@Inject`/`javax.inject.*` stripped;
+  Gson `core.data.local.mapper.toTagList` import replaced with local kotlinx-serialization version.
+  `SharedDomainUseCaseModule.provideComputeCardTagsUseCase` added. Verified: assembleDebug GREEN;
+  `core-data:compileKotlinWasmJs` GREEN (clean, no warnings); 0 platform imports in commonMain.
 - 2026-06-30 — **Phase 4: `StatsViewModel` DAO-direct violation fixed + `CalculateStandingsUseCase`
   + `RecordMatchResultUseCase` → `:shared:core-domain` (GREEN).**
   (1) `StatsViewModel` was injecting `GameSessionDao` directly and calling 9 DAO methods, bypassing
