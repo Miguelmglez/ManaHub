@@ -382,8 +382,8 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
 target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
 
-**308 shared `.kt` files** across 5 modules as of 2026-06-25.
-Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 errors, 0 skipped.
+**308 shared `.kt` files** across 5 modules as of 2026-06-25 (higher by session end 2026-06-30).
+Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 errors, 2 skipped.
 
 **Phase 4 completed (2026-06-24):**
 - ✅ `kotlinx-datetime` 0.6.2 added to all shared modules + `:app`
@@ -449,7 +449,10 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
   9/6/4 stringResource → English literals; coloredShadow split to expect/actual (Android:
   BlurMaskFilter, wasmJs: no-op; defaults on expect only — KMP rule). core-ui now ~54 shared composables.
   Remaining in :app/core/ui/components/: CardSearchSheet (Activity/Context hard blockers),
-  ManaCurveChart (android.graphics), ParticipantListRow/RoomCodeDisplay/RoomCodeField (online-excluded).
+  ParticipantListRow/RoomCodeDisplay/RoomCodeField (online-excluded).
+  ✅ ManaCurveChart (`750ce9a`, 2026-06-30) → shared core-ui; android.graphics.Paint/Typeface/nativeCanvas.drawText
+  replaced with CMP `rememberTextMeasurer()` + `DrawScope.drawText`; `legendLabel: String` param replaces
+  `stringResource(R.string.deckbuilder_ideal_curve)`.
 - ✅ **9 deck use cases → `:shared:core-domain` `commonMain` (2026-06-29).** Full package
   `com.mmg.manahub.feature.decks.domain.usecase` moved — all 9 files that were in `:app`:
   `BudgetOptimizer`, `BudgetConstraints`, `BudgetSelection` (in BudgetOptimizer.kt),
@@ -528,11 +531,22 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
    - ❌ BLOCKER: `GetDeckGameStatsUseCase` — injects `GameSessionDao` + `SurveyAnswerDao` +
      `CardDao` directly + takes a DAO-type `SessionSummary` result; needs 3+ new repo methods and
      domain types before it can move.
-   - `EvaluatePlayerEliminationUseCase` — `Player` in core-ui → core-domain can't dep on core-ui.
+   - ✅ `EvaluatePlayerEliminationUseCase` → `:shared:core-domain` DONE 2026-06-30 (`0afbad9`).
+     `PlayerState` interface added to `:shared:core-model` (life/poison/commanderDamage);
+     `Player` in core-ui now implements `PlayerState` (3 override fields, zero callsite change);
+     use case param changed from `Player` → `PlayerState`; `@Inject` stripped; `GameModule.companion`
+     `@Provides @Singleton` added. Package UNCHANGED → zero consumer import edits.
+   - ✅ `ClaimQuestRewardUseCase` → `:shared:core-domain` DONE 2026-06-30 (`d46b2d2`). Circular dep
+     (`GamificationRepositoryImpl` was injecting the use case) eliminated by decomposing `claimQuest()`
+     into 3 repo primitives (`getQuestForClaim`/`grantQuestClaimXp`/`markQuestClaimed`);
+     `GamificationRepository` interface updated; use case ctor takes `GamificationRepository + Clock`
+     (no `@Inject`); `GamificationModule.companion` `@Provides @Singleton` added; `ProfileViewModel`
+     injects use case directly; Koin bridge via `profileKoinModule` + `ManaHubApp`; tests updated
+     (now mock the repository boundary, not the DAO). `QuestClaimData` + `GrantResult` domain models
+     added to `core-domain`. `ManaCurveChart` → shared core-ui also done in this session (`750ce9a`).
    - `GetAccountNudgeUseCase` — presentation dep.
    - `ImportCommunityDeckUseCase` — Firebase Crashlytics dep.
    - `UpdateTradeCollectionUseCase` — Room DAO dep.
-   - `ClaimQuestRewardUseCase` — Room DAO dep.
    - Online/excluded use cases — deferred per plan.
 8. ✅ **`ComputeCardTagsUseCase`** — DONE 2026-06-30 (Gson mapper → `TagJsonMapper.kt` with
    kotlinx-serialization in `:shared:core-data` commonMain; `@Inject` stripped;
