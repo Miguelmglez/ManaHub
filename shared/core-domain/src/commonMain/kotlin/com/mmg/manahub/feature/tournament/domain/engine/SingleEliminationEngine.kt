@@ -1,8 +1,6 @@
 package com.mmg.manahub.feature.tournament.domain.engine
 
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.feature.tournament.domain.engine.SingleEliminationEngine.generateNextRound
-import com.mmg.manahub.feature.tournament.domain.engine.SingleEliminationEngine.isFinalRoundComplete
+import com.mmg.manahub.core.model.TournamentMatch
 
 /**
  * Single-elimination bracket engine.
@@ -45,7 +43,6 @@ object SingleEliminationEngine {
         }
 
         // Pair remaining players
-        var order = pairings.size
         var i = 0
         while (i + 1 < playing.size) {
             pairings.add(playing[i] to playing[i + 1])
@@ -64,7 +61,7 @@ object SingleEliminationEngine {
      * of [previousRoundMatches], preserving bracket position (scheduledOrder).
      */
     fun generateNextRound(
-        previousRoundMatches: List<TournamentMatchEntity>,
+        previousRoundMatches: List<TournamentMatch>,
     ): List<Pair<Long, Long?>> {
         // Collect winners in bracket order
         val winners = previousRoundMatches
@@ -95,7 +92,7 @@ object SingleEliminationEngine {
     /**
      * True when a single champion can be determined from the last round's results.
      */
-    fun isFinalRoundComplete(lastRoundMatches: List<TournamentMatchEntity>): Boolean {
+    fun isFinalRoundComplete(lastRoundMatches: List<TournamentMatch>): Boolean {
         val winners = lastRoundMatches.mapNotNull { match ->
             val ids = parseIds(match.playerIds)
             when {

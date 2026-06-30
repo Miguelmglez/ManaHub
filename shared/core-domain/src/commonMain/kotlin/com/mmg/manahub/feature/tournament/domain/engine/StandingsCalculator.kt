@@ -1,7 +1,6 @@
 package com.mmg.manahub.feature.tournament.domain.engine
 
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
+import com.mmg.manahub.core.model.TournamentMatch
 import com.mmg.manahub.core.model.TournamentPlayer
 import com.mmg.manahub.core.model.TournamentStanding
 import kotlin.math.max
@@ -24,8 +23,8 @@ object StandingsCalculator {
     private const val OMW_FLOOR = 0.33
 
     fun calculate(
-        players: List<TournamentPlayerEntity>,
-        finishedMatches: List<TournamentMatchEntity>,
+        players: List<TournamentPlayer>,
+        finishedMatches: List<TournamentMatch>,
     ): List<TournamentStanding> {
         val matchWinRate = computeMatchWinRates(players, finishedMatches)
         val gameWinRate  = computeGameWinRates(players, finishedMatches)
@@ -59,7 +58,7 @@ object StandingsCalculator {
             val ogwPercent  = computeOgwPercent(player.id, finishedMatches, gameWinRate)
 
             TournamentStanding(
-                player        = player.toDomain(),
+                player        = player,
                 wins          = wins,
                 losses        = losses,
                 draws         = draws,
@@ -86,8 +85,8 @@ object StandingsCalculator {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private fun computeMatchWinRates(
-        players: List<TournamentPlayerEntity>,
-        finishedMatches: List<TournamentMatchEntity>,
+        players: List<TournamentPlayer>,
+        finishedMatches: List<TournamentMatch>,
     ): Map<Long, Double> = players.associate { player ->
         var wins   = 0
         var played = 0
@@ -110,8 +109,8 @@ object StandingsCalculator {
     }
 
     private fun computeGameWinRates(
-        players: List<TournamentPlayerEntity>,
-        finishedMatches: List<TournamentMatchEntity>,
+        players: List<TournamentPlayer>,
+        finishedMatches: List<TournamentMatch>,
     ): Map<Long, Double> {
         // Phase 1: single-game matches only. GW% == MW% for best-of-1 with no draws = same logic.
         // Phase 2 will track per-game scores once tournament_match_players is added.
@@ -120,7 +119,7 @@ object StandingsCalculator {
 
     private fun computeOmwPercent(
         playerId: Long,
-        finishedMatches: List<TournamentMatchEntity>,
+        finishedMatches: List<TournamentMatch>,
         matchWinRate: Map<Long, Double>,
     ): Double {
         val opponentIds = finishedMatches
@@ -139,7 +138,7 @@ object StandingsCalculator {
 
     private fun computeOgwPercent(
         playerId: Long,
-        finishedMatches: List<TournamentMatchEntity>,
+        finishedMatches: List<TournamentMatch>,
         gameWinRate: Map<Long, Double>,
     ): Double {
         val opponentIds = finishedMatches
@@ -160,9 +159,4 @@ object StandingsCalculator {
 
     internal fun parseLifeTotals(json: String): Map<Long, Int> = TournamentIdCodec.decodeLifeTotals(json)
 
-    /** Maps a Room entity player to a pure domain [TournamentPlayer] for inclusion in standings. */
-    private fun TournamentPlayerEntity.toDomain(): TournamentPlayer = TournamentPlayer(
-        id = id, tournamentId = tournamentId, playerName = playerName, playerColor = playerColor,
-        deckId = deckId, seed = seed,
-    )
 }

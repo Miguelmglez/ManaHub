@@ -1,18 +1,15 @@
 package com.mmg.manahub.feature.tournament.domain.usecase
 
-import com.mmg.manahub.core.data.local.entity.TournamentEntity
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import io.mockk.mockk
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import com.mmg.manahub.core.model.Tournament
+import com.mmg.manahub.core.model.TournamentMatch
+import com.mmg.manahub.core.model.TournamentPlayer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * JVM-only tests for [GenerateNextRoundUseCase.plan] — the SINGLE pure advancement decision used by
- * both the standalone [GenerateNextRoundUseCase.invoke] and the repository's atomic finish path
- * (audit C1). `plan` touches no DB, so the [dao] mock is never invoked here.
+ * JVM-only tests for [GenerateNextRoundUseCase.plan] — the SINGLE pure advancement decision (audit C1).
+ * `plan` is pure (no DB, no coroutine dispatch), so no mocks are required.
  *
  * Covers: H2 round-aware advancement (lowest fully-finished round without a successor), M1 globally
  * monotonic scheduledOrder for the next round, and the per-structure outcomes (SWISS / SINGLE_ELIM /
@@ -20,20 +17,19 @@ import org.junit.Test
  */
 class GenerateNextRoundPlanTest {
 
-    private val dao = mockk<com.mmg.manahub.core.data.local.dao.TournamentDao>(relaxed = true)
-    private val useCase = GenerateNextRoundUseCase(dao, UnconfinedTestDispatcher())
+    private val useCase = GenerateNextRoundUseCase()
 
-    private fun tournament(structure: String, id: Long = 1L) = TournamentEntity(
+    private fun tournament(structure: String, id: Long = 1L) = Tournament(
         id = id, name = "T", format = "STANDARD", structure = structure, status = "ACTIVE",
         matchesPerPairing = 1, isRandomPairings = false,
     )
 
     private fun player(id: Long) =
-        TournamentPlayerEntity(id = id, tournamentId = 1L, playerName = "P$id", playerColor = "#FFF", seed = id.toInt())
+        TournamentPlayer(id = id, tournamentId = 1L, playerName = "P$id", playerColor = "#FFF", seed = id.toInt())
 
     private fun match(
         id: Long, p1: Long, p2: Long?, winnerId: Long?, status: String, round: Int, order: Int,
-    ) = TournamentMatchEntity(
+    ) = TournamentMatch(
         id = id, tournamentId = 1L, round = round,
         playerIds = if (p2 == null) "[$p1]" else "[$p1,$p2]",
         winnerId = winnerId, status = status, scheduledOrder = order,
