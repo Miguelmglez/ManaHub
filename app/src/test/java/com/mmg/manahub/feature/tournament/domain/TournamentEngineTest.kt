@@ -2,7 +2,8 @@ package com.mmg.manahub.feature.tournament.domain
 
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
 import com.mmg.manahub.feature.tournament.domain.engine.SingleEliminationEngine
 import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
 import com.mmg.manahub.feature.tournament.domain.engine.SwissEngine
@@ -52,7 +53,14 @@ class TournamentEngineTest {
 
     private fun standing(player: TournamentPlayerEntity, points: Int = 0): TournamentStanding =
         TournamentStanding(
-            player        = player,
+            player        = TournamentPlayer(
+                id           = player.id,
+                tournamentId = player.tournamentId,
+                playerName   = player.playerName,
+                playerColor  = player.playerColor,
+                deckId       = player.deckId,
+                seed         = player.seed,
+            ),
             wins          = points / 3,
             losses        = 0,
             draws         = 0,

@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
-import com.mmg.manahub.core.data.local.entity.TournamentEntity
+import com.mmg.manahub.core.model.Tournament
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -156,7 +156,7 @@ fun TournamentListScreen(
 
 @Composable
 private fun TournamentListItem(
-    tournament: TournamentEntity,
+    tournament: Tournament,
     onClick:    () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors

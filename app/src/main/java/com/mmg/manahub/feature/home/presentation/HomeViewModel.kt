@@ -1340,7 +1340,7 @@ private fun Map<Rarity, Int>.toRarityMap(): Map<String, Int> =
     }
 
 /** Resolves the first active/setup tournament into a compact summary, or null. */
-private fun List<com.mmg.manahub.core.data.local.entity.TournamentEntity>.firstActiveSummary(): TournamentSummary? {
+private fun List<com.mmg.manahub.core.model.Tournament>.firstActiveSummary(): TournamentSummary? {
     val active = firstOrNull { it.status == "ACTIVE" || it.status == "SETUP" } ?: return null
     return TournamentSummary(
         tournamentId = active.id,

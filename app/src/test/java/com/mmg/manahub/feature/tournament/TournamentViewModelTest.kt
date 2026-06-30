@@ -2,10 +2,10 @@ package com.mmg.manahub.feature.tournament
 
 import androidx.lifecycle.SavedStateHandle
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.data.local.entity.TournamentEntity
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.model.Tournament
+import com.mmg.manahub.core.model.TournamentMatch
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
 import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.feature.game.domain.model.GameMode
@@ -54,13 +54,13 @@ class TournamentViewModelTest {
     private val calculateStandingsUseCase = mockk<CalculateStandingsUseCase>(relaxed = true)
     private val recordMatchResultUseCase  = mockk<RecordMatchResultUseCase>(relaxed = true)
 
-    private fun buildTournamentEntity(
+    private fun buildTournament(
         id:        Long   = 1L,
         name:      String = "Friday Night Magic",
         format:    String = "STANDARD",
         structure: String = "ROUND_ROBIN",
         status:    String = "ACTIVE",
-    ) = TournamentEntity(
+    ) = Tournament(
         id                = id,
         name              = name,
         format            = format,
@@ -75,7 +75,7 @@ class TournamentViewModelTest {
         tournamentId: Long   = 1L,
         name:         String = "Player",
         seed:         Int    = 0,
-    ) = TournamentPlayerEntity(
+    ) = TournamentPlayer(
         id           = id,
         tournamentId = tournamentId,
         playerName   = name,
@@ -90,7 +90,7 @@ class TournamentViewModelTest {
         status:         String = "PENDING",
         round:          Int    = 1,
         scheduledOrder: Int    = 0,
-    ) = TournamentMatchEntity(
+    ) = TournamentMatch(
         id             = id,
         tournamentId   = tournamentId,
         round          = round,
@@ -100,11 +100,11 @@ class TournamentViewModelTest {
     )
 
     private fun buildViewModel(
-        tournamentId: Long                        = 1L,
-        tournament:   TournamentEntity?           = buildTournamentEntity(),
-        matches:      List<TournamentMatchEntity>  = emptyList(),
-        players:      List<TournamentPlayerEntity> = emptyList(),
-        standings:    List<TournamentStanding>    = emptyList(),
+        tournamentId: Long                   = 1L,
+        tournament:   Tournament?            = buildTournament(),
+        matches:      List<TournamentMatch>  = emptyList(),
+        players:      List<TournamentPlayer> = emptyList(),
+        standings:    List<TournamentStanding> = emptyList(),
     ): TournamentViewModel {
         val handle = SavedStateHandle(mapOf("tournamentId" to tournamentId))
 
@@ -246,21 +246,21 @@ class TournamentViewModelTest {
 
     @Test
     fun `given COMMANDER format when getGameMode then returns GameMode COMMANDER`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(format = "COMMANDER"))
+        val vm = buildViewModel(tournament = buildTournament(format = "COMMANDER"))
         advanceUntilIdle()
         assertEquals(GameMode.COMMANDER, vm.getGameMode())
     }
 
     @Test
     fun `given STANDARD format when getGameMode then returns GameMode STANDARD`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(format = "STANDARD"))
+        val vm = buildViewModel(tournament = buildTournament(format = "STANDARD"))
         advanceUntilIdle()
         assertEquals(GameMode.STANDARD, vm.getGameMode())
     }
 
     @Test
     fun `given lowercase commander format when getGameMode then returns COMMANDER`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(format = "commander"))
+        val vm = buildViewModel(tournament = buildTournament(format = "commander"))
         advanceUntilIdle()
         assertEquals(GameMode.COMMANDER, vm.getGameMode())
     }
@@ -274,7 +274,7 @@ class TournamentViewModelTest {
 
     @Test
     fun `given unknown format when getGameMode then returns STANDARD as default`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(format = "DRAFT"))
+        val vm = buildViewModel(tournament = buildTournament(format = "DRAFT"))
         advanceUntilIdle()
         assertEquals(GameMode.STANDARD, vm.getGameMode())
     }
@@ -363,7 +363,7 @@ class TournamentViewModelTest {
 
     @Test
     fun `given tournament loaded when ViewModel initialises then isLoading becomes false`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity())
+        val vm = buildViewModel(tournament = buildTournament())
         advanceUntilIdle()
         assertFalse(vm.uiState.value.isLoading)
     }
@@ -421,14 +421,14 @@ class TournamentViewModelTest {
 
     @Test
     fun `given SETUP tournament when ViewModel initialises then it IS auto-resumed`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(status = "SETUP"))
+        val vm = buildViewModel(tournament = buildTournament(status = "SETUP"))
         advanceUntilIdle()
         coVerify(exactly = 1) { repository.startTournament(1L) }
     }
 
     @Test
     fun `given PAUSED tournament when ViewModel initialises then it is NOT auto-resumed`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(status = "PAUSED"))
+        val vm = buildViewModel(tournament = buildTournament(status = "PAUSED"))
         advanceUntilIdle()
         coVerify(exactly = 0) { repository.startTournament(any()) }
         assertTrue(vm.uiState.value.isPaused)
@@ -436,14 +436,14 @@ class TournamentViewModelTest {
 
     @Test
     fun `given ACTIVE tournament when ViewModel initialises then it is NOT re-started`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(status = "ACTIVE"))
+        val vm = buildViewModel(tournament = buildTournament(status = "ACTIVE"))
         advanceUntilIdle()
         coVerify(exactly = 0) { repository.startTournament(any()) }
     }
 
     @Test
     fun `given PAUSED tournament when resumeTournament then it is explicitly started`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(status = "PAUSED"))
+        val vm = buildViewModel(tournament = buildTournament(status = "PAUSED"))
         advanceUntilIdle()
 
         vm.resumeTournament()
@@ -455,7 +455,7 @@ class TournamentViewModelTest {
 
     @Test
     fun `given active tournament when pause then repository pauseTournament is called and state is paused`() = runTest {
-        val vm = buildViewModel(tournament = buildTournamentEntity(status = "ACTIVE"))
+        val vm = buildViewModel(tournament = buildTournament(status = "ACTIVE"))
         advanceUntilIdle()
 
         vm.pause()

@@ -89,7 +89,7 @@ class HomeViewModelTest {
     private val totalGamesFlow = MutableStateFlow(0)
     private val activeDraftFlow = MutableStateFlow<DraftState?>(null)
     private val tournamentsFlow =
-        MutableStateFlow<List<com.mmg.manahub.core.data.local.entity.TournamentEntity>>(emptyList())
+        MutableStateFlow<List<com.mmg.manahub.core.model.Tournament>>(emptyList())
     private val deckSummariesFlow = MutableStateFlow<List<DeckSummary>>(emptyList())
 
     // Gamification (Phase 2) flows.

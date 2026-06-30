@@ -4,8 +4,11 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.model.Tournament
+import com.mmg.manahub.core.model.TournamentMatch
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
@@ -16,6 +19,7 @@ import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCas
 import com.mmg.manahub.feature.tournament.domain.usecase.NextRoundResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import javax.inject.Inject
@@ -349,21 +353,40 @@ class TournamentRepositoryImpl @Inject constructor(
 
     // ── Observe ───────────────────────────────────────────────────────────────
 
-    override fun observeTournaments(): Flow<List<TournamentEntity>> =
-        dao.observeAllTournaments()
+    override fun observeTournaments(): Flow<List<Tournament>> =
+        dao.observeAllTournaments().map { list -> list.map { it.toDomain() } }
 
-    override fun observeTournament(tournamentId: Long): Flow<TournamentEntity?> =
-        dao.observeTournament(tournamentId)
+    override fun observeTournament(tournamentId: Long): Flow<Tournament?> =
+        dao.observeTournament(tournamentId).map { it?.toDomain() }
 
-    override fun observeMatches(tournamentId: Long): Flow<List<TournamentMatchEntity>> =
-        dao.observeMatches(tournamentId)
+    override fun observeMatches(tournamentId: Long): Flow<List<TournamentMatch>> =
+        dao.observeMatches(tournamentId).map { list -> list.map { it.toDomain() } }
 
-    override fun observePlayers(tournamentId: Long): Flow<List<TournamentPlayerEntity>> =
-        dao.observePlayers(tournamentId)
+    override fun observePlayers(tournamentId: Long): Flow<List<TournamentPlayer>> =
+        dao.observePlayers(tournamentId).map { list -> list.map { it.toDomain() } }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun parsePlayerIds(json: String): List<Long> = TournamentIdCodec.decodeIds(json)
+
+    // ── Entity → domain mappers (file-private) ────────────────────────────────
+
+    private fun TournamentEntity.toDomain(): Tournament = Tournament(
+        id = id, name = name, format = format, structure = structure, status = status,
+        matchesPerPairing = matchesPerPairing, isRandomPairings = isRandomPairings,
+        createdAt = createdAt, finishedAt = finishedAt,
+    )
+
+    private fun TournamentMatchEntity.toDomain(): TournamentMatch = TournamentMatch(
+        id = id, tournamentId = tournamentId, round = round, playerIds = playerIds,
+        winnerId = winnerId, status = status, gameSessionId = gameSessionId,
+        scheduledOrder = scheduledOrder, finalLifeTotals = finalLifeTotals,
+    )
+
+    private fun TournamentPlayerEntity.toDomain(): TournamentPlayer = TournamentPlayer(
+        id = id, tournamentId = tournamentId, playerName = playerName, playerColor = playerColor,
+        deckId = deckId, seed = seed,
+    )
 
     private fun nextPowerOf2(n: Int): Int {
         var pow = 1
