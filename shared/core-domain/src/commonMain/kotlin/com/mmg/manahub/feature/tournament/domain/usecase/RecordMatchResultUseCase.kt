@@ -2,8 +2,6 @@ package com.mmg.manahub.feature.tournament.domain.usecase
 
 import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * The ONE entry point for recording a tournament match result (audit C1/C2).
@@ -12,9 +10,11 @@ import javax.inject.Singleton
  * call these methods, and the repository's [TournamentRepository.finishMatch] performs the entire
  * finish + round-advancement + tournament-finish (XP-emitting) sequence atomically. There is no
  * separate advancement path in any ViewModel.
+ *
+ * Moved from :app to :shared:core-domain (KMP Phase 4); package preserved so no consumer import
+ * changes. Constructed by [com.mmg.manahub.feature.tournament.di.TournamentModule].
  */
-@Singleton
-class RecordMatchResultUseCase @Inject constructor(
+class RecordMatchResultUseCase(
     private val repository: TournamentRepository,
 ) {
 

@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.stats.presentation
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow
+import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.MagicSet
@@ -95,5 +95,5 @@ data class StatsUiState(
     val sessionHistory:      List<GameHistoryItem>   = emptyList(),
     val deckPerformance:     List<DeckPerformance>   = emptyList(),
     /** Matchup win-rate grouped by opponent archetype; empty until games are classified. */
-    val archetypeMatchups:   List<ArchetypeMatchupRow> = emptyList(),
+    val archetypeMatchups:   List<ArchetypeMatchupData> = emptyList(),
 )

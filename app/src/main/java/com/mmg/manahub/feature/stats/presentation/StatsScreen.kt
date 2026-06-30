@@ -1426,7 +1426,7 @@ private fun DeckPerformanceRow(
 /** One row in the matchup section: opponent archetype name, W/total, and a win-rate bar. */
 @Composable
 private fun ArchetypeMatchupItem(
-    matchup: com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow,
+    matchup: com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData,
     mc: MagicColors,
 ) {
     val ty = MaterialTheme.magicTypography
