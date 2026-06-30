@@ -474,6 +474,16 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
   `CalculateStandingsUseCase`/`GenerateNextRoundUseCase` (Room entities), `EvaluatePlayerEliminationUseCase`
   (`Player` in core-ui → core-domain can't dep), `GetAccountNudgeUseCase` (presentation dep), online-excluded.
 
+- ✅ **`TournamentRepository` interface + domain models → `:shared:core-domain`/`:shared:core-model`
+  `commonMain` (2026-06-30, `f8db684`).** `Tournament`, `TournamentMatch`, `TournamentPlayer`,
+  `TournamentStanding` (replaces Room projection) added to `:shared:core-model`; `TournamentRepository`
+  + `MatchResultOutcome` moved to `:shared:core-domain` (package PRESERVED → zero consumer import edits).
+  `TournamentRepositoryImpl` gains private `toDomain()` mappers; `StandingsCalculator` keeps entity
+  inputs but produces domain-type output. `CalculateStandingsUseCase` DAO-direct layering violation
+  fixed (now delegates to `repository.calculateStandings()`). `HomeViewModel.firstActiveSummary()`
+  receiver updated from FQN `TournamentEntity` to `core.model.Tournament`. 21 files changed. Verified:
+  assembleDebug GREEN; core-model + core-domain `compileKotlinWasmJs` GREEN; `testDebugUnitTest`
+  1964/123/2 (== baseline); 0 platform imports in commonMain.
 - ✅ **`GameSessionRepository` interface → `:shared:core-domain` `commonMain` (2026-06-30).** The
   interface's Room-projection return types (`DeckStatsRow`, `ModeCount`, `EliminationCount`,
   `LocalSessionHistoryRow`, `GameSessionWithPlayers`) were the blocker — they can't go to `commonMain`.
@@ -497,9 +507,11 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
    heavy string resources). Migrate with CMP Res.
 5. **Room-backed repo impls** (Card, Deck, Stats, UserCard, GameSession, Tournament) — each needs
    DAO-abstraction interfaces in commonMain. For web, fresh Supabase-backed impls behind same interface.
-6. **Repository interfaces with Room types** (`TournamentRepository`) —
-   Room entities/projections in interface signatures. Need domain model equivalents.
-   (`GameSessionRepository` DONE 2026-06-30.)
+6. **Repository interfaces with Room types** — Room entities/projections in interface signatures.
+   Need domain model equivalents. ✅ `GameSessionRepository` DONE 2026-06-30.
+   ✅ `TournamentRepository` DONE 2026-06-30 (`f8db684`); `CalculateStandingsUseCase` DAO-direct
+   layering violation fixed. Remaining: `CardRepository`, `DeckRepository`, `UserCardRepository`,
+   `StatsRepository` still carry Room/entity types (blocked until those domain models are ported).
 7. **~16 blocked use cases** — Room DAOs, Firebase, tournament engine. *(Deck Doctor use cases
    migrated 2026-06-29; ~9 deck use cases done, leaves Room-DAO-coupled and Firebase-coupled ones.)*
 8. **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
@@ -623,6 +635,24 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-30 — **Phase 4: `TournamentRepository` domain extraction + `CalculateStandingsUseCase`
+  layering fix (GREEN, `f8db684`).** 4 pure domain models added to `:shared:core-model`:
+  `Tournament`, `TournamentMatch`, `TournamentPlayer`, `TournamentStanding` (replaces
+  `projection/TournamentStanding.kt`). `TournamentRepository` interface + `MatchResultOutcome`
+  sealed interface moved to `:shared:core-domain` (package PRESERVED → zero consumer import edits
+  at definition sites). `TournamentRepositoryImpl` gains 3 private `toDomain()` extension mappers;
+  `StandingsCalculator` keeps entity inputs but produces domain-type output (Option A — avoids
+  `GenerateNextRoundUseCase` cascade). `CalculateStandingsUseCase` DAO-direct layering violation
+  fixed: removed `TournamentDao` injection, delegates to `repository.calculateStandings()`. 6
+  presentation files updated (`TournamentViewModel`, `TournamentScreen`, `TournamentListViewModel`,
+  `TournamentListScreen`), 3 test files updated. GOTCHA: `HomeViewModel.firstActiveSummary()`
+  had an inline FQN `TournamentEntity` receiver (not in imports — import-only grep missed it) +
+  `HomeViewModelTest` mock type mismatch; both fixed. 21 files changed. Verified: assembleDebug
+  GREEN; core-model + core-domain `compileKotlinWasmJs` GREEN; testDebugUnitTest 1964/123/2
+  (== pre-existing baseline); 0 platform imports in commonMain.
+- 2026-06-30 — **Phase 4: `GameSessionRepository` → `:shared:core-domain` + 9 deck use cases +
+  `BudgetOptimizer`/`CandidatePoolGenerator` → `:shared:core-domain` (GREEN, `17f62a6` +
+  `1328a6a`).** See prior session notes.
 - 2026-06-24 — **Phase 4: kotlinx-datetime + java.time elimination + shared composables (GREEN,
   `57ff46f`→`5d7ad9b`).** (1) `kotlinx-datetime` 0.6.2 added to version catalog + core-ui + core-model +
   `:app`. (2) `DraftSetCard` → shared (java.time → kotlinx-datetime, LocalContext removed). (3)
