@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.tournament.di
 import com.mmg.manahub.feature.tournament.data.repository.TournamentRepositoryImpl
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
+import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import dagger.Binds
 import dagger.Module
@@ -44,5 +45,9 @@ abstract class TournamentModule {
         fun provideRecordMatchResultUseCase(
             repository: TournamentRepository,
         ): RecordMatchResultUseCase = RecordMatchResultUseCase(repository)
+
+        @Provides
+        @Singleton
+        fun provideGenerateNextRoundUseCase(): GenerateNextRoundUseCase = GenerateNextRoundUseCase()
     }
 }

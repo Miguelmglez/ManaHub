@@ -221,7 +221,10 @@ class TournamentRepositoryImpl @Inject constructor(
         withContext(ioDispatcher) {
             val players         = dao.getPlayers(tournamentId)
             val finishedMatches = dao.getFinishedMatches(tournamentId)
-            StandingsCalculator.calculate(players, finishedMatches)
+            StandingsCalculator.calculate(
+                players.map { it.toDomain() },
+                finishedMatches.map { it.toDomain() },
+            )
         }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -274,13 +277,17 @@ class TournamentRepositoryImpl @Inject constructor(
             lifeTotals   = json,
             finishedAt   = System.currentTimeMillis(),
             buildAdvancement = { matchesAfterFinish ->
-                val plan = generateNextRound.plan(tournament, players, matchesAfterFinish)
+                val plan = generateNextRound.plan(
+                    tournament.toDomain(),
+                    players.map { it.toDomain() },
+                    matchesAfterFinish.map { it.toDomain() },
+                )
                 val advanceKind = when {
-                    plan.tournamentFinished                      -> TournamentDao.AdvanceKind.TOURNAMENT_FINISHED
+                    plan.tournamentFinished                        -> TournamentDao.AdvanceKind.TOURNAMENT_FINISHED
                     plan.result is NextRoundResult.RoundGenerated -> TournamentDao.AdvanceKind.ROUND_GENERATED
-                    else                                         -> TournamentDao.AdvanceKind.ROUND_NOT_COMPLETE
+                    else                                           -> TournamentDao.AdvanceKind.ROUND_NOT_COMPLETE
                 }
-                plan.matchesToInsert to advanceKind
+                plan.matchesToInsert.map { it.toEntity() } to advanceKind
             },
         )
 
@@ -386,6 +393,18 @@ class TournamentRepositoryImpl @Inject constructor(
     private fun TournamentPlayerEntity.toDomain(): TournamentPlayer = TournamentPlayer(
         id = id, tournamentId = tournamentId, playerName = playerName, playerColor = playerColor,
         deckId = deckId, seed = seed,
+    )
+
+    private fun TournamentMatch.toEntity(): TournamentMatchEntity = TournamentMatchEntity(
+        id              = id,
+        tournamentId    = tournamentId,
+        round           = round,
+        playerIds       = playerIds,
+        winnerId        = winnerId,
+        status          = status,
+        gameSessionId   = gameSessionId,
+        scheduledOrder  = scheduledOrder,
+        finalLifeTotals = finalLifeTotals,
     )
 
     private fun nextPowerOf2(n: Int): Int {

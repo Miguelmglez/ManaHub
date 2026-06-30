@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.tournament.domain.engine
 
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
+import com.mmg.manahub.core.model.TournamentMatch
 import com.mmg.manahub.core.model.TournamentStanding
 import kotlin.math.ceil
 import kotlin.math.log2
@@ -30,7 +30,7 @@ object SwissEngine {
      */
     fun generateNextRound(
         standings: List<TournamentStanding>,
-        finishedMatches: List<TournamentMatchEntity>,
+        finishedMatches: List<TournamentMatch>,
     ): List<Pair<Long, Long?>> {
         if (standings.isEmpty()) return emptyList()
 
@@ -72,7 +72,7 @@ object SwissEngine {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun buildPriorOpponentsMap(
-        finishedMatches: List<TournamentMatchEntity>,
+        finishedMatches: List<TournamentMatch>,
     ): Map<Long, Set<Long>> {
         val map = mutableMapOf<Long, MutableSet<Long>>()
         for (match in finishedMatches) {
@@ -85,7 +85,7 @@ object SwissEngine {
         return map
     }
 
-    private fun findByeRecipients(finishedMatches: List<TournamentMatchEntity>): Set<Long> =
+    private fun findByeRecipients(finishedMatches: List<TournamentMatch>): Set<Long> =
         finishedMatches
             .filter { parseIds(it.playerIds).size == 1 }
             .mapNotNull { parseIds(it.playerIds).firstOrNull() }
