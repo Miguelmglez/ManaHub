@@ -18,7 +18,6 @@ import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
@@ -183,7 +182,6 @@ class ManaHubApp : Application() {
     @Inject lateinit var getCollectionSetCodesUseCase: GetCollectionSetCodesUseCase
     @Inject lateinit var scryfallRemoteDataSource: ScryfallRemoteDataSource
     @Inject lateinit var refreshCollectionPricesUseCase: RefreshCollectionPricesUseCase
-    @Inject lateinit var gameSessionDao: GameSessionDao
     @Inject lateinit var gameSessionRepository: GameSessionRepository  // shared: Stats + Profile
     @Inject lateinit var deckRepository: DeckRepository
 
@@ -407,7 +405,6 @@ class ManaHubApp : Application() {
                     getCollectionStats = getCollectionStatsUseCase,
                     getCollectionSetCodes = getCollectionSetCodesUseCase,
                     refreshPricesUseCase = refreshCollectionPricesUseCase,
-                    gameSessionDao = gameSessionDao,
                 ),
                 profileKoinModule(
                     surveyAnswerDao = surveyAnswerDao,

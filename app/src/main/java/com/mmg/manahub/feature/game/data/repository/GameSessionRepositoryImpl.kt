@@ -7,6 +7,7 @@ import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
 import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.GameModeCount
@@ -153,6 +154,32 @@ class GameSessionRepositoryImpl @Inject constructor(
                 if (session.winnerName == playerName) streak++ else break
             }
             streak
+        }
+
+    override fun observePendingSurveyCount(): Flow<Int> =
+        dao.observePendingSurveyCount()
+
+    override fun observeLocalDeckGameStats(): Flow<List<DeckStats>> =
+        dao.observeLocalDeckGameStats().map { rows ->
+            rows.map { row ->
+                DeckStats(
+                    deckId     = row.deckId,
+                    deckName   = row.deckName,
+                    totalGames = row.totalGames,
+                    wins       = row.wins,
+                )
+            }
+        }
+
+    override fun observeArchetypeMatchups(): Flow<List<ArchetypeMatchupData>> =
+        dao.observeArchetypeMatchups().map { rows ->
+            rows.map { row ->
+                ArchetypeMatchupData(
+                    opponentArchetype = row.opponentArchetype,
+                    totalGames        = row.totalGames,
+                    wins              = row.wins,
+                )
+            }
         }
 
     override suspend fun deleteSession(sessionId: Long) =

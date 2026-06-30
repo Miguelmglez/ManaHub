@@ -63,6 +63,13 @@ data class PlayerSummaryData(
     val archetype: String?,
 )
 
+/** Domain equivalent of [com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow]. */
+data class ArchetypeMatchupData(
+    val opponentArchetype: String,
+    val totalGames: Int,
+    val wins: Int,
+)
+
 /**
  * Domain equivalent of [com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers].
  * Combines a session summary with its player list.

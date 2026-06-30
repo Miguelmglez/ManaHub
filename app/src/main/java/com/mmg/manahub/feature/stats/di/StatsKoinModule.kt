@@ -1,6 +1,5 @@
 package com.mmg.manahub.feature.stats.di
 
-import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -41,7 +40,6 @@ fun statsKoinModule(
     getCollectionStats: GetCollectionStatsUseCase,
     getCollectionSetCodes: GetCollectionSetCodesUseCase,
     refreshPricesUseCase: RefreshCollectionPricesUseCase,
-    gameSessionDao: GameSessionDao,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Stats-only Hilt-owned singletons to Koin. ──
     // (UserPreferencesRepository [Settings], GameSessionRepository [Profile + Home], DeckRepository [Home]
@@ -50,7 +48,6 @@ fun statsKoinModule(
     single { getCollectionStats }
     single { getCollectionSetCodes }
     single { refreshPricesUseCase }
-    single { gameSessionDao }
 
     // ── The Koin island: StatsViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
@@ -60,7 +57,6 @@ fun statsKoinModule(
             scryfallDataSource = get(),
             refreshPricesUseCase = get(),
             userPreferencesDataStore = get(),
-            gameSessionDao = get(),
             gameSessionRepository = get(),
             deckRepository = get(),
         )

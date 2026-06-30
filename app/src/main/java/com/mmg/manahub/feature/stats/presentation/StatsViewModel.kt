@@ -2,12 +2,16 @@ package com.mmg.manahub.feature.stats.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.local.entity.SurveyStatus
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
+import com.mmg.manahub.feature.game.domain.model.DeckStats
+import com.mmg.manahub.feature.game.domain.model.EliminationStats
+import com.mmg.manahub.feature.game.domain.model.GameModeCount
+import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
@@ -40,7 +44,6 @@ class StatsViewModel(
     private val scryfallDataSource:       ScryfallRemoteDataSource,
     private val refreshPricesUseCase:     RefreshCollectionPricesUseCase,
     private val userPreferencesDataStore: UserPreferencesRepository,
-    private val gameSessionDao:           GameSessionDao,
     private val gameSessionRepository:    GameSessionRepository,
     private val deckRepository:           DeckRepository,
 ) : ViewModel() {
@@ -114,15 +117,15 @@ class StatsViewModel(
             // can diverge from the current UserPreferences name (default "Wizard"), which
             // would silently zero out the win-rate and W/L badges.
             combine(
-                gameSessionDao.observeTotalGames(),
-                gameSessionDao.observeLocalWins(),
-                gameSessionDao.observeAvgDurationMs(),
-                gameSessionDao.observeFavoriteMode(),
-                gameSessionDao.observeMostFrequentElimination(),
-                gameSessionDao.observePendingSurveyCount(),
-                gameSessionDao.observeLocalSessionHistory(),
-                gameSessionDao.observeLocalDeckGameStats(),
-                gameSessionDao.observeArchetypeMatchups(),
+                gameSessionRepository.observeTotalGames(),
+                gameSessionRepository.observeLocalWins(),
+                gameSessionRepository.observeAvgDurationMs(),
+                gameSessionRepository.observeFavoriteMode(),
+                gameSessionRepository.observeMostFrequentElimination(),
+                gameSessionRepository.observePendingSurveyCount(),
+                gameSessionRepository.observeLocalSessionHistory(),
+                gameSessionRepository.observeLocalDeckGameStats(),
+                gameSessionRepository.observeArchetypeMatchups(),
                 deckRepository.observeAllDecks(),
             ) { args ->
                 // combine with 10 flows uses the array variant
@@ -130,12 +133,12 @@ class StatsViewModel(
                 val totalGames   = args[0] as Int
                 val wins         = args[1] as Int
                 val avgDuration  = args[2] as Double?
-                val favoriteMode = args[3] as com.mmg.manahub.core.data.local.dao.ModeCount?
-                val mostLoss     = args[4] as com.mmg.manahub.core.data.local.dao.EliminationCount?
+                val favoriteMode = args[3] as GameModeCount?
+                val mostLoss     = args[4] as EliminationStats?
                 val pending      = args[5] as Int
-                val history      = args[6] as List<com.mmg.manahub.core.data.local.dao.LocalSessionHistoryRow>
-                val deckStats    = args[7] as List<com.mmg.manahub.core.data.local.dao.DeckStatsRow>
-                val matchups     = args[8] as List<com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow>
+                val history      = args[6] as List<SessionHistoryEntry>
+                val deckStats    = args[7] as List<DeckStats>
+                val matchups     = args[8] as List<ArchetypeMatchupData>
                 val allDecks     = args[9] as List<com.mmg.manahub.core.model.Deck>
 
                 val deckNameById = allDecks.associate { it.id to it.name }
@@ -199,7 +202,7 @@ class StatsViewModel(
         val gameStats: GameStats,
         val history: List<GameHistoryItem>,
         val deckPerformance: List<DeckPerformance>,
-        val matchups: List<com.mmg.manahub.core.data.local.dao.ArchetypeMatchupRow>,
+        val matchups: List<ArchetypeMatchupData>,
     )
 
     // ── Public actions ────────────────────────────────────────────────────────

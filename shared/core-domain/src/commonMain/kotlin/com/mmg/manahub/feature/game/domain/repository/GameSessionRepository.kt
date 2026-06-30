@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.game.domain.repository
 
+import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
 import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.GameModeCount
@@ -64,6 +65,15 @@ interface GameSessionRepository {
     fun observeAvgWinTurn(playerName: String): Flow<Double?>
 
     fun observeCurrentStreak(playerName: String): Flow<Int>
+
+    /** Count of sessions with PENDING or PARTIAL survey status. */
+    fun observePendingSurveyCount(): Flow<Int>
+
+    /** Per-deck win/loss stats aggregated from the local seat's sessions. */
+    fun observeLocalDeckGameStats(): Flow<List<DeckStats>>
+
+    /** Win-rate breakdown grouped by the opponent's classified archetype. */
+    fun observeArchetypeMatchups(): Flow<List<ArchetypeMatchupData>>
 
     suspend fun deleteSession(sessionId: Long)
 }
