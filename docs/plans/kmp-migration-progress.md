@@ -508,12 +508,31 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
 5. **Room-backed repo impls** (Card, Deck, Stats, UserCard, GameSession, Tournament) — each needs
    DAO-abstraction interfaces in commonMain. For web, fresh Supabase-backed impls behind same interface.
 6. **Repository interfaces with Room types** — Room entities/projections in interface signatures.
-   Need domain model equivalents. ✅ `GameSessionRepository` DONE 2026-06-30.
-   ✅ `TournamentRepository` DONE 2026-06-30 (`f8db684`); `CalculateStandingsUseCase` DAO-direct
-   layering violation fixed. Remaining: `CardRepository`, `DeckRepository`, `UserCardRepository`,
-   `StatsRepository` still carry Room/entity types (blocked until those domain models are ported).
-7. **~16 blocked use cases** — Room DAOs, Firebase, tournament engine. *(Deck Doctor use cases
-   migrated 2026-06-29; ~9 deck use cases done, leaves Room-DAO-coupled and Firebase-coupled ones.)*
+   Need domain model equivalents.
+   - ✅ `GameSessionRepository` DONE 2026-06-30. `StatsViewModel` DAO-direct violation also fixed:
+     3 new methods added (`observePendingSurveyCount`, `observeLocalDeckGameStats`,
+     `observeArchetypeMatchups`) + `ArchetypeMatchupData` domain type; `gameSessionDao` removed
+     from `StatsViewModel` ctor + `StatsKoinModule` + `ManaHubApp`.
+   - ✅ `TournamentRepository` DONE 2026-06-30 (`f8db684`).
+   - Remaining: `CardRepository`, `DeckRepository`, `UserCardRepository`, `StatsRepository` still
+     carry Room/entity types (blocked until those domain models are ported).
+7. **Blocked use cases:**
+   - ✅ `CalculateStandingsUseCase` → `:shared:core-domain` DONE 2026-06-30 (`@Inject` stripped,
+     `TournamentModule.provideCalculateStandingsUseCase` added, package UNCHANGED).
+   - ✅ `RecordMatchResultUseCase` → `:shared:core-domain` DONE 2026-06-30 (`@Inject` stripped,
+     `TournamentModule.provideRecordMatchResultUseCase` added, package UNCHANGED).
+   - ❌ BLOCKER: `GenerateNextRoundUseCase` — `plan()` takes `TournamentDao`/`TournamentEntity`/
+     `TournamentMatchEntity`/`TournamentPlayerEntity` as parameters (Room types in signature);
+     needs domain model equivalents of those Room entities first.
+   - ❌ BLOCKER: `GetDeckGameStatsUseCase` — injects `GameSessionDao` + `SurveyAnswerDao` +
+     `CardDao` directly + takes a DAO-type `SessionSummary` result; needs 3+ new repo methods and
+     domain types before it can move.
+   - `EvaluatePlayerEliminationUseCase` — `Player` in core-ui → core-domain can't dep on core-ui.
+   - `GetAccountNudgeUseCase` — presentation dep.
+   - `ImportCommunityDeckUseCase` — Firebase Crashlytics dep.
+   - `UpdateTradeCollectionUseCase` — Room DAO dep.
+   - `ClaimQuestRewardUseCase` — Room DAO dep.
+   - Online/excluded use cases — deferred per plan.
 8. **`ComputeCardTagsUseCase`** — blocked on Gson tag mapper.
 9. **EXCLUDED features** (online, voice, scanner) — deferred per plan.
 
@@ -635,6 +654,25 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-30 — **Phase 4: `StatsViewModel` DAO-direct violation fixed + `CalculateStandingsUseCase`
+  + `RecordMatchResultUseCase` → `:shared:core-domain` (GREEN).**
+  (1) `StatsViewModel` was injecting `GameSessionDao` directly and calling 9 DAO methods, bypassing
+  `GameSessionRepository`. Fixed: 3 missing repo methods added (`observePendingSurveyCount`,
+  `observeLocalDeckGameStats`, `observeArchetypeMatchups`) to `GameSessionRepository` interface
+  (core-domain) + implemented in `GameSessionRepositoryImpl`; new domain type `ArchetypeMatchupData`
+  added to `SessionStats.kt` (core-model). `StatsViewModel` ctor now takes only
+  `GameSessionRepository` (no `GameSessionDao`); combine casts updated to domain types
+  (`GameModeCount`, `EliminationStats`, `SessionHistoryEntry`, `DeckStats`, `ArchetypeMatchupData`).
+  `StatsUiState.archetypeMatchups` type updated; `ArchetypeMatchupItem` composable param updated.
+  `StatsKoinModule` signature simplified (no `gameSessionDao` param); `ManaHubApp` `@Inject` field
+  + module call arg removed. 9 files changed.
+  (2) `CalculateStandingsUseCase` + `RecordMatchResultUseCase`: `@Singleton`/`@Inject constructor`/
+  `import javax.inject.*` stripped; `git mv` to `shared/core-domain/src/commonMain/...tournament.
+  domain.usecase/` (packages UNCHANGED → zero consumer import edits). `TournamentModule` gains
+  `companion object` with `@Provides @Singleton` for both. 3 files changed.
+  BLOCKER documented: `GenerateNextRoundUseCase` takes Room entity types as params (can't move yet).
+  Verified: `:app:assembleDebug` GREEN; `:shared:core-domain:compileKotlinWasmJs` GREEN;
+  `testDebugUnitTest` 1964/123/2 (== baseline); 0 platform imports in commonMain.
 - 2026-06-30 — **Phase 4: `TournamentRepository` domain extraction + `CalculateStandingsUseCase`
   layering fix (GREEN, `f8db684`).** 4 pure domain models added to `:shared:core-model`:
   `Tournament`, `TournamentMatch`, `TournamentPlayer`, `TournamentStanding` (replaces
