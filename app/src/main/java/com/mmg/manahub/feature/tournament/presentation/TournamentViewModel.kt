@@ -4,10 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.data.local.entity.TournamentEntity
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.model.Tournament
+import com.mmg.manahub.core.model.TournamentMatch
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
 import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
@@ -44,12 +44,12 @@ class TournamentViewModel(
     ) { "TournamentViewModel requires a positive tournamentId" }
 
     data class UiState(
-        val tournament:      TournamentEntity?            = null,
+        val tournament:      Tournament?                  = null,
         val standings:       List<TournamentStanding>     = emptyList(),
-        val matches:         List<TournamentMatchEntity>   = emptyList(),
-        val players:         List<TournamentPlayerEntity>  = emptyList(),
-        val nextMatch:       TournamentMatchEntity?        = null,
-        val activeMatch:     TournamentMatchEntity?        = null,
+        val matches:         List<TournamentMatch>         = emptyList(),
+        val players:         List<TournamentPlayer>        = emptyList(),
+        val nextMatch:       TournamentMatch?              = null,
+        val activeMatch:     TournamentMatch?              = null,
         val isFinished:      Boolean                      = false,
         val isPaused:        Boolean                      = false,
         val isLoading:       Boolean                      = true,

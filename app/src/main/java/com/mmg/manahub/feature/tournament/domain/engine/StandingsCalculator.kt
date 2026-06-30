@@ -2,7 +2,8 @@ package com.mmg.manahub.feature.tournament.domain.engine
 
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
 import kotlin.math.max
 
 /**
@@ -58,7 +59,7 @@ object StandingsCalculator {
             val ogwPercent  = computeOgwPercent(player.id, finishedMatches, gameWinRate)
 
             TournamentStanding(
-                player        = player,
+                player        = player.toDomain(),
                 wins          = wins,
                 losses        = losses,
                 draws         = draws,
@@ -158,4 +159,10 @@ object StandingsCalculator {
     internal fun parseIds(json: String): List<Long> = TournamentIdCodec.decodeIds(json)
 
     internal fun parseLifeTotals(json: String): Map<Long, Int> = TournamentIdCodec.decodeLifeTotals(json)
+
+    /** Maps a Room entity player to a pure domain [TournamentPlayer] for inclusion in standings. */
+    private fun TournamentPlayerEntity.toDomain(): TournamentPlayer = TournamentPlayer(
+        id = id, tournamentId = tournamentId, playerName = playerName, playerColor = playerColor,
+        deckId = deckId, seed = seed,
+    )
 }

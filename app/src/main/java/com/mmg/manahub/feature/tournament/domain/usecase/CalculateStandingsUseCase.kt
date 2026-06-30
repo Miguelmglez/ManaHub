@@ -1,23 +1,22 @@
 package com.mmg.manahub.feature.tournament.domain.usecase
 
-import com.mmg.manahub.core.data.local.dao.TournamentDao
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
-import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.withContext
+import com.mmg.manahub.core.model.TournamentStanding
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Returns current DCI standings for a tournament.
+ *
+ * Delegates to [TournamentRepository.calculateStandings] — the layering violation of injecting
+ * [com.mmg.manahub.core.data.local.dao.TournamentDao] directly has been removed as part of the
+ * KMP Phase 4 domain extraction.
+ */
 @Singleton
 class CalculateStandingsUseCase @Inject constructor(
-    private val dao: TournamentDao,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val repository: TournamentRepository,
 ) {
 
-    suspend operator fun invoke(tournamentId: Long): List<TournamentStanding> = withContext(ioDispatcher) {
-        val players         = dao.getPlayers(tournamentId)
-        val finishedMatches = dao.getFinishedMatches(tournamentId)
-        StandingsCalculator.calculate(players, finishedMatches)
-    }
+    suspend operator fun invoke(tournamentId: Long): List<TournamentStanding> =
+        repository.calculateStandings(tournamentId)
 }

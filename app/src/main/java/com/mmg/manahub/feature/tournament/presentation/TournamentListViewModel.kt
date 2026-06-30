@@ -2,7 +2,7 @@ package com.mmg.manahub.feature.tournament.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.entity.TournamentEntity
+import com.mmg.manahub.core.model.Tournament
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +17,7 @@ class TournamentListViewModel(
     private val repository: TournamentRepository,
 ) : ViewModel() {
 
-    val tournaments: StateFlow<List<TournamentEntity>> =
+    val tournaments: StateFlow<List<Tournament>> =
         repository.observeTournaments()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }
