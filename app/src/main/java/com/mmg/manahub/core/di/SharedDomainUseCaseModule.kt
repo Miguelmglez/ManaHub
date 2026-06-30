@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.tagging.StrategyAnalyzer
 import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
+import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
 import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -144,6 +145,12 @@ object SharedDomainUseCaseModule {
     fun provideSuggestTagsUseCase(
         strategyAnalyzer: StrategyAnalyzer,
     ): SuggestTagsUseCase = SuggestTagsUseCase(strategyAnalyzer)
+
+    @Provides
+    @Singleton
+    fun provideComputeCardTagsUseCase(
+        suggestTags: SuggestTagsUseCase,
+    ): ComputeCardTagsUseCase = ComputeCardTagsUseCase(suggestTags)
 
     @Provides
     @Singleton

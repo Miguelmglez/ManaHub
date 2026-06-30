@@ -1,10 +1,9 @@
 package com.mmg.manahub.core.domain.usecase.card
 
-import com.mmg.manahub.core.data.local.mapper.toTagList
+import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.SuggestedTag
-import javax.inject.Inject
 
 /**
  * Computes the final (tagsJson, suggestedTagsJson) pair to persist for a card.
@@ -17,7 +16,7 @@ import javax.inject.Inject
  *
  * Pure logic — no I/O, no Android imports. Safe to call on [kotlinx.coroutines.Dispatchers.Default].
  */
-class ComputeCardTagsUseCase @Inject constructor(
+class ComputeCardTagsUseCase(
     private val suggestTags: SuggestTagsUseCase,
 ) {
 
@@ -45,7 +44,7 @@ class ComputeCardTagsUseCase @Inject constructor(
         val keepExisting = !existingTagsJson.isNullOrBlank() && existingTagsJson != "[]"
         val mergedConfirmed = if (keepExisting) {
             // Merge: preserve user choices and add any new engine-confirmed tags not already present.
-            (existingTagsJson!!.toTagList() + engineResult.confirmed).distinct()
+            (existingTagsJson.toTagList() + engineResult.confirmed).distinct()
         } else {
             engineResult.confirmed
         }
