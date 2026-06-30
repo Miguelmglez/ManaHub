@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.game.data.repository
 
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
@@ -8,6 +9,8 @@ import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
+import com.mmg.manahub.feature.game.domain.model.CardImpactScore
+import com.mmg.manahub.feature.game.domain.model.DeckSessionSummary
 import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.GameModeCount
@@ -16,6 +19,7 @@ import com.mmg.manahub.feature.game.domain.model.PlayerSummaryData
 import com.mmg.manahub.feature.game.domain.model.SessionDetail
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.feature.game.domain.model.SessionSummaryData
+import com.mmg.manahub.feature.game.domain.model.SingleDeckStats
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +34,7 @@ class GameSessionRepositoryImpl @Inject constructor(
     private val dao: GameSessionDao,
     private val progressionEventBus: ProgressionEventBus,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val surveyAnswerDao: SurveyAnswerDao,
 ) : GameSessionRepository {
 
     override suspend fun saveGameSession(data: GameSessionData): Long = withContext(ioDispatcher) {
@@ -180,6 +185,33 @@ class GameSessionRepositoryImpl @Inject constructor(
                     wins              = row.wins,
                 )
             }
+        }
+
+    override fun observeSingleDeckStats(deckId: String, playerName: String): Flow<SingleDeckStats?> =
+        dao.observeSingleDeckStats(deckId, playerName).map { row ->
+            row?.let {
+                SingleDeckStats(
+                    deckId = it.deckId,
+                    totalGames = it.totalGames,
+                    wins = it.wins,
+                    avgDurationMs = it.avgDurationMs,
+                )
+            }
+        }
+
+    override fun observeTopCardImpactsForDeck(deckId: String, limit: Int): Flow<List<CardImpactScore>> =
+        surveyAnswerDao.observeTopCardsForDeck(deckId, limit).map { rows ->
+            rows.map { CardImpactScore(cardReference = it.cardReference, appearances = it.appearances, avgScore = it.avgScore) }
+        }
+
+    override fun observeWeakestCardImpactsForDeck(deckId: String, limit: Int): Flow<List<CardImpactScore>> =
+        surveyAnswerDao.observeWeakestCardsForDeck(deckId, limit).map { rows ->
+            rows.map { CardImpactScore(cardReference = it.cardReference, appearances = it.appearances, avgScore = it.avgScore) }
+        }
+
+    override fun observeSessionSummariesForDeck(deckId: String): Flow<List<DeckSessionSummary>> =
+        dao.observeSessionsForDeck(deckId).map { rows ->
+            rows.map { DeckSessionSummary(id = it.id, playedAt = it.playedAt, winnerName = it.winnerName, surveyStatus = it.surveyStatus) }
         }
 
     override suspend fun deleteSession(sessionId: Long) =

@@ -25,6 +25,8 @@ import com.mmg.manahub.core.domain.usecase.card.SearchCardUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
+import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
@@ -316,4 +318,13 @@ object SharedDomainUseCaseModule {
     ): CommitScannedCardsUseCase = CommitScannedCardsUseCase(
         addCardToCollectionUseCase, progressionEventBus,
     )
+
+    // -- Deck use cases (moved from :app to :shared:core-domain, Phase 4). --
+
+    @Provides
+    @Singleton
+    fun provideGetDeckGameStatsUseCase(
+        gameSessionRepository: GameSessionRepository,
+        cardRepository: CardRepository,
+    ): GetDeckGameStatsUseCase = GetDeckGameStatsUseCase(gameSessionRepository, cardRepository)
 }

@@ -1,12 +1,15 @@
 package com.mmg.manahub.feature.game.domain.repository
 
 import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
+import com.mmg.manahub.feature.game.domain.model.CardImpactScore
+import com.mmg.manahub.feature.game.domain.model.DeckSessionSummary
 import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.GameModeCount
 import com.mmg.manahub.feature.game.domain.model.GameSessionData
 import com.mmg.manahub.feature.game.domain.model.SessionDetail
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
+import com.mmg.manahub.feature.game.domain.model.SingleDeckStats
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -74,6 +77,18 @@ interface GameSessionRepository {
 
     /** Win-rate breakdown grouped by the opponent's classified archetype. */
     fun observeArchetypeMatchups(): Flow<List<ArchetypeMatchupData>>
+
+    /** Win/loss/duration stats for ONE deck, keyed by [playerName] (legacy name-match, mirrors [observeWins]). */
+    fun observeSingleDeckStats(deckId: String, playerName: String): Flow<SingleDeckStats?>
+
+    /** Top [limit] best-scoring cards (by post-game survey impact) for [deckId]. */
+    fun observeTopCardImpactsForDeck(deckId: String, limit: Int): Flow<List<CardImpactScore>>
+
+    /** Worst [limit] scoring cards (by post-game survey impact) for [deckId]. */
+    fun observeWeakestCardImpactsForDeck(deckId: String, limit: Int): Flow<List<CardImpactScore>>
+
+    /** Session summaries for [deckId], most-recent first (unlimited — caller truncates). */
+    fun observeSessionSummariesForDeck(deckId: String): Flow<List<DeckSessionSummary>>
 
     suspend fun deleteSession(sessionId: Long)
 }

@@ -78,3 +78,26 @@ data class SessionDetail(
     val session: SessionSummaryData,
     val players: List<PlayerSummaryData>,
 )
+
+/** Per-deck win/loss/duration stats for ONE specific deck (vs [DeckStats] which covers all decks). */
+data class SingleDeckStats(
+    val deckId: String,
+    val totalGames: Int,
+    val wins: Int,
+    val avgDurationMs: Double,
+)
+
+/** Card-impact aggregate from post-game surveys (top/weakest cards for a deck). */
+data class CardImpactScore(
+    val cardReference: String?,
+    val appearances: Int,
+    val avgScore: Double,
+)
+
+/** Lightweight per-session summary for a deck's recent-games list (subset of [SessionSummaryData] fields actually consumed by the UI). */
+data class DeckSessionSummary(
+    val id: Long,
+    val playedAt: Long,
+    val winnerName: String,
+    val surveyStatus: String,
+)

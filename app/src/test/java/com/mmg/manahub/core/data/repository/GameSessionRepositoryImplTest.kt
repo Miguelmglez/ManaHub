@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
@@ -40,6 +41,7 @@ class GameSessionRepositoryImplTest {
 
     private val dao = mockk<GameSessionDao>(relaxed = true)
     private val progressionEventBus = mockk<ProgressionEventBus>(relaxed = true)
+    private val surveyAnswerDao = mockk<SurveyAnswerDao>(relaxed = true)
     private lateinit var repository: GameSessionRepositoryImpl
 
     // ── Fixture helpers ───────────────────────────────────────────────────────
@@ -104,7 +106,7 @@ class GameSessionRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = GameSessionRepositoryImpl(dao, progressionEventBus, UnconfinedTestDispatcher())
+        repository = GameSessionRepositoryImpl(dao, progressionEventBus, UnconfinedTestDispatcher(), surveyAnswerDao)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
