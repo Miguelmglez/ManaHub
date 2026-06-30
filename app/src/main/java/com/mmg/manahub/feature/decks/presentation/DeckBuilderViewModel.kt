@@ -128,7 +128,9 @@ class DeckMagicDetailViewModel(
             .map { it.deck?.id }
             .distinctUntilChanged()
             .filterNotNull()
-            .flatMapLatest { id -> getDeckGameStatsUseCase(id) }
+            .flatMapLatest { id ->
+                userPrefsStore.playerNameFlow.flatMapLatest { name -> getDeckGameStatsUseCase(id, name) }
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

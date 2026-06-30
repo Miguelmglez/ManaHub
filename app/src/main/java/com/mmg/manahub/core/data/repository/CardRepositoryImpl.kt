@@ -137,6 +137,11 @@ class CardRepositoryImpl @Inject constructor(
     override suspend fun searchWithRawQuery(query: String): List<Card> =
         withContext(ioDispatcher) { remote.searchWithRawQuery(query) }
 
+    override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = withContext(ioDispatcher) {
+        if (scryfallIds.isEmpty()) return@withContext emptyList()
+        cardDao.getByIds(scryfallIds).map { it.toDomainCard() }
+    }
+
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = withContext(ioDispatcher) {
         val cached = cardDao.getById(scryfallId)
         if (cached != null && CachePolicy.isFresh(cached.cachedAt) && cached.relatedUris != "{}")

@@ -34,6 +34,9 @@ interface CardRepository {
 
     /** Executes a raw Scryfall query string and returns matching cards. */
     suspend fun searchWithRawQuery(query: String): List<Card>
+
+    /** Batch-resolves [scryfallIds] to [Card]s from the local cache. IDs not found locally are silently skipped (no network fetch). */
+    suspend fun getCardsByIds(scryfallIds: List<String>): List<Card>
     fun observeCard(scryfallId: String): Flow<Card?>
     suspend fun refreshCollectionPrices()
     suspend fun updatePrices(

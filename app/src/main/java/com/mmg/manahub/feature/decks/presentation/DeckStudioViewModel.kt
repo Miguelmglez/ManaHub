@@ -277,7 +277,9 @@ class DeckStudioViewModel(
             .map { it.deck?.id }
             .distinctUntilChanged()
             .filterNotNull()
-            .flatMapLatest { id -> getDeckGameStatsUseCase(id) }
+            .flatMapLatest { id ->
+                userPreferences.playerNameFlow.flatMapLatest { name -> getDeckGameStatsUseCase(id, name) }
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

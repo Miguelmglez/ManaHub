@@ -370,12 +370,12 @@ private fun WeakCardGrid(
 }
 
 /**
- * A single row representing one [com.mmg.manahub.core.data.local.dao.SessionSummary].
+ * A single row representing one [com.mmg.manahub.feature.game.domain.model.DeckSessionSummary].
  * Shows relative date, win/loss badge, survey status chip, and a trailing icon.
  */
 @Composable
 private fun SessionRow(
-    session: com.mmg.manahub.core.data.local.dao.SessionSummary,
+    session: com.mmg.manahub.feature.game.domain.model.DeckSessionSummary,
     playerName: String,
     onReviewSurvey: (Long) -> Unit,
 ) {
