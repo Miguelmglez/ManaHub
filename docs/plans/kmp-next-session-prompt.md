@@ -35,13 +35,13 @@ git log --oneline -5               # local HEAD
 ### Step 3 — Current state (as of 2026-06-30)
 
 **~330 shared `.kt` files** in `commonMain` across 5 modules:
-- `:shared:core-model` ~115 types (domain models, gamification, game, deck, trade, friend, draft,
+- `:shared:core-model` ~119 types (domain models, gamification, game, deck, trade, friend, draft,
   playtest; + `EliminationReason`, `GameSessionData`/`PlayerSaveData`/`PlayerResultData`,
   `DeckStats`, `GameModeCount`, `EliminationStats`, `SessionHistoryEntry`, `SessionDetail`,
-  `CardConstants`)
-- `:shared:core-domain` ~85 files (repo interfaces + use cases + gamification catalogs + deck engine;
-  + `GameSessionRepository` [pure, no Room types], + 9 deck use cases + `BudgetOptimizer` +
-  `CandidatePoolGenerator`)
+  `CardConstants`; + `Tournament`, `TournamentMatch`, `TournamentPlayer`, `TournamentStanding`)
+- `:shared:core-domain` ~87 files (repo interfaces + use cases + gamification catalogs + deck engine;
+  + `GameSessionRepository` [pure, no Room types]; + `TournamentRepository` + `MatchResultOutcome`
+  [pure, no Room types]; + 9 deck use cases + `BudgetOptimizer` + `CandidatePoolGenerator`)
 - `:shared:core-data` ~65 files (Ktor clients, DTOs, rate-limit queues, trade use cases, repo impls)
 - `:shared:core-ui` ~50 files (theme, 33+ composables; + `FloatingDelta`, `GameModeSelector`,
   `SharedComponents`, `AddCardSheet`, `TradeSelectionSheet`, `VariantSelectorSheet`;
@@ -49,36 +49,31 @@ git log --oneline -5               # local HEAD
 - `:shared:core-common` ~4 files (DispatcherProvider, KeyValueStore, CrashReporter, Page)
 
 **Phase 1 (Hilt→Koin):** COMPLETE.
-**Phase 2 (data layer):** SUBSTANTIALLY COMPLETE — Retrofit removed, 6 Ktor clients, 20 repo
-interfaces shared (incl. `GameSessionRepository` now pure in core-domain), ~85 use cases shared.
+**Phase 2 (data layer):** SUBSTANTIALLY COMPLETE — Retrofit removed, 6 Ktor clients, 21 repo
+interfaces shared (incl. `GameSessionRepository` + `TournamentRepository` now pure in core-domain),
+~87 use cases shared.
 **Phase 3 (UI):** SUBSTANTIALLY COMPLETE — 33+ composables in core-ui, design system fully shared.
 **Phase 4 (platform parity):** IN PROGRESS — `java.time` eliminated, `@StringRes`/`R.string`
-eliminated from all shared code, Deck Doctor engine shared, `GameSessionRepository` domain projections
-extracted and interface moved to core-domain. Remaining: `TournamentRepository`, blocked use cases,
-remaining composables.
+eliminated from all shared code, Deck Doctor engine shared, `GameSessionRepository` +
+`TournamentRepository` domain projections extracted and interfaces moved to core-domain.
+`CalculateStandingsUseCase` DAO-direct layering violation fixed.
 
-Test baseline: **1964 tests, 122 failed** (pre-existing), 2 skipped.
+Test baseline: **1964 tests, 123 failed** (pre-existing), 2 skipped.
 
 Recent commits (most recent first):
+- `f8db684` KMP Phase 4: TournamentRepository → shared core-domain + CalculateStandingsUseCase fix
 - `17f62a6` KMP Phase 4: GameSessionRepository → shared core-domain
 - `b49d68d` docs(kmp): update progress tracker
 - `1328a6a` KMP Phase 4: 9 deck use cases + BudgetOptimizer + CandidatePoolGenerator → core-domain
 - `996b0ff` KMP Phase 4: AddCardSheet/TradeSelectionSheet/VariantSelectorSheet + coloredShadow expect/actual
-- `ac787c6` KMP Phase 4: FloatingDelta/GameModeSelector/SharedComponents/CardConstants → shared
 
 ### Step 4 — Remaining work (Tier 3/4 — deeper infrastructure)
 
 Work in priority order, delegating each to `android-kotlin-architect`:
 
-1. **`TournamentRepository` domain projection extraction** — same pattern as `GameSessionRepository`
-   (just completed). Interface is in `:app` and uses `TournamentEntity`, `TournamentMatchEntity`,
-   `TournamentPlayerEntity`, `TournamentStanding` (all Room types). Extract pure domain equivalents
-   to `core-model`, move interface to `core-domain`. This unblocks tournament use cases.
-   Files to read first:
-   - `app/.../feature/tournament/domain/repository/TournamentRepository.kt`
-   - `app/.../core/data/local/entity/TournamentEntity.kt` (+ Match, Player, Standing variants)
-   - Callers: `TournamentViewModel`, `GenerateNextRoundUseCase`, `CalculateStandingsUseCase`,
-     `RecordMatchResultUseCase`
+1. **`StatsViewModel` DAO-direct violation** — imports `GameSessionDao` directly (bypasses
+   `GameSessionRepository`). Route `observeFavoriteMode()` through the repo interface.
+   File: `app/.../feature/stats/presentation/StatsViewModel.kt` line ~133.
 
 2. **`DeckMagicEngine.kt`** — blocked on `core.tagging.label` extension (not shared) + `@IoDispatcher`.
    Extract `CardTag.label` extension to shared file (maps `TagCategory` → String, both shared), then
@@ -93,13 +88,15 @@ Work in priority order, delegating each to `android-kotlin-architect`:
    - `MagicBottomBar` — `Screen` sealed class (`:app`) + `R.drawable` icons (hoist as params).
    - `CardSearchSheet` — `android.app.Activity` reference (hardblocked; defer).
 
-4. **`StatsViewModel` DAO-direct violation** — imports `GameSessionDao` directly (bypasses
-   `GameSessionRepository`). Route `observeFavoriteMode()` through the repo interface.
-   File: `app/.../feature/stats/presentation/StatsViewModel.kt` line ~133.
+4. **~20 blocked use cases** — `GetDeckGameStatsUseCase` (Room DAOs), tournament use cases
+   (now unblocked: `TournamentRepository` is in core-domain), `ClaimQuestRewardUseCase`
+   (GamificationDao), `ComputeCardTagsUseCase` (Gson tag mapper — replace with kotlinx-serialization
+   or manual parser).
 
-5. **~20 blocked use cases** — `GetDeckGameStatsUseCase` (Room DAOs), tournament use cases
-   (unblocked by item 1), `ClaimQuestRewardUseCase` (GamificationDao), `ComputeCardTagsUseCase`
-   (Gson tag mapper — replace with kotlinx-serialization or manual parser).
+5. **Repository interfaces still carrying Room types** — `CardRepository`, `DeckRepository`,
+   `UserCardRepository`, `StatsRepository` interfaces carry entity/DAO types. Extract domain
+   equivalents to core-model and move interfaces to core-domain (same pattern as GameSession +
+   Tournament done 2026-06-30).
 
 6. **EXCLUDED features** (online/voice/scanner) — deferred. Do NOT touch.
 
@@ -108,13 +105,17 @@ Work in priority order, delegating each to `android-kotlin-architect`:
 - **Excluded & untouched** (still Hilt + Android Compose): `feature/online`, `core/voice` + in-game
   voice, `feature/scanner`. If a slice would touch them → stop and report instead.
 - **One slice = one logical code commit + one tracker commit. Android GREEN at every commit.**
-- Verify gauntlet baseline: **1964 tests, 122 failed** (pre-existing; the failing-test-CLASS set must
+- Verify gauntlet baseline: **1964 tests, 123 failed** (pre-existing; the failing-test-CLASS set must
   not grow). Leak grep over `shared/*/src/commonMain` must show no `import androidx`/`android.`/`java.`
   lines (except `java.util.UUID` → use `kotlin.uuid.Uuid`).
 - **`--rerun-tasks`** on build verification — Gradle stale cache causes false `Unresolved reference`
   errors after cross-module file moves. This has happened 5+ times during this migration.
 - **Small-and-safe beats big-and-broken:** if a slice can't reach green, leave the last green commit,
   write the exact blocker into the tracker NEXT STEP, and STOP.
+- **Inline FQN gotcha:** after any model/type move, grep for the moved type's name as an INLINE fully-
+  qualified reference (not just imports). `HomeViewModel.kt` missed this twice — import sweeps are
+  insufficient. Always run: `grep -rn "TournamentEntity\|GameSessionEntity" app/src/main/java` (adapt
+  to the moved type) after updating imports.
 
 ### Step 6 — Close the loop after each slice
 - Commit (standard ManaHub trailers).
