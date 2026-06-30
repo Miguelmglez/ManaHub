@@ -377,35 +377,40 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## NEXT STEP (resume here)
 
-**➡️ NEXT = Continue Phase 4 platform parity (Android KMP-readiness focus).**
+**➡️ NEXT = Phase 4 item 5 — Room-backed repo impls / DAO-abstraction interfaces for the web
+data-source phase.** (Tier 3/4, medium-to-high effort; the last open item in "Phase 4 remaining work".)
 
 User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
 target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
 
-**2026-07-01 — CMP composeResources infrastructure + ONE proof-of-concept string landed (`6002793`,
-item 3 above). The bulk migration is NOT done — pick up here next:**
-- **Files still blocked on the Res system specifically** (their `stringResource`/hardcoded-English
-  literals are candidates once someone does the bulk sweep — these are listed under item 4 in "Phase 4
-  remaining work" above as the composables with deep platform deps): `CardSearchSheet` (blocked on
-  `android.app.Activity`/`Context` — its STRING literals are now technically Res-eligible even though the
-  whole file can't move yet; worth doing the string swap in place even pre-move, or batching it into the
-  eventual move), `GameModeSelector`/`MagicBottomBar` (already moved to core-ui per the 2026-06-29 log —
-  re-check if they still have hardcoded-English literals that could become Res entries now that the
-  infra exists), and any of the ~54 already-shared core-ui composables that currently hardcode English
-  strings inline (they were moved BEFORE the Res system existed, so check for swap candidates — this
-  tracker's Phase 3 log repeatedly says "X stringResource → English literals" as the unblocking move;
-  those literals are now promotable to `composeResources/values/strings.xml` entries, though doing so is
-  optional polish, not a blocker for anything else).
-- **Distinguish the two blocker types going forward**: a file can be blocked on (a) the Res system (now
-  UNBLOCKED) or (b) a genuinely Android-only API (`Activity`, `Context`, `android.graphics`, bitmap
-  resources — still BLOCKED, needs `expect`/`actual` or a different abstraction). `CardSearchSheet` is the
-  clearest example of (b) blocking the whole file even though (a) is no longer an issue for its strings.
-- Otherwise, continue down the "Phase 4 remaining work" list above: item 4 (remaining `:app` composables
-  with deep platform deps), item 5 (Room-backed repo impls / DAO-abstraction interfaces for the web
-  data-source phase) — both still open, Tier 3/4, medium-to-high effort.
+**2026-07-01 — Composable/Res follow-up assessment session (audit only, no `.kt` code change; doc-only
+commit). Item 4 ("remaining `:app` composables with deep platform deps") is now CLOSED — see its full
+entry above. Summary of what was checked and decided:**
+- **`CardSearchSheet.kt` re-confirmed as a genuine hard blocker** — its forced-keyboard-dismiss logic is
+  load-bearing on `Activity`/`WindowInsetsControllerCompat`/`LocalView` (none CMP-portable). Left
+  exactly as-is; its `R.string.*` calls correctly stay plain Android resources (the file isn't shared,
+  so CMP `Res` buys nothing). No string-swap-in-place was done — rejected as churn with no payoff while
+  the file can't move.
+- **`ParticipantListRow`/`RoomCodeDisplay`/`RoomCodeField` re-confirmed online-excluded** (sole
+  consumers are `feature/online/presentation/lobby/*`) — untouched per the hard exclusion rule.
+- **No other `:app` composables remain with deep platform deps** — directory listing of
+  `core/ui/components/` has exactly these 4 files; everything else from the Phase-3/4 backlog was
+  already moved in prior sessions.
+- **Bulk Res sweep across the ~54 already-shared core-ui composables and the 3 gamification catalogs
+  was evaluated and SKIPPED** (no code change) — see item 4b above for the full rationale. Short
+  version: the composables have no concentrated string-duplication worth centralizing, and the catalogs
+  are eagerly-initialized `object`s where `Res.string.*` isn't even mechanically usable (no
+  `@Composable`/`suspend` context at construction) — converting them would need a bigger key/resolve
+  refactor with zero localization payoff in an English-only app. Revisit only if a second locale is ever
+  planned.
+- **Phase 4 remaining work is now down to item 5 only** (Room-backed repo impls for the web data-source
+  phase — Card/Deck/Stats/UserCard/GameSession/Tournament each need a DAO-abstraction interface in
+  `commonMain`, with fresh Supabase-backed impls behind the same interface for web). That's the next
+  slice to pick up.
 
 **308 shared `.kt` files** across 5 modules as of 2026-06-25 (higher by session end 2026-06-30).
-Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 errors, 2 skipped.
+Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 errors, 2 skipped. (No test
+run was needed this session — zero `.kt`/`.gradle.kts` changes were made; pure documentation update.)
 
 **2026-06-30 (later session) — audit only, no code change.** Item 6 ("Repository interfaces with Room
 types") is now CLOSED: `CardRepository`/`DeckRepository`/`UserCardRepository`/`StatsRepository` were
@@ -584,8 +589,65 @@ Tier 3/4, medium-to-high effort; pick up there.
    above; flag this as a soft gap if a future session wants a stricter confirmation. commonMain leak-grep
    (excluding the already-established-safe `androidx.compose.*`/`androidx.annotation` CMP-compatible
    imports, per this module's own header comment "binary-compatible with AndroidX Compose") → EMPTY (PASS).
-4. **Remaining composables in `:app`** — deep platform deps (bitmap resources, `android.graphics`,
-   heavy string resources). Migrate with CMP Res.
+4. ✅ **CLOSED 2026-07-01 (audit only, no code change).** Re-surveyed `:app/.../core/ui/components/`
+   (`find ... -maxdepth 1 -name "*.kt"`) — only **4 files** remain there, matching exactly what the
+   Phase-3/4 logs already expected:
+   - **`CardSearchSheet.kt` — CONFIRMED genuine hard blocker, NOT moved.** Read the full file: the
+     `android.app.Activity`/`Context` dependency is load-bearing, not liftable. Its `forceHideKeyboard()`
+     closure (called from 7+ call-sites: dispose, tab switches, search-clear, advanced-search button,
+     pointer-input, confirm/cancel) does `view.context.findActivity()` then
+     `WindowInsetsControllerCompat(activity.window, view).hide(WindowInsetsCompat.Type.ime())` — a forced
+     IME-dismiss workaround using `androidx.core.view.WindowInsetsCompat`/`WindowInsetsControllerCompat`
+     (AndroidX **Core View**, not CMP-portable) plus `androidx.compose.ui.platform.LocalView` (resolves to
+     `android.view.View`, Android-only — CMP has no common `LocalView`). There is no `Activity`/
+     `WindowInsetsController` concept on `wasmJs`; unblocking this would require inventing a new
+     `expect`/`actual` "force-hide-soft-keyboard" abstraction with a web no-op `actual` — out of scope for
+     an incremental slice, not attempted. **Its `stringResource(R.string.*)` calls are NOT converted to
+     CMP `Res.string.*`**: the file stays `:app`-only (not in a shared module), so plain Android
+     `R.string` is the correct idiomatic tool here — CMP `Res` only pays off for code that actually lives
+     in `commonMain`. No "do the string swap in place pre-move" work was done (rejected as churn with no
+     payoff while the file can't move).
+   - **`ParticipantListRow.kt` / `RoomCodeDisplay.kt` / `RoomCodeField.kt` — CONFIRMED online-excluded,
+     untouched.** Grepped all consumers project-wide
+     (`grep -rl "ParticipantListRow\|RoomCodeDisplay\|RoomCodeField" app/src/main/java`): the ONLY callers
+     are `feature/online/presentation/lobby/OnlineHostSheet.kt` and `OnlineJoinSheet.kt`. Per the hard
+     exclusion rule (`feature/online` never touched), these are out of scope for this migration wave —
+     left exactly as-is, no assessment work needed beyond confirming the exclusion.
+   - **Conclusion: item 4 is fully resolved.** There are no other `:app` composables left with deep
+     platform deps outside the excluded trio — every other Phase-3/4-listed file (ManaSymbolImage,
+     DeckItem, ManaCurveChart, VariantSelectorSheet, AddCardSheet, TradeSelectionSheet, GameModeSelector,
+     MagicBottomBar, CircularDistribution) was already moved in prior sessions and the directory listing
+     now confirms nothing was missed.
+
+4b. ✅ **DECIDED 2026-07-01 (assessment only, no code change) — bulk Res sweep across the ~54 already-
+   shared `core-ui` composables AND the 3 gamification catalogs is SKIPPED, not a backlog item.**
+   - **The ~54 `core-ui` composables (hardcoded English literals from pre-Res Phase-3 moves):** grepped
+     `shared/core-ui/src/commonMain` for common reused literals (`"Cancel"`, `"Confirm"`, `"Close"`,
+     `"Search"`, `"Remove"`, `"Loading..."`, `"No cards found"`, `"Add to deck"`) — only 11 hits spread
+     across 6 files, mostly one-off `contentDescription`s, not duplicated boilerplate. There is no
+     concentrated subset where centralizing into `Res.string.*` would meaningfully reduce duplication —
+     converting all ~54 files would be a large, purely cosmetic diff (every literal → a new
+     `strings.xml` row + a `stringResource(Res.string.x)` call) with zero functional payoff: the app is
+     explicitly English-only with no localization roadmap (CLAUDE.md), so the #1 reason to externalize
+     strings (translation) doesn't apply here. Genuine value (single source of truth, future
+     `values-xx/` would Just Work) is real but marginal for a one-locale app — judged not worth the
+     churn right now. **Skipped.**
+   - **The 3 gamification catalogs (`AchievementCatalog`/`QuestCatalog`/`UnlockableCatalog`, ~87
+     strings) — SKIPPED for a concrete technical reason, not just a value judgment.** Read
+     `AchievementCatalog.kt`: it's a top-level `object` whose `AchievementDef` entries (`title =
+     "Hoarder"`, `description = "Own 100 / 1,000 / 5,000 cards"`, ...) are constructed **eagerly at
+     object-init time**, in plain (non-`@Composable`, non-`suspend`) Kotlin code. CMP's `Res.string.*`
+     can only be resolved via `stringResource()` (requires `@Composable` context) or `getString()`
+     (requires a coroutine/`suspend` context) — neither is available where these catalogs build their
+     static `List<AchievementDef>`. Converting them would NOT be a find-and-replace: it would require
+     restructuring every catalog to carry stable string **keys** instead of resolved text, then
+     resolving display strings lazily at each of the 7 UI consumer call-sites identified in the
+     2026-06-25 log — a materially bigger refactor than "swap a literal for a Res call," for the same
+     zero-localization-payoff reason as above. **Skipped — not attempted.**
+   - Both decisions are pure-quality/consistency calls (or in the catalog case, an architectural
+     mismatch with eager `object` initialization) with **no unblocking value** — nothing downstream
+     depends on this conversion. Revisit only if/when the project ever adds a second locale (currently
+     explicitly out of scope per CLAUDE.md "Language rules").
 5. **Room-backed repo impls** (Card, Deck, Stats, UserCard, GameSession, Tournament) — each needs
    DAO-abstraction interfaces in commonMain. For web, fresh Supabase-backed impls behind same interface.
 6. **Repository interfaces with Room types** — Room entities/projections in interface signatures.
