@@ -385,6 +385,14 @@ target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready
 **308 shared `.kt` files** across 5 modules as of 2026-06-25 (higher by session end 2026-06-30).
 Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 errors, 2 skipped.
 
+**2026-06-30 (later session) — audit only, no code change.** Item 6 ("Repository interfaces with Room
+types") is now CLOSED: `CardRepository`/`DeckRepository`/`UserCardRepository`/`StatsRepository` were
+re-verified and are ALREADY pure + ALREADY in `shared/core-domain` (done in earlier Phase-2 slices; the
+"Remaining" bullet under item 6 was stale — see that section for commit SHAs). No interface in
+`shared/core-domain` carries a Room/Android type. **Next unblocked Phase-4 items are #3 (CMP Res system)
+and #5 (Room-backed repo impls / DAO-abstraction interfaces for the web data-source phase)** — both
+Tier 3/4, medium-to-high effort; pick up there.
+
 **Phase 4 completed (2026-06-24):**
 - ✅ `kotlinx-datetime` 0.6.2 added to all shared modules + `:app`
 - ✅ `java.time` completely eliminated from app source (0 imports remain)
@@ -533,8 +541,17 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
      `observeArchetypeMatchups`) + `ArchetypeMatchupData` domain type; `gameSessionDao` removed
      from `StatsViewModel` ctor + `StatsKoinModule` + `ManaHubApp`.
    - ✅ `TournamentRepository` DONE 2026-06-30 (`f8db684`).
-   - Remaining: `CardRepository`, `DeckRepository`, `UserCardRepository`, `StatsRepository` still
-     carry Room/entity types (blocked until those domain models are ported).
+   - ✅ **Verified 2026-06-30 (audit, no code change): `CardRepository`, `DeckRepository`,
+     `UserCardRepository`, `StatsRepository` were ALREADY pure + ALREADY in `shared/core-domain`
+     `commonMain` from earlier Phase-2 slices — this bullet was stale.** `StatsRepository` moved in
+     `158559a` (Slice 1), `DeckRepository` in `8dc2bc1` (Slice 2a-i), `CardRepository` in `e8e83b3`
+     (Slice 2b-ii), `UserCardRepository` in `815f169` (batch #3, Recipe-4 paging split —
+     `CollectionPagerSource` stays `:app`-only for the `PagingData<UserCardWithCard>` pager method;
+     `UserCardRepositoryImpl` implements both interfaces). Re-read all 4 interface files + their `:app`
+     impls on 2026-06-30: zero Room/Android types in any signature, zero blockers found. **Item 6 is
+     CLOSED — no repository interface still carries a Room type.** (`GenerateNextRoundUseCase`'s
+     `TournamentMatch.toEntity()` reverse-mapper in `TournamentRepositoryImpl` is the only Room-entity
+     touch point left, and it's impl-side, not on the interface.)
 7. **Blocked use cases:**
    - ✅ `CalculateStandingsUseCase` → `:shared:core-domain` DONE 2026-06-30 (`@Inject` stripped,
      `TournamentModule.provideCalculateStandingsUseCase` added, package UNCHANGED).
@@ -706,6 +723,22 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-30 (later session) — **Audit-only: "4 Room-typed repository interfaces" task found ALREADY
+  DONE, tracker corrected, no `.kt` change.** Assigned task was to extract `CardRepository`,
+  `DeckRepository`, `UserCardRepository`, `StatsRepository` out of `:app` into `shared/core-domain`
+  (mirroring the `GameSessionRepository`/`TournamentRepository` pattern), since the tracker's item-6
+  "Remaining" bullet listed them as still Room-typed. Re-read all 4 interface files + their `:app`
+  impls: **all 4 were already pure and already living in `shared/core-domain/src/commonMain`**, done in
+  earlier Phase-2 slices — `StatsRepository` (`158559a`, Slice 1), `DeckRepository` (`8dc2bc1`, Slice
+  2a-i), `CardRepository` (`e8e83b3`, Slice 2b-ii), `UserCardRepository` (`815f169`, batch #3 — Recipe-4
+  paging split, `CollectionPagerSource` stays `:app`-only for the `PagingData<UserCardWithCard>` pager
+  method). The stale bullet was simply never struck off when those slices landed. Corrected the tracker
+  (STATUS item 6 + NEXT STEP header) to close item 6 and point at the real next unblocked items (#3 CMP
+  Res system, #5 Room-backed repo impl DAO-abstraction). Verified HEAD (`b6e16b7`) still green:
+  `:app:assembleDebug` BUILD SUCCESSFUL (`--rerun-tasks`); `:shared:core-model`/`:shared:core-domain`
+  `compileKotlinWasmJs` SUCCESSFUL (`--rerun-tasks`); `:app:testDebugUnitTest` 1964 tests / 123 failed /
+  2 skipped (== documented baseline, no new failing classes). No commit needed for code (none changed);
+  doc-only commit for this tracker correction.
 - 2026-06-30 — **Phase 4: `GetDeckGameStatsUseCase` → `:shared:core-domain` (GREEN, `72e4551`) +
   Tasks 2-4 verification sweep (no code changes).**
   **Task 1 (landed):** `GetDeckGameStatsUseCase` moved to `:shared:core-domain` commonMain (package
