@@ -7,6 +7,7 @@ import com.mmg.manahub.core.gamification.di.GamificationModule.Companion.provide
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.gamification.engine.GamificationEngineImpl
 import dagger.Binds
 import dagger.Module
@@ -67,5 +68,19 @@ abstract class GamificationModule {
         @Provides
         @Singleton
         fun provideTimeZone(): TimeZone = TimeZone.currentSystemDefault()
+
+        /**
+         * Provides the [ClaimQuestRewardUseCase] singleton.
+         *
+         * The use case lives in `commonMain` and lost its `@Inject` annotation (javax.inject is
+         * JVM-only). Declared here so Hilt can inject it into [com.mmg.manahub.core.gamification.engine.QuestReconciler]
+         * and into the Koin bridge (via [com.mmg.manahub.app.ManaHubApp]).
+         */
+        @Provides
+        @Singleton
+        fun provideClaimQuestRewardUseCase(
+            gamificationRepository: GamificationRepository,
+            clock: Clock,
+        ): ClaimQuestRewardUseCase = ClaimQuestRewardUseCase(gamificationRepository, clock)
     }
 }

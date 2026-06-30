@@ -6,6 +6,8 @@ import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
 import com.mmg.manahub.core.data.local.entity.PlayerProgressionEntity
 import com.mmg.manahub.core.data.local.entity.QuestInstanceEntity
 import com.mmg.manahub.core.data.local.entity.StreakEntity
+import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
+import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.QuestPeriod
 import com.mmg.manahub.core.gamification.domain.QuestPeriodKeys
@@ -24,9 +26,10 @@ import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
 import com.mmg.manahub.core.gamification.domain.model.RewardUiModel
 import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
-import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
-import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.gamification.domain.model.ClaimResult
+import com.mmg.manahub.core.gamification.domain.model.GrantResult
+import com.mmg.manahub.core.gamification.domain.model.QuestClaimData
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.engine.StreakTracker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -52,7 +55,6 @@ class GamificationRepositoryImpl @Inject constructor(
     private val dao: GamificationDao,
     private val clock: Clock,
     private val timeZone: TimeZone,
-    private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : GamificationRepository {
 
@@ -104,8 +106,37 @@ class GamificationRepositoryImpl @Inject constructor(
             rows.firstOrNull { it.type == StreakTracker.TYPE_DAILY_ACTIVITY }.toUiModel()
         }
 
-    override suspend fun claimQuest(instanceId: String): ClaimResult =
-        claimQuestRewardUseCase(instanceId)
+    // ── Quest claim primitives (Phase 2) — used by ClaimQuestRewardUseCase ──────
+
+    override suspend fun getQuestForClaim(instanceId: String): QuestClaimData? {
+        val entity = dao.getQuest(instanceId) ?: return null
+        return QuestClaimData(status = entity.status, xpReward = entity.xpReward)
+    }
+
+    override suspend fun grantQuestClaimXp(instanceId: String, xpDelta: Int, now: Long): GrantResult {
+        val daoResult = dao.grantXpAtomically(
+            txn = XpTransactionEntity(
+                idempotencyKey = "quest_claim:$instanceId",
+                amount = xpDelta,
+                sourceCategory = XpSourceCategory.QUEST.name,
+                sourceRef = instanceId,
+                createdAt = now,
+            ),
+            amount = xpDelta,
+            updatedAt = now,
+            levelForTotalXp = LevelCurve::levelForTotalXp,
+        )
+        return GrantResult(
+            applied = daoResult.applied,
+            previousLevel = daoResult.previousLevel,
+            newLevel = daoResult.newLevel,
+        )
+    }
+
+    override suspend fun markQuestClaimed(instanceId: String) {
+        val entity = dao.getQuest(instanceId) ?: return
+        dao.upsertQuest(entity.copy(status = STATUS_CLAIMED))
+    }
 
     // ── Rewards / cosmetics (Phase 3) ─────────────────────────────────────────
 
@@ -245,6 +276,7 @@ class GamificationRepositoryImpl @Inject constructor(
     }
 
     private companion object {
+        const val STATUS_CLAIMED = "CLAIMED"
         const val STATUS_EXPIRED = "EXPIRED"
     }
 }

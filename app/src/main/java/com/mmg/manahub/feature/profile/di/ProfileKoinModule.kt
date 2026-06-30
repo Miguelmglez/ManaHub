@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.profile.di
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
@@ -14,12 +15,12 @@ import org.koin.dsl.module
  * feature stays on Hilt. This continues the incremental, per-feature cutover proven by Spike D.
  *
  * ## Bridge pattern (same as Settings + Stats)
- * [ProfileViewModel] depends on seven singletons still owned by the Hilt object graph. Rather than
+ * [ProfileViewModel] depends on singletons still owned by the Hilt object graph. Rather than
  * re-providing them in Koin — which would risk duplicate construction / divergent state — `ManaHubApp`
  * is the bridge: it `@Inject`s the already-constructed Hilt instances and passes them into
  * [profileKoinModule], which re-exposes the Profile-only ones to Koin as `single { }`.
  *
- * Six of the seven dependencies are SHARED with other islands and are therefore NOT registered here —
+ * Six of the eight dependencies are SHARED with other islands and are therefore NOT registered here —
  * they are bridged exactly once in `coreBridgeKoinModule` (registering the same type in two loaded
  * modules would throw `DefinitionOverrideException`), and this module resolves them via `get()`:
  * - [GameSessionRepository] — shared with the Stats + Home islands.
@@ -27,23 +28,22 @@ import org.koin.dsl.module
  * - [AuthRepository] — shared with the Settings + Home islands.
  * - [StatsRepository] — shared with the Home island.
  * - [GamificationRepository] — shared with the Home island.
- * - `FriendRepository` — shared with the Friends island. PROMOTED into `coreBridgeKoinModule` (and
- *   this param/`single` removed) when the Friends island also began consuming it.
+ * - `FriendRepository` — shared with the Friends island.
  *
- * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
- * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
- * the app uncompilable between commits.
+ * [SurveyAnswerDao] and [ClaimQuestRewardUseCase] are Profile-only singletons bridged here.
  *
  * @return a Koin [Module] that provides the Profile-only bridged singletons and the [ProfileViewModel] factory.
  */
 fun profileKoinModule(
     surveyAnswerDao: SurveyAnswerDao,
+    claimQuestRewardUseCase: ClaimQuestRewardUseCase,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Profile-only Hilt-owned singletons to Koin. ──
     // (gameSessionRepo, userPreferencesDataStore, authRepository, statsRepository, gamificationRepository
     //  and friendRepository are shared → bridged in coreBridgeKoinModule, not here, to avoid
     //  DefinitionOverrideException.)
     single { surveyAnswerDao }
+    single { claimQuestRewardUseCase }
 
     // ── The Koin island: ProfileViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
@@ -55,6 +55,7 @@ fun profileKoinModule(
             friendRepository = get(),
             authRepository = get(),
             gamificationRepository = get(),
+            claimQuestRewardUseCase = get(),
         )
     }
 }

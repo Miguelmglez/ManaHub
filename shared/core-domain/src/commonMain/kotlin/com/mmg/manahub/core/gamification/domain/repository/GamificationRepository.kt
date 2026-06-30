@@ -1,12 +1,14 @@
 package com.mmg.manahub.core.gamification.domain.repository
 
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
+import com.mmg.manahub.core.gamification.domain.model.GrantResult
 import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
 import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.QuestClaimData
 import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
-import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -59,11 +61,33 @@ interface GamificationRepository {
      */
     fun observeDailyActivityStreak(): Flow<StreakUiModel>
 
+    // ── Quest claim primitives (Phase 2 — used by ClaimQuestRewardUseCase) ──────
+
     /**
-     * Claims a COMPLETED quest's XP reward (Phase 2). Delegates to the idempotent claim use case;
-     * a double-claim never double-grants. Returns the outcome for the UI to surface.
+     * Returns the minimal claim-relevant state of the quest instance [instanceId], or `null` when
+     * no instance with that id exists. Used by [com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase]
+     * so the use case does not need a direct Room/DAO dependency.
      */
-    suspend fun claimQuest(instanceId: String): ClaimResult
+    suspend fun getQuestForClaim(instanceId: String): QuestClaimData?
+
+    /**
+     * Atomically grants [xpDelta] XP for a quest claim via the ledger key
+     * `quest_claim:{instanceId}`. Idempotent: a duplicate key results in `applied = false`.
+     * Delegates to `GamificationDao.grantXpAtomically` in the Android implementation.
+     *
+     * @param instanceId  The quest instance id; used to build the idempotency key.
+     * @param xpDelta     XP amount to add (caller-validated > 0).
+     * @param now         Epoch-millis timestamp for the ledger row and the progression update.
+     * @return            A [GrantResult] indicating whether the grant was applied and the new level.
+     */
+    suspend fun grantQuestClaimXp(instanceId: String, xpDelta: Int, now: Long): GrantResult
+
+    /**
+     * Marks the quest instance [instanceId] as CLAIMED. Idempotent: if the instance is already
+     * CLAIMED this is a no-op. Called after a successful XP grant (or after a duplicate-key
+     * no-op to make status consistent).
+     */
+    suspend fun markQuestClaimed(instanceId: String)
 
     // ── Rewards / cosmetics (Phase 3, ADR-002 §10) ────────────────────────────
 
