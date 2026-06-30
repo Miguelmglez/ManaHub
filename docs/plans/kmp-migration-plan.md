@@ -365,6 +365,15 @@ compile on wasmJs. **Phase 4** platform parity (Firebase/WorkManager/camera/voic
 fallbacks + responsive). **Phase 5** hardening + Cloudflare Pages deploy. Eventually migrate the excluded
 online/voice/scanner trio in a final wave.
 
+> **NOTE (2026-07-01):** this whole §9.6 list predates Phase 4 and is stale (Phase 2/3 are long complete —
+> see `kmp-migration-progress.md` STATUS, which always wins over this backlog if they disagree). One
+> specific update worth recording here: the `painterResource`/`R` → CMP `Res` step above is now PARTIALLY
+> done — composeResources infrastructure exists in `:shared:core-ui` (`compose.components.resources` +
+> `src/commonMain/composeResources/values/strings.xml`) and one string round-tripped through it
+> (`ManaCurveChart` `commit 6002793`). The bulk string/drawable sweep across the remaining shared
+> composables + the still-`:app`-only ones is NOT done — see the progress tracker's NEXT STEP for the
+> current state and file list.
+
 ### 9.7 Per-slice task template (what the orchestrator hands the architect)
 > Branch `feature/kmp-migration`, last green commit `<sha>`, tree CLEAN. Do NOT touch online/voice/scanner.
 > **Slice:** `<one item from §9.6, ≤ ~12 files>`. **Recipe:** `<§9.4 recipe #>`. **Decision tree:** apply

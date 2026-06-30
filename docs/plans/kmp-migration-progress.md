@@ -382,6 +382,28 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
 target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
 
+**2026-07-01 — CMP composeResources infrastructure + ONE proof-of-concept string landed (`6002793`,
+item 3 above). The bulk migration is NOT done — pick up here next:**
+- **Files still blocked on the Res system specifically** (their `stringResource`/hardcoded-English
+  literals are candidates once someone does the bulk sweep — these are listed under item 4 in "Phase 4
+  remaining work" above as the composables with deep platform deps): `CardSearchSheet` (blocked on
+  `android.app.Activity`/`Context` — its STRING literals are now technically Res-eligible even though the
+  whole file can't move yet; worth doing the string swap in place even pre-move, or batching it into the
+  eventual move), `GameModeSelector`/`MagicBottomBar` (already moved to core-ui per the 2026-06-29 log —
+  re-check if they still have hardcoded-English literals that could become Res entries now that the
+  infra exists), and any of the ~54 already-shared core-ui composables that currently hardcode English
+  strings inline (they were moved BEFORE the Res system existed, so check for swap candidates — this
+  tracker's Phase 3 log repeatedly says "X stringResource → English literals" as the unblocking move;
+  those literals are now promotable to `composeResources/values/strings.xml` entries, though doing so is
+  optional polish, not a blocker for anything else).
+- **Distinguish the two blocker types going forward**: a file can be blocked on (a) the Res system (now
+  UNBLOCKED) or (b) a genuinely Android-only API (`Activity`, `Context`, `android.graphics`, bitmap
+  resources — still BLOCKED, needs `expect`/`actual` or a different abstraction). `CardSearchSheet` is the
+  clearest example of (b) blocking the whole file even though (a) is no longer an issue for its strings.
+- Otherwise, continue down the "Phase 4 remaining work" list above: item 4 (remaining `:app` composables
+  with deep platform deps), item 5 (Room-backed repo impls / DAO-abstraction interfaces for the web
+  data-source phase) — both still open, Tier 3/4, medium-to-high effort.
+
 **308 shared `.kt` files** across 5 modules as of 2026-06-25 (higher by session end 2026-06-30).
 Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 errors, 2 skipped.
 
@@ -529,7 +551,39 @@ Tier 3/4, medium-to-high effort; pick up there.
   commonMain.
 
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
-3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
+3. ✅ **CMP Res system — DONE-POC (2026-06-30/07-01, `6002793`).** Infrastructure stood up + ONE string
+   proven end-to-end; the BULK string/drawable migration across the remaining `:app` composables is
+   still future work (see item 4 below for the file list). `implementation(compose.components.resources)`
+   added to `:shared:core-ui` commonMain; first `src/commonMain/composeResources/values/strings.xml`
+   (single entry `deckbuilder_ideal_curve`, English-only — NOT a localization mechanism, no `values-xx/`
+   dirs per CLAUDE.md). `ManaCurveChart.kt`'s `legendLabel` default switched from the hardcoded literal
+   to `stringResource(Res.string.deckbuilder_ideal_curve)` — zero behavior change, zero caller edits
+   (`DraftResultScreen.kt`/`StatsScreen.kt` don't pass it explicitly). **No AGP9/`androidLibrary{}`
+   friction found** — `convertXmlValueResourcesForCommonMain` → `generateComposeResClass` →
+   `generateResourceAccessorsForCommonMain` ran automatically ahead of `compileKotlinWasmJs` AND the
+   Android `assembleDebug` path with **zero explicit `dependsOn` wiring** (Gradle's implicit
+   compile-classpath task dependency handled it on both targets). **Generated package is
+   `manahub.shared.core_ui.generated.resources`** — auto-derived from the Gradle module path
+   (`:shared:core-ui` → `manahub.shared.core_ui`), NOT from the `androidLibrary.namespace`
+   (`com.mmg.manahub.core.ui`); no `compose.resources { packageOfResClass = ... }` override was needed
+   for this single-module POC (didn't collide with anything). `Res`/`Res.string.*` accessors generate
+   `internal` visibility — fine since the only consumer (`ManaCurveChart.kt`) is in the same module;
+   a FUTURE module that also wants composeResources (e.g. a `:shared:feature-*` module) will get its
+   own auto-namespaced package with no collision risk, but a cross-module consumer would need the
+   producing module to set `packageOfResClass` + expose the strings differently (not yet exercised).
+   Verified: `:app:assembleDebug --rerun-tasks` BUILD SUCCESSFUL; `compileKotlinWasmJs` SUCCESSFUL for
+   core-model + core-domain + core-ui; `testDebugUnitTest --rerun-tasks` 1964 tests / **124 failed** / 2
+   skipped — 20 failing classes, ALL in subsystems with zero code-path connection to this diff (Trades/
+   Wishlist/OpenForTrade/sync/auth-repo/online-lobby/scanner/tagging/voice/push-deeplink/HomeViewModel —
+   exactly the pre-existing flaky surface this tracker's Phase 0.5 entry already named: "Crashlytics-init,
+   Turbine, scanner tuning, trades/sync"); treated as flakiness consistent with the documented "123 known
+   flaky +1, not a regression" precedent, not a regression from this slice (no class touches core-ui,
+   ManaCurveChart, or compose resources). A clean-HEAD re-run for a strict A/B class-set diff hit an
+   unrelated Windows env flake (`processDebugResources` → `Couldn't delete …R.jar`, a transient file-lock,
+   not a code issue) before reaching the test task — not re-attempted given the corroborating evidence
+   above; flag this as a soft gap if a future session wants a stricter confirmation. commonMain leak-grep
+   (excluding the already-established-safe `androidx.compose.*`/`androidx.annotation` CMP-compatible
+   imports, per this module's own header comment "binary-compatible with AndroidX Compose") → EMPTY (PASS).
 4. **Remaining composables in `:app`** — deep platform deps (bitmap resources, `android.graphics`,
    heavy string resources). Migrate with CMP Res.
 5. **Room-backed repo impls** (Card, Deck, Stats, UserCard, GameSession, Tournament) — each needs
@@ -721,6 +775,19 @@ Update this tracker after each step. Keep Android shippable at every step.
   API property declared in different module"). Fix = capture into a local `val` before the check (done for
   `NewsItem.Video.duration` in VideoCard.kt and `NewsFilterPrefs.sourceIds` in HomeViewModel.kt). Expect
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
+- **CMP composeResources (2026-06-30/07-01):** `implementation(compose.components.resources)` +
+  `src/commonMain/composeResources/values/strings.xml` needs NO explicit task wiring — the
+  `convertXmlValueResourcesForCommonMain`/`generateComposeResClass`/`generateResourceAccessorsForCommonMain`
+  chain is automatically ordered ahead of `compileKotlinWasmJs` and the Android compile path by Gradle's
+  implicit compile-classpath dependency; no AGP9 `androidLibrary{}`-vs-CMP-resources friction encountered.
+  The generated `Res` accessor package is derived from the **Gradle module path** (`:shared:core-ui` →
+  `manahub.shared.core_ui.generated.resources`), NOT the `androidLibrary.namespace` — set
+  `compose.resources { packageOfResClass = "..." }` explicitly if a stable/predictable package matching
+  the namespace is ever needed (not required for a same-module consumer; `Res`/`Res.string.*` generate
+  `internal`, so cross-module consumption needs that override). Forbidden-import leak-grep allowlists
+  `androidx.compose.*`/`androidx.annotation` (CMP-compatible, binary-compatible with AndroidX on Android —
+  see `:shared:core-ui/build.gradle.kts` header comment); only OTHER `androidx.*`/`android.*`/`java.*`
+  imports are real leaks.
 
 ## CHANGE LOG
 - 2026-06-30 (later session) — **Audit-only: "4 Room-typed repository interfaces" task found ALREADY
