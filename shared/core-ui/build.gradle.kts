@@ -57,6 +57,11 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.ui)
                 implementation(compose.materialIconsExtended)
+                // CMP Resources — the multiplatform replacement for android R.string/R.drawable in
+                // shared composables (commonMain has no access to androidx resources). ManaHub is
+                // English-only (CLAUDE.md): this is NOT a localization mechanism, just the KMP string/
+                // drawable accessor — keep src/commonMain/composeResources/values/strings.xml single-locale.
+                implementation(compose.components.resources)
                 implementation(libs.coil.compose)
                 implementation(libs.kotlinx.datetime)
             }

@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import manahub.shared.core_ui.generated.resources.Res
+import manahub.shared.core_ui.generated.resources.deckbuilder_ideal_curve
+import org.jetbrains.compose.resources.stringResource
 
 // Height budget constants (all in dp, converted in Canvas scope)
 private val CANVAS_HEIGHT        = 96.dp
@@ -47,9 +50,11 @@ private val BASELINE_STROKE_DP   = 0.5.dp
  * @param title           Optional header label (displayed left of the legend).
  * @param showIdealCurve  When `true`, overlays the [idealCurve] as a dashed line.
  * @param idealCurve      Per-CMC ideal ratios (length must be ≥ 8 when [showIdealCurve] is true).
- * @param legendLabel     Label for the ideal-curve legend swatch. Defaults to "Ideal curve".
- *                        Pass the app's localised string if required; the default is English-only
- *                        (acceptable — the app is English-only per CLAUDE.md).
+ * @param legendLabel     Label for the ideal-curve legend swatch. Defaults to the CMP composeResources
+ *                        string `deckbuilder_ideal_curve` ("Ideal curve"). Pass an override only if a
+ *                        caller needs different copy; ManaHub is English-only (CLAUDE.md) so there is
+ *                        no localisation behind this default — it is purely the KMP replacement for
+ *                        the old `stringResource(R.string.deckbuilder_ideal_curve)` Android call.
  */
 @Composable
 fun ManaCurveChart(
@@ -58,7 +63,7 @@ fun ManaCurveChart(
     title: String? = null,
     showIdealCurve: Boolean = false,
     idealCurve: FloatArray? = null,
-    legendLabel: String = "Ideal curve",
+    legendLabel: String = stringResource(Res.string.deckbuilder_ideal_curve),
 ) {
     val mc = MaterialTheme.magicColors
     val textMeasurer = rememberTextMeasurer()
