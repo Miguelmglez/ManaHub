@@ -503,6 +503,22 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
   Verified: `:app:assembleDebug` GREEN; shared modules `compileKotlinWasmJs` GREEN;
   `testDebugUnitTest` 1964/122/2 (== baseline, `GameSessionRepositoryImplTest` 0/0 failures);
   0 platform imports in `commonMain`.
+- ✅ **`GetDeckGameStatsUseCase` → `:shared:core-domain` `commonMain` (2026-06-30, `72e4551`).** Last
+  blocked use case in the §9.6 backlog. It previously injected `GameSessionDao`/`SurveyAnswerDao`/
+  `CardDao`/`UserPreferencesDataStore` directly; now depends only on `GameSessionRepository` +
+  `CardRepository`. `GameSessionRepository` gained 4 methods (`observeSingleDeckStats`,
+  `observeTopCardImpactsForDeck`, `observeWeakestCardImpactsForDeck`, `observeSessionSummariesForDeck`)
+  backed by 3 new domain types in `SessionStats.kt` (`SingleDeckStats`, `CardImpactScore`,
+  `DeckSessionSummary`); `GameSessionRepositoryImpl` now also injects `SurveyAnswerDao`.
+  `CardRepository` gained `getCardsByIds` (batch scryfallId→Card). `playerName` is now an explicit
+  `invoke(deckId, playerName)` param (was read internally from `UserPreferencesDataStore`);
+  `DeckStudioViewModel`/`DeckMagicDetailViewModel` thread their existing `playerNameFlow` through.
+  `DeckStatsCard.SessionRow` takes the new domain `DeckSessionSummary` instead of the Room-projection
+  `SessionSummary` (zero body change, same 4 fields). `@Inject` stripped, Hilt `@Provides` added to
+  `SharedDomainUseCaseModule`. 12 files changed (the use case `git mv`'d). Verified: assembleDebug
+  GREEN; core-model + core-domain `compileKotlinWasmJs` GREEN; `testDebugUnitTest` 1964/123/2 (==
+  baseline, no new failing classes); 0 platform imports in `shared/core-domain` + `shared/core-model`
+  commonMain.
 
 **Phase 4 remaining work (Android KMP-readiness) — ALL are Tier 3/4, medium-to-high effort:**
 3. **CMP Res system** — unblocks remaining `stringResource()` composables + catalogs.
@@ -528,9 +544,7 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
      replacing Room entities; `TournamentMatch.toEntity()` reverse mapper added to
      `TournamentRepositoryImpl`; `toSortedSet()` JVM-only → `distinct().sorted()` for wasmJs;
      dead `invoke()` deleted; `TournamentModule.provideGenerateNextRoundUseCase` added).
-   - ❌ BLOCKER: `GetDeckGameStatsUseCase` — injects `GameSessionDao` + `SurveyAnswerDao` +
-     `CardDao` directly + takes a DAO-type `SessionSummary` result; needs 3+ new repo methods and
-     domain types before it can move.
+   - ✅ `GetDeckGameStatsUseCase` → `:shared:core-domain` DONE 2026-06-30 (`72e4551`). See STATUS.
    - ✅ `EvaluatePlayerEliminationUseCase` → `:shared:core-domain` DONE 2026-06-30 (`0afbad9`).
      `PlayerState` interface added to `:shared:core-model` (life/poison/commanderDamage);
      `Player` in core-ui now implements `PlayerState` (3 override fields, zero callsite change);
@@ -544,14 +558,35 @@ Test baseline: 1964 tests, 123 failed (vs 122 pre-existing; +1 is noise), 0 erro
      injects use case directly; Koin bridge via `profileKoinModule` + `ManaHubApp`; tests updated
      (now mock the repository boundary, not the DAO). `QuestClaimData` + `GrantResult` domain models
      added to `core-domain`. `ManaCurveChart` → shared core-ui also done in this session (`750ce9a`).
-   - `GetAccountNudgeUseCase` — presentation dep.
-   - `ImportCommunityDeckUseCase` — Firebase Crashlytics dep.
-   - `UpdateTradeCollectionUseCase` — Room DAO dep.
+   - ❌ BLOCKER (verified still accurate 2026-06-30): `GetAccountNudgeUseCase` — zero ctor deps,
+     pure-primitives logic, but returns `NudgeTrigger` which still lives in
+     `feature/home/presentation/HomeUiState.kt:279` (presentation layer — domain→presentation import
+     would violate layering even if Hilt/DAO deps weren't an issue). Would need `NudgeTrigger`
+     extracted to `core-model`/`core-domain` first + its `feature.home.presentation` consumers
+     re-pointed. Out of scope for an incremental slice; no action taken.
+   - ❌ BLOCKER: `ImportCommunityDeckUseCase` — Firebase Crashlytics dep.
+   - ❌ BLOCKER: `UpdateTradeCollectionUseCase` — Room DAO dep.
    - Online/excluded use cases — deferred per plan.
 8. ✅ **`ComputeCardTagsUseCase`** — DONE 2026-06-30 (Gson mapper → `TagJsonMapper.kt` with
    kotlinx-serialization in `:shared:core-data` commonMain; `@Inject` stripped;
    `SharedDomainUseCaseModule.provideComputeCardTagsUseCase` added).
 9. **EXCLUDED features** (online, voice, scanner) — deferred per plan.
+10. **`core/tagging/` 3 remaining files — verified still genuinely blocked (2026-06-30), no action.**
+    `TagAnalyzers.kt` is already a pure compatibility shim (analyzer logic moved to `:shared:core-data`
+    in a prior session — nothing left to do). `TagDictionary.kt` uses `java.util.Locale` (`currentLang()`)
+    + `:app`-only `CardTypeTranslator` — genuine §9.3-rule-2 blocker (Locale is NOT in the
+    Recipe-6 fixable list). `TagDictionaryRepository.kt` depends on `UserPreferencesDataStore`
+    (Android DataStore) + raw Gson; even swapping Gson→the existing `TagJsonMapper`
+    (kotlinx-serialization, already used by `ComputeCardTagsUseCase`) would NOT unblock a module move
+    — the file is pinned to `:app` regardless by the DataStore dependency, so the swap has zero
+    migration value and was not done. `CardTagLabel.kt` is correctly `:app`-only by design (its own
+    KDoc explains why) — not a gap.
+11. **`GetAccountNudgeUseCase` reassessed 2026-06-30 — still correctly NOT moved.** See item 7 above.
+12. **Use-case sweep (2026-06-30):** diffed all `*UseCase*.kt` filenames in `:app` against `shared/`.
+    Remaining unmigrated: 16 files under `core/online/domain/usecase/` (online-session feature,
+    EXCLUDED), `AutoTagCardUseCase.kt` (already a compatibility typealias re-export, no-op),
+    `GetAccountNudgeUseCase`/`ImportCommunityDeckUseCase`/`UpdateTradeCollectionUseCase` (blockers
+    above), `GetDeckGameStatsUseCase` (DONE this session, item 7). Nothing new to batch-move.
 
 ---
 
@@ -671,6 +706,38 @@ Update this tracker after each step. Keep Android shippable at every step.
   more of these as additional models migrate — grep the consumers of each moved nullable prop.
 
 ## CHANGE LOG
+- 2026-06-30 — **Phase 4: `GetDeckGameStatsUseCase` → `:shared:core-domain` (GREEN, `72e4551`) +
+  Tasks 2-4 verification sweep (no code changes).**
+  **Task 1 (landed):** `GetDeckGameStatsUseCase` moved to `:shared:core-domain` commonMain (package
+  unchanged). Dropped direct `GameSessionDao`/`SurveyAnswerDao`/`CardDao`/`UserPreferencesDataStore`
+  injection in favor of `GameSessionRepository` + `CardRepository`. `GameSessionRepository` gained 4
+  methods (`observeSingleDeckStats`, `observeTopCardImpactsForDeck`, `observeWeakestCardImpactsForDeck`,
+  `observeSessionSummariesForDeck`) backed by 3 new `SessionStats.kt` domain types (`SingleDeckStats`,
+  `CardImpactScore`, `DeckSessionSummary`); `GameSessionRepositoryImpl` now also injects
+  `SurveyAnswerDao`. `CardRepository` gained `getCardsByIds` (batch resolve), implemented in
+  `CardRepositoryImpl`. `playerName` became an explicit `invoke(deckId, playerName)` param (was
+  read internally from DataStore); `DeckStudioViewModel`/`DeckMagicDetailViewModel` thread their
+  existing `playerNameFlow` through via a nested `flatMapLatest`. `DeckStatsCard.SessionRow` now
+  takes the domain `DeckSessionSummary` (same 4 fields, zero body change). `@Inject` stripped, Hilt
+  `@Provides` added to `SharedDomainUseCaseModule`. 12 files changed (the use case `git mv`'d).
+  Delegated to `android-kotlin-architect`; pre-push security gate (`android-security-auditor`) PASS.
+  Verified: assembleDebug GREEN; core-model + core-domain `compileKotlinWasmJs` GREEN;
+  `testDebugUnitTest` 1964/123/2 (== baseline, no new failing classes — confirmed via per-class XML
+  report diff, not just the count); 0 platform imports in `shared/core-domain` + `shared/core-model`
+  commonMain.
+  **Task 2 (verified, no action):** re-read all 4 `core/tagging/` files. Confirmed prior findings
+  still hold — analyzers already shared (`TagAnalyzers.kt` is a pure compat shim), `TagDictionary.kt`
+  blocked on `java.util.Locale` + `:app`-only `CardTypeTranslator`, `TagDictionaryRepository.kt`
+  blocked on `UserPreferencesDataStore` + Gson (swapping Gson→`TagJsonMapper` would not unblock a
+  module move since DataStore pins the file to `:app` regardless — no migration value, skipped),
+  `CardTagLabel.kt` correctly `:app`-only by design. No safe incremental slice; no commit.
+  **Task 3 (verified, no action):** `GetAccountNudgeUseCase` still blocked on `NudgeTrigger` living in
+  `feature/home/presentation/HomeUiState.kt:279` (presentation-layer return type). No move; no commit.
+  **Task 4 (verified, no action):** swept all `*UseCase*.kt` in `:app` not yet under `shared/`. All
+  remaining ones are already-triaged: 16 under `core/online/domain/usecase/` (excluded
+  online-session feature), `AutoTagCardUseCase.kt` (already a compat typealias, no-op),
+  `GetAccountNudgeUseCase`/`ImportCommunityDeckUseCase`/`UpdateTradeCollectionUseCase` (known
+  blockers). Nothing batchable; no commit.
 - 2026-06-30 — **Phase 4: tournament engine cluster + GenerateNextRoundUseCase → `:shared:core-domain`
   + ComputeCardTagsUseCase Gson→kotlinx-serialization → `:shared:core-data` (GREEN, `97e665f`+`06ac4a0`).**
   **Slice 1 (tournament engines):** `TournamentIdCodec`, `StandingsCalculator`, `SwissEngine`,
