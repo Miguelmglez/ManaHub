@@ -1,7 +1,5 @@
 package com.mmg.manahub.core.ui.components
 
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -25,12 +23,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -42,6 +39,18 @@ private val BAR_SPACING_DP       = 5.dp
 private val BAR_CORNER_DP        = 3.dp
 private val BASELINE_STROKE_DP   = 0.5.dp
 
+/**
+ * Bar chart visualising the mana-curve distribution of a deck.
+ *
+ * @param cmcDistribution Map from converted mana cost (0–7+) to card count.
+ * @param modifier        Layout modifier.
+ * @param title           Optional header label (displayed left of the legend).
+ * @param showIdealCurve  When `true`, overlays the [idealCurve] as a dashed line.
+ * @param idealCurve      Per-CMC ideal ratios (length must be ≥ 8 when [showIdealCurve] is true).
+ * @param legendLabel     Label for the ideal-curve legend swatch. Defaults to "Ideal curve".
+ *                        Pass the app's localised string if required; the default is English-only
+ *                        (acceptable — the app is English-only per CLAUDE.md).
+ */
 @Composable
 fun ManaCurveChart(
     cmcDistribution: Map<Int, Int>,
@@ -49,8 +58,10 @@ fun ManaCurveChart(
     title: String? = null,
     showIdealCurve: Boolean = false,
     idealCurve: FloatArray? = null,
+    legendLabel: String = "Ideal curve",
 ) {
     val mc = MaterialTheme.magicColors
+    val textMeasurer = rememberTextMeasurer()
 
     // --- Data buckets ---
     val buckets = remember(cmcDistribution) {
@@ -77,14 +88,27 @@ fun ManaCurveChart(
     }
 
     // --- Color tokens ---
-    val barColorTop    = mc.primaryAccent
-    val barColorBottom = mc.primaryAccent.copy(alpha = 0.4f)
-    val idealColor     = Color.White.copy(alpha = 0.35f)
-    val baselineColor  = Color.White.copy(alpha = 0.12f)
-    val countLabelArgb = Color.White.copy(alpha = 0.70f).toArgb()
-    val axisLabelArgb  = Color.White.copy(alpha = 0.30f).toArgb()
+    val barColorTop      = mc.primaryAccent
+    val barColorBottom   = mc.primaryAccent.copy(alpha = 0.4f)
+    val idealColor       = Color.White.copy(alpha = 0.35f)
+    val baselineColor    = Color.White.copy(alpha = 0.12f)
+    val countLabelColor  = Color.White.copy(alpha = 0.70f)
+    val axisLabelColor   = Color.White.copy(alpha = 0.30f)
 
     val axisLabels = remember { listOf("0", "1", "2", "3", "4", "5", "6", "7+") }
+
+    // --- Pre-measure text (stable across animation; re-measure only when buckets/labels change) ---
+    val countLabelStyle = remember { TextStyle(fontSize = 10.sp) }
+    val axisLabelStyle  = remember { TextStyle(fontSize = 11.sp) }
+
+    val measuredCounts = remember(buckets, textMeasurer) {
+        buckets.map { count ->
+            if (count > 0) textMeasurer.measure(count.toString(), countLabelStyle) else null
+        }
+    }
+    val measuredAxisLabels = remember(textMeasurer) {
+        axisLabels.map { label -> textMeasurer.measure(label, axisLabelStyle) }
+    }
 
     Column(modifier = modifier) {
         // --- Header row ---
@@ -108,9 +132,11 @@ fun ManaCurveChart(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Canvas(modifier = Modifier
-                            .width(20.dp)
-                            .height(2.dp)) {
+                        Canvas(
+                            modifier = Modifier
+                                .width(20.dp)
+                                .height(2.dp),
+                        ) {
                             drawLine(
                                 color = idealColor,
                                 start = Offset(0f, size.height / 2),
@@ -120,7 +146,7 @@ fun ManaCurveChart(
                             )
                         }
                         Text(
-                            text = stringResource(R.string.deckbuilder_ideal_curve),
+                            text = legendLabel,
                             style = MaterialTheme.magicTypography.labelSmall,
                             color = mc.textDisabled,
                         )
@@ -135,14 +161,14 @@ fun ManaCurveChart(
                 .fillMaxWidth()
                 .height(CANVAS_HEIGHT),
         ) {
-            val barCount = 8
+            val barCount      = 8
             val spacing       = BAR_SPACING_DP.toPx()
             val axisZone      = AXIS_LABEL_ZONE_DP.toPx()
             val countZone     = COUNT_LABEL_ZONE_DP.toPx()
             val barWidth      = (size.width - spacing * (barCount - 1)) / barCount
-            
-            // Drawing zones: 
-            // barZoneTop/Bottom are strictly to define the HEIGHT of the bars 
+
+            // Drawing zones:
+            // barZoneTop/Bottom strictly define the HEIGHT of the bars
             // so they don't overlap with labels above or below.
             val barZoneBottom = size.height - axisZone
             val barZoneHeight = barZoneBottom - countZone
@@ -159,16 +185,15 @@ fun ManaCurveChart(
             animatedRatios.forEachIndexed { i, ratioState ->
                 val ratio = ratioState.value
                 if (ratio > 0f) {
-                    val barH    = ratio * barZoneHeight
-                    val barX    = i * (barWidth + spacing)
-                    val barTop  = barZoneBottom - barH
+                    val barH   = ratio * barZoneHeight
+                    val barX   = i * (barWidth + spacing)
+                    val barTop = barZoneBottom - barH
 
-                    // Draw a single bar with a vertical gradient
                     drawRoundRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(barColorTop, barColorBottom),
                             startY = barTop,
-                            endY   = barZoneBottom
+                            endY   = barZoneBottom,
                         ),
                         topLeft      = Offset(barX, barTop),
                         size         = Size(barWidth, barH),
@@ -198,43 +223,42 @@ fun ManaCurveChart(
                 }
             }
 
-            // --- Count labels (ABOVE) ---
-            val countPaint = Paint().apply {
-                isAntiAlias = true
-                textAlign   = Paint.Align.CENTER
-                textSize    = 10.sp.toPx()
-                color       = countLabelArgb
-                typeface    = Typeface.DEFAULT
-            }
+            // --- Count labels (ABOVE bars) ---
+            // drawText positions at topLeft; we want the label bottom at (barTop - 3dp).
             buckets.forEachIndexed { i, count ->
                 if (count > 0) {
-                    val barX    = i * (barWidth + spacing)
-                    val centerX = barX + barWidth / 2f
-                    val ratio   = animatedRatios[i].value
-                    val barH    = ratio * barZoneHeight
-                    val labelY  = barZoneBottom - barH - 3.dp.toPx()
-                    drawContext.canvas.nativeCanvas.drawText(
-                        count.toString(),
-                        centerX,
-                        labelY,
-                        countPaint,
+                    val measured = measuredCounts[i] ?: return@forEachIndexed
+                    val barX      = i * (barWidth + spacing)
+                    val centerX   = barX + barWidth / 2f
+                    val ratio     = animatedRatios[i].value
+                    val barH      = ratio * barZoneHeight
+                    val labelBottomY = barZoneBottom - barH - 3.dp.toPx()
+                    drawText(
+                        textLayoutResult = measured,
+                        color   = countLabelColor,
+                        topLeft = Offset(
+                            x = centerX - measured.size.width / 2f,
+                            y = labelBottomY - measured.size.height,
+                        ),
                     )
                 }
             }
 
-            // --- Axis labels (BELOW) ---
-            val axisPaint = Paint().apply {
-                isAntiAlias = true
-                textAlign   = Paint.Align.CENTER
-                textSize    = 11.sp.toPx()
-                color       = axisLabelArgb
-                typeface    = Typeface.DEFAULT
-            }
-            val labelY = barZoneBottom + axisZone / 2f + axisPaint.textSize / 3f
-            axisLabels.forEachIndexed { i, label ->
-                val barX    = i * (barWidth + spacing)
-                val centerX = barX + barWidth / 2f
-                drawContext.canvas.nativeCanvas.drawText(label, centerX, labelY, axisPaint)
+            // --- Axis labels (BELOW baseline) ---
+            // Centre each label vertically in the axis zone.
+            val axisCenterY = barZoneBottom + axisZone / 2f
+            axisLabels.forEachIndexed { i, _ ->
+                val measured = measuredAxisLabels[i]
+                val barX     = i * (barWidth + spacing)
+                val centerX  = barX + barWidth / 2f
+                drawText(
+                    textLayoutResult = measured,
+                    color   = axisLabelColor,
+                    topLeft = Offset(
+                        x = centerX - measured.size.width / 2f,
+                        y = axisCenterY - measured.size.height / 2f,
+                    ),
+                )
             }
         }
     }
