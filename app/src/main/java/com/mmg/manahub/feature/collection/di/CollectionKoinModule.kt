@@ -17,17 +17,19 @@ import org.koin.dsl.module
  * Survey, News, Draft, Playtest, Tournament and Trades).
  *
  * ## Bridge pattern (same as the earlier islands)
- * [CollectionViewModel] takes twelve constructor arguments, all of which are singletons still owned by the
+ * [CollectionViewModel] takes thirteen constructor arguments, all of which are singletons still owned by the
  * Hilt object graph. Rather than re-providing them in Koin — which would risk duplicate construction /
  * divergent state — `ManaHubApp` is the bridge: it `@Inject`s the already-constructed Hilt instances and
  * passes the Collection-only ones into [collectionKoinModule], which re-exposes them to Koin as
  * `single { }`. The shared ones are resolved via `get()` from the modules that already register them.
  *
- * The VM has NO `SavedStateHandle` and NO nav args — all three Collection call-sites (Collection / DeckList
- * / Trades tabs in `AppNavGraph`) use the screen's default `viewModel` param, so the only call-site change
- * is swapping that default `hiltViewModel()` → `koinViewModel()` in `CollectionScreen`. No `AppNavGraph` edit.
+ * `savedStateHandle = get()` resolves the Koin-injected [androidx.lifecycle.SavedStateHandle] that carries
+ * the `tab` nav arg (if any), so the nav-arg behaviour is identical to the previous Hilt resolution.
+ * All three Collection call-sites (Collection / DeckList / Trades tabs in `AppNavGraph`) use the screen's
+ * default `viewModel` param, so the only call-site change is swapping that default `hiltViewModel()` →
+ * `koinViewModel()` in `CollectionScreen`. No `AppNavGraph` edit.
  *
- * Six of the twelve dependencies are SHARED with other islands and are therefore NOT registered here —
+ * Six of the thirteen dependencies are SHARED with other islands and are therefore NOT registered here —
  * they are bridged exactly once in `coreBridgeKoinModule` (registering the same type in two loaded modules
  * would throw `DefinitionOverrideException`) and resolved below via `get()`:
  * - `CardRepository` — shared with Home + CommunityDecks + CardDetail.
@@ -81,6 +83,7 @@ fun collectionKoinModule(
     // ── The Koin island: CollectionViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
         CollectionViewModel(
+            savedStateHandle = get(),
             getCollection = get(),
             cardRepository = get(),
             userCardRepository = get(),

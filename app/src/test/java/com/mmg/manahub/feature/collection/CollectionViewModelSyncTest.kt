@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.collection
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
 import androidx.work.WorkManager
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.domain.repository.CardRepository
@@ -108,6 +109,7 @@ class CollectionViewModelSyncTest {
     // ── Builder ───────────────────────────────────────────────────────────────
 
     private fun buildViewModel(): CollectionViewModel = CollectionViewModel(
+        savedStateHandle       = SavedStateHandle(),
         getCollection          = getCollection,
         cardRepository         = cardRepository,
         userCardRepository     = userCardRepository,

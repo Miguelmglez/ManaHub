@@ -8,6 +8,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -484,24 +485,23 @@ private fun CardDetailContent(
                         // Force hardware layer during transition to prevent "snapping"
                         compositingStrategy = CompositingStrategy.Offscreen
                     }
-                    .clip(CardShape)
+                    .then(
+                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                            with(sharedTransitionScope) {
+                                Modifier.sharedBounds(
+                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    clipInOverlayDuringTransition = OverlayClip(CardShape),
+                                    boundsTransform = sharedBoundsTransform,
+                                    renderInOverlayDuringTransition = true,
+                                )
+                            }
+                        } else Modifier.clip(CardShape)
+                    )
                     .then(
                         if (card.imageBackNormal != null)
                             Modifier.clickable { showBackFace = !showBackFace }
                         else Modifier
-                    )
-                    .then(
-                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedElement(
-                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                    boundsTransform = sharedBoundsTransform,
-                                    placeholderSize = SharedTransitionScope.PlaceholderSize.AnimatedSize,
-                                    renderInOverlayDuringTransition = true,
-                                )
-                            }
-                        } else Modifier
                     ),
                 contentAlignment = Alignment.Center,
             ) {

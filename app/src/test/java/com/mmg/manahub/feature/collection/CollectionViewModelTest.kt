@@ -1,5 +1,6 @@
 ﻿package com.mmg.manahub.feature.collection
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.AdvancedSearchQuery
@@ -155,6 +156,7 @@ class CollectionViewModelTest {
         coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
 
         return CollectionViewModel(
+            savedStateHandle       = SavedStateHandle(),
             getCollection          = getCollection,
             cardRepository         = cardRepository,
             userCardRepository     = userCardRepository,
