@@ -59,6 +59,7 @@ import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
@@ -190,6 +191,7 @@ class ManaHubApp : Application() {
     // statsRepository + gamificationRepository are now also shared with Home → bridged in coreBridge.)
     @Inject lateinit var statsRepository: StatsRepository  // shared: Profile + Home
     @Inject lateinit var surveyAnswerDao: SurveyAnswerDao
+    @Inject lateinit var claimQuestRewardUseCase: ClaimQuestRewardUseCase  // Profile island only
     @Inject lateinit var friendRepository: FriendRepository
     @Inject lateinit var gamificationRepository: GamificationRepository  // shared: Profile + Home
 
@@ -408,6 +410,7 @@ class ManaHubApp : Application() {
                 ),
                 profileKoinModule(
                     surveyAnswerDao = surveyAnswerDao,
+                    claimQuestRewardUseCase = claimQuestRewardUseCase,
                 ),
                 homeKoinModule(
                     getNewsFeedUseCase = getNewsFeedUseCase,

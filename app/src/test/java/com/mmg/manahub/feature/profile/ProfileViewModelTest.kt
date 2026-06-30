@@ -20,6 +20,7 @@ import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.model.ClaimResult
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
@@ -85,6 +86,7 @@ class ProfileViewModelTest {
     private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
     private val gamificationRepository   = mockk<GamificationRepository>(relaxed = true)
+    private val claimQuestRewardUseCase  = mockk<ClaimQuestRewardUseCase>()
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Wizard")
@@ -213,6 +215,7 @@ class ProfileViewModelTest {
         friendRepository         = friendRepository,
         authRepository           = authRepository,
         gamificationRepository   = gamificationRepository,
+        claimQuestRewardUseCase  = claimQuestRewardUseCase,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -707,7 +710,7 @@ class ProfileViewModelTest {
     fun `given a claimable quest when claimQuest succeeds then a QuestClaimed event is emitted`() = runTest {
         // Arrange
         wireDefaultMocks()
-        coEvery { gamificationRepository.claimQuest("q1") } returns
+        coEvery { claimQuestRewardUseCase("q1") } returns
             ClaimResult.Claimed(xpAwarded = 50, newLevel = 2, leveledUp = false)
         viewModel = buildViewModel()
         advanceUntilIdle()
@@ -721,14 +724,14 @@ class ProfileViewModelTest {
             assertEquals(50, (event as ProfileViewModel.Event.QuestClaimed).xpAwarded)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 1) { gamificationRepository.claimQuest("q1") }
+        coVerify(exactly = 1) { claimQuestRewardUseCase("q1") }
     }
 
     @Test
     fun `given a non-completed quest when claimQuest returns NotCompleted then QuestClaimFailed is emitted`() = runTest {
         // Arrange
         wireDefaultMocks()
-        coEvery { gamificationRepository.claimQuest("q2") } returns ClaimResult.NotCompleted
+        coEvery { claimQuestRewardUseCase("q2") } returns ClaimResult.NotCompleted
         viewModel = buildViewModel()
         advanceUntilIdle()
 
@@ -745,7 +748,7 @@ class ProfileViewModelTest {
     fun `given claimQuest throws then QuestClaimFailed is emitted (no crash)`() = runTest {
         // Arrange
         wireDefaultMocks()
-        coEvery { gamificationRepository.claimQuest("q3") } throws RuntimeException("boom")
+        coEvery { claimQuestRewardUseCase("q3") } throws RuntimeException("boom")
         viewModel = buildViewModel()
         advanceUntilIdle()
 

@@ -20,6 +20,7 @@ import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.model.ClaimResult
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
@@ -60,6 +61,7 @@ class ProfileViewModel(
     private val friendRepository: FriendRepository,
     private val authRepository: AuthRepository,
     private val gamificationRepository: GamificationRepository,
+    private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
 ) : ViewModel() {
 
     data class UiState(
@@ -372,7 +374,7 @@ class ProfileViewModel(
      */
     fun claimQuest(instanceId: String) {
         viewModelScope.launch {
-            val result = runCatching { gamificationRepository.claimQuest(instanceId) }
+            val result = runCatching { claimQuestRewardUseCase(instanceId) }
                 .getOrElse { ClaimResult.NotFound }
             val event = when (result) {
                 is ClaimResult.Claimed -> Event.QuestClaimed(result.xpAwarded)
