@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
@@ -136,22 +138,21 @@ fun CardListItem(
             leadingContent = {
                 val imageModifier = Modifier
                     .size(width = 56.dp, height = 80.dp)
-                    .clip(MaterialTheme.shapes.small)
 
                 val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && scryfallId != null) {
                     with(sharedTransitionScope) {
-                        imageModifier.sharedElement(
+                        imageModifier.sharedBounds(
                             sharedContentState = rememberSharedContentState(key = "card-image-$scryfallId"),
                             animatedVisibilityScope = animatedVisibilityScope,
+                            clipInOverlayDuringTransition = OverlayClip(CardShape),
                             boundsTransform = { _, _ ->
                                 tween(durationMillis = 500, easing = FastOutSlowInEasing)
                             },
-                            placeholderSize = SharedTransitionScope.PlaceholderSize.AnimatedSize,
                             renderInOverlayDuringTransition = true,
                         )
                     }
                 } else {
-                    imageModifier
+                    imageModifier.clip(CardShape)
                 }
 
                 Box(modifier = finalImageModifier) {

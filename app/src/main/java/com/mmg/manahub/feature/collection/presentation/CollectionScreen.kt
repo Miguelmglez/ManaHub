@@ -27,10 +27,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -114,7 +116,6 @@ fun CollectionScreen(
     onBrowseCommunityDecks:   () -> Unit = {},
     onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
     onNavigateToTradeThread:   (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
-    initialTab:               CollectionTab = CollectionTab.CARDS,
     viewModel:                CollectionViewModel = koinViewModel(),
     advancedSearchViewModel:  AdvancedSearchViewModel = hiltViewModel(),
     sharedTransitionScope:    SharedTransitionScope? = null,
@@ -122,12 +123,6 @@ fun CollectionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
-
-    // Synchronize initialTab with ViewModel — specifically useful for
-    // deep-links or direct navigation to sub-routes (e.g. collection/decks).
-    LaunchedEffect(initialTab) {
-        viewModel.onTabSelected(initialTab)
-    }
 
     CollectionContent(
         uiState               = uiState,
@@ -155,6 +150,8 @@ fun CollectionScreen(
         onSnackbarDismissed        = viewModel::onSnackbarDismissed,
         onNavigateToTradeProposal  = onNavigateToTradeProposal,
         onNavigateToTradeThread    = onNavigateToTradeThread,
+        gridState                  = viewModel.gridState,
+        listState                  = viewModel.listState,
         sharedTransitionScope      = sharedTransitionScope,
         animatedVisibilityScope    = animatedVisibilityScope,
     )
@@ -193,6 +190,8 @@ private fun CollectionContent(
     onSnackbarDismissed:  () -> Unit,
     onNavigateToTradeProposal: (String) -> Unit = {},
     onNavigateToTradeThread:   (String, String) -> Unit = { _, _ -> },
+    gridState:            LazyGridState,
+    listState:            LazyListState,
     sharedTransitionScope:    SharedTransitionScope? = null,
     animatedVisibilityScope:  AnimatedVisibilityScope? = null,
 ) {
@@ -315,6 +314,8 @@ private fun CollectionContent(
                         onShowAdvancedSearch  = onShowAdvancedSearch,
                         onViewModeToggle      = onViewModeToggle,
                         onSortChange          = onSortChange,
+                        gridState             = gridState,
+                        listState             = listState,
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
                     )
@@ -357,6 +358,8 @@ private fun CardsTabContent(
     onShowAdvancedSearch: () -> Unit,
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
+    gridState:            LazyGridState,
+    listState:            LazyListState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
@@ -522,12 +525,14 @@ private fun CardsTabContent(
             CollectionViewMode.GRID -> CardGrid(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
+                state       = gridState,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
             CollectionViewMode.LIST -> CardList(
                 cards       = uiState.cards,
                 onCardClick = onCardClick,
+                state       = listState,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
@@ -597,11 +602,13 @@ private fun SearchBar(
 private fun CardGrid(
     cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
+    state:       LazyGridState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     LazyVerticalGrid(
         columns               = GridCells.Adaptive(minSize = 100.dp),
+        state                 = state,
         contentPadding        = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 80.dp),
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -631,10 +638,12 @@ private fun CardGrid(
 private fun CardList(
     cards:       List<CollectionCardGroup>,
     onCardClick: (String) -> Unit,
+    state:       LazyListState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     androidx.compose.foundation.lazy.LazyColumn(
+        state               = state,
         contentPadding      = PaddingValues(top = 4.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {

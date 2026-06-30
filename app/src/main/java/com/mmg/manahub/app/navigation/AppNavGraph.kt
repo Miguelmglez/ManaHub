@@ -387,15 +387,7 @@ fun AppNavGraph(
                             },
                         ),
                     ) { backStackEntry ->
-                        val tabArg = backStackEntry.arguments?.getString("tab")?.lowercase()
-                        val initialTab = when (tabArg) {
-                            "decks" -> CollectionTab.DECKS
-                            "trades" -> CollectionTab.TRADES
-                            else -> CollectionTab.CARDS
-                        }
-
                         CollectionScreen(
-                            initialTab = initialTab,
                             onCardClick = { id ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                             },

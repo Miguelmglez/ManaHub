@@ -1,5 +1,8 @@
 package com.mmg.manahub.feature.collection.presentation
 
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
@@ -42,6 +45,7 @@ import kotlinx.coroutines.launch
  * internally by [SyncManager] — this ViewModel only reports the state to the UI.
  */
 class CollectionViewModel(
+    private val savedStateHandle: SavedStateHandle,
     private val getCollection: GetCollectionUseCase,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
@@ -55,6 +59,9 @@ class CollectionViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val analyticsHelper: AnalyticsHelper,
 ) : ViewModel() {
+
+    val gridState = LazyGridState()
+    val listState = LazyListState()
 
     private val _uiState = MutableStateFlow(CollectionUiState())
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
@@ -79,6 +86,15 @@ class CollectionViewModel(
     private var openForTradeUnsyncedCount = 0
 
     init {
+        // Initialize tab from SavedStateHandle ("tab" nav arg)
+        val tabArg = savedStateHandle.get<String>("tab")?.lowercase()
+        val initialTab = when (tabArg) {
+            "decks" -> CollectionTab.DECKS
+            "trades" -> CollectionTab.TRADES
+            else -> CollectionTab.CARDS
+        }
+        _uiState.update { it.copy(selectedTab = initialTab) }
+
         observeCollection()
         observeWishlistIds()
         observeTradeListUnsyncedCounts()
