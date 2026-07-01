@@ -457,7 +457,24 @@ handoff.** Concrete checklist adopted for the rest of Phase 5 (Android-only):
       restructuring — worth a dedicated secret/security sweep beyond the routine pre-push gate).
 - [ ] C. DI graph completeness: Koin↔Hilt bridge has no missing bindings / orphaned modules after
       ~250+ moved files.
-- [ ] D. `:baseline-profile` module still valid post module-split (class refs, generation still works).
+- [x] D. **DONE 2026-07-01 (audit only, zero `.kt` change).** `:baseline-profile` module still valid
+      post module-split. Checked `baseline-profile/build.gradle.kts` (`com.android.test` plugin,
+      `targetProjectPath = ":app"`, no `androidx.baselineprofile` plugin yet — AGP 9.x incompatibility
+      documented in-file, pre-existing/unrelated to this migration) and
+      `BaselineProfileGenerator.kt` (the sole source file). The generator drives journeys purely at the
+      UI-automator level (`By.descContains(...)`, the app's package-name string, `pressHome`/
+      `startActivityAndWait`) — it has **zero imports and zero FQN references to any
+      ViewModel/UseCase/Repository/model class**, so it was structurally immune to the ~250+ file
+      relocations by design; confirmed with `grep -rn "com\.mmg\.manahub\.\(feature\|core\.domain\|
+      core\.data\|core\.model\)" baseline-profile/` → empty. Verified `./gradlew
+      :baseline-profile:assemble` → **BUILD SUCCESSFUL** (a first attempt hit a transient Windows
+      file-lock on `shared:core-domain`'s jar from a concurrently-running agent — not a real failure;
+      retry succeeded clean). **Full profile generation
+      (`:baseline-profile:connectedAndroidTest`) could NOT be verified** — no `adb`/emulator available
+      in this environment (`adb: command not found`, no `$ANDROID_HOME/emulator`); this is an
+      environment limitation, not a code issue, and matches the module's own pre-existing note that the
+      `androidx.baselineprofile` automation plugin isn't wired yet anyway. No code changes were
+      required — nothing broke.
 - [x] E. **CANCELLED per user directive (2026-07-01): do NOT delete `DeckMagicDetailScreen`/
       `DeckBuilderViewModel`/`Screen.DeckDetail`.** Despite being currently unused (superseded by Deck
       Studio), the user wants it kept — it will be used again in the future. Item closed as
