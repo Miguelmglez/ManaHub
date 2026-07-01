@@ -6,9 +6,9 @@
  * signatures reference only :shared:core-model types, kotlinx (Flow, etc.) and primitives. The
  * concrete implementations stay in :app (Android side) and keep implementing these interfaces.
  *
- * Depends on :shared:core-model (the moved interfaces reference its model types). :shared:core-common
- * is intentionally NOT a dependency yet — the current batch needs none of its contracts; it is wired
- * in later when use cases that touch DispatcherProvider/KeyValueStore/CrashReporter move here.
+ * Depends on :shared:core-model (the moved interfaces reference its model types) and
+ * :shared:core-common (cross-cutting contracts — CrashReporter, DispatcherProvider, KeyValueStore —
+ * consumed by use cases moved here, e.g. ImportCommunityDeckUseCase).
  *
  * Targets/source-set/plugin setup mirror :shared:core-model and :shared:core-common (the AGP-9
  * KMP-library path).
@@ -47,6 +47,9 @@ kotlin {
             dependencies {
                 // Moved repository interfaces reference core-model types (UserPreferences, CollectionStats…).
                 api(project(":shared:core-model"))
+                // Cross-cutting contracts (CrashReporter, DispatcherProvider, KeyValueStore) consumed
+                // by use cases moved here (e.g. ImportCommunityDeckUseCase → CrashReporter).
+                implementation(project(":shared:core-common"))
                 implementation(libs.coroutines.core)
                 // Use cases use Clock.System.now() for event timestamps.
                 implementation(libs.kotlinx.datetime)

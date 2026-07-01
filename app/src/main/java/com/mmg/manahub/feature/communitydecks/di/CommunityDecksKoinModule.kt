@@ -96,7 +96,7 @@ fun communityDecksKoinModule(
     // ── Domain use cases. ──
     single { SearchCommunityDecksUseCase(repository = get()) }
     single { GetCommunityDeckUseCase(repository = get()) }
-    single { ImportCommunityDeckUseCase(deckRepository = get(), cardRepository = get()) }
+    single { ImportCommunityDeckUseCase(deckRepository = get(), cardRepository = get(), crashReporter = get()) }
 
     // ── The Koin island: both Community Decks ViewModels are now resolved by Koin, not Hilt. ──
     // Koin injects the SavedStateHandle (carrying the `cardName` / `archidektId` nav args) into each
