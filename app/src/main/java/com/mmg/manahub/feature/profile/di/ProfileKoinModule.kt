@@ -4,6 +4,7 @@ import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
+import com.mmg.manahub.feature.profile.presentation.ProfileEditViewModel
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
@@ -32,7 +33,16 @@ import org.koin.dsl.module
  *
  * [SurveyAnswerDao] and [ClaimQuestRewardUseCase] are Profile-only singletons bridged here.
  *
- * @return a Koin [Module] that provides the Profile-only bridged singletons and the [ProfileViewModel] factory.
+ * ## [ProfileEditViewModel] (remediation slice P1.3)
+ * [ProfileEditViewModel] backs `ProfileEditSheet` and is added to THIS module (rather than a new
+ * standalone one) because Profile is already its natural feature owner. All three of its constructor
+ * deps — [com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource],
+ * [com.mmg.manahub.core.data.local.UserPreferencesDataStore] and
+ * [com.mmg.manahub.core.domain.auth.AuthRepository] — are already bridged in `coreBridgeKoinModule`
+ * (shared with other islands), so no new `ManaHubApp` bridging or module constructor param is needed.
+ *
+ * @return a Koin [Module] that provides the Profile-only bridged singletons and the [ProfileViewModel]
+ *   / [ProfileEditViewModel] factories.
  */
 fun profileKoinModule(
     surveyAnswerDao: SurveyAnswerDao,
@@ -56,6 +66,15 @@ fun profileKoinModule(
             authRepository = get(),
             gamificationRepository = get(),
             claimQuestRewardUseCase = get(),
+        )
+    }
+
+    // ── ProfileEditViewModel (P1.3): all deps already bridged in coreBridgeKoinModule. ──
+    viewModel {
+        ProfileEditViewModel(
+            scryfallRemoteDataSource = get(),
+            userPreferencesDataStore = get(),
+            authRepository = get(),
         )
     }
 }

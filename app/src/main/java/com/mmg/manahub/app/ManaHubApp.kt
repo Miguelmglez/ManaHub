@@ -67,6 +67,7 @@ import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.di.authKoinModule
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
+import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.decks.di.decksKoinModule
 import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
@@ -104,6 +105,7 @@ import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
 import com.mmg.manahub.feature.friends.di.friendsKoinModule
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.feature.gamification.di.gamificationKoinModule
 import com.mmg.manahub.feature.game.di.gameKoinModule
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
@@ -474,6 +476,8 @@ class ManaHubApp : Application() {
                     workManager = workManager,
                     migrateLocalTradeLists = migrateLocalTradeListsUseCase,
                 ),
+                searchWidgetsKoinModule(),
+                gamificationKoinModule(),
                 decksKoinModule(
                     suggestTags = suggestTagsUseCase,
                     evaluateDeck = evaluateDeckUseCase,

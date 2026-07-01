@@ -5,16 +5,20 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.SetType
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class SetPickerViewModel @Inject constructor(
+/**
+ * KMP migration — Phase 1 Hilt->Koin cutover. Resolved via
+ * `koinViewModel(key = availableSets?.hashCode()?.toString())` from `searchWidgetsKoinModule` (see
+ * `core/ui/components/search/di/SearchKoinModule.kt`) — the `key` param preserves the prior
+ * `hiltViewModel(key = ...)` behavior of minting a fresh instance whenever `availableSets` changes.
+ * [scryfallDataSource] is a coreBridge-bridged singleton, resolved via `get()` (no new bridging needed).
+ */
+class SetPickerViewModel(
     private val scryfallDataSource: ScryfallRemoteDataSource,
 ) : ViewModel() {
 

@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +14,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * Drives the global celebration queue (ADR-002, Phase 1 + Phase 3, Chunk B).
@@ -37,10 +35,14 @@ import javax.inject.Inject
  * ### Master toggle
  * When gamification is disabled, [current] is forced to null and the dismiss handlers are no-ops —
  * nothing is consumed, so pending celebrations remain queued for if the user re-enables gamification.
+ *
+ * ### KMP migration — Phase 1 Hilt->Koin cutover
+ * Resolved via `koinViewModel()` from `gamificationKoinModule` (see
+ * `feature/gamification/di/GamificationKoinModule.kt`). Both constructor deps are already bridged
+ * Hilt-owned singletons in `coreBridgeKoinModule`, resolved via `get()` — no new bridging needed.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class GamificationCelebrationViewModel @Inject constructor(
+class GamificationCelebrationViewModel(
     private val repository: GamificationRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : ViewModel() {
