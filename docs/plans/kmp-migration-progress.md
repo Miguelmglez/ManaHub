@@ -444,9 +444,17 @@ backlog is fully executed). Being worked through as GREEN slices:
   ViewModel` → new `gamificationKoinModule`; `ProfileEditViewModel` → existing `ProfileKoinModule`). All deps
   already single'd in coreBridge/addCard → zero new bridges. **DI cutover now COMPLETE for every non-excluded
   feature** — `grep '^@HiltViewModel'` non-excluded is EMPTY. Baseline 1967/122/2.
-- ⏳ Queued: §3.1 quick-win use-case moves, P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`),
-  P1.1 (CrashReporter 40-site sweep), P1.2 (6 Room impls → `core-data/androidMain`),
-  P1.4 (commonTest for Deck Doctor + RateLimitedQueue), P1.5 (Hilt end-state decision — needs user).
+- ✅ **§3.1 quick-wins (2026-07-01, `<pending-sha>`+committed)** — (1) `AutoTagCardUseCase` already migrated
+  (it's a typealias to `core-data`'s `SuggestTagsUseCase`; audit doc was stale). (2) `GetAccountNudgeUseCase`
+  DEFERRED — real presentation dep (`import feature.home.presentation.NudgeTrigger`); unblock needs
+  promoting `NudgeTrigger` to a domain model (separate decision). (3) `ImportCommunityDeckUseCase` MOVED to
+  `core-domain` (Firebase→`CrashReporter`, `System.currentTimeMillis`→`Clock.System`). **NEW: `core-domain`
+  now depends on `core-common`** — future use-case moves touching `CrashReporter`/`DispatcherProvider`/
+  `KeyValueStore` need no further Gradle edit. Baseline 1967/122/2.
+- ⏳ Queued: P1.1 (CrashReporter — RE-SCOPED: swap only in migration-candidate code, NOT a blind 40-site
+  sweep; pure-Android screens keep `FirebaseCrashlytics` directly), P1.2 (6 Room impls →
+  `core-data/androidMain`), P1.4 (commonTest for Deck Doctor + RateLimitedQueue),
+  P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`), P1.5 (Hilt end-state decision — needs user).
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
 
