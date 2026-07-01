@@ -21,10 +21,8 @@ import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
-import com.mmg.manahub.core.domain.usecase.card.SearchCardUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
-import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
@@ -33,15 +31,12 @@ import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import com.mmg.manahub.core.tagging.createStrategyAnalyzer
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetCardByNameUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.LookupCardIdUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
@@ -81,12 +76,6 @@ object SharedDomainUseCaseModule {
 
     @Provides
     @Singleton
-    fun provideSearchCardUseCase(
-        cardRepository: CardRepository,
-    ): SearchCardUseCase = SearchCardUseCase(cardRepository)
-
-    @Provides
-    @Singleton
     fun provideSearchCardsUseCase(
         cardRepository: CardRepository,
     ): SearchCardsUseCase = SearchCardsUseCase(cardRepository)
@@ -113,12 +102,6 @@ object SharedDomainUseCaseModule {
     fun provideGetCollectionUseCase(
         userCardRepository: UserCardRepository,
     ): GetCollectionUseCase = GetCollectionUseCase(userCardRepository)
-
-    @Provides
-    @Singleton
-    fun provideRemoveCardUseCase(
-        userCardRepository: UserCardRepository,
-    ): RemoveCardUseCase = RemoveCardUseCase(userCardRepository)
 
     @Provides
     @Singleton
@@ -170,12 +153,6 @@ object SharedDomainUseCaseModule {
 
     @Provides
     @Singleton
-    fun provideGetCardByNameUseCase(
-        draftRepository: DraftRepository,
-    ): GetCardByNameUseCase = GetCardByNameUseCase(draftRepository)
-
-    @Provides
-    @Singleton
     fun provideGetDraftableSetsUseCase(
         draftRepository: DraftRepository,
     ): GetDraftableSetsUseCase = GetDraftableSetsUseCase(draftRepository)
@@ -185,12 +162,6 @@ object SharedDomainUseCaseModule {
     fun provideGetSetCardsPageUseCase(
         draftRepository: DraftRepository,
     ): GetSetCardsPageUseCase = GetSetCardsPageUseCase(draftRepository)
-
-    @Provides
-    @Singleton
-    fun provideGetSetCardsUseCase(
-        draftRepository: DraftRepository,
-    ): GetSetCardsUseCase = GetSetCardsUseCase(draftRepository)
 
     @Provides
     @Singleton
@@ -209,12 +180,6 @@ object SharedDomainUseCaseModule {
     fun provideGetSetVideosUseCase(
         draftRepository: DraftRepository,
     ): GetSetVideosUseCase = GetSetVideosUseCase(draftRepository)
-
-    @Provides
-    @Singleton
-    fun provideLookupCardIdUseCase(
-        draftRepository: DraftRepository,
-    ): LookupCardIdUseCase = LookupCardIdUseCase(draftRepository)
 
     @Provides
     @Singleton
