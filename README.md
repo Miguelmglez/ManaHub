@@ -101,13 +101,13 @@ Coming soon.
 
 | Layer | Technology |
 | --- | --- |
-| Language | Kotlin |
+| Language | Kotlin (Multiplatform — Android now, Web/wasmJs next) |
 | Build | AGP / Gradle Kotlin DSL / KSP |
-| UI | Jetpack Compose + Material 3 (12 custom MagicTheme palettes) |
-| Architecture | MVVM + Clean Architecture (single `:app` module) |
-| Dependency Injection | Hilt |
-| Database | Room (exported schemas, DB v40) |
-| Networking | Retrofit + OkHttp; kotlinx.serialization |
+| UI | Compose Multiplatform + Material 3 (12 custom MagicTheme palettes) |
+| Architecture | MVVM + Clean Architecture, KMP-oriented (`:shared:core-*` commonMain + `:app` Android) |
+| Dependency Injection | Koin (new/migrated code) + Hilt (legacy, being phased out) |
+| Database | Room (exported schemas, DB v40) — Android-only (no wasm target); repo interfaces are shared |
+| Networking | Ktor (commonMain, js/wasm-ready) + kotlinx.serialization; a small Retrofit remnant remains only for `DraftModule` (Cloudflare/YouTube manual JSON) |
 | Backend (BaaS) | Supabase (auth + postgrest + realtime + edge functions) via Ktor client |
 | Image loading | Coil + SVG decoder |
 | Camera / OCR | CameraX + ML Kit Text Recognition (on-device) |
@@ -128,7 +128,22 @@ Release builds use R8 (minification + resource shrinking) with a custom `proguar
 
 ## Architecture
 
-Clean Architecture by layer (data / domain / presentation). Root package: `com.mmg.manahub`. Single Gradle module (`:app`).
+Clean Architecture by layer (data / domain / presentation), **migrating to Kotlin Multiplatform**
+(Android + Web). Root package: `com.mmg.manahub`. Sequencing: get the Android app fully working on
+KMP first, then build the Web target incrementally — `:webApp` doesn't exist yet.
+
+```
+:shared:core-model    — commonMain — pure domain models (no platform deps)
+:shared:core-common   — commonMain — DispatcherProvider, KeyValueStore, CrashReporter, Page
+:shared:core-domain   — commonMain — repository interfaces, use cases, gamification catalogs, deck/tournament engines
+:shared:core-data     — commonMain — Ktor clients, DTOs, rate-limit queues, some repo impls, tagging support
+:shared:core-ui       — commonMain — MagicTheme design system, 55+ shared composables, CMP composeResources
+:app                  — androidMain (+ legacy single-module layout below) — Room, Hilt (legacy), Android-only UI
+:baseline-profile     — Android baseline profile generation
+```
+
+`:app`'s internal layout (data / domain / presentation per feature) predates the KMP split and still
+holds everything not yet migrated:
 
 ```
 app/
@@ -138,17 +153,22 @@ app/
 │   └── navigation/          — AppNavGraph.kt, Screen.kt (sealed routes); start destination = Home
 ├── core/
 │   ├── auth/                — SecureSessionManager (Keystore AES-GCM + DataStore)
-│   ├── data/{local,remote,repository}  — Room (MtgDatabase v40); Scryfall API; repo impls + cache policy
-│   ├── di/                  — Hilt modules
-│   ├── domain/              — shared models, repository interfaces, use cases
+│   ├── data/{local,remote,repository}  — Room (MtgDatabase v40); repo impls mapping to shared domain types
+│   ├── di/                  — Hilt modules (legacy) + Koin bridge modules (migrated features)
 │   ├── network/             — OkHttp client + Scryfall request queue (≤10 req/s)
 │   ├── sync/                — WorkManager workers + SyncManager
-│   ├── tagging/             — TagDictionary, analyzers, override repository
-│   ├── ui/                  — shared composables + 12 MagicTheme palettes
+│   ├── tagging/             — TagDictionary (Android-only: Locale/DataStore), analyzers (shared), override repository
+│   ├── ui/                  — remaining Android-only composables (hard-blocked, e.g. Activity-bound sheets)
 │   └── util/                — utilities
 └── feature/                 — one package per screen/flow (home, collection, decks, game,
-                               scanner, stats, trades, …)
+                               scanner, stats, trades, …); `feature/online`, `core/voice`, and
+                               `feature/scanner` are explicitly excluded from the KMP migration for now
 ```
+
+**Room has no wasm target** — DAOs/entities/migrations stay `androidMain`-only; every repository
+interface lives in `shared/core-domain` as a pure Kotlin contract, with the Android impl mapping
+DAO/entity types to shared domain models at the repository boundary. Web will get its own
+Supabase-backed implementation of the same interfaces when that phase starts.
 
 > Note: the repository also contains feature modules that are still in active development and not yet enabled in the shipping build (see Roadmap).
 
