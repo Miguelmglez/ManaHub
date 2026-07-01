@@ -436,11 +436,23 @@ comparison); zero uncertain items remain. New test baseline: **1967 tests, 122 f
 (supersedes "1964/122-124/2"). No CI configuration exists in the repo (a documented gap, not a
 regression — nothing to fix, since there's no old pipeline the module restructuring could have broken).
 
-**➡️ NEXT for Phase 5:** the remaining Phase-5 hardening items per `kmp-migration-plan.md` §5/§8
-(performance pass, README/CLAUDE.md doc refresh reflecting the final module layout, and — if the user
-wants it — standing up a first CI workflow for the `:app` + `:shared:core-*` task graph, which doesn't
-exist yet) are still open; none are urgent blockers. **Phase 4 (Android-first scope) is CONSIDERED
-COMPLETE as of 2026-07-01.** All 12 items in
+**2026-07-01 (doc-refresh slice) — README updated, CI explicitly skipped by user decision.**
+- ✅ `README.md` Tech Stack + Architecture sections rewritten (`2f1087e`) — was still describing the
+  pre-migration single-module/Hilt-only/Retrofit setup; now reflects `:shared:core-*`, Koin/Hilt
+  transition, Ktor networking, Room-is-Android-only, excluded-features list. `CLAUDE.md` needed no
+  change (kept current throughout the migration already).
+- ⏸ **CI setup: user explicitly chose to SKIP for now** (2026-07-01) — repo has zero CI config
+  (`.github/workflows`, etc. all absent). Revisit when the web target exists rather than doing
+  Android-only CI now and web CI later.
+- ⚠️ `docs/adr/ADR-004` does not exist — the plan's "ADR-004 final" line item is premature while the
+  web target hasn't started; defer until the migration is closer to fully done.
+- ⏸ **Performance (bundle size/first paint)** from the original Phase-5 scope is a web-target concern
+  (wasm bundle) — N/A under Android-only scope; not reframed as an APK-size check, no decision made.
+
+**➡️ NEXT for Phase 5:** with regression-audit + docs done and CI/performance/ADR-004 explicitly
+deferred, the remaining open fork is the same one flagged below: continue Android-only Phase 5 with a
+new concrete task (if one is identified), or hand off to the web phase. **Phase 4 (Android-first scope)
+is CONSIDERED COMPLETE as of 2026-07-01.** All 12 items in
 "Phase 4 remaining work" are resolved: DONE (3, 4, 6, 7-partial, 8), DECIDED-SKIP with rationale (4b),
 or CLOSED-AS-DEFERRED / permanently-blocked-by-design with no further Android-side action possible
 (5, 7-remainder, 9, 10, 11, 12). See item 5's full entry below for the item-5 closure (the last item
