@@ -451,10 +451,21 @@ backlog is fully executed). Being worked through as GREEN slices:
   `core-domain` (Firebase→`CrashReporter`, `System.currentTimeMillis`→`Clock.System`). **NEW: `core-domain`
   now depends on `core-common`** — future use-case moves touching `CrashReporter`/`DispatcherProvider`/
   `KeyValueStore` need no further Gradle edit. Baseline 1967/122/2.
-- ⏳ Queued: P1.1 (CrashReporter — RE-SCOPED: swap only in migration-candidate code, NOT a blind 40-site
-  sweep; pure-Android screens keep `FirebaseCrashlytics` directly), P1.2 (6 Room impls →
-  `core-data/androidMain`), P1.4 (commonTest for Deck Doctor + RateLimitedQueue),
-  P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`), P1.5 (Hilt end-state decision — needs user).
+- ✅ **P1.1 (2026-07-01, committed)** — RE-SCOPED targeted swap: the 7 migration-candidate (A) classes
+  (`PushTokenRepositoryImpl`, `GamificationSyncManager`, `SyncManager`, `UserProfileDataSource`,
+  `DraftSimRepositoryImpl`, `FriendRepositoryImpl`, `PlaytestRepositoryImpl`) now use `core-common`'s
+  `CrashReporter` instead of direct `FirebaseCrashlytics` — removes the Crashlytics pin blocking their
+  future move to shared. Pure-Android (B) screens/VMs/FCM keep `FirebaseCrashlytics` by design. Full (A)
+  set fit the cap; no follow-up. Instrumentation-preserving (Android actual delegates to Crashlytics).
+  Hilt resolves `CrashReporter` via a new `CrashlyticsModule` provider. 4 test files drop
+  `mockkStatic(FirebaseCrashlytics)`. **New baseline: 1967/118/2** (was /122 — 4 previously-flaky
+  unmocked-Crashlytics tests now pass; failing-CLASS set did not grow, A/B-verified via git stash).
+  → NOTE the reference floor is now **1967 tests / 118 failed / 2 skipped**.
+- ⏳ Queued: P1.4 (commonTest for Deck Doctor + RateLimitedQueue — next, autonomous),
+  **P1.2 (6 Room impls → `core-data/androidMain` — BIG INFRA: needs Room-KSP-in-KMP-androidMain wiring +
+  schema location; do SPIKE-FIRST with one impl, not a blind 6-way move — DECISION POINT)**,
+  P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`),
+  **P1.5 (Hilt end-state decision — needs USER)**.
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
 
