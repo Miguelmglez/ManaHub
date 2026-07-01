@@ -458,9 +458,10 @@ handoff.** Concrete checklist adopted for the rest of Phase 5 (Android-only):
 - [ ] C. DI graph completeness: Koin↔Hilt bridge has no missing bindings / orphaned modules after
       ~250+ moved files.
 - [ ] D. `:baseline-profile` module still valid post module-split (class refs, generation still works).
-- [ ] E. Dead-code cleanup: `DeckMagicDetailScreen`/`DeckBuilderViewModel`/`Screen.DeckDetail` were
-      flagged as an unused fallback (kept "until parity confirmed in real use, then delete" —
-      `project_deck_studio` memory) — confirm parity and delete if safe.
+- [x] E. **CANCELLED per user directive (2026-07-01): do NOT delete `DeckMagicDetailScreen`/
+      `DeckBuilderViewModel`/`Screen.DeckDetail`.** Despite being currently unused (superseded by Deck
+      Studio), the user wants it kept — it will be used again in the future. Item closed as
+      "keep as-is," not attempted.
 - [ ] F. `android-edge-case-tester` scoped pass on the most heavily-migrated critical flows (Tournament
       finish-and-advance path, GameSession/Stats, Deck Doctor engine) to catch regressions unit tests
       might miss.
