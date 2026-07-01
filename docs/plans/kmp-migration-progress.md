@@ -439,8 +439,13 @@ backlog is fully executed). Being worked through as GREEN slices:
 - ✅ **P0.3 (2026-07-01, doc-only)** — fixed the §9.2 leak-grep regex (was `import (androidx|...)` → floods
   core-ui with `androidx.compose.*` false positives). Now uses PCRE negative lookahead
   `import (androidx\.(?!compose)|android\.|java\.)` + a non-`-P` fallback. Baseline label updated 1964→1967.
-- ⏳ Queued: P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`), P1.3 (4 orphan @HiltViewModel → Koin),
-  §3.1 quick-win moves, P1.1 (CrashReporter 40-site sweep), P1.2 (6 Room impls → `core-data/androidMain`),
+- ✅ **P1.3 (2026-07-01, `edf9230`)** — converted the 4 orphan `@HiltViewModel` to Koin
+  (`AdvancedSearchViewModel`+`SetPickerViewModel` → new `searchWidgetsKoinModule`; `GamificationCelebration
+  ViewModel` → new `gamificationKoinModule`; `ProfileEditViewModel` → existing `ProfileKoinModule`). All deps
+  already single'd in coreBridge/addCard → zero new bridges. **DI cutover now COMPLETE for every non-excluded
+  feature** — `grep '^@HiltViewModel'` non-excluded is EMPTY. Baseline 1967/122/2.
+- ⏳ Queued: §3.1 quick-win use-case moves, P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`),
+  P1.1 (CrashReporter 40-site sweep), P1.2 (6 Room impls → `core-data/androidMain`),
   P1.4 (commonTest for Deck Doctor + RateLimitedQueue), P1.5 (Hilt end-state decision — needs user).
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
