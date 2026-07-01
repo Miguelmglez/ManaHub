@@ -70,6 +70,9 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
+                // Pure-coroutine concurrency primitives (RateLimitedQueue) need runTest/virtual-time
+                // control to test min-delay spacing and Mutex serialisation deterministically.
+                implementation(libs.coroutines.test)
             }
         }
         // androidMain / wasmJsMain intentionally have minimal code yet (placeholders for future actuals).
