@@ -254,9 +254,13 @@ predate the test-set compiling as one unit — ignore them; 122 is the live base
 ./gradlew :app:assembleDebug                              # → BUILD SUCCESSFUL
 ./gradlew :shared:core-model:compileKotlinWasmJs \
           :shared:core-domain:compileKotlinWasmJs          # (+ :shared:core-common / :shared:core-data if touched) → SUCCESSFUL
-./gradlew :app:testDebugUnitTest                          # → 1964 tests, 122 failed, 2 skipped
-# leak check — must print NOTHING but KDoc comment lines (no `import` lines):
-grep -rn -E "import (androidx|android\.|java\.)" shared/*/src/commonMain
+./gradlew :app:testDebugUnitTest                          # → 1967 tests, 122 failed, 2 skipped (post-2026-07-01 baseline)
+# leak check — must print NOTHING but KDoc comment lines (no `import` lines).
+# NOTE: exclude androidx.compose.* — Compose Multiplatform publishes under that namespace and is
+# CMP-compatible, so a bare `androidx` match floods core-ui with false positives. Use the negative
+# lookahead below (PCRE) so the check stays usable:
+grep -rnP "import (androidx\.(?!compose)|android\.|java\.)" shared/*/src/commonMain
+# (if your grep lacks -P, fall back to: grep -rnE "import (androidx|android\.|java\.)" shared/*/src/commonMain | grep -v "androidx.compose")
 ```
 - **122 vs 123:** `HomeViewModelTest` (Discover `order:random`) is flaky and may flip 122↔123 — NOT a
   regression. The rule is: **the set of failing test CLASSES must not grow.** `CollectionUseCasesTest` is a
