@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.communitydecks.domain.usecase
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.Deck
@@ -9,17 +10,11 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.core.model.CommunityDeckCard
 import com.mmg.manahub.core.model.CommunityDeckOwner
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.slot
-import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -36,6 +31,7 @@ class ImportCommunityDeckUseCaseTest {
 
     private val deckRepository: DeckRepository = mockk(relaxUnitFun = true)
     private val cardRepository: CardRepository = mockk()
+    private val crashReporter: CrashReporter = mockk(relaxUnitFun = true)
 
     private lateinit var useCase: ImportCommunityDeckUseCase
 
@@ -121,24 +117,13 @@ class ImportCommunityDeckUseCaseTest {
 
     @Before
     fun setUp() {
-        // The use case logs telemetry via FirebaseCrashlytics (unresolved-card breadcrumbs,
-        // high-failure-rate / import-failed non-fatals) outside any runCatching, which throws
-        // "Default FirebaseApp is not initialized" without a static mock.
-        mockkStatic(FirebaseCrashlytics::class)
-        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
-        every { FirebaseCrashlytics.getInstance() } returns crashlytics
-
         coEvery { deckRepository.createDeck(any(), any(), any()) } returns testDeckId
 
         useCase = ImportCommunityDeckUseCase(
             deckRepository = deckRepository,
             cardRepository = cardRepository,
+            crashReporter = crashReporter,
         )
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ── Group 1: Happy path — all cards resolve ─────────────────────────────

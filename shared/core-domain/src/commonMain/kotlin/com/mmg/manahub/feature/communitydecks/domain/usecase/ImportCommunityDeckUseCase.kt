@@ -1,13 +1,13 @@
 package com.mmg.manahub.feature.communitydecks.domain.usecase
 
-import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.core.util.recordNonFatal
-import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.DataResult
 import kotlinx.coroutines.flow.first
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Imports a fetched [CommunityDeck] (Archidekt) into a new local ManaHub deck.
@@ -20,10 +20,20 @@ import kotlinx.coroutines.flow.first
  *
  * On completion the new deck is stamped with community-source attribution
  * (URL / author / service / timestamp) via [DeckRepository.updateDeckAttribution].
+ *
+ * KMP migration note: reports through the platform-neutral [CrashReporter] (Crashlytics on
+ * Android, no-op on web) instead of `FirebaseCrashlytics` directly, and uses
+ * `Clock.System.now().toEpochMilliseconds()` instead of `System.currentTimeMillis()` — both
+ * required for this use case to live in `commonMain`. Millisecond semantics are unchanged.
+ *
+ * @param crashReporter platform-neutral crash/log reporter, injected so Android keeps recording
+ *   to Crashlytics with zero behavior change.
  */
+@OptIn(ExperimentalTime::class)
 class ImportCommunityDeckUseCase(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
+    private val crashReporter: CrashReporter,
 ) {
 
     /** Outcome of an import attempt. */
@@ -80,8 +90,9 @@ class ImportCommunityDeckUseCase(
                 } else {
                     // Card could not be resolved against Scryfall — skip it (never abort).
                     // Log only the index + name length (never the name itself — PII-adjacent).
-                    FirebaseCrashlytics.getInstance()
-                        .log("community_deck_import_card_unresolved: index=$index, name_length=${card.name.length}")
+                    crashReporter.log(
+                        "community_deck_import_card_unresolved: index=$index, name_length=${card.name.length}",
+                    )
                     failedCount++
                 }
                 onProgress(resolvedCount + failedCount, allCards.size)
@@ -90,8 +101,8 @@ class ImportCommunityDeckUseCase(
             // If more than half the cards failed to resolve, surface a non-fatal so we can
             // diagnose systemic resolution problems (e.g. a broken Scryfall name mapping).
             if (failedCount > allCards.size / 2) {
-                recordSafeNonFatal(
-                    "community_deck_import_high_failure_rate",
+                crashReporter.log("community_deck_import_high_failure_rate")
+                crashReporter.recordException(
                     IllegalStateException("$failedCount/${allCards.size} cards unresolved"),
                 )
             }
@@ -105,7 +116,7 @@ class ImportCommunityDeckUseCase(
                         createdDeck.copy(
                             commanderCardId = commanderId,
                             coverCardId = createdDeck.coverCardId ?: commanderId,
-                            updatedAt = System.currentTimeMillis(),
+                            updatedAt = Clock.System.now().toEpochMilliseconds(),
                         )
                     )
                 }
@@ -117,7 +128,7 @@ class ImportCommunityDeckUseCase(
                 sourceUrl = deck.sourceUrl,
                 sourceAuthor = deck.owner.username,
                 sourceService = "archidekt",
-                importedAt = System.currentTimeMillis(),
+                importedAt = Clock.System.now().toEpochMilliseconds(),
             )
 
             ImportResult.Success(
@@ -126,9 +137,9 @@ class ImportCommunityDeckUseCase(
                 failedCount = failedCount,
             )
         } catch (e: Exception) {
-            recordNonFatal("community_deck_import_failed", e)
-            FirebaseCrashlytics.getInstance()
-                .setCustomKey("community_deck_import_card_count", deck.cards.size)
+            crashReporter.log("community_deck_import_failed")
+            crashReporter.recordException(e)
+            crashReporter.setCustomKey("community_deck_import_card_count", deck.cards.size.toString())
             ImportResult.Error(e.message ?: "Import failed")
         }
     }
