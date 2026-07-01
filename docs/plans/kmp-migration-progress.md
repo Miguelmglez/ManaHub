@@ -425,6 +425,26 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     `feature/scanner` files were touched (confirmed via `git diff --stat` on the fix commit — the only
     file changed is the playtest test).
 
+## REMEDIATION LOG — audit 2026-07-01 (local doc: `kmp-migration-audit-2026-07-01.md`, gitignored)
+
+A read-only audit (2 sub-agents, cross-verified vs the live tree) produced a prioritized P0/P1/P2 backlog
+in `docs/plans/kmp-migration-audit-2026-07-01.md` (gitignored per the planning-doc rule; delete when the
+backlog is fully executed). Being worked through as GREEN slices:
+- ✅ **P0.1 (2026-07-01, `b392a4f`)** — deleted 4 DEAD shared use cases stranded in `:shared:core-domain`
+  (`SearchCardUseCase`, `GetCardByNameUseCase`, `GetSetCardsUseCase`, `LookupCardIdUseCase`) — migrated in
+  Phase-2 batch #1 with no consumer, `@Provides` already removed from `SharedDomainUseCaseModule`.
+  `RemoveCardUseCase` KEPT (real test consumer `CollectionUseCasesTest`, plain-ctor). Gauntlet green,
+  1967/122/2. NOTE: core-domain needed `clean` — deleting klib source corrupts the wasmJs incremental cache
+  (`WasmIrFileMetadata` AIOOBE); `:shared:core-domain:clean` fixes it. Add this to known-gotchas.
+- ✅ **P0.3 (2026-07-01, doc-only)** — fixed the §9.2 leak-grep regex (was `import (androidx|...)` → floods
+  core-ui with `androidx.compose.*` false positives). Now uses PCRE negative lookahead
+  `import (androidx\.(?!compose)|android\.|java\.)` + a non-`-P` fallback. Baseline label updated 1964→1967.
+- ⏳ Queued: P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`), P1.3 (4 orphan @HiltViewModel → Koin),
+  §3.1 quick-win moves, P1.1 (CrashReporter 40-site sweep), P1.2 (6 Room impls → `core-data/androidMain`),
+  P1.4 (commonTest for Deck Doctor + RateLimitedQueue), P1.5 (Hilt end-state decision — needs user).
+- Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
+  orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
+
 ## NEXT STEP (resume here)
 
 **🟡 Phase 5 · Slice 1 (full regression audit, Android-only scope) is DONE as of 2026-07-01 —
