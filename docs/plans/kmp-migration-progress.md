@@ -486,8 +486,66 @@ handoff.** Concrete checklist adopted for the rest of Phase 5 (Android-only):
       `:app:assembleDebug` + all 5 `:shared:core-*:compileKotlinWasmJs` → BUILD SUCCESSFUL;
       `:app:testDebugUnitTest --rerun-tasks` → **1967 tests, 122 failed, 2 skipped** (== baseline, zero
       regressions).
-- [ ] B. `android-security-auditor` full pass over the shared modules + migration diff (huge
-      restructuring — worth a dedicated secret/security sweep beyond the routine pre-push gate).
+- [x] B. **DONE 2026-07-01 (audit only, zero `.kt` change — clean pass, no fixes required).**
+      `android-security-auditor` full pass over the 5 `shared/core-*` modules' `commonMain` (all ~340
+      shared `.kt` files as of this session) + the migration diff, per CLAUDE.md's "Security notes" +
+      "Supabase invariants." Web target (`wasmJsMain`) explicitly out of scope; `feature/online`/
+      `core/voice`/`feature/scanner` untouched (confirmed via `git diff --stat` — only this doc changed).
+      Five areas audited, all CLEAN:
+      1. **Secrets/credentials.** Regex sweep for API-key/token/secret literals, known key-prefix
+         patterns (`AIza`, `sk_live`, `ghp_`, `eyJhbGciOi`, `service_role`, PEM headers), and
+         `http://`/embedded-credential URLs across `shared/**/*.kt` — zero hits. Also ran `git log -S`
+         (pickaxe) for the same prefixes across the **full history** of `shared/` (70 commits) to catch
+         a secret that predates the routine pre-push gate — zero hits. No `BuildConfig.*` reference
+         exists in `shared/` at all (expected: `commonMain` can't see Android's `BuildConfig`), so
+         nothing could have been carried over hardcoded.
+      2. **commonMain data-boundary risk (forward-looking for web).** No `io.ktor.client.plugins.logging`
+         `Logging` plugin installed anywhere in `shared/` (all HTTP logging is wired per-client in `:app`
+         via `OkHttpClient`/`HttpLoggingInterceptor`, gated `BODY`-debug/`NONE`-release — Android-only,
+         correctly outside commonMain). No `println`/`Log.*`/`console.log` in `shared/`. No raw
+         token storage in `commonMain`: `KeyValueStore` is an `expect` interface only; the Android
+         `actual` (`DataStoreKeyValueStore`) and the wasmJs `actual` (`LocalStorageKeyValueStore`,
+         already scaffolded — NOT reviewed here, web-target scope) are the platform-specific impls. ID
+         tokens (`SignInWithGoogleUseCase` etc.) pass through to the repository as plain params with no
+         logging. **Forward-looking note for the web phase (not a current bug):** `UserProfileClient`/
+         `FriendshipClient` in `shared/core-data` rely on the Android `OkHttpClient` engine's
+         interceptor to attach the Supabase `apikey`/Bearer headers (wired in `:app`'s
+         `AuthModule`/`FriendModule`) — this pattern is Android-OkHttp-engine-specific and will NOT
+         carry over to Ktor's JS engine; `kmp-web-fullstack-dev` will need an equivalent
+         auth-header-injection mechanism for the wasmJs `HttpClient`. Also noted: `LocalStorageKeyValueStore`
+         already exists in `wasmJsMain` — flagged for `kmp-web-fullstack-dev` to review against
+         CLAUDE.md's "no hand-rolled token storage in `localStorage`" rule when the web auth phase starts
+         (not audited here — out of scope).
+      3. **Ktor migration parity — CONFIRMED preserved.** All `baseUrl`s in `:app` DI (`ScryfallClient`,
+         `YouTubeClient`, `ArchidektClient`, Supabase clients) are `https://`; `network_security_config.xml`
+         still blocks cleartext at the OS level, unaffected by the module split (Android resource, not
+         touched by the restructuring). `ScryfallRequestQueue`'s allowlist sanitization survived the move
+         to `BuildScryfallQueryUseCase` in `shared/core-domain` byte-for-byte (regex
+         `[^a-zA-Z0-9\-',.\s]` strip, unchanged). The YouTube API key is injected via `BuildConfig
+         .YOUTUBE_API_KEY` at the `:app` DI boundary (`DraftModule.provideYouTubeClient`) — never
+         hardcoded in `shared` — and its dedicated Ktor `HttpClient` (`provideYouTubeHttpClient`)
+         deliberately does NOT install `HttpLoggingInterceptor` at all (unlike the Cloudflare/global
+         clients, which do), so the key — travelling as a `?key=` query param per the YouTube REST API's
+         own requirement — is never written to Logcat even in debug builds. This is equivalent-or-better
+         than the pre-migration OkHttp-interceptor approach the CLAUDE.md note describes.
+      4. **DI/Koin exposure — N/A, nothing to audit yet.** Zero `org.koin` imports anywhere in
+         `shared/`; every Koin module (all 20 islands) still lives in `:app`. No secret or
+         internal-only endpoint is `single { }`-provided in `commonMain` because no DI wiring exists
+         there yet. Revisit this check once Koin modules start moving into `shared/` (not yet planned).
+      5. **Room→domain mapper boundary — clean.** Audited `GameSessionRepositoryImpl.toDomain()` and
+         `TournamentRepositoryImpl`'s three `toDomain()` mappers (the two examples named in the task) —
+         both are explicit field-by-field mappings (no reflection/wildcard copy), and the shared domain
+         types they populate (`SessionDetail`/`SessionHistoryEntry`/`DeckStats`/etc. in
+         `feature.game.domain.model`; `Tournament`/`TournamentMatch`/`TournamentPlayer` in `core.model`)
+         carry only gameplay data — no device id, no debug/internal-only flag, no Android-local-only
+         field is exposed. Spot-checked `TradeItemRequestDto` (a client-authored request DTO carrying
+         `from_user_id`/`to_user_id`) — this is a pre-existing pattern unchanged by the migration (Gson
+         → kotlinx.serialization only) and its safety depends on backend RLS/RPC enforcement
+         (`backend-supabase-expert`'s domain, not this migration's), not a mapper-boundary issue; noted
+         but not treated as a migration-introduced finding.
+      **Net result: 0 fixes delegated to `android-kotlin-architect`** (nothing rose to "genuine
+      current-state issue"). 2 forward-looking notes recorded above for whoever picks up the web
+      auth/networking phase.
 - [ ] C. DI graph completeness: Koin↔Hilt bridge has no missing bindings / orphaned modules after
       ~250+ moved files.
 - [x] D. **DONE 2026-07-01 (audit only, zero `.kt` change).** `:baseline-profile` module still valid
