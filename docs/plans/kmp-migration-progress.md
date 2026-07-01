@@ -451,8 +451,41 @@ regression — nothing to fix, since there's no old pipeline the module restruct
 
 **2026-07-01 (user directive) — continue Android hardening to completion before considering the web
 handoff.** Concrete checklist adopted for the rest of Phase 5 (Android-only):
-- [ ] A. Release build health: `assembleRelease` + R8/consumer-rules sanity across `:shared:core-*`
-      (new modules may need consumer ProGuard rules; `:app`'s `proguard-rules.pro` predates the split).
+- [x] A. **DONE 2026-07-01 (audit only, zero `.pro`/`.gradle.kts` change — release build was already
+      healthy).** Ran a real signed `./gradlew :app:assembleRelease --rerun-tasks` (local keystore in
+      the gitignored `local.properties` is fully configured) → **BUILD SUCCESSFUL in 7m13s**, R8
+      (`minifyReleaseWithR8`) + resource shrinking (`optimizeReleaseResources`) + `packageRelease` +
+      `uploadCrashlyticsMappingFileRelease` all ran and succeeded — this proves R8 doesn't choke on the
+      `:shared:core-*` split, not just that a debug build compiles. Verified R8 didn't silently strip
+      anything the split introduced by inspecting `app/build/outputs/mapping/release/mapping.txt`
+      (1.2M lines): all `com.mmg.manahub.core.data.remote.dto.*` `@Serializable` DTOs (now living in
+      `:shared:core-data`) kept their original class names + full constructor signatures (spot-checked
+      `CardDto`'s 37-arg synthetic `@Serializable` constructor, byte-for-byte present); `org.koin.core.Koin`
+      and `io.ktor.client.HttpClient` both present/kept; `com.mmg.manahub.core.data.repository.
+      DeckRepositoryImpl` (a `:shared:core-data` repo impl) present with real method names; no
+      `missing_rules.txt` was generated (R8 only emits that file when a `-keep` rule can't be resolved —
+      its absence confirms zero missing-rule failures). **Root cause of "why nothing broke":** the
+      Phase-2/3 data-layer moves were consistently **package-preserving** (per the standing pattern in
+      `project_kmp_phase2_usecase_batch1`/`batch2` — e.g. `core.domain.model.*` → `core.model.*` DTOs
+      still live under `com.mmg.manahub.core.data.remote.**`, repo impls still under `com.mmg.manahub.
+      core.data.repository.**`), so `proguard-rules.pro`'s existing **wildcard** keep rules (`-keep class
+      com.mmg.manahub.core.data.remote.** { *; }`, the `@kotlinx.serialization.Serializable` blanket keep,
+      `-keep class com.mmg.manahub.core.model.** { *; }`, `-keep class org.koin.** { *; }`, `-keep class
+      io.ktor.** { *; }`) already transitively cover the classes' NEW module regardless of which
+      `.jar`/module they physically compile from — R8 operates on the merged post-D8 class graph, not
+      per-module, so a package-scoped wildcard rule doesn't care that the package moved from `:app` to
+      `:shared:core-data`. **One stale-but-harmless line found, left as-is (zero risk, zero benefit to
+      touching it):** `-keep class com.mmg.manahub.core.domain.model.** { *; }` now matches an EMPTY
+      package (`app/src/main/java/.../core/domain/model/` has 0 files — everything moved to
+      `:shared:core-model`'s `core.model`); it's a no-op keep rule, not a bug, so it was left untouched
+      rather than invent a cosmetic-only commit. **No `consumerProguardFiles` were added to any
+      `:shared:core-*` module** — none were needed; `:app` is the only module that produces a shrunk
+      artifact (the shared modules ship as plain `.aar`/`.klib` with no minification of their own), so
+      keep rules belong exclusively in `:app`'s `proguard-rules.pro` per the task's own guidance. Full
+      gauntlet re-verified after the release build (to rule out any config-cache/daemon side effects):
+      `:app:assembleDebug` + all 5 `:shared:core-*:compileKotlinWasmJs` → BUILD SUCCESSFUL;
+      `:app:testDebugUnitTest --rerun-tasks` → **1967 tests, 122 failed, 2 skipped** (== baseline, zero
+      regressions).
 - [ ] B. `android-security-auditor` full pass over the shared modules + migration diff (huge
       restructuring — worth a dedicated secret/security sweep beyond the routine pre-push gate).
 - [ ] C. DI graph completeness: Koin↔Hilt bridge has no missing bindings / orphaned modules after
