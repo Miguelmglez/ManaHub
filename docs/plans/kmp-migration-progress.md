@@ -449,10 +449,28 @@ regression — nothing to fix, since there's no old pipeline the module restruct
 - ⏸ **Performance (bundle size/first paint)** from the original Phase-5 scope is a web-target concern
   (wasm bundle) — N/A under Android-only scope; not reframed as an APK-size check, no decision made.
 
+**2026-07-01 (user directive) — continue Android hardening to completion before considering the web
+handoff.** Concrete checklist adopted for the rest of Phase 5 (Android-only):
+- [ ] A. Release build health: `assembleRelease` + R8/consumer-rules sanity across `:shared:core-*`
+      (new modules may need consumer ProGuard rules; `:app`'s `proguard-rules.pro` predates the split).
+- [ ] B. `android-security-auditor` full pass over the shared modules + migration diff (huge
+      restructuring — worth a dedicated secret/security sweep beyond the routine pre-push gate).
+- [ ] C. DI graph completeness: Koin↔Hilt bridge has no missing bindings / orphaned modules after
+      ~250+ moved files.
+- [ ] D. `:baseline-profile` module still valid post module-split (class refs, generation still works).
+- [ ] E. Dead-code cleanup: `DeckMagicDetailScreen`/`DeckBuilderViewModel`/`Screen.DeckDetail` were
+      flagged as an unused fallback (kept "until parity confirmed in real use, then delete" —
+      `project_deck_studio` memory) — confirm parity and delete if safe.
+- [ ] F. `android-edge-case-tester` scoped pass on the most heavily-migrated critical flows (Tournament
+      finish-and-advance path, GameSession/Stats, Deck Doctor engine) to catch regressions unit tests
+      might miss.
+
+Work through these one at a time, each its own verified GREEN slice/commit, until the list is done or
+a genuine blocker is hit (documented here, not forced).
+
 **➡️ NEXT for Phase 5:** with regression-audit + docs done and CI/performance/ADR-004 explicitly
-deferred, the remaining open fork is the same one flagged below: continue Android-only Phase 5 with a
-new concrete task (if one is identified), or hand off to the web phase. **Phase 4 (Android-first scope)
-is CONSIDERED COMPLETE as of 2026-07-01.** All 12 items in
+deferred, continue the checklist above. Web-phase handoff remains available whenever the user wants it,
+but is not the current directive. All 12 items in
 "Phase 4 remaining work" are resolved: DONE (3, 4, 6, 7-partial, 8), DECIDED-SKIP with rationale (4b),
 or CLOSED-AS-DEFERRED / permanently-blocked-by-design with no further Android-side action possible
 (5, 7-remainder, 9, 10, 11, 12). See item 5's full entry below for the item-5 closure (the last item
