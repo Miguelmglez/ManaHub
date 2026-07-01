@@ -461,11 +461,19 @@ backlog is fully executed). Being worked through as GREEN slices:
   `mockkStatic(FirebaseCrashlytics)`. **New baseline: 1967/118/2** (was /122 — 4 previously-flaky
   unmocked-Crashlytics tests now pass; failing-CLASS set did not grow, A/B-verified via git stash).
   → NOTE the reference floor is now **1967 tests / 118 failed / 2 skipped**.
-- ⏳ Queued: P1.4 (commonTest for Deck Doctor + RateLimitedQueue — next, autonomous),
-  **P1.2 (6 Room impls → `core-data/androidMain` — BIG INFRA: needs Room-KSP-in-KMP-androidMain wiring +
-  schema location; do SPIKE-FIRST with one impl, not a blind 6-way move — DECISION POINT)**,
-  P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`),
-  **P1.5 (Hilt end-state decision — needs USER)**.
+- 🔵 **P1.5 — DECIDED by USER (2026-07-01): Hilt is NOT permanent. TARGET = full Koin.** Move ALL
+  non-excluded DI to Koin now. The Hilt runtime survives ONLY as long as the excluded trio
+  (`feature/online`, `feature/scanner`, `core/voice`) stays Hilt (they still need a Hilt graph for their
+  `@HiltViewModel`s + the shared singletons they consume); Hilt fully retires in the final excluded-trio
+  migration wave. Actionable now: convert every remaining non-excluded Hilt `@Module` to Koin, keeping only
+  the bindings the excluded trio genuinely consumes (bridge those Koin→Hilt or keep a thin Hilt `@Provides`
+  reading the Koin single). → NEW WORK ITEM **"Hilt-to-Koin module cutover"** below.
+- 🔵 **P1.2 — RESERVED by USER (2026-07-01): Room repo impls STAY in `:app` until the web implementation
+  phase begins.** Do NOT move the 6 Room-backed impls to `core-data/androidMain` now, no spike. Revisit
+  when `kmp-web-fullstack-dev` starts the web target (the wasmJs actual + the androidMain move land together).
+- ⏳ Queued: P1.4 (commonTest for Deck Doctor + RateLimitedQueue — IN PROGRESS),
+  **Hilt→Koin module cutover (per P1.5 decision — move all non-excluded @Modules to Koin, incremental)**,
+  P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`).
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
 
