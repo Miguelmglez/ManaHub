@@ -41,7 +41,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog
@@ -50,6 +49,7 @@ import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import org.koin.androidx.compose.koinViewModel
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -71,7 +71,7 @@ import kotlin.random.Random
 @Composable
 fun GamificationCelebrationHost(
     modifier: Modifier = Modifier,
-    viewModel: GamificationCelebrationViewModel = hiltViewModel(),
+    viewModel: GamificationCelebrationViewModel = koinViewModel(),
 ) {
     val current by viewModel.current.collectAsStateWithLifecycle()
 

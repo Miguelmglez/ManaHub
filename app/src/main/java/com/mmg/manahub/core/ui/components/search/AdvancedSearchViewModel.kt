@@ -12,17 +12,20 @@ import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.SearchDirection
 import com.mmg.manahub.core.model.SearchOrder
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class AdvancedSearchViewModel @Inject constructor(
+/**
+ * KMP migration — Phase 1 Hilt->Koin cutover. Resolved via `koinViewModel()` from
+ * `searchWidgetsKoinModule` (see `core/ui/components/search/di/SearchKoinModule.kt`); all three
+ * constructor deps are already bridged Hilt-owned singletons resolvable via `get()` (no new bridging
+ * needed -- see that module's KDoc for details).
+ */
+class AdvancedSearchViewModel(
     private val scryfallDataSource: ScryfallRemoteDataSource,
     private val buildQuery: BuildScryfallQueryUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,

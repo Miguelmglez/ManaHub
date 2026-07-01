@@ -51,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.svg.SvgDecoder
@@ -63,6 +62,7 @@ import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.SetType
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,7 +79,7 @@ fun SetPickerSheet(
     singleSelection: Boolean = false,
 ) {
     // Force a new ViewModel whenever availableSets changes to ensure clean initialization
-    val viewModel: SetPickerViewModel = hiltViewModel(key = availableSets?.hashCode()?.toString())
+    val viewModel: SetPickerViewModel = koinViewModel(key = availableSets?.hashCode()?.toString())
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
