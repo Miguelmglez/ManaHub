@@ -379,13 +379,68 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
   "remaining Phase-4 work" in the Android-first sense, it IS the web phase, and belongs to
   `kmp-web-fullstack-dev` per CLAUDE.md's agent-assignment section. The deferred Phase-2 items (Room DAO
   abstractions for web, `PushTokenRepositoryImpl`) fall in the same bucket.
-- ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
-  (Per `kmp-migration-plan.md` §8 sequencing, Phase 5 and the web-target portion of Phase 4 are the two
-  legitimate next moves now that Phase 4's Android-first scope is closed — see NEXT STEP.)
+- 🟡 **Phase 5 · Slice 1 — full regression audit (Android-only scope) DONE & GREEN (2026-07-01,
+  `30864f6`).** The documented test baseline ("1964 tests, ~122-124 failed, 2 skipped") had been
+  treated as a fixed floor throughout the migration but never root-caused — every prior session only
+  diffed the failing-CLASS set against the previous run. This slice finally did it: ran
+  `:app:testDebugUnitTest --rerun-tasks` fresh, read the actual `<failure>` messages out of every
+  `TEST-*.xml` report (not just class names), and classified all 19 failing classes.
+  - **1 migration regression found and FIXED:** `CanPlaytestDeckUseCaseTest` — stale test left over
+    from a Phase 4 slice (2026-06-29) that added Casual-format support (60-card min, same threshold as
+    Standard) to `CanPlaytestDeckUseCase` but never updated the test, which still asserted
+    `casual format then Ineligible` under "Group 5: Unsupported formats." Fixed by removing the stale
+    assertion and adding a proper "Group 1b: Casual" boundary-test block (60/>60/59/0 cards), mirroring
+    the existing Standard coverage. Commit `30864f6`.
+  - **18 classes / 122 tests CONFIRMED pre-existing, NOT migration-caused, out of scope for Phase 5:**
+    - **4 classes / 74 tests in the permanently-excluded trees** (presumptively out of scope by
+      definition — these trees are untouched by this migration): `OnlineSessionRepositoryImplTest`,
+      `LobbyJoinViewModelTest` (`feature/online`); `CommandGrammarTest` (`core/voice`);
+      `ScannerViewModelTest` (`feature/scanner`).
+    - **14 classes / 48 tests independently verified pre-existing** via `git log`/`git blame` on the
+      test file + code under test (none touched by a KMP-migration commit) and, for the one genuinely
+      ambiguous case, a live `git worktree` comparison against `master` (`AuthRepositoryImplTest` fails
+      identically on `master` — confirmed pre-existing, not a regression). Grouped by subsystem:
+      - **Push/notifications (2):** `PushTokenRepositoryImplTest`, `PushDeeplinkRouterTest`.
+      - **Collection/sync (5):** `UserCardRepositoryImplTest`, `UserCardRepositoryImplSyncTest`,
+        `CollectionUseCasesTest`, `CollectionSyncTest`, `SyncManagerTest`.
+      - **Auth (1):** `AuthRepositoryImplTest` (verified against `master` directly, see above).
+      - **Tagging (2):** `TagLocalizationTest`, `TagDictionaryViewModelTest`.
+      - **Trades (4):** `OpenForTradeRepositoryImplTest`, `TradesRepositoryImplTest`,
+        `WishlistRepositoryImplTest`, `TradeProposalViewModelMatchesTest`.
+  - **0 uncertain items remain** — every one of the 19 originally-failing classes was placed
+    confidently into "fixed" or "confirmed pre-existing."
+  - **New test baseline: 1967 tests, 122 failed, 2 skipped** (was 1964/123/2 — net +3 tests from the
+    `CanPlaytestDeckUseCaseTest` edit, failures down by exactly 1, zero new failures introduced). This
+    replaces "1964/122-124/2" as the tracker's reference floor going forward.
+  - **CI/build-health finding: there is NO CI configuration in this repository** — verified
+    project-wide: no `.github/workflows/`, no `.gitlab-ci.yml`, no `azure-pipelines.yml`, no
+    `Jenkinsfile`. Nothing was broken by the module restructuring (`:shared:core-*` + `:app`) because
+    there is no CI pipeline referencing the old single-module task graph to break. This is a real gap
+    (no automated build/test gate on push), but standing up CI is a separate future initiative, not
+    something this "hardening/regression audit" slice should invent — flagged here for whoever picks up
+    CI setup next.
+  - Verified: `:app:testDebugUnitTest --tests "...CanPlaytestDeckUseCaseTest" --rerun-tasks` → 26/0
+    failures; `:app:assembleDebug --rerun-tasks` → BUILD SUCCESSFUL; full `testDebugUnitTest` →
+    1967/122/2 (no new failing classes vs. the pre-fix run). No `feature/online`/`core/voice`/
+    `feature/scanner` files were touched (confirmed via `git diff --stat` on the fix commit — the only
+    file changed is the playtest test).
 
 ## NEXT STEP (resume here)
 
-**🟢 Phase 4 (Android-first scope) is now CONSIDERED COMPLETE as of 2026-07-01.** All 12 items in
+**🟡 Phase 5 · Slice 1 (full regression audit, Android-only scope) is DONE as of 2026-07-01 —
+see the STATUS entry above for the full categorized breakdown.** Short version: 1 genuine migration
+regression found and fixed (`CanPlaytestDeckUseCaseTest`, commit `30864f6`); the other 18 failing
+classes / 122 tests are all confirmed pre-existing/out-of-scope (4 classes in the permanently-excluded
+online/voice/scanner trees, 14 independently verified against `git log`/a live `master` worktree
+comparison); zero uncertain items remain. New test baseline: **1967 tests, 122 failed, 2 skipped**
+(supersedes "1964/122-124/2"). No CI configuration exists in the repo (a documented gap, not a
+regression — nothing to fix, since there's no old pipeline the module restructuring could have broken).
+
+**➡️ NEXT for Phase 5:** the remaining Phase-5 hardening items per `kmp-migration-plan.md` §5/§8
+(performance pass, README/CLAUDE.md doc refresh reflecting the final module layout, and — if the user
+wants it — standing up a first CI workflow for the `:app` + `:shared:core-*` task graph, which doesn't
+exist yet) are still open; none are urgent blockers. **Phase 4 (Android-first scope) is CONSIDERED
+COMPLETE as of 2026-07-01.** All 12 items in
 "Phase 4 remaining work" are resolved: DONE (3, 4, 6, 7-partial, 8), DECIDED-SKIP with rationale (4b),
 or CLOSED-AS-DEFERRED / permanently-blocked-by-design with no further Android-side action possible
 (5, 7-remainder, 9, 10, 11, 12). See item 5's full entry below for the item-5 closure (the last item
