@@ -1,26 +1,41 @@
 # KMP migration — next-session kickoff prompt (Sonnet 4.6, high effort)
 
 Paste the block below as the **first message** of the next session (model = **Sonnet 4.6, high effort**).
-It is self-contained: it tells the session to resume the KMP migration from the tracker, follow the
-mechanical playbook, and execute the next slice. Everything it references is committed on
-`feature/kmp-migration`.
+It is self-contained. **Status as of 2026-07-01: Phase 4 (Android-first scope) is CLOSED** — see
+`docs/plans/kmp-migration-progress.md` STATUS/NEXT STEP. The next session needs a **human decision**
+between two legitimate next moves before it can pick a mechanical backlog again: (A) Phase 5
+(hardening/release, Android-only) or (B) hand off to `kmp-web-fullstack-dev` to start the web phase
+(`:webApp`, wasmJs actuals behind the now-fully-pure repo interfaces). This prompt orients the session
+either way — do not assume which one to start without checking with the user first.
 
 ---
 
 ## ▶️ COPY FROM HERE
 
 You are resuming the **ManaHub Kotlin Multiplatform migration** (Android + Web / wasmJs). You are the
-**orchestrator**; all `.kt` and `.gradle.kts` work is delegated to the **`android-kotlin-architect`**
-agent. Do not edit `.kt` yourself.
+**orchestrator**; all `.kt` and `.gradle.kts` Android/shared work is delegated to the
+**`android-kotlin-architect`** agent; all web-target (`wasmJsMain`) work is delegated to
+**`kmp-web-fullstack-dev`**. Do not edit `.kt` yourself.
 
 ### Step 1 — Orient (read these, in order)
-1. `docs/plans/kmp-migration-progress.md` — the living tracker. Read **STATUS** + **NEXT STEP**.
+1. `docs/plans/kmp-migration-progress.md` — the living tracker. Read **STATUS** + **NEXT STEP** —
+   Phase 4 (Android-first scope) closed 2026-07-01; NEXT STEP explains the two legitimate next moves
+   (Phase 5 vs. web-phase handoff) and why neither is presumed.
 2. `docs/plans/kmp-migration-plan.md` — **§9 "Execution playbook for Sonnet 4.6"** is your operating
-   contract. Follow it verbatim (§9.1 rules, §9.2 verify gauntlet, §9.3 decision tree, §9.4 recipes,
-   §9.5 gotchas, §9.6 backlog, §9.7 task template).
+   contract for any further Android/shared slices. Follow it verbatim (§9.1 rules, §9.2 verify gauntlet,
+   §9.3 decision tree, §9.4 recipes, §9.5 gotchas, §9.6 backlog, §9.7 task template). §5/§8 define
+   Phase 5 and the web-phase scope if that's the direction chosen.
 3. `docs/plans/kmp-library-and-filesystem-map.md` — library/source-set fates + target module tree.
 4. Memory (loaded automatically): `project_kmp_migration_progress`, `project_kmp_spike_findings`,
    `project_modularization_blockers`.
+
+### Step 0 — Ask the user first
+Before doing any work, confirm with the user which direction to take: **Phase 5 hardening/release**
+(Android-only — full regression, CI, README/CLAUDE.md update) or **start the web phase** (delegate to
+`kmp-web-fullstack-dev`: `:webApp` entrypoint, wasmJs `actual` data sources, Firebase/WorkManager/
+camera/voice web actuals, web responsive layout, web security/telemetry review). Both are valid; this
+tracker does not choose for you. If the user has already stated a preference in this conversation, that
+overrides this step.
 
 ### Step 2 — Verify the tree before doing anything
 ```bash
@@ -74,26 +89,25 @@ Recent commits (most recent first):
 - `b86279c` docs(kmp): update next-session prompt — state as of 2026-06-30
 - `17f62a6` KMP Phase 4: GameSessionRepository → shared core-domain
 
-### Step 4 — Remaining work (Tier 3/4 — deeper infrastructure)
+### Step 4 — Remaining work
 
-Work in priority order, delegating each to `android-kotlin-architect`:
+**Everything in the old Tier-3/4 Android-first punch list is now resolved as of 2026-07-01** —
+`GetDeckGameStatsUseCase`, all 6 repo interfaces (Card/Deck/Stats/UserCard/GameSession/Tournament,
+zero Room types left in any signature), the CMP Res POC, and the remaining-composables survey are all
+DONE or closed. `CardSearchSheet` (Activity dep) and the online/voice/scanner-excluded composables
+remain genuine, permanent blockers (not TODOs). See `kmp-migration-progress.md` item 5's 2026-07-01
+entry for the survey that closed the last open bullet (Room-backed repo impls / DAO-abstraction).
 
-1. **Remaining composables in `:app/core/ui/components/`:**
-   - `CardSearchSheet` — `android.app.Activity` reference (hard-blocked; defer to Phase 5).
+**Permanently-blocked items (documented, not actionable without disproportionate refactors — do not
+re-attempt without new information):** `GetAccountNudgeUseCase` (presentation-layer `NudgeTrigger`
+dep), `ImportCommunityDeckUseCase` (Firebase Crashlytics dep), `UpdateTradeCollectionUseCase` (Room DAO
+dep), the 3 `core/tagging/` files (`java.util.Locale` / Android `DataStore`), the excluded
+online/voice/scanner trio.
 
-2. **Blocked use cases (lower value, harder):**
-   - ❌ `GetDeckGameStatsUseCase` — injects `GameSessionDao` + `SurveyAnswerDao` + `CardDao`
-     directly; needs 3+ new repo methods + domain types first. High effort.
-   - `GetAccountNudgeUseCase` — presentation dep (HomeUiState reference).
-   - `ImportCommunityDeckUseCase` — Firebase Crashlytics dep (needs CrashReporter expect/actual wiring).
-   - `UpdateTradeCollectionUseCase` — Room DAO dep.
-
-3. **Repository interfaces still carrying Room types** — `CardRepository`, `DeckRepository`,
-   `UserCardRepository`, `StatsRepository` interfaces carry entity/DAO types. Extract domain
-   equivalents to core-model and move interfaces to core-domain (same pattern as GameSession +
-   Tournament done 2026-06-30).
-
-4. **EXCLUDED features** (online/voice/scanner) — deferred. Do NOT touch.
+**What's actually next is a direction choice, not a mechanical backlog item** — see Step 0 above:
+Phase 5 (Android hardening/release) or the web phase (delegate to `kmp-web-fullstack-dev`). Once the
+user picks, follow that phase's definition in `kmp-migration-plan.md` §5 (Phase 5) or §3/§4 (web-phase
+scope), using this file's Step 5/6 hard rules either way.
 
 ### Step 5 — Hard rules (non-negotiable)
 - Work **only** on `feature/kmp-migration`. **Never** merge or push to `master`.

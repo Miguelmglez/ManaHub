@@ -369,21 +369,59 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
     strings each) + CardSearchSheet (`android.app.Activity`).
   - **Feature-layer deps**: GameModeSelector (`GameMode`), MagicBottomBar (`Screen`/`R.drawable`),
     ParticipantListRow/RoomCodeDisplay/RoomCodeField (online-excluded).
-- ⬜ **Phase 4** — platform parity (Firebase/Work/Camera/Vosk/auth expect-actual) + web responsive +
-  `:webApp`. The deferred Phase-2 items (Room DAO abstractions for web, gamification types, `@StringRes`
-  decoupling, `PushTokenRepositoryImpl`) naturally land here alongside the web-platform `actual`
-  implementations.
+- 🟢 **Phase 4 (Android-first scope) COMPLETE (2026-07-01).** All Android-side punch-list items
+  (CMP Res POC, remaining composables survey, repo-interface Room-type extraction, blocked-use-case
+  unblocking, Room-backed repo impl survey — see NEXT STEP below for the full item-by-item closure) are
+  either DONE, decided-skip-with-rationale, or closed-as-permanently-deferred. What the ORIGINAL Phase-4
+  scope in `kmp-migration-plan.md` §5 called out — Firebase/WorkManager/camera/voice `expect`/`actual`,
+  web responsive layout, `:webApp` entrypoint, web security/telemetry review — is, on inspection, **100%
+  web-target work** with no Android-side action possible until the web phase starts; it is NOT
+  "remaining Phase-4 work" in the Android-first sense, it IS the web phase, and belongs to
+  `kmp-web-fullstack-dev` per CLAUDE.md's agent-assignment section. The deferred Phase-2 items (Room DAO
+  abstractions for web, `PushTokenRepositoryImpl`) fall in the same bucket.
 - ⬜ **Phase 5** — hardening, CI for both targets, Cloudflare Pages deploy, README/CLAUDE.md update.
+  (Per `kmp-migration-plan.md` §8 sequencing, Phase 5 and the web-target portion of Phase 4 are the two
+  legitimate next moves now that Phase 4's Android-first scope is closed — see NEXT STEP.)
 
 ## NEXT STEP (resume here)
 
-**➡️ NEXT = Phase 4 item 5 — Room-backed repo impls / DAO-abstraction interfaces for the web
-data-source phase.** (Tier 3/4, medium-to-high effort; the last open item in "Phase 4 remaining work".)
+**🟢 Phase 4 (Android-first scope) is now CONSIDERED COMPLETE as of 2026-07-01.** All 12 items in
+"Phase 4 remaining work" are resolved: DONE (3, 4, 6, 7-partial, 8), DECIDED-SKIP with rationale (4b),
+or CLOSED-AS-DEFERRED / permanently-blocked-by-design with no further Android-side action possible
+(5, 7-remainder, 9, 10, 11, 12). See item 5's full entry below for the item-5 closure (the last item
+that was still open going into this session). **There is no further Android-first-scope work
+identified in Phase 4** — see "➡️ NEXT" below for what that means concretely.
+
+**➡️ NEXT = Phase 5 (Hardening & release) per `kmp-migration-plan.md` §5/§8, OR hand off to
+`kmp-web-fullstack-dev` to start the web phase (Phase 3/4 web-target work: `:webApp` entrypoint,
+wasmJs `actual` data sources behind the now-fully-pure repo interfaces, Firebase/WorkManager/camera/
+voice web actuals, web responsive layout, web security/telemetry review).** Both are legitimate next
+moves and are not mutually exclusive — the remaining Android-side punch list (the permanently-blocked
+items below: `GetAccountNudgeUseCase`, `ImportCommunityDeckUseCase`, `UpdateTradeCollectionUseCase`,
+the 3 `core/tagging/` files, the excluded online/voice/scanner trio) does NOT block starting the web
+phase, since none of it sits on the path of any repo interface or shared model the web target would
+consume. A human/orchestrator decision is needed on which to pick up first — this session does not
+presume to choose for the user.
 
 User decision (2026-06-24): prepare Android for 100% KMP FIRST, no web implementation yet. Web
-target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready.
+target (`:webApp`, web `actual` impls) deferred until Android is fully KMP-ready. **That condition is
+now met for the scope Phase 4 defined** (see the completeness statement above) — the web phase can
+start whenever the user is ready to greenlight it.
 
-**2026-07-01 — Composable/Res follow-up assessment session (audit only, no `.kt` code change; doc-only
+**2026-07-01 (survey session) — Phase 4 item 5 closed as deferred, zero `.kt` change.** Surveyed the
+6 Room-backed repo impls (`CardRepositoryImpl`/`DeckRepositoryImpl`/`StatsRepositoryImpl`/
+`UserCardRepositoryImpl`/`GameSessionRepositoryImpl`/`TournamentRepositoryImpl`) for (a) thin-CRUD /
+(b) business-logic / (c) network-mixed-with-Room concerns — full categorization + conclusion is in
+item 5's entry below (search "CLOSED-AS-DEFERRED 2026-07-01"). Short version: item 5 as originally
+scoped ("DAO-abstraction interfaces in commonMain") is subsumed by item 6 (already closed 2026-06-30
+— the repo interfaces themselves ARE the abstraction boundary); the only remaining piece is writing
+NEW `wasmJsMain` implementations, which is 100% web-target work and `kmp-web-fullstack-dev`'s domain,
+not an Android-first action item. No layering violations or misplaced logic were found in the survey
+that would justify a standalone Android-side cleanup slice, so none was forced. This closes out the
+last open bullet in "Phase 4 remaining work," which is why Phase 4 (Android-first scope) is now
+considered complete (see the banner above).
+
+**2026-07-01 (earlier session) — Composable/Res follow-up assessment session (audit only, no `.kt` code change; doc-only
 commit). Item 4 ("remaining `:app` composables with deep platform deps") is now CLOSED — see its full
 entry above. Summary of what was checked and decided:**
 - **`CardSearchSheet.kt` re-confirmed as a genuine hard blocker** — its forced-keyboard-dismiss logic is
@@ -648,8 +686,50 @@ Tier 3/4, medium-to-high effort; pick up there.
      mismatch with eager `object` initialization) with **no unblocking value** — nothing downstream
      depends on this conversion. Revisit only if/when the project ever adds a second locale (currently
      explicitly out of scope per CLAUDE.md "Language rules").
-5. **Room-backed repo impls** (Card, Deck, Stats, UserCard, GameSession, Tournament) — each needs
-   DAO-abstraction interfaces in commonMain. For web, fresh Supabase-backed impls behind same interface.
+5. ✅ **CLOSED-AS-DEFERRED 2026-07-01 (survey only, no code change).** Surveyed all 6 Room-backed repo
+   impls (`CardRepositoryImpl`, `DeckRepositoryImpl`, `StatsRepositoryImpl`, `UserCardRepositoryImpl`,
+   `GameSessionRepositoryImpl`, `TournamentRepositoryImpl`) against their DAO deps + business-logic
+   surface:
+   - **`CardRepositoryImpl`** (2 DAOs: `CardDao`, `UserCardCollectionDao` + `ScryfallRemoteDataSource`) —
+     (a) thin pass-through for `getCardsByIds`/`observeCard`; **(b)** `CachePolicy.isFresh/isStale`
+     cache-freshness + stale-marking logic (`getCardById`, `refreshCollectionPrices`); **(c)** network
+     calls (`remote.getCardById`/`getCardByExactName`/`searchWithRawQuery`) interleaved with Room reads/
+     writes in the same method bodies. Most complex of the 6.
+   - **`DeckRepositoryImpl`** (1 DAO: `DeckDao`) — mostly **(a)** thin CRUD/entity↔domain mapping;
+     **(b)** light — emits `ProgressionEventBus` events (deck-created/cards-added) alongside DAO writes.
+     No network.
+   - **`StatsRepositoryImpl`** (2 DAOs: `StatsDao`, `DeckDao`) — **(a)** thin mapper: a large
+     `combine(15+ flows)` folding DAO projections into the domain `Stats` model. No caching, no
+     network, no gamification. Purely a fan-in mapper.
+   - **`UserCardRepositoryImpl`** (`UserCardCollectionDao` + `RemoteKeyDao`) — mostly **(a)**
+     thin CRUD/mapping; **(b)** light — `AddOutcome` create-vs-increment business logic in
+     `addOrIncrement`. The one Android-only surface (`PagingData<UserCardWithCard>`) is already
+     correctly isolated on a separate `:app`-only `CollectionPagerSource` interface via the Recipe-4
+     split (batch #3, `815f169`) — not a fresh finding, re-confirmed still correct.
+   - **`GameSessionRepositoryImpl`** (`GameSessionDao` + `SurveyAnswerDao`) — **(a)** thin
+     mapper (already rewritten 2026-06-30 to map DAO projections → domain types); **(b)** light —
+     emits `ProgressionEventBus` events (`GameFinished`) alongside the session-save write. No network.
+   - **`TournamentRepositoryImpl`** (`TournamentDao`) — **(a)** CRUD/mapping plus **(b)** genuinely
+     non-trivial business logic: the atomic finish-and-advance state machine (single-write-path
+     invariant documented in CLAUDE.md's Tournament section — `finishMatchAndAdvanceAtomically`
+     orchestration, round-aware `GenerateNextRoundUseCase.plan` delegation) and `ProgressionEventBus`
+     (`TournamentCompleted`) emission. No network. Second-most complex of the 6 alongside Card.
+   - **No layering violations or misplaced logic found in any of the 6.** `CachePolicy` living in the
+     repo impl and `ProgressionEventBus` emission at the repo write path are both the CORRECT,
+     documented architecture (CLAUDE.md: "features emit via bus at the canonical write path —
+     repository/use-case, after a successful commit"), not something to clean up. The one Android-only
+     leak (Paging) was already correctly interface-split in a prior session.
+   - **Conclusion — item 5 folds into item 6 and is closed as deferred, zero code change.** Item 5 as
+     originally worded ("each needs DAO-abstraction interfaces in commonMain") describes exactly what
+     item 6 already delivered on 2026-06-30: all 6 repo INTERFACES are pure Kotlin, 100% commonMain,
+     with zero Room/Android types in any signature — the interface itself already IS the DAO-abstraction
+     boundary a future web data source would implement. There is no additional Android-side
+     "abstraction interface" left to extract. The only work item 5 still names — "fresh Supabase-backed
+     impls behind the same interface" — is 100% forward-looking `wasmJsMain` work (new files in a
+     source set that doesn't exist for these yet), explicitly deferred by the 2026-06-24 sequencing
+     decision ("prepare Android for 100% KMP first, no web implementation yet") and, per CLAUDE.md's
+     agent-assignment section, is `kmp-web-fullstack-dev`'s domain, not `android-kotlin-architect`'s.
+     No `.kt`/`.gradle.kts` change was made this session.
 6. **Repository interfaces with Room types** — Room entities/projections in interface signatures.
    Need domain model equivalents.
    - ✅ `GameSessionRepository` DONE 2026-06-30. `StatsViewModel` DAO-direct violation also fixed:
