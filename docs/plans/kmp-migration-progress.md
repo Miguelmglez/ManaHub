@@ -471,9 +471,31 @@ backlog is fully executed). Being worked through as GREEN slices:
 - 🔵 **P1.2 — RESERVED by USER (2026-07-01): Room repo impls STAY in `:app` until the web implementation
   phase begins.** Do NOT move the 6 Room-backed impls to `core-data/androidMain` now, no spike. Revisit
   when `kmp-web-fullstack-dev` starts the web target (the wasmJs actual + the androidMain move land together).
-- ⏳ Queued: P1.4 (commonTest for Deck Doctor + RateLimitedQueue — IN PROGRESS),
-  **Hilt→Koin module cutover (per P1.5 decision — move all non-excluded @Modules to Koin, incremental)**,
-  P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`).
+- ✅ **P1.4 (2026-07-01, committed)** — first real `commonTest` coverage: 26 tests (kotlin-test +
+  coroutines-test, no MockK) — `RateLimitedQueue` (7, core-data), `ManaBaseAnalyzer` (10) + `TribeDeriver`
+  (9, core-domain). All PASS on JVM host (`:shared:*:testAndroidHostTest` — the KMP-android host test task,
+  NOT `testDebugUnitTest`) and COMPILE for wasmJs. No production change. Floor 1967/118/2.
+
+### WORK ITEM — Hilt→Koin full module cutover (per P1.5 decision "move all to Koin")
+Three Hilt subsystems to invert to **Koin as source of truth**, keeping a MINIMAL Hilt graph only for the
+excluded trio (online/scanner/voice/nearby) until their final wave:
+1. **25 `@Module`s**: 4 excluded-own (`OnlineSessionModule`/`VoiceModule`/`ScannerModule`/`NearbyModule` —
+   STAY Hilt); ~11 infra (`DatabaseModule`(Room)/`NetworkModule`/`SupabaseModule`/`DispatcherModule`/
+   `CoroutineScopesModule`/`CrashlyticsModule`/`AnalyticsModule`/`PushModule`/`SyncModule`/`CommunityModule`/
+   `RepositoryModule`); ~10 feature/bridge (`AuthModule`/`DeckDoctorModule`/`DraftModule`/`FriendModule`/
+   `GameModule`/`NewsModule`/`TournamentModule`/`TradesModule`/`GamificationModule`/`SharedDomainUseCaseModule`).
+2. **8 `@HiltWorker`** (WorkManager): 7 non-excluded (`GamificationSyncWorker`/`QuestRotationWorker`/
+   `RegisterPushTokenWorker`/`UnregisterPushTokenWorker`/`CollectionStatsSyncWorker`/`CollectionSyncWorker`/
+   `PriceRefreshWorker`) → migrate to a Koin `WorkerFactory` (`koin-androidx-workmanager`);
+   `EmbeddingDatabaseUpdateWorker` (scanner) STAYS Hilt.
+3. **Excluded-trio consumption surface** (the minimal Koin→Hilt bridge): they `@Inject` `AuthRepository`,
+   `CardRepository`, `AnalyticsHelper`, `OkHttpClient`, `WorkManager`, `UserPreferences*`, dispatchers,
+   `VoiceModelRepository`, `SoundManager`, `NearbySessionRepository`, `OnlineSessionRepository` + their own
+   online/nearby use cases. Whatever the excluded trio consumes must stay Hilt-resolvable (thin Koin→Hilt
+   bridge or keep those specific Hilt bindings).
+Incremental, GREEN per batch. Batch order: safe feature modules first (no excluded/worker consumer) →
+worker subsystem → infra modules (define the bridge surface) → last, the minimal excluded bridge.
+- ⏳ Queued after cutover: P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`).
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
 
