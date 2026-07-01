@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.sync
 
-import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
@@ -69,6 +69,7 @@ class SyncManager @Inject constructor(
     private val scryfallRemote: ScryfallRemoteDataSource,
     private val syncPrefs: SyncPreferencesStore,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) {
 
     private val syncMutex = Mutex()
@@ -226,7 +227,7 @@ class SyncManager @Inject constructor(
                     decksPulled = decksPulled,
                 )
             }.getOrElse { error ->
-                FirebaseCrashlytics.getInstance().apply {
+                crashReporter.apply {
                     log("sync_failed: userId=$userId")
                     setCustomKey("sync_error_type", error::class.simpleName ?: "Unknown")
                     recordException(error)
@@ -379,10 +380,10 @@ class SyncManager @Inject constructor(
                     decksPulled = decksPulled,
                 )
             }.getOrElse { error ->
-                FirebaseCrashlytics.getInstance().apply {
+                crashReporter.apply {
                     log("assign_user_sync_failed: userId=$newUserId hasData=${localCollectionCount > 0}")
                     setCustomKey("sync_error_type", error::class.simpleName ?: "Unknown")
-                    setCustomKey("sync_user_has_data", localCollectionCount > 0)
+                    setCustomKey("sync_user_has_data", (localCollectionCount > 0).toString())
                     recordException(error)
                 }
                 SyncResult(state = SyncState.ERROR, error = error.message)
@@ -534,8 +535,8 @@ class SyncManager @Inject constructor(
                 }
                 .onFailure { e ->
                     // Non-fatal: entries for this chunk are skipped and retried on the next sync cycle.
-                    FirebaseCrashlytics.getInstance().apply {
-                        setCustomKey("scryfall_batch_chunk_size", chunk.size)
+                    crashReporter.apply {
+                        setCustomKey("scryfall_batch_chunk_size", chunk.size.toString())
                         setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
                         recordException(RuntimeException("[ensureCardsExist] Scryfall batch fetch failed", e))
                     }

@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.friends.data.repository
 
 import android.util.Log
-import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
@@ -35,6 +35,7 @@ class FriendRepositoryImpl @Inject constructor(
     private val remote: FriendRemoteDataSource,
     private val cardRepo: CardRepository,
     private val progressionEventBus: ProgressionEventBus,
+    private val crashReporter: CrashReporter,
 ) : FriendRepository {
 
     override fun observeFriends(): Flow<List<Friend>> =
@@ -80,12 +81,12 @@ class FriendRepositoryImpl @Inject constructor(
                 // the next manual refresh, so make it observable (and retry once) instead of
                 // discarding the Result fire-and-forget.
                 refreshFriends(currentUserId).onFailure { firstError ->
-                    FirebaseCrashlytics.getInstance().apply {
+                    crashReporter.apply {
                         log("acceptRequest: refreshFriends failed after ACCEPT (friendshipId=$friendshipId), retrying once")
                         recordException(firstError)
                     }
                     refreshFriends(currentUserId).onFailure { retryError ->
-                        FirebaseCrashlytics.getInstance().apply {
+                        crashReporter.apply {
                             log("acceptRequest: refreshFriends retry also failed (friendshipId=$friendshipId); local friends cache may be stale")
                             recordException(retryError)
                         }
@@ -197,7 +198,7 @@ class FriendRepositoryImpl @Inject constructor(
                 is DataResult.Success -> r.data
                 is DataResult.Error -> {
                     Log.w("FriendRepository", "Card metadata unavailable: ${dto.scryfallId} — ${r.message}")
-                    FirebaseCrashlytics.getInstance().log(
+                    crashReporter.log(
                         "getFriendCollection: card metadata unavailable for ${dto.scryfallId} (list=$list): ${r.message}"
                     )
                     null

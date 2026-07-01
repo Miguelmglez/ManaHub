@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.playtest.data.repository
 
-import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.entity.PlaytestCardStatEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSessionEntity
@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 class PlaytestRepositoryImpl(
     private val playtestDao: PlaytestDao,
     private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) : PlaytestRepository {
 
     override suspend fun saveTest(
@@ -60,12 +61,12 @@ class PlaytestRepositoryImpl(
         runCatching {
             playtestDao.saveTestAtomically(session, cardStats)
         }.onFailure { e ->
-            FirebaseCrashlytics.getInstance().apply {
+            crashReporter.apply {
                 log("playtest_db_save_test_failed: deckId=$deckId format=$deckFormat mulligansUsed=$mulligansUsed drawCount=$configuredDrawCount")
                 setCustomKey("playtest_deck_id", deckId)
                 setCustomKey("playtest_format", deckFormat)
-                setCustomKey("playtest_draw_count", configuredDrawCount)
-                setCustomKey("playtest_mulligans_used", mulligansUsed)
+                setCustomKey("playtest_draw_count", configuredDrawCount.toString())
+                setCustomKey("playtest_mulligans_used", mulligansUsed.toString())
                 recordException(RuntimeException("[PlaytestRepository] saveTestAtomically failed", e))
             }
             throw e
@@ -96,7 +97,7 @@ class PlaytestRepositoryImpl(
         try {
             playtestDao.replacePlaytestSurveyAnswers(playtestSessionId, entities)
         } catch (e: Exception) {
-            FirebaseCrashlytics.getInstance().apply {
+            crashReporter.apply {
                 log("playtest_db_save_survey_failed: sessionId=$playtestSessionId deckId=$deckId answerCount=${entities.size}")
                 setCustomKey("playtest_deck_id", deckId)
                 recordException(RuntimeException("[PlaytestRepository] replacePlaytestSurveyAnswers failed", e))

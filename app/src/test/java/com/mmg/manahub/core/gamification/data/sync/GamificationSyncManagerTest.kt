@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.gamification.data.sync
 
-import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
@@ -20,13 +20,10 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.mockkStatic
 import io.mockk.slot
-import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -57,6 +54,7 @@ class GamificationSyncManagerTest {
     private val dao = mockk<GamificationDao>(relaxed = true)
     private val remote = mockk<GamificationRemoteDataSource>(relaxed = true)
     private val prefs = mockk<SyncPreferencesStore>(relaxed = true)
+    private val crashReporter = mockk<CrashReporter>(relaxed = true)
 
     private lateinit var manager: GamificationSyncManager
 
@@ -64,14 +62,12 @@ class GamificationSyncManagerTest {
 
     @Before
     fun setUp() {
-        mockkStatic(FirebaseCrashlytics::class)
-        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
-
         manager = GamificationSyncManager(
             gamificationDao = dao,
             remote = remote,
             syncPrefs = prefs,
             ioDispatcher = testDispatcher,
+            crashReporter = crashReporter,
         )
 
         // Sensible defaults: empty everything, watermarks at 0, remote calls succeed with empty lists.
@@ -91,11 +87,6 @@ class GamificationSyncManagerTest {
         coEvery { remote.getAchievementChangesSince(any()) } returns Result.success(emptyList())
         coEvery { remote.getEntitlementChangesSince(any()) } returns Result.success(emptyList())
         coEvery { remote.getStreakChangesSince(any()) } returns Result.success(emptyList())
-    }
-
-    @After
-    fun tearDown() {
-        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ── PUSH ─────────────────────────────────────────────────────────────────

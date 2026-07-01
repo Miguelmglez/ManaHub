@@ -1,6 +1,6 @@
 package com.mmg.manahub.core.gamification.data.sync
 
-import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.di.IoDispatcher
@@ -48,6 +48,7 @@ class GamificationSyncManager @Inject constructor(
     private val remote: GamificationRemoteDataSource,
     private val syncPrefs: SyncPreferencesStore,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) {
 
     private val syncMutex = Mutex()
@@ -220,7 +221,7 @@ class GamificationSyncManager @Inject constructor(
         syncPrefs.saveGamificationSyncMillis(userId, newPullWatermark)
         Unit
     }.onFailure { error ->
-        FirebaseCrashlytics.getInstance().apply {
+        crashReporter.apply {
             log("gamification_sync_failed: userId=$userId")
             setCustomKey("gamification_sync_error_type", error::class.simpleName ?: "Unknown")
             recordException(error)

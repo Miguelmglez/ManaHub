@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
 import androidx.work.WorkManager
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
 import com.mmg.manahub.core.model.AppLanguage
@@ -48,6 +49,7 @@ class PushTokenRepositoryImplTest {
     private val dataSource = mockk<PushTokenRemoteDataSource>(relaxed = true)
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>()
     private val workManager = mockk<WorkManager>(relaxed = true)
+    private val crashReporter = mockk<CrashReporter>(relaxed = true)
 
     private lateinit var repository: PushTokenRepositoryImpl
 
@@ -85,6 +87,7 @@ class PushTokenRepositoryImplTest {
             dataSource = dataSource,
             userPreferencesDataStore = userPreferencesDataStore,
             workManager = workManager,
+            crashReporter = crashReporter,
         )
     }
 

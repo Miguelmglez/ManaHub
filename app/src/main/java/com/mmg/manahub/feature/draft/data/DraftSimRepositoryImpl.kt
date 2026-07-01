@@ -1,13 +1,13 @@
 package com.mmg.manahub.feature.draft.data
 
 import android.content.Context
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonSyntaxException
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
 import com.mmg.manahub.core.di.IoDispatcher
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -63,6 +63,7 @@ class DraftSimRepositoryImpl @Inject constructor(
     private val draftSessionDao: DraftSessionDao,
     private val gson: Gson,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) : DraftSimRepository {
 
     companion object {
@@ -169,7 +170,7 @@ class DraftSimRepositoryImpl @Inject constructor(
 
                 DataResult.Success(draftableSet)
             } catch (e: Exception) {
-                FirebaseCrashlytics.getInstance().recordException(e)
+                crashReporter.recordException(e)
                 DataResult.Error(DraftError.Unexpected(e.message ?: "Failed to load set").toString())
             }
         }
@@ -383,7 +384,7 @@ class DraftSimRepositoryImpl @Inject constructor(
                 // Persisting the session is the only durable record of draft progress;
                 // record the failure as a non-fatal, then rethrow so the caller's
                 // error path still fires (the draft state is not silently lost).
-                FirebaseCrashlytics.getInstance().recordException(e)
+                crashReporter.recordException(e)
                 throw e
             }
         }
@@ -426,7 +427,7 @@ class DraftSimRepositoryImpl @Inject constructor(
                     deckRepository.replaceAllCards(deckId, slots)
                 }.onFailure { e ->
                     runCatching { deckRepository.deleteDeck(deckId) }
-                    FirebaseCrashlytics.getInstance().recordException(e)
+                    crashReporter.recordException(e)
                     throw e
                 }
 
@@ -436,7 +437,7 @@ class DraftSimRepositoryImpl @Inject constructor(
 
                 DataResult.Success(deckId)
             } catch (e: Exception) {
-                FirebaseCrashlytics.getInstance().recordException(e)
+                crashReporter.recordException(e)
                 DataResult.Error(
                     DraftError.Unexpected(e.message ?: "Failed to save deck").toString(),
                 )
