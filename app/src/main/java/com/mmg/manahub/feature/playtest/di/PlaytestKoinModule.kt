@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.playtest.di
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.feature.playtest.data.repository.PlaytestRepositoryImpl
 import com.mmg.manahub.core.domain.repository.PlaytestRepository
@@ -43,6 +44,8 @@ import org.koin.dsl.module
  * `DefinitionOverrideException`:
  * - `DeckRepository` — already in `coreBridgeKoinModule`.
  * - `CardDao` — already a `single` in `surveyKoinModule`.
+ * - `CrashReporter` (KMP migration P1.1) — already a `single` in `coreBridgeKoinModule`; used by
+ *   [PlaytestRepositoryImpl] instead of a direct `FirebaseCrashlytics.getInstance()` call.
  *
  * ## ViewModel resolution notes
  * - [PlaytestSetupViewModel] takes a `SavedStateHandle` carrying the `"deckId"` nav arg →
@@ -64,7 +67,11 @@ fun playtestKoinModule(
 
     // ── Playtest data layer (formerly the Hilt PlaytestModule @Binds). ──
     single<PlaytestRepository> {
-        PlaytestRepositoryImpl(playtestDao = get(), ioDispatcher = Dispatchers.IO)
+        PlaytestRepositoryImpl(
+            playtestDao = get(),
+            ioDispatcher = Dispatchers.IO,
+            crashReporter = get(),
+        )
     }
 
     // ── Playtest use cases (formerly @Inject constructor). ──

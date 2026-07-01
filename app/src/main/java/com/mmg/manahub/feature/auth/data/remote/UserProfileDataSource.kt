@@ -2,12 +2,12 @@ package com.mmg.manahub.feature.auth.data.remote
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.dto.CompleteUserProfileDto
 import com.mmg.manahub.core.data.remote.dto.GetProfileByUserIdDto
 import com.mmg.manahub.core.data.remote.dto.UpsertUserProfileDto
 import com.mmg.manahub.core.data.remote.dto.UserProfileDto
-import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.domain.auth.AuthUser
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -50,6 +50,7 @@ sealed interface ProfileFetchResult {
 class UserProfileDataSource(
     private val client: UserProfileClient,
     private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) {
 
     /**
@@ -104,9 +105,12 @@ class UserProfileDataSource(
         } catch (e: Exception) {
             // Surface these in production dashboards: a spike here means the OkHttp
             // interceptor is falling back to the anon key (session not yet propagated
-            // after signInWith(IDToken)), which the RPC rejects. recordSafeNonFatal
-            // strips the message so no PII (user id, token) reaches Crashlytics.
-            recordSafeNonFatal("auth_profile_fetch_failed", e)
+            // after signInWith(IDToken)), which the RPC rejects. The message is stripped
+            // (mirrors the old recordSafeNonFatal helper) so no PII (user id, token)
+            // reaches the crash reporter.
+            crashReporter.recordException(
+                RuntimeException("[auth_profile_fetch_failed] ${e::class.simpleName}", e),
+            )
             if (BuildConfig.DEBUG) {
                 Log.w(TAG, "getProfileByUserId failed for user $userId", e)
             } else {

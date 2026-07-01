@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.auth.di
 
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
@@ -127,6 +128,7 @@ abstract class AuthModule {
         fun provideUserProfileDataSource(
             client: UserProfileClient,
             @IoDispatcher dispatcher: CoroutineDispatcher,
-        ): UserProfileDataSource = UserProfileDataSource(client, dispatcher)
+            crashReporter: CrashReporter,
+        ): UserProfileDataSource = UserProfileDataSource(client, dispatcher, crashReporter)
     }
 }
