@@ -21,10 +21,10 @@ import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
+import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -124,9 +124,6 @@ import com.mmg.manahub.feature.survey.di.surveyKoinModule
 import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
-import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
-import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
-import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.SharedListsRepository
@@ -200,13 +197,14 @@ class ManaHubApp : Application() {
     // Home island (Phase 1) bridge deps. The shared deps (userPreferencesDataStore, authRepository,
     // gameSessionRepository, statsRepository, deckRepository, scryfallRemoteDataSource,
     // gamificationRepository) are bridged in coreBridgeKoinModule; only the Home-only deps are here.
+    // TournamentRepository is natively Koin-built in coreBridgeKoinModule (Hilt TournamentModule
+    // deleted) — no bridge field needed anymore. CommunityStatsRepository is natively Koin-built in
+    // homeKoinModule (Hilt CommunityModule deleted) — no bridge field needed anymore.
     @Inject lateinit var draftSimRepository: DraftSimRepository
-    @Inject lateinit var tournamentRepository: TournamentRepository  // shared: Home + Tournament + Hilt GameViewModel (bridged in coreBridge)
     @Inject lateinit var cardRepository: CardRepository  // shared: Home + CommunityDecks (bridged in coreBridge)
     @Inject lateinit var getNewsFeedUseCase: GetNewsFeedUseCase
     @Inject lateinit var refreshNewsFeedUseCase: RefreshNewsFeedUseCase
     @Inject lateinit var manageSourcesUseCase: ManageSourcesUseCase
-    @Inject lateinit var communityStatsRepository: CommunityStatsRepository
     @Inject lateinit var draftRepository: DraftRepository
     @Inject lateinit var wishlistRepository: WishlistRepository
     @Inject lateinit var getAccountNudgeUseCase: GetAccountNudgeUseCase
@@ -282,16 +280,13 @@ class ManaHubApp : Application() {
     // coreBridgeKoinModule and CardDao from surveyKoinModule via get().
     @Inject lateinit var playtestDao: PlaytestDao
 
-    // Tournament island (Phase 1) bridge deps. TournamentRepository is shared with Home + the still-Hilt
-    // GameViewModel → PROMOTED into coreBridgeKoinModule (the existing `tournamentRepository` field above
-    // feeds it there now; the Hilt TournamentModule binding is KEPT for GameViewModel). Only the two
-    // Tournament use cases are here:
-    //  - CalculateStandingsUseCase: used only by TournamentViewModel (kept Hilt-built so its TournamentDao
-    //    + IO-dispatcher deps stay in the Hilt graph — no DAO bridging needed).
-    //  - RecordMatchResultUseCase: the SINGLE finish-and-advance entry point, STILL consumed by the Hilt
-    //    GameViewModel → its Hilt @Inject binding is KEPT and the same singleton is bridged here.
-    @Inject lateinit var calculateStandingsUseCase: CalculateStandingsUseCase
-    @Inject lateinit var recordMatchResultUseCase: RecordMatchResultUseCase
+    // Tournament island (Phase 1) bridge deps. The feature-private Hilt `TournamentModule` was CONVERTED
+    // and DELETED (KMP migration batch, 2026-07): GameViewModel is already a plain Koin-resolved class
+    // (gameKoinModule), so nothing in the Hilt graph consumes TournamentRepository / CalculateStandingsUseCase
+    // / RecordMatchResultUseCase / GenerateNextRoundUseCase anymore — they are now built directly by Koin
+    // (tournamentKoinModule + coreBridgeKoinModule). Only the Room-owned TournamentDao (still Hilt/
+    // DatabaseModule-provided, Room stays androidMain) is bridged here.
+    @Inject lateinit var tournamentDao: TournamentDao
 
     // Trades island (Phase 1) bridge deps. The trades data layer is split across five repositories by
     // concern; three of them are shared with other islands → PROMOTED into coreBridgeKoinModule and the
@@ -393,10 +388,10 @@ class ManaHubApp : Application() {
                     friendRepository = friendRepository,
                     draftRepository = draftRepository,
                     draftSimRepository = draftSimRepository,
-                    tournamentRepository = tournamentRepository,
                     tradesRepository = tradesRepository,
                     wishlistRepository = wishlistRepository,
                     openForTradeRepository = openForTradeRepository,
+                    progressionEventBus = progressionEventBus,
                 ),
                 settingsKoinModule(
                     userProfileDataSource = userProfileDataSource,
@@ -418,7 +413,6 @@ class ManaHubApp : Application() {
                     getNewsFeedUseCase = getNewsFeedUseCase,
                     refreshNewsFeedUseCase = refreshNewsFeedUseCase,
                     manageSourcesUseCase = manageSourcesUseCase,
-                    communityStatsRepository = communityStatsRepository,
                     getAccountNudgeUseCase = getAccountNudgeUseCase,
                 ),
                 tagDictionaryKoinModule(
@@ -463,8 +457,7 @@ class ManaHubApp : Application() {
                     playtestDao = playtestDao,
                 ),
                 tournamentKoinModule(
-                    calculateStandings = calculateStandingsUseCase,
-                    recordMatchResult = recordMatchResultUseCase,
+                    tournamentDao = tournamentDao,
                 ),
                 tradesKoinModule(
                     sharedListsRepository = sharedListsRepository,

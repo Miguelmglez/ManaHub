@@ -4,7 +4,6 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Tournament
 import com.mmg.manahub.core.model.TournamentMatch
 import com.mmg.manahub.core.model.TournamentPlayer
@@ -22,15 +21,18 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class TournamentRepositoryImpl @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover. Constructed natively by Koin (`coreBridgeKoinModule`, shared
+ * across the Home/Game/Tournament islands) since [TournamentRepository] has zero remaining Hilt-only
+ * consumers. [ioDispatcher] is passed `Dispatchers.IO` directly at the Koin call site — no
+ * `@IoDispatcher` qualifier needed outside the Hilt graph.
+ */
+class TournamentRepositoryImpl(
     private val dao: TournamentDao,
     private val progressionEventBus: ProgressionEventBus,
     private val generateNextRound: GenerateNextRoundUseCase,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : TournamentRepository {
 
     // ── Creation ──────────────────────────────────────────────────────────────
