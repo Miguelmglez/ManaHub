@@ -569,7 +569,19 @@ worker subsystem → infra modules (define the bridge surface) → last, the min
 - ✅ **Cutover Batch 4 — COMMITTED (2026-07-03).** Friend/Game/Gamification → Koin (3 Hilt @Modules
   deleted). Reverse-bridged FriendRepository + GamificationSyncManager + QuestReconciler (workers). 6
   ManaHubApp fields → `by inject()`. Fixed a pre-existing missing `single<GameSessionDao>`. GREEN 1967/118/2.
-- ⏳ **Cutover remaining plan:** Batch 5 = **Auth** (reverse-bridge AuthRepository for workers+excluded;
+- ✅ **Cutover Batch 5 — COMMITTED (2026-07-03).** AuthModule → Koin (deleted). AuthRepository flipped
+  native in coreBridge + reverse-bridged (workers+excluded); @Named supabase/supabaseKtor HttpClients →
+  Koin `named()` singles; Supabase `Auth` derived from the Koin SupabaseClient single; Friends + Settings
+  shrunk (promote-then-shrink). GREEN — failing-CLASS set unchanged (18 pre-existing). **ALL non-excluded
+  FEATURE modules are now Koin.** Remaining Hilt = infra + 8 workers + 4 excluded modules.
+- ⏳ **Cutover remaining plan (DURABLE — infra/worker→Koin stays; only KoinToHiltBridgeModule is temporary,
+  deleted when the excluded trio migrates):** Batch 6 = **workers → Koin `WorkerFactory`** + their infra
+  deps (SyncModule/PushModule/DAOs/DataStore → Koin), `DelegatingWorkerFactory` to coexist with the excluded
+  scanner `@HiltWorker`; then drop the worker-only reverse-bridges. Batch 7 = remaining infra
+  (Network/Supabase/Dispatcher/CoroutineScopes/Analytics/Crashlytics/Database-DAOs/RepositoryModule/
+  SharedDomainUseCaseModule-residual) → Koin, reverse-bridge ONLY what the excluded trio needs. END-STATE:
+  only the 4 excluded Hilt modules + minimal reverse bridge remain, until the excluded wave.
+- ~~old Batch 5 line~~ (superseded above): Batch 5 = **Auth** (reverse-bridge AuthRepository for workers+excluded;
   move @Named supabase/supabaseKtor HttpClients + UserProfileClient/DataSource; the batch-4 ManaHubApp
   `supabaseKtorHttpClient` forward-bridge flips native). Batch 6 = **workers → Koin `WorkerFactory`**
   (`koin-androidx-workmanager`) → then RETIRE the worker reverse-bridges (Friend/GamificationSync/
