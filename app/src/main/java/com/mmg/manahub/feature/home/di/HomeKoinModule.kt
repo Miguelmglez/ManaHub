@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.home.di
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.repository.CommunityStatsRepositoryStub
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
@@ -48,13 +49,16 @@ import org.koin.dsl.module
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
  * the app uncompilable between commits.
  *
+ * `CommunityStatsRepository` was PROMOTED off this bridge (KMP migration batch — 2026-07): the
+ * feature-private Hilt `CommunityModule` had exactly one consumer (this island), so it is now
+ * natively Koin-built here as `CommunityStatsRepositoryStub()` instead of bridged from Hilt.
+ *
  * @return a Koin [Module] that provides the Home-only bridged singletons and the [HomeViewModel] factory.
  */
 fun homeKoinModule(
     getNewsFeedUseCase: GetNewsFeedUseCase,
     refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
     manageSourcesUseCase: ManageSourcesUseCase,
-    communityStatsRepository: CommunityStatsRepository,
     getAccountNudgeUseCase: GetAccountNudgeUseCase,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Home-only Hilt-owned singletons to Koin. ──
@@ -65,8 +69,11 @@ fun homeKoinModule(
     single { getNewsFeedUseCase }
     single { refreshNewsFeedUseCase }
     single { manageSourcesUseCase }
-    single { communityStatsRepository }
     single { getAccountNudgeUseCase }
+
+    // ── CommunityStatsRepository: natively Koin-built (Hilt CommunityModule deleted). ──
+    // Single consumer (this island) — no promotion to coreBridgeKoinModule needed.
+    single<CommunityStatsRepository> { CommunityStatsRepositoryStub() }
 
     // ── The Koin island: HomeViewModel is now resolved by Koin, not Hilt. ──
     viewModel {

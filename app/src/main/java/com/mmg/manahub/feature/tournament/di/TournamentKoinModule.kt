@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.tournament.di
 
+import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
+import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
 import com.mmg.manahub.feature.tournament.presentation.TournamentListViewModel
 import com.mmg.manahub.feature.tournament.presentation.TournamentSetupViewModel
@@ -15,48 +17,45 @@ import org.koin.dsl.module
  * [TournamentViewModel]) are resolved by Koin (`koinViewModel()`) while every other unmigrated feature
  * stays on Hilt. This continues the incremental, per-feature cutover proven by Spike D.
  *
- * ## Bridge pattern (same as the earlier islands)
- * `ManaHubApp` is the bridge: it `@Inject`s the still-Hilt-owned singletons and passes the Tournament-only
- * ones into [tournamentKoinModule], which re-exposes them to Koin as `single { }`.
+ * ## Deterministic batch-1 cutover (2026-07)
+ * The feature-private Hilt `TournamentModule` was CONVERTED and DELETED: `GameViewModel` (the last
+ * suspected still-Hilt consumer of `TournamentRepository` / `RecordMatchResultUseCase`) had ALREADY been
+ * migrated to a plain Koin-resolved class in an earlier batch (`gameKoinModule`), so nothing in the Hilt
+ * graph consumes any Tournament-owned type anymore. `TournamentRepository`, `CalculateStandingsUseCase`,
+ * `RecordMatchResultUseCase` and `GenerateNextRoundUseCase` are now built directly by Koin.
  *
  * ## What is NOT registered here
  * - [com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository] is SHARED with the Home
- *   island (already migrated) and with the still-Hilt `GameViewModel`, so it is bridged exactly once in
- *   `coreBridgeKoinModule` (registering the same type in two loaded modules would throw
- *   `DefinitionOverrideException`) and resolved here via `get()`.
+ *   and Game islands, so it is natively constructed exactly once in `coreBridgeKoinModule` (registering
+ *   the same type in two loaded modules would throw `DefinitionOverrideException`) and resolved here via
+ *   `get()`. Its own dependencies — [TournamentDao] and [GenerateNextRoundUseCase] — are registered
+ *   below (Tournament-only); Koin resolves `get()` across modules regardless of declaration site.
  *
- * ## What IS bridged here (Tournament-only, from the Hilt graph)
- * - [CalculateStandingsUseCase] — used only by [TournamentViewModel] (Koin), but left Hilt-constructed
- *   and bridged so its `TournamentDao` + IO-dispatcher deps stay in the Hilt graph (no DAO bridging).
- * - [RecordMatchResultUseCase] — the SINGLE finish-and-advance entry point. It is STILL consumed by the
- *   Hilt `GameViewModel` (the game-played result flow), so its Hilt `@Inject constructor` binding is KEPT
- *   and the same singleton is bridged here. The DI cutover does not touch the atomic write path
- *   (`RecordMatchResultUseCase` → `TournamentRepository.finishMatch` →
- *   `TournamentDao.finishMatchAndAdvanceAtomically`) — both the game flow and the manual dialog keep
- *   routing through the identical instance.
+ * ## What IS registered here (Tournament-only, natively Koin-built)
+ * - [TournamentDao] — bridged from the Room/`DatabaseModule`-owned Hilt singleton (`ManaHubApp` `@Inject`
+ *   field); Room stays `androidMain`/Hilt-provided per the KMP migration plan, only the DAO instance
+ *   itself is re-exposed to Koin.
+ * - [GenerateNextRoundUseCase] — stateless, no-arg; used only by [TournamentRepositoryImpl].
+ * - [CalculateStandingsUseCase] — used only by [TournamentViewModel].
+ * - [RecordMatchResultUseCase] — the SINGLE finish-and-advance entry point, ALSO resolved via `get()` by
+ *   `gameKoinModule` (the game-played result flow) — one shared instance across both consumers, same as
+ *   before, just Koin-native instead of Hilt-bridged.
  *
  * The [TournamentViewModel] factory resolves a Koin-injected `SavedStateHandle` (`savedStateHandle =
  * get()`), which carries the `tournamentId` nav arg from the NavBackStackEntry's `CreationExtras` exactly
  * as Hilt did — so the `> 0L` construction guard and nav behaviour are byte-for-byte unchanged.
  *
- * The feature-private Hilt `TournamentModule` (`@Binds TournamentRepository`) is KEPT (NOT converted /
- * deleted): the still-Hilt `GameViewModel` consumes `TournamentRepository` from the Hilt graph, so the
- * binding must stay alive. The bridge guarantees one shared singleton instance across both DI graphs.
- *
- * @param calculateStandings the Hilt-owned [CalculateStandingsUseCase] singleton (Tournament only).
- * @param recordMatchResult the Hilt-owned [RecordMatchResultUseCase] singleton (Tournament + the Hilt
- *   `GameViewModel`).
- * @return a Koin [Module] providing the Tournament-only bridged singletons and the three ViewModel factories.
+ * @param tournamentDao the Room/`DatabaseModule`-owned Hilt singleton, bridged for [TournamentRepository].
+ * @return a Koin [Module] providing the Tournament-only singletons and the three ViewModel factories.
  */
 fun tournamentKoinModule(
-    calculateStandings: CalculateStandingsUseCase,
-    recordMatchResult: RecordMatchResultUseCase,
+    tournamentDao: TournamentDao,
 ): Module = module {
-    // ── Hilt → Koin bridge: re-expose the Tournament-only Hilt-owned singletons to Koin. ──
-    // (TournamentRepository is shared → bridged in coreBridgeKoinModule, not here, and resolved below
-    //  via get().)
-    single { calculateStandings }
-    single { recordMatchResult }
+    // ── Tournament-only singletons, natively Koin-built (Hilt TournamentModule deleted). ──
+    single { tournamentDao }
+    single { GenerateNextRoundUseCase() }
+    single { CalculateStandingsUseCase(repository = get()) }
+    single { RecordMatchResultUseCase(repository = get()) }
 
     // ── The Koin island: the three tournament ViewModels are now resolved by Koin, not Hilt. ──
     viewModel {
