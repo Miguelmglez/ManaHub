@@ -1,8 +1,6 @@
 package com.mmg.manahub.feature.addcard.di
 
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
-import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.feature.addcard.presentation.AddCardViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
@@ -25,26 +23,17 @@ import org.koin.dsl.module
  * `DefinitionOverrideException`), and this module resolves it via `get()`:
  * - [UserPreferencesRepository] — shared with Settings + Stats.
  *
- * The two AddCard-only use cases ([SearchCardsUseCase], [BuildScryfallQueryUseCase]) are bridged here.
+ * `SearchCardsUseCase` and `BuildScryfallQueryUseCase` (KMP migration batch 2) are now natively
+ * Koin-built in `SharedDomainKoinModule` — this module takes NO constructor params anymore and
+ * resolves both via `get()`.
+ *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
  * the app uncompilable between commits.
  *
- * @param searchCards the Hilt-owned [SearchCardsUseCase] singleton (AddCard-only).
- * @param buildScryfallQuery the Hilt-owned [BuildScryfallQueryUseCase] singleton (AddCard-only).
- * @return a Koin [Module] that provides the AddCard-only bridged singletons and the
- *   [AddCardViewModel] factory.
+ * @return a Koin [Module] that provides the [AddCardViewModel] factory.
  */
-fun addCardKoinModule(
-    searchCards: SearchCardsUseCase,
-    buildScryfallQuery: BuildScryfallQueryUseCase,
-): Module = module {
-    // ── Hilt → Koin bridge: re-expose the AddCard-only Hilt-owned singletons to Koin. ──
-    // (UserPreferencesRepository is bridged in coreBridgeKoinModule, shared with Settings + Stats,
-    //  and resolved below via get().)
-    single { searchCards }
-    single { buildScryfallQuery }
-
+fun addCardKoinModule(): Module = module {
     // ── The Koin island: AddCardViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
         AddCardViewModel(

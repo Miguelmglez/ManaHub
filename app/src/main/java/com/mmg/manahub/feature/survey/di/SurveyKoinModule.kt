@@ -2,7 +2,6 @@ package com.mmg.manahub.feature.survey.di
 
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
-import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.survey.presentation.SurveyViewModel
 import kotlinx.coroutines.Dispatchers
 import org.koin.android.ext.koin.androidContext
@@ -21,7 +20,9 @@ import org.koin.dsl.module
  * `@Inject`s and hands in):
  * - [SurveyCardImpactDao] — per-seat card-impact rows (Room/`DatabaseModule`).
  * - [CardDao] — resolves deck-card scryfall ids to domain cards (Room/`DatabaseModule`).
- * - [CompleteSurveyUseCase] — emits the idempotent `survey:{sessionId}` progression event on submit.
+ *
+ * `CompleteSurveyUseCase` (KMP migration batch 2) is now natively Koin-built in
+ * `SharedDomainKoinModule` — resolved below via `get()`, not registered here anymore.
  *
  * ## Shared singletons (resolved via `get()`, NOT re-registered)
  * The other dependencies are already provided by loaded modules — a `single<T>` is resolvable via
@@ -37,18 +38,15 @@ import org.koin.dsl.module
  *
  * @param surveyCardImpactDao the Hilt/Room-owned [SurveyCardImpactDao] singleton (this island only).
  * @param cardDao the Hilt/Room-owned [CardDao] singleton (this island only).
- * @param completeSurvey the Hilt-owned [CompleteSurveyUseCase] singleton (this island only).
  * @return a Koin [Module] providing the Survey-only bridged singletons and the [SurveyViewModel] factory.
  */
 fun surveyKoinModule(
     surveyCardImpactDao: SurveyCardImpactDao,
     cardDao: CardDao,
-    completeSurvey: CompleteSurveyUseCase,
 ): Module = module {
     // ── Hilt → Koin bridge: the Survey-only singletons. ──
     single { surveyCardImpactDao }
     single { cardDao }
-    single { completeSurvey }
 
     // ── The Koin island: SurveyViewModel is now resolved by Koin, not Hilt. ──
     viewModel {

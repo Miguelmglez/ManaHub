@@ -1,10 +1,8 @@
 package com.mmg.manahub.feature.collection.di
 
 import androidx.work.WorkManager
-import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
-import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -47,38 +45,36 @@ import org.koin.dsl.module
  * - `GetLocalWishlistUseCase` — already a `single` in `tradesKoinModule`.
  * - `UserCardRepository` — already a `single` in `cardDetailKoinModule`.
  *
- * The remaining four are Collection-only bridged singletons consumed by no other Koin island and are the
- * [Module] params here: [GetCollectionUseCase], [SyncManager], [WorkManager] (the same Hilt-owned
- * singleton `ManaHubApp` already `@Inject`s for its own use) and [MigrateLocalTradeListsUseCase].
+ * The remaining two are Collection-only bridged singletons consumed by no other Koin island and are the
+ * [Module] params here: [SyncManager] and [WorkManager] (the same Hilt-owned singleton `ManaHubApp`
+ * already `@Inject`s for its own use).
+ *
+ * `GetCollectionUseCase` and `MigrateLocalTradeListsUseCase` (KMP migration batch 2) are now natively
+ * Koin-built in `SharedDomainKoinModule` — resolved below via `get()`, not registered here anymore.
  *
  * As features migrate further in Phase 1, each `single { hiltInstance }` here is replaced by a real Koin
  * provider and the matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing
  * without ever leaving the app uncompilable between commits.
  *
- * @param getCollection the Hilt-owned [GetCollectionUseCase] singleton (this island only).
  * @param syncManager the Hilt-owned [SyncManager] singleton (this island only).
  * @param workManager the Hilt-owned [WorkManager] singleton (this island only; the same instance
  *   `ManaHubApp` already injects for global sync scheduling).
- * @param migrateLocalTradeLists the Hilt-owned [MigrateLocalTradeListsUseCase] singleton (this island only).
  * @return a Koin [Module] that provides the Collection-only bridged singletons and the
  *   [CollectionViewModel] factory.
  */
 fun collectionKoinModule(
-    getCollection: GetCollectionUseCase,
     syncManager: SyncManager,
     workManager: WorkManager,
-    migrateLocalTradeLists: MigrateLocalTradeListsUseCase,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Collection-only Hilt-owned singletons to Koin. ──
     // (CardRepository, AuthRepository, UserPreferencesRepository, AnalyticsHelper, WishlistRepository and
     //  OpenForTradeRepository are shared → bridged in coreBridgeKoinModule; GetLocalWishlistUseCase and
-    //  UserCardRepository are already singles in tradesKoinModule / cardDetailKoinModule. All eight are
-    //  resolved below via get(), never re-registered here — a second single<T> for the same type across
-    //  two loaded modules would throw DefinitionOverrideException.)
-    single { getCollection }
+    //  UserCardRepository are already singles in tradesKoinModule / cardDetailKoinModule; GetCollectionUseCase
+    //  and MigrateLocalTradeListsUseCase are now singles in SharedDomainKoinModule. All resolved below via
+    //  get(), never re-registered here — a second single<T> for the same type across two loaded modules
+    //  would throw DefinitionOverrideException.)
     single { syncManager }
     single { workManager }
-    single { migrateLocalTradeLists }
 
     // ── The Koin island: CollectionViewModel is now resolved by Koin, not Hilt. ──
     viewModel {

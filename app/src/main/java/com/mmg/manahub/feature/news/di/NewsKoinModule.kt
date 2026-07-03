@@ -15,17 +15,17 @@ import org.koin.dsl.module
  * This island bridges NOTHING of its own — every dependency of both ViewModels is already a `single`
  * in a loaded module (a `single<T>` is resolvable via `get()` from ANY loaded module), so
  * [newsKoinModule] takes no parameters and `ManaHubApp` needs no new `@Inject` field:
- * - `GetNewsFeedUseCase`, `RefreshNewsFeedUseCase`, `ManageSourcesUseCase` — already registered as
- *   `single` in `homeKoinModule` (the Home news widget shares them).
+ * - `GetNewsFeedUseCase`, `RefreshNewsFeedUseCase`, `ManageSourcesUseCase` — natively Koin-built in
+ *   `SharedDomainKoinModule` (KMP migration batch 2; previously Hilt-bridged via `homeKoinModule`).
  * - `UserPreferencesDataStore` — already in `coreBridgeKoinModule`.
  *
  * ## Hilt `NewsModule` is KEPT (not converted/deleted)
- * The feature-private Hilt `NewsModule` (`@Binds NewsRepository`) MUST stay. Although `NewsRepository`
- * is consumed by no screen outside this feature, the three news use cases above are still
- * Hilt-constructed (`@Inject constructor`) for the HOME island bridge (`ManaHubApp` `@Inject`s them
- * from the Hilt graph and hands them to `homeKoinModule`). Those use cases depend on `NewsRepository`,
- * so deleting its only Hilt binding would break the Hilt graph — the same reason Friends KEPT its
- * `FriendModule`. When Home is later migrated off Hilt, `NewsModule` can be converted and deleted.
+ * The feature-private Hilt `NewsModule` (`@Binds NewsRepository`) MUST stay. `NewsRepository` is
+ * consumed by no screen outside this feature, but the three news use cases above still need it — it is
+ * now forward-bridged into `SharedDomainKoinModule` (`ManaHubApp` `@Inject`s it from the Hilt graph and
+ * hands it in), so deleting its only Hilt binding would break that bridge — the same reason Friends
+ * KEPT its `FriendModule`. When Home is later migrated off Hilt, `NewsModule` can be converted and
+ * deleted.
  *
  * @return a Koin [Module] providing both News ViewModel factories.
  */

@@ -11,9 +11,6 @@ import com.mmg.manahub.core.gamification.domain.repository.GamificationRepositor
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.home.presentation.HomeViewModel
-import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
-import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
-import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -53,22 +50,20 @@ import org.koin.dsl.module
  * feature-private Hilt `CommunityModule` had exactly one consumer (this island), so it is now
  * natively Koin-built here as `CommunityStatsRepositoryStub()` instead of bridged from Hilt.
  *
- * @return a Koin [Module] that provides the Home-only bridged singletons and the [HomeViewModel] factory.
+ * `GetNewsFeedUseCase`/`RefreshNewsFeedUseCase`/`ManageSourcesUseCase` (KMP migration batch 2) are now
+ * natively Koin-built in `SharedDomainKoinModule` — resolved below via `get()`, not registered here
+ * anymore.
+ *
+ * @return a Koin [Module] that provides the Home-only bridged singleton and the [HomeViewModel] factory.
  */
 fun homeKoinModule(
-    getNewsFeedUseCase: GetNewsFeedUseCase,
-    refreshNewsFeedUseCase: RefreshNewsFeedUseCase,
-    manageSourcesUseCase: ManageSourcesUseCase,
     getAccountNudgeUseCase: GetAccountNudgeUseCase,
 ): Module = module {
-    // ── Hilt → Koin bridge: re-expose the Home-only Hilt-owned singletons to Koin. ──
+    // ── Hilt → Koin bridge: re-expose the Home-only Hilt-owned singleton to Koin. ──
     // (UserPreferencesDataStore, AuthRepository, GameSessionRepository, StatsRepository, DeckRepository,
     //  ScryfallRemoteDataSource, GamificationRepository, CardRepository, DraftRepository, DraftSimRepository,
-    //  TournamentRepository and WishlistRepository are shared → bridged in coreBridgeKoinModule, not here,
-    //  and resolved below via get().)
-    single { getNewsFeedUseCase }
-    single { refreshNewsFeedUseCase }
-    single { manageSourcesUseCase }
+    //  TournamentRepository and WishlistRepository are shared → bridged in coreBridgeKoinModule; the three
+    //  news use cases are singles in SharedDomainKoinModule. All resolved below via get().)
     single { getAccountNudgeUseCase }
 
     // ── CommunityStatsRepository: natively Koin-built (Hilt CommunityModule deleted). ──
