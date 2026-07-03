@@ -11,8 +11,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Advances active quest progress for an event (ADR-002, Phase 2).
@@ -26,8 +24,7 @@ import javax.inject.Singleton
  * Pure period math comes from [QuestPeriodKeys]; [clock] + [zoneId] are injected so tests can pin the
  * period. The DAO upsert (INSERT-OR-IGNORE + @Update) never uses REPLACE.
  */
-@Singleton
-class QuestEvaluator @Inject constructor(
+class QuestEvaluator(
     private val dao: GamificationDao,
     private val clock: Clock,
     private val timeZone: TimeZone,

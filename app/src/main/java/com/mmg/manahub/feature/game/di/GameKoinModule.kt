@@ -57,21 +57,24 @@ import org.koin.dsl.module
  * - [com.mmg.manahub.core.voice.domain.VoiceModelRepository] is already a `single` in `settingsKoinModule`
  *   — resolved via `get()` for [GameSetupViewModel], NOT re-registered.
  *
- * ## What IS bridged here (Game-only / deferred-feature, from the Hilt graph)
- * - [GamificationEngine] (core/gamification) — Hilt-owned, not previously a Koin `single`; bridged for
- *   [GameResultStripViewModel].
- * - [EvaluatePlayerEliminationUseCase] (game) — game-only; bridged.
+ * ## What IS bridged here (deferred-feature, from the Hilt graph)
  * - The voice/online/nearby singletons listed above.
+ *
+ * ## KMP migration — Hilt→Koin cutover batch 4
+ * [GamificationEngine] (core/gamification) is now NATIVELY Koin-built in
+ * `com.mmg.manahub.core.gamification.di.gamificationEngineKoinModule` (the whole Hilt
+ * `core.gamification.di.GamificationModule` was deleted) — resolved via `get()` for
+ * [GameResultStripViewModel], NOT bridged here anymore. [EvaluatePlayerEliminationUseCase] (game-only, no
+ * ctor deps) is now a plain native `single { }` here — the feature-private Hilt `GameModule` that used to
+ * `@Provides` it was DELETED entirely (its `@Binds GameSessionRepository` also moved: the repo is now
+ * natively Koin-built in `coreBridgeKoinModule`, since the still-Hilt online/nearby code never consumed
+ * it directly — only `GameViewModel`, already Koin, did).
  *
  * The [GameViewModel] factory resolves a Koin-injected `SavedStateHandle` (`savedStateHandle = get()`),
  * which carries the `mode`/`playerCount` nav args from the back-stack entry's `CreationExtras` exactly as
  * Hilt did. At the call-site [GameViewModel] is Activity-scoped (game state must persist across all
  * navigation): `koinViewModel(viewModelStoreOwner = activity)` — the exact equivalent of the old
  * `hiltViewModel(activity)`.
- *
- * The feature-private Hilt `GameModule` (`@Binds GameSessionRepository`) is KEPT (NOT converted/deleted):
- * the repo is bridged in `coreBridgeKoinModule` and is also consumed by the still-Hilt online/nearby code,
- * so the binding must stay alive.
  *
  * @param observeSession the Hilt-owned [ObserveSessionUseCase] (core/online — deferred, KEEP Hilt).
  * @param updateLife the Hilt-owned [UpdateLifeUseCase] (core/online — deferred, KEEP Hilt).
@@ -85,8 +88,6 @@ import org.koin.dsl.module
  * @param toggleLandPlayed the Hilt-owned [ToggleLandPlayedUseCase] (core/online — deferred, KEEP Hilt).
  * @param nearbyRepository the Hilt-owned [NearbySessionRepository] (core/nearby — deferred, KEEP Hilt).
  * @param voiceCommandRecognizer the Hilt-owned [VoiceCommandRecognizer] (core/voice — deferred, KEEP Hilt).
- * @param evaluatePlayerElimination the Hilt-owned [EvaluatePlayerEliminationUseCase] (game only).
- * @param gamificationEngine the Hilt-owned [GamificationEngine] singleton (game only consumer in Koin).
  * @return a Koin [Module] providing the Game-only bridged singletons and the three ViewModel factories.
  */
 fun gameKoinModule(
@@ -102,8 +103,6 @@ fun gameKoinModule(
     toggleLandPlayed: ToggleLandPlayedUseCase,
     nearbyRepository: NearbySessionRepository,
     voiceCommandRecognizer: VoiceCommandRecognizer,
-    evaluatePlayerElimination: EvaluatePlayerEliminationUseCase,
-    gamificationEngine: GamificationEngine,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Game-only + deferred (voice/online/nearby) Hilt-owned
     //    singletons to Koin. The deferred features themselves stay 100% Hilt. ──
@@ -119,8 +118,10 @@ fun gameKoinModule(
     single { toggleLandPlayed }
     single { nearbyRepository }
     single { voiceCommandRecognizer }
-    single { evaluatePlayerElimination }
-    single { gamificationEngine }
+
+    // ── EvaluatePlayerEliminationUseCase: natively Koin-constructed (KMP migration batch 4; Hilt
+    //    `GameModule` deleted). No ctor deps — game-only. ──
+    single { EvaluatePlayerEliminationUseCase() }
 
     // ── The Koin island: the three game ViewModels are now resolved by Koin, not Hilt. ──
     viewModel {

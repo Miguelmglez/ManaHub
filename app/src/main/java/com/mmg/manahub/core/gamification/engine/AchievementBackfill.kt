@@ -4,7 +4,6 @@ import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
-import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementDef
@@ -14,8 +13,6 @@ import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.floor
 
 /**
@@ -33,12 +30,11 @@ import kotlin.math.floor
  * Family-B (COUNTER) achievements are intentionally NOT backfilled — streaks and remote-backed
  * social/tournament counts cannot be reconstructed from local Room data.
  */
-@Singleton
-class AchievementBackfill @Inject constructor(
+class AchievementBackfill(
     private val dao: GamificationDao,
     private val statsDao: GamificationStatsDao,
     private val clock: Clock,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
+    private val defaultDispatcher: CoroutineDispatcher,
 ) {
 
     private companion object {

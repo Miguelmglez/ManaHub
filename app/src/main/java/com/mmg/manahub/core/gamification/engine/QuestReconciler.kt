@@ -10,8 +10,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Rolls quests over between periods (ADR-002, Phase 2).
@@ -30,8 +28,7 @@ import javax.inject.Singleton
  * All time windows derive from the injected [clock] + [zoneId] — never `LocalDate.now()` — so the
  * roll-over boundary is testable and matches the device's local midnight / ISO week.
  */
-@Singleton
-class QuestReconciler @Inject constructor(
+class QuestReconciler(
     private val dao: GamificationDao,
     private val stableIdProvider: QuestStableIdProvider,
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,

@@ -6,6 +6,8 @@ import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.common.provideCrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.DeckDao
+import com.mmg.manahub.core.data.local.dao.FriendDao
+import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.repository.DeckRepositoryImpl
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -14,13 +16,14 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.repository.DraftRepository
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl
 import com.mmg.manahub.feature.draft.data.DraftSimRepositoryImpl
+import com.mmg.manahub.feature.friends.data.repository.FriendRepositoryImpl
+import com.mmg.manahub.feature.game.data.repository.GameSessionRepositoryImpl
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.tournament.data.repository.TournamentRepositoryImpl
 import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
@@ -64,23 +67,35 @@ import org.koin.dsl.module
  * forward-bridged this batch (no Koin presence before): the former feeds `NewsFeedService`
  * (`newsKoinModule`), the latter feeds all five trades remote data sources (`tradesKoinModule`).
  *
+ * ## KMP migration — Hilt→Koin cutover batch 4
+ * [FriendRepository] and [GameSessionRepository] are now NATIVELY Koin-built here too (their impls lost
+ * `@Inject`/`@Singleton`; the feature-private Hilt `FriendModule`/`GameModule` were deleted). [FriendDao]
+ * and [GameSessionDao] are newly forward-bridged (Room stays androidMain) to build them.
+ * [ProgressionEventBus] is ALSO now natively constructed here (`single { ProgressionEventBus() }`)
+ * instead of bridging a Hilt instance — `ManaHubApp` switched its own field from `@Inject lateinit var`
+ * to a Koin `by inject()` delegate (see `ManaHubApp`'s KDoc) so its direct `AppOpenedToday` emission and
+ * the whole gamification engine graph (`gamificationEngineKoinModule`) still share this ONE instance.
+ * [GamificationRepository] moved OUT of this module — it is now natively built in
+ * `com.mmg.manahub.core.gamification.di.gamificationEngineKoinModule` (the whole gamification engine
+ * graph lives there); Profile/Home/GamificationCelebration keep resolving it via `get()` unchanged.
+ * `FriendRepository` has a surviving Hilt-only consumer (`core.sync.CollectionStatsSyncWorker`,
+ * `@HiltWorker`) — reverse-bridged in `KoinToHiltBridgeModule`. `GameSessionRepository` was audited
+ * (excluded online/voice/scanner/nearby trees + every `@HiltWorker`) — no Hilt-only consumer found, so
+ * it needs no reverse bridge.
+ *
  * @param userPreferencesRepo the Hilt-owned [UserPreferencesRepository] singleton (Settings + Stats).
  * @param userPrefsDataStore the Hilt-owned [UserPreferencesDataStore] singleton (Settings + Profile + Home).
  * @param authRepository the Hilt-owned [AuthRepository] singleton (Settings + Profile + Home).
- * @param gameSessionRepository the Hilt-owned [GameSessionRepository] singleton (Stats + Profile + Home).
  * @param statsRepository the Hilt-owned [StatsRepository] singleton (Profile + Home).
  * @param scryfallRemoteDataSource the Hilt-owned [ScryfallRemoteDataSource] singleton (Stats + Home).
- * @param gamificationRepository the Hilt-owned [GamificationRepository] singleton (Profile + Home).
  * @param cardRepository the Hilt-owned [CardRepository] singleton (Home + CommunityDecks + CardDetail).
  * @param analyticsHelper the Hilt-owned [AnalyticsHelper] singleton (Settings + CardDetail).
- * @param friendRepository the Hilt-owned [FriendRepository] singleton (Profile + Friends).
- * @param progressionEventBus the Hilt-owned [ProgressionEventBus] singleton (gamification event bus).
- *   Bridged here (from the ALREADY-existing `ManaHubApp` field used by the gamification engine) so that
- *   natively-Koin-constructed repositories emit onto the SAME instance the Hilt-owned
- *   `GamificationEngine` collects. Constructing a second `ProgressionEventBus` in Koin would silently
- *   orphan its events (nothing would ever collect them).
  * @param deckDao the Hilt/Room-owned [DeckDao] singleton (Room stays androidMain) — needed to build
  *   [DeckRepositoryImpl] natively.
+ * @param friendDao the Hilt/Room-owned [FriendDao] singleton (Room stays androidMain) — needed to build
+ *   [FriendRepositoryImpl] natively.
+ * @param gameSessionDao the Hilt/Room-owned [GameSessionDao] singleton (Room stays androidMain) — needed
+ *   to build [GameSessionRepositoryImpl] natively.
  * @param okHttpClient the Hilt-owned app-wide [OkHttpClient] singleton — needed to build
  *   `NewsFeedService` (`newsKoinModule`); ALSO still used directly by `ManaHubApp` for the Coil image
  *   loader (unchanged).
@@ -89,21 +104,19 @@ import org.koin.dsl.module
  *   repositories below.
  * @return a Koin [Module] exposing the cross-island bridged singletons plus the natively-Koin-constructed
  *   [TournamentRepository]/[DeckRepository]/[DraftRepository]/[DraftSimRepository]/[TradesRepository]/
- *   [WishlistRepository]/[OpenForTradeRepository].
+ *   [WishlistRepository]/[OpenForTradeRepository]/[FriendRepository]/[GameSessionRepository].
  */
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
     userPrefsDataStore: UserPreferencesDataStore,
     authRepository: AuthRepository,
-    gameSessionRepository: GameSessionRepository,
     statsRepository: StatsRepository,
     scryfallRemoteDataSource: ScryfallRemoteDataSource,
-    gamificationRepository: GamificationRepository,
     cardRepository: CardRepository,
     analyticsHelper: AnalyticsHelper,
-    friendRepository: FriendRepository,
-    progressionEventBus: ProgressionEventBus,
     deckDao: DeckDao,
+    friendDao: FriendDao,
+    gameSessionDao: GameSessionDao,
     okHttpClient: OkHttpClient,
     supabaseClient: SupabaseClient,
 ): Module = module {
@@ -116,17 +129,45 @@ fun coreBridgeKoinModule(
     single { userPreferencesRepo }
     single { userPrefsDataStore }
     single { authRepository }
-    single { gameSessionRepository }
     single { statsRepository }
     single { scryfallRemoteDataSource }
-    single { gamificationRepository }
     single { cardRepository }
     single { analyticsHelper }
-    single { friendRepository }
-    single { progressionEventBus }
     single { deckDao }
+    single { friendDao }
+    single { gameSessionDao }
     single { okHttpClient }
     single { supabaseClient }
+
+    // Natively constructed (batch 4) — the SAME instance the whole gamification engine graph
+    // (gamificationEngineKoinModule) and ManaHubApp's own direct emission share.
+    single { ProgressionEventBus() }
+
+    // ── FriendRepository: natively Koin-constructed (KMP migration batch 4; Hilt `FriendModule`
+    //    deleted). Shared by Profile + Friends — registered exactly once here. `FriendRemoteDataSource`
+    //    comes from `friendsKoinModule` — resolved cross-module via `get()`. ──
+    single<FriendRepository> {
+        FriendRepositoryImpl(
+            dao = get(),
+            remote = get(),
+            cardRepo = get(),
+            progressionEventBus = get(),
+            crashReporter = get(),
+        )
+    }
+
+    // ── GameSessionRepository: natively Koin-constructed (KMP migration batch 4; Hilt `GameModule`
+    //    deleted). Shared by Stats + Profile + Home + Survey — registered exactly once here.
+    //    `SurveyAnswerDao` is already a single in `profileKoinModule` — resolved cross-module via
+    //    `get()`. ──
+    single<GameSessionRepository> {
+        GameSessionRepositoryImpl(
+            dao = get(),
+            progressionEventBus = get(),
+            ioDispatcher = Dispatchers.IO,
+            surveyAnswerDao = get(),
+        )
+    }
 
     // ── TournamentRepository: natively Koin-constructed (Hilt `TournamentModule` deleted). ──
     // Shared by the Home + Game + Tournament islands (all Koin now) — registered exactly once here.

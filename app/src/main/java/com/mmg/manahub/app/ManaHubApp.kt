@@ -21,6 +21,10 @@ import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.dao.FriendDao
+import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.GamificationDao
+import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.NewsDao
@@ -42,6 +46,7 @@ import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
+import com.mmg.manahub.core.gamification.di.gamificationEngineKoinModule
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -58,8 +63,6 @@ import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
-import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
@@ -84,11 +87,8 @@ import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
 import com.mmg.manahub.feature.friends.di.friendsKoinModule
-import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.gamification.di.gamificationKoinModule
 import com.mmg.manahub.feature.game.di.gameKoinModule
-import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
-import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
 import com.mmg.manahub.feature.home.di.homeKoinModule
 import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.di.newsKoinModule
@@ -103,6 +103,7 @@ import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
 import dagger.hilt.android.HiltAndroidApp
 import io.github.jan.supabase.SupabaseClient
+import io.ktor.client.HttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.component.KoinComponent
@@ -119,6 +120,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import javax.inject.Inject
+import javax.inject.Named
 
 @HiltAndroidApp
 class ManaHubApp : Application(), KoinComponent {
@@ -132,17 +134,26 @@ class ManaHubApp : Application(), KoinComponent {
     // that ordering hazard rules out routing this the other way, Hilt-provider-calls-into-Koin.)
     private val syncManaSymbols: SyncManaSymbolsUseCase by inject()
 
+    // ── KMP migration — Hilt→Koin cutover batch 4 ───────────────────────────────────────────────
+    // The whole gamification engine graph (ADR-002) is now natively Koin-built in
+    // `gamificationEngineKoinModule` — the Hilt `core.gamification.di.GamificationModule` that used to
+    // provide these via `@Binds`/`@Provides`/implicit `@Inject constructor` satisfaction was deleted.
+    // These six properties switched from Hilt `@Inject lateinit var` to Koin `by inject()` delegates —
+    // the SAME lazy-resolution pattern already used above for `syncManaSymbols`: every read below
+    // happens from `appScope.launch { }` blocks (or `gamificationEngine.start(appScope)` directly) that
+    // run strictly AFTER `startKoin()` returns in `onCreate()`, so the lazy resolution is safe.
+    private val gamificationEngine: GamificationEngine by inject()
+    private val progressionEventBus: ProgressionEventBus by inject()
+    private val achievementBackfill: AchievementBackfill by inject()
+    private val questReconciler: QuestReconciler by inject()
+    private val entitlementGranter: EntitlementGranter by inject()
+    private val gamificationSyncManager: GamificationSyncManager by inject()
+
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var pushTokenRepository: PushTokenRepository
     @Inject lateinit var okHttpClient: OkHttpClient
-    @Inject lateinit var gamificationEngine: GamificationEngine
-    @Inject lateinit var progressionEventBus: ProgressionEventBus
-    @Inject lateinit var achievementBackfill: AchievementBackfill
-    @Inject lateinit var questReconciler: QuestReconciler
-    @Inject lateinit var entitlementGranter: EntitlementGranter
-    @Inject lateinit var gamificationSyncManager: GamificationSyncManager
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
@@ -174,17 +185,20 @@ class ManaHubApp : Application(), KoinComponent {
     // RefreshCollectionPricesUseCase moved to SharedDomainKoinModule (batch 2) — statsKoinModule now
     // resolves all three via get(), so no field is needed for them anymore. DeckRepository is natively
     // Koin-built in coreBridgeKoinModule as of batch 3 — no bridge field needed for it anymore.
+    // GameSessionRepository is natively Koin-built in coreBridgeKoinModule as of batch 4 (Hilt `GameModule`
+    // deleted) — `gameSessionDao` below (Room, stays androidMain) is forward-bridged to build it.
     @Inject lateinit var scryfallRemoteDataSource: ScryfallRemoteDataSource
-    @Inject lateinit var gameSessionRepository: GameSessionRepository  // shared: Stats + Profile
+    @Inject lateinit var gameSessionDao: GameSessionDao  // shared: Stats + Profile + Home (via GameSessionRepository)
 
     // Profile island (Phase 1) bridge deps. (userPreferencesDataStore + authRepository are shared with
     // Settings and gameSessionRepository is shared with Stats — all bridged in coreBridgeKoinModule.
     // statsRepository + gamificationRepository are now also shared with Home → bridged in coreBridge.)
+    // claimQuestRewardUseCase is now a native single in gamificationEngineKoinModule (batch 4) — no bridge
+    // field needed for it anymore. friendRepository/gamificationRepository likewise dropped: FriendRepository
+    // is natively Koin-built in coreBridgeKoinModule via `friendDao` below; GamificationRepository is
+    // natively Koin-built in gamificationEngineKoinModule.
     @Inject lateinit var statsRepository: StatsRepository  // shared: Profile + Home
     @Inject lateinit var surveyAnswerDao: SurveyAnswerDao
-    @Inject lateinit var claimQuestRewardUseCase: ClaimQuestRewardUseCase  // Profile island only
-    @Inject lateinit var friendRepository: FriendRepository
-    @Inject lateinit var gamificationRepository: GamificationRepository  // shared: Profile + Home
 
     // Home island (Phase 1) bridge deps. The shared deps (userPreferencesDataStore, authRepository,
     // gameSessionRepository, statsRepository, scryfallRemoteDataSource, gamificationRepository) are
@@ -219,17 +233,22 @@ class ManaHubApp : Application(), KoinComponent {
     // still-Hilt (excluded) ScannerViewModel, via KoinToHiltBridgeModule's reverse bridge.
     @Inject lateinit var userCardRepository: UserCardRepository
 
-    // Friends island (Phase 1) bridge deps. FriendRepository is shared with Profile → PROMOTED into
-    // coreBridgeKoinModule (the existing `friendRepository` field above feeds it there now). AuthRepository
-    // + AnalyticsHelper are also bridged in coreBridge (shared). TradesRepository is natively Koin-built
-    // in coreBridgeKoinModule as of batch 3 — no bridge field needed for it anymore. Only the
-    // Friends-only singleton is here:
+    // Friends island (Phase 1) bridge deps. FriendRepository is shared with Profile → natively Koin-built
+    // in coreBridgeKoinModule as of batch 4 (Hilt `FriendModule` deleted); `friendDao` below (Room, stays
+    // androidMain) is forward-bridged to build it there. AuthRepository + AnalyticsHelper are also bridged
+    // in coreBridge (shared). TradesRepository is natively Koin-built in coreBridgeKoinModule as of
+    // batch 3 — no bridge field needed for it anymore. Friends-only singletons/deps are here:
     //  - PendingInviteStore: deferred invite codes for InviteDispatcher.
+    //  - supabaseKtorHttpClient (`@Named("supabaseKtor")`): still Hilt-built by the not-yet-converted
+    //    `feature.auth.di.AuthModule` — needed to build `FriendshipClient` natively in `friendsKoinModule`.
     @Inject lateinit var pendingInviteStore: PendingInviteStore
+    @Inject lateinit var friendDao: FriendDao
+    @Inject @Named("supabaseKtor") lateinit var supabaseKtorHttpClient: HttpClient
 
     // Survey island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
     //  - SurveyAnswerDao is already injected (above, Profile island field) and bridged by profileKoinModule.
-    //  - GameSessionDao is already injected (above, Stats island field) and bridged by statsKoinModule.
+    //  - GameSessionDao is already injected (above, Stats island field) and bridged by coreBridgeKoinModule
+    //    (batch 4 — it feeds the natively-Koin-built GameSessionRepository there).
     //  - DeckRepository + UserPreferencesRepository are bridged in coreBridgeKoinModule.
     //  - The application Context + IO dispatcher are supplied by Koin (androidContext() / Dispatchers.IO).
     // Only the Survey-only singletons are here.
@@ -303,8 +322,10 @@ class ManaHubApp : Application(), KoinComponent {
     // re-declared here — GameSessionRepository, TournamentRepository, AnalyticsHelper and
     // UserPreferencesDataStore are bridged in coreBridgeKoinModule; RecordMatchResultUseCase is already a
     // single in tournamentKoinModule; VoiceModelRepository (GameSetup) is a single in settingsKoinModule;
-    // gamificationEngine is already injected above (Phase 0 field) — all resolved via get(), never
-    // re-registered (a duplicate single<T> would throw DefinitionOverrideException).
+    // gamificationEngine is now a native Koin single in gamificationEngineKoinModule (batch 4) — all
+    // resolved via get(), never re-registered (a duplicate single<T> would throw DefinitionOverrideException).
+    // EvaluatePlayerEliminationUseCase is likewise now a plain native single in gameKoinModule itself
+    // (no ctor deps) — no bridge field needed for it anymore.
     //
     // GameViewModel integrates the DEFERRED core/voice + core/online + core/nearby features, which stay
     // 100% Hilt-owned. Those singletons are bridged here from the Hilt graph (NOT de-Hilt'd) so the one
@@ -322,7 +343,13 @@ class ManaHubApp : Application(), KoinComponent {
     @Inject lateinit var toggleLandPlayedUseCase: ToggleLandPlayedUseCase
     @Inject lateinit var nearbySessionRepository: NearbySessionRepository
     @Inject lateinit var voiceCommandRecognizer: VoiceCommandRecognizer
-    @Inject lateinit var evaluatePlayerEliminationUseCase: EvaluatePlayerEliminationUseCase
+
+    // Gamification engine island (KMP migration batch 4) bridge deps. The whole Hilt
+    // `core.gamification.di.GamificationModule` was deleted — `gamificationEngineKoinModule` builds the
+    // entire engine graph natively. Only the Room-owned DAOs (Room stays androidMain) are bridged here;
+    // ProgressionEventBus is natively constructed in coreBridgeKoinModule (see its KDoc).
+    @Inject lateinit var gamificationDao: GamificationDao
+    @Inject lateinit var gamificationStatsDao: GamificationStatsDao
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -344,17 +371,23 @@ class ManaHubApp : Application(), KoinComponent {
                     userPreferencesRepo = userPreferencesRepository,
                     userPrefsDataStore = userPreferencesDataStore,
                     authRepository = authRepository,
-                    gameSessionRepository = gameSessionRepository,
                     statsRepository = statsRepository,
                     scryfallRemoteDataSource = scryfallRemoteDataSource,
-                    gamificationRepository = gamificationRepository,
                     cardRepository = cardRepository,
                     analyticsHelper = analyticsHelper,
-                    friendRepository = friendRepository,
-                    progressionEventBus = progressionEventBus,
                     deckDao = deckDao,
+                    friendDao = friendDao,
+                    gameSessionDao = gameSessionDao,
                     okHttpClient = okHttpClient,
                     supabaseClient = supabaseClient,
+                ),
+                // The gamification engine graph (ADR-002), natively Koin-built (batch 4; Hilt
+                // `core.gamification.di.GamificationModule` deleted). Must load alongside coreBridgeKoinModule
+                // (ProgressionEventBus) and every island below that resolves GamificationRepository/
+                // GamificationEngine/ClaimQuestRewardUseCase via get() (Profile, Home, Game, GamificationCelebration).
+                gamificationEngineKoinModule(
+                    gamificationDao = gamificationDao,
+                    gamificationStatsDao = gamificationStatsDao,
                 ),
                 settingsKoinModule(
                     userProfileDataSource = userProfileDataSource,
@@ -374,7 +407,6 @@ class ManaHubApp : Application(), KoinComponent {
                 statsKoinModule(),
                 profileKoinModule(
                     surveyAnswerDao = surveyAnswerDao,
-                    claimQuestRewardUseCase = claimQuestRewardUseCase,
                 ),
                 homeKoinModule(
                     getAccountNudgeUseCase = getAccountNudgeUseCase,
@@ -391,6 +423,7 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 friendsKoinModule(
                     pendingInviteStore = pendingInviteStore,
+                    supabaseKtorHttpClient = supabaseKtorHttpClient,
                 ),
                 splashKoinModule(),
                 surveyKoinModule(
@@ -437,8 +470,6 @@ class ManaHubApp : Application(), KoinComponent {
                     toggleLandPlayed = toggleLandPlayedUseCase,
                     nearbyRepository = nearbySessionRepository,
                     voiceCommandRecognizer = voiceCommandRecognizer,
-                    evaluatePlayerElimination = evaluatePlayerEliminationUseCase,
-                    gamificationEngine = gamificationEngine,
                 ),
             )
         }

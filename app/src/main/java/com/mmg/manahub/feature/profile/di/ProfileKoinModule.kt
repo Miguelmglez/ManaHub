@@ -31,7 +31,13 @@ import org.koin.dsl.module
  * - [GamificationRepository] — shared with the Home island.
  * - `FriendRepository` — shared with the Friends island.
  *
- * [SurveyAnswerDao] and [ClaimQuestRewardUseCase] are Profile-only singletons bridged here.
+ * [SurveyAnswerDao] is a Profile-only singleton bridged here.
+ *
+ * ## KMP migration — Hilt→Koin cutover batch 4
+ * [ClaimQuestRewardUseCase] is no longer bridged from `ManaHubApp` — it is now a NATIVE Koin single in
+ * `com.mmg.manahub.core.gamification.di.gamificationEngineKoinModule` (shared with `QuestReconciler`, the
+ * whole Hilt `core.gamification.di.GamificationModule` was deleted). [ProfileViewModel] still resolves it
+ * via `get()`, unchanged.
  *
  * ## [ProfileEditViewModel] (remediation slice P1.3)
  * [ProfileEditViewModel] backs `ProfileEditSheet` and is added to THIS module (rather than a new
@@ -46,14 +52,13 @@ import org.koin.dsl.module
  */
 fun profileKoinModule(
     surveyAnswerDao: SurveyAnswerDao,
-    claimQuestRewardUseCase: ClaimQuestRewardUseCase,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Profile-only Hilt-owned singletons to Koin. ──
     // (gameSessionRepo, userPreferencesDataStore, authRepository, statsRepository, gamificationRepository
     //  and friendRepository are shared → bridged in coreBridgeKoinModule, not here, to avoid
-    //  DefinitionOverrideException.)
+    //  DefinitionOverrideException. claimQuestRewardUseCase is now a native single in
+    //  gamificationEngineKoinModule — resolved via get() below, not re-registered.)
     single { surveyAnswerDao }
-    single { claimQuestRewardUseCase }
 
     // ── The Koin island: ProfileViewModel is now resolved by Koin, not Hilt. ──
     viewModel {

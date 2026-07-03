@@ -11,8 +11,6 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.daysUntil
 import kotlinx.datetime.toLocalDateTime
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Advances the daily-activity streak on [ProgressionEvent.AppOpenedToday] (ADR-002 §Context, Phase 2).
@@ -25,8 +23,7 @@ import javax.inject.Singleton
  * The decision logic is the PURE [advance] function (existing row + today → new row) so the full matrix
  * is unit-testable without Room or a clock. [process] is the thin IO shell.
  */
-@Singleton
-class StreakTracker @Inject constructor(
+class StreakTracker(
     private val dao: GamificationDao,
     private val clock: Clock,
     private val timeZone: TimeZone,

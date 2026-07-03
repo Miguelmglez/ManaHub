@@ -40,8 +40,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Default [GamificationRepository], backed by [GamificationDao].
@@ -50,8 +48,7 @@ import javax.inject.Singleton
  * `total_xp` into level + within-level progress via [LevelCurve]. A null entity (row not yet
  * seeded) maps to the level-1 / 0-XP default.
  */
-@Singleton
-class GamificationRepositoryImpl @Inject constructor(
+class GamificationRepositoryImpl(
     private val dao: GamificationDao,
     private val clock: Clock,
     private val timeZone: TimeZone,
