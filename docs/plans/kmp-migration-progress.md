@@ -565,12 +565,18 @@ worker subsystem → infra modules (define the bridge surface) → last, the min
     the only `androidx`/`android.`/`java.` hits are pre-existing `shared/core-ui` Compose Multiplatform
     imports (legitimate — CMP shares the `androidx.compose.*` namespace), zero in `core-domain`/`core-model`
     (untouched this batch). **Not committed** (user reviews the diff first, per task instructions).
-- ⏳ Remaining from the original Batch 3 scope (explicitly deferred this session): Friend/Game/
-  Gamification/Auth still have a residual feature-private Hilt `@Module` each (`FriendModule`/
-  `GameModule`/`GamificationModule`/`AuthModule`) even though their ViewModels are already Koin islands —
-  same "shrink after Koin island lands" pattern as News/Draft/Decks/Trades were until this batch. Audit
-  each for excluded-trio/`@HiltWorker` consumers before flipping. Batch 4: worker subsystem → Koin
-  `WorkerFactory`. Batch 5: infra + finalize.
+- ✅ **Cutover Batch 3 — COMMITTED (2026-07-03).** News/Draft/DeckDoctor/Trades → Koin. GREEN 1967/118/2.
+- ✅ **Cutover Batch 4 — COMMITTED (2026-07-03).** Friend/Game/Gamification → Koin (3 Hilt @Modules
+  deleted). Reverse-bridged FriendRepository + GamificationSyncManager + QuestReconciler (workers). 6
+  ManaHubApp fields → `by inject()`. Fixed a pre-existing missing `single<GameSessionDao>`. GREEN 1967/118/2.
+- ⏳ **Cutover remaining plan:** Batch 5 = **Auth** (reverse-bridge AuthRepository for workers+excluded;
+  move @Named supabase/supabaseKtor HttpClients + UserProfileClient/DataSource; the batch-4 ManaHubApp
+  `supabaseKtorHttpClient` forward-bridge flips native). Batch 6 = **workers → Koin `WorkerFactory`**
+  (`koin-androidx-workmanager`) → then RETIRE the worker reverse-bridges (Friend/GamificationSync/
+  QuestReconciler/RefreshCollectionPrices). Batch 7 = **infra** (Network/Supabase/Dispatcher/CoroutineScopes/
+  Analytics/Crashlytics/Push/Sync/DatabaseModule-DAOs/RepositoryModule/SharedDomainUseCaseModule-residual) →
+  Koin, keeping a reverse-bridge ONLY for what the excluded trio still needs. END-STATE: only the 4 excluded
+  Hilt modules (online/scanner/voice/nearby) + a minimal reverse bridge remain, until the excluded wave.
 - ⏳ Queued after cutover: P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`).
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
