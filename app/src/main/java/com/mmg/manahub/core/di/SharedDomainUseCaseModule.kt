@@ -1,56 +1,17 @@
 package com.mmg.manahub.core.di
 
 import com.mmg.manahub.core.common.DispatcherProvider
-import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.network.ScryfallCache
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.data.tagging.StrategyAnalyzer
 import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
-import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
-import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
-import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.domain.repository.DraftRepository
-import com.mmg.manahub.core.domain.repository.DraftSimRepository
-import com.mmg.manahub.core.domain.repository.NewsRepository
-import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.repository.WishlistRepository
-import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
-import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
-import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
-import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
-import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
-import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
-import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import com.mmg.manahub.core.tagging.createStrategyAnalyzer
-import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
-import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
-import com.mmg.manahub.core.domain.engine.DraftDeckBuilder
-import com.mmg.manahub.core.domain.engine.DraftEngine
-import kotlinx.coroutines.Dispatchers
-import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
-import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
-import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
-import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
-import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
-import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -58,84 +19,51 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Hilt providers for the pure domain use cases that moved to `:shared:core-domain` `commonMain`
- * during the KMP migration (Phase 2+).
+ * KMP migration — Hilt→Koin cutover batch 2. This module used to provide ~30 pure domain use cases;
+ * ALL of them (bar the six below) now live natively in [com.mmg.manahub.core.di.SharedDomainKoinModule]
+ * (Koin), consumed via `get()` by the migrated Koin islands. Three of the moved ones
+ * ([com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase],
+ * [com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase],
+ * [com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase]) still have a
+ * Hilt-only consumer and are re-exposed to Hilt via [com.mmg.manahub.core.di.KoinToHiltBridgeModule]
+ * (`GlobalContext.get().get()`).
  *
- * These classes used to carry an `@Inject` constructor, but `javax.inject` is JVM-only and cannot be
- * imported in a KMP `commonMain` source set. They now expose plain constructors and Hilt builds them
- * here instead. Behaviour is unchanged: every prior construction site still receives a Hilt-owned
- * singleton -- the still-Hilt `AdvancedSearchViewModel` and the `ManaHubApp` field-injection bridge
- * that re-exposes these singletons to the Koin islands keep working as before.
+ * ## Why these six providers COULD NOT move (the ordering hazard the reverse bridge above can't fix)
+ * `GlobalContext.get()` throws unless Koin has already been started. That is safe for
+ * `KoinToHiltBridgeModule`'s three use cases because their Hilt-only consumers
+ * (`ScannerViewModel`/`PriceRefreshWorker`) are built LAZILY, strictly after `ManaHubApp.onCreate()`
+ * has called `startKoin()`.
  *
- * As each consuming feature finishes its Hilt->Koin cutover, the corresponding provider here is
- * dropped and the use case is built directly in that feature's Koin module via its plain constructor.
+ * The six providers below feed classes with NO such luxury: [ScryfallRemoteDataSource] and
+ * [ComputeCardTagsUseCase] are `@Inject` constructor params of `CardRepositoryImpl` /
+ * `core.sync.SyncManager` (both `@Singleton`, still-Hilt this batch — "repos stay Hilt-bridged"), and
+ * [GetDraftableSetsUseCase]/[GetSetTierListUseCase]/[GetSetCardsPageUseCase] are `@Inject` constructor
+ * params of `feature.draft.data.DraftSimRepositoryImpl` (same reason — `DraftModule` is KEPT this
+ * batch). ALL FOUR of those repository impls are themselves eagerly built the moment `ManaHubApp`'s own
+ * `@Inject lateinit var` fields (`cardRepository`, `draftSimRepository`, etc.) are populated — which
+ * Hilt does BEFORE `ManaHubApp.onCreate()`'s body runs, i.e. before `startKoin()`. A `@Provides` that
+ * called into Koin here would crash on cold start with "KoinApplication has not been started".
+ * [ScryfallCache] only exists to build [ScryfallRemoteDataSource] and has no other consumer, so it
+ * stays alongside it.
+ *
+ * ## Why this isn't a real behaviour split
+ * All six are pure/stateless wrappers EXCEPT [ScryfallRemoteDataSource], which genuinely must stay a
+ * single shared instance (it owns the ONE app-wide [ScryfallRequestQueue] rate limiter — CLAUDE.md:
+ * "All Scryfall calls must be wrapped in `ScryfallRequestQueue.execute{}`"). That singleton's
+ * provisioning is UNCHANGED from before this batch: still built here, still forward-bridged into
+ * `coreBridgeKoinModule` via the pre-existing `ManaHubApp.scryfallRemoteDataSource` field — every
+ * consumer (Hilt or Koin) shares the exact same instance, so there is no divergence risk.
+ * [ComputeCardTagsUseCase]/[GetDraftableSetsUseCase]/[GetSetTierListUseCase] are stateless wrappers
+ * (verified by reading their bodies) — [SharedDomainKoinModule] ALSO builds Koin-native copies of the
+ * latter two for the Draft island's ViewModels; both copies wrap the SAME shared `DraftRepository`
+ * singleton, so the duplication is behaviourally invisible. `ComputeCardTagsUseCase` has no Koin
+ * consumer at all, so it stays 100% Hilt-only, self-contained (inlines its own
+ * [SuggestTagsUseCase]/`StrategyAnalyzer` rather than sharing Koin's instance — again harmless, both
+ * are pure functions with no shared state).
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object SharedDomainUseCaseModule {
-
-    @Provides
-    @Singleton
-    fun provideSearchCardsUseCase(
-        cardRepository: CardRepository,
-    ): SearchCardsUseCase = SearchCardsUseCase(cardRepository)
-
-    @Provides
-    @Singleton
-    fun provideBuildScryfallQueryUseCase(): BuildScryfallQueryUseCase =
-        BuildScryfallQueryUseCase()
-
-    @Provides
-    @Singleton
-    fun provideGetCollectionSetCodesUseCase(
-        statsRepository: StatsRepository,
-    ): GetCollectionSetCodesUseCase = GetCollectionSetCodesUseCase(statsRepository)
-
-    @Provides
-    @Singleton
-    fun provideGetCollectionStatsUseCase(
-        statsRepository: StatsRepository,
-    ): GetCollectionStatsUseCase = GetCollectionStatsUseCase(statsRepository)
-
-    @Provides
-    @Singleton
-    fun provideGetCollectionUseCase(
-        userCardRepository: UserCardRepository,
-    ): GetCollectionUseCase = GetCollectionUseCase(userCardRepository)
-
-    @Provides
-    @Singleton
-    fun provideRefreshCollectionPricesUseCase(
-        userCardRepository: UserCardRepository,
-        cardRepository: CardRepository,
-        scryfallRemoteDataSource: ScryfallRemoteDataSource,
-    ): RefreshCollectionPricesUseCase = RefreshCollectionPricesUseCase(
-        userCardRepository, cardRepository, scryfallRemoteDataSource, DispatcherProvider(),
-    )
-
-    @Provides
-    @Singleton
-    fun provideSyncManaSymbolsUseCase(
-        api: ScryfallClient,
-        store: ManaSymbolStore,
-        requestQueue: ScryfallRequestQueue,
-    ): SyncManaSymbolsUseCase = SyncManaSymbolsUseCase(api, store, requestQueue)
-
-    @Provides
-    @Singleton
-    fun provideStrategyAnalyzer(): StrategyAnalyzer = createStrategyAnalyzer()
-
-    @Provides
-    @Singleton
-    fun provideSuggestTagsUseCase(
-        strategyAnalyzer: StrategyAnalyzer,
-    ): SuggestTagsUseCase = SuggestTagsUseCase(strategyAnalyzer)
-
-    @Provides
-    @Singleton
-    fun provideComputeCardTagsUseCase(
-        suggestTags: SuggestTagsUseCase,
-    ): ComputeCardTagsUseCase = ComputeCardTagsUseCase(suggestTags)
 
     @Provides
     @Singleton
@@ -149,7 +77,16 @@ object SharedDomainUseCaseModule {
         cache: ScryfallCache,
     ): ScryfallRemoteDataSource = ScryfallRemoteDataSource(api, requestQueue, cache, DispatcherProvider())
 
-    // -- Draft use cases (consumed by Hilt-owned DraftSimRepositoryImpl + ManaHubApp bridge). --
+    /**
+     * Self-contained: builds its own [SuggestTagsUseCase]/`StrategyAnalyzer` instance rather than
+     * sharing [com.mmg.manahub.core.di.SharedDomainKoinModule]'s Koin-native one. Both are pure/
+     * stateless (no I/O, no shared mutable state), so this is behaviourally identical to sharing an
+     * instance — and keeps this Hilt-only provider from ever needing to reach into Koin.
+     */
+    @Provides
+    @Singleton
+    fun provideComputeCardTagsUseCase(): ComputeCardTagsUseCase =
+        ComputeCardTagsUseCase(SuggestTagsUseCase(createStrategyAnalyzer()))
 
     @Provides
     @Singleton
@@ -159,137 +96,13 @@ object SharedDomainUseCaseModule {
 
     @Provides
     @Singleton
-    fun provideGetSetCardsPageUseCase(
-        draftRepository: DraftRepository,
-    ): GetSetCardsPageUseCase = GetSetCardsPageUseCase(draftRepository)
-
-    @Provides
-    @Singleton
-    fun provideGetSetGuideUseCase(
-        draftRepository: DraftRepository,
-    ): GetSetGuideUseCase = GetSetGuideUseCase(draftRepository)
-
-    @Provides
-    @Singleton
     fun provideGetSetTierListUseCase(
         draftRepository: DraftRepository,
     ): GetSetTierListUseCase = GetSetTierListUseCase(draftRepository)
 
     @Provides
     @Singleton
-    fun provideGetSetVideosUseCase(
+    fun provideGetSetCardsPageUseCase(
         draftRepository: DraftRepository,
-    ): GetSetVideosUseCase = GetSetVideosUseCase(draftRepository)
-
-    @Provides
-    @Singleton
-    fun provideObserveDraftUseCase(
-        draftSimRepository: DraftSimRepository,
-    ): ObserveDraftUseCase = ObserveDraftUseCase(draftSimRepository)
-
-    @Provides
-    @Singleton
-    fun provideGetDraftableSimSetUseCase(
-        draftSimRepository: DraftSimRepository,
-    ): GetDraftableSimSetUseCase = GetDraftableSimSetUseCase(draftSimRepository, Dispatchers.IO)
-
-    @Provides
-    @Singleton
-    fun provideStartDraftUseCase(
-        draftSimRepository: DraftSimRepository,
-        engine: DraftEngine,
-    ): StartDraftUseCase = StartDraftUseCase(draftSimRepository, engine, Dispatchers.IO, Dispatchers.Default)
-
-    @Provides
-    @Singleton
-    fun provideMakePickUseCase(
-        draftSimRepository: DraftSimRepository,
-        engine: DraftEngine,
-    ): MakePickUseCase = MakePickUseCase(draftSimRepository, engine, Dispatchers.IO, Dispatchers.Default)
-
-    @Provides
-    @Singleton
-    fun provideAutoPickUseCase(
-        draftSimRepository: DraftSimRepository,
-        engine: DraftEngine,
-    ): AutoPickUseCase = AutoPickUseCase(draftSimRepository, engine, Dispatchers.IO, Dispatchers.Default)
-
-    @Provides
-    @Singleton
-    fun provideCompleteDraftUseCase(
-        draftSimRepository: DraftSimRepository,
-        deckBuilder: DraftDeckBuilder,
-    ): CompleteDraftUseCase = CompleteDraftUseCase(draftSimRepository, deckBuilder, Dispatchers.IO, Dispatchers.Default)
-
-    // -- Trades use cases (consumed by still-Hilt ScannerViewModel + ManaHubApp field injection). --
-
-    @Provides
-    @Singleton
-    fun provideAddToWishlistUseCase(
-        wishlistRepository: WishlistRepository,
-        authRepository: AuthRepository,
-    ): AddToWishlistUseCase = AddToWishlistUseCase(wishlistRepository, authRepository)
-
-    @Provides
-    @Singleton
-    fun provideMigrateLocalTradeListsUseCase(
-        wishlistRepository: WishlistRepository,
-        openForTradeRepository: OpenForTradeRepository,
-    ): MigrateLocalTradeListsUseCase = MigrateLocalTradeListsUseCase(wishlistRepository, openForTradeRepository)
-
-    // -- News use cases (consumed by ManaHubApp Hilt field injection). --
-
-    @Provides
-    @Singleton
-    fun provideGetNewsFeedUseCase(
-        newsRepository: NewsRepository,
-    ): GetNewsFeedUseCase = GetNewsFeedUseCase(newsRepository)
-
-    @Provides
-    @Singleton
-    fun provideManageSourcesUseCase(
-        newsRepository: NewsRepository,
-    ): ManageSourcesUseCase = ManageSourcesUseCase(newsRepository)
-
-    @Provides
-    @Singleton
-    fun provideRefreshNewsFeedUseCase(
-        newsRepository: NewsRepository,
-    ): RefreshNewsFeedUseCase = RefreshNewsFeedUseCase(newsRepository)
-
-    // -- Collection / survey use cases (moved from :app to :shared:core-domain, Phase 4). --
-
-    @Provides
-    @Singleton
-    fun provideCompleteSurveyUseCase(
-        progressionEventBus: ProgressionEventBus,
-    ): CompleteSurveyUseCase = CompleteSurveyUseCase(progressionEventBus)
-
-    @Provides
-    @Singleton
-    fun provideAddCardToCollectionUseCase(
-        cardRepository: CardRepository,
-        userCardRepository: UserCardRepository,
-        progressionEventBus: ProgressionEventBus,
-    ): AddCardToCollectionUseCase = AddCardToCollectionUseCase(
-        cardRepository, userCardRepository, progressionEventBus,
-    )
-
-    @Provides
-    @Singleton
-    fun provideCommitScannedCardsUseCase(
-        addCardToCollectionUseCase: AddCardToCollectionUseCase,
-        progressionEventBus: ProgressionEventBus,
-    ): CommitScannedCardsUseCase = CommitScannedCardsUseCase(
-        addCardToCollectionUseCase, progressionEventBus,
-    )
-
-    // -- Deck use cases (moved from :app to :shared:core-domain, Phase 4). --
-
-    @Provides
-    @Singleton
-    fun provideGetDeckGameStatsUseCase(
-        gameSessionRepository: GameSessionRepository,
-        cardRepository: CardRepository,
-    ): GetDeckGameStatsUseCase = GetDeckGameStatsUseCase(gameSessionRepository, cardRepository)
+    ): GetSetCardsPageUseCase = GetSetCardsPageUseCase(draftRepository)
 }

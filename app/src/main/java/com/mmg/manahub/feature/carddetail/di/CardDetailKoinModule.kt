@@ -1,9 +1,7 @@
 package com.mmg.manahub.feature.carddetail.di
 
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailViewModel
-import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -43,33 +41,32 @@ import org.koin.dsl.module
  * — registering the same type in two loaded modules would throw `DefinitionOverrideException` — and are
  * resolved below via `get()`.
  *
- * The remaining [Module] params are the CardDetail-only bridged singletons consumed by no other Koin
+ * The remaining [Module] param is the CardDetail-only bridged singleton consumed by no other Koin
  * island (`UserCardRepository` is also resolved via `get()` by the Trades island — leaving it here is
  * fine, a `single<T>` is resolvable from any loaded module).
+ *
+ * `AddCardToCollectionUseCase` and `AddToWishlistUseCase` (KMP migration batch 2) are now natively
+ * Koin-built in `SharedDomainKoinModule` — resolved below via `get()`, not registered here anymore.
+ * (`AddToWishlistUseCase` is ALSO re-exposed to the still-Hilt, excluded `ScannerViewModel` via
+ * `KoinToHiltBridgeModule`'s reverse bridge — same singleton instance either way.)
  *
  * As features migrate further in Phase 1, each `single { hiltInstance }` here is replaced by a real Koin
  * provider and the matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing
  * without ever leaving the app uncompilable between commits.
  *
  * @param userCardRepository the Hilt-owned [UserCardRepository] singleton (CardDetail + Trades-via-get()).
- * @param addToCollection the Hilt-owned [AddCardToCollectionUseCase] singleton (this island only).
- * @param addToWishlistUseCase the Hilt-owned [AddToWishlistUseCase] singleton (this island only).
- * @return a Koin [Module] that provides the CardDetail-only bridged singletons and the
+ * @return a Koin [Module] that provides the CardDetail-only bridged singleton and the
  *   [CardDetailViewModel] factory.
  */
 fun cardDetailKoinModule(
     userCardRepository: UserCardRepository,
-    addToCollection: AddCardToCollectionUseCase,
-    addToWishlistUseCase: AddToWishlistUseCase,
 ): Module = module {
-    // ── Hilt → Koin bridge: re-expose the CardDetail-only Hilt-owned singletons to Koin. ──
+    // ── Hilt → Koin bridge: re-expose the CardDetail-only Hilt-owned singleton to Koin. ──
     // (CardRepository, DeckRepository, UserPreferencesRepository, UserPreferencesDataStore, AuthRepository,
     //  AnalyticsHelper, WishlistRepository and OpenForTradeRepository are shared → bridged in
     //  coreBridgeKoinModule. All are resolved below via get(), never re-registered here — a second
     //  single<T> for the same type across two loaded modules would throw DefinitionOverrideException.)
     single { userCardRepository }
-    single { addToCollection }
-    single { addToWishlistUseCase }
 
     // ── The Koin island: CardDetailViewModel is now resolved by Koin, not Hilt. ──
     // Koin injects the SavedStateHandle (carrying the `scryfallId` nav arg) into the factory, so the
