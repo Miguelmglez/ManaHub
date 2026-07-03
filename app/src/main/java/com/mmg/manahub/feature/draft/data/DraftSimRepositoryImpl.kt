@@ -6,7 +6,6 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonSyntaxException
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
@@ -31,7 +30,6 @@ import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -39,8 +37,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Implementation of [DraftSimRepository].
@@ -51,10 +47,12 @@ import javax.inject.Singleton
  * sessions as a single JSON blob in `draft_sessions` (see [DraftSessionEntity]).
  *
  * @see DraftSimRepository for the contract and per-method behaviour notes.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule].
  */
-@Singleton
-class DraftSimRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+class DraftSimRepositoryImpl(
+    private val context: Context,
     private val cloudflareClient: CloudflareContentClient,
     private val getDraftableSets: GetDraftableSetsUseCase,
     private val getSetTierList: GetSetTierListUseCase,
@@ -62,7 +60,7 @@ class DraftSimRepositoryImpl @Inject constructor(
     private val deckRepository: DeckRepository,
     private val draftSessionDao: DraftSessionDao,
     private val gson: Gson,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
     private val crashReporter: CrashReporter,
 ) : DraftSimRepository {
 

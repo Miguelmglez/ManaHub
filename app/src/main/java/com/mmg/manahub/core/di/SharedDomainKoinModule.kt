@@ -8,9 +8,6 @@ import com.mmg.manahub.core.data.tagging.StrategyAnalyzer
 import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
-import com.mmg.manahub.core.domain.engine.DraftDeckBuilder
-import com.mmg.manahub.core.domain.engine.DraftEngine
-import com.mmg.manahub.core.domain.repository.NewsRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
@@ -24,6 +21,7 @@ import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
+import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetGuideUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetVideosUseCase
@@ -57,13 +55,15 @@ import org.koin.dsl.module
  * `AuthRepository`, `GameSessionRepository`, `ScryfallRemoteDataSource`, `ProgressionEventBus` and
  * `DispatcherProvider` are all already `single`s (`coreBridgeKoinModule` or an earlier island) —
  * resolved below via `get()`, never re-registered (a second `single<T>` for the same type across two
- * loaded modules throws `DefinitionOverrideException`).
+ * loaded modules throws `DefinitionOverrideException`). As of batch 3, `NewsRepository`
+ * (`newsKoinModule`) and `DraftEngine`/`DraftDeckBuilder` (`draftKoinModule`) are ALSO natively
+ * Koin-built and resolved the same way — no forward-bridge ctor param needed for them anymore.
  *
  * ## Newly forward-bridged singletons (ctor params — Hilt-built, feature-private modules KEPT this batch)
- * These six types have NO Koin presence yet because their owning Hilt module (`NetworkModule`,
- * `DatabaseModule`, `NewsModule`, `DraftModule`) is intentionally left untouched this batch (repos and
- * their infra stay Hilt-bridged until batch 3): `ManaHubApp` `@Inject`s the already-constructed Hilt
- * singletons and passes them in here, exactly like every other bridge in this migration.
+ * These three types have NO Koin presence yet because their owning Hilt module (`NetworkModule`,
+ * `DatabaseModule`) is intentionally left untouched this batch: `ManaHubApp` `@Inject`s the
+ * already-constructed Hilt singletons and passes them in here, exactly like every other bridge in this
+ * migration.
  *
  * @param scryfallClient the Hilt-owned [ScryfallClient] (`NetworkModule`) — needed to build
  *   [SyncManaSymbolsUseCase].
@@ -72,29 +72,17 @@ import org.koin.dsl.module
  *   usage is untouched — it keeps resolving this exact singleton through its existing Hilt provider.)
  * @param manaSymbolStore the Hilt-owned [ManaSymbolStore] (`DatabaseModule`) — needed to build
  *   [SyncManaSymbolsUseCase].
- * @param newsRepository the Hilt-owned [NewsRepository] (`NewsModule`, `@Binds`-kept) — needed to build
- *   the three News use cases.
- * @param draftEngine the Hilt-owned [DraftEngine] (`DraftModule`, kept) — needed to build
- *   [StartDraftUseCase]/[MakePickUseCase]/[AutoPickUseCase].
- * @param draftDeckBuilder the Hilt-owned [DraftDeckBuilder] (`DraftModule`, kept) — needed to build
- *   [CompleteDraftUseCase].
  * @return a Koin [Module] exposing every migrated use case as a `single`.
  */
 fun sharedDomainKoinModule(
     scryfallClient: ScryfallClient,
     scryfallRequestQueue: ScryfallRequestQueue,
     manaSymbolStore: ManaSymbolStore,
-    newsRepository: NewsRepository,
-    draftEngine: DraftEngine,
-    draftDeckBuilder: DraftDeckBuilder,
 ): Module = module {
     // ── Hilt → Koin forward bridge: infra singletons with no Koin presence yet. ──
     single { scryfallClient }
     single { scryfallRequestQueue }
     single { manaSymbolStore }
-    single { newsRepository }
-    single { draftEngine }
-    single { draftDeckBuilder }
 
     // ── AddCard / Collection / Stats use cases. ──
     single { SearchCardsUseCase(repository = get()) }
@@ -120,13 +108,15 @@ fun sharedDomainKoinModule(
     single<StrategyAnalyzer> { createStrategyAnalyzer() }
     single { SuggestTagsUseCase(strategyAnalyzer = get()) }
 
-    // ── Draft use cases. GetDraftableSetsUseCase/GetSetTierListUseCase are ALSO duplicated in the
-    //    residual SharedDomainUseCaseModule for DraftSimRepositoryImpl (still-Hilt, eager) — both
-    //    wrap the SAME shared DraftRepository singleton, so there is no state/behaviour divergence.
+    // ── Draft use cases. GetSetCardsPageUseCase is ALSO consumed by DraftSimRepositoryImpl (now
+    //    natively Koin-built, batch 3) — the residual Hilt SharedDomainUseCaseModule copies of these
+    //    three use cases were DELETED this batch (DraftSimRepositoryImpl no longer needs Hilt to
+    //    build them; it resolves the SAME singles below via get()).
     single { GetDraftableSetsUseCase(repository = get()) }
     single { GetSetGuideUseCase(repository = get()) }
     single { GetSetTierListUseCase(repository = get()) }
     single { GetSetVideosUseCase(repository = get()) }
+    single { GetSetCardsPageUseCase(repository = get()) }
     single { ObserveDraftUseCase(repository = get()) }
     single { GetDraftableSimSetUseCase(repository = get(), ioDispatcher = Dispatchers.IO) }
     single {

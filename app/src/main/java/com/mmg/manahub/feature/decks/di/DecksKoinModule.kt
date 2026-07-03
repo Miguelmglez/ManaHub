@@ -1,10 +1,18 @@
 package com.mmg.manahub.feature.decks.di
 
 import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
+import com.mmg.manahub.feature.decks.domain.engine.PowerResolver
+import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.usecase.BudgetOptimizer
 import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailViewModel
@@ -17,70 +25,86 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
- * KMP migration — Phase 1 Hilt→Koin cutover. The **Decks** Koin island.
+ * KMP migration — Hilt→Koin cutover batch 3. The **Decks** Koin island.
  *
  * This is a multi-ViewModel island: it resolves ALL ViewModels under the `feature/decks`
  * tree via Koin — [DeckViewModel] (deck list), [DeckStudioViewModel] (the unified create+edit
  * surface), [DeckImprovementViewModel] (inline Deck Doctor), and the legacy fallback
  * [DeckMagicDetailViewModel].
  *
- * ## Bridge strategy (Hilt-built objects re-exposed to Koin)
- * The Deck Doctor scoring engine ([com.mmg.manahub.feature.decks.domain.engine.DeckScorer]
- * and its `@Inject`-constructed graph) MUST stay Hilt-owned: the still-Hilt Draft feature
- * (`ScoringDraftDeckBuilder` in `DraftModule`) consumes the SAME `DeckScorer` singleton, and
- * the scoring use cases ([EvaluateDeckUseCase], [SuggestCutsUseCase],
- * [SuggestAddsWithBudgetUseCase], [BuildDeckFromSeedsUseCase], [DeckMagicEngine]) transitively
- * depend on it. Rebuilding them in Koin would create a SECOND `DeckScorer` instance that could
- * diverge from the one Draft uses. So — exactly like the Tournament island — the feature-private
- * Hilt `DeckDoctorModule` is KEPT, the engine + use cases keep their `@Inject` annotations, and
- * the Hilt-built singletons are BRIDGED in through [ManaHubApp] and handed to this module. The DI
- * cutover therefore touches only annotations/wiring, never any Deck Studio / Deck Doctor behaviour
- * (the `createdFreshDraft` discard contract, the `isImporting` exit-guard, the free-text budget
- * parsing, the incremental `AnalysisCache`/`GapSignature` logic all stay byte-for-byte identical).
+ * ## The Deck Doctor scoring engine is now natively Koin-built (the Hilt `DeckDoctorModule` was DELETED)
+ * Every class in the engine graph ([DeckScorer], [RoleClassifier], [ManaBaseAnalyzer], [EdhrecPowerResolver],
+ * [DeckMagicEngine], [BudgetOptimizer], [CandidatePoolGenerator], [InferDeckIdentityUseCase] and the six
+ * deck use cases) already lived in `:shared:core-domain` `commonMain` with NO `@Inject`/`@Singleton`
+ * annotations (an earlier KMP-migration slice stripped them). The ONLY class that still had `@Inject`
+ * was [com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder] (the still-Hilt Draft
+ * consumer that motivated keeping `DeckDoctorModule` alive) — this batch de-Hilt's Draft too (see
+ * `feature.draft.di.draftKoinModule`), so `DeckScorer` now has a SINGLE natively-Koin-built instance
+ * shared by both islands (`get()` resolves the same singleton regardless of which module is loaded
+ * first — Koin doesn't care about declaration order).
  *
  * ## Dependencies resolved via `get()` from OTHER loaded modules (NOT re-registered here)
  * Re-registering any of these would load a second `single<T>` for the same type into the one Koin
  * container → `DefinitionOverrideException` at `startKoin`:
  * - `DeckRepository`, `CardRepository`, `WishlistRepository`, `UserPreferencesRepository`,
- *   `UserPreferencesDataStore`, `AuthRepository`, `AnalyticsHelper` — from `coreBridgeKoinModule`.
+ *   `UserPreferencesDataStore`, `AuthRepository`, `AnalyticsHelper`, `ProgressionEventBus` —
+ *   from `coreBridgeKoinModule`.
  * - `UserCardRepository` — already a `single` in `cardDetailKoinModule`.
  * - `SyncManager` — already a `single` in `collectionKoinModule`.
  * - `SearchCardsUseCase`, `SuggestTagsUseCase`, `GetDeckGameStatsUseCase` — already `single`s in
- *   `SharedDomainKoinModule` (KMP migration batch 2; `SuggestTagsUseCase`/`GetDeckGameStatsUseCase`
- *   were previously Hilt-bridged params here — they moved to Koin-native construction, so this module
- *   no longer takes them as ctor params).
+ *   `SharedDomainKoinModule`.
  *
- * @param evaluateDeck Hilt-owned [EvaluateDeckUseCase] (wraps the shared `DeckScorer`).
- * @param inferDeckIdentity Hilt-owned [InferDeckIdentityUseCase].
- * @param suggestCuts Hilt-owned [SuggestCutsUseCase] (wraps the shared `DeckScorer`).
- * @param suggestAddsWithBudget Hilt-owned [SuggestAddsWithBudgetUseCase] (wraps the shared `DeckScorer`).
- * @param buildDeckFromSeeds Hilt-owned [BuildDeckFromSeedsUseCase] (wraps the shared `DeckScorer`).
- * @param importDeck Hilt-owned [ImportDeckUseCase].
- * @param deckMagicEngine Hilt-owned [DeckMagicEngine] (wraps the shared `DeckScorer`).
  * @param applicationScope the Hilt-owned `@ApplicationScope` [CoroutineScope] (legacy
  *   [DeckMagicDetailViewModel] only — survives the ViewModel for fire-and-forget sync work).
- * @return a Koin [Module] exposing the four Decks ViewModels + the bridged Decks-only singletons.
+ * @return a Koin [Module] exposing the four Decks ViewModels + the Deck Doctor engine graph.
  */
 fun decksKoinModule(
-    evaluateDeck: EvaluateDeckUseCase,
-    inferDeckIdentity: InferDeckIdentityUseCase,
-    suggestCuts: SuggestCutsUseCase,
-    suggestAddsWithBudget: SuggestAddsWithBudgetUseCase,
-    buildDeckFromSeeds: BuildDeckFromSeedsUseCase,
-    importDeck: ImportDeckUseCase,
-    deckMagicEngine: DeckMagicEngine,
     applicationScope: CoroutineScope,
 ): Module = module {
-    // ── Hilt → Koin bridge: re-expose the Decks-only Hilt-owned singletons to Koin. ──
-    // Each appears in NO other loaded module (audited) → no duplicate single<T>.
-    single { evaluateDeck }
-    single { inferDeckIdentity }
-    single { suggestCuts }
-    single { suggestAddsWithBudget }
-    single { buildDeckFromSeeds }
-    single { importDeck }
-    single { deckMagicEngine }
+    // ── Hilt → Koin bridge: the one remaining Hilt-owned singleton this island still needs. ──
     single { applicationScope }
+
+    // ── Deck Doctor scoring engine (natively Koin-built; DeckDoctorModule's Hilt sibling was
+    //    DELETED). Now `edhrec_rank` is persisted on Card, EdhrecPowerResolver derives the power
+    //    signal from each card's EDHREC rank on a logarithmic scale. ──
+    single<PowerResolver> { EdhrecPowerResolver(rankOf = { it.edhrecRank }) }
+    single { RoleClassifier() }
+    single { ManaBaseAnalyzer() }
+    single {
+        DeckScorer(
+            roleClassifier = get(),
+            power = get(),
+            manaBaseAnalyzer = get(),
+        )
+    }
+    single { DeckMagicEngine(deckScorer = get()) }
+
+    // ── Candidate pool helpers. ──
+    single { BudgetOptimizer() }
+    single { CandidatePoolGenerator(cardRepository = get()) }
+
+    // ── Deck use cases. ──
+    single { InferDeckIdentityUseCase() }
+    single { EvaluateDeckUseCase(deckScorer = get(), progressionEventBus = get()) }
+    single { SuggestAddsUseCase(deckScorer = get()) }
+    single { SuggestCutsUseCase(deckScorer = get()) }
+    single {
+        SuggestAddsWithBudgetUseCase(
+            deckScorer = get(),
+            candidatePoolGenerator = get(),
+            budgetOptimizer = get(),
+            cardRepository = get(),
+        )
+    }
+    single {
+        BuildDeckFromSeedsUseCase(
+            deckScorer = get(),
+            roleClassifier = get(),
+            candidatePoolGenerator = get(),
+            budgetOptimizer = get(),
+        )
+    }
+    single { ImportDeckUseCase(cardRepository = get(), deckRepository = get()) }
 
     // ── ViewModels (the Decks island) ──────────────────────────────────────────────
     // DeckViewModel: backs the deck list.

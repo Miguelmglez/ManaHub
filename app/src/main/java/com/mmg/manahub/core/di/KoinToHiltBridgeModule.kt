@@ -38,18 +38,19 @@ import javax.inject.Singleton
  *   screen — again strictly after `onCreate()`.
  *
  * This is why these three (and ONLY these three) use cases can be safely provided via this reverse
- * bridge. Three other moved types — [com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase],
- * `GetDraftableSetsUseCase` and `GetSetTierListUseCase` — are needed by `CardRepositoryImpl` /
- * `DraftSimRepositoryImpl`, which ARE constructed eagerly (they satisfy `ManaHubApp`'s OWN `@Inject`
- * fields, e.g. `cardRepository`/`draftSimRepository`, injected by Hilt BEFORE `onCreate()`'s body — and
- * therefore before `startKoin()` — ever runs). Routing those through `GlobalContext.get()` would crash
- * with "KoinApplication has not been started" on cold start. That is why those three (plus
- * `ScryfallRemoteDataSource`/`ScryfallCache`, needed by the same eager `CardRepositoryImpl` AND
- * `SyncManager`) instead keep a small residual `@Provides` in the shrunk
- * [com.mmg.manahub.core.di.SharedDomainUseCaseModule] — self-contained, never touching Koin. All are
- * pure/stateless wrappers (verified by reading their bodies), so a Koin-native duplicate used by the
- * migrated islands and a separately Hilt-built instance used by the still-Hilt repositories are
- * behaviourally identical; only [RefreshCollectionPricesUseCase] wraps a real singleton
+ * bridge. One other moved type —
+ * [com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase] — is needed by `CardRepositoryImpl`,
+ * which IS constructed eagerly (it satisfies `ManaHubApp`'s OWN `@Inject` field `cardRepository`,
+ * injected by Hilt BEFORE `onCreate()`'s body — and therefore before `startKoin()` — ever runs). Routing
+ * it through `GlobalContext.get()` would crash with "KoinApplication has not been started" on cold
+ * start. That is why it (plus `ScryfallRemoteDataSource`/`ScryfallCache`, needed by the same eager
+ * `CardRepositoryImpl` AND `SyncManager`) instead keeps a small residual `@Provides` in the shrunk
+ * [com.mmg.manahub.core.di.SharedDomainUseCaseModule] — self-contained, never touching Koin. (As of KMP
+ * migration batch 3, `DraftSimRepositoryImpl`/`DraftRepositoryImpl` are ALSO natively Koin-built — they
+ * no longer need this eager-Hilt exemption; see `coreBridgeKoinModule`.) All remaining residual
+ * providers are pure/stateless wrappers (verified by reading their bodies), so a Koin-native duplicate
+ * used by the migrated islands and a separately Hilt-built instance used by the still-Hilt repositories
+ * are behaviourally identical; only [RefreshCollectionPricesUseCase] wraps a real singleton
  * ([com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource]) but that singleton itself is NOT
  * duplicated — see [com.mmg.manahub.core.di.SharedDomainUseCaseModule] for why.
  */

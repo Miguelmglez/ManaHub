@@ -17,11 +17,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class TradesRepositoryImpl @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared with Friends + the
+ * still-Hilt `HomeViewModel`/`FriendDetailViewModel` bridges).
+ */
+class TradesRepositoryImpl(
     private val remote: TradesRemoteDataSource,
     private val cardDao: CardDao,
     private val progressionEventBus: ProgressionEventBus,

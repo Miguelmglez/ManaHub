@@ -1,59 +1,168 @@
 package com.mmg.manahub.feature.draft.di
 
+import android.content.Context
+import com.google.gson.Gson
+import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.local.dao.DraftSessionDao
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.remote.CloudflareContentClient
+import com.mmg.manahub.core.data.remote.YouTubeClient
+import com.mmg.manahub.core.domain.engine.BoosterGenerator
 import com.mmg.manahub.core.domain.engine.BotDrafter
+import com.mmg.manahub.core.domain.engine.DraftDeckBuilder
+import com.mmg.manahub.core.domain.engine.DraftEngine
+import com.mmg.manahub.feature.draft.data.engine.ArchetypeAwareBotDrafter
+import com.mmg.manahub.feature.draft.data.engine.DefaultDraftEngine
+import com.mmg.manahub.feature.draft.data.engine.HeuristicBotDrafter
+import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder
+import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftViewModel
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailViewModel
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.Json
+import okhttp3.Cache
+import okhttp3.logging.HttpLoggingInterceptor
+import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+
+private const val MAX_RESPONSE_BYTES = 5L * 1024 * 1024 // 5 MB
 
 /**
- * KMP migration — Phase 1 Hilt→Koin cutover. The Draft feature is the thirteenth "Koin island" and the
- * FOURTH multi-ViewModel island: [DraftViewModel] (set list), [SetDraftDetailViewModel] (guide/tier/videos)
- * and [DraftSimViewModel] (the setup → drafting → result simulator flow) are all resolved by Koin
- * (`koinViewModel()`) while every other feature stays on Hilt.
+ * KMP migration — Hilt→Koin cutover batch 3. The Draft feature is the Koin island for
+ * [DraftViewModel] (set list), [SetDraftDetailViewModel] (guide/tier/videos) and [DraftSimViewModel]
+ * (the setup → drafting → result simulator flow).
  *
- * ## Bridge pattern (same as the earlier islands)
- * The Draft data/domain graph (Cloudflare Worker + YouTube Retrofit clients, the draft engine —
- * [com.mmg.manahub.feature.draft.data.engine.ArchetypeAwareBotDrafter] / `DefaultDraftEngine` /
- * `WeightedBoosterGenerator` — repositories and `DraftSimRepositoryImpl`) is still owned by the Hilt
- * `DraftModule`, which is **deliberately KEPT** (NOT converted/deleted): `DraftSimRepositoryImpl`
- * still needs a few of these use cases built by Hilt (see `SharedDomainUseCaseModule`'s KDoc), so the
- * whole Hilt sub-graph must stay intact. `ManaHubApp` is the bridge for the one Draft-only singleton
- * that isn't (yet) natively Koin-built: it `@Inject`s the already-constructed Hilt [BotDrafter] and
- * hands it to this module, which re-exposes it to Koin as `single { }`.
+ * ## Everything below is now natively Koin-built (the feature-private Hilt `DraftModule` was DELETED)
+ * `DraftRepositoryImpl`, `DraftSimRepositoryImpl` and [ScoringDraftDeckBuilder] all had their
+ * `@Inject`/`@Singleton` annotations stripped this batch — confirmed with a full-codebase consumer
+ * audit that none of `DraftRepository`/`DraftSimRepository`/`DraftDeckBuilder`/`DraftEngine`/
+ * `BotDrafter` had a remaining Hilt-only consumer (the excluded trio — online/scanner/voice/nearby —
+ * touches none of them). `DraftRepository`/`DraftSimRepository` are built in
+ * [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared with Home); everything else Draft-only lives
+ * here.
  *
- * All ten Draft use cases (KMP migration batch 2) are now natively Koin-built in
- * `SharedDomainKoinModule` — resolved below via `get()`, not registered here anymore. (Two of them,
- * `GetDraftableSetsUseCase`/`GetSetTierListUseCase`, ALSO have a separate Hilt-built copy in the
- * residual `SharedDomainUseCaseModule` for `DraftSimRepositoryImpl`'s sake — both copies wrap the same
- * shared `DraftRepository` singleton, so there is no behaviour divergence.)
+ * ## Infra singletons declared here, resolved cross-module via `get()`
+ * [Gson], [YouTubeClient], [CloudflareContentClient], [DraftSetDao] and [DraftSessionDao] have no other
+ * consumer outside the two Draft repository impls (which are built in `coreBridgeKoinModule` — Koin
+ * resolves `get()` across ALL loaded modules regardless of declaration site, exactly like the
+ * pre-existing `TournamentDao`/`TournamentRepository` split).
  *
- * The two repositories the VMs reach (transitively, through the use cases) plus [AnalyticsHelper] are
- * SHARED with the Home island, so they are NOT registered here — they live in `coreBridgeKoinModule`
- * (registering the same type in two loaded modules would throw `DefinitionOverrideException`). Draft does
- * not register them directly; the bridged use cases already hold their own Koin-resolved references, and
- * [DraftSimViewModel] resolves `AnalyticsHelper` + `DraftSimRepository` via `get()` from the core bridge.
+ * ## Dependencies resolved via `get()` from OTHER loaded modules (NOT re-registered here)
+ * `ScryfallClient`/`ScryfallRequestQueue` (`SharedDomainKoinModule`), `DeckScorer` (`decksKoinModule`),
+ * `GetDraftableSetsUseCase`/`GetSetGuideUseCase`/`GetSetTierListUseCase`/`GetSetVideosUseCase`/
+ * `ObserveDraftUseCase`/`GetDraftableSimSetUseCase`/`StartDraftUseCase`/`MakePickUseCase`/
+ * `AutoPickUseCase`/`CompleteDraftUseCase` (`SharedDomainKoinModule`), `AnalyticsHelper` +
+ * `DraftRepository`/`DraftSimRepository` (`coreBridgeKoinModule`).
  *
- * The `@DefaultDispatcher` qualified [kotlinx.coroutines.CoroutineDispatcher] that [DraftSimViewModel]
- * needs is supplied as `Dispatchers.Default` directly — the exact same singleton the Hilt
- * `@DefaultDispatcher` binding returns (the CommunityDecks/Survey precedent for `Dispatchers.IO`).
- *
- * @param botDrafter Hilt-owned [BotDrafter] (archetype-aware, shared, stateless).
- * @return a Koin [Module] exposing the Draft-only bridged singleton and the three Draft VM factories.
+ * @param draftSetDao the Hilt/Room-owned [DraftSetDao] singleton (Room stays androidMain).
+ * @param draftSessionDao the Hilt/Room-owned [DraftSessionDao] singleton (Room stays androidMain).
+ * @return a Koin [Module] exposing the Draft data/engine graph + the three Draft VM factories.
  */
 fun draftKoinModule(
-    botDrafter: BotDrafter,
+    draftSetDao: DraftSetDao,
+    draftSessionDao: DraftSessionDao,
 ): Module = module {
-    // ── Hilt → Koin bridge: re-expose the Draft-only Hilt-owned singleton to Koin. ──
-    // (DraftRepository, DraftSimRepository and AnalyticsHelper are shared with Home → bridged in
-    //  coreBridgeKoinModule; the ten Draft use cases are singles in SharedDomainKoinModule. All
-    //  resolved below via get().)
-    single { botDrafter }
+    // ── Hilt → Koin bridge: the Room-owned DAOs (Room stays androidMain / Hilt/DatabaseModule). ──
+    single { draftSetDao }
+    single { draftSessionDao }
 
-    // ── The Koin island: all three Draft ViewModels are now resolved by Koin, not Hilt. ──
+    // ── Draft-only infra (natively Koin-built; DraftModule's Hilt sibling was DELETED). ──
+    single { Gson() }
+
+    single<BoosterGenerator> { WeightedBoosterGenerator() }
+    single<BotDrafter> { ArchetypeAwareBotDrafter(fallback = HeuristicBotDrafter()) }
+    single<DraftEngine> { DefaultDraftEngine(boosterGenerator = get(), botDrafter = get()) }
+    single<DraftDeckBuilder> { ScoringDraftDeckBuilder(deckScorer = get()) }
+
+    /**
+     * Dedicated Ktor [HttpClient] for the YouTube Data API v3. Built from scratch (no shared OkHttp
+     * interceptor stack) — same isolation the Hilt provider had.
+     */
+    single {
+        val youtubeHttpClient = HttpClient(OkHttp) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+        YouTubeClient(
+            httpClient = youtubeHttpClient,
+            baseUrl = "https://www.googleapis.com/youtube/v3/",
+            apiKey = BuildConfig.YOUTUBE_API_KEY,
+        )
+    }
+
+    /**
+     * Dedicated Ktor [HttpClient] for the Cloudflare Worker: User-Agent header, HTTP logging
+     * (BODY in debug, NONE in release), a 10 MB disk cache, a 5 MB response-size guard and a 30 s
+     * read timeout — ported verbatim from the deleted Hilt `DraftModule`.
+     */
+    single<CloudflareContentClient> {
+        val context = androidContext()
+        val cloudflareHttpClient = HttpClient(OkHttp) {
+            engine {
+                config {
+                    readTimeout(30, TimeUnit.SECONDS)
+                    addInterceptor { chain ->
+                        val request = chain.request().newBuilder()
+                            .header("User-Agent", "ManaHub/1.0 Android")
+                            .build()
+                        chain.proceed(request)
+                    }
+                    addInterceptor(HttpLoggingInterceptor().apply {
+                        level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                                else HttpLoggingInterceptor.Level.NONE
+                    })
+                    cache(
+                        Cache(
+                            File(context.cacheDir, "http_cache_cloudflare"),
+                            10L * 1024 * 1024,
+                        ),
+                    )
+                    addNetworkInterceptor { chain ->
+                        val response = chain.proceed(chain.request())
+                        val contentLength = response.header("Content-Length")?.toLongOrNull()
+                        // Guard 1: reject early if Content-Length already exceeds limit
+                        if (contentLength != null && contentLength > MAX_RESPONSE_BYTES) {
+                            response.close()
+                            throw IOException(
+                                "Cloudflare response too large: ${contentLength / 1024} KB " +
+                                    "(limit ${MAX_RESPONSE_BYTES / 1024 / 1024} MB)"
+                            )
+                        }
+                        // Guard 2: for chunked/unknown-length responses, pre-buffer up to
+                        // limit+1 bytes so we can detect overflow before the body is parsed.
+                        val body = response.body
+                        val source = body.source()
+                        source.request(MAX_RESPONSE_BYTES + 1)
+                        if (source.buffer.size > MAX_RESPONSE_BYTES) {
+                            body.close()
+                            throw IOException(
+                                "Cloudflare response exceeds " +
+                                    "${MAX_RESPONSE_BYTES / 1024 / 1024} MB limit"
+                            )
+                        }
+                        response
+                    }
+                }
+            }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+        CloudflareContentClient(cloudflareHttpClient, BuildConfig.CLOUDFLARE_WORKER_URL)
+    }
+
+    // ── The Koin island: all three Draft ViewModels. ──
     viewModel {
         DraftViewModel(
             getDraftableSetsUseCase = get(),

@@ -14,11 +14,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Instant
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class WishlistRepositoryImpl @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared across the Trades,
+ * Home, CardDetail, Collection and Decks Koin islands).
+ */
+class WishlistRepositoryImpl(
     private val dao: LocalWishlistDao,
     private val remote: WishlistRemoteDataSource,
 ) : WishlistRepository {

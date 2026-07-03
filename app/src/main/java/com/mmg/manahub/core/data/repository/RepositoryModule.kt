@@ -5,7 +5,6 @@ import com.mmg.manahub.core.data.remote.collection.SupabaseCollectionDataSource
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -31,8 +30,10 @@ abstract class RepositoryModule {
     @Binds @Singleton
     abstract fun bindDeckRemoteDataSource(impl: SupabaseDeckDataSource): DeckRemoteDataSource
 
-    @Binds @Singleton
-    abstract fun bindDeckRepository(impl: DeckRepositoryImpl): DeckRepository
+    // bindDeckRepository was REMOVED (KMP migration — Hilt→Koin cutover batch 3): DeckRepositoryImpl
+    // lost its @Inject constructor and is now a native Koin `single` in
+    // com.mmg.manahub.app.di.coreBridgeKoinModule. DeckRemoteDataSource stays Hilt-bound below (still
+    // consumed by the still-Hilt SyncManager); DeckRepositoryImpl no longer uses it directly.
 
     @Binds @Singleton
     abstract fun bindStatsRepository(impl: StatsRepositoryImpl): StatsRepository

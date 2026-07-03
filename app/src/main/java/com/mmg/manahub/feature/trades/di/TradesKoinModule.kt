@@ -1,8 +1,18 @@
 package com.mmg.manahub.feature.trades.di
 
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
+import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.SharedListsRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradeSuggestionsRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
+import com.mmg.manahub.core.data.repository.SharedListsRepositoryImpl
+import com.mmg.manahub.core.data.repository.TradeSuggestionsRepositoryImpl
 import com.mmg.manahub.core.domain.repository.SharedListsRepository
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
+import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
@@ -31,50 +41,63 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
- * KMP migration — Phase 1 Hilt→Koin cutover. The **Trades "Koin island"**: all FIVE trades
+ * KMP migration — Hilt→Koin cutover batch 3. The **Trades "Koin island"**: all FIVE trades
  * `*ViewModel`s are resolved via `koinViewModel()`. This is the most repo-entangled island so far —
  * the trades data layer is intentionally split across five repositories by concern, three of which
  * are also consumed by other islands and so live in [com.mmg.manahub.app.di.coreBridgeKoinModule].
  *
+ * ## Everything below is now natively Koin-built (the feature-private Hilt `TradesModule` was DELETED)
+ * `TradesRepositoryImpl`/`WishlistRepositoryImpl`/`OpenForTradeRepositoryImpl` had their
+ * `@Inject`/`@Singleton` annotations stripped this batch (a full-codebase consumer audit found no
+ * remaining Hilt-only consumer of any of the five trades repositories or their remote data sources —
+ * the excluded trio touches none of them). `SharedListsRemoteDataSource`/`TradeSuggestionsRemoteDataSource`/
+ * `TradesRemoteDataSource`/`WishlistRemoteDataSource`/`OpenForTradeRemoteDataSource` and
+ * `SharedListsRepositoryImpl`/`TradeSuggestionsRepositoryImpl` were ALREADY plain classes (an earlier
+ * KMP-migration slice moved them to `:shared:core-data` `commonMain`) — only their Hilt `@Provides`
+ * wiring needed replacing.
+ *
  * ## Shared-repository ownership (the entangled part)
  * Per CLAUDE.md, the five trades repositories own distinct behaviours and must NOT be merged. Their
  * Koin ownership:
- * - **TradesRepository** — promoted into `coreBridgeKoinModule` (shared with Friends + the still-Hilt
- *   `HomeViewModel`/`FriendDetailViewModel`); resolved here via `get()`. (Previously a Friends-island
- *   `single`; the Friends module was shrunk when this island promoted it.)
- * - **WishlistRepository** — promoted into `coreBridgeKoinModule` (shared with Home + CardDetail +
- *   still-Hilt Collection/DeckStudio/DeckImprovement); resolved here via `get()`. (Previously a Home
- *   `single`; the Home module was shrunk.)
- * - **OpenForTradeRepository** — promoted into `coreBridgeKoinModule` (shared with CardDetail +
- *   still-Hilt Collection); resolved here via `get()`. (Previously a CardDetail `single`; CardDetail
- *   was shrunk.)
- * - **SharedListsRepository** — trades-only → bridged here as a `single` (from the Hilt graph).
- * - **TradeSuggestionsRepository** — trades-only AND consumed by no migrated ViewModel → stays
- *   Hilt-owned in `TradesModule`; NOT bridged here.
+ * - **TradesRepository** / **WishlistRepository** / **OpenForTradeRepository** — natively Koin-built in
+ *   `coreBridgeKoinModule` (shared with Home/CardDetail/Collection/Decks); resolved here via `get()`.
+ * - **SharedListsRepository** / **TradeSuggestionsRepository** — trades-only → natively Koin-built here.
  *
- * The Hilt `TradesModule` is KEPT (NOT deleted): its `@Binds` for `WishlistRepository`/
- * `OpenForTradeRepository`/`TradeSuggestionsRepository` are still consumed by Hilt features
- * (`CollectionViewModel`, `DeckStudioViewModel`, `DeckImprovementViewModel`). The bridge guarantees the
- * SAME singleton instance serves both DI graphs.
+ * ## `SupabaseClient` forward bridge
+ * The five trades remote data sources all need `SupabaseClient`, which had NO Koin presence before
+ * this batch. It is now forward-bridged once in `coreBridgeKoinModule` (new `ManaHubApp` field,
+ * shared cross-island) and resolved here via `get()`.
  *
- * @param sharedListsRepository the Hilt-owned [SharedListsRepository] singleton (trades-only).
  * @param tradeCollectionSyncDao the Room/`DatabaseModule`-owned [TradeCollectionSyncDao] (trades-only;
  *   used by [UpdateTradeCollectionUseCase] inside [TradeNegotiationViewModel]).
- * @return a Koin [Module] providing the trades-only bridged singletons, the trades use-case factories,
- *   and the five ViewModel factories.
+ * @param localWishlistDao the Room/`DatabaseModule`-owned [LocalWishlistDao] (needed to build
+ *   [com.mmg.manahub.feature.trades.data.repository.WishlistRepositoryImpl] in `coreBridgeKoinModule`).
+ * @param localOpenForTradeDao the Room/`DatabaseModule`-owned [LocalOpenForTradeDao] (needed to build
+ *   [com.mmg.manahub.feature.trades.data.repository.OpenForTradeRepositoryImpl] in `coreBridgeKoinModule`).
+ * @return a Koin [Module] providing the trades-only data layer, use-case factories, and the five
+ *   ViewModel factories.
  */
 fun tradesKoinModule(
-    sharedListsRepository: SharedListsRepository,
     tradeCollectionSyncDao: TradeCollectionSyncDao,
+    localWishlistDao: LocalWishlistDao,
+    localOpenForTradeDao: LocalOpenForTradeDao,
 ): Module = module {
-    // ── Hilt → Koin bridge: trades-only Hilt-owned singletons. ──
-    // (Shared repos — TradesRepository / WishlistRepository / OpenForTradeRepository — live in
-    //  coreBridgeKoinModule and are resolved via get(); UserCardRepository is a CardDetail-island
-    //  single and is also resolved via get(); AuthRepository / CardRepository / AnalyticsHelper /
-    //  FriendRepository are all in coreBridge. Registering any of those here would load a duplicate
-    //  single<T> across two modules → DefinitionOverrideException.)
-    single { sharedListsRepository }
+    // ── Hilt → Koin bridge: the Room-owned DAOs (Room stays androidMain / Hilt/DatabaseModule). ──
     single { tradeCollectionSyncDao }
+    single { localWishlistDao }
+    single { localOpenForTradeDao }
+
+    // ── Trades remote data sources (natively Koin-built; TradesModule's Hilt sibling was DELETED).
+    //    All five share the SupabaseClient forward-bridged in coreBridgeKoinModule. ──
+    single { OpenForTradeRemoteDataSource(supabaseClient = get()) }
+    single { SharedListsRemoteDataSource(supabaseClient = get()) }
+    single { TradeSuggestionsRemoteDataSource(supabaseClient = get()) }
+    single { TradesRemoteDataSource(supabaseClient = get()) }
+    single { WishlistRemoteDataSource(supabaseClient = get()) }
+
+    // ── Trades-only repositories (not shared with any other island). ──
+    single<SharedListsRepository> { SharedListsRepositoryImpl(remote = get()) }
+    single<TradeSuggestionsRepository> { TradeSuggestionsRepositoryImpl(remote = get()) }
 
     // ── Trades use cases (stateless; built over the bridged repositories). ──
     single { GetLocalWishlistUseCase(get()) }

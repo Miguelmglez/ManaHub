@@ -18,6 +18,12 @@ import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.dao.DeckDao
+import com.mmg.manahub.core.data.local.dao.DraftSessionDao
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
@@ -25,7 +31,6 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.di.ApplicationScope
@@ -34,9 +39,6 @@ import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
-import com.mmg.manahub.core.domain.engine.DraftDeckBuilder
-import com.mmg.manahub.core.domain.engine.DraftEngine
-import com.mmg.manahub.core.domain.repository.NewsRepository
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
@@ -68,17 +70,7 @@ import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
 import com.mmg.manahub.feature.decks.di.decksKoinModule
-import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
-import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.draft.di.draftKoinModule
-import com.mmg.manahub.core.domain.engine.BotDrafter
-import com.mmg.manahub.core.domain.repository.DraftRepository
-import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
 import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
 import com.mmg.manahub.core.online.domain.usecase.ConfirmDefeatUseCase
@@ -109,11 +101,8 @@ import com.mmg.manahub.feature.survey.di.surveyKoinModule
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
-import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.core.domain.repository.SharedListsRepository
-import com.mmg.manahub.core.data.repository.TradesRepository
-import com.mmg.manahub.core.domain.repository.WishlistRepository
 import dagger.hilt.android.HiltAndroidApp
+import io.github.jan.supabase.SupabaseClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.component.KoinComponent
@@ -168,22 +157,25 @@ class ManaHubApp : Application(), KoinComponent {
     @Inject lateinit var userProfileDataSource: UserProfileDataSource
     @Inject lateinit var notificationPrefsRepository: NotificationPrefsRepository
     @Inject lateinit var voiceModelRepository: VoiceModelRepository
+    @Inject lateinit var supabaseClient: SupabaseClient  // shared: Trades' five remote data sources
 
-    // SharedDomainKoinModule (batch 2) forward-bridge deps. These six types have no Koin presence via
-    // any other bridge yet — see SharedDomainKoinModule's KDoc for the full per-type rationale.
+    // SharedDomainKoinModule (batch 2) forward-bridge deps. These three types have no Koin presence via
+    // any other bridge yet — see SharedDomainKoinModule's KDoc for the full per-type rationale. (News'
+    // NewsRepository and Draft's DraftEngine/DraftDeckBuilder are natively Koin-built as of batch 3 —
+    // see newsKoinModule/draftKoinModule — so neither needs a bridge field here anymore.)
     @Inject lateinit var scryfallClient: ScryfallClient
     @Inject lateinit var scryfallRequestQueue: ScryfallRequestQueue
     @Inject lateinit var manaSymbolStore: ManaSymbolStore
-    @Inject lateinit var newsRepository: NewsRepository
-    @Inject lateinit var draftEngine: DraftEngine
-    @Inject lateinit var draftDeckBuilder: DraftDeckBuilder
+    // DeckDao (Room, stays androidMain) — needed to build DeckRepositoryImpl natively in
+    // coreBridgeKoinModule as of KMP migration batch 3 (Hilt `bindDeckRepository` was deleted).
+    @Inject lateinit var deckDao: DeckDao
 
     // Stats island (Phase 1) bridge deps. GetCollectionStatsUseCase/GetCollectionSetCodesUseCase/
     // RefreshCollectionPricesUseCase moved to SharedDomainKoinModule (batch 2) — statsKoinModule now
-    // resolves all three via get(), so no field is needed for them anymore.
+    // resolves all three via get(), so no field is needed for them anymore. DeckRepository is natively
+    // Koin-built in coreBridgeKoinModule as of batch 3 — no bridge field needed for it anymore.
     @Inject lateinit var scryfallRemoteDataSource: ScryfallRemoteDataSource
     @Inject lateinit var gameSessionRepository: GameSessionRepository  // shared: Stats + Profile
-    @Inject lateinit var deckRepository: DeckRepository
 
     // Profile island (Phase 1) bridge deps. (userPreferencesDataStore + authRepository are shared with
     // Settings and gameSessionRepository is shared with Stats — all bridged in coreBridgeKoinModule.
@@ -195,15 +187,12 @@ class ManaHubApp : Application(), KoinComponent {
     @Inject lateinit var gamificationRepository: GamificationRepository  // shared: Profile + Home
 
     // Home island (Phase 1) bridge deps. The shared deps (userPreferencesDataStore, authRepository,
-    // gameSessionRepository, statsRepository, deckRepository, scryfallRemoteDataSource,
-    // gamificationRepository) are bridged in coreBridgeKoinModule; only the Home-only deps are here.
-    // TournamentRepository is natively Koin-built in coreBridgeKoinModule (Hilt TournamentModule
-    // deleted) — no bridge field needed anymore. CommunityStatsRepository is natively Koin-built in
-    // homeKoinModule (Hilt CommunityModule deleted) — no bridge field needed anymore.
-    @Inject lateinit var draftSimRepository: DraftSimRepository
+    // gameSessionRepository, statsRepository, scryfallRemoteDataSource, gamificationRepository) are
+    // bridged in coreBridgeKoinModule; only the Home-only deps are here. TournamentRepository,
+    // DeckRepository, DraftRepository/DraftSimRepository and WishlistRepository are ALL natively
+    // Koin-built in coreBridgeKoinModule (their owning Hilt modules were deleted) — no bridge field
+    // needed for any of them anymore. CommunityStatsRepository is natively Koin-built in homeKoinModule.
     @Inject lateinit var cardRepository: CardRepository  // shared: Home + CommunityDecks (bridged in coreBridge)
-    @Inject lateinit var draftRepository: DraftRepository
-    @Inject lateinit var wishlistRepository: WishlistRepository
     @Inject lateinit var getAccountNudgeUseCase: GetAccountNudgeUseCase
     // GetNewsFeedUseCase/RefreshNewsFeedUseCase/ManageSourcesUseCase moved to SharedDomainKoinModule
     // (batch 2) — homeKoinModule/newsKoinModule now resolve all three via get(), no field needed.
@@ -221,23 +210,21 @@ class ManaHubApp : Application(), KoinComponent {
 
     // CardDetail island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
     //  - AnalyticsHelper is now bridged in coreBridgeKoinModule (promoted from Settings; shared with it).
-    //  - CardRepository, DeckRepository, UserPreferencesRepository, UserPreferencesDataStore and
-    //    AuthRepository are all bridged in coreBridgeKoinModule (shared with other islands).
-    //  - WishlistRepository is already a Home bridge field (`wishlistRepository`, above) and is bridged
-    //    by homeKoinModule, so CardDetail resolves it via get() — it is NOT re-declared/re-registered.
+    //  - CardRepository, DeckRepository, UserPreferencesRepository, UserPreferencesDataStore,
+    //    AuthRepository, WishlistRepository and OpenForTradeRepository are ALL bridged in
+    //    coreBridgeKoinModule (shared with other islands, natively Koin-built as of batch 3).
     // Only the CardDetail-only deps are here.
     // AddCardToCollectionUseCase/AddToWishlistUseCase moved to SharedDomainKoinModule (batch 2) —
     // cardDetailKoinModule now resolves both via get(). AddToWishlistUseCase is ALSO consumed by the
     // still-Hilt (excluded) ScannerViewModel, via KoinToHiltBridgeModule's reverse bridge.
     @Inject lateinit var userCardRepository: UserCardRepository
-    @Inject lateinit var openForTradeRepository: OpenForTradeRepository
 
     // Friends island (Phase 1) bridge deps. FriendRepository is shared with Profile → PROMOTED into
     // coreBridgeKoinModule (the existing `friendRepository` field above feeds it there now). AuthRepository
-    // + AnalyticsHelper are also bridged in coreBridge (shared). Only the Friends-only singletons are here:
-    //  - TradesRepository: FriendDetail trade history (also used by Hilt Trades VMs → still Hilt-owned).
+    // + AnalyticsHelper are also bridged in coreBridge (shared). TradesRepository is natively Koin-built
+    // in coreBridgeKoinModule as of batch 3 — no bridge field needed for it anymore. Only the
+    // Friends-only singleton is here:
     //  - PendingInviteStore: deferred invite codes for InviteDispatcher.
-    @Inject lateinit var tradesRepository: TradesRepository
     @Inject lateinit var pendingInviteStore: PendingInviteStore
 
     // Survey island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
@@ -252,18 +239,18 @@ class ManaHubApp : Application(), KoinComponent {
     // it via get().
 
     // Splash island (Phase 1) needs NO new bridge field — its only dep (AuthRepository) is already
-    // bridged in coreBridgeKoinModule. News island (Phase 1) likewise needs NO new bridge field — its
-    // ViewModels' deps (the 3 news use cases + UserPreferencesDataStore) are already bridged
-    // (SharedDomainKoinModule + coreBridgeKoinModule), so both modules take no constructor args.
+    // bridged in coreBridgeKoinModule. News island (KMP migration batch 3) needs only the Room-owned
+    // NewsDao (Room stays androidMain) — its data layer (NewsRepositoryImpl + collaborators) is now
+    // natively Koin-built in newsKoinModule; the 3 news use cases + UserPreferencesDataStore are already
+    // bridged elsewhere (SharedDomainKoinModule + coreBridgeKoinModule).
+    @Inject lateinit var newsDao: NewsDao
 
-    // Draft island (Phase 1) bridge dep. The feature-private Hilt DraftModule is KEPT (NOT deleted):
-    // DraftSimRepositoryImpl (still-Hilt) consumes GetDraftableSetsUseCase/GetSetTierListUseCase/
-    // GetSetCardsPageUseCase from the residual SharedDomainUseCaseModule, and DraftEngine/
-    // DraftDeckBuilder are forward-bridged above (SharedDomainKoinModule section) for the Koin-native
-    // Start/MakePick/AutoPick/CompleteDraft use cases. The other nine Draft use cases moved to
-    // SharedDomainKoinModule (batch 2) — draftKoinModule now resolves all of them via get(). Only
-    // BotDrafter (stateless, shared with no other island) stays a bridge field here.
-    @Inject lateinit var botDrafter: BotDrafter
+    // Draft island (KMP migration batch 3) bridge deps. The feature-private Hilt DraftModule was
+    // CONVERTED and DELETED: DraftRepository/DraftSimRepository (coreBridgeKoinModule) and
+    // DraftEngine/DraftDeckBuilder/BotDrafter (draftKoinModule) are all natively Koin-built now — only
+    // the Room-owned DAOs (Room stays androidMain) are still bridged here.
+    @Inject lateinit var draftSetDao: DraftSetDao
+    @Inject lateinit var draftSessionDao: DraftSessionDao
 
     // Playtest island (Phase 1) bridge dep. The feature-private Hilt PlaytestModule was converted +
     // DELETED (its @Binds PlaytestRepository is consumed by no Hilt feature) → the repo + the six use
@@ -280,18 +267,14 @@ class ManaHubApp : Application(), KoinComponent {
     // DatabaseModule-provided, Room stays androidMain) is bridged here.
     @Inject lateinit var tournamentDao: TournamentDao
 
-    // Trades island (Phase 1) bridge deps. The trades data layer is split across five repositories by
-    // concern; three of them are shared with other islands → PROMOTED into coreBridgeKoinModule and the
-    // older islands shrunk: TradesRepository (was Friends-only; shared with Trades + still-Hilt Home/
-    // FriendDetail), WishlistRepository (was Home-only; shared with Trades + CardDetail + still-Hilt
-    // Collection/DeckStudio/DeckImprovement), OpenForTradeRepository (was CardDetail-only; shared with
-    // Trades + still-Hilt Collection) — fed there by the existing tradesRepository / wishlistRepository /
-    // openForTradeRepository fields above. UserCardRepository is reused from cardDetailKoinModule and
-    // AuthRepository/CardRepository/AnalyticsHelper/FriendRepository from coreBridge, all via get(). The
-    // Hilt TradesModule is KEPT (its WishlistRepository/OpenForTradeRepository/TradeSuggestionsRepository
-    // @Binds still serve Hilt features). Only the two trades-only bridged singletons are here.
-    @Inject lateinit var sharedListsRepository: SharedListsRepository
+    // Trades island (KMP migration batch 3) bridge deps. The feature-private Hilt TradesModule was
+    // CONVERTED and DELETED: TradesRepository/WishlistRepository/OpenForTradeRepository are natively
+    // Koin-built in coreBridgeKoinModule (shared across islands); SharedListsRepository/
+    // TradeSuggestionsRepository (trades-only) plus all five remote data sources are natively Koin-built
+    // in tradesKoinModule. Only the Room-owned DAOs (Room stays androidMain) are still bridged here.
     @Inject lateinit var tradeCollectionSyncDao: TradeCollectionSyncDao
+    @Inject lateinit var localWishlistDao: LocalWishlistDao
+    @Inject lateinit var localOpenForTradeDao: LocalOpenForTradeDao
 
     // Collection island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
     //  - CardRepository, AuthRepository, UserPreferencesRepository, AnalyticsHelper, WishlistRepository
@@ -303,25 +286,17 @@ class ManaHubApp : Application(), KoinComponent {
     // collectionKoinModule now resolves both via get(). Only SyncManager stays a bridge field here.
     @Inject lateinit var syncManager: SyncManager
 
-    // Decks island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
-    //  - DeckRepository, CardRepository, WishlistRepository, UserPreferencesRepository,
-    //    UserPreferencesDataStore, AuthRepository and AnalyticsHelper are bridged in coreBridgeKoinModule.
-    //  - UserCardRepository is already a single in cardDetailKoinModule, SyncManager in collectionKoinModule,
-    //    SearchCardsUseCase in addCardKoinModule, and WorkManager in collectionKoinModule — all resolved via
-    //    get(), never re-registered.
-    // Only the Decks-only Hilt-built singletons are bridged here. The Deck Doctor engine (DeckScorer +
-    // its @Inject graph) and the feature-private Hilt DeckDoctorModule are KEPT (still-Hilt Draft consumes
-    // the SAME DeckScorer singleton via ScoringDraftDeckBuilder) — these use cases wrap it, so they are
-    // bridged from the Hilt graph rather than rebuilt in Koin to keep ONE shared DeckScorer instance.
-    // SuggestTagsUseCase/GetDeckGameStatsUseCase moved to SharedDomainKoinModule (batch 2) —
-    // decksKoinModule now resolves both via get().
-    @Inject lateinit var evaluateDeckUseCase: EvaluateDeckUseCase
-    @Inject lateinit var inferDeckIdentityUseCase: InferDeckIdentityUseCase
-    @Inject lateinit var suggestCutsUseCase: SuggestCutsUseCase
-    @Inject lateinit var suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase
-    @Inject lateinit var buildDeckFromSeedsUseCase: BuildDeckFromSeedsUseCase
-    @Inject lateinit var importDeckUseCase: ImportDeckUseCase
-    @Inject lateinit var deckMagicEngine: DeckMagicEngine
+    // Decks island (KMP migration batch 3) bridge dep. The feature-private Hilt DeckDoctorModule was
+    // CONVERTED and DELETED: the entire Deck Doctor scoring engine (DeckScorer + its graph) and all six
+    // deck use cases are now natively Koin-built in decksKoinModule (they were already plain classes in
+    // :shared:core-domain — the ONLY class needing @Inject stripped was Draft's own
+    // ScoringDraftDeckBuilder). DeckRepository, CardRepository, WishlistRepository,
+    // UserPreferencesRepository, UserPreferencesDataStore, AuthRepository and AnalyticsHelper are
+    // bridged in coreBridgeKoinModule; UserCardRepository is a single in cardDetailKoinModule;
+    // SyncManager is a single in collectionKoinModule; SearchCardsUseCase/SuggestTagsUseCase/
+    // GetDeckGameStatsUseCase are singles in SharedDomainKoinModule — all resolved via get(), never
+    // re-registered. Only the Hilt `@ApplicationScope` CoroutineScope (legacy DeckMagicDetailViewModel
+    // only) is still bridged here.
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
 
     // Game island (Phase 1, the LAST non-excluded island) bridge deps. The shared deps are NOT
@@ -371,18 +346,15 @@ class ManaHubApp : Application(), KoinComponent {
                     authRepository = authRepository,
                     gameSessionRepository = gameSessionRepository,
                     statsRepository = statsRepository,
-                    deckRepository = deckRepository,
                     scryfallRemoteDataSource = scryfallRemoteDataSource,
                     gamificationRepository = gamificationRepository,
                     cardRepository = cardRepository,
                     analyticsHelper = analyticsHelper,
                     friendRepository = friendRepository,
-                    draftRepository = draftRepository,
-                    draftSimRepository = draftSimRepository,
-                    tradesRepository = tradesRepository,
-                    wishlistRepository = wishlistRepository,
-                    openForTradeRepository = openForTradeRepository,
                     progressionEventBus = progressionEventBus,
+                    deckDao = deckDao,
+                    okHttpClient = okHttpClient,
+                    supabaseClient = supabaseClient,
                 ),
                 settingsKoinModule(
                     userProfileDataSource = userProfileDataSource,
@@ -398,9 +370,6 @@ class ManaHubApp : Application(), KoinComponent {
                     scryfallClient = scryfallClient,
                     scryfallRequestQueue = scryfallRequestQueue,
                     manaSymbolStore = manaSymbolStore,
-                    newsRepository = newsRepository,
-                    draftEngine = draftEngine,
-                    draftDeckBuilder = draftDeckBuilder,
                 ),
                 statsKoinModule(),
                 profileKoinModule(
@@ -428,9 +397,12 @@ class ManaHubApp : Application(), KoinComponent {
                     surveyCardImpactDao = surveyCardImpactDao,
                     cardDao = cardDao,
                 ),
-                newsKoinModule(),
+                newsKoinModule(
+                    newsDao = newsDao,
+                ),
                 draftKoinModule(
-                    botDrafter = botDrafter,
+                    draftSetDao = draftSetDao,
+                    draftSessionDao = draftSessionDao,
                 ),
                 playtestKoinModule(
                     playtestDao = playtestDao,
@@ -439,8 +411,9 @@ class ManaHubApp : Application(), KoinComponent {
                     tournamentDao = tournamentDao,
                 ),
                 tradesKoinModule(
-                    sharedListsRepository = sharedListsRepository,
                     tradeCollectionSyncDao = tradeCollectionSyncDao,
+                    localWishlistDao = localWishlistDao,
+                    localOpenForTradeDao = localOpenForTradeDao,
                 ),
                 collectionKoinModule(
                     syncManager = syncManager,
@@ -449,13 +422,6 @@ class ManaHubApp : Application(), KoinComponent {
                 searchWidgetsKoinModule(),
                 gamificationKoinModule(),
                 decksKoinModule(
-                    evaluateDeck = evaluateDeckUseCase,
-                    inferDeckIdentity = inferDeckIdentityUseCase,
-                    suggestCuts = suggestCutsUseCase,
-                    suggestAddsWithBudget = suggestAddsWithBudgetUseCase,
-                    buildDeckFromSeeds = buildDeckFromSeedsUseCase,
-                    importDeck = importDeckUseCase,
-                    deckMagicEngine = deckMagicEngine,
                     applicationScope = applicationScope,
                 ),
                 gameKoinModule(

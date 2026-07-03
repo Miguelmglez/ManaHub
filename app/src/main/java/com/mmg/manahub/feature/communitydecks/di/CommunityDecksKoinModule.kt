@@ -125,9 +125,9 @@ private const val MAX_ARCHIDEKT_RESPONSE_BYTES = 5L * 1024 * 1024
  * Builds the Archidekt [ArchidektClient] backed by a Ktor [HttpClient] with the OkHttp engine.
  *
  * The underlying [OkHttpClient] is built FROM SCRATCH (not `globalClient.newBuilder()`) — mirroring the
- * Cloudflare client in `DraftModule` — so it does not inherit the app-wide network interceptor (which
- * forces an aggressive `Cache-Control` that would conflict with this dedicated HTTP cache), and so the
- * User-Agent / timeouts / response-size guard are scoped to Archidekt only.
+ * Cloudflare client in `feature.draft.di.draftKoinModule` — so it does not inherit the app-wide network
+ * interceptor (which forces an aggressive `Cache-Control` that would conflict with this dedicated HTTP
+ * cache), and so the User-Agent / timeouts / response-size guard are scoped to Archidekt only.
  *
  * `expectSuccess = true` ensures Ktor throws [io.ktor.client.plugins.ResponseException] on non-2xx
  * status codes, preserving the same error-handling contract the old Retrofit [HttpException] provided.

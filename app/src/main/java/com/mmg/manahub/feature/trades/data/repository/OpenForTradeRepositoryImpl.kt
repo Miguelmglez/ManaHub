@@ -12,11 +12,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Instant
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class OpenForTradeRepositoryImpl @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared across the Trades,
+ * CardDetail and Collection Koin islands).
+ */
+class OpenForTradeRepositoryImpl(
     private val dao: LocalOpenForTradeDao,
     private val remote: OpenForTradeRemoteDataSource,
 ) : OpenForTradeRepository {
