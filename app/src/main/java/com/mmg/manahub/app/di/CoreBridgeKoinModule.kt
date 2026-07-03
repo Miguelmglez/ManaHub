@@ -11,6 +11,7 @@ import com.mmg.manahub.core.data.local.dao.GameSessionDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.repository.DeckRepositoryImpl
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
@@ -34,10 +35,12 @@ import com.mmg.manahub.feature.trades.data.repository.OpenForTradeRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.TradesRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.WishlistRepositoryImpl
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -83,9 +86,21 @@ import org.koin.dsl.module
  * (excluded online/voice/scanner/nearby trees + every `@HiltWorker`) — no Hilt-only consumer found, so
  * it needs no reverse bridge.
  *
+ * ## KMP migration — Hilt→Koin cutover batch 5
+ * [AuthRepository] is now NATIVELY Koin-built here too (the feature-private Hilt `AuthModule` was
+ * DELETED). It is built from [AuthRepositoryImpl], deriving its [io.github.jan.supabase.auth.Auth] dep
+ * directly from the already-bridged [SupabaseClient] single (`get<SupabaseClient>().auth`) rather than
+ * a separate `Auth` bridge/single. Its `@Named("supabase")` [OkHttpClient] and
+ * `UserProfileClient`/`UserProfileDataSource` deps are natively Koin-built in `authKoinModule` —
+ * resolved cross-module via `get()`; `applicationScope` reuses the single already registered by
+ * `decksKoinModule` (legacy `DeckMagicDetailViewModel`) rather than a second `CoroutineScope` single.
+ * `AuthRepository` has THREE surviving Hilt-only consumers — `core.sync.CollectionSyncWorker`,
+ * `core.sync.CollectionStatsSyncWorker` and `core.gamification.data.sync.GamificationSyncWorker`
+ * (all `@HiltWorker`) plus the excluded `feature.online` lobby ViewModels — reverse-bridged in
+ * `KoinToHiltBridgeModule`.
+ *
  * @param userPreferencesRepo the Hilt-owned [UserPreferencesRepository] singleton (Settings + Stats).
  * @param userPrefsDataStore the Hilt-owned [UserPreferencesDataStore] singleton (Settings + Profile + Home).
- * @param authRepository the Hilt-owned [AuthRepository] singleton (Settings + Profile + Home).
  * @param statsRepository the Hilt-owned [StatsRepository] singleton (Profile + Home).
  * @param scryfallRemoteDataSource the Hilt-owned [ScryfallRemoteDataSource] singleton (Stats + Home).
  * @param cardRepository the Hilt-owned [CardRepository] singleton (Home + CommunityDecks + CardDetail).
@@ -109,7 +124,6 @@ import org.koin.dsl.module
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
     userPrefsDataStore: UserPreferencesDataStore,
-    authRepository: AuthRepository,
     statsRepository: StatsRepository,
     scryfallRemoteDataSource: ScryfallRemoteDataSource,
     cardRepository: CardRepository,
@@ -124,11 +138,28 @@ fun coreBridgeKoinModule(
     single<CrashReporter> { provideCrashReporter() }
     single { DispatcherProvider() }
 
+    // ── AuthRepository: natively Koin-constructed (KMP migration batch 5; Hilt `AuthModule` deleted).
+    //    Shared across nearly every island — registered exactly once here. `Auth` is derived directly
+    //    from the already-bridged SupabaseClient single (no separate bridge/single needed); the
+    //    `@Named("supabase")` OkHttpClient and UserProfileClient/UserProfileDataSource are natively
+    //    Koin-built in `authKoinModule` — resolved cross-module via `get()`. `applicationScope` reuses
+    //    the CoroutineScope single already registered by `decksKoinModule`. ──
+    single<AuthRepository> {
+        AuthRepositoryImpl(
+            supabaseAuth = get<SupabaseClient>().auth,
+            userProfileDataSource = get(),
+            userProfileClient = get(),
+            userPreferencesDataStore = get(),
+            supabaseOkHttpClient = get(named("supabase")),
+            applicationScope = get(),
+            ioDispatcher = Dispatchers.IO,
+        )
+    }
+
     // Shared across the Settings + Stats + Profile + Home + CommunityDecks + CardDetail + Friends +
     // Draft + Tournament + Trades + Decks islands — each registered exactly once.
     single { userPreferencesRepo }
     single { userPrefsDataStore }
-    single { authRepository }
     single { statsRepository }
     single { scryfallRemoteDataSource }
     single { cardRepository }
