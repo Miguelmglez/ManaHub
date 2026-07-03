@@ -427,6 +427,12 @@ All `.kt` work → delegate to `android-kotlin-architect`. Spike/lib gotchas →
 
 ## REMEDIATION LOG — audit 2026-07-01 (local doc: `kmp-migration-audit-2026-07-01.md`, gitignored)
 
+> **EXECUTION AUTHORIZATION (user, 2026-07-03):** run the remediation plan + Hilt→Koin cutover with
+> **FULL autonomy** — chain slices, delegate to `android-kotlin-architect`, verify + **commit each green
+> slice locally WITHOUT asking**, and continue. **NO push** (local commits only until the user explicitly
+> asks). On a blocker/micro-decision: use best judgment, document it here, keep going; only consult the
+> user if the action is irreversible or changes product scope.
+
 A read-only audit (2 sub-agents, cross-verified vs the live tree) produced a prioritized P0/P1/P2 backlog
 in `docs/plans/kmp-migration-audit-2026-07-01.md` (gitignored per the planning-doc rule; delete when the
 backlog is fully executed). Being worked through as GREEN slices:
@@ -495,6 +501,22 @@ excluded trio (online/scanner/voice/nearby) until their final wave:
    bridge or keep those specific Hilt bindings).
 Incremental, GREEN per batch. Batch order: safe feature modules first (no excluded/worker consumer) →
 worker subsystem → infra modules (define the bridge surface) → last, the minimal excluded bridge.
+- ✅ **Cutover Batch 1 (2026-07-03, committed)** — Community + Tournament modules inverted to Koin
+  (deleted their Hilt `@Module`s; `TournamentRepository` flipped native in coreBridge; 4 dead `ManaHubApp`
+  `@Inject` fields removed). GREEN 1967/118/2.
+- 🔑 **KEY FINDING — `SharedDomainUseCaseModule` is the cross-cutting LYNCHPIN.** It `@Provides` use cases
+  (News: `GetNewsFeed`/`RefreshNewsFeed`/`ManageSources`; all 10 Draft use cases; `AddToWishlistUseCase`;
+  `RefreshCollectionPricesUseCase`; etc.) that require LIVE Hilt bindings of the feature repos → News,
+  Draft, DeckDoctor (transitive via `ScoringDraftDeckBuilder`→`DeckScorer`), and Trades cannot convert
+  until this hub does. And the hub is itself entangled: `RefreshCollectionPricesUseCase`→`PriceRefreshWorker`
+  (Hilt worker), `AddToWishlistUseCase`→`ScannerViewModel` (excluded). **Unlock = a Koin→Hilt REVERSE
+  BRIDGE** (`app/di/KoinToHiltBridgeModule.kt`, Hilt `@Module` with `@Provides fun x() =
+  GlobalContext.get().get<X>()` per type a Hilt consumer still needs) so the hub + feature modules move to
+  Koin while workers/excluded keep resolving via Hilt-from-Koin. Koin starts in `ManaHubApp.onCreate` before
+  any worker/excluded resolution → ordering safe (verify).
+- ⏳ Cutover Batch 2 (NEXT): reverse-bridge + convert `SharedDomainUseCaseModule` → unblocks News/Draft/
+  DeckDoctor. Batch 3: Trades repo-split (needs `SupabaseClient`/`ProgressionEventBus` bridged) + Friend/
+  Game/Gamification/Auth. Batch 4: worker subsystem → Koin `WorkerFactory`. Batch 5: infra + finalize.
 - ⏳ Queued after cutover: P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`).
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).
