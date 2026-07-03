@@ -6,7 +6,6 @@ import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
-import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.settings.presentation.SettingsViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
@@ -40,19 +39,24 @@ import org.koin.dsl.module
  * - `AnalyticsHelper` — now shared with CardDetail, so it was PROMOTED from this island into
  *   `coreBridgeKoinModule`; resolved below via `get()` instead of being registered here.
  *
+ * ## KMP migration — Hilt→Koin cutover batch 5
+ * `UserProfileDataSource` is now NATIVELY Koin-built in `authKoinModule` (the feature-private Hilt
+ * `AuthModule` — which used to `@Provides` it — was deleted). It is shared with the Auth island
+ * (`AuthRepositoryImpl`, via `coreBridgeKoinModule`), so this island's own `single { userProfileDataSource }`
+ * registration was removed (the promote-then-shrink ritual) — [SettingsViewModel] now resolves it
+ * cross-module via `get()` instead of a `ManaHubApp` forward-bridge field.
+ *
  * @return a Koin [Module] that provides the bridged singletons and the [SettingsViewModel] factory.
  */
 fun settingsKoinModule(
-    userProfileDataSource: UserProfileDataSource,
     pushTokenRepository: PushTokenRepository,
     notificationPrefsRepository: NotificationPrefsRepository,
     voiceModelRepository: VoiceModelRepository,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Settings-only Hilt-owned singletons to Koin (see KDoc). ──
-    // (UserPreferencesRepository [Stats], UserPreferencesDataStore [Profile], AuthRepository [Profile]
-    //  and AnalyticsHelper [CardDetail] are shared → bridged in coreBridgeKoinModule, not here, and
-    //  resolved below via get().)
-    single { userProfileDataSource }
+    // (UserPreferencesRepository [Stats], UserPreferencesDataStore [Profile], AuthRepository [Profile],
+    //  AnalyticsHelper [CardDetail] and UserProfileDataSource [Auth] are shared → bridged/natively built
+    //  elsewhere, not here, and resolved below via get().)
     single { pushTokenRepository }
     single { notificationPrefsRepository }
     single { voiceModelRepository }

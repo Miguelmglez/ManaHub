@@ -66,7 +66,6 @@ import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.feature.addcard.di.addCardKoinModule
-import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.di.authKoinModule
 import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
@@ -103,7 +102,6 @@ import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
 import dagger.hilt.android.HiltAndroidApp
 import io.github.jan.supabase.SupabaseClient
-import io.ktor.client.HttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.component.KoinComponent
@@ -120,7 +118,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 import javax.inject.Inject
-import javax.inject.Named
 
 @HiltAndroidApp
 class ManaHubApp : Application(), KoinComponent {
@@ -149,9 +146,16 @@ class ManaHubApp : Application(), KoinComponent {
     private val entitlementGranter: EntitlementGranter by inject()
     private val gamificationSyncManager: GamificationSyncManager by inject()
 
+    // ── KMP migration — Hilt→Koin cutover batch 5 ───────────────────────────────────────────────
+    // AuthRepository is now natively Koin-built in `coreBridgeKoinModule` (the feature-private Hilt
+    // `AuthModule` was deleted) — switched from a Hilt `@Inject lateinit var` to a Koin `by inject()`
+    // delegate, the same lazy-resolution pattern used above: its only direct use below
+    // (`authRepository.sessionState.collect { }`) runs from an `appScope.launch { }` block strictly
+    // AFTER `startKoin()` returns in `onCreate()`, so lazy resolution is safe.
+    private val authRepository: AuthRepository by inject()
+
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
-    @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var pushTokenRepository: PushTokenRepository
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
@@ -165,7 +169,6 @@ class ManaHubApp : Application(), KoinComponent {
     // Spike D (Settings island) + Phase 1 (Stats island, the second cutover).
     @Inject lateinit var userPreferencesRepository: UserPreferencesRepository  // shared: Settings + Stats
     @Inject lateinit var analyticsHelper: AnalyticsHelper
-    @Inject lateinit var userProfileDataSource: UserProfileDataSource
     @Inject lateinit var notificationPrefsRepository: NotificationPrefsRepository
     @Inject lateinit var voiceModelRepository: VoiceModelRepository
     @Inject lateinit var supabaseClient: SupabaseClient  // shared: Trades' five remote data sources
@@ -237,13 +240,13 @@ class ManaHubApp : Application(), KoinComponent {
     // in coreBridgeKoinModule as of batch 4 (Hilt `FriendModule` deleted); `friendDao` below (Room, stays
     // androidMain) is forward-bridged to build it there. AuthRepository + AnalyticsHelper are also bridged
     // in coreBridge (shared). TradesRepository is natively Koin-built in coreBridgeKoinModule as of
-    // batch 3 — no bridge field needed for it anymore. Friends-only singletons/deps are here:
-    //  - PendingInviteStore: deferred invite codes for InviteDispatcher.
-    //  - supabaseKtorHttpClient (`@Named("supabaseKtor")`): still Hilt-built by the not-yet-converted
-    //    `feature.auth.di.AuthModule` — needed to build `FriendshipClient` natively in `friendsKoinModule`.
+    // batch 3 — no bridge field needed for it anymore. The `@Named("supabaseKtor")` HttpClient is now
+    // natively Koin-built in `authKoinModule` (batch 5; Hilt `AuthModule` deleted) — `friendsKoinModule`
+    // resolves it cross-module via `get(named("supabaseKtor"))` instead of a forward-bridge field, so no
+    // field is needed for it here anymore. Only PendingInviteStore (deferred invite codes for
+    // InviteDispatcher) is still Friends-only here.
     @Inject lateinit var pendingInviteStore: PendingInviteStore
     @Inject lateinit var friendDao: FriendDao
-    @Inject @Named("supabaseKtor") lateinit var supabaseKtorHttpClient: HttpClient
 
     // Survey island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
     //  - SurveyAnswerDao is already injected (above, Profile island field) and bridged by profileKoinModule.
@@ -370,7 +373,6 @@ class ManaHubApp : Application(), KoinComponent {
                 coreBridgeKoinModule(
                     userPreferencesRepo = userPreferencesRepository,
                     userPrefsDataStore = userPreferencesDataStore,
-                    authRepository = authRepository,
                     statsRepository = statsRepository,
                     scryfallRemoteDataSource = scryfallRemoteDataSource,
                     cardRepository = cardRepository,
@@ -390,7 +392,6 @@ class ManaHubApp : Application(), KoinComponent {
                     gamificationStatsDao = gamificationStatsDao,
                 ),
                 settingsKoinModule(
-                    userProfileDataSource = userProfileDataSource,
                     pushTokenRepository = pushTokenRepository,
                     notificationPrefsRepository = notificationPrefsRepository,
                     voiceModelRepository = voiceModelRepository,
@@ -423,7 +424,6 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 friendsKoinModule(
                     pendingInviteStore = pendingInviteStore,
-                    supabaseKtorHttpClient = supabaseKtorHttpClient,
                 ),
                 splashKoinModule(),
                 surveyKoinModule(

@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.di
 
 import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
@@ -35,6 +36,11 @@ import javax.inject.Singleton
  *   `core.gamification.di.GamificationModule` was deleted).
  * - [QuestReconciler] (batch 4) → `core.gamification.data.sync.QuestRotationWorker` (`@HiltWorker`).
  *   Also natively Koin-built in `gamificationEngineKoinModule`.
+ * - [AuthRepository] (batch 5) → `core.sync.CollectionSyncWorker`, `core.sync.CollectionStatsSyncWorker`
+ *   and `core.gamification.data.sync.GamificationSyncWorker` (all `@HiltWorker`), plus the excluded
+ *   `feature.online` lobby ViewModels (`LobbyHostViewModel`/`LobbyJoinViewModel`, `@HiltViewModel` —
+ *   `feature/online` is explicitly EXCLUDED from the KMP migration). The repo itself is now natively
+ *   Koin-built in `app.di.coreBridgeKoinModule` (the feature-private Hilt `AuthModule` was deleted).
  *
  * Each `@Provides` below pulls the SAME singleton instance Koin already built — `GlobalContext.get()`
  * returns the one running `KoinApplication`, and `.get<T>()` resolves the existing `single` — so Hilt
@@ -98,5 +104,10 @@ object KoinToHiltBridgeModule {
     @Provides
     @Singleton
     fun provideQuestReconciler(): QuestReconciler =
+        GlobalContext.get().get()
+
+    @Provides
+    @Singleton
+    fun provideAuthRepository(): AuthRepository =
         GlobalContext.get().get()
 }

@@ -11,9 +11,9 @@ import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import com.mmg.manahub.feature.friends.presentation.FriendsViewModel
 import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailViewModel
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
-import io.ktor.client.HttpClient
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -50,21 +50,19 @@ import org.koin.dsl.module
  * [FriendshipClient] and [FriendRemoteDataSource] are now NATIVELY Koin-built here (the feature-private
  * Hilt `FriendModule` that used to `@Provides` them was deleted). `FriendRepository` itself moved to
  * `coreBridgeKoinModule` (shared with Profile) and resolves [FriendRemoteDataSource] from here via
- * `get()`. [FriendshipClient] needs the `@Named("supabaseKtor")` Ktor [HttpClient] — still Hilt-built by
- * the not-yet-converted `feature.auth.di.AuthModule` (`AuthModule` is deferred to the next batch) — so it
- * is forward-bridged from `ManaHubApp` as [supabaseKtorHttpClient]. It is registered here (not
- * `coreBridgeKoinModule`) because Friends is its ONLY Koin consumer, and no other `HttpClient` (Ktor)
- * single exists anywhere in the app yet, so no Koin qualifier is needed (mirrors the
- * `CommunityDecksKoinModule` OkHttpClient precedent).
+ * `get()`.
+ *
+ * ## KMP migration — Hilt→Koin cutover batch 5
+ * [FriendshipClient]'s `@Named("supabaseKtor")` Ktor [io.ktor.client.HttpClient] dependency is now
+ * NATIVELY Koin-built in `authKoinModule` (the feature-private Hilt `AuthModule` — which used to
+ * `@Provides` it — was deleted). It is resolved cross-module via `get(named("supabaseKtor"))` instead
+ * of the former `ManaHubApp` forward-bridge field (`supabaseKtorHttpClient`), which was removed.
  *
  * @param pendingInviteStore the Hilt-owned [PendingInviteStore] singleton (deferred invite codes).
- * @param supabaseKtorHttpClient the Hilt-owned `@Named("supabaseKtor")` [HttpClient] singleton
- *   (`AuthModule`, not yet converted) — needed to build [FriendshipClient] natively.
  * @return a Koin [Module] providing the Friends-only bridged singletons + the three ViewModel factories.
  */
 fun friendsKoinModule(
     pendingInviteStore: PendingInviteStore,
-    supabaseKtorHttpClient: HttpClient,
 ): Module = module {
     // ── Hilt → Koin bridge: Friends-only Hilt-owned singletons. ──
     // (FriendRepository, AuthRepository, AnalyticsHelper and TradesRepository are shared → bridged in
@@ -73,10 +71,11 @@ fun friendsKoinModule(
 
     // ── FriendshipClient / FriendRemoteDataSource: natively Koin-constructed (KMP migration batch 4;
     //    Hilt `FriendModule` deleted). Friends-only — FriendRepository (coreBridgeKoinModule) resolves
-    //    FriendRemoteDataSource from here via `get()`. ──
+    //    FriendRemoteDataSource from here via `get()`. The `@Named("supabaseKtor")` HttpClient is a
+    //    native single in `authKoinModule` (batch 5) — resolved cross-module via `get()`. ──
     single {
         FriendshipClient(
-            httpClient = supabaseKtorHttpClient,
+            httpClient = get(named("supabaseKtor")),
             baseUrl = "${BuildConfig.SUPABASE_URL}/rest/v1/",
         )
     }

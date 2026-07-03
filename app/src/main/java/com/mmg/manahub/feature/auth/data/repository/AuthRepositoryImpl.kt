@@ -3,8 +3,6 @@ package com.mmg.manahub.feature.auth.data.repository
 import android.util.Log
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.di.ApplicationScope
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.dto.UpdateAvatarUrlDto
 import com.mmg.manahub.core.data.remote.dto.UpdateNicknameDto
@@ -55,19 +53,22 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
 import java.security.SecureRandom
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 
-@Singleton
-class AuthRepositoryImpl @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover batch 5: natively Koin-constructed in `app.di.coreBridgeKoinModule`
+ * (the feature-private Hilt `AuthModule`, which used to `@Binds` this class, was deleted). The
+ * `@Named("supabase")`/`@ApplicationScope`/`@IoDispatcher` Hilt qualifiers are gone — Koin resolves the
+ * equivalent deps positionally via `get(named("supabase"))` / a shared `CoroutineScope` single /
+ * `Dispatchers.IO` at the call site instead.
+ */
+class AuthRepositoryImpl(
     private val supabaseAuth: Auth,
     private val userProfileDataSource: UserProfileDataSource,
     private val userProfileClient: UserProfileClient,
     private val userPreferencesDataStore: UserPreferencesDataStore,
-    @Named("supabase") private val supabaseOkHttpClient: OkHttpClient,
-    @ApplicationScope private val applicationScope: CoroutineScope,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val supabaseOkHttpClient: OkHttpClient,
+    private val applicationScope: CoroutineScope,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : AuthRepository {
 
     private val profileRefreshSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
