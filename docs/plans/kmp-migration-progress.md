@@ -514,9 +514,63 @@ worker subsystem → infra modules (define the bridge surface) → last, the min
   GlobalContext.get().get<X>()` per type a Hilt consumer still needs) so the hub + feature modules move to
   Koin while workers/excluded keep resolving via Hilt-from-Koin. Koin starts in `ManaHubApp.onCreate` before
   any worker/excluded resolution → ordering safe (verify).
-- ⏳ Cutover Batch 2 (NEXT): reverse-bridge + convert `SharedDomainUseCaseModule` → unblocks News/Draft/
-  DeckDoctor. Batch 3: Trades repo-split (needs `SupabaseClient`/`ProgressionEventBus` bridged) + Friend/
-  Game/Gamification/Auth. Batch 4: worker subsystem → Koin `WorkerFactory`. Batch 5: infra + finalize.
+- ✅ **Cutover Batch 2 (committed, `refactor(kmp): Hilt->Koin cutover batch 2`)** — the reverse bridge
+  (`KoinToHiltBridgeModule`) landed + `SharedDomainUseCaseModule` shrunk to 2 residual `@Provides`
+  (`ScryfallCache`/`ScryfallRemoteDataSource` builder, `ComputeCardTagsUseCase`) — the rest natively
+  Koin-built in the new `SharedDomainKoinModule`. This is exactly the doc's "Batch 2" above.
+- ✅ **Cutover Batch 3 (this session, 2026-07-03, NOT YET committed — user reviews first)** — the four
+  now-free feature-private Hilt `@Module`s DELETED: `NewsModule`, `DraftModule`, `DeckDoctorModule`,
+  `TradesModule`. Consumer audit (full-codebase grep, confirmed zero excluded-trio/`@HiltWorker` touch)
+  found NO type needed a `KoinToHiltBridgeModule` reverse-bridge entry — every repo impl's Hilt-only
+  consumer had already migrated to Koin.
+  - `NewsRepositoryImpl`/`NewsFeedService`/`RssFeedParser`/`YouTubeRssFeedParser` lost `@Inject`/
+    `@Singleton` → native singles in `newsKoinModule` (new `newsDao` bridge field).
+  - `DraftRepositoryImpl`/`DraftSimRepositoryImpl`/`ScoringDraftDeckBuilder` lost `@Inject`/`@Singleton` →
+    `DraftRepository`/`DraftSimRepository` natively built in `coreBridgeKoinModule` (shared w/ Home);
+    `DraftEngine`/`DraftDeckBuilder`/`BotDrafter`/`BoosterGenerator`/the YouTube+Cloudflare Ktor clients/
+    `Gson` natively built in `draftKoinModule` (new `draftSetDao`/`draftSessionDao` bridge fields). The
+    residual Hilt `SharedDomainUseCaseModule` lost its 3 Draft-only `@Provides` (`GetDraftableSetsUseCase`/
+    `GetSetTierListUseCase`/`GetSetCardsPageUseCase`) — `DraftSimRepositoryImpl` was their only Hilt-only
+    consumer and is itself now Koin-native.
+  - **The ENTIRE Deck Doctor engine graph was ALREADY plain (no `@Inject`) in `:shared:core-domain`** —
+    the sole reason `DeckDoctorModule` survived batches 1–2 was `ScoringDraftDeckBuilder`'s `@Inject`
+    (Draft's `DeckScorer` consumer); de-Hilt'ing Draft this batch let the whole engine
+    (`DeckScorer`/`RoleClassifier`/`ManaBaseAnalyzer`/`EdhrecPowerResolver`/`DeckMagicEngine`/
+    `BudgetOptimizer`/`CandidatePoolGenerator`/`InferDeckIdentityUseCase`/all 6 deck use cases) move to
+    `decksKoinModule` in one shot — `decksKoinModule(...)` now takes only `applicationScope`.
+  - `TradesRepositoryImpl`/`WishlistRepositoryImpl`/`OpenForTradeRepositoryImpl` lost `@Inject`/
+    `@Singleton` → natively built in `coreBridgeKoinModule` (shared across many islands);
+    `SharedListsRepositoryImpl`/`TradeSuggestionsRepositoryImpl` (already plain from an earlier KMP move)
+    + all 5 trades remote data sources natively built in `tradesKoinModule` (new `localWishlistDao`/
+    `localOpenForTradeDao` bridge fields; `tradeCollectionSyncDao` kept). **`SupabaseClient` had NO Koin
+    presence before this batch** — newly forward-bridged in `coreBridgeKoinModule` (new `ManaHubApp`
+    field) since all 5 trades remote sources need it.
+  - `DeckRepositoryImpl` also flipped native in `coreBridgeKoinModule` (new `deckDao` bridge field) —
+    `RepositoryModule.bindDeckRepository` deleted (single surgical line removed from an otherwise-Hilt
+    shared module, since Hilt would otherwise fail with a missing binding for the stripped impl).
+  - `OkHttpClient` forward-bridged into `coreBridgeKoinModule` too (reused the pre-existing `ManaHubApp`
+    field used for Coil) — needed by the newly-native `NewsFeedService`.
+  - **Koin-graph audit (manual, no `checkModules()` test exists in this repo):** grepped every
+    `single<T>`/`single { }` across all loaded modules for the ~15 flipped/newly-bridged types — zero
+    duplicates found (no `DefinitionOverrideException` risk); every cross-module `get()` (e.g. `DeckScorer`
+    resolved from `draftKoinModule`'s `ScoringDraftDeckBuilder`, `SupabaseClient` resolved from
+    `tradesKoinModule`'s 5 remote sources) has exactly one registration site, following the pre-existing
+    `TournamentDao`/`TournamentRepository` cross-module precedent.
+  - Verified: `./gradlew :app:assembleDebug` BUILD SUCCESSFUL (deprecation warnings only — Hilt/KSP
+    compiled clean, confirming no missing binding anywhere in the app);
+    `:shared:core-domain:compileKotlinWasmJs` SUCCESSFUL; `:app:testDebugUnitTest` → **1967 tests, 118
+    failed, 2 skipped** — EXACTLY the documented floor (`1967/118/2`, see NEXT STEP above), failing-class
+    set cross-checked class-by-class against the documented pre-existing list (Online×2, Push, Collection
+    sync×2/3, Auth, Tagging×2, Scanner, Trades×4 — all present, none new); commonMain leak grep confirmed
+    the only `androidx`/`android.`/`java.` hits are pre-existing `shared/core-ui` Compose Multiplatform
+    imports (legitimate — CMP shares the `androidx.compose.*` namespace), zero in `core-domain`/`core-model`
+    (untouched this batch). **Not committed** (user reviews the diff first, per task instructions).
+- ⏳ Remaining from the original Batch 3 scope (explicitly deferred this session): Friend/Game/
+  Gamification/Auth still have a residual feature-private Hilt `@Module` each (`FriendModule`/
+  `GameModule`/`GamificationModule`/`AuthModule`) even though their ViewModels are already Koin islands —
+  same "shrink after Koin island lands" pattern as News/Draft/Decks/Trades were until this batch. Audit
+  each for excluded-trio/`@HiltWorker` consumers before flipping. Batch 4: worker subsystem → Koin
+  `WorkerFactory`. Batch 5: infra + finalize.
 - ⏳ Queued after cutover: P0.2 (web KV stub honesty → `kmp-web-fullstack-dev`).
 - Audit finding on checklist item **C** (Koin↔Hilt binding completeness): ANSWERED — bindings complete, no
   orphaned modules beyond the by-design bridges + the 4 orphan VMs (P1.3).

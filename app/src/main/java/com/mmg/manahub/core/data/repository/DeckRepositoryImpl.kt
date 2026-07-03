@@ -7,7 +7,6 @@ import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainDeck
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckSummary
@@ -21,8 +20,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Local-first implementation of [DeckRepository].
@@ -35,12 +32,14 @@ import javax.inject.Singleton
  * so deletions are propagated to Supabase on the next push.
  *
  * RPCs have been removed entirely from this class — they are SyncManager's responsibility.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared across many islands).
  */
-@Singleton
-class DeckRepositoryImpl @Inject constructor(
+class DeckRepositoryImpl(
     private val deckDao: DeckDao,
     private val progressionEventBus: ProgressionEventBus,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : DeckRepository {
 
     private val gson = Gson()

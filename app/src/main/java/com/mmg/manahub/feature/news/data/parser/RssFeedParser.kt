@@ -8,11 +8,9 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class RssFeedParser @Inject constructor() {
+/** KMP migration — Hilt→Koin cutover batch 3. Plain class; a native Koin `single`. */
+class RssFeedParser {
 
     fun parse(xml: String, sourceId: String, sourceName: String): List<NewsArticleEntity> {
         val items = mutableListOf<NewsArticleEntity>()

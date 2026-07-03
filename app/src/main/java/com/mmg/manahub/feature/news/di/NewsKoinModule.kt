@@ -1,5 +1,11 @@
 package com.mmg.manahub.feature.news.di
 
+import com.mmg.manahub.core.data.local.dao.NewsDao
+import com.mmg.manahub.core.domain.repository.NewsRepository
+import com.mmg.manahub.feature.news.data.NewsRepositoryImpl
+import com.mmg.manahub.feature.news.data.parser.RssFeedParser
+import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
+import com.mmg.manahub.feature.news.data.remote.NewsFeedService
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsViewModel
 import com.mmg.manahub.feature.news.presentation.NewsViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -7,29 +13,46 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 
 /**
- * KMP migration — Phase 1 Hilt→Koin cutover. The News feature is a multi-ViewModel "Koin island":
+ * KMP migration — Hilt→Koin cutover batch 3. The News feature is a multi-ViewModel "Koin island":
  * BOTH [NewsViewModel] (feed + filters) and [NewsSourcesSettingsViewModel] (source management) are
  * resolved by Koin (`koinViewModel()`) while every other un-migrated feature stays on Hilt.
  *
+ * ## `NewsRepository` is now natively Koin-built (the feature-private Hilt `NewsModule` was DELETED)
+ * `NewsRepositoryImpl` and its three collaborators ([NewsFeedService], [RssFeedParser],
+ * [YouTubeRssFeedParser]) had their `@Inject`/`@Singleton` annotations stripped — this batch confirmed
+ * `NewsRepository` had NO other Hilt-only consumer (only `SharedDomainKoinModule`'s three News use
+ * cases, which already resolved it via `get()`, never the forward-bridged instance directly).
+ *
  * ## Bridge / shared singletons (all resolved via `get()`)
- * This island bridges NOTHING of its own — every dependency of both ViewModels is already a `single`
- * in a loaded module (a `single<T>` is resolvable via `get()` from ANY loaded module), so
- * [newsKoinModule] takes no parameters and `ManaHubApp` needs no new `@Inject` field:
  * - `GetNewsFeedUseCase`, `RefreshNewsFeedUseCase`, `ManageSourcesUseCase` — natively Koin-built in
- *   `SharedDomainKoinModule` (KMP migration batch 2; previously Hilt-bridged via `homeKoinModule`).
+ *   `SharedDomainKoinModule` (batch 2).
  * - `UserPreferencesDataStore` — already in `coreBridgeKoinModule`.
+ * - `OkHttpClient` — the app-wide client, promoted into `coreBridgeKoinModule` this batch (was only a
+ *   Hilt `ManaHubApp` field used for the Coil image loader; now also feeds [NewsFeedService]).
  *
- * ## Hilt `NewsModule` is KEPT (not converted/deleted)
- * The feature-private Hilt `NewsModule` (`@Binds NewsRepository`) MUST stay. `NewsRepository` is
- * consumed by no screen outside this feature, but the three news use cases above still need it — it is
- * now forward-bridged into `SharedDomainKoinModule` (`ManaHubApp` `@Inject`s it from the Hilt graph and
- * hands it in), so deleting its only Hilt binding would break that bridge — the same reason Friends
- * KEPT its `FriendModule`. When Home is later migrated off Hilt, `NewsModule` can be converted and
- * deleted.
- *
- * @return a Koin [Module] providing both News ViewModel factories.
+ * ## Bridged singleton (Room DAO stays Hilt/`DatabaseModule`-owned)
+ * @param newsDao the Hilt/Room-owned [NewsDao] singleton (this island only).
+ * @return a Koin [Module] providing the News data layer + both News ViewModel factories.
  */
-fun newsKoinModule(): Module = module {
+fun newsKoinModule(
+    newsDao: NewsDao,
+): Module = module {
+    // ── Hilt → Koin bridge: the Room-owned DAO (Room stays androidMain / Hilt/DatabaseModule). ──
+    single { newsDao }
+
+    // ── News data layer (natively Koin-built; the feature-private Hilt NewsModule was DELETED). ──
+    single { NewsFeedService(client = get()) }
+    single { RssFeedParser() }
+    single { YouTubeRssFeedParser() }
+    single<NewsRepository> {
+        NewsRepositoryImpl(
+            newsDao = get(),
+            feedService = get(),
+            rssParser = get(),
+            ytParser = get(),
+        )
+    }
+
     viewModel {
         NewsViewModel(
             getNewsFeed = get(),

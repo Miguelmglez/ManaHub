@@ -8,7 +8,6 @@ import com.google.gson.JsonObject
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.mapper.toDomain
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DraftSet
@@ -30,7 +29,6 @@ import com.mmg.manahub.core.model.SetTierList
 import com.mmg.manahub.core.model.TierCard
 import com.mmg.manahub.core.model.TierGroup
 import com.mmg.manahub.core.domain.repository.DraftRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,9 +36,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 
 /**
  * Implementation of [DraftRepository] that fetches draft content from the Cloudflare Worker
@@ -54,18 +49,20 @@ import javax.inject.Singleton
  *   Worker publishes a new version.
  *
  * No assets/ reads. If Cloudflare is unreachable and no local file exists, an error is returned.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule].
  */
-@Singleton
-class DraftRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+class DraftRepositoryImpl(
+    private val context: Context,
     private val scryfallApi: ScryfallClient,
     private val scryfallQueue: ScryfallRequestQueue,
     private val youTubeClient: YouTubeClient,
     private val cloudflareClient: CloudflareContentClient,
     private val draftSetDao: DraftSetDao,
     private val gson: Gson,
-    @Named("draft_prefs") private val draftPrefs: SharedPreferences,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val draftPrefs: SharedPreferences,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : DraftRepository {
 
     companion object {
