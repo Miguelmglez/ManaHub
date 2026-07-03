@@ -8,8 +8,6 @@ import com.mmg.manahub.core.gamification.domain.catalog.UnlockableCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.UnlockableId
 import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
 import kotlinx.datetime.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Grants unlockable-cosmetic entitlements when the player's state satisfies a catalog rule (ADR-002
@@ -31,8 +29,7 @@ import javax.inject.Singleton
  *
  * [clock] is injected so the `unlocked_at` stamp is testable.
  */
-@Singleton
-class EntitlementGranter @Inject constructor(
+class EntitlementGranter(
     private val dao: GamificationDao,
     private val clock: Clock,
 ) {

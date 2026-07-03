@@ -5,7 +5,6 @@ import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.feature.game.domain.model.ArchetypeMatchupData
@@ -26,14 +25,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class GameSessionRepositoryImpl @Inject constructor(
+class GameSessionRepositoryImpl(
     private val dao: GameSessionDao,
     private val progressionEventBus: ProgressionEventBus,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
     private val surveyAnswerDao: SurveyAnswerDao,
 ) : GameSessionRepository {
 

@@ -3,7 +3,6 @@ package com.mmg.manahub.core.gamification.data.sync
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.GamificationDao
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.gamification.data.remote.GamificationRemoteDataSource
 import com.mmg.manahub.core.gamification.data.remote.toDto
 import com.mmg.manahub.core.gamification.data.remote.toEntity
@@ -13,8 +12,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Bidirectional Room ↔ Supabase sync for the gamification engine (ADR-002 §11, Phase 4).
@@ -42,12 +39,11 @@ import javax.inject.Singleton
  * Quests are deliberately NOT synced (deterministically regenerable). A [Mutex] serializes [sync] and
  * [reconcileOnSignIn] so the two never interleave.
  */
-@Singleton
-class GamificationSyncManager @Inject constructor(
+class GamificationSyncManager(
     private val gamificationDao: GamificationDao,
     private val remote: GamificationRemoteDataSource,
     private val syncPrefs: SyncPreferencesStore,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
     private val crashReporter: CrashReporter,
 ) {
 

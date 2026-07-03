@@ -13,8 +13,6 @@ import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.AchievementUnlock
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import kotlinx.datetime.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.floor
 
 /**
@@ -35,8 +33,7 @@ import kotlin.math.floor
  *
  * @return the list of tier unlocks produced by THIS event (for [com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome]).
  */
-@Singleton
-class AchievementEvaluator @Inject constructor(
+class AchievementEvaluator(
     private val dao: GamificationDao,
     private val statsDao: GamificationStatsDao,
     private val clock: Clock,

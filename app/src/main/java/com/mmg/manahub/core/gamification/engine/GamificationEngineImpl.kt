@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.gamification.engine
 
-import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -17,8 +16,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Default [GamificationEngine].
@@ -32,15 +29,14 @@ import javax.inject.Singleton
  * GameResult strip can correlate it. Processing of one event never crashes the collector: failures are
  * isolated per event so one bad event cannot tear down progression for the whole session.
  */
-@Singleton
-class GamificationEngineImpl @Inject constructor(
+class GamificationEngineImpl(
     private val bus: ProgressionEventBus,
     private val xpGranter: XpGranter,
     private val achievementEvaluator: AchievementEvaluator,
     private val questEvaluator: QuestEvaluator,
     private val streakTracker: StreakTracker,
     private val entitlementGranter: EntitlementGranter,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
+    private val defaultDispatcher: CoroutineDispatcher,
 ) : GamificationEngine {
 
     /** Guards against starting the collector more than once. */

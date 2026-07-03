@@ -16,8 +16,6 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Maps a [ProgressionEvent] to an XP grant, enforces daily/weekly caps from the ledger, computes
@@ -36,8 +34,7 @@ import javax.inject.Singleton
  * the quests feature persists ([UserPreferencesDataStore.getOrCreateGamificationDeviceId]) — never a
  * second device-id source.
  */
-@Singleton
-class XpGranter @Inject constructor(
+class XpGranter(
     private val dao: GamificationDao,
     private val clock: Clock,
     private val timeZone: TimeZone,

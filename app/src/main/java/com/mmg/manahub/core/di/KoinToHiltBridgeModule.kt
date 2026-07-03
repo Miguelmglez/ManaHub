@@ -1,6 +1,9 @@
 package com.mmg.manahub.core.di
 
 import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
+import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import dagger.Module
@@ -23,6 +26,15 @@ import javax.inject.Singleton
  * - [CommitScannedCardsUseCase] → the same `ScannerViewModel`.
  * - [RefreshCollectionPricesUseCase] → `core.sync.PriceRefreshWorker` (`@HiltWorker`, built lazily by
  *   `HiltWorkerFactory` whenever `WorkManager` actually runs the work).
+ * - [FriendRepository] (KMP migration batch 4) → `core.sync.CollectionStatsSyncWorker` (`@HiltWorker`).
+ *   The repo itself is now natively Koin-built in `app.di.coreBridgeKoinModule` (the feature-private Hilt
+ *   `FriendModule` was deleted).
+ * - [GamificationSyncManager] (batch 4) → `core.gamification.data.sync.GamificationSyncWorker`
+ *   (`@HiltWorker`). Natively Koin-built in
+ *   `core.gamification.di.gamificationEngineKoinModule` (the whole Hilt
+ *   `core.gamification.di.GamificationModule` was deleted).
+ * - [QuestReconciler] (batch 4) → `core.gamification.data.sync.QuestRotationWorker` (`@HiltWorker`).
+ *   Also natively Koin-built in `gamificationEngineKoinModule`.
  *
  * Each `@Provides` below pulls the SAME singleton instance Koin already built — `GlobalContext.get()`
  * returns the one running `KoinApplication`, and `.get<T>()` resolves the existing `single` — so Hilt
@@ -71,5 +83,20 @@ object KoinToHiltBridgeModule {
     @Provides
     @Singleton
     fun provideRefreshCollectionPricesUseCase(): RefreshCollectionPricesUseCase =
+        GlobalContext.get().get()
+
+    @Provides
+    @Singleton
+    fun provideFriendRepository(): FriendRepository =
+        GlobalContext.get().get()
+
+    @Provides
+    @Singleton
+    fun provideGamificationSyncManager(): GamificationSyncManager =
+        GlobalContext.get().get()
+
+    @Provides
+    @Singleton
+    fun provideQuestReconciler(): QuestReconciler =
         GlobalContext.get().get()
 }

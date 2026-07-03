@@ -28,9 +28,8 @@ import com.mmg.manahub.core.domain.repository.FriendRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
-import javax.inject.Inject
 
-class FriendRepositoryImpl @Inject constructor(
+class FriendRepositoryImpl(
     private val dao: FriendDao,
     private val remote: FriendRemoteDataSource,
     private val cardRepo: CardRepository,
