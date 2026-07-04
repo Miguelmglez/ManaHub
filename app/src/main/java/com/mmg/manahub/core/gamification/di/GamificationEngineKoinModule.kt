@@ -7,6 +7,8 @@ import com.mmg.manahub.core.gamification.data.remote.GamificationRemoteDataSourc
 import com.mmg.manahub.core.gamification.data.remote.SupabaseGamificationDataSource
 import com.mmg.manahub.core.gamification.data.repository.GamificationRepositoryImpl
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
+import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
+import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.QuestStableIdProvider
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
@@ -23,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.workmanager.dsl.worker
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -46,9 +49,10 @@ import org.koin.dsl.module
  * - [XpGranter], [AchievementEvaluator], [QuestEvaluator], [StreakTracker], [EntitlementGranter],
  *   [QuestStableIdProvider] — previously bare `@Inject constructor` classes satisfied implicitly by the
  *   Hilt graph; now explicit Koin singles.
- * - [AchievementBackfill], [QuestReconciler], [GamificationSyncManager] — same as above, PLUS each had a
- *   Hilt-only consumer that survives the cutover (`ManaHubApp` for the first two; a `@HiltWorker` for the
- *   latter two) — see the reverse-bridge note below.
+ * - [AchievementBackfill], [QuestReconciler], [GamificationSyncManager] — same as above. `AchievementBackfill`
+ *   has a surviving Hilt-only consumer (`ManaHubApp`, still bridged via `by inject()`); `QuestReconciler`/
+ *   `GamificationSyncManager`'s former `@HiltWorker` consumers were converted to Koin `worker { }`
+ *   registrations in KMP migration batch 6 (see below) — no reverse bridge remains for either.
  *
  * ## [com.mmg.manahub.core.gamification.domain.ProgressionEventBus] is NOT registered here
  * It is registered as a native `single { ProgressionEventBus() }` in `coreBridgeKoinModule` (that is
@@ -70,16 +74,18 @@ import org.koin.dsl.module
  * Hilt-built singleton `core.sync.CollectionStatsSyncWorker`/the legacy `SyncManager` use — there is no
  * risk of divergent state from having two instances live in the two DI graphs.
  *
- * ## Reverse bridge (Koin → Hilt) — see `KoinToHiltBridgeModule`
- * [GamificationSyncManager] → `core.gamification.data.sync.GamificationSyncWorker` (`@HiltWorker`) and
- * [QuestReconciler] → `core.gamification.data.sync.QuestRotationWorker` (`@HiltWorker`) are the two
- * Hilt-only consumers surviving this cutover; both workers are instantiated lazily by `HiltWorkerFactory`
- * well after `Application.onCreate()`/`startKoin()` — the same safe ordering already relied on by every
- * other reverse-bridge entry.
+ * ## KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem)
+ * [GamificationSyncWorker] and [QuestRotationWorker] were converted from `@HiltWorker`/`@AssistedInject`
+ * to plain `CoroutineWorker`s registered here via Koin's `worker { }` DSL — [GamificationSyncManager]
+ * and [QuestReconciler] were ALREADY native Koin singles in this module, so no new dependency wiring was
+ * needed. The reverse-bridge `@Provides` for both in `KoinToHiltBridgeModule` were deleted (no other
+ * Hilt-only consumer remained after the conversion — audited against the excluded online/voice/scanner/
+ * nearby trees). See `core.di.SyncModule.provideWorkManager` for the [androidx.work.DelegatingWorkerFactory]
+ * wiring that lets these Koin-resolved workers coexist with the excluded scanner's Hilt worker.
  *
- * [GamificationEngine], [GamificationRepository], [ClaimQuestRewardUseCase], [AchievementBackfill] and
- * [EntitlementGranter] were audited for OTHER Hilt-only consumers (the excluded online/voice/scanner/
- * nearby trees + all `@HiltWorker`s) — none found, so none of them need a reverse bridge.
+ * [GamificationEngine], [GamificationRepository], [ClaimQuestRewardUseCase] and [AchievementBackfill]
+ * were audited for OTHER Hilt-only consumers (the excluded online/voice/scanner/nearby trees + all
+ * `@HiltWorker`s) — none found, so none of them need a reverse bridge.
  *
  * @param gamificationDao the Hilt/Room-owned [GamificationDao] singleton.
  * @param gamificationStatsDao the Hilt/Room-owned [GamificationStatsDao] singleton.
@@ -163,6 +169,23 @@ fun gamificationEngineKoinModule(
             syncPrefs = get(),
             ioDispatcher = Dispatchers.IO,
             crashReporter = get(),
+        )
+    }
+
+    // ── KMP migration — Hilt→Koin cutover batch 6: WorkManager subsystem. ──
+    worker {
+        GamificationSyncWorker(
+            appContext = androidContext(),
+            workerParams = it.get(),
+            gamificationSyncManager = get(),
+            authRepository = get(),
+        )
+    }
+    worker {
+        QuestRotationWorker(
+            appContext = androidContext(),
+            workerParams = it.get(),
+            questReconciler = get(),
         )
     }
 }

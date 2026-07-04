@@ -31,10 +31,11 @@ import com.mmg.manahub.core.model.DraftConfig
 import com.mmg.manahub.core.model.DraftSeat
 import com.mmg.manahub.core.model.DraftState
 import com.mmg.manahub.core.model.DraftStatus
+import com.mmg.manahub.core.model.NudgeTrigger
 import com.mmg.manahub.core.model.PassDirection
 import com.mmg.manahub.core.domain.repository.DraftRepository
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
-import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
+import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase

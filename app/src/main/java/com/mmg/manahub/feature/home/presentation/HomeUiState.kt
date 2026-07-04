@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.home.presentation
 import androidx.annotation.StringRes
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.NudgeTrigger
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.news.NewsItem
 // FirstStepItem is defined in the same package — no explicit import needed.
@@ -275,10 +276,6 @@ data class AccountNudge(
     @StringRes val messageRes: Int = 0,
     val trigger: NudgeTrigger,
 )
-
-enum class NudgeTrigger {
-    COLLECTION_MILESTONE, DECK_MILESTONE, GAME_MILESTONE, SYNC_PENDING, ACTION_REQUIRED
-}
 
 /** Simplified news wrapper removed in favor of rich NewsItem. */
 // data class NewsItem(val id: String, val title: String, val imageUrl: String?)

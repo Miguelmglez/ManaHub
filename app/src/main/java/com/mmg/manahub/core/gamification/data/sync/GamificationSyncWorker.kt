@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.gamification.data.sync
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -12,25 +11,28 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 /**
  * WorkManager worker that delegates to [GamificationSyncManager] for bidirectional gamification sync
  * (ADR-002 §11, Phase 4).
  *
- * Mirrors [com.mmg.manahub.core.sync.CollectionSyncWorker] exactly: `@HiltWorker` + `@AssistedInject`,
- * a periodic (1h) and a one-time builder, [NetworkType.CONNECTED], exponential backoff, and the
- * `getCurrentUser()?.id ?: Result.success()` guest guard. Anonymous guests have a real Supabase id
- * (like collection sync), so this runs for them too.
+ * Mirrors [com.mmg.manahub.core.sync.CollectionSyncWorker]'s shape: a periodic (1h) and a one-time
+ * builder, [NetworkType.CONNECTED], exponential backoff, and the `getCurrentUser()?.id ?:
+ * Result.success()` guest guard. Anonymous guests have a real Supabase id (like collection sync), so
+ * this runs for them too.
+ *
+ * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
+ * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `gamificationEngineKoinModule`
+ * ([gamificationSyncManager] and [authRepository] are already native Koin singles there /
+ * `coreBridgeKoinModule`). See `core.di.SyncModule.provideWorkManager` for the resulting
+ * [androidx.work.DelegatingWorkerFactory] wiring shared with the excluded scanner's Hilt worker.
  *
  * This is SEPARATE from the sibling [QuestRotationWorker] — quests stay unsynced (ADR-002 §11).
  */
-@HiltWorker
-class GamificationSyncWorker @AssistedInject constructor(
-    @Assisted private val appContext: Context,
-    @Assisted workerParams: WorkerParameters,
+class GamificationSyncWorker(
+    appContext: Context,
+    workerParams: WorkerParameters,
     private val gamificationSyncManager: GamificationSyncManager,
     private val authRepository: AuthRepository,
 ) : CoroutineWorker(appContext, workerParams) {
