@@ -1,15 +1,12 @@
 package com.mmg.manahub.core.gamification.data.sync
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -22,15 +19,17 @@ import java.util.concurrent.TimeUnit
  * Periodic worker that rolls quests over once a day (ADR-002, Phase 2).
  *
  * Delegates entirely to [QuestReconciler] (idempotent), so the app-start reconcile and this worker can
- * both run without conflict. No network constraint — quests are 100% local (ADR-002 §11). Mirrors
- * [com.mmg.manahub.core.sync.CollectionSyncWorker]'s `@HiltWorker` + `@AssistedInject` shape; the
- * [androidx.hilt.work.HiltWorkerFactory] wiring that already powers `CollectionSyncWorker` covers this
- * worker too.
+ * both run without conflict. No network constraint — quests are 100% local (ADR-002 §11).
+ *
+ * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
+ * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `gamificationEngineKoinModule`
+ * ([questReconciler] is already a native Koin single there). See `core.di.SyncModule.provideWorkManager`
+ * for the resulting [androidx.work.DelegatingWorkerFactory] wiring shared with the excluded scanner's
+ * Hilt worker.
  */
-@HiltWorker
-class QuestRotationWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters,
+class QuestRotationWorker(
+    appContext: Context,
+    workerParams: WorkerParameters,
     private val questReconciler: QuestReconciler,
 ) : CoroutineWorker(appContext, workerParams) {
 

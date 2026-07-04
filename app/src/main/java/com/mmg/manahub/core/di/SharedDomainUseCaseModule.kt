@@ -17,18 +17,20 @@ import javax.inject.Singleton
 /**
  * KMP migration — Hilt→Koin cutover batch 2. This module used to provide ~30 pure domain use cases;
  * ALL of them (bar the six below) now live natively in [com.mmg.manahub.core.di.SharedDomainKoinModule]
- * (Koin), consumed via `get()` by the migrated Koin islands. Three of the moved ones
+ * (Koin), consumed via `get()` by the migrated Koin islands. Two of the moved ones
  * ([com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase],
- * [com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase],
- * [com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase]) still have a
- * Hilt-only consumer and are re-exposed to Hilt via [com.mmg.manahub.core.di.KoinToHiltBridgeModule]
- * (`GlobalContext.get().get()`).
+ * [com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase]) still have a
+ * Hilt-only consumer (`ScannerViewModel`) and are re-exposed to Hilt via
+ * [com.mmg.manahub.core.di.KoinToHiltBridgeModule] (`GlobalContext.get().get()`).
+ * [com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase] used to be a THIRD
+ * reverse-bridged entry (its Hilt-only consumer was `core.sync.PriceRefreshWorker`, `@HiltWorker`) but
+ * that worker was converted to a Koin `worker { }` registration in KMP migration batch 6 — the reverse
+ * bridge entry was deleted, since no Hilt-only consumer remains.
  *
  * ## Why the remaining two providers COULD NOT move (the ordering hazard the reverse bridge can't fix)
  * `GlobalContext.get()` throws unless Koin has already been started. That is safe for
- * `KoinToHiltBridgeModule`'s three use cases because their Hilt-only consumers
- * (`ScannerViewModel`/`PriceRefreshWorker`) are built LAZILY, strictly after `ManaHubApp.onCreate()`
- * has called `startKoin()`.
+ * `KoinToHiltBridgeModule`'s two use cases because their Hilt-only consumer (`ScannerViewModel`) is built
+ * LAZILY, strictly after `ManaHubApp.onCreate()` has called `startKoin()`.
  *
  * The two providers below feed classes with NO such luxury: [ScryfallRemoteDataSource] and
  * [ComputeCardTagsUseCase] are `@Inject` constructor params of `CardRepositoryImpl` /

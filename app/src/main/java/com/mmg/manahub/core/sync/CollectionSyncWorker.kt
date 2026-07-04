@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.sync
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -12,23 +11,25 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 /**
  * WorkManager worker that delegates to [SyncManager] for bidirectional sync.
  *
- * Annotated with [HiltWorker] so Hilt can inject dependencies via [AssistedInject].
  * Only runs when [NetworkType.CONNECTED] is satisfied.
  *
  * Retry policy: exponential backoff starting at 15 minutes, up to 3 attempts
  * before the worker is marked as failed.
+ *
+ * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
+ * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `feature.collection.di.collectionKoinModule`
+ * (co-located with the [SyncManager] bridge single it needs — [SyncManager] itself KEEPS its Hilt
+ * `@Inject constructor`, since the legacy `DeckBuilderViewModel` — still `@HiltViewModel` — also injects
+ * it; [authRepository] is a native Koin single in `coreBridgeKoinModule`).
  */
-@HiltWorker
-class CollectionSyncWorker @AssistedInject constructor(
-    @Assisted private val appContext: Context,
-    @Assisted workerParams: WorkerParameters,
+class CollectionSyncWorker(
+    appContext: Context,
+    workerParams: WorkerParameters,
     private val syncManager: SyncManager,
     private val authRepository: AuthRepository,
 ) : CoroutineWorker(appContext, workerParams) {

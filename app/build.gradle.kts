@@ -197,6 +197,9 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
+    // KMP migration — Hilt→Koin cutover batch 6: WorkManager subsystem. `worker { }` DSL +
+    // KoinWorkerFactory for the 7 non-excluded @HiltWorkers (see core.di.SyncModule).
+    implementation(libs.koin.androidx.workmanager)
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)

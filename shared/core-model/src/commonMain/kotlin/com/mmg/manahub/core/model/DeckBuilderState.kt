@@ -1,9 +1,4 @@
-package com.mmg.manahub.core.domain.model
-
-import com.mmg.manahub.core.model.BasicLandDistribution
-import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.DeckCard
-import com.mmg.manahub.core.model.DeckFormat
+package com.mmg.manahub.core.model
 
 data class DeckBuilderState(
     val deckName: String = "",

@@ -16,6 +16,7 @@ import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.NudgeTrigger
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.QuickStartAction
@@ -42,7 +43,7 @@ import com.mmg.manahub.core.model.DraftState
 import com.mmg.manahub.core.model.DraftStatus
 import com.mmg.manahub.core.domain.repository.DraftRepository
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
-import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
+import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.DISCOVER_RANDOM_QUERY
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MAX_NEWS
 import com.mmg.manahub.core.model.news.ContentSource

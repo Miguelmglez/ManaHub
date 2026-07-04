@@ -1,9 +1,12 @@
 package com.mmg.manahub.feature.collection.di
 
 import androidx.work.WorkManager
+import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
+import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.androidx.workmanager.dsl.worker
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -56,6 +59,13 @@ import org.koin.dsl.module
  * provider and the matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing
  * without ever leaving the app uncompilable between commits.
  *
+ * ## KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem)
+ * [CollectionSyncWorker] was converted from `@HiltWorker`/`@AssistedInject` to a plain `CoroutineWorker`
+ * registered here via Koin's `worker { }` DSL, co-located with the [SyncManager] bridge single it needs.
+ * [SyncManager] itself KEEPS its Hilt `@Inject constructor` — the legacy (still `@HiltViewModel`)
+ * `DeckBuilderViewModel` also injects it — so this stays a forward bridge, not a native conversion.
+ * `AuthRepository` is a native Koin single in `coreBridgeKoinModule`, resolved via `get()`.
+ *
  * @param syncManager the Hilt-owned [SyncManager] singleton (this island only).
  * @param workManager the Hilt-owned [WorkManager] singleton (this island only; the same instance
  *   `ManaHubApp` already injects for global sync scheduling).
@@ -75,6 +85,16 @@ fun collectionKoinModule(
     //  would throw DefinitionOverrideException.)
     single { syncManager }
     single { workManager }
+
+    // ── KMP migration — Hilt→Koin cutover batch 6: WorkManager subsystem. ──
+    worker {
+        CollectionSyncWorker(
+            appContext = androidContext(),
+            workerParams = it.get(),
+            syncManager = get(),
+            authRepository = get(),
+        )
+    }
 
     // ── The Koin island: CollectionViewModel is now resolved by Koin, not Hilt. ──
     viewModel {

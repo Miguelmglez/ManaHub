@@ -29,11 +29,13 @@ import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
+import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -53,10 +55,12 @@ import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.engine.AchievementBackfill
 import com.mmg.manahub.core.gamification.engine.EntitlementGranter
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
+import com.mmg.manahub.core.push.di.pushKoinModule
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
 import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.di.syncKoinModule
 import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -89,7 +93,6 @@ import com.mmg.manahub.feature.friends.di.friendsKoinModule
 import com.mmg.manahub.feature.gamification.di.gamificationKoinModule
 import com.mmg.manahub.feature.game.di.gameKoinModule
 import com.mmg.manahub.feature.home.di.homeKoinModule
-import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.news.di.newsKoinModule
 import com.mmg.manahub.feature.playtest.di.playtestKoinModule
 import com.mmg.manahub.feature.profile.di.profileKoinModule
@@ -157,6 +160,11 @@ class ManaHubApp : Application(), KoinComponent {
     @Inject lateinit var tagDictionaryRepo: TagDictionaryRepository
     @Inject lateinit var workManager: WorkManager
     @Inject lateinit var pushTokenRepository: PushTokenRepository
+    // KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem). PushTokenRemoteDataSource
+    // keeps its Hilt @Inject constructor (PushTokenRepositoryImpl, still Hilt via PushModule, needs it) —
+    // this field just forward-bridges the SAME already-constructed singleton to Koin's pushKoinModule
+    // for the two push workers. See pushKoinModule's KDoc for the full ordering rationale.
+    @Inject lateinit var pushTokenRemoteDataSource: PushTokenRemoteDataSource
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
     // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
@@ -192,6 +200,10 @@ class ManaHubApp : Application(), KoinComponent {
     // deleted) — `gameSessionDao` below (Room, stays androidMain) is forward-bridged to build it.
     @Inject lateinit var scryfallRemoteDataSource: ScryfallRemoteDataSource
     @Inject lateinit var gameSessionDao: GameSessionDao  // shared: Stats + Profile + Home (via GameSessionRepository)
+    // KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem). StatsDao (Room, stays
+    // androidMain / Hilt-DatabaseModule-owned) is a NEW forward-bridge, needed by the Koin-registered
+    // CollectionStatsSyncWorker in core.sync.di.syncKoinModule.
+    @Inject lateinit var statsDao: StatsDao
 
     // Profile island (Phase 1) bridge deps. (userPreferencesDataStore + authRepository are shared with
     // Settings and gameSessionRepository is shared with Stats — all bridged in coreBridgeKoinModule.
@@ -210,7 +222,8 @@ class ManaHubApp : Application(), KoinComponent {
     // Koin-built in coreBridgeKoinModule (their owning Hilt modules were deleted) — no bridge field
     // needed for any of them anymore. CommunityStatsRepository is natively Koin-built in homeKoinModule.
     @Inject lateinit var cardRepository: CardRepository  // shared: Home + CommunityDecks (bridged in coreBridge)
-    @Inject lateinit var getAccountNudgeUseCase: GetAccountNudgeUseCase
+    // GetAccountNudgeUseCase moved to :shared:core-domain and is natively Koin-built in homeKoinModule
+    // (KMP migration — closing minor debt); no bridge field needed for it anymore.
     // GetNewsFeedUseCase/RefreshNewsFeedUseCase/ManageSourcesUseCase moved to SharedDomainKoinModule
     // (batch 2) — homeKoinModule/newsKoinModule now resolve all three via get(), no field needed.
 
@@ -409,9 +422,7 @@ class ManaHubApp : Application(), KoinComponent {
                 profileKoinModule(
                     surveyAnswerDao = surveyAnswerDao,
                 ),
-                homeKoinModule(
-                    getAccountNudgeUseCase = getAccountNudgeUseCase,
-                ),
+                homeKoinModule(),
                 tagDictionaryKoinModule(
                     tagDictionaryRepository = tagDictionaryRepo,
                 ),
@@ -451,6 +462,15 @@ class ManaHubApp : Application(), KoinComponent {
                 collectionKoinModule(
                     syncManager = syncManager,
                     workManager = workManager,
+                ),
+                // KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem): the two remaining
+                // core/sync workers (CollectionStatsSyncWorker, PriceRefreshWorker — CollectionSyncWorker's
+                // worker { } lives in collectionKoinModule above) and the two core/push workers.
+                syncKoinModule(
+                    statsDao = statsDao,
+                ),
+                pushKoinModule(
+                    pushTokenRemoteDataSource = pushTokenRemoteDataSource,
                 ),
                 searchWidgetsKoinModule(),
                 gamificationKoinModule(),

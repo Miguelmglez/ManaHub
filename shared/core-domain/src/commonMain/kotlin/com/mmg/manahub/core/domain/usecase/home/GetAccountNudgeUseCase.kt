@@ -1,10 +1,9 @@
-package com.mmg.manahub.feature.home.domain.usecase
+package com.mmg.manahub.core.domain.usecase.home
 
-import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase.Companion.COLLECTION_MILESTONE
-import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase.Companion.DECK_MILESTONE
-import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase.Companion.GAME_MILESTONE
-import com.mmg.manahub.feature.home.presentation.NudgeTrigger
-import javax.inject.Inject
+import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase.Companion.COLLECTION_MILESTONE
+import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase.Companion.DECK_MILESTONE
+import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase.Companion.GAME_MILESTONE
+import com.mmg.manahub.core.model.NudgeTrigger
 
 /**
  * Resolves the highest-priority account nudge trigger for an unauthenticated user.
@@ -24,7 +23,7 @@ import javax.inject.Inject
  *
  * @return The highest-priority [NudgeTrigger] that applies, or `null` if none.
  */
-class GetAccountNudgeUseCase @Inject constructor() {
+class GetAccountNudgeUseCase {
 
     /**
      * Evaluates nudge eligibility.

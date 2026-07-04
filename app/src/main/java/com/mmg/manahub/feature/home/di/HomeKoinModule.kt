@@ -7,9 +7,9 @@ import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
-import com.mmg.manahub.feature.home.domain.usecase.GetAccountNudgeUseCase
 import com.mmg.manahub.feature.home.presentation.HomeViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
@@ -54,17 +54,19 @@ import org.koin.dsl.module
  * natively Koin-built in `SharedDomainKoinModule` — resolved below via `get()`, not registered here
  * anymore.
  *
- * @return a Koin [Module] that provides the Home-only bridged singleton and the [HomeViewModel] factory.
+ * `GetAccountNudgeUseCase` (KMP migration — closing minor debt) moved to `:shared:core-domain`
+ * (`com.mmg.manahub.core.domain.usecase.home`) and lost its Hilt `@Inject` — it is a stateless,
+ * dependency-free class, so it is now natively Koin-built here instead of bridged from Hilt.
+ *
+ * @return a Koin [Module] that provides the Home-only singletons and the [HomeViewModel] factory.
  */
-fun homeKoinModule(
-    getAccountNudgeUseCase: GetAccountNudgeUseCase,
-): Module = module {
-    // ── Hilt → Koin bridge: re-expose the Home-only Hilt-owned singleton to Koin. ──
-    // (UserPreferencesDataStore, AuthRepository, GameSessionRepository, StatsRepository, DeckRepository,
-    //  ScryfallRemoteDataSource, GamificationRepository, CardRepository, DraftRepository, DraftSimRepository,
-    //  TournamentRepository and WishlistRepository are shared → bridged in coreBridgeKoinModule; the three
-    //  news use cases are singles in SharedDomainKoinModule. All resolved below via get().)
-    single { getAccountNudgeUseCase }
+fun homeKoinModule(): Module = module {
+    // ── Bridged shared singletons (UserPreferencesDataStore, AuthRepository, GameSessionRepository,
+    //    StatsRepository, DeckRepository, ScryfallRemoteDataSource, GamificationRepository,
+    //    CardRepository, DraftRepository, DraftSimRepository, TournamentRepository, WishlistRepository)
+    //    live in coreBridgeKoinModule; the three news use cases are singles in SharedDomainKoinModule.
+    //    All resolved below via get(). ──
+    single { GetAccountNudgeUseCase() }
 
     // ── CommunityStatsRepository: natively Koin-built (Hilt CommunityModule deleted). ──
     // Single consumer (this island) — no promotion to coreBridgeKoinModule needed.
