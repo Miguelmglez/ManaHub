@@ -33,8 +33,7 @@ platform-agnostic domain/data/ViewModel/UI in `commonMain` by default, with anyt
 web-specific isolated behind `expect`/`actual` or interfaces in `androidMain`/`wasmJsMain`. Do not
 write new code that hard-couples to Android (`Context`, AndroidX-only APIs, Room/DataStore directly,
 Hilt) unless it genuinely belongs in `androidMain`. DI is **Koin** (not Hilt) for all new/migrated
-code. See the **Kotlin Multiplatform migration** section below + `docs/plans/kmp-migration-plan.md`
-and `docs/plans/kmp-library-and-filesystem-map.md`.
+code. See the **Kotlin Multiplatform migration** section below + `docs/plans/kmp-migration-plan.md`.
 
 ## Language rules
 
@@ -86,8 +85,8 @@ Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` s
 
 The project is migrating to **KMP, targeting Android + Web (Compose Multiplatform / `wasmJs`)**.
 iOS/Desktop are out of scope for now but the structure must not preclude them. **DI is moving Hilt →
-Koin.** Full plan: `docs/plans/kmp-migration-plan.md`; library/source-set + file-tree map:
-`docs/plans/kmp-library-and-filesystem-map.md`; spike findings + wasm/library gotchas live in memory
+Koin.** Master plan (status, decisions, Android debt, web roadmap): `docs/plans/kmp-migration-plan.md`;
+living tracker: `docs/plans/kmp-migration-progress.md`; spike findings + wasm/library gotchas live in memory
 `project_kmp_spike_findings`. **Read these before any KMP-tagged work.** Until a feature is
 migrated, existing Hilt/Room/androidx-Compose code stays as-is — do not pre-emptively KMP-ify
 unrelated code.
