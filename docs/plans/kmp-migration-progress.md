@@ -574,13 +574,34 @@ worker subsystem → infra modules (define the bridge surface) → last, the min
   Koin `named()` singles; Supabase `Auth` derived from the Koin SupabaseClient single; Friends + Settings
   shrunk (promote-then-shrink). GREEN — failing-CLASS set unchanged (18 pre-existing). **ALL non-excluded
   FEATURE modules are now Koin.** Remaining Hilt = infra + 8 workers + 4 excluded modules.
-- ⏳ **Cutover remaining plan (DURABLE — infra/worker→Koin stays; only KoinToHiltBridgeModule is temporary,
-  deleted when the excluded trio migrates):** Batch 6 = **workers → Koin `WorkerFactory`** + their infra
-  deps (SyncModule/PushModule/DAOs/DataStore → Koin), `DelegatingWorkerFactory` to coexist with the excluded
-  scanner `@HiltWorker`; then drop the worker-only reverse-bridges. Batch 7 = remaining infra
-  (Network/Supabase/Dispatcher/CoroutineScopes/Analytics/Crashlytics/Database-DAOs/RepositoryModule/
-  SharedDomainUseCaseModule-residual) → Koin, reverse-bridge ONLY what the excluded trio needs. END-STATE:
-  only the 4 excluded Hilt modules + minimal reverse bridge remain, until the excluded wave.
+- 🛑 **CUTOVER STOPPED HERE by USER decision (2026-07-04) — feature-DI cutover COMPLETE; workers + infra
+  stay Hilt as the shared platform base.** Batch 6 (workers → Koin `WorkerFactory`) was attempted twice and
+  reverted both times: it hit the session cap mid-wiring (broken tree, restored to green each time) AND it is
+  **runtime-risky + unverifiable in this environment** — converting the 7 `@HiltWorker`s requires rewriting
+  the `WorkManagerFactory` (a `DelegatingWorkerFactory` coexisting with the excluded scanner `@HiltWorker`);
+  a mis-wire makes workers fail ONLY at runtime (no emulator/adb here, unit tests don't cover WorkManager
+  instantiation). Marginal value now is low (the 7 workers already work fine via the `KoinToHiltBridgeModule`
+  reverse bridge; Hilt runtime stays anyway for the excluded trio), so it is **deferred to the final
+  excluded-trio wave** (online/scanner/voice → Koin), when Hilt is removed wholesale ONCE, with a launchable
+  app to verify the WorkManagerFactory at runtime.
+- ✅ **CUTOVER END-STATE (stable, committed, GREEN 1967/≈118/2):**
+  - **Koin owns ALL feature DI** — every non-excluded ViewModel (~40, via `koinViewModel()`) + every feature
+    repository/use-case/engine. Feature Hilt `@Module`s DELETED: Community, Tournament, News, Draft,
+    DeckDoctor, Trades, Friend, Game, Gamification, Auth (10) + the `SharedDomainUseCaseModule` use-case hub
+    (moved to `SharedDomainKoinModule`, 33 singles).
+  - **Hilt retained as the shared platform base** (consumed by both Koin — via forward-bridge in
+    `CoreBridgeKoinModule`/`ManaHubApp` — and the still-Hilt workers/excluded trio): infra modules
+    `DatabaseModule`(Room), `NetworkModule`, `SupabaseModule`, `DispatcherModule`, `CoroutineScopesModule`,
+    `AnalyticsModule`, `CrashlyticsModule`, `PushModule`, `SyncModule`, `RepositoryModule` (6 residual
+    `@Binds`), `SharedDomainUseCaseModule` (3 residual eager-singleton `@Provides`); the 8 `@HiltWorker`s;
+    the 4 excluded modules (`OnlineSessionModule`/`ScannerModule`/`VoiceModule`/`NearbyModule`).
+  - **`KoinToHiltBridgeModule`** (Koin→Hilt reverse bridge) exposes to Hilt consumers the types now
+    Koin-owned that workers/excluded still need: `AuthRepository`, `FriendRepository`,
+    `GamificationSyncManager`, `QuestReconciler`, `RefreshCollectionPricesUseCase`, `AddToWishlistUseCase`,
+    `CommitScannedCardsUseCase`. This module + the forward-bridges shrink to nothing when the excluded trio
+    migrates and Hilt is deleted.
+- ⏳ **Remaining cutover (deferred to the excluded-trio final wave, NOT this session):** workers → Koin
+  `WorkerFactory`; infra modules → Koin; then delete Hilt + `KoinToHiltBridgeModule` entirely.
 - ~~old Batch 5 line~~ (superseded above): Batch 5 = **Auth** (reverse-bridge AuthRepository for workers+excluded;
   move @Named supabase/supabaseKtor HttpClients + UserProfileClient/DataSource; the batch-4 ManaHubApp
   `supabaseKtorHttpClient` forward-bridge flips native). Batch 6 = **workers → Koin `WorkerFactory`**
