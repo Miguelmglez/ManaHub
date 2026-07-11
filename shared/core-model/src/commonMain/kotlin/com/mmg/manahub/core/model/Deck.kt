@@ -28,6 +28,16 @@ data class Deck(
     val sourceAuthor:  String? = null,
     val sourceService: String? = null,
     val importedAt:    Long?   = null,
+    // ── Archetype-aware Deck Doctor (v42→v43, D2) ───────────────────────────
+    // `null` archetypeOverride = the engine INFERS the deck's macro archetype every
+    // analysis (see InferDeckArchetypeUseCase); a non-null value is a user pin that always
+    // wins over inference. Raw enum-name strings (never `ArchetypeId`/`ThemeId` directly —
+    // this module is below `:shared:core-domain`, so the layering rule forbids depending on
+    // the engine's archetype enums here); callers parse via `entries.firstOrNull { ... }`,
+    // NEVER `.valueOf()`, per the standing CLAUDE.md convention. themesOverride is at most 2
+    // entries; empty means "no theme pin" (inference decides, or the macro pin runs theme-less).
+    val archetypeOverride: String? = null,
+    val themesOverride: List<String> = emptyList(),
 )
 
 data class DeckSlot(

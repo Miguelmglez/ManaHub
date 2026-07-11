@@ -401,6 +401,34 @@ sealed interface DeckWarning {
      * [ColorSourceShortage].
      */
     data class UnfixedSplash(val color: ManaColor) : DeckWarning
+
+    // ── Archetype-aware roles (Deck Doctor Community/Archetype plan, Phase 1.6) ──
+    // Surfaced ONLY when a non-GENERIC archetype (or at least one theme) is resolved for the
+    // deck (see EvaluateDeckUseCase's archetype wiring) — a plain-GENERIC deck never emits these,
+    // preserving the pre-Phase-1 GENERIC-path warning set byte-for-byte.
+
+    /**
+     * The deck falls short of the resolved archetype skeleton's minimum for [roleKey] (Appendix A
+     * vocabulary, e.g. `"mana_fix"`, `"sac_outlet"`, `"tutor"`). Distinct from the legacy
+     * [MissingRole] (which is keyed on the old [DeckRole] enum) — this is keyed on the new dynamic
+     * [RoleKey] string vocabulary.
+     */
+    data class ArchetypeRoleGap(val roleKey: RoleKey, val current: Int, val min: Int) : DeckWarning
+
+    /**
+     * The deck runs more copies of an archetype ANTI-role (e.g. `removal_mass` in an AGGRO
+     * skeleton) than the resolved tolerance allows (A.4 step 5: anti-roles resolve to
+     * `[0, 0, priorMax]`).
+     */
+    data class ArchetypeAntiRolePresent(val roleKey: RoleKey, val current: Int, val tolerance: Int) : DeckWarning
+
+    /**
+     * The deck's average CMC falls outside the resolved archetype's curve band
+     * ([ResolvedArchetypeSkeleton.curve]). Distinct from [CurveTooHigh]/[CurveTooLow] (which use a
+     * fixed, archetype-agnostic threshold) — this compares against the archetype-specific band and
+     * is suppressed entirely when an active [CurveExemption] applies (A.3).
+     */
+    data class CurveOutsideArchetypeBand(val avgCmc: Double, val min: Double, val max: Double) : DeckWarning
 }
 
 data class DeckEvaluation(

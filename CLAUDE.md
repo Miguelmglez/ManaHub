@@ -411,7 +411,18 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
   assign `filteredSets = allSets`.
 
 ### Deck Doctor
-Original 8 phases complete; a separate **engine-quality plan** is in progress (see below). Key invariants:
+Original 8 phases complete; a separate **engine-quality plan** is complete (see below), and the
+**archetype-aware Community/Archetype plan** (`docs/claude-code-prompt-deck-doctor-community.md`)
+Phase 1 is complete: a new archetype/theme skeleton layer (`ArchetypeDefinition`/`ThemeDefinition`/
+`ArchetypeSkeletonResolver`/`ArchetypeEvaluator`/`ArchetypeRoleClassifier`/
+`InferDeckArchetypeUseCase`) sits ADDITIVELY on top of the engine below, in the SAME
+`shared/core-domain` commonMain package as the rest of it (not `:app`'s `feature/decks/domain/engine`
+— that location is stale, the whole engine was promoted to `shared/core-domain` during the KMP
+migration). `EvaluateDeckUseCase` resolves the deck's archetype (`Deck.archetypeOverride`/
+`themesOverride` pin, else classifier inference) and only computes archetype-aware warnings when
+non-GENERIC/themed — a GENERIC deck's evaluation is byte-identical to before. Deck Studio's
+Suggestions header carries a "Deck plan" chip/sheet (still behind the same
+`DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flag). → memory: `project_archetype_engine`. Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
 - `generateFromSeeds()` captures inputs atomically inside `_uiState.update { }` (double-tap + stale-snapshot guards).
 - `DeckDoctorOrchestrator.loadAnalysis()` cancels its own `analysisJob` before relaunching (the

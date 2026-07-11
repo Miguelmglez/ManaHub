@@ -26,6 +26,14 @@ data class DeckEntity(
     @ColumnInfo(name = "source_author") val sourceAuthor: String? = null,
     @ColumnInfo(name = "source_service") val sourceService: String? = null,
     @ColumnInfo(name = "imported_at") val importedAt: Long? = null,
+    // ── Archetype-aware Deck Doctor (v43) ──────────────────────────────────
+    // Nullable: null = the engine infers the macro archetype every analysis. A raw enum-name
+    // string (ArchetypeId.name), never persisted as anything richer — parsed defensively via
+    // `entries.firstOrNull { ... }` at every read site (CLAUDE.md: never `.valueOf()`).
+    @ColumnInfo(name = "archetype_override") val archetypeOverride: String? = null,
+    // JSON array of theme enum-name strings (ThemeId.name), e.g. `["TRIBAL","ARISTOCRATS"]`.
+    // Null/blank = no theme pin. At most 2 entries (enforced at the UI/use-case layer, not here).
+    @ColumnInfo(name = "themes_override") val themesOverride: String? = null,
 )
 
 /** Cross-reference: which cards belong to which deck (mainboard + sideboard). */

@@ -688,6 +688,11 @@
     <string name="deck_health_warning_color_source_shortage">Not enough %1$s sources: %2$d (aim for about %3$d to cast your %1$s spells reliably).</string>
     <string name="deck_health_warning_unfixed_splash">Your %1$s is unfixed: almost no lands make %1$s mana. Add fixing or cut the color.</string>
 
+    <!-- Archetype-aware warnings (Deck Doctor Community/Archetype plan, Phase 1.6) -->
+    <string name="deck_health_warning_archetype_role_gap">Missing %1$s for this plan — aim for about %2$d (have %3$d).</string>
+    <string name="deck_health_warning_archetype_anti_role">Too many %1$s for this plan: %2$d (aim for at most %3$d).</string>
+    <string name="deck_health_warning_curve_outside_archetype_band">Mana curve (avg %1$s) is outside this plan\'s expected %2$s-%3$s range.</string>
+
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
     ═══════════════════════════════════════════ -->
@@ -775,6 +780,17 @@
     <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Check your connection and try again.</string>
     <string name="deck_studio_tab_build">Build</string>
     <string name="deck_studio_tab_suggestions">Suggestions</string>
+
+    <!-- Archetype plan (Deck Doctor Community/Archetype plan, Phase 1.7) -->
+    <string name="deck_studio_archetype_chip_prefix">Deck plan: %1$s</string>
+    <string name="deck_studio_archetype_chip_action">Edit deck plan</string>
+    <string name="deck_studio_archetype_low_confidence_hint">Set your deck\'s plan for better advice</string>
+    <string name="deck_studio_archetype_sheet_title">Deck plan</string>
+    <string name="deck_studio_archetype_sheet_macro_label">Archetype</string>
+    <string name="deck_studio_archetype_sheet_themes_label">Themes (up to 2)</string>
+    <string name="deck_studio_archetype_auto_detect">Auto-detect</string>
+    <string name="deck_studio_archetype_apply">Apply</string>
+    <string name="deck_studio_archetype_plan_updated">Deck plan updated</string>
     <string name="deck_studio_empty_title">Your deck is empty</string>
     <string name="deck_studio_empty_subtitle">Add cards with the + button, or import an existing list.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
