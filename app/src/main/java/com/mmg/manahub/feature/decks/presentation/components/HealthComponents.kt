@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.improvement.components
+package com.mmg.manahub.feature.decks.presentation.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -40,14 +39,20 @@ import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.domain.engine.RoleCoverage
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Doctor — Health view
 //
 //  Stateless, theme-token-only composables for the read-only Health evaluation:
-//  a score ring, role-coverage track bars, a mana-curve mini chart and warning chips.
+//  a score ring, role-coverage track bars and warning chips. Relocated from
+//  `improvement/components/` in Phase 0.5 of
+//  `docs/claude-code-prompt-deck-doctor-community.md` (D10) when the standalone
+//  Deck Improvement screen was retired — Deck Studio's Suggestions tab is the only
+//  consumer now. This file's own `ManaCurveChart` was DROPPED during the move (dead
+//  code once `DeckImprovementScreen` was deleted, and it would have collided with
+//  the unrelated, already-live `ManaCurveChart` in this same package used by
+//  `DeckSummaryCard`).
 //  All colors derive from MagicColors (good → mid → low = lifePositive → goldMtg →
 //  lifeNegative); none are hardcoded.
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -209,75 +214,6 @@ fun RoleCoverageRow(
         )
     }
 }
-
-/**
- * Mana-curve mini bar chart. Lands are excluded (the engine's [DeckEvaluation.curveHistogram] only
- * counts non-lands). Buckets run 1..7, where bucket 7 is "7+".
- */
-@Composable
-fun ManaCurveChart(
-    histogram: Map<Int, Int>,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
-    val buckets = (1..7).toList()
-    val maxCount = (histogram.values.maxOrNull() ?: 0).coerceAtLeast(1)
-    val chartDescription = stringResource(R.string.deck_health_curve_cd)
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(120.dp)
-            .clearAndSetSemantics { contentDescription = chartDescription },
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        buckets.forEach { bucket ->
-            val count = histogram[bucket] ?: 0
-            val heightFraction = count.toFloat() / maxCount
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Bottom,
-            ) {
-                Text(
-                    text = count.toString(),
-                    style = ty.labelSmall,
-                    color = mc.textSecondary,
-                )
-                Spacer(Modifier.height(MaterialTheme.spacing.xxs))
-                // Bar grows from the bottom; min visible sliver even when empty.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .barHeight(heightFraction, maxHeight = 72.dp)
-                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                        .background(if (count == 0) mc.surfaceVariant else mc.primaryAccent),
-                )
-                Spacer(Modifier.height(MaterialTheme.spacing.xs))
-                Text(
-                    text = if (bucket == 7) "7+" else bucket.toString(),
-                    style = ty.labelSmall,
-                    color = mc.textSecondary,
-                )
-            }
-        }
-    }
-}
-
-/** Lays a curve bar out at [fraction] of [maxHeight], with a small floor so empty bars stay visible. */
-private fun Modifier.barHeight(fraction: Float, maxHeight: androidx.compose.ui.unit.Dp): Modifier =
-    this.then(
-        Modifier.layout { measurable, constraints ->
-            val maxPx = maxHeight.roundToPx()
-            val minPx = (maxPx * 0.04f).toInt().coerceAtLeast(2)
-            val h = (maxPx * fraction.coerceIn(0f, 1f)).toInt().coerceAtLeast(minPx)
-            val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
-            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-        },
-    )
 
 /** A warning chip rendered in the alert color. */
 @Composable

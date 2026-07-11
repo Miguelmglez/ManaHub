@@ -51,9 +51,10 @@ sealed class Screen(val route: String) {
     object DeckAddCards : Screen("collection/decks/{deckId}/add") {
         fun createRoute(deckId: String) = "collection/decks/$deckId/add"
     }
-    object DeckImprovement : Screen("collection/decks/{deckId}/improvement") {
-        fun createRoute(deckId: String) = "collection/decks/$deckId/improvement"
-    }
+    // Screen.DeckImprovement (the standalone Deck Doctor screen) was RETIRED in Phase 0.5 of
+    // docs/claude-code-prompt-deck-doctor-community.md (D10) — Deck Studio's Suggestions tab
+    // is now the sole Deck Doctor UI surface. DeckMagicDetailScreen.onImproveDeck navigates to
+    // Screen.DeckStudio instead (see AppNavGraph.kt).
 
     // ── Community Decks (Archidekt browse + import) ──────────────────────────
     /** Community Decks landing / browse screen. */

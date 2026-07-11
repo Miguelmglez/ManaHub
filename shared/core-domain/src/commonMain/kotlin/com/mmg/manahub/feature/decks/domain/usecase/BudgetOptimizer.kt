@@ -76,6 +76,15 @@ data class BudgetSelection(
  * It does NOT solve the 0/1 knapsack optimally — that is acceptable for a suggestion list where the
  * user makes the final call. The per-role grouping only influences tie ordering, ensuring we don't
  * spend the whole budget over-filling a single role before touching the others.
+ *
+ * **DORMANT: not wired to any live surface as of 2026-07.** Do NOT delete — kept for a possible
+ * budget-suggestions revival (D5, `docs/claude-code-prompt-deck-doctor-community.md` Phase 0.6).
+ * The Deck Studio "Suggestions" tab that exercises this class end-to-end (via
+ * `SuggestAddsWithBudgetUseCase`) is currently hidden behind
+ * `DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` (default `false` —
+ * see `docs/hidden-features/deck-studio-suggestions.md`), so no user-reachable screen calls this
+ * code path today even though it stays fully compiled and unit-tested. See memory
+ * `project_dormant_budget_pool`.
  */
 class BudgetOptimizer {
 

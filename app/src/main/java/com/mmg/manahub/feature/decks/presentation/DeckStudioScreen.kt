@@ -112,16 +112,16 @@ import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
+import com.mmg.manahub.feature.decks.presentation.components.AddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.CutSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
+import com.mmg.manahub.feature.decks.presentation.components.RoleCoverageRow
 import com.mmg.manahub.feature.decks.presentation.components.SeedsContent
+import com.mmg.manahub.feature.decks.presentation.components.WarningChip
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
-import com.mmg.manahub.feature.decks.presentation.improvement.components.AddSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.improvement.components.CutSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.improvement.components.HealthScoreRing
-import com.mmg.manahub.feature.decks.presentation.improvement.components.RoleCoverageRow
-import com.mmg.manahub.feature.decks.presentation.improvement.components.WarningChip
-import com.mmg.manahub.feature.decks.presentation.improvement.components.key
-import com.mmg.manahub.feature.decks.presentation.improvement.components.label
+import com.mmg.manahub.feature.decks.presentation.components.key
+import com.mmg.manahub.feature.decks.presentation.components.label
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -1335,9 +1335,10 @@ private fun InspirationsSheetContent(
 /**
  * The Suggestions surface (Deck Doctor inline, Phase 2): a Health summary, the Cut
  * list, the Add list, and the free-text [BudgetInputBar], all driven by the live
- * deck via [DeckStudioViewModel]. The row composables and string helpers are reused
- * verbatim from the standalone Deck Doctor screen
- * ([com.mmg.manahub.feature.decks.presentation.improvement.components]).
+ * deck via [DeckStudioViewModel]. The row composables and string helpers live in
+ * [com.mmg.manahub.feature.decks.presentation.components] — this is now the SOLE
+ * Deck Doctor UI surface; the standalone Deck Improvement screen those composables
+ * were originally copied from was retired in Phase 0.5 (D10).
  *
  * Stateless: all state comes from [uiState]; every mutation is a callback to the VM.
  */

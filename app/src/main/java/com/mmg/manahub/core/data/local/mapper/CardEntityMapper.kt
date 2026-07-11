@@ -117,6 +117,7 @@ fun CardEntity.toDomainCard(): Card = Card(
         runCatching { gson.fromJson<List<CardFace>>(it, cardFacesType) }
             .getOrNull()
     },
+    producedMana = producedMana,
 )
 
 fun Card.toEntityCard(): CardEntity = CardEntity(
@@ -172,6 +173,7 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     edhrecRank = edhrecRank,
     pennyRank = pennyRank,
     cardFaces = cardFaces?.let { gson.toJson(it) },
+    producedMana = producedMana,
 )
 
 fun List<CardEntity>.toDomainCardList(): List<Card> = map { it.toDomainCard() }

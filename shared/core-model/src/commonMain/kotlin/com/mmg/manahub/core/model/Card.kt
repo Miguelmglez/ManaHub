@@ -79,4 +79,14 @@ data class Card(
      * shortcut for the most common DFC use-case (displaying the back image).
      */
     val cardFaces: List<CardFace>? = null,
+    /**
+     * D14: the WUBRG colours this card can PRODUCE (mana abilities), as a compact
+     * subset string in canonical W-U-B-R-G order — e.g. `"WU"`, never a JSON blob.
+     * Populated from Scryfall's `produced_mana` (root card object; see
+     * [com.mmg.manahub.core.data.remote.mapper.toDomain]). Empty for cards that
+     * produce no mana. Persisted at the card level; for multi-face cards the
+     * Scryfall root already unions both faces' production, so no per-face merge
+     * is needed here.
+     */
+    val producedMana: String = "",
 )

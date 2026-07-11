@@ -59,7 +59,6 @@ import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
-import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftSetupScreen
@@ -265,7 +264,7 @@ fun AppNavGraph(
                             // HomeViewModel is now resolved by Koin via the screen's koinViewModel() default
                             // param (KMP migration — Home Koin island). Other features still use hiltViewModel().
                             activeGame = activeGame,
-                            onAction = { action ->
+                            onAction = { action: HomeAction ->
                                 when (action) {
                                     HomeAction.StartGame -> {
                                         if (hasActiveGame) {
@@ -373,6 +372,8 @@ fun AppNavGraph(
                                     -> Unit
                                 }
                             },
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = this@composable
                         )
                     }
 
@@ -465,8 +466,11 @@ fun AppNavGraph(
             ) {
                 DeckMagicDetailScreen(
                     onBack = { navController.popBackStack() },
+                    // D10 (Phase 0.5): the standalone Deck Improvement screen was retired —
+                    // Deck Studio's Suggestions tab is now the sole Deck Doctor UI. "Improve
+                    // deck" re-points here instead of Screen.DeckImprovement (deleted).
                     onImproveDeck = { id ->
-                        navController.navigate(Screen.DeckImprovement.createRoute(id))
+                        navController.navigate(Screen.DeckStudio.createRoute(id))
                     },
                     onReviewSurvey = { sessionId ->
                         navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
@@ -474,15 +478,6 @@ fun AppNavGraph(
                     onPlaytest = { id ->
                         navController.navigate(Screen.PlaytestSetup.createRoute(id))
                     },
-                )
-            }
-
-            composable(
-                route = Screen.DeckImprovement.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
-            ) {
-                DeckImprovementScreen(
-                    onBack = { navController.popBackStack() }
                 )
             }
 

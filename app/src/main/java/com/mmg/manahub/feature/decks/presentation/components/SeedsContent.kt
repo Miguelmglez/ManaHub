@@ -62,7 +62,8 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
-import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetFilterBar
+// BudgetFilterBar lives in this same package (feature/decks/presentation/components/) since
+// Phase 0.5 relocated it out of improvement/components/ — no import needed.
 
 /**
  * SEEDS step content: pick 1+ seed cards, see the inferred color identity + detected strategy + the

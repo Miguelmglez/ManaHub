@@ -99,6 +99,10 @@ object DatabaseModule {
                 // reason). Additive: adds attribution columns to `decks` + the
                 // community_deck_cache table (Community Decks, Batch 1).
                 MIGRATION_40_41,
+                // v41 → v42 lives as a top-level `val` in Migration_41_42.kt (same
+                // reason). Additive: adds produced_mana (compact WUBRG string) to
+                // `cards` (Deck Doctor Community/Archetype plan, Phase 0.3, D14).
+                MIGRATION_41_42,
             )
             .build()
 

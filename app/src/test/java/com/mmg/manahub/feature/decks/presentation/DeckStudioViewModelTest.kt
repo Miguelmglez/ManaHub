@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
@@ -92,6 +93,7 @@ class DeckStudioViewModelTest {
     private val wishlistRepository = mockk<WishlistRepository>()
     private val deckMagicEngine = mockk<com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine>(relaxed = true)
     private val userPreferences = mockk<UserPreferencesDataStore>()
+    private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
 
     // ── Real engine + use cases (deterministic fixed PowerResolver) ───────────
@@ -253,6 +255,7 @@ class DeckStudioViewModelTest {
             deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
+            crashReporter = crashReporter,
             appContext = appContext,
             savedStateHandle = SavedStateHandle(
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
@@ -277,6 +280,7 @@ class DeckStudioViewModelTest {
             deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
+            crashReporter = crashReporter,
             appContext = appContext,
             savedStateHandle = SavedStateHandle(
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
@@ -301,6 +305,7 @@ class DeckStudioViewModelTest {
             deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
+            crashReporter = crashReporter,
             appContext = appContext,
             savedStateHandle = SavedStateHandle(
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
@@ -372,6 +377,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = ssh,
             )
@@ -2517,6 +2523,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
@@ -2558,6 +2565,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
@@ -2607,6 +2615,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
@@ -2646,6 +2655,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
@@ -2687,6 +2697,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
@@ -2737,6 +2748,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )
@@ -2787,6 +2799,7 @@ class DeckStudioViewModelTest {
                 deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
+                crashReporter = crashReporter,
                 appContext = appContext,
                 savedStateHandle = SavedStateHandle(emptyMap()),
             )

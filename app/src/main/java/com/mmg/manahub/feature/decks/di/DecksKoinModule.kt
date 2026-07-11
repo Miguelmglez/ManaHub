@@ -18,7 +18,6 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckViewModel
-import com.mmg.manahub.feature.decks.presentation.improvement.DeckImprovementViewModel
 import kotlinx.coroutines.CoroutineScope
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
@@ -29,8 +28,12 @@ import org.koin.dsl.module
  *
  * This is a multi-ViewModel island: it resolves ALL ViewModels under the `feature/decks`
  * tree via Koin — [DeckViewModel] (deck list), [DeckStudioViewModel] (the unified create+edit
- * surface), [DeckImprovementViewModel] (inline Deck Doctor), and the legacy fallback
+ * surface, including its inline Deck Doctor Suggestions tab), and the legacy fallback
  * [DeckMagicDetailViewModel].
+ *
+ * `DeckImprovementViewModel`/`DeckImprovementScreen` (the standalone Deck Doctor surface) were
+ * RETIRED in Phase 0.5 of `docs/claude-code-prompt-deck-doctor-community.md` (D10) — Deck Studio's
+ * Suggestions tab is now the sole Deck Doctor UI. See `project_deck_studio_improvement_retirement`.
  *
  * ## The Deck Doctor scoring engine is now natively Koin-built (the Hilt `DeckDoctorModule` was DELETED)
  * Every class in the engine graph ([DeckScorer], [RoleClassifier], [ManaBaseAnalyzer], [EdhrecPowerResolver],
@@ -56,7 +59,7 @@ import org.koin.dsl.module
  *
  * @param applicationScope the Hilt-owned `@ApplicationScope` [CoroutineScope] (legacy
  *   [DeckMagicDetailViewModel] only — survives the ViewModel for fire-and-forget sync work).
- * @return a Koin [Module] exposing the four Decks ViewModels + the Deck Doctor engine graph.
+ * @return a Koin [Module] exposing the three Decks ViewModels + the Deck Doctor engine graph.
  */
 fun decksKoinModule(
     applicationScope: CoroutineScope,
@@ -129,23 +132,8 @@ fun decksKoinModule(
             deckMagicEngine = get(),
             wishlistRepository = get(),
             userPreferences = get(),
+            crashReporter = get(),
             appContext = get(),
-            savedStateHandle = get(),
-        )
-    }
-
-    // DeckImprovementViewModel: inline Deck Doctor. `savedStateHandle = get()` carries "deckId".
-    viewModel {
-        DeckImprovementViewModel(
-            deckRepository = get(),
-            cardRepository = get(),
-            userCardRepository = get(),
-            evaluateDeckUseCase = get(),
-            inferDeckIdentityUseCase = get(),
-            suggestCutsUseCase = get(),
-            suggestAddsWithBudgetUseCase = get(),
-            wishlistRepository = get(),
-            userPreferences = get(),
             savedStateHandle = get(),
         )
     }

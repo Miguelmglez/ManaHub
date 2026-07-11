@@ -231,7 +231,7 @@
          TAG DICTIONARY SCREEN
     ═══════════════════════════════════════════ -->
     <string name="tagdictionary_title">Tag Dictionary</string>
-    <string name="tagdictionary_reset_all_description">Reset all</string>
+    <string name="tagdictionary_reset_all_description">Delete all custom tags</string>
     <string name="tagdictionary_search_hint">Search tag…</string>
     <string name="tagdictionary_edit_title">Edit: %1$s</string>
     <string name="tagdictionary_thresholds_title">Precision Thresholds</string>
@@ -244,6 +244,16 @@
     <string name="tagdictionary_labels_section">Labels</string>
     <string name="tagdictionary_patterns_hint">One rule per line. Combine required terms with \' + \'. Prefix a term with \'!\' to exclude. Example: gain + life + !gain control</string>
     <string name="tagdictionary_patterns_en_label">Patterns</string>
+    <string name="tagdictionary_system_readonly">System tag · read-only</string>
+    <string name="tagdictionary_create_custom_tag">Create custom tag</string>
+    <string name="tagdictionary_create_custom_tag_description">Create custom tag</string>
+    <string name="tagdictionary_create_label_hint">Give your custom tag a name</string>
+    <string name="tagdictionary_reset_all_confirm_title">Delete all custom tags?</string>
+    <string name="tagdictionary_reset_all_confirm_message">This deletes every tag you created. System tags are never affected.</string>
+    <string name="tagdictionary_reset_all_confirm_action">Delete all</string>
+    <string name="tagdictionary_reset_all_success_toast">All custom tags deleted</string>
+    <string name="tagdictionary_empty_title">No tags found</string>
+    <string name="tagdictionary_empty_subtitle">Try a different search, or create a custom tag.</string>
 
     <!-- ══════════════════════════════════════════
          SCANNER SCREEN
@@ -2209,6 +2219,11 @@
     <string name="trades_login_required_subtitle">Build your wishlist, list cards you\'re open to trade, and discover smart matches with friends. Sign in to get started.</string>
     <string name="trades_login_required_action">Log in / Sign up</string>
 
+    <!-- Trades list / history — one-shot events and misc UI (audit 2026-07-10) -->
+    <string name="trades_sync_failed">Couldn\'t sync your trade lists. Try again later.</string>
+    <string name="trades_history_unknown_trader">Unknown trader</string>
+    <string name="trades_create_proposal_content_description">Create trade proposal</string>
+
     <!-- Phase 3: status badges (canonical, used in detail screens) -->
     <string name="trade_status_draft">Draft</string>
     <string name="trade_status_proposed">Proposed</string>
@@ -2254,6 +2269,20 @@
     <string name="trades_tab_friend_offers">%1$s\'s offers</string>
     <string name="trades_tab_your_offers">Your offers</string>
     <string name="trades_tab_all_cards">All cards</string>
+
+    <!-- Proposal editor: typed VM feedback (audit §5.1 — replaces the old hardcoded
+         sentinel-to-English mapping in CreateTradeProposalScreen) -->
+    <string name="trades_error_no_receiver">Please select a friend to trade with</string>
+    <string name="trades_error_initial_asymmetry">Both sides must have at least one item</string>
+    <string name="trades_error_self_trade">You cannot trade with yourself</string>
+    <string name="trades_error_not_logged_in">You must be logged in to trade</string>
+    <string name="trades_error_prefill_failed">Couldn\'t load this proposal. Please try again.</string>
+
+    <!-- Proposal editor: friend-selector sheet empty states (audit §5.1) -->
+    <string name="trades_friend_sheet_login_title">Log in to trade with your friends and sync your collection across devices.</string>
+    <string name="trades_friend_sheet_login_action">Log In</string>
+    <string name="trades_friend_sheet_no_friends_title">You don\'t have any friends yet. Add friends to start trading!</string>
+    <string name="trades_friend_sheet_no_friends_action">Add Friends</string>
 
     <!-- Phase 3: negotiation screen -->
     <string name="trades_negotiation_title">Trade Negotiation</string>
@@ -2308,6 +2337,7 @@
     <string name="trades_update_collection">Update Collection</string>
     <string name="trades_collection_updated">✓ Collection updated</string>
     <string name="trades_collection_update_success">Collection updated successfully</string>
+    <string name="trades_collection_update_failed">Failed to update collection</string>
     <string name="trades_history_awaiting_response">Awaiting their response</string>
     <string name="trades_history_your_turn">Your turn</string>
     <string name="trades_history_refreshing">Updating…</string>
@@ -2384,6 +2414,10 @@
     <string name="lobby_host_default_name">Host</string>
     <string name="lobby_player_default_name">Player</string>
     <string name="lobby_existing_session_abandon">Abandon &amp; create new</string>
+    <string name="lobby_session_finished_msg">The game has ended.</string>
+    <string name="lobby_session_abandoned_msg">The host closed the room.</string>
+    <string name="lobby_action_close_room">Close room</string>
+    <string name="lobby_action_leave_room">Leave room</string>
 
     <!-- Home widget board -->
     <string name="home_greeting_morning">Good morning, %s</string>

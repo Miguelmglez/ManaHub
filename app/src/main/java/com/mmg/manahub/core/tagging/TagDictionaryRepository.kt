@@ -6,6 +6,7 @@ import com.google.gson.JsonElement
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.core.util.recordNonFatal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -22,6 +23,14 @@ import javax.inject.Singleton
  * [MagicFolderApp] calls [loadAndApply] once at startup so analyzers running
  * inside [com.mmg.manahub.core.data.repository.CardRepositoryImpl] see
  * the user's overrides immediately.
+ *
+ * **D12 — system tags are read-only.** Only overrides whose [TagOverride.key] starts
+ * with [CUSTOM_KEY_PREFIX] may be created/edited/deleted through [upsert]/[delete].
+ * There is no legitimate path (from the UI or otherwise) that writes an override
+ * targeting a system (non-`custom_`) key going forward — [upsert] rejects such
+ * calls defensively and records a Non-Fatal instead of silently corrupting the
+ * store. Any override on a system key found in *existing* persisted data (written
+ * before D12) is dropped by the one-time [loadAndApply] migration.
  */
 @Singleton
 class TagDictionaryRepository @Inject constructor(
@@ -35,6 +44,20 @@ class TagDictionaryRepository @Inject constructor(
     // calls don't silently clobber each other's changes.
     private val writeMutex = Mutex()
 
+    /**
+     * F1 — last known-good state, in memory only. Kept in sync on every successful
+     * [decode] AND on every successful write ([upsert]/[delete]/[resetAll]/
+     * [loadAndApply]'s migration), so it always reflects the true current state —
+     * not just whatever the most recent raw-JSON parse happened to produce. When
+     * [decode] hits unparsable JSON (corrupt blob) it returns this value instead of
+     * silently treating the corruption as "no overrides", and every read-modify-write
+     * is based on it — so a single corrupt read can never wipe out the user's other
+     * overrides (see `given corrupt stored blob when upsert runs...` in
+     * `TagDictionaryRepositoryTest`).
+     */
+    @Volatile
+    private var lastKnownGood: List<TagOverride> = emptyList()
+
     val overridesFlow: Flow<List<TagOverride>> = prefs.tagDictionaryOverridesFlow.map { json ->
         decode(json)
     }
@@ -43,26 +66,46 @@ class TagDictionaryRepository @Inject constructor(
      * Reads the persisted overrides and applies them to the singleton.
      * Acquires [writeMutex] so this never races with an in-progress upsert/delete.
      *
-     * Performs a one-time silent migration: if the persisted JSON is in the legacy
-     * shape (map-shaped `patterns`, es/de labels), it is re-encoded in the new
-     * English-only list shape and saved back.
+     * Performs two one-time silent migrations:
+     *  - Legacy shape (map-shaped `patterns`, es/de labels) → re-encoded in the new
+     *    English-only list shape.
+     *  - D12: any override targeting a system (non-`custom_`) key is retired (it is
+     *    no longer creatable/editable from the UI, so persisted copies from before
+     *    D12 must be dropped). A count-only Non-Fatal breadcrumb
+     *    (`tagdict_system_override_retired`) is recorded — no key names/PII.
      */
     suspend fun loadAndApply() = writeMutex.withLock {
         val raw = prefs.tagDictionaryOverridesFlow.first()
-        val list = decode(raw)
-        // Silent migration: if decode produced records but re-encoding differs from
-        // what is stored (legacy shape detected), persist the canonical new shape.
-        val canonical = encode(list)
-        if (list.isNotEmpty() && isLegacyShape(raw)) {
-            prefs.saveTagDictionaryOverrides(canonical)
+        val decoded = decode(raw)
+
+        val (customOnly, systemKeyOverrides) = decoded.partition { it.key.startsWith(CUSTOM_KEY_PREFIX) }
+
+        val needsRewrite = systemKeyOverrides.isNotEmpty() || (decoded.isNotEmpty() && isLegacyShape(raw))
+        if (systemKeyOverrides.isNotEmpty()) {
+            recordNonFatal("tagdict_system_override_retired: count=${systemKeyOverrides.size}")
         }
-        TagDictionary.applyOverrides(list)
+        if (needsRewrite) {
+            prefs.saveTagDictionaryOverrides(encode(customOnly))
+        }
+        lastKnownGood = customOnly
+        TagDictionary.applyOverrides(customOnly)
     }
 
+    /**
+     * D12: rejects any override whose key does not start with [CUSTOM_KEY_PREFIX] — system
+     * dictionary entries are read-only for users. A rejected call is a no-op (defensive; the
+     * UI never constructs a non-`custom_` override after D12) and records a Non-Fatal so a
+     * future regression is visible instead of silently corrupting the store.
+     */
     suspend fun upsert(override: TagOverride) = writeMutex.withLock {
+        if (!override.key.startsWith(CUSTOM_KEY_PREFIX)) {
+            recordNonFatal("tagdict_upsert_rejected_non_custom_key")
+            return@withLock
+        }
         val current = decode(prefs.tagDictionaryOverridesFlow.first())
             .filterNot { it.key == override.key } + override
         prefs.saveTagDictionaryOverrides(encode(current))
+        lastKnownGood = current
         TagDictionary.applyOverrides(current)
     }
 
@@ -70,11 +113,17 @@ class TagDictionaryRepository @Inject constructor(
         val current = decode(prefs.tagDictionaryOverridesFlow.first())
             .filterNot { it.key == key }
         prefs.saveTagDictionaryOverrides(encode(current))
+        lastKnownGood = current
         TagDictionary.applyOverrides(current)
     }
 
+    /**
+     * F2 — deletes all user-created custom tags (all persisted overrides are `custom_`-keyed
+     * after D12, so clearing the whole store is equivalent to "delete all custom tags").
+     */
     suspend fun resetAll() = writeMutex.withLock {
         prefs.saveTagDictionaryOverrides("[]")
+        lastKnownGood = emptyList()
         TagDictionary.applyOverrides(emptyList())
     }
 
@@ -93,8 +142,26 @@ class TagDictionaryRepository @Inject constructor(
      *  - NEW: `patterns` is a JSON array of rule-line strings; labels are en-only.
      *  - LEGACY: `patterns` is a JSON object `{lang:[...]}`; labels may carry es/de.
      *    Only the "en" pattern list and "en" label are kept; es/de are dropped.
+     *
+     * F1: a **blank** blob (`""`) is a legitimate empty state and decodes to an empty
+     * list without touching [lastKnownGood]. A **corrupt** blob (non-empty but
+     * unparsable — a `JsonSyntaxException` or similar) is reported via [recordNonFatal]
+     * and [lastKnownGood] is returned instead, so a transient corruption never looks
+     * like (and never gets persisted as) "the user has no overrides".
      */
-    private fun decode(json: String): List<TagOverride> = runCatching {
+    private fun decode(json: String): List<TagOverride> {
+        if (json.isBlank()) return emptyList()
+        val decoded = decodeOrNull(json)
+        if (decoded == null) {
+            recordNonFatal("tagdict_decode_failed", IllegalStateException("Corrupt tag dictionary override JSON"))
+            return lastKnownGood
+        }
+        lastKnownGood = decoded
+        return decoded
+    }
+
+    /** Returns null (never an empty-as-fallback list) when [json] fails to parse as a whole. */
+    private fun decodeOrNull(json: String): List<TagOverride>? = try {
         val elements: List<JsonElement> = gson.fromJson(json, listType) ?: emptyList()
         elements.mapNotNull { element ->
             if (!element.isJsonObject) return@mapNotNull null
@@ -136,7 +203,9 @@ class TagDictionaryRepository @Inject constructor(
                 patterns = patterns,
             )
         }
-    }.getOrDefault(emptyList())
+    } catch (e: Exception) {
+        null
+    }
 
     /** True when the raw JSON uses the legacy shape (map-shaped patterns or es/de labels). */
     private fun isLegacyShape(json: String): Boolean = runCatching {
@@ -161,4 +230,9 @@ class TagDictionaryRepository @Inject constructor(
             )
         }
     )
+
+    companion object {
+        /** D12: prefix that namespaces user-created tags away from system dictionary keys. */
+        const val CUSTOM_KEY_PREFIX = "custom_"
+    }
 }
