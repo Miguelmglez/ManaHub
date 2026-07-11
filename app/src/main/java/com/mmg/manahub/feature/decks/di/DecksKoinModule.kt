@@ -11,6 +11,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
@@ -88,7 +89,10 @@ fun decksKoinModule(
 
     // ── Deck use cases. ──
     single { InferDeckIdentityUseCase() }
-    single { EvaluateDeckUseCase(deckScorer = get(), progressionEventBus = get()) }
+    // Deck Doctor Community/Archetype plan, Phase 1.4: the archetype/theme classifier. Stateless
+    // and pure — a single shared instance is safe.
+    single { InferDeckArchetypeUseCase() }
+    single { EvaluateDeckUseCase(deckScorer = get(), progressionEventBus = get(), inferDeckArchetypeUseCase = get()) }
     single { SuggestAddsUseCase(deckScorer = get()) }
     single { SuggestCutsUseCase(deckScorer = get()) }
     single {

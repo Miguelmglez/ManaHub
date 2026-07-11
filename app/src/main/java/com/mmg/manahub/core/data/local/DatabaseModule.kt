@@ -103,6 +103,10 @@ object DatabaseModule {
                 // reason). Additive: adds produced_mana (compact WUBRG string) to
                 // `cards` (Deck Doctor Community/Archetype plan, Phase 0.3, D14).
                 MIGRATION_41_42,
+                // v42 → v43 lives as a top-level `val` in Migration_42_43.kt (same
+                // reason). Additive: adds archetype_override / themes_override to
+                // `decks` (Deck Doctor Community/Archetype plan, Phase 1.5, D2).
+                MIGRATION_42_43,
             )
             .build()
 

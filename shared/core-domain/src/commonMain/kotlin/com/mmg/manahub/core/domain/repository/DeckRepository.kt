@@ -91,4 +91,17 @@ interface DeckRepository {
      * @param slots List of (scryfallId, quantity, isSideboard) triples.
      */
     suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>)
+
+    /**
+     * Pins (or clears) the deck's archetype/theme override (Deck Doctor Phase 1.5, D2).
+     *
+     * @param archetypeOverride a raw `ArchetypeId.name` string, or null to clear the macro pin
+     *        (the engine goes back to inferring it every analysis).
+     * @param themesOverride raw `ThemeId.name` strings (at most 2); empty clears the theme pin.
+     */
+    suspend fun updateArchetypeOverride(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+    )
 }

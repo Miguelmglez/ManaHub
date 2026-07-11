@@ -25,8 +25,10 @@ import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
+import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
 import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
@@ -1195,6 +1197,24 @@ class DeckStudioViewModel(
                 deckDoctorOrchestrator.loadAnalysis(deckId, _uiState.value.budgetConstraints)
             }
         }
+    }
+
+    /**
+     * Pins the deck's archetype/theme plan (Deck Doctor Community/Archetype plan, Phase 1.7
+     * Studio header chip / bottom sheet). Delegates straight to
+     * [DeckDoctorOrchestrator.setArchetypeOverride], which writes through the repository and
+     * re-runs a full analysis. A no-op when `deckId` never resolved (defensive — the chip is
+     * only reachable once the deck has loaded).
+     */
+    fun onSetArchetypeOverride(archetypeId: ArchetypeId?, themes: List<ThemeId>) {
+        if (!::deckId.isInitialized) return
+        deckDoctorOrchestrator.setArchetypeOverride(deckId, _uiState.value.budgetConstraints, archetypeId, themes)
+    }
+
+    /** "Auto-detect" — clears the pin and re-infers the archetype/themes from the live deck. */
+    fun onClearArchetypeOverride() {
+        if (!::deckId.isInitialized) return
+        deckDoctorOrchestrator.clearArchetypeOverride(deckId, _uiState.value.budgetConstraints)
     }
 
     /**

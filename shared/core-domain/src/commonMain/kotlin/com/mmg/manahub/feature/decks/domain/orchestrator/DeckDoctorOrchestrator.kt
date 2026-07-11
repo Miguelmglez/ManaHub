@@ -9,11 +9,13 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
@@ -152,13 +154,29 @@ class DeckDoctorOrchestrator(
         val unresolvedCount: Int,
         var gapSignature: GapSignature,
         var externalPool: List<Card>,
+        // ── Archetype-aware Deck Doctor (Phase 1.6, D2) ─────────────────────────
+        /** Raw `Deck.archetypeOverride`/`themesOverride` — re-read on every incremental recompute
+         * so a mid-session override change (via [setArchetypeOverride]/[clearArchetypeOverride])
+         * is picked up without a full [loadAnalysis]. */
+        var archetypeOverride: String?,
+        var themesOverride: List<String>,
+        val commanderTags: List<CardTag>,
     )
 
-    /** Drives the external Scryfall candidate query; an unchanged signature reuses the cached pool. */
+    /**
+     * Drives the external Scryfall candidate query; an unchanged signature reuses the cached pool.
+     * [archetypeId]/[colorCount] were added in Phase 1.6 (D18/D2): an override change or a
+     * color-affecting mainboard edit must invalidate the cached external pool exactly like a gap-
+     * role change already does — the resolved skeleton (and therefore which roles are "gaps")
+     * depends on both.
+     */
     private data class GapSignature(
         val gapRoles: Set<DeckRole>,
         val colorIdentity: Set<ManaColor>,
         val format: DeckFormat,
+        val archetypeId: ArchetypeId,
+        val themes: List<ThemeId>,
+        val colorCount: Int,
     )
 
     /**
@@ -199,10 +217,13 @@ class DeckDoctorOrchestrator(
             val commanderId = deckWithCards.deck.commanderCardId
             val commanderCard = commanderId?.let { resolveCard(it) }
             val commanderIdentity = commanderCard?.colorIdentity?.toSet().orEmpty()
+            val commanderTags = commanderCard?.let { it.tags + it.userTags }.orEmpty()
 
             val seedCards = inferenceSeeds(commanderCard, mainboardEntries)
             val seedTags = inferDeckIdentityUseCase(seedCards).seedTags
             val weights = weightsProvider().toScoreWeights()
+            val archetypeOverride = deckWithCards.deck.archetypeOverride
+            val themesOverride = deckWithCards.deck.themesOverride
 
             val health = evaluateDeckUseCase(
                 mainboard = mainboardEntries,
@@ -210,6 +231,9 @@ class DeckDoctorOrchestrator(
                 commanderIdentity = commanderIdentity,
                 seedTags = seedTags,
                 weights = weights,
+                archetypeOverride = archetypeOverride,
+                themesOverride = themesOverride,
+                commanderTags = commanderTags,
             )
             val cuts = suggestCutsUseCase(
                 mainboard = mainboardEntries,
@@ -241,6 +265,9 @@ class DeckDoctorOrchestrator(
                 unresolvedCount = unresolvedCount,
                 gapSignature = gapSignatureOf(health),
                 externalPool = emptyList(),
+                archetypeOverride = archetypeOverride,
+                themesOverride = themesOverride,
+                commanderTags = commanderTags,
             )
 
             if (unresolvedCount > 0) {
@@ -352,6 +379,9 @@ class DeckDoctorOrchestrator(
                 commanderIdentity = context.commanderIdentity,
                 seedTags = context.seedTags,
                 weights = weights,
+                archetypeOverride = context.archetypeOverride,
+                themesOverride = context.themesOverride,
+                commanderTags = context.commanderTags,
             )
             val cuts = suggestCutsUseCase(
                 mainboard = mainboard,
@@ -462,7 +492,7 @@ class DeckDoctorOrchestrator(
     private fun identityTagCount(card: Card): Int =
         (card.tags + card.userTags).count { it.category in IDENTITY_CATEGORIES }
 
-    /** The queryable gap set + identity/format that drives the external Scryfall pool. */
+    /** The queryable gap set + identity/format/archetype that drives the external Scryfall pool. */
     private fun gapSignatureOf(health: DeckHealth): GapSignature = GapSignature(
         gapRoles = health.evaluation.roleCoverage
             .filter { it.gap > 0 && it.role.queryFragment() != null }
@@ -470,7 +500,44 @@ class DeckDoctorOrchestrator(
             .toSet(),
         colorIdentity = health.profile.colorIdentity,
         format = health.profile.format,
+        archetypeId = health.archetypeResolution.macro,
+        themes = health.archetypeResolution.themes,
+        colorCount = health.profile.colorIdentity.size,
     )
+
+    // ── Archetype override (Phase 1.7 Studio UI entry point) ───────────────────────
+
+    /**
+     * Pins (or, when both params are null/empty, clears) the deck's archetype/theme override —
+     * writes through [DeckRepository.updateArchetypeOverride] then re-runs a FULL [loadAnalysis]
+     * (a macro/theme change reshapes the whole resolved skeleton, so an incremental recompute is
+     * not enough — mirrors [changeFormat]'s "cheap enough to just reload" precedent).
+     *
+     * @param archetypeId `null` clears the macro pin (back to inference); a non-null value pins it.
+     * @param themes at most 2 (the caller — the Studio bottom sheet — already enforces this cap);
+     *        empty clears the theme pin.
+     */
+    fun setArchetypeOverride(deckId: String, constraints: BudgetConstraints, archetypeId: ArchetypeId?, themes: List<ThemeId>) {
+        scope.launch {
+            runCatching {
+                deckRepository.updateArchetypeOverride(
+                    deckId = deckId,
+                    archetypeOverride = archetypeId?.name,
+                    themesOverride = themes.take(2).map { it.name },
+                )
+            }.onFailure {
+                crashReporter.log("deck_studio_archetype_override_failed")
+                crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_archetype_override_failed", it))
+                return@launch
+            }
+            loadAnalysis(deckId, constraints)
+        }
+    }
+
+    /** "Auto-detect" — clears both the macro and theme pin and re-infers from scratch. */
+    fun clearArchetypeOverride(deckId: String, constraints: BudgetConstraints) {
+        setArchetypeOverride(deckId, constraints, archetypeId = null, themes = emptyList())
+    }
 
     /** Appends a [DeckWarning.UnresolvedCards] when one or more mainboard slots failed to resolve. */
     private fun withUnresolvedWarning(health: DeckHealth, unresolvedCount: Int): DeckHealth {

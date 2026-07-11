@@ -236,6 +236,21 @@ class DeckRepositoryImpl(
         }
     }
 
+    override suspend fun updateArchetypeOverride(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.updateArchetypeOverride(
+                deckId = deckId,
+                archetypeOverride = archetypeOverride,
+                themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
     override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) {
         withContext(ioDispatcher) {
             val entities = slots.map { (scryfallId, quantity, isSideboard) ->

@@ -94,10 +94,15 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
+import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
+import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanChip
+import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanHint
+import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanSheetContent
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
 import com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
@@ -190,6 +195,7 @@ fun DeckStudioScreen(
     val cardCutMsg = stringResource(R.string.deck_studio_card_cut)
     val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
     val seedBuiltMsg = stringResource(R.string.deck_studio_seed_built)
+    val archetypePlanUpdatedMsg = stringResource(R.string.deck_studio_archetype_plan_updated)
 
     // Screen-entry breadcrumb (no PII).
     LaunchedEffect(Unit) {
@@ -377,6 +383,14 @@ fun DeckStudioScreen(
                             onClearBudget = viewModel::onClearBudget,
                             onAdd = { s -> viewModel.onAddSuggestion(s.fit.card.scryfallId, s.fit.card.name) },
                             onCut = { fit -> viewModel.onCutSuggestion(fit.card.scryfallId, fit.card.name) },
+                            onApplyArchetypePlan = { macro, themes ->
+                                viewModel.onSetArchetypeOverride(macro, themes)
+                                toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
+                            },
+                            onAutoDetectArchetypePlan = {
+                                viewModel.onClearArchetypeOverride()
+                                toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
+                            },
                         )
                     }
                 }
@@ -1342,6 +1356,7 @@ private fun InspirationsSheetContent(
  *
  * Stateless: all state comes from [uiState]; every mutation is a callback to the VM.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SuggestionsTab(
     uiState: DeckStudioUiState,
@@ -1351,6 +1366,8 @@ private fun SuggestionsTab(
     onClearBudget: () -> Unit,
     onAdd: (AddSuggestion) -> Unit,
     onCut: (CardFit) -> Unit,
+    onApplyArchetypePlan: (ArchetypeId, List<ThemeId>) -> Unit,
+    onAutoDetectArchetypePlan: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -1374,6 +1391,25 @@ private fun SuggestionsTab(
 
     val evaluation = health.evaluation
     val spacing = MaterialTheme.spacing
+    var showArchetypeSheet by remember { mutableStateOf(false) }
+
+    if (showArchetypeSheet) {
+        val archetypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showArchetypeSheet = false },
+            sheetState = archetypeSheetState,
+            shape = BottomSheetShape,
+            containerColor = mc.background,
+        ) {
+            ArchetypePlanSheetContent(
+                initialMacro = health.archetypeResolution.macro,
+                initialThemes = health.archetypeResolution.themes,
+                onApply = onApplyArchetypePlan,
+                onAutoDetect = onAutoDetectArchetypePlan,
+                onDismiss = { showArchetypeSheet = false },
+            )
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -1381,6 +1417,24 @@ private fun SuggestionsTab(
         contentPadding = PaddingValues(spacing.lg),
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
+        // ── Archetype plan chip (Phase 1.7) ─────────────────────────────────────
+        item(key = "archetype_plan_chip") {
+            ArchetypePlanChip(
+                macro = health.archetypeResolution.macro,
+                themes = health.archetypeResolution.themes,
+                isManualOverride = health.archetypeResolution.isManualOverride,
+                onClick = { showArchetypeSheet = true },
+            )
+        }
+        if (!health.archetypeResolution.isManualOverride &&
+            health.archetypeResolution.macro == ArchetypeId.GENERIC &&
+            health.archetypeResolution.themes.isEmpty()
+        ) {
+            item(key = "archetype_plan_hint") {
+                ArchetypePlanHint(onClick = { showArchetypeSheet = true })
+            }
+        }
+
         // ── Health summary ────────────────────────────────────────────────────
         item(key = "health_ring") {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

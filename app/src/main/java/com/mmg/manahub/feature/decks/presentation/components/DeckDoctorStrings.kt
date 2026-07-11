@@ -6,6 +6,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
+import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.ScoreReason
 
 /**
@@ -64,7 +65,20 @@ fun DeckWarning.label(): String = when (this) {
         stringResource(R.string.deck_health_warning_color_source_shortage, color.displayName, sources, needed)
     is DeckWarning.UnfixedSplash ->
         stringResource(R.string.deck_health_warning_unfixed_splash, color.displayName)
+    is DeckWarning.ArchetypeRoleGap ->
+        stringResource(R.string.deck_health_warning_archetype_role_gap, roleKey.archetypeRoleLabel(), min, current)
+    is DeckWarning.ArchetypeAntiRolePresent ->
+        stringResource(R.string.deck_health_warning_archetype_anti_role, roleKey.archetypeRoleLabel(), current, tolerance)
+    is DeckWarning.CurveOutsideArchetypeBand ->
+        stringResource(R.string.deck_health_warning_curve_outside_archetype_band, formatCmc(avgCmc), formatCmc(min), formatCmc(max))
 }
+
+/**
+ * Human-readable fallback label for a [RoleKey] (the Appendix A dynamic-role vocabulary — no
+ * per-key `strings.xml` entry, mirrors `CardTag.displayLabel`'s snake_case->Title Case fallback).
+ */
+fun RoleKey.archetypeRoleLabel(): String = replace('_', ' ').split(' ')
+    .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
 /** Stable identity for a warning, used as a LazyColumn key. */
 val DeckWarning.key: String
@@ -82,6 +96,9 @@ val DeckWarning.key: String
         is DeckWarning.OffColorIdentity -> "off_color_identity_$cardName"
         is DeckWarning.ColorSourceShortage -> "color_source_shortage_${color.name}"
         is DeckWarning.UnfixedSplash -> "unfixed_splash_${color.name}"
+        is DeckWarning.ArchetypeRoleGap -> "archetype_role_gap_$roleKey"
+        is DeckWarning.ArchetypeAntiRolePresent -> "archetype_anti_role_$roleKey"
+        is DeckWarning.CurveOutsideArchetypeBand -> "curve_outside_archetype_band"
     }
 
 /** One-decimal CMC formatting, locale-stable. */

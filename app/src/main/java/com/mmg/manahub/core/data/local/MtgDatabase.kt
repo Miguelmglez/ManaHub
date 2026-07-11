@@ -99,7 +99,7 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         // Community Decks (v41)
         CommunityDeckCacheEntity::class,
     ],
-    version = 42,
+    version = 43,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
