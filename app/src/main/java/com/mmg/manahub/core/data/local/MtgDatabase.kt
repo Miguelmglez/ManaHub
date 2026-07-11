@@ -43,6 +43,8 @@ import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyEntity
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
+import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
+import com.mmg.manahub.core.data.local.entity.CommunityAggregateEntity
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.local.dao.FriendDao
@@ -98,8 +100,10 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         EntitlementEntity::class,
         // Community Decks (v41)
         CommunityDeckCacheEntity::class,
+        // Community aggregate cache — Deck Doctor Community/Archetype plan, Phase 3.3 (v44)
+        CommunityAggregateEntity::class,
     ],
-    version = 43,
+    version = 44,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -132,4 +136,10 @@ abstract class MtgDatabase : RoomDatabase() {
 
     /** Cache of fetched community deck (Archidekt) responses (Community Decks, v41). */
     abstract fun communityDeckCacheDao(): CommunityDeckCacheDao
+
+    /**
+     * Cache of fetched community aggregate (EDHREC/Archidekt) snapshots — Deck Doctor
+     * Community/Archetype plan, Phase 3.3 (v44).
+     */
+    abstract fun communityAggregateDao(): CommunityAggregateDao
 }

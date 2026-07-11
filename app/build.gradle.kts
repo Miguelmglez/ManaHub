@@ -58,6 +58,15 @@ android {
             "CLOUDFLARE_WORKER_URL",
             "\"${localProperties.getProperty("CLOUDFLARE_WORKER_URL", "https://manahub-draft-api.miguel-mglez.workers.dev/")}\""
         )
+        buildConfigField(
+            "String",
+            "COMMUNITY_WORKER_URL",
+            // The `manahub-community` Worker (Deck Doctor Community/Archetype plan, Phase 3.3) is
+            // NOT deployed yet — see cloudflare/manahub-community/wrangler.toml's provisioning
+            // note. This default is an intentionally obvious placeholder (never a real-looking
+            // workers.dev subdomain) until real Cloudflare resources are provisioned.
+            "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.PLACEHOLDER.workers.dev/")}\""
+        )
 
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")

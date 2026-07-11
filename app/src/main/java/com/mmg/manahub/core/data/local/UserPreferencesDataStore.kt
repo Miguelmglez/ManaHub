@@ -81,6 +81,15 @@ private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notific
 /** Master Community Decks switch (Archidekt import/browse). Default: DISABLED until rollout. */
 private val KEY_COMMUNITY_DECKS_ENABLED = booleanPreferencesKey("community_decks_enabled")
 /**
+ * Master Community Engine switch (D4, Deck Doctor Community/Archetype plan, Phase 3.3) — gates
+ * Motor B (EDHREC/Archidekt-backed suggestion aggregates from the `manahub-community` Worker).
+ * DISTINCT from [KEY_COMMUNITY_DECKS_ENABLED] (which gates the unrelated Archidekt deck
+ * browse/import feature). Default: DISABLED — the Worker isn't deployed yet and Motor B has no
+ * consumer UI in this phase; `CommunityAggregateRepositoryImpl` short-circuits every method to a
+ * [com.mmg.manahub.core.model.DataResult.Error] while this is off.
+ */
+private val KEY_COMMUNITY_ENGINE_ENABLED = booleanPreferencesKey("community_engine_enabled")
+/**
  * Master gamification switch (XP, levels, achievements, quests). Default: DISABLED — the
  * gamification UI is hidden for this release (see docs/gamification-hidden-for-release.md).
  * The engine keeps recording progress silently while this is off, so re-enabling restores
@@ -508,6 +517,19 @@ class UserPreferencesDataStore @Inject constructor(
 
     suspend fun setCommunityDecksEnabled(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_COMMUNITY_DECKS_ENABLED] = enabled }
+    }
+
+    /**
+     * Controls whether the Community Engine (Motor B: EDHREC/Archidekt suggestion aggregates) is
+     * active. Default: false (DISABLED) — see [KEY_COMMUNITY_ENGINE_ENABLED]. Distinct from
+     * [communityDecksEnabledFlow].
+     */
+    val communityEngineEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_COMMUNITY_ENGINE_ENABLED] ?: false }
+        .catch { emit(false) }
+
+    suspend fun setCommunityEngineEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_COMMUNITY_ENGINE_ENABLED] = enabled }
     }
 
     /**
