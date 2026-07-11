@@ -43,7 +43,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
 import com.mmg.manahub.feature.decks.domain.usecase.SeedDeckResult
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.Companion.MAX_SEED_CARDS
 import com.mmg.manahub.core.domain.repository.WishlistRepository
@@ -237,7 +237,7 @@ class DeckStudioViewModel(
     private val evaluateDeckUseCase: EvaluateDeckUseCase,
     private val inferDeckIdentityUseCase: InferDeckIdentityUseCase,
     private val suggestCutsUseCase: SuggestCutsUseCase,
-    private val suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase,
+    private val suggestAddsFromCollectionUseCase: SuggestAddsFromCollectionUseCase,
     private val buildDeckFromSeedsUseCase: BuildDeckFromSeedsUseCase,
     private val getDeckGameStatsUseCase: GetDeckGameStatsUseCase,
     private val importDeckUseCase: ImportDeckUseCase,
@@ -278,7 +278,7 @@ class DeckStudioViewModel(
         wishlistRepository = wishlistRepository,
         evaluateDeckUseCase = evaluateDeckUseCase,
         suggestCutsUseCase = suggestCutsUseCase,
-        suggestAddsWithBudgetUseCase = suggestAddsWithBudgetUseCase,
+        suggestAddsFromCollectionUseCase = suggestAddsFromCollectionUseCase,
         inferDeckIdentityUseCase = inferDeckIdentityUseCase,
         crashReporter = crashReporter,
         resolveCard = ::resolveCard,

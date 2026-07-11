@@ -775,9 +775,11 @@
     <string name="deck_studio_suggestions_tab_health">Health</string>
     <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
     <string name="deck_studio_suggestions_tab_adds">Adds</string>
+    <string name="deck_studio_suggestions_from_collection">From your collection</string>
+    <string name="deck_studio_suggestions_from_collection_empty_subtitle">Nothing in your collection fits this deck\'s gaps right now.</string>
     <string name="deck_studio_card_added">Added %1$s</string>
     <string name="deck_studio_card_cut">Removed %1$s</string>
-    <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Check your connection and try again.</string>
+    <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Please try again.</string>
     <string name="deck_studio_tab_build">Build</string>
     <string name="deck_studio_tab_suggestions">Suggestions</string>
 

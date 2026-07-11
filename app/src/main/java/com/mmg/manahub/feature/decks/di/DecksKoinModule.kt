@@ -13,6 +13,7 @@ import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
@@ -95,6 +96,11 @@ fun decksKoinModule(
     single { EvaluateDeckUseCase(deckScorer = get(), progressionEventBus = get(), inferDeckArchetypeUseCase = get()) }
     single { SuggestAddsUseCase(deckScorer = get()) }
     single { SuggestCutsUseCase(deckScorer = get()) }
+    // Deck Doctor Community/Archetype plan, Phase 2 (Motor A): the primary, always-available,
+    // offline adds source — see `project_deck_doctor_phase2_motor_a` memory. Still registered
+    // (DORMANT, D5): `SuggestAddsWithBudgetUseCase` + its `CandidatePoolGenerator`/`BudgetOptimizer`
+    // dependencies — kept for a possible future revival, no longer injected into any live surface.
+    single { SuggestAddsFromCollectionUseCase(deckScorer = get(), manaBaseAnalyzer = get()) }
     single {
         SuggestAddsWithBudgetUseCase(
             deckScorer = get(),
@@ -129,7 +135,7 @@ fun decksKoinModule(
             evaluateDeckUseCase = get(),
             inferDeckIdentityUseCase = get(),
             suggestCutsUseCase = get(),
-            suggestAddsWithBudgetUseCase = get(),
+            suggestAddsFromCollectionUseCase = get(),
             buildDeckFromSeedsUseCase = get(),
             getDeckGameStatsUseCase = get(),
             importDeckUseCase = get(),
