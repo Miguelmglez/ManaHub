@@ -9,12 +9,13 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
-import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
-import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
@@ -22,9 +23,8 @@ import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.queryFragment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -46,15 +46,19 @@ data class DeckDoctorState(
     val health: DeckHealth? = null,
     /** Cut candidates (worst fit first), excluding lands / commander / combo cores. */
     val cuts: List<CardFit> = emptyList(),
-    /** Add suggestions (collection + wishlist + external), budget-filtered, best fit first. */
+    /** Add suggestions — Motor A (collection-only, Phase 2), best fit first. */
     val adds: List<AddSuggestion> = emptyList(),
-    /** Total money the currently shown adds would cost to buy (owned/free cards excluded). */
+    /**
+     * Total money the currently shown adds would cost to buy. Always `0.0` for Motor A (every
+     * candidate is already owned) — kept on the state shape so a future budget-aware source
+     * (Motor B, Phase 4) does not need a UI-facing rename.
+     */
     val addsTotalCostEur: Double = 0.0,
-    /** How many of the shown adds have a non-zero price (i.e. need buying). */
+    /** How many of the shown adds have a non-zero price. Always `0` for Motor A. */
     val addsCardsToBuy: Int = 0,
     /** True while the full analysis (Health + Cut + Add) is being computed. */
     val isSuggestionsLoading: Boolean = false,
-    /** True while only the external (Scryfall) ADD pool is being fetched/recomputed. */
+    /** True while the ADD list is being (re)computed. */
     val isAddsLoading: Boolean = false,
     /** True once at least one full [DeckDoctorOrchestrator.loadAnalysis] has completed. */
     val isLoaded: Boolean = false,
@@ -63,18 +67,21 @@ data class DeckDoctorState(
 /** One-shot Deck Doctor events, delivered through a buffered [Channel] (never a nullable StateFlow). */
 sealed interface DeckDoctorEvent {
     /**
-     * The external (Scryfall) candidate fetch failed; suggestions fell back to collection +
-     * wishlist. The host surfaces this as a non-fatal warning toast.
+     * The ADD suggestion computation threw. Motor A ([SuggestAddsFromCollectionUseCase]) is a pure,
+     * offline, in-memory computation, so this is a purely DEFENSIVE catch (an unexpected bug, never
+     * a network failure) — kept from the pre-Motor-A (Scryfall-backed) pipeline so the host's
+     * existing non-fatal warning toast wiring needs no change. See `project_deck_doctor_phase2_motor_a`
+     * memory for why the name/shape survived the Phase 2 swap unchanged.
      */
     data object ExternalPoolFailed : DeckDoctorEvent
 }
 
 /**
- * Owns the Deck Doctor "Suggestions" incremental-analysis machinery: the [AnalysisCache] +
- * [GapSignature] pattern, the full [loadAnalysis] pass, and incremental card add/cut recompute —
- * extracted out of `DeckStudioViewModel` (Phase 0.4,
- * `docs/claude-code-prompt-deck-doctor-community.md`) so Phase 1's archetype-aware engine has a
- * single home for this orchestration instead of two independently-maintained VM-side copies.
+ * Owns the Deck Doctor "Suggestions" incremental-analysis machinery: the [AnalysisCache] pattern,
+ * the full [loadAnalysis] pass, and incremental card add/cut recompute — extracted out of
+ * `DeckStudioViewModel` (Phase 0.4, `docs/claude-code-prompt-deck-doctor-community.md`) so Phase
+ * 1's archetype-aware engine and Phase 2's Motor A have a single home for this orchestration
+ * instead of two independently-maintained VM-side copies.
  *
  * Pure `commonMain`: platform-only concerns (Crashlytics, DataStore-backed weight overrides,
  * cache-aware card resolution) are injected as callbacks/interfaces by the host ViewModel rather
@@ -88,17 +95,27 @@ sealed interface DeckDoctorEvent {
  *
  * ## H3 — cancel-before-launch on the ADD recompute (preserved exactly)
  * A budget edit, an incremental recompute (after a suggestion add/cut), and the initial full
- * analysis can all race to recompute the external candidate pool; each would write
- * `analysisCache.externalPool` / emit a fresh adds list. [recomputeAddsJob] is cancelled
- * immediately before every new launch (mirroring the pre-extraction `DeckStudioViewModel`
- * behavior verbatim) so only the LATEST recompute can ever survive to update [state] — a stale,
- * slower fetch can never clobber the cache or emit a stale ADD list.
+ * analysis can all race to recompute the ADD list; each would emit a fresh adds list into [state].
+ * [recomputeAddsJob] is cancelled immediately before every new launch (mirroring the
+ * pre-extraction `DeckStudioViewModel` behavior verbatim) so only the LATEST recompute can ever
+ * survive to update [state] — a stale, slower computation can never clobber a newer one.
  *
- * ## Zero-Scryfall incremental reuse (Phase 7 pattern — see `feedback_deck_doctor_phase7_incremental_reload`)
- * The external pool is re-fetched ONLY when [GapSignature] (queryable gap roles ∩
- * [DeckRole.queryFragment], color identity, format) changes between recomputes; otherwise the
- * cached pool is reused via `externalCardsOverride`, so a cut→re-add round-trip with an unchanged
- * gap set issues zero Scryfall calls.
+ * ## Phase 2 — Motor A is the PRIMARY (and, as of this phase, only) adds source
+ * `docs/claude-code-prompt-deck-doctor-community.md` Phase 2 replaces the previous
+ * `SuggestAddsWithBudgetUseCase` pipeline (wishlist + external Scryfall via the now-dormant
+ * `CandidatePoolGenerator`/`BudgetOptimizer`, D5 — see `project_dormant_budget_pool` memory) with
+ * [SuggestAddsFromCollectionUseCase]: an OFFLINE, ALWAYS-AVAILABLE source with no flag gate (unlike
+ * the future Cloudflare-Worker-backed Motor B, Phase 4, which IS flag-gated behind
+ * `communityEngineEnabledFlow`). Because Motor A only ever suggests already-owned cards, the whole
+ * external-pool-fetch-avoidance apparatus the old pipeline needed (a `GapSignature` cache key +
+ * `externalPool` re-fetch guard, to avoid hammering Scryfall on every recompute) is genuinely dead
+ * weight now — there is no network call to avoid, and a full in-memory Motor A recompute on every
+ * incremental add/cut is cheap — so it was removed rather than left unused; see
+ * `project_deck_doctor_phase2_motor_a` memory. Budget UI ([BudgetConstraints]) is intentionally
+ * still threaded through every public method here (D5: "the code stays intact, you're just not
+ * surfacing budget controls") even though Motor A ignores it — zero VM-side signature churn for a
+ * change that only touches HOW the adds list is computed, not the API host `DeckStudioViewModel`
+ * calls.
  *
  * @param scope the host's coroutine scope (typically `viewModelScope`) that every internal job
  *        launches on.
@@ -115,7 +132,7 @@ class DeckDoctorOrchestrator(
     private val wishlistRepository: WishlistRepository,
     private val evaluateDeckUseCase: EvaluateDeckUseCase,
     private val suggestCutsUseCase: SuggestCutsUseCase,
-    private val suggestAddsWithBudgetUseCase: SuggestAddsWithBudgetUseCase,
+    private val suggestAddsFromCollectionUseCase: SuggestAddsFromCollectionUseCase,
     private val inferDeckIdentityUseCase: InferDeckIdentityUseCase,
     private val crashReporter: CrashReporter,
     private val resolveCard: suspend (scryfallId: String) -> Card?,
@@ -129,11 +146,9 @@ class DeckDoctorOrchestrator(
     val events: Flow<DeckDoctorEvent> = _events.receiveAsFlow()
 
     /**
-     * Everything an in-memory incremental re-analysis needs after the first full
-     * [loadAnalysis]. A suggestion add/cut mutates [AnalysisCache.workingMainboard] and
-     * recomputes profile/evaluation/cuts locally; the expensive external (Scryfall) pool is
-     * only re-fetched when [AnalysisCache.gapSignature] changes. Null until the first full
-     * analysis runs.
+     * Everything an in-memory incremental re-analysis needs after the first full [loadAnalysis].
+     * A suggestion add/cut mutates [AnalysisCache.workingMainboard] and recomputes
+     * profile/evaluation/cuts/adds locally. Null until the first full analysis runs.
      */
     private var analysisCache: AnalysisCache? = null
 
@@ -149,11 +164,13 @@ class DeckDoctorOrchestrator(
         val commanderIdentity: Set<String>,
         val seedTags: List<CardTag>,
         val collection: List<Card>,
+        /**
+         * Kept for a possible future wishlist-backed suggestion source — Motor A (Phase 2) reads
+         * ONLY [collection], never this. See the class KDoc's "Phase 2" section.
+         */
         val wishlistIds: Set<String>,
         val resolvedById: MutableMap<String, Card>,
         val unresolvedCount: Int,
-        var gapSignature: GapSignature,
-        var externalPool: List<Card>,
         // ── Archetype-aware Deck Doctor (Phase 1.6, D2) ─────────────────────────
         /** Raw `Deck.archetypeOverride`/`themesOverride` — re-read on every incremental recompute
          * so a mid-session override change (via [setArchetypeOverride]/[clearArchetypeOverride])
@@ -161,22 +178,6 @@ class DeckDoctorOrchestrator(
         var archetypeOverride: String?,
         var themesOverride: List<String>,
         val commanderTags: List<CardTag>,
-    )
-
-    /**
-     * Drives the external Scryfall candidate query; an unchanged signature reuses the cached pool.
-     * [archetypeId]/[colorCount] were added in Phase 1.6 (D18/D2): an override change or a
-     * color-affecting mainboard edit must invalidate the cached external pool exactly like a gap-
-     * role change already does — the resolved skeleton (and therefore which roles are "gaps")
-     * depends on both.
-     */
-    private data class GapSignature(
-        val gapRoles: Set<DeckRole>,
-        val colorIdentity: Set<ManaColor>,
-        val format: DeckFormat,
-        val archetypeId: ArchetypeId,
-        val themes: List<ThemeId>,
-        val colorCount: Int,
     )
 
     /**
@@ -263,8 +264,6 @@ class DeckDoctorOrchestrator(
                 wishlistIds = wishlistIds,
                 resolvedById = resolvedById,
                 unresolvedCount = unresolvedCount,
-                gapSignature = gapSignatureOf(health),
-                externalPool = emptyList(),
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
                 commanderTags = commanderTags,
@@ -285,54 +284,48 @@ class DeckDoctorOrchestrator(
                     isSuggestionsLoading = false,
                 )
             }
-            recomputeAddsInternal(constraints, externalOverride = null)
+            recomputeAddsInternal(constraints)
         }
     }
 
     /**
-     * Public entry for a budget-change-triggered recompute (a budget change alters the external
-     * USD pre-filter, so the external pool is always re-fetched here — never reused).
+     * Public entry for a budget-change-triggered recompute. Motor A ignores [constraints] entirely
+     * (every candidate is already owned — see the class KDoc's "Phase 2" section) but the method is
+     * kept so the host's budget-editing handlers (`onPerCardBudgetChange`/`onTotalBudgetChange`/
+     * `onClearBudget`) need no change, per D5.
      */
     fun recomputeAdds(constraints: BudgetConstraints) {
-        recomputeAddsInternal(constraints, externalOverride = null)
+        recomputeAddsInternal(constraints)
     }
 
     /**
-     * Recomputes the ADD suggestions from [analysisCache] against [constraints].
-     *
-     * @param externalOverride when non-null, the cached external pool is reused and NO Scryfall
-     *        call is made; when null, a fresh external pool is fetched and re-cached.
+     * Recomputes the ADD suggestions from [analysisCache] via Motor A
+     * ([SuggestAddsFromCollectionUseCase]). [constraints] is accepted (see [recomputeAdds]'s KDoc)
+     * but not forwarded — Motor A has no budget dimension.
      */
-    private fun recomputeAddsInternal(constraints: BudgetConstraints, externalOverride: List<Card>?) {
+    private fun recomputeAddsInternal(@Suppress("UNUSED_PARAMETER") constraints: BudgetConstraints) {
         val context = analysisCache ?: return
-        val profile = _state.value.health?.profile ?: return
-        val evaluation = _state.value.health?.evaluation ?: return
-        // Cancel any in-flight recompute so two racing fetches can't both write
-        // context.externalPool / emit a stale ADD list (H3).
+        val health = _state.value.health ?: return
+        // Cancel any in-flight recompute so two racing computations can't both emit a stale ADD
+        // list (H3).
         recomputeAddsJob?.cancel()
         recomputeAddsJob = scope.launch {
             _state.update { it.copy(isAddsLoading = true) }
-            val mainboardIds = context.workingMainboard.map { it.card.scryfallId }.toSet()
-            val mainboardCopiesByName = context.workingMainboard
-                .groupBy { it.card.name }
-                .mapValues { (_, entries) -> entries.sumOf { it.quantity } }
             val weights = weightsProvider().toScoreWeights()
+            val resolvedSkeleton = resolveArchetypeSkeleton(health)
+
             val result = runCatching {
-                suggestAddsWithBudgetUseCase(
+                suggestAddsFromCollectionUseCase(
                     collection = context.collection,
-                    wishlistIds = context.wishlistIds,
-                    mainboardIds = mainboardIds,
-                    profile = profile,
-                    evaluation = evaluation,
-                    constraints = constraints,
+                    mainboard = context.workingMainboard,
+                    profile = health.profile,
+                    resolvedSkeleton = resolvedSkeleton,
                     weights = weights,
-                    externalCardsOverride = externalOverride,
-                    mainboardCopiesByName = mainboardCopiesByName,
                 )
             }
-            val selection = result.getOrNull()
+            val suggestions = result.getOrNull()
 
-            if (selection == null) {
+            if (suggestions == null) {
                 val error = result.exceptionOrNull()
                 crashReporter.log("deck_studio_external_pool_failed")
                 crashReporter.setCustomKey("deck_studio_format", context.format.name)
@@ -345,17 +338,16 @@ class DeckDoctorOrchestrator(
                 return@launch
             }
 
-            context.externalPool = selection.externalPool
-            selection.selected.forEach {
+            suggestions.forEach {
                 val id = it.fit.card.scryfallId
                 if (id !in context.resolvedById) context.resolvedById[id] = it.fit.card
             }
 
             _state.update {
                 it.copy(
-                    adds = selection.selected,
-                    addsTotalCostEur = selection.totalCostEur,
-                    addsCardsToBuy = selection.cardsToBuy,
+                    adds = suggestions,
+                    addsTotalCostEur = 0.0,
+                    addsCardsToBuy = 0,
                     isAddsLoading = false,
                 )
             }
@@ -365,8 +357,6 @@ class DeckDoctorOrchestrator(
     /**
      * Re-evaluates the deck IN MEMORY from [AnalysisCache.workingMainboard] after a single-card
      * suggestion add/cut: rebuild profile/evaluation/cuts (pure), then recompute ADD suggestions.
-     * The external pool is re-fetched ONLY when the queryable gap set changed; otherwise the
-     * cached pool is reused (ZERO Scryfall calls).
      */
     private fun recomputeIncremental(constraints: BudgetConstraints) {
         val context = analysisCache ?: return
@@ -395,11 +385,7 @@ class DeckDoctorOrchestrator(
                     cuts = cuts,
                 )
             }
-
-            val newSignature = gapSignatureOf(health)
-            val gapsUnchanged = newSignature == context.gapSignature
-            context.gapSignature = newSignature
-            recomputeAddsInternal(constraints, externalOverride = if (gapsUnchanged) context.externalPool else null)
+            recomputeAddsInternal(constraints)
         }
     }
 
@@ -492,18 +478,26 @@ class DeckDoctorOrchestrator(
     private fun identityTagCount(card: Card): Int =
         (card.tags + card.userTags).count { it.category in IDENTITY_CATEGORIES }
 
-    /** The queryable gap set + identity/format/archetype that drives the external Scryfall pool. */
-    private fun gapSignatureOf(health: DeckHealth): GapSignature = GapSignature(
-        gapRoles = health.evaluation.roleCoverage
-            .filter { it.gap > 0 && it.role.queryFragment() != null }
-            .map { it.role }
-            .toSet(),
-        colorIdentity = health.profile.colorIdentity,
-        format = health.profile.format,
-        archetypeId = health.archetypeResolution.macro,
-        themes = health.archetypeResolution.themes,
-        colorCount = health.profile.colorIdentity.size,
-    )
+    /**
+     * Resolves the archetype/theme skeleton Motor A's theme-role bonus scores against, mirroring
+     * [EvaluateDeckUseCase]'s own resolution EXACTLY (same inputs: format, resolved macro/themes,
+     * color count) — a cheap, pure, side-effect-free re-derivation (no card iteration), never a
+     * second source of truth. Returns `null` for the GENERIC-with-no-themes / no-archetype-skeleton
+     * (Draft) cases, exactly like [EvaluateDeckUseCase]'s own byte-stability branch — Motor A then
+     * scores purely off [com.mmg.manahub.feature.decks.domain.engine.DeckScorer.rankAdds] plus the
+     * pip multiplier, with zero theme bonus.
+     */
+    private fun resolveArchetypeSkeleton(health: DeckHealth): ResolvedArchetypeSkeleton? {
+        val archetypeFormat = ArchetypeFormat.of(health.profile.format) ?: return null
+        val resolution = health.archetypeResolution
+        if (resolution.macro == ArchetypeId.GENERIC && resolution.themes.isEmpty()) return null
+        return ArchetypeSkeletonResolver.resolveWithColor(
+            format = archetypeFormat,
+            archetype = resolution.macro,
+            themes = resolution.themes,
+            colorCount = health.profile.colorIdentity.size,
+        )
+    }
 
     // ── Archetype override (Phase 1.7 Studio UI entry point) ───────────────────────
 

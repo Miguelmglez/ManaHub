@@ -58,6 +58,10 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(libs.kotlin.test)
+                // Deck Doctor Community/Archetype plan, Phase 2: SuggestAddsFromCollectionUseCase's
+                // `invoke` is `suspend` (withContext(ioDispatcher)) — runTest/virtual-time control is
+                // needed to call it deterministically from commonTest.
+                implementation(libs.coroutines.test)
             }
         }
         // androidMain / wasmJsMain intentionally have no code yet (placeholders for future actuals).

@@ -29,14 +29,13 @@ import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetOptimizer
-import com.mmg.manahub.feature.decks.domain.usecase.BudgetSelection
 import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SeedDeckResult
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import io.mockk.clearMocks
@@ -71,8 +70,10 @@ import org.junit.Test
  * - Phase 1 tests use REAL use-case instances for the Deck Doctor pipeline (EvaluateDeckUseCase,
  *   InferDeckIdentityUseCase, SuggestCutsUseCase) to verify end-to-end wiring, with only the
  *   repository / network surface mocked (pattern from DeckImprovementViewModelTest).
- * - Phase 2 tests mock [SuggestAddsWithBudgetUseCase] directly to control add-pipeline behaviour
- *   without triggering Scryfall calls, focusing on the incremental-reuse and budget-guard logic.
+ * - Phase 2 (Deck Doctor Community/Archetype plan, Motor A) tests mock
+ *   [SuggestAddsFromCollectionUseCase] directly to control add-pipeline behaviour, focusing on the
+ *   incremental-recompute and budget-parsing-state (D5: budget UI is hidden but the VM's parsing
+ *   state machinery stays intact) logic.
  * - [FirebaseCrashlytics] is always static-mocked because [logFailure] is called outside
  *   a runCatching block.
  * - [Context] is mocked to return the canonical "New deck" default name so the
@@ -104,16 +105,15 @@ class DeckStudioViewModelTest {
     private val suggestCutsUseCase = SuggestCutsUseCase(scorer, dispatcher)
     private val candidatePoolGenerator = CandidatePoolGenerator(cardRepository, dispatcher)
     private val budgetOptimizer = BudgetOptimizer()
-    private val realSuggestAddsWithBudgetUseCase = SuggestAddsWithBudgetUseCase(
+    // Deck Doctor Community/Archetype plan, Phase 2: Motor A is the primary (offline,
+    // collection-only) adds source — see `project_deck_doctor_phase2_motor_a` memory.
+    private val realSuggestAddsFromCollectionUseCase = SuggestAddsFromCollectionUseCase(
         deckScorer = scorer,
-        candidatePoolGenerator = candidatePoolGenerator,
-        budgetOptimizer = budgetOptimizer,
-        cardRepository = cardRepository,
         ioDispatcher = dispatcher,
     )
 
-    // ── Mocked suggestAddsWithBudgetUseCase for Phase 2 budget/incremental tests ──
-    private val mockSuggestAddsWithBudgetUseCase = mockk<SuggestAddsWithBudgetUseCase>()
+    // ── Mocked suggestAddsFromCollectionUseCase for Phase 2 budget/incremental tests ──
+    private val mockSuggestAddsFromCollectionUseCase = mockk<SuggestAddsFromCollectionUseCase>()
 
     // ── Real BuildDeckFromSeedsUseCase for Phase 3 seed-build (reuses the engine instances) ──
     private val buildDeckFromSeedsUseCase = BuildDeckFromSeedsUseCase(
@@ -248,7 +248,7 @@ class DeckStudioViewModelTest {
             evaluateDeckUseCase = evaluateDeckUseCase,
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
-            suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+            suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
             buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             getDeckGameStatsUseCase = getDeckGameStatsUseCase,
             importDeckUseCase = importDeckUseCase,
@@ -262,7 +262,7 @@ class DeckStudioViewModelTest {
             ),
         )
 
-    /** Creates the ViewModel with a MOCKED SuggestAddsWithBudgetUseCase (Phase 2 budget tests). */
+    /** Creates the ViewModel with a MOCKED SuggestAddsFromCollectionUseCase (Phase 2 budget tests). */
     private fun createVmWithMockedAdds(deckId: String? = null): DeckStudioViewModel =
         DeckStudioViewModel(
             deckRepository = deckRepository,
@@ -273,7 +273,7 @@ class DeckStudioViewModelTest {
             evaluateDeckUseCase = evaluateDeckUseCase,
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
-            suggestAddsWithBudgetUseCase = mockSuggestAddsWithBudgetUseCase,
+            suggestAddsFromCollectionUseCase = mockSuggestAddsFromCollectionUseCase,
             buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             getDeckGameStatsUseCase = getDeckGameStatsUseCase,
             importDeckUseCase = importDeckUseCase,
@@ -298,7 +298,7 @@ class DeckStudioViewModelTest {
             evaluateDeckUseCase = evaluateDeckUseCase,
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
-            suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+            suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
             buildDeckFromSeedsUseCase = mockBuildDeckFromSeedsUseCase,
             getDeckGameStatsUseCase = getDeckGameStatsUseCase,
             importDeckUseCase = importDeckUseCase,
@@ -340,13 +340,6 @@ class DeckStudioViewModelTest {
         primaryTag = CardTag.TRIBAL,
     )
 
-    /** A minimal empty BudgetSelection returned by the mock adds use case. */
-    private fun emptyBudgetSelection(externalPool: List<Card> = emptyList()) = BudgetSelection(
-        selected = emptyList(),
-        totalCostEur = 0.0,
-        cardsToBuy = 0,
-        externalPool = externalPool,
-    )
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 1 — Init: draft creation vs. existing deck
@@ -370,7 +363,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = importDeckUseCase,
@@ -1069,7 +1062,7 @@ class DeckStudioViewModelTest {
 
             // Assert — no analysis triggered from BUILD tab selection.
             assertEquals(DeckStudioTab.BUILD, vm.uiState.value.selectedTab)
-            coVerify(exactly = 0) { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+            coVerify(exactly = 0) { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) }
         }
 
     @Test
@@ -1143,8 +1136,8 @@ class DeckStudioViewModelTest {
         runTest(dispatcher) {
             // Arrange — open SUGGESTIONS so analysisCache is primed.
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
@@ -1165,8 +1158,8 @@ class DeckStudioViewModelTest {
         runTest(dispatcher) {
             // Arrange
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
@@ -1193,8 +1186,8 @@ class DeckStudioViewModelTest {
         runTest(dispatcher) {
             // Arrange
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
@@ -1215,8 +1208,8 @@ class DeckStudioViewModelTest {
         runTest(dispatcher) {
             // Arrange — BudgetConstraints.init throws for value <= 0.
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
@@ -1234,8 +1227,8 @@ class DeckStudioViewModelTest {
     fun `given negative value when onPerCardBudgetChange then budgetError=true`() =
         runTest(dispatcher) {
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
@@ -1254,8 +1247,8 @@ class DeckStudioViewModelTest {
         runTest(dispatcher) {
             // Arrange — set an invalid budget first.
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
@@ -1280,8 +1273,8 @@ class DeckStudioViewModelTest {
         runTest(dispatcher) {
             // Arrange
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
@@ -1298,34 +1291,33 @@ class DeckStudioViewModelTest {
         }
 
     @Test
-    fun `budget change always forces a refetch (externalCardsOverride = null)`() =
+    fun `budget change still triggers a Motor A recompute (D5 — budget UI hidden, wiring intact)`() =
         runTest(dispatcher) {
-            // Arrange — prime the cache.
+            // Arrange — prime the cache. Motor A (SuggestAddsFromCollectionUseCase) has no budget
+            // dimension (Phase 2 — every candidate is already owned), but the VM's budget-parsing
+            // handlers still call `deckDoctorOrchestrator.recomputeAdds(constraints)` unconditionally
+            // (D5: "the code stays intact, you're just not surfacing budget controls") — this test
+            // pins that a budget edit still results in (at least) one more Motor A call, i.e. the
+            // wiring was not silently dropped when Motor A replaced the old budget-aware pipeline.
             stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection(externalPool = listOf(elfCard))
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
             vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
             advanceUntilIdle()
 
             // Clear call history to isolate the budget-change call.
-            clearMocks(mockSuggestAddsWithBudgetUseCase, answers = false, recordedCalls = true, verificationMarks = true)
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
-                emptyBudgetSelection()
+            clearMocks(mockSuggestAddsFromCollectionUseCase, answers = false, recordedCalls = true, verificationMarks = true)
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } returns
+                emptyList()
 
-            // Act — change the budget (forces a refetch, externalOverride = null).
+            // Act
             vm.onPerCardBudgetChange("3.00")
             advanceUntilIdle()
 
-            // Assert — called with externalCardsOverride = null (fresh fetch).
-            coVerify {
-                mockSuggestAddsWithBudgetUseCase(
-                    any(), any(), any(), any(), any(), any(), any(), any(),
-                    externalCardsOverride = null,
-                    any(),
-                )
-            }
+            // Assert
+            coVerify(atLeast = 1) { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) }
         }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1513,39 +1505,23 @@ class DeckStudioViewModelTest {
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 12 — ExternalPoolFailed path (Phase 2)
+    //
+    //  Motor A (SuggestAddsFromCollectionUseCase, Phase 2) is a pure, offline, in-memory
+    //  computation over the already-loaded collection/mainboard — it never calls a repository
+    //  or the network, so there is no longer a "network throws" scenario to simulate via
+    //  `cardRepository.searchWithRawQuery` (the pre-Motor-A test that did this was retired: its
+    //  premise no longer holds, see `project_deck_doctor_phase2_motor_a` memory). The single
+    //  remaining scenario is a purely DEFENSIVE catch of an unexpected exception from the use
+    //  case itself, covered below with the mocked use case.
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `when suggestAddsWithBudgetUseCase throws then ExternalPoolFailed event is emitted`() =
+    fun `when suggestAddsFromCollectionUseCase throws then ExternalPoolFailed event is emitted`() =
         runTest(dispatcher) {
-            // Arrange — make the real use case fail by having CandidatePoolGenerator throw
-            // via a mock cardRepository that throws on searchWithRawQuery.
+            // Arrange
             stubResolvableDeck()
-            coEvery { cardRepository.searchWithRawQuery(any()) } throws RuntimeException("Scryfall unavailable")
-            val vm = createVm()
-            advanceUntilIdle()
-
-            val events = mutableListOf<DeckStudioEvent>()
-            val collectJob = backgroundScope.launch { vm.events.collect { events += it } }
-
-            // Act — open SUGGESTIONS tab which triggers loadAnalysis → recomputeAdds.
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
-            advanceUntilIdle()
-            collectJob.cancel()
-
-            // Assert — ExternalPoolFailed emitted, VM does not crash.
-            // Note: if no gap roles need external fetch, the call may not happen.
-            // The test asserts the VM is still operational.
-            assertFalse("isAddsLoading must be false after failure", vm.uiState.value.isAddsLoading)
-        }
-
-    @Test
-    fun `when suggestAddsWithBudgetUseCase returns null selection then ExternalPoolFailed event emitted`() =
-        runTest(dispatcher) {
-            // Arrange — mock the use case to return null (simulates an exception via getOrNull).
-            stubResolvableDeck()
-            coEvery { mockSuggestAddsWithBudgetUseCase(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } throws
-                RuntimeException("Network error")
+            coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } throws
+                RuntimeException("Unexpected Motor A failure")
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
 
@@ -2516,7 +2492,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
@@ -2558,7 +2534,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
@@ -2608,7 +2584,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
@@ -2648,7 +2624,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
@@ -2690,7 +2666,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
@@ -2741,7 +2717,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = blockingImport,
@@ -2792,7 +2768,7 @@ class DeckStudioViewModelTest {
                 evaluateDeckUseCase = evaluateDeckUseCase,
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
-                suggestAddsWithBudgetUseCase = realSuggestAddsWithBudgetUseCase,
+                suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
                 buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = blockingImport,

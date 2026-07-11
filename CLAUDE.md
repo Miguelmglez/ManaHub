@@ -413,26 +413,31 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
 ### Deck Doctor
 Original 8 phases complete; a separate **engine-quality plan** is complete (see below), and the
 **archetype-aware Community/Archetype plan** (`docs/claude-code-prompt-deck-doctor-community.md`)
-Phase 1 is complete: a new archetype/theme skeleton layer (`ArchetypeDefinition`/`ThemeDefinition`/
-`ArchetypeSkeletonResolver`/`ArchetypeEvaluator`/`ArchetypeRoleClassifier`/
-`InferDeckArchetypeUseCase`) sits ADDITIVELY on top of the engine below, in the SAME
-`shared/core-domain` commonMain package as the rest of it (not `:app`'s `feature/decks/domain/engine`
-— that location is stale, the whole engine was promoted to `shared/core-domain` during the KMP
-migration). `EvaluateDeckUseCase` resolves the deck's archetype (`Deck.archetypeOverride`/
-`themesOverride` pin, else classifier inference) and only computes archetype-aware warnings when
-non-GENERIC/themed — a GENERIC deck's evaluation is byte-identical to before. Deck Studio's
-Suggestions header carries a "Deck plan" chip/sheet (still behind the same
-`DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flag). → memory: `project_archetype_engine`. Key invariants:
+Phases 1-2 are complete: Phase 1 added a new archetype/theme skeleton layer
+(`ArchetypeDefinition`/`ThemeDefinition`/`ArchetypeSkeletonResolver`/`ArchetypeEvaluator`/
+`ArchetypeRoleClassifier`/`InferDeckArchetypeUseCase`) sitting ADDITIVELY on top of the engine
+below, in the SAME `shared/core-domain` commonMain package as the rest of it (not `:app`'s
+`feature/decks/domain/engine` — that location is stale, the whole engine was promoted to
+`shared/core-domain` during the KMP migration). `EvaluateDeckUseCase` resolves the deck's archetype
+(`Deck.archetypeOverride`/`themesOverride` pin, else classifier inference) and only computes
+archetype-aware warnings when non-GENERIC/themed — a GENERIC deck's evaluation is byte-identical to
+before. Deck Studio's Suggestions header carries a "Deck plan" chip/sheet (still behind the same
+`DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flag). Phase 2 added **Motor A**
+(`SuggestAddsFromCollectionUseCase`, same package): the offline, always-on, collection-only add
+source, now `DeckDoctorOrchestrator`'s SOLE adds source (it REPLACED, not supplemented,
+`SuggestAddsWithBudgetUseCase`). → memory: `project_archetype_engine`, `project_deck_doctor_phase2_motor_a`.
+Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
 - `generateFromSeeds()` captures inputs atomically inside `_uiState.update { }` (double-tap + stale-snapshot guards).
 - `DeckDoctorOrchestrator.loadAnalysis()` cancels its own `analysisJob` before relaunching (the
   incremental-analysis machinery lives there now, not inline in the ViewModel — see the Deck Studio
   section above).
-- `CandidatePoolGenerator`/`BudgetOptimizer` (D5) are marked DORMANT via KDoc — not wired to any
-  live surface while the Studio Suggestions tab stays flag-gated off; do not delete.
-  `Card.colors`/`colorIdentity`/`producedMana` (D14) are persisted as compact WUBRG-subset strings
-  (not JSON) for the future color-aware skeleton/scoring rules. → memory: `project_dormant_budget_pool`,
-  `project_card_model_produced_mana`
+- `CandidatePoolGenerator`/`BudgetOptimizer`/`SuggestAddsWithBudgetUseCase` (D5) are DORMANT — still
+  Koin-registered but no longer referenced by any live class since Motor A replaced them in
+  `DeckDoctorOrchestrator` (Phase 2); do not delete. `Card.colors`/`colorIdentity`/`producedMana`
+  (D14) are persisted as compact WUBRG-subset strings (not JSON); Motor A's pip-intensity multiplier
+  and unknown-color-identity fail-closed filter (Commander only) consume them. → memory:
+  `project_dormant_budget_pool`, `project_card_model_produced_mana`, `project_deck_doctor_phase2_motor_a`
 - `CandidatePoolGenerator.legalityFragment()` returns `String?`; `DRAFT → null` (no legality restriction).
 - `BudgetConstraints` has an `init` block validating finite/positive values.
 - `SeedStrategy.TOKENS` test requires all 3 primary tags (TOKENS+AGGRO+TRIBAL) to beat AGGRO's tie.

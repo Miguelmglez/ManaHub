@@ -1347,12 +1347,14 @@ private fun InspirationsSheetContent(
 }
 
 /**
- * The Suggestions surface (Deck Doctor inline, Phase 2): a Health summary, the Cut
- * list, the Add list, and the free-text [BudgetInputBar], all driven by the live
- * deck via [DeckStudioViewModel]. The row composables and string helpers live in
- * [com.mmg.manahub.feature.decks.presentation.components] — this is now the SOLE
- * Deck Doctor UI surface; the standalone Deck Improvement screen those composables
- * were originally copied from was retired in Phase 0.5 (D10).
+ * The Suggestions surface (Deck Doctor inline, Phase 1/2): a Health summary, the Cut list, and
+ * the "From your collection" Add list (Motor A, Phase 2 — offline, always available), all driven
+ * by the live deck via [DeckStudioViewModel]. [BudgetInputBar] is NOT shown here (D5 — Motor A
+ * suggestions are already owned, so budget is moot); it stays in the codebase for a different
+ * editing surface. The row composables and string helpers live in
+ * [com.mmg.manahub.feature.decks.presentation.components] — this is now the SOLE Deck Doctor UI
+ * surface; the standalone Deck Improvement screen those composables were originally copied from
+ * was retired in Phase 0.5 (D10).
  *
  * Stateless: all state comes from [uiState]; every mutation is a callback to the VM.
  */
@@ -1474,33 +1476,14 @@ private fun SuggestionsTab(
             }
         }
 
-        // ── Budget + Adds ────────────────────────────────────────────────────────
+        // ── Adds — Motor A (Deck Doctor Community/Archetype plan Phase 2): collection-only,
+        //    offline, always available. `BudgetInputBar` stays in the codebase (D5) but is not
+        //    surfaced here — every Motor A suggestion is already owned, so budget is moot for it.
         item(key = "adds_header") {
-            SuggestionsSectionHeader(stringResource(R.string.deck_studio_suggestions_tab_adds), mc.lifePositive)
-        }
-        item(key = "budget_bar") {
-            BudgetInputBar(
-                perCardText = uiState.rawPerCardText,
-                totalText = uiState.rawTotalText,
-                ownedCardsAreFree = uiState.ownedCardsAreFree,
-                hasError = uiState.budgetError,
-                onPerCardChange = onPerCardBudgetChange,
-                onTotalChange = onTotalBudgetChange,
-                onOwnedFreeChange = onOwnedFreeChange,
-                onClear = onClearBudget,
+            SuggestionsSectionHeader(
+                stringResource(R.string.deck_studio_suggestions_from_collection),
+                mc.lifePositive,
             )
-        }
-        item(key = "budget_summary") {
-            val summaryText = if (uiState.addsCardsToBuy == 0) {
-                stringResource(R.string.deck_doctor_budget_all_owned)
-            } else {
-                stringResource(
-                    R.string.deck_doctor_budget_to_buy,
-                    String.format(java.util.Locale.US, "%.2f", uiState.addsTotalCostEur),
-                    uiState.addsCardsToBuy,
-                )
-            }
-            Text(text = summaryText, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
         }
         when {
             uiState.isAddsLoading -> item(key = "adds_loading") {
@@ -1512,10 +1495,10 @@ private fun SuggestionsTab(
                 }
             }
             uiState.adds.isEmpty() -> item(key = "adds_empty") {
-                Text(
-                    text = stringResource(R.string.deck_doctor_add_empty_title),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textSecondary,
+                EmptyState(
+                    title = stringResource(R.string.deck_doctor_add_empty_title),
+                    subtitle = stringResource(R.string.deck_studio_suggestions_from_collection_empty_subtitle),
+                    icon = Icons.Default.AutoAwesome,
                 )
             }
             else -> items(uiState.adds, key = { "add_${it.fit.card.scryfallId}" }) { suggestion ->
