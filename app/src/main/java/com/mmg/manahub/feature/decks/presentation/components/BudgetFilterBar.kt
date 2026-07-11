@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.improvement.components
+package com.mmg.manahub.feature.decks.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

@@ -125,12 +125,16 @@ Broadly-applicable rules (feature-specific detail → memory):
 and silently deletes all `UserCardEntity` rows for that card. The DAO uses INSERT OR IGNORE + `@Update`
 in a `@Transaction`. Regression test: `CardDao CASCADE regression`.
 
-### Database (Room v40)
+### Database (Room v42)
 - DB file `mtg_collection.db`. `UserCardEntity` FK to `CardEntity` is `ON DELETE RESTRICT` (v38).
-- Migration chain 1→40, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
-  not safe for production data). v39 = 6 gamification tables; **v40 = additive `legality_legacy`/
-  `legality_vintage`/`legality_pauper` on `cards`** (Deck Doctor Phase 4 D2; `MIGRATION_39_40`, top-level
-  `val`, `ADD COLUMN … TEXT NOT NULL DEFAULT 'not_legal'`, CardDao upsert untouched → no CASCADE risk).
+- Migration chain 1→42, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
+  not safe for production data). v39 = 6 gamification tables; v40 = additive `legality_legacy`/
+  `legality_vintage`/`legality_pauper` on `cards` (Deck Doctor Phase 4 D2); v41 = Community Decks
+  attribution columns on `decks` + `community_deck_cache` table; **v42 = additive `produced_mana`
+  (compact WUBRG string, not JSON) on `cards`** (Deck Doctor Community/Archetype plan Phase 0.3, D14).
+  Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
+  `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a `columnExists` check, CardDao upsert untouched
+  → no CASCADE risk. → memory: `project_card_model_produced_mana`
 - Schema: `app/schemas/com.mmg.manahub.core.data.local.MtgDatabase/` (latest version json gitignored —
   regenerate locally).
 
@@ -331,8 +335,11 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   `WeightedBoosterGenerator` matches `variant.contents` keys to `sheets[name]`). Never collapse names —
   matching `"foil"` before `"land"` misfiles `foilLand`/`nonFoilLand` as foil and **deletes the land slot**.
   Booster sheet ids are oracle-collapse-remapped onto the app pool (`set:<code> lang:en unique:cards`) so
-  everything resolves on-device with no app change; external sheets (`specialGuest`) are dropped and their
-  slot re-homed to `common`.
+  everything resolves on-device. Cross-product uuids resolve via MTGJSON `sourceSetCodes`; a source set the
+  tier list RATES joins the pool as top-level `extraPoolSets: [...]` in booster.json (SOS → `["soa"]`
+  Mystical Archive — the app widens the pool query to `(set:x or set:y) lang:en`, entries sanitised against
+  `^[a-z0-9]{2,6}$` at BOTH parse and query build), while unrated external sheets (`specialGuest`) are
+  dropped and their slot re-homed to `common`.
 - **Bot/suggested-pick engine must be archetype-based, not 2-color commitment** (the old
   `HeuristicBotDrafter` forces a 2-color pool and breaks 3+ color sets like TDM's wedges). Target: a
   data-driven `engine.json` per set + a generic `ArchetypeAwareBotDrafter`, with `HeuristicBotDrafter` as
@@ -358,7 +365,13 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   stripped and the card's own name is replaced with `~` before matching.
 - **Tag keys are persisted user data — NEVER rename an existing key.** User overrides use the
   rule-line syntax: terms joined by ` + ` are ANDed, `!term` excludes.
-- → memory: `project_tagging_engine_v2`
+- **D12 — system dictionary entries are read-only for users.** The editor shows system rows
+  view-only (label + rules, no edit/delete); users can only create/edit/delete their OWN tags, under
+  the `custom_` key prefix (`TagDictionaryRepository.CUSTOM_KEY_PREFIX`) — `upsert` rejects any other
+  key. `StrategyAnalyzer.analyze()` returns empty on a blank `oracleText` BEFORE evaluating any rule,
+  including `typeLineAnyOf`-only ones — a type-line-only detector still needs a non-blank oracle text
+  fixture to be exercised in tests.
+- → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
@@ -376,16 +389,22 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
   guard added when existing decks started routing through Studio; without it, opening a real empty deck and
   backing out deleted it.) Delete completes BEFORE nav.
 - Free-text budget: **never build `BudgetConstraints` from raw `TextField` text** — raw String + last-valid +
-  error flag, parse-guard in the VM. Deck Doctor incremental `AnalysisCache`/`GapSignature` is DUPLICATED
-  here (not shared with `DeckImprovementViewModel`).
+  error flag, parse-guard in the VM. The Deck Doctor incremental `AnalysisCache`/`GapSignature`/
+  `loadAnalysis`/`recomputeIncremental`/`recomputeAdds` machinery lives in `DeckDoctorOrchestrator`
+  (`shared/core-domain/.../feature/decks/domain/orchestrator/`, commonMain) — `DeckStudioViewModel`
+  constructs one instance per session and delegates to it; VM-internal LOGIC gates must read
+  `deckDoctorOrchestrator.state.value` directly (never the merged `_uiState`) to stay race-free.
 - Migrated from the legacy editor: inline `CardDetailSheet` (deck-card taps; search-result taps still nav to
   CardDetail), basic-land suggestions (`landDeltas`/`applyLandSuggestions`), stateless `WarningOverlay`
   (over-limit/color-identity/non-legendary-commander + acknowledge), deck game-stats card, playtest button.
   `CardDetailSheet`/`WarningOverlay`/`DeckFormatChipRow` are reusable composables in `presentation/components/`.
 - `DeckMagicDetailScreen` (in `DeckBuilderScreen.kt`) + `DeckBuilderViewModel` + `Screen.DeckDetail` route are
-  now an UNUSED fallback (kept compiling until parity confirmed in real use — then delete). `DeckImprovementScreen`
-  unchanged (still reachable as a secondary path; the Studio Suggestions tab covers the same engine inline).
-- → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`
+  now an UNUSED fallback (kept compiling until parity confirmed in real use — then delete).
+  **`DeckImprovementScreen`/`DeckImprovementViewModel`/`Screen.DeckImprovement` were RETIRED (D10)** — the
+  Studio Suggestions tab is the sole Deck Doctor UI surface; `DeckMagicDetailScreen.onImproveDeck`
+  re-points to `Screen.DeckStudio`.
+- → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`,
+  `project_deck_doctor_orchestrator_extraction`, `project_deck_studio_improvement_retirement`
 
 ### Incomplete / quirks
 - **SetPickerViewModel**: `clearFilters()` calls `applyFilters()` to respect `restrictedSets` — do not
@@ -395,7 +414,14 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
 Original 8 phases complete; a separate **engine-quality plan** is in progress (see below). Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
 - `generateFromSeeds()` captures inputs atomically inside `_uiState.update { }` (double-tap + stale-snapshot guards).
-- `loadAnalysis()` cancels via `analysisJob?.cancel()` before relaunching; sets `isLoading` only when `health == null`.
+- `DeckDoctorOrchestrator.loadAnalysis()` cancels its own `analysisJob` before relaunching (the
+  incremental-analysis machinery lives there now, not inline in the ViewModel — see the Deck Studio
+  section above).
+- `CandidatePoolGenerator`/`BudgetOptimizer` (D5) are marked DORMANT via KDoc — not wired to any
+  live surface while the Studio Suggestions tab stays flag-gated off; do not delete.
+  `Card.colors`/`colorIdentity`/`producedMana` (D14) are persisted as compact WUBRG-subset strings
+  (not JSON) for the future color-aware skeleton/scoring rules. → memory: `project_dormant_budget_pool`,
+  `project_card_model_produced_mana`
 - `CandidatePoolGenerator.legalityFragment()` returns `String?`; `DRAFT → null` (no legality restriction).
 - `BudgetConstraints` has an `init` block validating finite/positive values.
 - `SeedStrategy.TOKENS` test requires all 3 primary tags (TOKENS+AGGRO+TRIBAL) to beat AGGRO's tie.

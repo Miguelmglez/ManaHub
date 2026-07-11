@@ -6,6 +6,25 @@ import com.mmg.manahub.core.model.CardFace
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+/**
+ * D14: canonical WUBRG letter order used everywhere a compact colour-subset string is
+ * persisted (`Card.producedMana`, and mirrored by `Card.colors`/`colorIdentity` call sites
+ * that want a stable display order).
+ */
+private val WUBRG_ORDER = listOf("W", "U", "B", "R", "G")
+
+/**
+ * Collapses a Scryfall colour-letter list (e.g. `["U", "W"]`) into a compact, canonically
+ * ordered subset string (`"WU"`) — NOT a JSON blob. Unknown/malformed letters are dropped
+ * defensively rather than propagated, since this string is later re-parsed by pip/production
+ * matching (Deck Doctor mana-base analysis, Phase 1).
+ */
+private fun List<String>?.toCompactWubrg(): String {
+    if (this.isNullOrEmpty()) return ""
+    val present = this.map { it.uppercase() }.toSet()
+    return WUBRG_ORDER.filter { it in present }.joinToString("")
+}
+
 @OptIn(ExperimentalTime::class)
 fun CardDto.toDomain(): Card {
     val front = cardFaces?.firstOrNull()
@@ -74,6 +93,7 @@ fun CardDto.toDomain(): Card {
                 imageArtCrop = face.imageUris?.artCrop,
             )
         },
+        producedMana = producedMana.toCompactWubrg(),
     )
 }
 

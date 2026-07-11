@@ -13,6 +13,9 @@ data class CardDto(
     @SerialName("cmc")              val cmc:             Double?      = null,
     @SerialName("colors")           val colors:          List<String>? = null,
     @SerialName("color_identity")   val colorIdentity:   List<String>,
+    // D14: colours this card's mana ability(ies) can produce. Absent (null) for cards
+    // with no mana ability. Only Scryfall's fixed WUBRG letters are expected here.
+    @SerialName("produced_mana")    val producedMana:    List<String>? = null,
     @SerialName("type_line")        val typeLine:        String?      = null,
     @SerialName("printed_type_line")val printedTypeLine: String?      = null,
     @SerialName("oracle_text")      val oracleText:      String?      = null,

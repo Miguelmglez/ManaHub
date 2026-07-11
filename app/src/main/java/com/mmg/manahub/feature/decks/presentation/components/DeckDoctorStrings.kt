@@ -1,4 +1,4 @@
-package com.mmg.manahub.feature.decks.presentation.improvement.components
+package com.mmg.manahub.feature.decks.presentation.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
