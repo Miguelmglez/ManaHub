@@ -413,7 +413,7 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
 ### Deck Doctor
 Original 8 phases complete; a separate **engine-quality plan** is complete (see below), and the
 **archetype-aware Community/Archetype plan** (`docs/claude-code-prompt-deck-doctor-community.md`)
-Phases 1-2 are complete: Phase 1 added a new archetype/theme skeleton layer
+Phases 1-3 are complete: Phase 1 added a new archetype/theme skeleton layer
 (`ArchetypeDefinition`/`ThemeDefinition`/`ArchetypeSkeletonResolver`/`ArchetypeEvaluator`/
 `ArchetypeRoleClassifier`/`InferDeckArchetypeUseCase`) sitting ADDITIVELY on top of the engine
 below, in the SAME `shared/core-domain` commonMain package as the rest of it (not `:app`'s
@@ -438,6 +438,14 @@ Key invariants:
   (D14) are persisted as compact WUBRG-subset strings (not JSON); Motor A's pip-intensity multiplier
   and unknown-color-identity fail-closed filter (Commander only) consume them. → memory:
   `project_dormant_budget_pool`, `project_card_model_produced_mana`, `project_deck_doctor_phase2_motor_a`
+- **Phase 3** added a new Cloudflare Worker `cloudflare/manahub-community/` (TypeScript, Wrangler,
+  vitest+miniflare) aggregating community deck data — EDHREC for Commander, Archidekt for 60-card
+  (D16) — behind KV (7-day snapshot TTL) + D1 (anonymous weekly trending counters, no PII), plus a
+  full `commonMain` client stack (`CommunityAggregateApi`/`CommunityAggregateRepositoryImpl`/
+  `CommunityAggregate` domain model). **Not deployed** — `wrangler.toml` KV/D1 bindings are
+  placeholder ids pending human-authorized provisioning. Consumed by nothing yet (Motor B/UI is
+  Phase 4); androidMain Room cache + `communityEngineEnabledFlow` DataStore flag (D4) + Koin wiring
+  are the remaining plumbing. → memory: `project_community_aggregate_worker`
 - `CandidatePoolGenerator.legalityFragment()` returns `String?`; `DRAFT → null` (no legality restriction).
 - `BudgetConstraints` has an `init` block validating finite/positive values.
 - `SeedStrategy.TOKENS` test requires all 3 primary tags (TOKENS+AGGRO+TRIBAL) to beat AGGRO's tie.

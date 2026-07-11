@@ -124,7 +124,7 @@ Coming soon.
 
 SDK: `minSdk = 29` (Android 10) · `targetSdk = 35` · `compileSdk = 36`. JDK 17.
 
-Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
+Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`, `COMMUNITY_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
 
 ## Architecture
 
@@ -220,6 +220,7 @@ SUPABASE_ANON_KEY=...       # *
 GOOGLE_CLIENT_ID=...        # *
 YOUTUBE_API_KEY=...         # optional — News videos disabled if absent
 CLOUDFLARE_WORKER_URL=...   # optional — has a default
+COMMUNITY_WORKER_URL=...    # optional — has a placeholder default, `manahub-community` Worker not yet deployed
 
 # Release signing (optional)
 KEY_STORE_PATH=

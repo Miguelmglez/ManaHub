@@ -17,6 +17,7 @@ import com.mmg.manahub.app.di.coreBridgeKoinModule
 import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
@@ -75,6 +76,7 @@ import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
+import com.mmg.manahub.feature.decks.di.communityAggregateKoinModule
 import com.mmg.manahub.feature.decks.di.decksKoinModule
 import com.mmg.manahub.feature.draft.di.draftKoinModule
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
@@ -237,6 +239,11 @@ class ManaHubApp : Application(), KoinComponent {
     // layer (ArchidektApi/RequestQueue/Repository/use cases) is now Koin-owned in communityDecksKoinModule.
     // Only the Room-owned cache DAO (this island only) is bridged here.
     @Inject lateinit var communityDeckCacheDao: CommunityDeckCacheDao
+
+    // Community Aggregate (Motor B, Deck Doctor Community/Archetype plan Phase 3.3) bridge dep.
+    // Unrelated to communityDeckCacheDao above (that's the Archidekt browse/import cache; this is
+    // the EDHREC/Archidekt suggestion-aggregate cache). No consumer UI yet — wired ahead of Motor B.
+    @Inject lateinit var communityAggregateDao: CommunityAggregateDao
 
     // CardDetail island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
     //  - AnalyticsHelper is now bridged in coreBridgeKoinModule (promoted from Settings; shared with it).
@@ -429,6 +436,9 @@ class ManaHubApp : Application(), KoinComponent {
                 addCardKoinModule(),
                 communityDecksKoinModule(
                     cacheDao = communityDeckCacheDao,
+                ),
+                communityAggregateKoinModule(
+                    cacheDao = communityAggregateDao,
                 ),
                 cardDetailKoinModule(
                     userCardRepository = userCardRepository,

@@ -355,6 +355,9 @@ graphify-out/
 # Wrangler local state only — Worker source is tracked
 /cloudflare/**/.wrangler/
 
+# Node dependencies for Worker projects (manahub-community) — package.json is tracked, not the tree
+/cloudflare/**/node_modules/
+
 # GitHub Pages site (separate git repo, not part of the app)
 /github-pages/
 /AGENTS.md

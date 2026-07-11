@@ -27,4 +27,11 @@ data class ArchidektDeckSummaryDto(
     val createdAt: String = "",
     val updatedAt: String = "",
     val colors: Map<String, Int> = emptyMap(),
+    // Added for Phase 3 (community aggregate sanitization) — verified live 2026-07-11,
+    // see docs/adr/ADR-004-community-api-contracts.md §1. Additive, defaulted: existing
+    // callers (CommunityDecksRepositoryImpl) are unaffected.
+    val edhBracket: Int? = null,
+    val private: Boolean = false,
+    val unlisted: Boolean = false,
+    val theorycrafted: Boolean = false,
 )

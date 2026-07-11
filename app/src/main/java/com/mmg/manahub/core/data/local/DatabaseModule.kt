@@ -20,6 +20,7 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.NewsDao
@@ -107,6 +108,10 @@ object DatabaseModule {
                 // reason). Additive: adds archetype_override / themes_override to
                 // `decks` (Deck Doctor Community/Archetype plan, Phase 1.5, D2).
                 MIGRATION_42_43,
+                // v43 → v44 lives as a top-level `val` in Migration_43_44.kt (same
+                // reason). Additive: creates the community_aggregate_cache table
+                // (Deck Doctor Community/Archetype plan, Phase 3.3).
+                MIGRATION_43_44,
             )
             .build()
 
@@ -731,4 +736,5 @@ object DatabaseModule {
     @Provides fun provideGamificationDao(db: MtgDatabase): GamificationDao = db.gamificationDao()
     @Provides fun provideGamificationStatsDao(db: MtgDatabase): GamificationStatsDao = db.gamificationStatsDao()
     @Provides fun provideCommunityDeckCacheDao(db: MtgDatabase): CommunityDeckCacheDao = db.communityDeckCacheDao()
+    @Provides fun provideCommunityAggregateDao(db: MtgDatabase): CommunityAggregateDao = db.communityAggregateDao()
 }

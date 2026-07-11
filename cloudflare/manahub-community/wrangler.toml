@@ -1,0 +1,42 @@
+# Cloudflare Worker: manahub-community
+#
+# Serves read-only, cached community deck aggregates (Archidekt + EDHREC) for the
+# Deck Doctor Motor B / Community Hub features (see docs/adr/ADR-004-community-api-contracts.md
+# and docs/claude-code-prompt-deck-doctor-community.md Phase 3). No auth, no PII, GET only.
+#
+# PROVISIONING NOTE (2026-07-11): the KV namespace and D1 database below use PLACEHOLDER ids.
+# This Worker has NOT been deployed and NO real Cloudflare resources have been created for it.
+# Before the first `wrangler deploy`, a human must run (once, authorized separately from this
+# commit):
+#   npx wrangler kv:namespace create COMMUNITY_KV
+#   npx wrangler kv:namespace create COMMUNITY_KV --preview
+#   npx wrangler d1 create manahub-community-db
+# ...then replace the "TBD-*" placeholders below with the real ids, and apply
+# test/schema.sql to the new D1 database with `npx wrangler d1 execute`.
+name = "manahub-community"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "COMMUNITY_KV"
+id = "TBD-run-wrangler-kv-namespace-create-COMMUNITY_KV"
+preview_id = "TBD-run-wrangler-kv-namespace-create-COMMUNITY_KV-preview"
+
+[[d1_databases]]
+binding = "COMMUNITY_DB"
+database_name = "manahub-community-db"
+database_id = "TBD-run-wrangler-d1-create-manahub-community-db"
+
+# Weekly cron: prune trending counters older than 8 weeks + pre-warm the top-10 trending
+# commanders (fixes cold start on Monday morning). NOT scheduled/deployed by this change —
+# defining the trigger here is config-as-code only; `wrangler deploy` (out of scope for this
+# phase) is what actually activates it.
+[triggers]
+crons = ["0 6 * * 1"]
+
+# Cloudflare rate-limit rule (dashboard-side, NOT provisioned by this file): a free-plan
+# account should add a "Rate Limiting Rule" on this Worker's route capping requests per IP
+# to protect the free-tier subrequest/CPU budget from abuse (e.g. 60 req/min per IP, GET only,
+# path prefix /v1/). This is a dashboard/Zone-level setting outside Wrangler's config surface —
+# a human must add it manually after deploy; documented here so it isn't forgotten.
