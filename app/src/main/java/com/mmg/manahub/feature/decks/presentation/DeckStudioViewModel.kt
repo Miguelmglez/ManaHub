@@ -37,14 +37,24 @@ import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.ImportOutcome
+import com.mmg.manahub.feature.decks.domain.usecase.ImportSource
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
 import com.mmg.manahub.feature.decks.domain.usecase.SeedDeckResult
+import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.WeightedCardName
+import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
+import com.mmg.manahub.core.model.CommunityAggregate
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.Companion.MAX_SEED_CARDS
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -168,6 +178,16 @@ data class DeckStudioUiState(
     /** True once the Suggestions surface has been opened at least once (lazy first analysis). */
     val suggestionsLoaded: Boolean = false,
 
+    // ── Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) ────────
+    /** Whether Motor B / the Community Hub Discover surface is enabled (`communityEngineEnabledFlow`). */
+    val communityEngineEnabled: Boolean = false,
+    /** "Popular in similar decks" — see [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorState.communityAdds]. */
+    val communityAdds: List<CommunityAddSuggestion> = emptyList(),
+    /** "Decks like yours" carousel. */
+    val similarDecks: List<SimilarDeckResult> = emptyList(),
+    val isCommunityLoading: Boolean = false,
+    val communityUnavailable: Boolean = false,
+
     // ── Free-text budget state (U7) ───────────────────────────────────────────
     /** Raw per-card € text exactly as typed (may be blank or invalid mid-typing). */
     val rawPerCardText: String = "",
@@ -195,6 +215,10 @@ data class DeckStudioUiState(
     val inferredIdentity: InferredIdentity? = null,
     /** True while the seed deck is being generated + written. */
     val isGenerating: Boolean = false,
+    /** "Use community data" toggle (Phase 5) — defaults ON only when [communityEngineEnabled] is
+     * true; ignored by [BuildDeckFromSeedsUseCase] when false (falls back to the pre-Phase-5
+     * heuristic filler unchanged). */
+    val useCommunityDataForSeed: Boolean = false,
 
     // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
     /** Collection-synergy discoveries (Inspirations surface, Phase 4). Empty until loaded. */
@@ -247,6 +271,16 @@ class DeckStudioViewModel(
     private val crashReporter: CrashReporter,
     private val appContext: Context,
     savedStateHandle: SavedStateHandle,
+    // ── Motor B (Phase 4) — appended last, nullable-defaulted so no existing test call site
+    // (all named-arg) needs to change; a `null` value means this ViewModel behaves exactly as
+    // before Phase 4 (no community state is ever populated).
+    private val suggestAddsFromCommunityUseCase: SuggestAddsFromCommunityUseCase? = null,
+    private val findSimilarDecksUseCase: FindSimilarDecksUseCase? = null,
+    private val communityAggregateRepository: CommunityAggregateRepository? = null,
+    // Deck Doctor Community/Archetype plan, Phase 6 (D17 deckstats.net import-by-URL). Reuses the
+    // SAME paste-a-deck-list text field the Studio already has — a pasted deckstats.net URL is
+    // detected and routed through the unified pipeline instead of the plain-text parser.
+    private val importDeckCardsUseCase: ImportDeckCardsUseCase? = null,
 ) : ViewModel() {
 
     /**
@@ -283,6 +317,10 @@ class DeckStudioViewModel(
         crashReporter = crashReporter,
         resolveCard = ::resolveCard,
         weightsProvider = { userPreferences.observeScoreWeightOverrides().first() },
+        communityAggregateRepository = communityAggregateRepository,
+        suggestAddsFromCommunityUseCase = suggestAddsFromCommunityUseCase,
+        findSimilarDecksUseCase = findSimilarDecksUseCase,
+        isCommunityEngineEnabled = { userPreferences.communityEngineEnabledFlow.first() },
     )
 
     /**
@@ -355,8 +393,20 @@ class DeckStudioViewModel(
                         isSuggestionsLoading = doctorState.isSuggestionsLoading,
                         isAddsLoading = doctorState.isAddsLoading,
                         suggestionsLoaded = doctorState.isLoaded,
+                        communityAdds = doctorState.communityAdds,
+                        similarDecks = doctorState.similarDecks,
+                        isCommunityLoading = doctorState.isCommunityLoading,
+                        communityUnavailable = doctorState.communityUnavailable,
                     )
                 }
+            }
+        }
+        // Motor B (Phase 4) / Community Hub (Phase 5) master flag — mirrored into uiState so the
+        // seed sheet's "Use community data" toggle default and the Suggestions tab's community
+        // section can both read it synchronously off one source.
+        viewModelScope.launch {
+            userPreferences.communityEngineEnabledFlow.collect { enabled ->
+                _uiState.update { it.copy(communityEngineEnabled = enabled) }
             }
         }
         viewModelScope.launch {
@@ -887,15 +937,33 @@ class DeckStudioViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isImporting = true) }
             FirebaseCrashlytics.getInstance().log("deck_studio_import_started")
-            importDeckUseCase(deckId, text)
-                .onSuccess {
-                    // Invalidate so the next Suggestions open re-analyses the imported cards.
-                    invalidateSuggestions()
+
+            // Phase 6 (D17): a pasted deckstats.net URL reuses this SAME text field but routes
+            // through the unified pipeline instead of the plain-text line parser. Falls back to
+            // the original text-list import for everything else — zero behavior change for the
+            // Moxfield/Arena paste flow that already worked here.
+            val trimmed = text.trim()
+            val cardsUseCase = importDeckCardsUseCase
+            val success = if (cardsUseCase != null && DECKSTATS_URL_PATTERN.containsMatchIn(trimmed)) {
+                when (val outcome = cardsUseCase(source = ImportSource.DeckstatsUrl(trimmed), targetDeckId = deckId)) {
+                    is ImportOutcome.Success -> true
+                    is ImportOutcome.Error -> {
+                        logFailure("deck_studio_import_deckstats_failed", IllegalStateException(outcome.message))
+                        false
+                    }
                 }
-                .onFailure { t ->
-                    logFailure("deck_studio_import_failed", t)
-                    _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_import_failed)))
-                }
+            } else {
+                importDeckUseCase(deckId, text)
+                    .onFailure { t -> logFailure("deck_studio_import_failed", t) }
+                    .isSuccess
+            }
+
+            if (success) {
+                // Invalidate so the next Suggestions open re-analyses the imported cards.
+                invalidateSuggestions()
+            } else {
+                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_import_failed)))
+            }
             _uiState.update { it.copy(isImporting = false) }
         }
     }
@@ -1236,8 +1304,14 @@ class DeckStudioViewModel(
     // ── Seed-build flow (Phase 3) ─────────────────────────────────────────────
 
     fun openSeedSheet() {
-        _uiState.update { it.copy(showSeedSheet = true) }
+        // Phase 5: default the "Use community data" toggle ON only when the master flag is on.
+        _uiState.update { it.copy(showSeedSheet = true, useCommunityDataForSeed = it.communityEngineEnabled) }
     }
+
+    /** Toggles the seed sheet's "Use community data" switch (Phase 5). No-op UI-wise when the
+     * master flag is off — the sheet hides the toggle entirely in that case. */
+    fun toggleUseCommunityDataForSeed() =
+        _uiState.update { it.copy(useCommunityDataForSeed = !it.useCommunityDataForSeed) }
 
     fun closeSeedSheet() {
         seedSearchJob?.cancel()
@@ -1338,6 +1412,12 @@ class DeckStudioViewModel(
                 val constraints = snapshot.budgetConstraints
                 val collection = userCardRepository.observeCollection().first().map { it.card }
                 val weights = userPreferences.observeScoreWeightOverrides().first().toScoreWeights()
+                // Phase 5: an OPTIONAL community-aggregate priority pool for the seeds' own
+                // commander (Commander format) / signature cards (60-card). ANY failure here
+                // (Worker down, no aggregate for an obscure seed) degrades to an empty pool —
+                // the seed build below NEVER fails because of this, it just falls back to the
+                // pre-Phase-5 heuristic fill order (see BuildDeckFromSeedsUseCase's KDoc).
+                val communityPool = communityPoolForSeeds(snapshot.useCommunityDataForSeed, snapshot.seedCards, format)
                 val seedResult: SeedDeckResult = buildDeckFromSeedsUseCase(
                     seeds = snapshot.seedCards,
                     identity = identity,
@@ -1345,6 +1425,7 @@ class DeckStudioViewModel(
                     constraints = constraints,
                     collection = collection,
                     weights = weights,
+                    communityPool = communityPool,
                 )
 
                 // U8: write straight through the repository, one card per copy. A coroutine
@@ -1406,6 +1487,37 @@ class DeckStudioViewModel(
             }
             onComplete(writtenCount)
         }
+    }
+
+    /**
+     * Fetches an OPTIONAL community-aggregate priority pool for [BuildDeckFromSeedsUseCase] (Phase
+     * 5) — a NO-OP (empty list) when [useCommunityData] is false, [communityAggregateRepository]
+     * was never wired (Koin didn't inject it), or no seed is commander-eligible / no signature
+     * cards exist. ANY exception is swallowed (returns empty) — this is a pure enhancement, never a
+     * seed-build blocker (mirrors the class-wide "Motor B never blocks the primary path" rule).
+     */
+    private suspend fun communityPoolForSeeds(
+        useCommunityData: Boolean,
+        seeds: List<Card>,
+        format: DeckFormat,
+    ): List<WeightedCardName> {
+        val repository = communityAggregateRepository ?: return emptyList()
+        if (!useCommunityData || seeds.isEmpty()) return emptyList()
+        return runCatching {
+            val cards: List<com.mmg.manahub.core.model.AggregateCardEntry> = if (format == DeckFormat.COMMANDER) {
+                val commanderSeed = seeds.firstOrNull {
+                    it.typeLine.contains("Legendary", ignoreCase = true) &&
+                        it.typeLine.contains("Creature", ignoreCase = true)
+                } ?: return emptyList()
+                (repository.getCommanderAggregate(commanderSeed.name) as? DataResult.Success)?.data?.cards.orEmpty()
+            } else {
+                val signature = seeds.map { it.name }.distinct().sorted().take(3)
+                if (signature.isEmpty()) return emptyList()
+                val result = repository.getSixtyAggregate(signature, SEED_COMMUNITY_ARCHIDEKT_FORMAT_ID)
+                (result as? DataResult.Success)?.data?.let { it as? CommunityAggregate.Sixty.Materialized }?.cards.orEmpty()
+            }
+            cards.map { WeightedCardName(name = it.name, weight = it.synergy) }
+        }.getOrDefault(emptyList())
     }
 
     // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
@@ -1472,5 +1584,15 @@ class DeckStudioViewModel(
 
         /** Debounce before a seed search runs, in ms (mirrors DeckMagicViewModel). */
         const val SEED_SEARCH_DEBOUNCE_MS = 400L
+
+        /** Archidekt's "Custom" format id — best-effort proxy for ManaHub's generic 60-card CASUAL
+         * format (mirrors [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
+         * .SIXTY_ARCHIDEKT_FORMAT_ID]). */
+        const val SEED_COMMUNITY_ARCHIDEKT_FORMAT_ID = 7
+
+        /** Detects a pasted deckstats.net deck URL in the Studio's plain-text import field
+         * (Phase 6, D17) — a cheap containment check, not a full URL parse (that happens inside
+         * [ImportDeckCardsUseCase]/`DeckstatsFetcherImpl`). */
+        val DECKSTATS_URL_PATTERN = Regex("""deckstats\.net/decks/\d+/\d+""")
     }
 }

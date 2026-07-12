@@ -1,5 +1,8 @@
 package com.mmg.manahub.feature.decks.di
 
+import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.remote.DeckstatsClient
+import com.mmg.manahub.core.data.remote.DeckstatsFetcherImpl
 import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
@@ -9,21 +12,32 @@ import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetOptimizer
 import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
+import com.mmg.manahub.feature.decks.domain.usecase.DeckstatsFetcher
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckViewModel
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.Json
+import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
+import java.util.concurrent.TimeUnit
 
 /**
  * KMP migration — Hilt→Koin cutover batch 3. The **Decks** Koin island.
@@ -117,7 +131,26 @@ fun decksKoinModule(
             budgetOptimizer = get(),
         )
     }
-    single { ImportDeckUseCase(cardRepository = get(), deckRepository = get()) }
+    // Deck Doctor Community/Archetype plan, Phase 4 (Motor B). `CommunityAggregateRepository`
+    // (communityAggregateKoinModule) and `CommunityDecksRepository` (communityDecksKoinModule) are
+    // resolved via `get()` — both modules load in the same ManaHubApp `modules(...)` call, so
+    // declaration order does not matter to Koin.
+    single { SuggestAddsFromCommunityUseCase(cardRepository = get()) }
+    single { FindSimilarDecksUseCase(communityDecksRepository = get()) }
+
+    // Deck Doctor Community/Archetype plan, Phase 6: the deckstats.net import-by-URL adapter
+    // (D17). A DEDICATED HttpClient with `expectSuccess = false` — deckstats returns a plain-text
+    // (not JSON) body on a 400 "not found" response (`docs/adr/ADR-004-community-api-contracts.md`
+    // §4), so the default `expectSuccess = true` convention every OTHER client in this codebase
+    // uses would throw before [DeckstatsClient] could read that body. See [DeckstatsFetcher]'s KDoc.
+    single { provideDeckstatsClient() }
+    single<DeckstatsFetcher> { DeckstatsFetcherImpl(client = get(), crashReporter = get()) }
+
+    // Deck Doctor Community/Archetype plan, Phase 6: the unified import pipeline.
+    // ImportDeckUseCase / ImportCommunityDeckUseCase (feature.communitydecks) are now THIN
+    // ADAPTERS over this — see their own KDocs.
+    single { ImportDeckCardsUseCase(deckRepository = get(), cardRepository = get(), crashReporter = get(), deckstatsFetcher = get()) }
+    single { ImportDeckUseCase(importDeckCardsUseCase = get()) }
 
     // ── ViewModels (the Decks island) ──────────────────────────────────────────────
     // DeckViewModel: backs the deck list.
@@ -145,6 +178,10 @@ fun decksKoinModule(
             crashReporter = get(),
             appContext = get(),
             savedStateHandle = get(),
+            suggestAddsFromCommunityUseCase = get(),
+            findSimilarDecksUseCase = get(),
+            communityAggregateRepository = get(),
+            importDeckCardsUseCase = get(),
         )
     }
 
@@ -166,4 +203,38 @@ fun decksKoinModule(
             getDeckGameStatsUseCase = get(),
         )
     }
+}
+
+/**
+ * Builds the dedicated [DeckstatsClient] (Deck Doctor Community/Archetype plan, Phase 6, D17).
+ * `expectSuccess = false` is a DELIBERATE deviation from every other Ktor client in this codebase
+ * (`provideArchidektClient`/`provideCommunityHttpClient` both use `expectSuccess = true`) — see
+ * [DeckstatsClient]'s KDoc for why the endpoint's own non-JSON error shape requires it.
+ */
+private fun provideDeckstatsClient(): DeckstatsClient {
+    val httpClient = HttpClient(OkHttp) {
+        expectSuccess = false
+        engine {
+            config {
+                connectTimeout(10, TimeUnit.SECONDS)
+                readTimeout(15, TimeUnit.SECONDS)
+                callTimeout(20, TimeUnit.SECONDS)
+                addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .header("User-Agent", "ManaHub/1.0 Android (deck import)")
+                        .header("Accept", "application/json")
+                        .build()
+                    chain.proceed(request)
+                }
+                addInterceptor(HttpLoggingInterceptor().apply {
+                    level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                            else HttpLoggingInterceptor.Level.NONE
+                })
+            }
+        }
+        install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; coerceInputValues = true })
+        }
+    }
+    return DeckstatsClient(httpClient)
 }

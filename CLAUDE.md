@@ -403,8 +403,14 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
   **`DeckImprovementScreen`/`DeckImprovementViewModel`/`Screen.DeckImprovement` were RETIRED (D10)** — the
   Studio Suggestions tab is the sole Deck Doctor UI surface; `DeckMagicDetailScreen.onImproveDeck`
   re-points to `Screen.DeckStudio`.
+- **Motor B (community suggestions, Phase 4) + community seed-build (Phase 5)**: the Suggestions tab
+  gains a flag-gated (`communityEngineEnabledFlow`, D4) "Popular in similar decks" section +
+  "Decks like yours" carousel, entirely additive to Motor A; the seed sheet gains a flag-gated
+  "Use community data" toggle that re-orders `BuildDeckFromSeedsUseCase`'s fill priority. Flag off =
+  zero community UI, byte-identical to pre-Phase-4.
 - → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`,
-  `project_deck_doctor_orchestrator_extraction`, `project_deck_studio_improvement_retirement`
+  `project_deck_doctor_orchestrator_extraction`, `project_deck_studio_improvement_retirement`,
+  `project_motor_b_community_suggestions`, `project_community_hub_seedbuild_trending`
 
 ### Incomplete / quirks
 - **SetPickerViewModel**: `clearFilters()` calls `applyFilters()` to respect `restrictedSets` — do not
@@ -567,6 +573,15 @@ Key invariants:
   `project_deck_doctor_phase7_inference_flow`, `project_deck_doctor_phase4`, `project_deck_doctor_phase5`,
   `project_deck_doctor_phase8`
 
+**Deck Doctor Community/Archetype plan** (`docs/claude-code-prompt-deck-doctor-community.md`, gitignored/
+pending deletion once this branch ships — durable record lives in memory + `docs/adr/ADR-004-*`): archetype-
+aware skeletons (Phase 1) + Motor A collection suggestions (Phase 2) + the `manahub-community` Cloudflare
+Worker (Phase 3, not deployed) + Motor B community suggestions (Phase 4) + Community Hub Discover/seed-build
+priority/Home trending widget (Phase 5) + unified import pipeline (Phase 6) are ALL COMPLETE, entirely
+flag-gated behind `communityEngineEnabledFlow` (D4, default OFF). → memory: `project_archetype_engine`,
+`project_deck_doctor_phase2_motor_a`, `project_community_aggregate_worker`, `project_motor_b_community_suggestions`,
+`project_community_hub_seedbuild_trending`, `project_import_unification`
+
 ### Home dashboard (`feature/home/`)
 Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-know:
 - **Start destination is `Screen.Home`** (not `Screen.Collection`). BottomBar is 3-slot: [Home] [⚔ FAB] [Library].
@@ -606,6 +621,11 @@ types in `HomeWidgetType` (each carries `persistedId`, `defaultTitleRes`, `suppo
 - `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` adds bounds/edit overlay; all
   widgets share `WidgetShell` (surface+CardShape+min height S=96/M=132/L=220dp). No `success`/`error`
   tokens exist — win=`lifePositive`, loss=`lifeNegative`. Community null→spinner, empty→empty body.
+- **`TRENDING_COMMANDERS` (Deck Doctor Community/Archetype plan Phase 5)**: its `TrendingSnapshot?`
+  data is kept OUTSIDE the `HomeUiState` combine chain (a separate `HomeViewModel.trendingFlow`
+  `stateIn`, threaded as its own param through `HomeScreen`→`HomeWidgetContainer`→`HomeWidgetHost`) —
+  see `project_community_hub_seedbuild_trending` memory for why. Silently hidden (never an error
+  state) on any failure/flag-off.
 - Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + edit pencil (Edit↔Done) + avatar.
 - → memory: `project_home_widget_board`
 

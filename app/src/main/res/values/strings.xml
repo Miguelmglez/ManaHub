@@ -722,6 +722,16 @@
     <string name="deck_doctor_origin_wishlist">Wishlist</string>
     <string name="deck_doctor_origin_new">New</string>
 
+    <!-- Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) -->
+    <string name="deck_studio_suggestions_community_header">Popular in similar decks</string>
+    <string name="deck_studio_suggestions_similar_decks_header">Decks like yours</string>
+    <string name="deck_doctor_community_inclusion">%1$d%% of %2$s decks</string>
+    <string name="deck_doctor_community_fills_gap">Fills a gap</string>
+    <string name="deck_doctor_community_color_match">%1$d%% color match</string>
+    <string name="deck_doctor_community_view_decks_cd">View decks containing %1$s</string>
+    <string name="deck_doctor_community_unavailable">Community data unavailable</string>
+    <string name="deck_doctor_community_empty">No community data for this deck yet.</string>
+
     <!-- Budget filter bar (Phase 6) -->
     <string name="deck_doctor_budget_title">Budget</string>
     <string name="deck_doctor_budget_per_card">Max €/card</string>
@@ -754,6 +764,8 @@
     <string name="deck_seeds_skeleton_title">Deck skeleton</string>
     <string name="deck_seeds_generate_cta">Generate deck →</string>
     <string name="deck_seeds_generating">Generating…</string>
+    <string name="deck_seeds_use_community_data_title">Use community data</string>
+    <string name="deck_seeds_use_community_data_subtitle">Prioritize cards popular in decks like this one</string>
 
     <!-- Deck Studio — unified hybrid deck builder (manual + suggestions + seed auto-build) -->
     <string name="deck_studio_title">Deck Studio</string>
@@ -2581,6 +2593,7 @@
     <string name="widget_title_collection_stats_hub">My Collection</string>
     <string name="widget_title_social_hub">Community</string>
     <string name="widget_title_trades_hub">Trades</string>
+    <string name="widget_title_trending_commanders">Trending Commanders</string>
     <string name="home_edit_widgets">Edit Widgets</string>
     <string name="widget_title_wishlist">Wishlist</string>
     <string name="widget_title_discover">Discover cards</string>
@@ -2949,5 +2962,13 @@
     <string name="community_deck_find_decks">Find Community Decks</string>
     <string name="community_deck_search_title">Community Decks</string>
     <string name="community_deck_sort_label">Sort: %1$s</string>
+
+    <!-- Community Hub — Discover (Deck Doctor Community/Archetype plan, Phase 5) -->
+    <string name="community_hub_tab_discover">Discover</string>
+    <string name="community_hub_tab_search">Search</string>
+    <string name="community_hub_discover_unavailable">Community data unavailable</string>
+    <string name="community_hub_trending_commanders">Top commanders this week</string>
+    <string name="community_hub_trending_cards">Most searched cards</string>
+    <string name="community_hub_popular_decks">Popular decks</string>
 
 </resources>

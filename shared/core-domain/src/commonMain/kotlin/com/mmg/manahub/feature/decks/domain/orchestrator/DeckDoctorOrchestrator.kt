@@ -1,11 +1,16 @@
 package com.mmg.manahub.feature.decks.domain.orchestrator
 
 import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.model.AggregateCardEntry
+import com.mmg.manahub.core.model.ArchidektFormat
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.CommunityAggregate
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.TagCategory
@@ -20,10 +25,14 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
+import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -62,6 +71,26 @@ data class DeckDoctorState(
     val isAddsLoading: Boolean = false,
     /** True once at least one full [DeckDoctorOrchestrator.loadAnalysis] has completed. */
     val isLoaded: Boolean = false,
+
+    // ── Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) ────────
+    // Entirely additive to Motor A above and gated behind `communityEngineEnabledFlow` (D4):
+    // when the flag is off (or the deck's format has no community aggregate — Draft), every field
+    // in this block simply stays at its empty/false default and the Studio UI renders nothing
+    // community-related. A Worker/aggregate failure NEVER touches `adds`/`cuts`/`health` above —
+    // see [recomputeCommunityInternal]'s KDoc.
+    /** "Popular in similar decks" — ranked by the community aggregate's own synergy. */
+    val communityAdds: List<CommunityAddSuggestion> = emptyList(),
+    /** "Decks like yours" carousel — real, importable Archidekt decks. */
+    val similarDecks: List<SimilarDeckResult> = emptyList(),
+    /** True while the community aggregate + similar-decks fetch is in flight. */
+    val isCommunityLoading: Boolean = false,
+    /**
+     * True when the community engine is ENABLED but the Worker/aggregate could not be reached (a
+     * degraded-but-not-dead state, per D3's fallback layering) — the Studio shows a single
+     * `InlineErrorState` for the Motor B section only. `false` (not an error) when the flag is off
+     * or the community fetch simply has not run yet.
+     */
+    val communityUnavailable: Boolean = false,
 )
 
 /** One-shot Deck Doctor events, delivered through a buffered [Channel] (never a nullable StateFlow). */
@@ -137,6 +166,14 @@ class DeckDoctorOrchestrator(
     private val crashReporter: CrashReporter,
     private val resolveCard: suspend (scryfallId: String) -> Card?,
     private val weightsProvider: suspend () -> ScoreWeightOverrides,
+    // ── Motor B (Phase 4) — appended last, all defaulted, so no existing positional-arg
+    // constructor call site (see `project_archetype_engine` memory's "append new optional params
+    // at the end" rule) needs to change. `null`/`{ false }` defaults mean an un-migrated caller
+    // simply never sees any community state populated (identical to today's behavior).
+    private val communityAggregateRepository: CommunityAggregateRepository? = null,
+    private val suggestAddsFromCommunityUseCase: SuggestAddsFromCommunityUseCase? = null,
+    private val findSimilarDecksUseCase: FindSimilarDecksUseCase? = null,
+    private val isCommunityEngineEnabled: suspend () -> Boolean = { false },
 ) {
 
     private val _state = MutableStateFlow(DeckDoctorState())
@@ -157,11 +194,17 @@ class DeckDoctorOrchestrator(
     /** The in-flight ADD recompute job (H3) — see the class doc for the cancel-before-launch contract. */
     private var recomputeAddsJob: Job? = null
 
+    /** The in-flight Motor B (community) fetch job — cancelled before every new launch, mirroring H3. */
+    private var communityJob: Job? = null
+
     private class AnalysisCache(
         var workingMainboard: List<DeckEntry>,
         val format: DeckFormat,
         val commanderId: String?,
         val commanderIdentity: Set<String>,
+        /** The resolved commander's name (Motor B: EDHREC commander-aggregate lookup key). Null for
+         * non-Commander decks or an unresolved commander. */
+        val commanderName: String?,
         val seedTags: List<CardTag>,
         val collection: List<Card>,
         /**
@@ -259,6 +302,7 @@ class DeckDoctorOrchestrator(
                 format = format,
                 commanderId = commanderId,
                 commanderIdentity = commanderIdentity,
+                commanderName = commanderCard?.name,
                 seedTags = seedTags,
                 collection = collectionCards,
                 wishlistIds = wishlistIds,
@@ -285,6 +329,10 @@ class DeckDoctorOrchestrator(
                 )
             }
             recomputeAddsInternal(constraints)
+            // Motor B (Phase 4): fetched once per full analysis, not on every incremental add/cut
+            // (see [recomputeCommunityInternal]'s KDoc for why) — [onAddCard]/[onCutCard] instead
+            // locally filter the already-fetched lists.
+            recomputeCommunityInternal()
         }
     }
 
@@ -355,6 +403,132 @@ class DeckDoctorOrchestrator(
     }
 
     /**
+     * Motor B (Deck Doctor Community/Archetype plan, Phase 4): fetches the community aggregate
+     * (Commander via EDHREC, 60-card via Archidekt — [CommunityAggregateRepository]) and the
+     * "decks like yours" carousel, then ranks them via [suggestAddsFromCommunityUseCase] /
+     * [findSimilarDecksUseCase]. Entirely OPT-IN and defensive:
+     *  - A `null` Motor B dependency (the legacy no-arg constructor default) is a silent no-op —
+     *    every field stays at its `DeckDoctorState` default.
+     *  - [isCommunityEngineEnabled] false (D4's `communityEngineEnabledFlow` off) is likewise a
+     *    silent no-op, no network/cache access at all (mirrors [CommunityAggregateRepositoryImpl]'s
+     *    own flag short-circuit — belt-and-braces).
+     *  - ANY failure (network, parsing, an unexpected exception in either use case) is caught here
+     *    and surfaces ONLY as [DeckDoctorState.communityUnavailable] = true — it NEVER touches
+     *    [DeckDoctorState.health]/`cuts`/`adds` (Motor A) and never emits [DeckDoctorEvent
+     *    .ExternalPoolFailed] (that event stays Motor-A-only; Motor B has its own dedicated,
+     *    non-blocking degradation flag instead of a toast, since the Studio renders an inline
+     *    per-section error state — see the plan's "Worker down -> Motor A untouched" requirement).
+     */
+    private fun recomputeCommunityInternal() {
+        val context = analysisCache ?: return
+        val health = _state.value.health ?: return
+        val aggregateRepository = communityAggregateRepository
+        val addsUseCase = suggestAddsFromCommunityUseCase
+        val similarUseCase = findSimilarDecksUseCase
+        if (aggregateRepository == null || addsUseCase == null || similarUseCase == null) return
+
+        communityJob?.cancel()
+        communityJob = scope.launch {
+            if (!isCommunityEngineEnabled()) {
+                _state.update {
+                    it.copy(communityAdds = emptyList(), similarDecks = emptyList(), isCommunityLoading = false, communityUnavailable = false)
+                }
+                return@launch
+            }
+            _state.update { it.copy(isCommunityLoading = true, communityUnavailable = false) }
+
+            val archetypeFormat = ArchetypeFormat.of(context.format)
+            val aggregateResult: DataResult<CommunityAggregate>? = try {
+                val commanderName = context.commanderName
+                if (context.format == DeckFormat.COMMANDER && commanderName != null) {
+                    aggregateRepository.getCommanderAggregate(commanderName)
+                } else if (archetypeFormat != null) {
+                    val signature = signatureCards(context.workingMainboard)
+                    if (signature.isEmpty()) null
+                    else aggregateRepository.getSixtyAggregate(signature, SIXTY_ARCHIDEKT_FORMAT_ID)
+                } else {
+                    null
+                }
+            } catch (t: Throwable) {
+                crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_community_aggregate_failed", t))
+                null
+            }
+
+            val cards: List<AggregateCardEntry> = when (val agg = aggregateResult) {
+                is DataResult.Success -> when (val data = agg.data) {
+                    is CommunityAggregate.Commander -> data.cards
+                    is CommunityAggregate.Sixty.Materialized -> data.cards
+                    is CommunityAggregate.Sixty.Building -> emptyList()
+                    else -> emptyList()
+                }
+                else -> emptyList()
+            }
+
+            val resolvedSkeleton = resolveArchetypeSkeleton(health)
+            val communityAdds = if (cards.isEmpty()) emptyList() else runCatching {
+                addsUseCase(
+                    aggregateCards = cards,
+                    mainboard = context.workingMainboard,
+                    profile = health.profile,
+                    collection = context.collection,
+                    resolvedSkeleton = resolvedSkeleton,
+                )
+            }.getOrDefault(emptyList())
+
+            // Register resolved community cards in the shared resolved-by-id map so a subsequent
+            // `onAddSuggestion` on a Motor B card hits [findCachedCard] and stays incremental
+            // instead of falling back to a full [loadAnalysis].
+            communityAdds.forEach { s -> if (s.card.scryfallId !in context.resolvedById) context.resolvedById[s.card.scryfallId] = s.card }
+
+            val similarSeed = context.commanderName ?: signatureCards(context.workingMainboard).firstOrNull()
+            val similarResult = similarSeed?.let { seed ->
+                runCatching {
+                    similarUseCase(
+                        seedQuery = seed,
+                        deckFormat = if (context.format == DeckFormat.COMMANDER) ArchidektFormat.COMMANDER.apiId else SIXTY_ARCHIDEKT_FORMAT_ID,
+                        userColorIdentity = health.profile.colorIdentity.map { it.symbol }.toSet(),
+                    )
+                }.getOrNull()
+            }
+            val similarDecks = (similarResult as? DataResult.Success)?.data.orEmpty()
+
+            // "Unavailable" only when EVERY Motor B signal came back empty AND the aggregate fetch
+            // itself failed/errored — a legitimately empty-but-successful aggregate (a very obscure
+            // commander with zero EDHREC data) is NOT an error state, just an empty section.
+            val aggregateFailed = aggregateResult == null || aggregateResult is DataResult.Error
+            val unavailable = aggregateFailed && communityAdds.isEmpty() && similarDecks.isEmpty()
+
+            _state.update {
+                it.copy(
+                    communityAdds = communityAdds,
+                    similarDecks = similarDecks,
+                    isCommunityLoading = false,
+                    communityUnavailable = unavailable,
+                )
+            }
+        }
+    }
+
+    /**
+     * Picks 2-3 signature cards for the 60-card canonical aggregate key (Phase 3.2 /
+     * [com.mmg.manahub.core.data.remote.CommunityAggregateKeys]): the LEAST globally popular
+     * non-land mainboard cards (highest [Card.edhrecRank] number — EDHREC ranks 1 = most played),
+     * so the key stays distinctive rather than collapsing onto generic staples every deck plays.
+     */
+    private fun signatureCards(mainboard: List<DeckEntry>): List<String> =
+        mainboard
+            .asSequence()
+            .map { it.card }
+            .filterNot { com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator.isLand(it) }
+            .filter { it.edhrecRank != null }
+            .sortedByDescending { it.edhrecRank }
+            .map { it.name }
+            .distinct()
+            .take(SIGNATURE_CARD_COUNT)
+            .toList()
+            .sorted()
+
+    /**
      * Re-evaluates the deck IN MEMORY from [AnalysisCache.workingMainboard] after a single-card
      * suggestion add/cut: rebuild profile/evaluation/cuts (pure), then recompute ADD suggestions.
      */
@@ -406,6 +580,10 @@ class DeckDoctorOrchestrator(
         } else {
             context.workingMainboard + DeckEntry(card = added, quantity = 1, isOwned = false, isSideboard = false)
         }
+        // Motor B is NOT re-fetched on every increment (see [recomputeCommunityInternal]'s KDoc) —
+        // just locally drop the just-added card so a suggestion already acted on disappears from
+        // the "Popular in similar decks" list immediately.
+        _state.update { it.copy(communityAdds = it.communityAdds.filterNot { s -> s.card.scryfallId == scryfallId }) }
         recomputeIncremental(constraints)
         return true
     }
@@ -453,6 +631,7 @@ class DeckDoctorOrchestrator(
         if (_state.value.isLoaded) {
             analysisJob?.cancel()
             recomputeAddsJob?.cancel()
+            communityJob?.cancel()
             analysisCache = null
             _state.update { it.copy(isLoaded = false) }
         }
@@ -548,5 +727,12 @@ class DeckDoctorOrchestrator(
 
         /** Cap on auto-selected identity seed cards (plus the commander) so one card can't skew the seed. */
         const val MAX_SEED_CARDS = 8
+
+        /** Signature-card count for the 60-card canonical aggregate key (Phase 3.2 precedent: 2-3). */
+        const val SIGNATURE_CARD_COUNT = 3
+
+        /** Archidekt's "Custom" format id (`7`) — the best-effort proxy for ManaHub's generic
+         * CASUAL 60-card format, which has no clean 1:1 Archidekt equivalent (see [ArchidektFormat]). */
+        const val SIXTY_ARCHIDEKT_FORMAT_ID = 7
     }
 }

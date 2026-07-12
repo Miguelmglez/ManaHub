@@ -1,5 +1,8 @@
 package com.mmg.manahub.feature.home.presentation
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -93,14 +96,20 @@ import java.util.Calendar
 //  widget rendering lives in HomeWidgets.kt; this file owns layout + interaction.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = koinViewModel(),
     onAction: (HomeAction) -> Unit,
     activeGame: HomeHeroState.ActiveGame? = null,
     modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
+    // Deck Doctor Community/Archetype plan, Phase 5 — kept OUTSIDE HomeUiState on purpose, see
+    // HomeViewModel.trendingFlow's KDoc.
+    val trending by viewModel.trendingFlow.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
     var showGallerySheet by remember { mutableStateOf(false) }
 
@@ -114,6 +123,7 @@ fun HomeScreen(
 
     HomeScreen(
         uiState = effectiveState,
+        trending = trending,
         onAction = { action ->
             when (action) {
                 HomeAction.CustomizeQuickStart -> showCustomizeSheet = true
@@ -141,6 +151,8 @@ fun HomeScreen(
             }
         },
         modifier = modifier,
+        sharedTransitionScope = sharedTransitionScope,
+        animatedVisibilityScope = animatedVisibilityScope,
     )
 
     if (showCustomizeSheet) {
@@ -181,11 +193,16 @@ fun HomeScreen(
 //  Stateless root + drag controller
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
     modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    // Deck Doctor Community/Archetype plan, Phase 5.
+    trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
 ) {
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -231,7 +248,10 @@ fun HomeScreen(
                     uiState = uiState,
                     onRegisterBounds = { id, rect -> itemBounds[id] = rect },
                     onAction = onAction,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
                     modifier = Modifier.animateItem(),
+                    trending = trending,
                 )
             }
 

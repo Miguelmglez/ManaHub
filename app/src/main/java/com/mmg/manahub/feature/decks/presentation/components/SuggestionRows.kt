@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +36,9 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.usecase.AddOrigin
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
+import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
+import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
+import kotlin.math.roundToInt
 
 /** Visual flavour of a [SuggestionTagChip], mapped to a semantic token. */
 enum class SuggestionTagTone { CUT, GAP, COLLECTION }
@@ -258,4 +264,166 @@ private fun AddSuggestion.priceLabel(): String = when {
     fit.card.priceEur != null ->
         stringResource(R.string.deck_doctor_price_eur, String.format(java.util.Locale.US, "%.2f", fit.card.priceEur))
     else -> stringResource(R.string.deck_doctor_price_unknown)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * "Popular in similar decks" (Motor B) row: an [AddSuggestionRow] SIBLING, not a fork — it reuses
+ * [SuggestionThumb]/[SuggestionTagChip] and mirrors the layout exactly, but renders a
+ * [CommunityAddSuggestion] (community-aggregate synergy/inclusion, no [CardFit] score components)
+ * with an inclusion-percentage caption ("78% of &lt;sourceLabel&gt; decks") instead of a fit score,
+ * and a trailing "view decks containing this card" action alongside Add.
+ *
+ * @param sourceLabel the commander name (Commander format) or a short "similar decks" label
+ *        (60-card) shown in the inclusion caption.
+ * @param onAdd adds one copy of the card to the live deck.
+ * @param onViewDecks navigates to [com.mmg.manahub.app.navigation.Screen.CommunityDecksByCard] for
+ *        this card.
+ */
+@Composable
+fun CommunityAddSuggestionRow(
+    suggestion: CommunityAddSuggestion,
+    sourceLabel: String,
+    onAdd: () -> Unit,
+    onViewDecks: () -> Unit,
+    onCardTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val card = suggestion.card
+    val inclusionPercent = (suggestion.inclusionPct * 100).roundToInt().coerceIn(0, 100)
+
+    Surface(
+        onClick = onCardTap,
+        color = mc.surface,
+        shape = CardShape,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(MaterialTheme.spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
+        ) {
+            SuggestionThumb(imageUrl = card.imageArtCrop ?: card.imageNormal, name = card.name)
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
+            ) {
+                Text(
+                    text = card.name,
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = stringResource(R.string.deck_doctor_community_inclusion, inclusionPercent, sourceLabel),
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                ) {
+                    if (suggestion.ownedInCollection) {
+                        SuggestionTagChip(
+                            text = stringResource(R.string.deck_reason_in_collection),
+                            tone = SuggestionTagTone.COLLECTION,
+                        )
+                    }
+                    if (suggestion.fillsGapRoles.isNotEmpty()) {
+                        SuggestionTagChip(
+                            text = stringResource(R.string.deck_doctor_community_fills_gap),
+                            tone = SuggestionTagTone.GAP,
+                        )
+                    }
+                }
+            }
+
+            IconButton(onClick = onViewDecks, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = stringResource(R.string.deck_doctor_community_view_decks_cd, card.name),
+                    tint = mc.textSecondary,
+                )
+            }
+            IconButton(onClick = onAdd, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(R.string.deck_doctor_add_cd, card.name),
+                    tint = mc.lifePositive,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A single "Decks like yours" carousel card: deck name, owner, view count, and a color-similarity
+ * badge. Stateless; the caller supplies [onClick] (navigates to the real, importable
+ * [com.mmg.manahub.app.navigation.Screen.CommunityDeckDetail]).
+ */
+@Composable
+fun SimilarDeckCard(
+    result: SimilarDeckResult,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Surface(
+        onClick = onClick,
+        shape = CardShape,
+        color = mc.surface,
+        modifier = modifier.width(180.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
+            Text(
+                text = result.name,
+                style = ty.titleMedium,
+                color = mc.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = result.ownerUsername,
+                style = ty.bodySmall,
+                color = mc.textDisabled,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Visibility,
+                    contentDescription = null,
+                    tint = mc.textDisabled,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = " ${result.viewCount}",
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                )
+            }
+            SuggestionTagChip(
+                text = stringResource(
+                    R.string.deck_doctor_community_color_match,
+                    (result.colorSimilarity * 100).roundToInt().coerceIn(0, 100),
+                ),
+                tone = SuggestionTagTone.COLLECTION,
+            )
+        }
+    }
 }

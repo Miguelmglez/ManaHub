@@ -548,6 +548,12 @@ fun AppNavGraph(
                     onReviewSurvey = { sessionId ->
                         navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
                     },
+                    onNavigateToCommunityDecksByCard = { cardName ->
+                        navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
+                    },
+                    onNavigateToCommunityDeckDetail = { archidektId ->
+                        navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
+                    },
                 )
             }
 

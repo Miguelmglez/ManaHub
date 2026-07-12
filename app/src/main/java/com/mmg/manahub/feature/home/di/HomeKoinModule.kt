@@ -92,6 +92,9 @@ fun homeKoinModule(): Module = module {
             wishlistRepository = get(),
             getAccountNudgeUseCase = get(),
             gamificationRepository = get(),
+            // Deck Doctor Community/Archetype plan, Phase 5 — from communityAggregateKoinModule
+            // (loaded in the same ManaHubApp `modules(...)` call).
+            communityAggregateRepository = get(),
         )
     }
 }

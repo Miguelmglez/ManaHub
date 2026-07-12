@@ -3,6 +3,17 @@ package com.mmg.manahub.feature.communitydecks.presentation
 import androidx.annotation.StringRes
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.CommunityDeckSummary
+import com.mmg.manahub.core.model.TrendingSnapshot
+
+/**
+ * The Community Hub's two sections (Deck Doctor Community/Archetype plan, Phase 5, D8: "no new
+ * bottom-nav destination — CommunityDecksScreen evolves into a Community Hub (Discover + Search)").
+ * [SEARCH] is the pre-Phase-5 screen, unchanged. [DISCOVER] is NEW and only reachable when
+ * [CommunityDecksSearchUiState.discoverEnabled] is true (`communityEngineEnabledFlow`, D4) — when
+ * that flag is off there is no tab row at all and the screen renders [SEARCH] directly, byte-for-byte
+ * identical to the pre-Phase-5 screen (the hard regression bar the plan requires).
+ */
+enum class CommunityHubTab { DISCOVER, SEARCH }
 
 /**
  * UI state for the Community Decks search / browse screen.
@@ -14,6 +25,11 @@ import com.mmg.manahub.core.model.CommunityDeckSummary
  * @property hasSearched flips to `true` after the first search is issued so the
  *   screen can distinguish "initial / nothing searched yet" from "searched but
  *   no results".
+ * @property discoverEnabled `communityEngineEnabledFlow` (D4) — gates the Discover tab entirely
+ *   (Phase 5). `false` means the screen shows no tab row, just [CommunityHubTab.SEARCH].
+ * @property hubTab the active Hub section. Defaults to [CommunityHubTab.SEARCH] when opened via the
+ *   `CommunityDecksByCard` deep-link (a pre-filled, auto-run search) — the route contract is
+ *   unchanged — else [CommunityHubTab.DISCOVER] when [discoverEnabled].
  */
 data class CommunityDecksSearchUiState(
     val query: String = "",
@@ -26,6 +42,17 @@ data class CommunityDecksSearchUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val hasSearched: Boolean = false,
+
+    // ── Community Hub — Discover (Phase 5) ────────────────────────────────────────
+    val discoverEnabled: Boolean = false,
+    val hubTab: CommunityHubTab = CommunityHubTab.DISCOVER,
+    val trending: TrendingSnapshot? = null,
+    val isTrendingLoading: Boolean = false,
+    val popularDecks: List<CommunityDeckSummary> = emptyList(),
+    val isPopularDecksLoading: Boolean = false,
+    /** True when the Discover data was requested but BOTH trending and popular decks came back
+     * empty/failed — the Discover section shows one inline error instead of two silent-empty ones. */
+    val discoverUnavailable: Boolean = false,
 )
 
 /**

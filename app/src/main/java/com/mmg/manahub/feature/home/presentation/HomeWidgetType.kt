@@ -169,6 +169,20 @@ enum class HomeWidgetType(
         category = WidgetCategory.SOCIAL,
         audience = WidgetAudience.ACCOUNT_GATED,
         icon = Icons.Default.SwapHoriz,
+    ),
+
+    // ── Community (Deck Doctor Community/Archetype plan, Phase 5) ─────────────────
+    /** Top-3 trending commanders of the week; tap navigates into the Community Hub's Discover
+     * section (reuses [HomeAction.OpenCommunityDecks] — the Hub lands on Discover by default when
+     * `communityEngineEnabledFlow` is on). Silently hidden — never an error state — on Worker
+     * failure or when the community engine is off; see [HomeViewModel.trendingFlow]. */
+    TRENDING_COMMANDERS(
+        persistedId = "trending_commanders",
+        defaultTitleRes = R.string.widget_title_trending_commanders,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.COMMUNITY,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.Group,
     );
 
     /** True for widgets that belong to the gamification system (hidden when the toggle is off). */

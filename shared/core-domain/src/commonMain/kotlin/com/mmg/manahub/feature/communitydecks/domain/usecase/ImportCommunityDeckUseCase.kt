@@ -4,39 +4,41 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.CommunityDeck
-import com.mmg.manahub.core.model.DataResult
-import kotlinx.coroutines.flow.first
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.ImportOutcome
+import com.mmg.manahub.feature.decks.domain.usecase.ImportSource
 
 /**
  * Imports a fetched [CommunityDeck] (Archidekt) into a new local ManaHub deck.
  *
- * The import is deliberately RESILIENT: each card is resolved against Scryfall by name
- * (via [CardRepository.searchCardByName], which is itself rate-limited through the
- * `ScryfallRequestQueue`), and a single unresolvable card is SKIPPED — it never aborts
- * the whole import. The resolved/failed counts are reported back so the UI can surface a
- * partial-import summary.
+ * ## Deck Doctor Community/Archetype plan, Phase 6 — now a THIN ADAPTER
+ * The parsing/resolution/write pipeline moved to
+ * [com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase] (shared with
+ * [com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase] and the new deckstats.net URL
+ * adapter). This class's PUBLIC `invoke(deck, onProgress)` signature AND its nested [ImportResult]
+ * type are UNCHANGED — `CommunityDeckDetailViewModel` needed zero edits.
  *
- * On completion the new deck is stamped with community-source attribution
- * (URL / author / service / timestamp) via [DeckRepository.updateDeckAttribution].
- *
- * KMP migration note: reports through the platform-neutral [CrashReporter] (Crashlytics on
- * Android, no-op on web) instead of `FirebaseCrashlytics` directly, and uses
- * `Clock.System.now().toEpochMilliseconds()` instead of `System.currentTimeMillis()` — both
- * required for this use case to live in `commonMain`. Millisecond semantics are unchanged.
- *
- * @param crashReporter platform-neutral crash/log reporter, injected so Android keeps recording
- *   to Crashlytics with zero behavior change.
+ * The import is still deliberately RESILIENT (skip-on-unresolvable, never abort), still stamps
+ * community-source attribution, and still sets the commander (Archidekt "Commander" category) +
+ * cover card — all preserved verbatim inside [ImportDeckCardsUseCase]'s unified write path.
  */
-@OptIn(ExperimentalTime::class)
 class ImportCommunityDeckUseCase(
-    private val deckRepository: DeckRepository,
-    private val cardRepository: CardRepository,
-    private val crashReporter: CrashReporter,
+    private val importDeckCardsUseCase: ImportDeckCardsUseCase,
 ) {
 
-    /** Outcome of an import attempt. */
+    /** Convenience constructor kept for source compatibility with the original 3-dependency shape
+     * (this codebase's own tests still construct it this way — see
+     * `app/src/test/.../ImportCommunityDeckUseCaseTest.kt`) — internally wraps a fresh
+     * [ImportDeckCardsUseCase]. */
+    constructor(
+        deckRepository: DeckRepository,
+        cardRepository: CardRepository,
+        crashReporter: CrashReporter,
+    ) : this(ImportDeckCardsUseCase(deckRepository = deckRepository, cardRepository = cardRepository, crashReporter = crashReporter))
+
+    /** Outcome of an import attempt — kept as this class's OWN nested type (not
+     * [ImportOutcome] directly) so `CommunityDeckDetailViewModel`'s existing `when` branches over
+     * `ImportCommunityDeckUseCase.ImportResult.Success`/`.Error` need zero edits. */
     sealed class ImportResult {
         /**
          * The deck was created. [resolvedCount] cards were added; [failedCount] could not be
@@ -59,88 +61,14 @@ class ImportCommunityDeckUseCase(
     suspend operator fun invoke(
         deck: CommunityDeck,
         onProgress: (resolved: Int, total: Int) -> Unit = { _, _ -> },
-    ): ImportResult {
-        return try {
-            // 1. Create the local deck.
-            val deckId = deckRepository.createDeck(
-                name = deck.name,
-                description = deck.description,
-                format = deck.format,
-            )
-
-            // 2. Resolve + add cards (skip unresolvable ones, never abort).
-            val allCards = deck.cards
-            var resolvedCount = 0
-            var failedCount = 0
-            var commanderScryfallId: String? = null
-
-            allCards.forEachIndexed { index, card ->
-                val result = cardRepository.searchCardByName(card.name)
-                if (result is DataResult.Success) {
-                    deckRepository.addCardToDeck(
-                        deckId = deckId,
-                        scryfallId = result.data.scryfallId,
-                        quantity = card.quantity,
-                        isSideboard = card.isSideboard,
-                    )
-                    if (card.isCommander && commanderScryfallId == null) {
-                        commanderScryfallId = result.data.scryfallId
-                    }
-                    resolvedCount++
-                } else {
-                    // Card could not be resolved against Scryfall — skip it (never abort).
-                    // Log only the index + name length (never the name itself — PII-adjacent).
-                    crashReporter.log(
-                        "community_deck_import_card_unresolved: index=$index, name_length=${card.name.length}",
-                    )
-                    failedCount++
-                }
-                onProgress(resolvedCount + failedCount, allCards.size)
-            }
-
-            // If more than half the cards failed to resolve, surface a non-fatal so we can
-            // diagnose systemic resolution problems (e.g. a broken Scryfall name mapping).
-            if (failedCount > allCards.size / 2) {
-                crashReporter.log("community_deck_import_high_failure_rate")
-                crashReporter.recordException(
-                    IllegalStateException("$failedCount/${allCards.size} cards unresolved"),
-                )
-            }
-
-            // 3. Set the commander, if one was resolved. The repository exposes no dedicated
-            //    setter, so we read the freshly-created deck and write back a copy — matching the
-            //    established DeckStudio / DeckBuilder pattern.
-            commanderScryfallId?.let { commanderId ->
-                deckRepository.observeDeckWithCards(deckId).first()?.deck?.let { createdDeck ->
-                    deckRepository.updateDeck(
-                        createdDeck.copy(
-                            commanderCardId = commanderId,
-                            coverCardId = createdDeck.coverCardId ?: commanderId,
-                            updatedAt = Clock.System.now().toEpochMilliseconds(),
-                        )
-                    )
-                }
-            }
-
-            // 4. Stamp community-source attribution.
-            deckRepository.updateDeckAttribution(
-                deckId = deckId,
-                sourceUrl = deck.sourceUrl,
-                sourceAuthor = deck.owner.username,
-                sourceService = "archidekt",
-                importedAt = Clock.System.now().toEpochMilliseconds(),
-            )
-
-            ImportResult.Success(
-                deckId = deckId,
-                resolvedCount = resolvedCount,
-                failedCount = failedCount,
-            )
-        } catch (e: Exception) {
-            crashReporter.log("community_deck_import_failed")
-            crashReporter.recordException(e)
-            crashReporter.setCustomKey("community_deck_import_card_count", deck.cards.size.toString())
-            ImportResult.Error(e.message ?: "Import failed")
-        }
+    ): ImportResult = when (
+        val outcome = importDeckCardsUseCase(
+            source = ImportSource.FromCommunityDeck(deck),
+            targetDeckId = null, // always creates a new deck (original contract).
+            onProgress = onProgress,
+        )
+    ) {
+        is ImportOutcome.Success -> ImportResult.Success(outcome.deckId, outcome.resolvedCount, outcome.failedCount)
+        is ImportOutcome.Error -> ImportResult.Error(outcome.message)
     }
 }
