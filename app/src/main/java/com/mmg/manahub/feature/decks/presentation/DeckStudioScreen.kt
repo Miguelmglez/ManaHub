@@ -118,6 +118,8 @@ import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
 import com.mmg.manahub.feature.decks.presentation.components.AddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.CommunityAddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.SimilarDeckCard
 import com.mmg.manahub.feature.decks.presentation.components.CutSuggestionRow
 import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
 import com.mmg.manahub.feature.decks.presentation.components.RoleCoverageRow
@@ -127,6 +129,8 @@ import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
 import com.mmg.manahub.feature.decks.presentation.components.key
 import com.mmg.manahub.feature.decks.presentation.components.label
+import com.mmg.manahub.core.ui.components.InlineErrorState
+import androidx.compose.foundation.lazy.LazyRow
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -152,6 +156,12 @@ fun DeckStudioScreen(
     onCardClick: (String) -> Unit,
     onPlaytest: (deckId: String) -> Unit,
     onReviewSurvey: (sessionId: Long) -> Unit,
+    // Deck Doctor Community/Archetype plan, Phase 4 (Motor B): navigates to
+    // Screen.CommunityDecksByCard(cardName) / Screen.CommunityDeckDetail(archidektId). Defaulted
+    // to a no-op so every OTHER call site of this screen (none exist besides AppNavGraph today,
+    // but this keeps the signature source-compatible for tests/previews) keeps compiling.
+    onNavigateToCommunityDecksByCard: (String) -> Unit = {},
+    onNavigateToCommunityDeckDetail: (Int) -> Unit = {},
     viewModel: DeckStudioViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -174,13 +184,16 @@ fun DeckStudioScreen(
     // commander-specific actions instead of the +/- counter).
     var isCardDetailInCommanderContext by remember { mutableStateOf(false) }
 
-    // C3: resolve the tapped card to a DeckSlotEntry from the deck list, commander, or search results.
+    // C3: resolve the tapped card to a DeckSlotEntry from the deck list, commander, search results,
+    // or (Phase 4) a Motor B community suggestion (quantityInDeck is always 0 there — a community
+    // card is by definition not yet in the mainboard).
     val selectedDeckCard = remember(
         selectedCardId,
         uiState.cards,
         uiState.addCardsResults,
         uiState.scryfallResults,
         uiState.commanderCard,
+        uiState.communityAdds,
     ) {
         selectedCardId?.let { id ->
             uiState.cards.find { it.scryfallId == id }
@@ -188,6 +201,8 @@ fun DeckStudioScreen(
                 ?: (uiState.addCardsResults + uiState.scryfallResults)
                     .find { it.card.scryfallId == id }
                     ?.let { row -> DeckSlotEntry(row.card.scryfallId, row.quantityInDeck, false, row.card) }
+                ?: uiState.communityAdds.find { it.card.scryfallId == id }
+                    ?.let { s -> DeckSlotEntry(s.card.scryfallId, 0, false, s.card) }
         }
     }
 
@@ -391,6 +406,12 @@ fun DeckStudioScreen(
                                 viewModel.onClearArchetypeOverride()
                                 toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
                             },
+                            onAddCommunity = { s ->
+                                viewModel.onAddSuggestion(s.card.scryfallId, s.card.name)
+                            },
+                            onCommunityCardTap = { id -> selectedCardId = id },
+                            onViewCommunityDecksForCard = onNavigateToCommunityDecksByCard,
+                            onOpenSimilarDeck = onNavigateToCommunityDeckDetail,
                         )
                     }
                 }
@@ -514,6 +535,13 @@ fun DeckStudioScreen(
                             onOwnedFreeChange = viewModel::onOwnedCardsFreeChange,
                             onClear = viewModel::onClearBudget,
                         )
+                    },
+                    // Phase 5: the toggle row is only shown when the master flag is on.
+                    useCommunityData = uiState.useCommunityDataForSeed,
+                    onToggleUseCommunityData = if (uiState.communityEngineEnabled) {
+                        viewModel::toggleUseCommunityDataForSeed
+                    } else {
+                        null
                     },
                 )
             }
@@ -1370,6 +1398,12 @@ private fun SuggestionsTab(
     onCut: (CardFit) -> Unit,
     onApplyArchetypePlan: (ArchetypeId, List<ThemeId>) -> Unit,
     onAutoDetectArchetypePlan: () -> Unit,
+    // Motor B (Phase 4) — no-op defaults so this composable never has to be re-plumbed in every
+    // call site if a preview/test constructs it without these.
+    onAddCommunity: (com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion) -> Unit = {},
+    onCommunityCardTap: (String) -> Unit = {},
+    onViewCommunityDecksForCard: (String) -> Unit = {},
+    onOpenSimilarDeck: (Int) -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -1503,6 +1537,71 @@ private fun SuggestionsTab(
             }
             else -> items(uiState.adds, key = { "add_${it.fit.card.scryfallId}" }) { suggestion ->
                 AddSuggestionRow(suggestion = suggestion, onAdd = { onAdd(suggestion) })
+            }
+        }
+
+        // ── Motor B (Deck Doctor Community/Archetype plan, Phase 4): community suggestions +
+        //    "Decks like yours". Entirely additive — when the flag is off (or nothing loaded yet),
+        //    `communityAdds`/`similarDecks` are simply empty and NOTHING below renders (no header,
+        //    no empty state — the plan's "flag off = nothing community-related" requirement). A
+        //    Worker/aggregate failure (`communityUnavailable`) shows ONE InlineErrorState for this
+        //    section only; Motor A above is never affected.
+        if (uiState.communityEngineEnabled) {
+            item(key = "community_adds_header") {
+                SuggestionsSectionHeader(
+                    stringResource(R.string.deck_studio_suggestions_community_header),
+                    mc.secondaryAccent,
+                )
+            }
+            when {
+                uiState.isCommunityLoading && uiState.communityAdds.isEmpty() -> item(key = "community_adds_loading") {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = spacing.xl),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(color = mc.secondaryAccent)
+                    }
+                }
+                uiState.communityUnavailable -> item(key = "community_unavailable") {
+                    InlineErrorState(message = stringResource(R.string.deck_doctor_community_unavailable))
+                }
+                uiState.communityAdds.isEmpty() -> item(key = "community_adds_empty") {
+                    Text(
+                        text = stringResource(R.string.deck_doctor_community_empty),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                else -> items(uiState.communityAdds, key = { "community_add_${it.card.scryfallId}" }) { suggestion ->
+                    CommunityAddSuggestionRow(
+                        suggestion = suggestion,
+                        sourceLabel = uiState.deck?.name.orEmpty().ifBlank { stringResource(R.string.deck_studio_suggestions_community_header) },
+                        onAdd = { onAddCommunity(suggestion) },
+                        onViewDecks = { onViewCommunityDecksForCard(suggestion.card.name) },
+                        onCardTap = { onCommunityCardTap(suggestion.card.scryfallId) },
+                    )
+                }
+            }
+
+            if (uiState.similarDecks.isNotEmpty()) {
+                item(key = "similar_decks_header") {
+                    SuggestionsSectionHeader(
+                        stringResource(R.string.deck_studio_suggestions_similar_decks_header),
+                        mc.secondaryAccent,
+                    )
+                }
+                item(key = "similar_decks_carousel") {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        items(uiState.similarDecks, key = { "similar_${it.archidektId}" }) { result ->
+                            SimilarDeckCard(
+                                result = result,
+                                onClick = { onOpenSimilarDeck(result.archidektId) },
+                            )
+                        }
+                    }
+                }
             }
         }
     }

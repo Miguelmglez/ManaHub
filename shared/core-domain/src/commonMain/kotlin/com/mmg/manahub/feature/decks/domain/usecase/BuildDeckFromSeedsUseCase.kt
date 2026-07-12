@@ -16,6 +16,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
+ * One community-aggregate card name + its relative pull weight (Deck Doctor Community/Archetype
+ * plan, Phase 5). Deliberately name+weight ONLY (no [com.mmg.manahub.core.model.Card] resolution
+ * inside this use case) — the caller (which already resolved the aggregate for the seeds'
+ * commander/signature via [com.mmg.manahub.core.domain.repository.CommunityAggregateRepository])
+ * supplies this as a pure PRIORITY signal over the candidate pool this use case already builds; see
+ * [BuildDeckFromSeedsUseCase]'s class KDoc "Community priority" section.
+ */
+data class WeightedCardName(val name: String, val weight: Float)
+
+/**
  * Result of [BuildDeckFromSeedsUseCase].
  *
  * @property mainboard the generated non-land mainboard (seeds first, then ranked fills) as
@@ -26,11 +36,14 @@ import kotlinx.coroutines.withContext
  *           LAND ideal, falling back to [DeckFormat.targetLandCount]).
  * @property usedExternalCandidates true when at least one Scryfall (NEW-origin) card made the cut —
  *           false when the network was unavailable and the deck was built from collection + seeds only.
+ * @property usedCommunityPool true when a non-empty `communityPool` was supplied AND at least one of
+ *           its cards was actually available to prioritize (Phase 5).
  */
 data class SeedDeckResult(
     val mainboard: List<MagicCard>,
     val reservedLandSlots: Int,
     val usedExternalCandidates: Boolean,
+    val usedCommunityPool: Boolean = false,
 )
 
 /**
@@ -61,6 +74,18 @@ data class SeedDeckResult(
  *     here: picking specific nonbasic lands is out of scope; the existing builder/basic-land flow fills
  *     the mana base. This keeps the use case focused on the spell selection problem.
  *
+ * ## Community priority (Deck Doctor Community/Archetype plan, Phase 5)
+ * An optional [WeightedCardName] list — the seeds' community-aggregate cards, resolved by the
+ * CALLER before this use case runs (see [WeightedCardName]'s KDoc for why resolution stays outside
+ * this use case) — RE-ORDERS the already-ranked-and-budgeted candidate list (step 4's output)
+ * before the step-5 fill passes, per the plan's exact priority: (1) community-pool cards the user
+ * ALREADY OWNS, (2) community-pool cards outside the collection, (3) the existing
+ * owned-first/best-fit heuristic order, UNCHANGED, for everything else. This never widens the
+ * candidate pool itself (a community-pool card that never made it into `unionById` — e.g. off-color
+ * or already-budget-excluded — is simply never prioritized, it does not get a second chance to
+ * enter); it only changes FILL ORDER among already-eligible candidates. An empty/default
+ * `communityPool` reproduces the pre-Phase-5 fill order exactly (zero behavior change).
+ *
  * The result is heuristic and deterministic given the same inputs (no randomness).
  */
 class BuildDeckFromSeedsUseCase(
@@ -78,6 +103,8 @@ class BuildDeckFromSeedsUseCase(
      * @param constraints the active budget filters.
      * @param collection the user's owned cards (one [Card] per distinct scryfallId is enough).
      * @param weights scoring weights (defaults to the engine's tuned defaults).
+     * @param communityPool optional community-aggregate priority signal (Phase 5); see the class
+     *        KDoc's "Community priority" section. Empty by default — zero behavior change.
      */
     suspend operator fun invoke(
         seeds: List<Card>,
@@ -86,6 +113,7 @@ class BuildDeckFromSeedsUseCase(
         constraints: BudgetConstraints,
         collection: List<Card>,
         weights: ScoreWeights = ScoreWeights(),
+        communityPool: List<WeightedCardName> = emptyList(),
     ): SeedDeckResult = withContext(ioDispatcher) {
         val seeds = seeds.distinctBy { it.scryfallId }
         val seedIds = seeds.mapTo(HashSet()) { it.scryfallId }
@@ -137,8 +165,16 @@ class BuildDeckFromSeedsUseCase(
 
         // ── 5. Fill toward the skeleton ─────────────────────────────────────────────
         // Prefer owned cards at equal usefulness: stable owned-first partition keeps fit order within.
+        // Phase 5: community-pool cards are prioritized FIRST (owned-in-pool, then pool-outside-
+        // collection), ahead of the pre-Phase-5 owned-first/score order — see the class KDoc.
+        val communityWeightByName = communityPool.associate { it.name to it.weight }
+        val usedCommunityPool = communityWeightByName.isNotEmpty() &&
+            budgeted.any { it.fit.card.name in communityWeightByName }
         val ordered = budgeted.sortedWith(
-            compareByDescending<AddSuggestion> { it.fit.isOwned }
+            compareByDescending<AddSuggestion> { communityWeightByName.containsKey(it.fit.card.name) && it.fit.isOwned }
+                .thenByDescending { communityWeightByName.containsKey(it.fit.card.name) }
+                .thenByDescending { communityWeightByName[it.fit.card.name] ?: 0f }
+                .thenByDescending { it.fit.isOwned }
                 .thenByDescending { it.fit.score },
         )
 
@@ -182,6 +218,7 @@ class BuildDeckFromSeedsUseCase(
             mainboard = mainboard,
             reservedLandSlots = reservedLandSlots(profile, format),
             usedExternalCandidates = usedExternal,
+            usedCommunityPool = usedCommunityPool,
         )
     }
 

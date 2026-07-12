@@ -104,6 +104,10 @@ class HomeViewModel(
     private val wishlistRepository: WishlistRepository,
     private val getAccountNudgeUseCase: GetAccountNudgeUseCase,
     private val gamificationRepository: GamificationRepository,
+    // Deck Doctor Community/Archetype plan, Phase 5 — appended last (see `project_archetype_engine`
+    // memory's "append new optional params at the end" rule for classes with positional-arg call
+    // sites; this project's tests use named args throughout, but the convention is kept anyway).
+    private val communityAggregateRepository: com.mmg.manahub.core.domain.repository.CommunityAggregateRepository? = null,
 ) : ViewModel() {
 
     /**
@@ -549,6 +553,42 @@ class HomeViewModel(
 
     /** Public UI state. */
     val state: StateFlow<HomeUiState> get() = uiState
+
+    /**
+     * Home trending widget (Deck Doctor Community/Archetype plan, Phase 5) — the top-3 commanders
+     * of the week from the `manahub-community` Worker's `/v1/trending`. Kept as an INDEPENDENT
+     * `StateFlow`, NOT threaded into the [uiState] combine chain: that chain is already
+     * documented as the most error-prone surface in this ViewModel (CLAUDE.md's "Home widget
+     * board" note — combine arity / property-init-order gotchas), and this widget's data has no
+     * dependency on anything else in [HomeUiState]. Mirrors the `deckStatsFlow`/`playerNameFlow`
+     * sibling-StateFlow precedent in `DeckStudioViewModel`.
+     *
+     * "Silently hidden (not an error state) on Worker failure — log only" (plan Phase 5): any
+     * failure (`communityAggregateRepository` null, the repo call throwing, or a
+     * [com.mmg.manahub.core.model.DataResult.Error]) resolves to `null`, which
+     * [com.mmg.manahub.feature.home.presentation.TrendingCommandersWidget] treats as "don't render
+     * this widget" — never an inline error UI.
+     */
+    val trendingFlow: StateFlow<com.mmg.manahub.core.model.TrendingSnapshot?> =
+        flow {
+            val repo = communityAggregateRepository
+            if (repo == null) {
+                emit(null)
+                return@flow
+            }
+            val result = runCatching { repo.getTrending() }.getOrElse {
+                crashlytics.log("home_trending_widget_failed")
+                null
+            }
+            emit((result as? com.mmg.manahub.core.model.DataResult.Success)?.data)
+        }.catch {
+            crashlytics.log("home_trending_widget_failed")
+            emit(null)
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
+        )
 
     init {
         authRepository.sessionState

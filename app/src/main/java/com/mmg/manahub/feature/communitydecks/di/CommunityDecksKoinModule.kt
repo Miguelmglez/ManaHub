@@ -96,7 +96,10 @@ fun communityDecksKoinModule(
     // ── Domain use cases. ──
     single { SearchCommunityDecksUseCase(repository = get()) }
     single { GetCommunityDeckUseCase(repository = get()) }
-    single { ImportCommunityDeckUseCase(deckRepository = get(), cardRepository = get(), crashReporter = get()) }
+    // Deck Doctor Community/Archetype plan, Phase 6: now a thin adapter over the shared
+    // ImportDeckCardsUseCase (registered in decksKoinModule, loaded in the same
+    // ManaHubApp `modules(...)` call — declaration order does not matter to Koin).
+    single { ImportCommunityDeckUseCase(importDeckCardsUseCase = get()) }
 
     // ── The Koin island: both Community Decks ViewModels are now resolved by Koin, not Hilt. ──
     // Koin injects the SavedStateHandle (carrying the `cardName` / `archidektId` nav args) into each
@@ -106,6 +109,9 @@ fun communityDecksKoinModule(
             savedStateHandle = get(),
             searchCommunityDecks = get(),
             userPreferences = get(),
+            // Community Hub Discover (Phase 5) — resolved from communityAggregateKoinModule
+            // (loaded in the same ManaHubApp `modules(...)` call, see that module's own KDoc).
+            communityAggregateRepository = get(),
         )
     }
     viewModel {

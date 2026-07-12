@@ -596,4 +596,5 @@ private val HomeWidgetType.description: String
         HomeWidgetType.RULES_TIP -> "A rules tip each day"
         HomeWidgetType.SOCIAL_HUB -> "Friends, community and online play"
         HomeWidgetType.TRADES_HUB -> "Trade inbox and suggestions"
+        HomeWidgetType.TRENDING_COMMANDERS -> "This week's most popular commanders"
     }

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
 import kotlinx.coroutines.Job
@@ -35,6 +36,7 @@ class CommunityDecksSearchViewModel(
     savedStateHandle: SavedStateHandle,
     private val searchCommunityDecks: SearchCommunityDecksUseCase,
     private val userPreferences: UserPreferencesDataStore,
+    private val communityAggregateRepository: CommunityAggregateRepository,
 ) : ViewModel() {
 
     private val crashlytics = FirebaseCrashlytics.getInstance()
@@ -42,8 +44,14 @@ class CommunityDecksSearchViewModel(
     /** Pre-filled card name from the CommunityDecksByCard route (Uri-decoded by the nav arg). */
     private val initialCardName: String? = savedStateHandle.get<String>("cardName")
 
+    /** The ByCard deep-link ALWAYS lands on Search (route contract unchanged, plan D8/Phase 5). */
+    private val openedViaByCardDeepLink: Boolean = !initialCardName.isNullOrBlank()
+
     private val _uiState = MutableStateFlow(
-        CommunityDecksSearchUiState(query = initialCardName ?: ""),
+        CommunityDecksSearchUiState(
+            query = initialCardName ?: "",
+            hubTab = if (openedViaByCardDeepLink) CommunityHubTab.SEARCH else CommunityHubTab.DISCOVER,
+        ),
     )
     val uiState: StateFlow<CommunityDecksSearchUiState> = _uiState.asStateFlow()
 
@@ -56,13 +64,72 @@ class CommunityDecksSearchViewModel(
 
     private var currentPage = 1
     private var searchJob: Job? = null
+    private var discoverLoaded = false
 
     init {
         crashlytics.log("screen_viewed: community_decks_search")
         crashlytics.setCustomKey("community_search_prefilled", !initialCardName.isNullOrBlank())
-        if (!initialCardName.isNullOrBlank()) {
+        if (openedViaByCardDeepLink) {
             search()
         }
+        // Phase 5 Community Hub: mirror the D4 flag into state; a lazy Discover load fires only
+        // once (guarded by `discoverLoaded`) the FIRST time it becomes true AND the landing tab is
+        // actually Discover (the ByCard deep-link never needs it unless the user manually switches
+        // tabs — [onSelectHubTab] covers that case).
+        viewModelScope.launch {
+            userPreferences.communityEngineEnabledFlow.collect { enabled ->
+                _uiState.update { it.copy(discoverEnabled = enabled) }
+                if (enabled && !openedViaByCardDeepLink && !discoverLoaded) loadDiscover()
+            }
+        }
+    }
+
+    /** Switches the active [CommunityHubTab], lazily loading Discover data the first time it's shown. */
+    fun onSelectHubTab(tab: CommunityHubTab) {
+        _uiState.update { it.copy(hubTab = tab) }
+        if (tab == CommunityHubTab.DISCOVER && !discoverLoaded && _uiState.value.discoverEnabled) loadDiscover()
+    }
+
+    /**
+     * Fetches "Top commanders this week" / "Most searched cards" ([TrendingSnapshot]) and "Popular
+     * decks" (the existing Archidekt search, `orderBy=-viewCount`, confirmed live in
+     * `docs/adr/ADR-004-community-api-contracts.md` §1). Runs at most once per ViewModel instance
+     * ([discoverLoaded]); ANY failure degrades to an empty section with [CommunityDecksSearchUiState
+     * .discoverUnavailable] — never blocks or affects the Search tab.
+     */
+    private fun loadDiscover() {
+        discoverLoaded = true
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTrendingLoading = true, isPopularDecksLoading = true) }
+
+            val trendingResult = runCatching { communityAggregateRepository.getTrending() }.getOrNull()
+            val trending = (trendingResult as? DataResult.Success)?.data
+
+            val popularResult = searchCommunityDecks(cardName = null, orderBy = CommunityDeckSort.POPULAR.apiValue, page = 1, pageSize = 10)
+            val popularDecks = (popularResult as? DataResult.Success)?.data?.decks.orEmpty()
+
+            val trendingFailed = trendingResult == null || trendingResult is DataResult.Error
+            val popularFailed = popularResult is DataResult.Error
+            if (trendingFailed) crashlytics.log("community_discover_trending_failed")
+            if (popularFailed) crashlytics.log("community_discover_popular_decks_failed")
+
+            _uiState.update {
+                it.copy(
+                    trending = trending,
+                    popularDecks = popularDecks,
+                    isTrendingLoading = false,
+                    isPopularDecksLoading = false,
+                    discoverUnavailable = trendingFailed && popularDecks.isEmpty(),
+                )
+            }
+        }
+    }
+
+    /** A trending card/commander name tapped in Discover — switches to Search pre-filled + auto-run. */
+    fun onDiscoverTermClick(term: String) {
+        crashlytics.log("community_discover_term_click")
+        _uiState.update { it.copy(query = term, hubTab = CommunityHubTab.SEARCH) }
+        search()
     }
 
     fun onQueryChange(query: String) {

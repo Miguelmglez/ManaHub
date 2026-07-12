@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -46,6 +47,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -68,6 +71,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -79,6 +83,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.model.CommunityDeckSummary
+import com.mmg.manahub.core.model.NamedCount
 
 /**
  * Community Decks search / browse screen.
@@ -147,7 +152,9 @@ fun CommunityDecksScreen(
                         .fillMaxSize()
                         .padding(padding),
                 )
-            } else {
+            } else if (!uiState.discoverEnabled) {
+                // Phase 5 hard regression bar (D8): flag off = EXACTLY the pre-Phase-5 screen, no
+                // tab row, straight to Search.
                 CommunityDecksSearchBody(
                     state = uiState,
                     contentPadding = padding,
@@ -158,6 +165,30 @@ fun CommunityDecksScreen(
                     onLoadMore = viewModel::loadMore,
                     onDeckClick = viewModel::onDeckClick,
                 )
+            } else {
+                Column(Modifier.fillMaxSize().padding(padding)) {
+                    CommunityHubTabRow(selected = uiState.hubTab, onSelect = viewModel::onSelectHubTab)
+                    when (uiState.hubTab) {
+                        CommunityHubTab.DISCOVER -> CommunityDiscoverBody(
+                            state = uiState,
+                            onRetry = { viewModel.onSelectHubTab(CommunityHubTab.DISCOVER) },
+                            onTermClick = viewModel::onDiscoverTermClick,
+                            onDeckClick = viewModel::onDeckClick,
+                            modifier = Modifier.weight(1f),
+                        )
+                        CommunityHubTab.SEARCH -> CommunityDecksSearchBody(
+                            state = uiState,
+                            contentPadding = PaddingValues(0.dp),
+                            onQueryChange = viewModel::onQueryChange,
+                            onSearch = viewModel::search,
+                            onFormatSelected = viewModel::onFormatSelected,
+                            onSortSelected = viewModel::onSortSelected,
+                            onLoadMore = viewModel::loadMore,
+                            onDeckClick = viewModel::onDeckClick,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
         MagicToastHost(toastState)
@@ -175,11 +206,12 @@ private fun CommunityDecksSearchBody(
     onSortSelected: (CommunityDeckSort) -> Unit,
     onLoadMore: () -> Unit,
     onDeckClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val spacing = MaterialTheme.spacing
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(contentPadding),
     ) {
@@ -661,4 +693,150 @@ private fun String.toManaColor(mc: MagicColors): Color? = when (uppercase()) {
     "R" -> mc.manaR
     "G" -> mc.manaG
     else -> null
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Community Hub — Discover (Deck Doctor Community/Archetype plan, Phase 5, D8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The Discover/Search tab row — only ever composed when [CommunityDecksSearchUiState.discoverEnabled]
+ * is true (see the screen's flag-gate above). */
+@Composable
+private fun CommunityHubTabRow(
+    selected: CommunityHubTab,
+    onSelect: (CommunityHubTab) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    TabRow(
+        selectedTabIndex = selected.ordinal,
+        containerColor = mc.backgroundSecondary,
+        contentColor = mc.primaryAccent,
+    ) {
+        CommunityHubTab.entries.forEach { tab ->
+            Tab(
+                selected = tab == selected,
+                onClick = { onSelect(tab) },
+                text = {
+                    Text(
+                        text = stringResource(
+                            if (tab == CommunityHubTab.DISCOVER) R.string.community_hub_tab_discover
+                            else R.string.community_hub_tab_search
+                        ),
+                        style = ty.labelLarge,
+                    )
+                },
+            )
+        }
+    }
+}
+
+/** The Discover section: trending commanders/cards + popular decks. Every sub-section degrades
+ * independently (empty on failure) except for the ALL-failed case, handled by [state.discoverUnavailable]. */
+@Composable
+private fun CommunityDiscoverBody(
+    state: CommunityDecksSearchUiState,
+    onRetry: () -> Unit,
+    onTermClick: (String) -> Unit,
+    onDeckClick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    if ((state.isTrendingLoading && state.isPopularDecksLoading) && state.trending == null && state.popularDecks.isEmpty()) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = mc.primaryAccent)
+        }
+        return
+    }
+
+    if (state.discoverUnavailable) {
+        InlineErrorState(
+            message = stringResource(R.string.community_hub_discover_unavailable),
+            retryLabel = stringResource(R.string.retry),
+            onRetry = onRetry,
+            modifier = modifier.padding(spacing.lg),
+        )
+        return
+    }
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = spacing.md, horizontal = spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(spacing.md),
+    ) {
+        val trending = state.trending
+        if (trending != null && trending.topCommanders.isNotEmpty()) {
+            item(key = "trending_commanders_header") {
+                Text(
+                    text = stringResource(R.string.community_hub_trending_commanders),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+            }
+            item(key = "trending_commanders_row") {
+                TrendingTermRow(terms = trending.topCommanders, onClick = onTermClick)
+            }
+        }
+        if (trending != null && trending.topCards.isNotEmpty()) {
+            item(key = "trending_cards_header") {
+                Text(
+                    text = stringResource(R.string.community_hub_trending_cards),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+            }
+            item(key = "trending_cards_row") {
+                TrendingTermRow(terms = trending.topCards, onClick = onTermClick)
+            }
+        }
+        if (state.popularDecks.isNotEmpty()) {
+            item(key = "popular_decks_header") {
+                Text(
+                    text = stringResource(R.string.community_hub_popular_decks),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+            }
+            items(state.popularDecks, key = { "popular_${it.archidektId}" }) { deck ->
+                CommunityDeckSummaryCard(deck = deck, onClick = { onDeckClick(deck.archidektId) })
+            }
+        }
+    }
+}
+
+/** A horizontally-scrollable row of trending term chips ("N week"-style ranking is implicit in order). */
+@Composable
+private fun TrendingTermRow(terms: List<NamedCount>, onClick: (String) -> Unit) {
+    val spacing = MaterialTheme.spacing
+    LazyRow(
+        contentPadding = PaddingValues(vertical = spacing.xxs),
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+    ) {
+        items(terms.take(10), key = { it.name }) { term ->
+            TrendingTermChip(term = term, onClick = { onClick(term.name) })
+        }
+    }
+}
+
+@Composable
+private fun TrendingTermChip(term: NamedCount, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(
+        onClick = onClick,
+        shape = ChipShape,
+        color = mc.surface,
+        border = BorderStroke(1.dp, mc.surfaceVariant),
+        modifier = Modifier.heightIn(min = 48.dp),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
+        ) {
+            Text(text = term.name, style = ty.labelMedium, color = mc.textPrimary)
+        }
+    }
 }

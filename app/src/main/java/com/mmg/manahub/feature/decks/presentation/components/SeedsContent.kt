@@ -36,6 +36,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -83,6 +85,12 @@ import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
  * @param budgetSlot optional custom budget UI rendered in place of the default [BudgetFilterBar]
  *        (the Deck Studio passes its free-text [com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar]);
  *        when null the default chip-based [BudgetFilterBar] driven by [budget]/[onBudgetChanged] is shown.
+ * @param useCommunityData current state of the "Use community data" toggle (Deck Doctor
+ *        Community/Archetype plan, Phase 5). Only meaningful when [onToggleUseCommunityData] is
+ *        non-null (see that param's KDoc).
+ * @param onToggleUseCommunityData when non-null, the toggle row IS SHOWN and this callback flips
+ *        [useCommunityData]; when null (the master `communityEngineEnabledFlow` is off) the row is
+ *        hidden entirely — this is the Phase 5 flag gate.
  */
 @Composable
 fun SeedsContent(
@@ -101,6 +109,8 @@ fun SeedsContent(
     onBudgetChanged: (BudgetConstraints) -> Unit,
     onGenerate: () -> Unit,
     budgetSlot: (@Composable () -> Unit)? = null,
+    useCommunityData: Boolean = false,
+    onToggleUseCommunityData: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -173,6 +183,13 @@ fun SeedsContent(
                 }
                 item(key = "skeleton") {
                     SkeletonPreviewCard(skeleton = skeleton)
+                }
+            }
+
+            // Community-data toggle (Phase 5) — only rendered when the master flag is on.
+            if (onToggleUseCommunityData != null) {
+                item(key = "use_community_data") {
+                    UseCommunityDataRow(checked = useCommunityData, onToggle = onToggleUseCommunityData)
                 }
             }
 
@@ -486,6 +503,54 @@ private fun SkeletonBar(role: DeckRole, ideal: Int, maxIdeal: Int) {
             )
         }
         Text(text = ideal.toString(), style = ty.labelMedium, color = mc.textPrimary, modifier = Modifier.width(24.dp))
+    }
+}
+
+/**
+ * "Use community data" toggle row (Deck Doctor Community/Archetype plan, Phase 5): when on, the
+ * seed-build prioritizes cards popular in community decks for the picked seeds' commander/
+ * signature cards (see [com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase]'s
+ * "Community priority" section) before falling back to the pre-Phase-5 heuristic fill.
+ */
+@Composable
+private fun UseCommunityDataRow(checked: Boolean, onToggle: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(
+        onClick = onToggle,
+        shape = CardShape,
+        color = mc.backgroundSecondary,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(MaterialTheme.spacing.md)
+                .heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.deck_seeds_use_community_data_title),
+                    style = ty.bodyMedium,
+                    color = mc.textPrimary,
+                )
+                Text(
+                    text = stringResource(R.string.deck_seeds_use_community_data_subtitle),
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = { onToggle() },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = mc.onAccent,
+                    checkedTrackColor = mc.primaryAccent,
+                    uncheckedThumbColor = mc.textDisabled,
+                    uncheckedTrackColor = mc.surfaceVariant,
+                ),
+            )
+        }
     }
 }
 

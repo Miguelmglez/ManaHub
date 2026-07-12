@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.CommunityDeckOwner
 import com.mmg.manahub.core.model.CommunityDeckSearchResult
@@ -49,6 +50,10 @@ class CommunityDecksSearchViewModelTest {
     private val searchUseCase: SearchCommunityDecksUseCase = mockk()
     private val userPreferences: UserPreferencesDataStore = mockk()
     private val featureFlagFlow = MutableStateFlow(true)
+    // Phase 5 Community Hub Discover — default OFF so pre-existing tests (written before this flag
+    // existed) keep exercising the byte-identical pre-Phase-5 screen path.
+    private val communityAggregateRepository: CommunityAggregateRepository = mockk(relaxed = true)
+    private val communityEngineEnabledFlow = MutableStateFlow(false)
 
     // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -86,6 +91,7 @@ class CommunityDecksSearchViewModelTest {
         every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
 
         every { userPreferences.communityDecksEnabledFlow } returns featureFlagFlow
+        every { userPreferences.communityEngineEnabledFlow } returns communityEngineEnabledFlow
     }
 
     @After
@@ -99,7 +105,7 @@ class CommunityDecksSearchViewModelTest {
         val handle = SavedStateHandle().apply {
             if (cardName != null) set("cardName", cardName)
         }
-        return CommunityDecksSearchViewModel(handle, searchUseCase, userPreferences)
+        return CommunityDecksSearchViewModel(handle, searchUseCase, userPreferences, communityAggregateRepository)
     }
 
     // ── Group 1: Initial state (no cardName) ────────────────────────────────

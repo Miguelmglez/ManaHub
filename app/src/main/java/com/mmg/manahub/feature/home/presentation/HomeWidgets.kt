@@ -7,6 +7,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -313,15 +317,25 @@ fun AccountGatedPlaceholder(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
+@OptIn(ExperimentalSharedTransitionApi::class)
 fun HomeWidgetHost(
     widget: WidgetInstance,
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    // Deck Doctor Community/Archetype plan, Phase 5 — kept OUTSIDE HomeUiState on purpose, see
+    // [com.mmg.manahub.feature.home.presentation.HomeViewModel.trendingFlow]'s KDoc.
+    trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
 ) {
     val spacing = MaterialTheme.spacing
     // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
     // in the persisted layout (so they reappear if re-enabled) but are not shown.
     if (widget.type.isGamification && !uiState.gamificationEnabled) return
+    // Phase 5: silently hidden (never an error state) while there's no trending data yet / the
+    // community engine is off / the Worker is unreachable — see HomeWidgetType.TRENDING_COMMANDERS'
+    // KDoc.
+    if (widget.type == HomeWidgetType.TRENDING_COMMANDERS && trending.isNullOrEmptyTrending()) return
 
     Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
         if (widget.type != HomeWidgetType.CONTEXT_HERO) {
@@ -340,14 +354,84 @@ fun HomeWidgetHost(
             HomeWidgetType.GAME_STATS_HUB -> GameStatsHubWidget(uiState, onAction)
             HomeWidgetType.COLLECTION_STATS_HUB -> CollectionStatsHubWidget(uiState, onAction)
             HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
-            HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(uiState.wishlistStats, uiState.isAuthenticated, onAction)
-            HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(uiState.discoverCards, uiState.discoverLoadState, onAction)
-            HomeWidgetType.CARD_OF_THE_DAY -> RandomCardWidget(uiState.cardOfTheDay, uiState.randomCardLoadState, onAction)
+            HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(
+                stats = uiState.wishlistStats,
+                isAuthenticated = uiState.isAuthenticated,
+                onAction = onAction,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+            HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(
+                cards = uiState.discoverCards,
+                loadState = uiState.discoverLoadState,
+                onAction = onAction,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+            HomeWidgetType.CARD_OF_THE_DAY -> RandomCardWidget(
+                card = uiState.cardOfTheDay,
+                loadState = uiState.randomCardLoadState,
+                onAction = onAction,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
             HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
             HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
             HomeWidgetType.RULES_TIP -> RulesTipWidget()
             HomeWidgetType.SOCIAL_HUB -> SocialHubWidget(uiState, onAction)
             HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
+            HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
+        }
+    }
+}
+
+/** `true` when there is no trending data to show (null snapshot or an empty commanders list) —
+ * the single guard [HomeWidgetHost] uses to hide [HomeWidgetType.TRENDING_COMMANDERS] entirely. */
+private fun com.mmg.manahub.core.model.TrendingSnapshot?.isNullOrEmptyTrending(): Boolean =
+    this == null || topCommanders.isEmpty()
+
+/**
+ * Top-3 trending commanders of the week (Deck Doctor Community/Archetype plan, Phase 5). Tapping
+ * ANY row (or the widget as a whole) navigates into the Community Hub via
+ * [HomeAction.OpenCommunityDecks] — the Hub lands on its Discover section by default whenever
+ * `communityEngineEnabledFlow` is on (see [com.mmg.manahub.feature.communitydecks.presentation
+ * .CommunityDecksSearchViewModel]'s `hubTab` default), so no new nav action was needed.
+ */
+@Composable
+private fun TrendingCommandersWidget(
+    trending: com.mmg.manahub.core.model.TrendingSnapshot?,
+    onAction: (HomeAction) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val topThree = trending?.topCommanders.orEmpty().take(3)
+    if (topThree.isEmpty()) return
+
+    WidgetShell(onClick = { onAction(HomeAction.OpenCommunityDecks) }, onClickLabel = stringResourceSafe(R.string.widget_title_trending_commanders)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            topThree.forEachIndexed { index, commander ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = ty.labelMedium,
+                        color = mc.primaryAccent,
+                        modifier = Modifier.width(20.dp),
+                    )
+                    Text(
+                        text = commander.name,
+                        style = ty.bodyMedium,
+                        color = mc.textPrimary,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }
@@ -1907,8 +1991,15 @@ private fun DecksShelfWidget(decks: List<DeckSummary>, onAction: (HomeAction) ->
 //  WISHLIST_PROGRESS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun WishlistWidget(stats: WishlistStats?, isAuthenticated: Boolean, onAction: (HomeAction) -> Unit) {
+private fun WishlistWidget(
+    stats: WishlistStats?,
+    isAuthenticated: Boolean,
+    onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+) {
     if (!isAuthenticated) {
         AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_wishlist)) { onAction(HomeAction.CreateAccount) }
         return
@@ -1925,7 +2016,12 @@ private fun WishlistWidget(stats: WishlistStats?, isAuthenticated: Boolean, onAc
         if (stats.cards.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                 items(stats.cards.toList(), key = { it.id }) { card ->
-                    DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+                    DiscoverCardThumb(
+                        card = card,
+                        onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
                 }
             }
         } else {
@@ -1944,11 +2040,14 @@ private fun WishlistWidget(stats: WishlistStats?, isAuthenticated: Boolean, onAc
 //  DISCOVER_CARDS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun DiscoverCardsWidget(
     cards: List<DiscoverCard>,
     loadState: DiscoverLoadState,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
@@ -1978,7 +2077,12 @@ private fun DiscoverCardsWidget(
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                     items(cards, key = { it.id }) { card ->
-                        DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+                        DiscoverCardThumb(
+                            card = card,
+                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
                     }
                 }
             }
@@ -1986,8 +2090,14 @@ private fun DiscoverCardsWidget(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
+private fun DiscoverCardThumb(
+    card: DiscoverCard,
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+) {
     val mc = MaterialTheme.magicColors
     Box(
         modifier = Modifier
@@ -1995,6 +2105,18 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
             // Full MTG card aspect ratio (745:1040) so the whole card is shown.
             .aspectRatio(0.717f)
             .clip(CardShape)
+            .then(
+                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                    with(sharedTransitionScope) {
+                        Modifier.sharedBounds(
+                            sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            clipInOverlayDuringTransition = OverlayClip(CardShape),
+                            renderInOverlayDuringTransition = true,
+                        )
+                    }
+                } else Modifier
+            )
             .background(mc.surfaceVariant)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -2016,11 +2138,14 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
 //  CARD_OF_THE_DAY (enum) → Random card widget: a single full card image, centered
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun RandomCardWidget(
     card: DiscoverCard?,
     loadState: DiscoverLoadState,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
     WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId)) } }) {
@@ -2045,6 +2170,18 @@ private fun RandomCardWidget(
                     // Full MTG card aspect ratio (745:1040).
                     .aspectRatio(0.717f)
                     .clip(CardShape)
+                    .then(
+                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                            with(sharedTransitionScope) {
+                                Modifier.sharedBounds(
+                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    clipInOverlayDuringTransition = OverlayClip(CardShape),
+                                    renderInOverlayDuringTransition = true,
+                                )
+                            }
+                        } else Modifier
+                    )
                     .background(mc.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2750,19 +2887,31 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
 //  Container — registers root bounds for drag hit-testing in the gallery
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeWidgetContainer(
     widget: WidgetInstance,
     uiState: HomeUiState,
     onRegisterBounds: (String, androidx.compose.ui.geometry.Rect) -> Unit,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
+    // Deck Doctor Community/Archetype plan, Phase 5.
+    trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
 ) {
     Box(
         modifier = modifier
             .onGloballyPositioned { coords -> onRegisterBounds(widget.type.persistedId, coords.boundsInRoot()) },
     ) {
-        HomeWidgetHost(widget, uiState, onAction)
+        HomeWidgetHost(
+            widget = widget,
+            uiState = uiState,
+            onAction = onAction,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
+            trending = trending,
+        )
     }
 }
 
