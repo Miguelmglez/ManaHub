@@ -62,10 +62,11 @@ android {
             "String",
             "COMMUNITY_WORKER_URL",
             // The `manahub-community` Worker (Deck Doctor Community/Archetype plan, Phase 3.3) is
-            // NOT deployed yet — see cloudflare/manahub-community/wrangler.toml's provisioning
-            // note. This default is an intentionally obvious placeholder (never a real-looking
-            // workers.dev subdomain) until real Cloudflare resources are provisioned.
-            "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.PLACEHOLDER.workers.dev/")}\""
+            // deployed at this real workers.dev subdomain as of 2026-07-12. Trailing slash is
+            // required — CommunityAggregateApi builds request URLs via "${baseUrl}v1/..." string
+            // concatenation (see its KDoc: "must end with `/`"), matching the CLOUDFLARE_WORKER_URL
+            // convention above.
+            "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.miguel-mglez.workers.dev/")}\""
         )
 
         ndk {
