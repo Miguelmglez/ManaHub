@@ -4,15 +4,7 @@
 # Deck Doctor Motor B / Community Hub features (see docs/adr/ADR-004-community-api-contracts.md
 # and docs/claude-code-prompt-deck-doctor-community.md Phase 3). No auth, no PII, GET only.
 #
-# PROVISIONING NOTE (2026-07-11): the KV namespace and D1 database below use PLACEHOLDER ids.
-# This Worker has NOT been deployed and NO real Cloudflare resources have been created for it.
-# Before the first `wrangler deploy`, a human must run (once, authorized separately from this
-# commit):
-#   npx wrangler kv:namespace create COMMUNITY_KV
-#   npx wrangler kv:namespace create COMMUNITY_KV --preview
-#   npx wrangler d1 create manahub-community-db
-# ...then replace the "TBD-*" placeholders below with the real ids, and apply
-# test/schema.sql to the new D1 database with `npx wrangler d1 execute`.
+# PROVISIONED (2026-07-12): KV namespace + D1 database created and deployed, user-authorized.
 name = "manahub-community"
 main = "src/index.ts"
 compatibility_date = "2026-07-01"
@@ -20,13 +12,13 @@ compatibility_flags = ["nodejs_compat"]
 
 [[kv_namespaces]]
 binding = "COMMUNITY_KV"
-id = "TBD-run-wrangler-kv-namespace-create-COMMUNITY_KV"
-preview_id = "TBD-run-wrangler-kv-namespace-create-COMMUNITY_KV-preview"
+id = "e9634f0193f64b6daf57fc345c836ebf"
+preview_id = "8ad9bc57a2db41f3a37ba2d7e279d26c"
 
 [[d1_databases]]
 binding = "COMMUNITY_DB"
 database_name = "manahub-community-db"
-database_id = "TBD-run-wrangler-d1-create-manahub-community-db"
+database_id = "a410d6e0-b383-4b20-9c6c-10e9c684048e"
 
 # Weekly cron: prune trending counters older than 8 weeks + pre-warm the top-10 trending
 # commanders (fixes cold start on Monday morning). NOT scheduled/deployed by this change —

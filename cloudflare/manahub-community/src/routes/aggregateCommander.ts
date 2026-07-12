@@ -10,7 +10,13 @@ export interface CommanderAggregateDeps {
 }
 
 export const defaultDeps: CommanderAggregateDeps = {
-  fetchImpl: fetch,
+  // Wrapped (not a bare `fetch` reference) — assigning the global `fetch` function directly
+  // as an object property detaches it from its required implicit receiver. Calling it later as
+  // `deps.fetchImpl(...)` then invokes it with `this` bound to `deps`, which workerd's real
+  // `fetch` rejects with `TypeError: Illegal invocation` (Node's fetch tolerates this, so
+  // Miniflare/vitest never caught it locally — see project memory
+  // `project_community_aggregate_worker.md`).
+  fetchImpl: (...args: Parameters<typeof fetch>) => fetch(...args),
   now: () => Date.now(),
 };
 
