@@ -35,7 +35,10 @@ export interface SixtyAggregateDeps {
 }
 
 export const defaultDeps: SixtyAggregateDeps = {
-  fetchImpl: fetch,
+  // Wrapped (not a bare `fetch` reference) — see the identical note in aggregateCommander.ts:
+  // assigning global `fetch` directly as a property detaches it from its implicit receiver and
+  // throws `Illegal invocation` in real workerd when called as `deps.fetchImpl(...)`.
+  fetchImpl: (...args: Parameters<typeof fetch>) => fetch(...args),
   now: () => Date.now(),
 };
 
