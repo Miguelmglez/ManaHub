@@ -84,9 +84,10 @@ private val KEY_COMMUNITY_DECKS_ENABLED = booleanPreferencesKey("community_decks
  * Master Community Engine switch (D4, Deck Doctor Community/Archetype plan, Phase 3.3) — gates
  * Motor B (EDHREC/Archidekt-backed suggestion aggregates from the `manahub-community` Worker).
  * DISTINCT from [KEY_COMMUNITY_DECKS_ENABLED] (which gates the unrelated Archidekt deck
- * browse/import feature). Default: DISABLED — the Worker isn't deployed yet and Motor B has no
- * consumer UI in this phase; `CommunityAggregateRepositoryImpl` short-circuits every method to a
- * [com.mmg.manahub.core.model.DataResult.Error] while this is off.
+ * browse/import feature). Default: ENABLED as of 2026-07-12 — the Worker is now deployed at a
+ * real URL and the feature has consumer UI (Deck Studio Suggestions tab, Home trending widget);
+ * `CommunityAggregateRepositoryImpl` short-circuits every method to a
+ * [com.mmg.manahub.core.model.DataResult.Error] only while this is explicitly turned off.
  */
 private val KEY_COMMUNITY_ENGINE_ENABLED = booleanPreferencesKey("community_engine_enabled")
 /**
@@ -521,12 +522,14 @@ class UserPreferencesDataStore @Inject constructor(
 
     /**
      * Controls whether the Community Engine (Motor B: EDHREC/Archidekt suggestion aggregates) is
-     * active. Default: false (DISABLED) — see [KEY_COMMUNITY_ENGINE_ENABLED]. Distinct from
-     * [communityDecksEnabledFlow].
+     * active. Default: true (ENABLED) as of 2026-07-12 — the `manahub-community` Worker is now
+     * deployed at a real URL (see `COMMUNITY_WORKER_URL` in `app/build.gradle.kts`) and the user
+     * explicitly requested the feature be visible. See [KEY_COMMUNITY_ENGINE_ENABLED]. Distinct
+     * from [communityDecksEnabledFlow].
      */
     val communityEngineEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_COMMUNITY_ENGINE_ENABLED] ?: false }
-        .catch { emit(false) }
+        .map { prefs -> prefs[KEY_COMMUNITY_ENGINE_ENABLED] ?: true }
+        .catch { emit(true) }
 
     suspend fun setCommunityEngineEnabled(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_COMMUNITY_ENGINE_ENABLED] = enabled }
