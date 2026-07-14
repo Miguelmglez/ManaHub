@@ -33,6 +33,10 @@ import com.mmg.manahub.core.ui.theme.magicTypography
  * @param retryLabel Label for the optional retry action. Only shown when non-null.
  * @param onRetry Click callback for the retry action.
  * @param modifier Modifier applied to the root [Row].
+ * @param enabled Whether the retry action responds to taps. Defaults to `true` (existing
+ *  behavior unchanged for every pre-existing call site). Pass `false` while a retry triggered by
+ *  this same action is already in flight, so a rapid double-tap can't launch overlapping retries
+ *  (the retry label dims to [magicColors]'s disabled tone while `enabled` is `false`).
  */
 @Composable
 fun InlineErrorState(
@@ -40,6 +44,7 @@ fun InlineErrorState(
     retryLabel: String? = null,
     onRetry: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -62,10 +67,10 @@ fun InlineErrorState(
             Text(
                 text = retryLabel,
                 style = ty.labelSmall,
-                color = mc.primaryAccent,
+                color = if (enabled) mc.primaryAccent else mc.textDisabled,
                 modifier = Modifier
                     .padding(start = 8.dp)
-                    .clickable(onClick = onRetry),
+                    .clickable(enabled = enabled, onClick = onRetry),
             )
         }
     }

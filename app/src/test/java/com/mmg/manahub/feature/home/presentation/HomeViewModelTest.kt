@@ -12,6 +12,7 @@ import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.WidgetSize
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.model.news.RefreshResult
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
@@ -177,7 +178,8 @@ class HomeViewModelTest {
         every { draftSimRepository.observeActiveSession() } returns activeDraftFlow
         every { tournamentRepository.observeTournaments() } returns tournamentsFlow
         every { getNewsFeedUseCase() } returns flowOf(emptyList())
-        coEvery { refreshNewsFeedUseCase() } returns Result.success(Unit)
+        coEvery { refreshNewsFeedUseCase() } returns
+            Result.success(RefreshResult(fetched = 0, failed = 0, notModified = 0))
         // News filter source of truth: default (English-only, all enabled sources).
         every { userPrefsDataStore.observeNewsFilters() } returns flowOf(NewsFilterPrefs.DEFAULT)
         // Default to no sources; news tests override this with sources that enable their feed.

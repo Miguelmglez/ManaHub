@@ -8,14 +8,6 @@ object DefaultSources {
 
     val articles = listOf(
         ContentSourceEntity(
-            id = "default_article_wizards",
-            name = "Wizards of the Coast",
-            feedUrl = "https://magic.wizards.com/en/rss/rss.xml",
-            type = "ARTICLE",
-            isDefault = true,
-            language = "en",
-        ),
-        ContentSourceEntity(
             id = "default_article_mtggoldfish",
             name = "MTGGoldfish",
             feedUrl = "https://www.mtggoldfish.com/feed",
@@ -87,11 +79,68 @@ object DefaultSources {
             isDefault = true,
             language = "en",
         ),
+        // Verified 2026-07-14 via curl (HTTP 200 + valid RSS + item count) — News feature
+        // improvements Phase 7.
+        ContentSourceEntity(
+            id = "default_article_hipsters",
+            name = "Hipsters of the Coast",
+            // Trailing slash is the final redirect target — `/feed` alone 301s here.
+            feedUrl = "https://www.hipstersofthecoast.com/feed/",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+        ),
+        ContentSourceEntity(
+            id = "default_article_commandersherald",
+            name = "Commander's Herald",
+            // Trailing slash is the final redirect target — `/feed` alone 301s here.
+            feedUrl = "https://commandersherald.com/feed/",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+        ),
+        ContentSourceEntity(
+            id = "default_article_quietspeculation",
+            name = "Quiet Speculation",
+            feedUrl = "https://www.quietspeculation.com/feed",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+        ),
+        ContentSourceEntity(
+            id = "default_article_wargamer",
+            name = "Wargamer",
+            // MTG-scoped tag feed, not the general Wargamer feed — confirmed all items are
+            // MTG-relevant.
+            feedUrl = "https://www.wargamer.com/magic-the-gathering/feed",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+        ),
+        // Rejected 2026-07-14 (News feature improvements Phase 7) — no entity added:
+        //   Bleeding Cool MTG    — redirects to a 404 `path.php`, dead feed url.
+        //   Dot Esports MTG      — 403, Cloudflare JS challenge, unfetchable.
+        //   MTGStocks news       — no RSS; every candidate path returns 202 (challenge/queue
+        //                          response, not a feed).
+        //   TCGplayer Infinite   — no public RSS; `/feed` returns the SPA HTML shell.
     )
 
     // ── Spanish article sources ───────────────────────────────────────────────
     // Verified: MagicBlogTK (Blogspot feed confirmed valid, last post March 2026)
     // Attempted but failed: WotC España (404), La Caverna de Voltir (SSL error)
+    //
+    // Re-attempted 2026-07-14 (News feature improvements Phase 7) — NONE verified, no entity
+    // added:
+    //   WotC España        — site is now a Nuxt SPA; `/es/rss/rss.xml` and `/es/news/rss` both
+    //                        404, `/es/news` only exposes `hreflang` alternates, no RSS
+    //                        `<link rel="alternate" type="application/rss+xml">` anywhere on the
+    //                        site. The EN counterpart (`default_article_wizards`,
+    //                        `https://magic.wizards.com/en/rss/rss.xml`) 404s the same way and was
+    //                        removed from `articles` above — WotC has no RSS feed at all anymore.
+    //   Vandal MTG topic   — no working RSS endpoint found (404/connection failure on every path
+    //                        tried).
+    //   mtgdecks.net       — Cloudflare-blocked (403 "Just a moment" challenge) on every path.
+    //   ElDesmarque        — 403 Access Denied.
 
     val articlesEs = listOf(
         ContentSourceEntity(
@@ -193,12 +242,51 @@ object DefaultSources {
             isDefault = true,
             language = "en",
         ),
+        // Verified 2026-07-14 (News feature improvements Phase 7) — 15 entries each, all active.
+        ContentSourceEntity(
+            id = "default_video_playtowin",
+            name = "Play to Win",
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UC7339iJMCETmek3jdx9LOkg",
+            type = "VIDEO",
+            isDefault = true,
+            language = "en",
+        ),
+        ContentSourceEntity(
+            id = "default_video_covertgoblue",
+            name = "CovertGoBlue",
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UC-UZjHl2kZ-6XKBLgbFgGAQ",
+            type = "VIDEO",
+            isDefault = true,
+            language = "en",
+        ),
+        ContentSourceEntity(
+            id = "default_video_cardmarket_magic",
+            name = "Cardmarket - Magic",
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCwatLpmoIeoL9egqVW2Cxbw",
+            type = "VIDEO",
+            isDefault = true,
+            language = "en",
+        ),
     )
 
     // ── Spanish video sources ─────────────────────────────────────────────────
     // Verified: Rebellion MTG (UCaWvebWif9HQblQlrgte7YA — confirmed valid Atom feed, active)
     //           MagicBlogTK / Magic Arena MundoTK (UC6LNy6IqI76s7emSw0zCZ2g — confirmed valid)
     // Attempted but not verified: @wizards_magicES, @Nsjavier, @ElCubilDelJabalí
+    //
+    // Re-attempted 2026-07-14 (News feature improvements Phase 7) — 1 new source verified, the
+    // rest re-checked and rejected:
+    //   @CommanderBCN     — resolves to UCWhjLOQcVzWrFd3q1HeLriA ("commanderbcn"), but the feed
+    //                       has only 3 entries, all from 2007-2009, unrelated personal/travel
+    //                       content — handle appears squatted/repurposed, not the MTG channel.
+    //   @TKMagicBlog      — resolves to UC6LNy6IqI76s7emSw0zCZ2g, the SAME channel already
+    //                       seeded as `default_video_magicblogtk_es` — confirmed duplicate.
+    //   @Nsjavier         — resolves to UCmk6QaIdjjVIqAXM8uEDqOg ("Nils Styf"), 0 video entries.
+    //   @ElCubilDelJabali, @wizards_magicES — handle pages return HTTP 404, could not resolve.
+    //   @Duelistas        — UCFreg9Hox-yZlYQmtz5HrDw, active but Portuguese-language general
+    //                       gaming content, not MTG, not Spanish.
+    //   @MagicParaTodos   — UCblryjlIvD9B_dNmTZtQtpg, MTG content but Portuguese-language, last
+    //                       activity 2023 (wrong language AND stale).
 
     val videosEs = listOf(
         ContentSourceEntity(
@@ -217,6 +305,15 @@ object DefaultSources {
             isDefault = true,
             language = "es",
         ),
+        // Verified 2026-07-14: 15 entries, cEDH deck-tech content, uploads multiple times daily.
+        ContentSourceEntity(
+            id = "default_video_lacasadelcomandante_es",
+            name = "La Casa del Comandante",
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCQsXkyjcL1gck9zaHgzBFLA",
+            type = "VIDEO",
+            isDefault = true,
+            language = "es",
+        ),
     )
 
     // ── German video sources ──────────────────────────────────────────────────
@@ -224,6 +321,13 @@ object DefaultSources {
     //           15 entries with German titles, active April 2026)
     // Attempted but not verified: Trader Online (handle only), Sol4r1s (invalid ID),
     //           KüchenTisch Gaming, Der Spielraum Wien, BlackSet MTG
+    //
+    // Re-attempted 2026-07-14 (News feature improvements Phase 7) — no new source, no entity
+    // added:
+    //   @TraderOnline, @TraderOnlineMTG, @KuechenTischGaming — all HTTP 404, handles don't exist.
+    //   @KuchenTischGaming (no umlaut, alt spelling) — resolves to UC5uRjXuo5KZAvRdDGb2SN9g,
+    //                       channel title "Giuliano Rizzo (Welgar)", 0 entries — wrong/unrelated
+    //                       channel.
 
     val videosDe = listOf(
         ContentSourceEntity(
