@@ -1836,8 +1836,10 @@
     <string name="news_filter_apply">Apply Filters</string>
     <string name="news_language_en">English</string>
     <string name="news_language_es">Español</string>
+    <string name="news_language_de">German</string>
     <string name="news_all_sources">All Sources</string>
     <string name="news_empty">No news yet. Pull down to refresh.</string>
+    <string name="news_refresh_partial_failure">Couldn\'t update %1$d source(s)</string>
 
     <!-- ══════════════════════════════════════════
          NEWS SOURCES SETTINGS
@@ -1850,6 +1852,8 @@
     <string name="news_sources_url_hint">Feed URL or YouTube channel ID</string>
     <string name="news_sources_validate_add">Validate &amp; Add</string>
     <string name="news_sources_found_items">Found %1$d items</string>
+    <string name="news_sources_language_label">Language</string>
+    <string name="news_sources_youtube_handle_unsupported">YouTube handles can\'t be added directly. Open the channel page, use \'Share\' → \'Copy channel ID\', and paste the ID starting with UC.</string>
 
     <!-- Settings section for News -->
     <string name="settings_section_news">News</string>

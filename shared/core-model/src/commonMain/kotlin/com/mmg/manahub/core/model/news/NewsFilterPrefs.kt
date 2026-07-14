@@ -29,5 +29,13 @@ data class NewsFilterPrefs(
             types = setOf(SourceType.ARTICLE, SourceType.VIDEO),
             sourceIds = null,
         )
+
+        /**
+         * Single source of truth for the short language codes the News feature understands
+         * (matches [ContentSource.language]). Both the filter-sheet language chips and the
+         * add-source language selector derive their options from this list — never hardcode
+         * a second `listOf("en", "es", ...)` anywhere in the News feature.
+         */
+        val SUPPORTED_NEWS_LANGUAGES = listOf("en", "es", "de")
     }
 }

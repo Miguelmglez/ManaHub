@@ -84,12 +84,12 @@ class QuickStartActionTest {
     }
 
     @Test
-    fun `defaults contains SCAN_CARD CREATE_DECK COMMUNITY_DECKS STATS in order`() {
+    fun `defaults contains SCAN_CARD CREATE_DECK SEARCH_CARD STATS in order`() {
         assertEquals(
             listOf(
                 QuickStartAction.SCAN_CARD,
                 QuickStartAction.CREATE_DECK,
-                QuickStartAction.COMMUNITY_DECKS,
+                QuickStartAction.SEARCH_CARD,
                 QuickStartAction.STATS,
             ),
             QuickStartAction.defaults,

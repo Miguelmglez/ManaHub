@@ -31,7 +31,10 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
     override suspend fun searchCardByName(query: String): DataResult<Card> =
         byName[query]?.let { DataResult.Success(it) } ?: DataResult.Error("not found")
     override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> = error("unused")
+    override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<com.mmg.manahub.core.model.PaginatedCards> = error("unused")
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = error("unused")
+    override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> = error("unused")
+    override suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>> = error("unused")
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardByExactName(name: String): Result<Card> = error("unused")

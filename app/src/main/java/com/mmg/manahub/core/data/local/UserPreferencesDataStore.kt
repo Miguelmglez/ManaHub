@@ -44,8 +44,18 @@ private val KEY_CARD_LANGUAGE     = stringPreferencesKey("card_language")
 private val KEY_NEWS_LANGUAGES    = stringSetPreferencesKey("news_languages")
 /** News filter: included [SourceType] names. Absent → both ARTICLE + VIDEO. */
 private val KEY_NEWS_FILTER_TYPES      = stringSetPreferencesKey("news_filter_types")
-/** News filter: explicit source-id allowlist. Absent/empty → null (= all enabled sources). */
+/**
+ * News filter: explicit source-id allowlist. Tri-state, split across two keys since a
+ * `stringSetPreferencesKey` cannot itself distinguish "unset" from "explicitly empty":
+ *  - key absent, [KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] absent/false → `null` (all
+ *    enabled sources — the default).
+ *  - key absent, [KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] true → `emptySet()` (the user
+ *    explicitly deselected every source via "Deselect All" — must NOT read back as "all").
+ *  - key present (always non-empty by construction) → that explicit allowlist.
+ */
 private val KEY_NEWS_FILTER_SOURCE_IDS = stringSetPreferencesKey("news_filter_source_ids")
+/** See [KEY_NEWS_FILTER_SOURCE_IDS]. Cleared whenever the allowlist is null or non-empty. */
+private val KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY = booleanPreferencesKey("news_filter_source_ids_explicit_empty")
 private val KEY_PREFERRED_CURRENCY = stringPreferencesKey("preferred_currency")
 private val LAST_PRICE_REFRESH_KEY = longPreferencesKey("last_price_refresh")
 private val AVATAR_URL_KEY         = stringPreferencesKey("avatar_url")
@@ -223,8 +233,14 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.ifEmpty { null }
                     ?: NewsFilterPrefs.DEFAULT.types
 
-                // An empty/absent source-id set means "all enabled sources" (null).
-                val sourceIds = prefs[KEY_NEWS_FILTER_SOURCE_IDS]?.takeIf { it.isNotEmpty() }
+                // Tri-state read: an explicit-empty flag wins over the (necessarily absent)
+                // allowlist key so "Deselect All" survives a restart instead of reverting to
+                // "all enabled sources". See KEY_NEWS_FILTER_SOURCE_IDS's KDoc for the scheme.
+                val sourceIds = if (prefs[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] == true) {
+                    emptySet()
+                } else {
+                    prefs[KEY_NEWS_FILTER_SOURCE_IDS]?.takeIf { it.isNotEmpty() }
+                }
 
                 NewsFilterPrefs(languages = languages, types = types, sourceIds = sourceIds)
             }
@@ -250,10 +266,48 @@ class UserPreferencesDataStore @Inject constructor(
                 .ifEmpty { NewsFilterPrefs.DEFAULT.types }
                 .map { it.name }
                 .toSet()
-            if (sourceIds.isNullOrEmpty()) {
+            // Tri-state write — see KEY_NEWS_FILTER_SOURCE_IDS's KDoc. `null` clears both keys
+            // (all enabled sources); an explicit empty set is preserved via the companion flag
+            // instead of collapsing to the same on-disk state as `null`.
+            when {
+                sourceIds == null -> {
+                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
+                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY)
+                }
+                sourceIds.isEmpty() -> {
+                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
+                    prefs[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] = true
+                }
+                else -> {
+                    prefs[KEY_NEWS_FILTER_SOURCE_IDS] = sourceIds
+                    prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY)
+                }
+            }
+        }
+    }
+
+    /**
+     * F6: atomically removes [sourceId] from the persisted news filter source-id allowlist in a
+     * SINGLE `edit{}` transaction against the live DataStore state. Unlike a read-then-write via
+     * [observeNewsFilters] + [setNewsFilters] (the previous implementation), this can never race
+     * with a concurrent filter-apply and clobber an unrelated language/type change that committed
+     * in between the read and the write — it only ever touches
+     * [KEY_NEWS_FILTER_SOURCE_IDS]/[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY], never
+     * [KEY_NEWS_LANGUAGES]/[KEY_NEWS_FILTER_TYPES]. No-op when the allowlist is unset or doesn't
+     * reference [sourceId]. Dropping the allowlist to empty preserves the tri-state "explicit
+     * empty" contract (see [KEY_NEWS_FILTER_SOURCE_IDS]) rather than silently reverting to "all
+     * enabled sources".
+     */
+    suspend fun pruneNewsFilterSourceId(sourceId: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            val current = prefs[KEY_NEWS_FILTER_SOURCE_IDS] ?: return@edit
+            if (sourceId !in current) return@edit
+            val updated = current - sourceId
+            if (updated.isEmpty()) {
                 prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
+                prefs[KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY] = true
             } else {
-                prefs[KEY_NEWS_FILTER_SOURCE_IDS] = sourceIds
+                prefs[KEY_NEWS_FILTER_SOURCE_IDS] = updated
             }
         }
     }
@@ -264,6 +318,7 @@ class UserPreferencesDataStore @Inject constructor(
             prefs[KEY_NEWS_LANGUAGES] = setOf(NewsLanguage.ENGLISH.code)
             prefs.remove(KEY_NEWS_FILTER_TYPES)
             prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS)
+            prefs.remove(KEY_NEWS_FILTER_SOURCE_IDS_EXPLICIT_EMPTY)
         }
     }
 
