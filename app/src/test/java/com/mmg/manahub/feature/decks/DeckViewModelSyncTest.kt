@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks
 
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.feature.decks.presentation.DeckViewModel
@@ -30,6 +31,7 @@ class DeckViewModelSyncTest {
 
     private val deckRepo = mockk<DeckRepository>(relaxed = true)
     private val cardRepo = mockk<CardRepository>(relaxed = true)
+    private val userPreferences = mockk<UserPreferencesDataStore>(relaxed = true)
 
     private lateinit var viewModel: DeckViewModel
 
@@ -37,7 +39,11 @@ class DeckViewModelSyncTest {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         every { deckRepo.observeAllDeckSummaries() } returns flowOf(emptyList())
-        viewModel = DeckViewModel(deckRepo, cardRepo)
+        // communityDecksEnabledFlow is collected at construction time (isCommunityDecksEnabled's
+        // stateIn property initializer) — relaxed mock only needs an explicit stub if a real Flow
+        // is required; relaxed mockk already returns an empty Flow for unstubbed Flow-returning calls.
+        every { userPreferences.communityDecksEnabledFlow } returns flowOf(false)
+        viewModel = DeckViewModel(deckRepo, cardRepo, userPreferences)
     }
 
     @After

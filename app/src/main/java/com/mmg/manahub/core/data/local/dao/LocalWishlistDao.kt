@@ -42,6 +42,11 @@ interface LocalWishlistDao {
     @Query("SELECT * FROM local_wishlists WHERE scryfall_id = :scryfallId")
     suspend fun getByScryfallId(scryfallId: String): List<LocalWishlistEntity>
 
+    // Used to check `synced` before mutating a row, so local edits to an already-synced entry
+    // can be paired with the matching remote call (trades audit §2.3, 2026-07-10).
+    @Query("SELECT * FROM local_wishlists WHERE id = :id")
+    suspend fun getById(id: String): LocalWishlistEntity?
+
     @Query("SELECT * FROM local_wishlists WHERE synced = 0")
     suspend fun getUnsynced(): List<LocalWishlistEntity>
 

@@ -9,10 +9,10 @@ import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.core.ui.theme.AppTheme
 
 data class SettingsUiState(
-    val currentTheme: AppTheme = AppTheme.NeonVoid,
+    val currentTheme: AppTheme = AppTheme.ArcaneCosmos,
     // ── Privacy toggles ───────────────────────────────────────────────────────
-    /** Mirrors the `collection_public` column in `user_profiles`. Default: false (private). */
-    val collectionPublic: Boolean = false,
+    /** Mirrors the `collection_public` column in `user_profiles`. Default: true (public). */
+    val collectionPublic: Boolean = true,
     /** Mirrors the `wishlist_public` column in `user_profiles`. Default: true (public). */
     val wishlistPublic: Boolean = true,
     /** Mirrors the `trade_list_public` column in `user_profiles`. Default: true (public). */

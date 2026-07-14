@@ -16,10 +16,16 @@ interface DraftRepository {
     /**
      * Like [getSetCards] but also returns Scryfall's `has_more` flag so callers can stop paging
      * without issuing a final request that 422s. The [Boolean] in the pair is `hasMore`.
+     *
+     * @param extraPoolSets Additional Scryfall set codes to widen the pool query to (from
+     * [com.mmg.manahub.core.model.BoosterConfig.extraPoolSets]), e.g. `["soa"]` for SOS's
+     * Mystical Archive. When empty (the default), the query is `set:$setCode lang:en`, exactly
+     * as before; otherwise it becomes `(set:$setCode or set:soa or ...) lang:en`.
      */
     suspend fun getSetCardsPage(
         setCode: String,
         page: Int = 1,
+        extraPoolSets: List<String> = emptyList(),
     ): DataResult<Pair<List<Card>, Boolean>>
     suspend fun getSetVideos(setCode: String, setName: String): DataResult<List<DraftVideo>>
     suspend fun resolveCardId(cardName: String, setCode: String): DataResult<String>

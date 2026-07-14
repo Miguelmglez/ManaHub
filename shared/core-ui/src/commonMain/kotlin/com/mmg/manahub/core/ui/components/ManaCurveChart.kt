@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import manahub.shared.core_ui.generated.resources.Res
-import manahub.shared.core_ui.generated.resources.deckbuilder_ideal_curve
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.deckbuilder_ideal_curve
 import org.jetbrains.compose.resources.stringResource
 
 // Height budget constants (all in dp, converted in Canvas scope)

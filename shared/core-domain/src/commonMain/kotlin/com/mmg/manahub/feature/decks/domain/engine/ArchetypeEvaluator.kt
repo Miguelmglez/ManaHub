@@ -64,6 +64,8 @@ object ArchetypeEvaluator {
         curveExemptionActive: Boolean = false,
     ): List<DeckWarning> = buildList {
         skeleton.roleTargets.forEach { (key, band) ->
+            if (key == ArchetypeData.MANA_FIX_KEY) return@forEach // A.5 check handled separately below
+
             val have = roleCounts[key] ?: 0
             if (key in skeleton.antiRoles) {
                 if (have > band.max) add(DeckWarning.ArchetypeAntiRolePresent(key, have, band.max))

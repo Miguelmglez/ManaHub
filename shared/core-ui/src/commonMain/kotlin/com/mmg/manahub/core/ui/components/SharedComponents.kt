@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,12 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -97,88 +91,27 @@ fun GroupingFlowSelector(
     selected: GroupingMode,
     onSelect: (GroupingMode) -> Unit
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        Surface(
-            onClick = { expanded = true },
-            color = mc.backgroundSecondary,
-            shape = MaterialTheme.shapes.medium,
-            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
-        ) {
-            Row(
-                modifier = Modifier
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Sort,
-                    contentDescription = null,
-                    tint = mc.primaryAccent,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = "Group by:",
-                    style = ty.labelLarge,
-                    color = mc.textSecondary
-                )
-                Text(
-                    text = when (selected) {
-                        GroupingMode.TYPE -> "Type"
-                        GroupingMode.COLOR -> "Color"
-                        GroupingMode.COST -> "CMC"
-                        GroupingMode.TAG -> "Tags"
-                    },
-                    style = ty.labelLarge,
-                    color = mc.primaryAccent
-                )
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = mc.textSecondary,
-                    modifier = Modifier.size(16.dp)
-                )
+    ManaHubSelector(
+        icon = Icons.AutoMirrored.Filled.Sort,
+        label = "Group by:",
+        valueText = when (selected) {
+            GroupingMode.TYPE -> "Type"
+            GroupingMode.COLOR -> "Color"
+            GroupingMode.COST -> "CMC"
+            GroupingMode.TAG -> "Tags"
+        },
+        items = GroupingMode.entries,
+        selectedItem = selected,
+        onSelect = onSelect,
+        itemLabel = {
+            when (it) {
+                GroupingMode.TYPE -> "Type"
+                GroupingMode.COLOR -> "Color"
+                GroupingMode.COST -> "CMC"
+                GroupingMode.TAG -> "Tags"
             }
         }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = mc.backgroundSecondary,
-            modifier = Modifier.width(200.dp)
-        ) {
-            GroupingMode.entries.forEachIndexed { index, mode ->
-                val label = when (mode) {
-                    GroupingMode.TYPE -> "Type"
-                    GroupingMode.COLOR -> "Color"
-                    GroupingMode.COST -> "CMC"
-                    GroupingMode.TAG -> "Tags"
-                }
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = label,
-                            style = ty.bodyMedium,
-                            color = if (mode == selected) mc.primaryAccent else mc.textPrimary
-                        )
-                    },
-                    onClick = {
-                        onSelect(mode)
-                        expanded = false
-                    },
-                    trailingIcon = if (mode == selected) {
-                        { Icon(Icons.Default.Check, null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp)) }
-                    } else null
-                )
-                if (index < GroupingMode.entries.size - 1) {
-                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
-                }
-            }
-        }
-    }
+    )
 }
 
 @Composable

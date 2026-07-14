@@ -14,6 +14,8 @@ import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import com.mmg.manahub.core.online.domain.usecase.JoinSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
+import com.mmg.manahub.core.online.presentation.classifyOnlineJoinError
+import com.mmg.manahub.core.online.presentation.mapOnlineBackendError
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
@@ -38,7 +40,7 @@ import javax.inject.Inject
  * ViewModel for the join lobby screen.
  *
  * Responsibilities:
- * - Validate and submit a 6-character session code via [JoinSessionUseCase].
+ * - Validate and submit a 6-digit numeric session code via [JoinSessionUseCase].
  * - Subscribe to Realtime [SessionEvent]s via [ObserveSessionUseCase].
  * - Toggle the player's ready state via [OnlineSessionRepository].
  * - Trigger [onGameStart] automatically when [SessionEvent.SessionStatusChanged] → ACTIVE.
@@ -60,12 +62,13 @@ class LobbyJoinViewModel @Inject constructor(
      * Full UI state for the join lobby.
      *
      * @property isLoading True while a network call is in flight.
-     * @property codeInput Raw text entered by the user (auto-uppercased, max 6 chars).
+     * @property codeInput Raw text entered by the user (digits only, max 6 chars).
      * @property displayName Player name shown to other participants.
      * @property selectedThemeKey Key for the chosen [PlayerThemeColors].
      * @property sessionId Assigned after a successful join.
      * @property slotIndex Seat index assigned by the backend.
      * @property participants Live list of all active participants.
+     * @property allReady True when every active participant has toggled ready.
      * @property isReady Whether this player has marked themselves ready.
      * @property sessionStatus Current lifecycle status of the session.
      * @property error User-visible error message, cleared after display.
@@ -80,6 +83,7 @@ class LobbyJoinViewModel @Inject constructor(
         val sessionMode: String = "STANDARD",
         val sessionPlayerCount: Int = 2,
         val participants: List<OnlineParticipant> = emptyList(),
+        val allReady: Boolean = false,
         val isReady: Boolean = false,
         val sessionStatus: OnlineSessionStatus = OnlineSessionStatus.LOBBY,
         val error: String? = null,
@@ -99,6 +103,9 @@ class LobbyJoinViewModel @Inject constructor(
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var gameLaunched = false
+
+    /** Per-participant-id consecutive-miss counter, used by the two-strike ghost rule. */
+    private var participantMissStreak: Map<String, Int> = emptyMap()
 
     private val numericCodeRegex = Regex("^[0-9]{6}$")
 
@@ -137,11 +144,12 @@ class LobbyJoinViewModel @Inject constructor(
 
     /**
      * Pre-fills the code input (e.g., when arriving via deep link).
-     * Does nothing if the session has already been joined.
+     * Does nothing if the session has already been joined. Digit-filtered to match
+     * [onCodeChanged] — codes are strictly 6-digit numeric.
      */
     fun prefillCode(code: String) {
         if (_uiState.value.sessionId != null) return
-        _uiState.update { it.copy(codeInput = code.uppercase().take(6)) }
+        _uiState.update { it.copy(codeInput = code.filter { c -> c.isDigit() }.take(6)) }
     }
 
     /**
@@ -154,7 +162,7 @@ class LobbyJoinViewModel @Inject constructor(
      */
     fun joinSession(onGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit) {
         val state = _uiState.value
-        if (state.sessionId != null) return // already joined
+        if (state.sessionId != null || state.isLoading) return // already joined or in flight
 
         if (!numericCodeRegex.matches(state.codeInput)) {
             _uiState.update {
@@ -167,12 +175,16 @@ class LobbyJoinViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             // Ensure a Supabase session exists; sign in anonymously for guests.
-            if (authRepository.sessionState.value is SessionState.Unauthenticated) {
+            // Await a settled auth state first — checking `.value` directly could observe a
+            // transient/initializing state and skip anonymous sign-in, causing the RPC below
+            // to fail with a generic error instead.
+            val settledSession = authRepository.sessionState.first { it !is SessionState.Loading }
+            if (settledSession is SessionState.Unauthenticated) {
                 val anonResult = authRepository.signInAnonymously()
                 if (anonResult is AuthResult.Error) {
                     val msg = anonResult.error.toString()
                     crashlytics.log("online_session_anon_signin_failed: $msg")
-                    _uiState.update { it.copy(isLoading = false, error = mapBackendError(msg)) }
+                    _uiState.update { it.copy(isLoading = false, error = mapOnlineBackendError(appContext, msg)) }
                     return@launch
                 }
             }
@@ -195,7 +207,9 @@ class LobbyJoinViewModel @Inject constructor(
                             slotIndex = slotIndex,
                         )
                     }
-                    // Fetch session metadata and existing participants for the waiting room
+                    // Fetch session metadata and existing participants for the waiting room.
+                    // Failure here is self-healing: startLobbyPolling refreshes sessionMode/
+                    // sessionPlayerCount from every subsequent snapshot (audit finding #5).
                     observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
                         crashlytics.setCustomKey("online_session_game_mode", snapshot.session.gameMode)
                         crashlytics.setCustomKey("online_session_player_count", snapshot.session.playerCount)
@@ -205,6 +219,7 @@ class LobbyJoinViewModel @Inject constructor(
                                 sessionMode        = snapshot.session.gameMode,
                                 sessionPlayerCount = snapshot.session.playerCount,
                                 participants       = ps,
+                                allReady           = ps.isNotEmpty() && ps.all { p -> p.isReady },
                             )
                         }
                     }
@@ -215,7 +230,7 @@ class LobbyJoinViewModel @Inject constructor(
                     startLobbyPolling(sessionId, onGameStart)
                 },
                 onFailure = { throwable ->
-                    val errorToken = classifyJoinError(throwable.message)
+                    val errorToken = classifyOnlineJoinError(throwable.message)
                     crashlytics.log("online_session_join_failed: $errorToken")
                     crashlytics.setCustomKey("online_session_join_error", errorToken)
                     crashlytics.setCustomKey("online_session_error_type", throwable::class.simpleName ?: "Unknown")
@@ -223,7 +238,7 @@ class LobbyJoinViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = mapBackendError(throwable.message),
+                            error = mapOnlineBackendError(appContext, throwable.message),
                         )
                     }
                 },
@@ -251,7 +266,7 @@ class LobbyJoinViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isReady = !ready,
-                        error = mapBackendError(throwable.message),
+                        error = mapOnlineBackendError(appContext, throwable.message),
                     )
                 }
             }
@@ -308,23 +323,47 @@ class LobbyJoinViewModel @Inject constructor(
     }
 
     /**
-     * Polls the session snapshot every 3 s, syncs the participant list, and checks whether
-     * the host has started the game. This is the primary mechanism for game-start detection
-     * because Realtime CDC may not be available in all environments.
+     * Polls the session snapshot every 3 s, syncs the participant list, refreshes session
+     * metadata, and checks whether the host has started the game. This is the primary
+     * mechanism for game-start detection because Realtime CDC may not be available in all
+     * environments.
+     *
+     * Stops once the session ends, once [gameLaunched] (audit finding #9), or once the
+     * backend reports a terminal status (audit finding #8).
      */
     private fun startLobbyPolling(
         sessionId: String,
         onGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
     ) {
         viewModelScope.launch {
-            while (_uiState.value.sessionId != null) {
+            while (_uiState.value.sessionId != null && !gameLaunched) {
                 kotlinx.coroutines.delay(3_000L)
-                if (_uiState.value.sessionId == null) break
+                if (_uiState.value.sessionId == null || gameLaunched) break
                 observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
-                    val ps = snapshot.participants.filter { it.status != ParticipantStatus.LEFT }
-                    _uiState.update { state ->
-                        state.copy(participants = if (ps.isNotEmpty()) ps.sortedBy { it.slotIndex } else state.participants)
+                    if (snapshot.session.status.isTerminal()) {
+                        handleTerminalStatus(snapshot.session.status)
+                        return@launch
                     }
+
+                    // Merge by id (never a raw replace — audit finding #4) and refresh
+                    // sessionMode/sessionPlayerCount from every snapshot so a failed initial
+                    // getSnapshot call after join self-heals within one poll cycle instead of
+                    // launching the game with the "STANDARD"/2 defaults (audit finding #5).
+                    val (merged, nextStreak) = mergeParticipantsById(
+                        current = _uiState.value.participants,
+                        snapshot = snapshot.participants,
+                        missingStreak = participantMissStreak,
+                    )
+                    participantMissStreak = nextStreak
+                    _uiState.update { state ->
+                        state.copy(
+                            participants = merged,
+                            allReady = merged.isNotEmpty() && merged.all { it.isReady },
+                            sessionMode = snapshot.session.gameMode,
+                            sessionPlayerCount = snapshot.session.playerCount,
+                        )
+                    }
+
                     if (snapshot.session.status == OnlineSessionStatus.ACTIVE &&
                         _uiState.value.sessionStatus != OnlineSessionStatus.ACTIVE
                     ) {
@@ -336,6 +375,30 @@ class LobbyJoinViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Resets the join lobby to its pre-join state after the session transitions to a
+     * terminal status (FINISHED or ABANDONED). Called from both the poll loop and the
+     * Realtime handler so either mechanism reacts identically (audit findings #8/#9/#13) —
+     * previously the joiner waited indefinitely with no user-visible message. User-entered
+     * preferences (display name, theme) are preserved.
+     */
+    private fun handleTerminalStatus(status: OnlineSessionStatus) {
+        crashlytics.log("online_session_terminal: joiner_view status=${status.name} slot_index=${_uiState.value.slotIndex}")
+        participantMissStreak = emptyMap()
+        val message = if (status == OnlineSessionStatus.FINISHED) {
+            appContext.getString(R.string.lobby_session_finished_msg)
+        } else {
+            appContext.getString(R.string.lobby_session_abandoned_msg)
+        }
+        _uiState.update {
+            UiState(
+                displayName = it.displayName,
+                selectedThemeKey = it.selectedThemeKey,
+                error = message,
+            )
         }
     }
 
@@ -352,69 +415,40 @@ class LobbyJoinViewModel @Inject constructor(
                         .plus(event.participant)
                         .filter { it.status != ParticipantStatus.LEFT }
                         .sortedBy { it.slotIndex }
-                    state.copy(participants = updated)
+                    state.copy(
+                        participants = updated,
+                        allReady = updated.isNotEmpty() && updated.all { it.isReady },
+                    )
                 }
             }
 
             is SessionEvent.SessionStatusChanged -> {
-                crashlytics.log("online_session_status_changed: ${event.status.name}")
+                crashlytics.log("online_session_status_changed: joiner ${event.status.name}")
+                // Capture the PREVIOUS status before updating state, and gate the ACTIVE branch
+                // on it — otherwise a poll-detected ACTIVE (which already fired onGameStart) can
+                // be immediately re-fired by a lagging Realtime CDC event for the same
+                // transition, double-navigating into the game screen (audit finding #3).
+                val previousStatus = _uiState.value.sessionStatus
                 _uiState.update { it.copy(sessionStatus = event.status) }
-                when (event.status) {
-                    OnlineSessionStatus.ACTIVE -> {
+                when {
+                    event.status == OnlineSessionStatus.ACTIVE && previousStatus != OnlineSessionStatus.ACTIVE -> {
                         val s = _uiState.value
                         gameLaunched = true
                         crashlytics.log("online_session_game_started: slot_index=${s.slotIndex} mode=${s.sessionMode}")
                         onGameStart(sessionId, s.slotIndex, s.sessionMode, s.sessionPlayerCount)
                     }
-                    OnlineSessionStatus.ABANDONED -> {
-                        crashlytics.log("online_session_abandoned: joiner_view slot_index=${_uiState.value.slotIndex}")
-                    }
+                    event.status.isTerminal() -> handleTerminalStatus(event.status)
                     else -> Unit
                 }
             }
 
             is SessionEvent.Error -> {
-                crashlytics.log("online_session_event_error: joiner ${event.message}")
-                _uiState.update { it.copy(error = mapBackendError(event.message)) }
+                crashlytics.log("online_session_event_error: joiner type=${event::class.simpleName}")
+                _uiState.update { it.copy(error = mapOnlineBackendError(appContext, event.message)) }
             }
 
             else -> Unit // Other events handled in GameViewModel (Phase 3)
         }
-    }
-
-    /**
-     * Returns a short, non-PII token identifying the join failure category.
-     * Used as a Crashlytics custom key value to segment join errors in dashboards.
-     */
-    private fun classifyJoinError(message: String?): String = when {
-        message == null -> "unknown"
-        "Too many failed join attempts" in message -> "rate_limited"
-        "Invalid session code format" in message -> "invalid_code_format"
-        "Session limit reached" in message -> "session_limit_reached"
-        "Session is full" in message -> "session_full"
-        "not in LOBBY" in message -> "session_not_found_or_started"
-        else -> "unexpected"
-    }
-
-    /**
-     * Maps raw backend error strings to user-friendly messages in Spanish.
-     * Unrecognised errors are replaced with a generic message to avoid leaking
-     * internal server details to the user. The raw throwable is recorded to
-     * Crashlytics separately by each call site before invoking this function.
-     */
-    private fun mapBackendError(message: String?): String = when {
-        message == null -> appContext.getString(R.string.lobby_error_generic)
-        "Too many failed join attempts" in message ->
-            appContext.getString(R.string.lobby_error_too_many_attempts)
-        "Invalid session code format" in message ->
-            appContext.getString(R.string.lobby_error_invalid_code)
-        "Session limit reached" in message ->
-            appContext.getString(R.string.lobby_error_active_room)
-        "Session is full" in message ->
-            appContext.getString(R.string.lobby_error_full)
-        "not in LOBBY" in message ->
-            appContext.getString(R.string.lobby_error_not_found)
-        else -> appContext.getString(R.string.lobby_error_generic)
     }
 
     override fun onCleared() {
@@ -428,8 +462,11 @@ class LobbyJoinViewModel @Inject constructor(
         }
         if (!gameLaunched) {
             cleanupScope.launch {
-                observeSessionUseCase.disconnect(sessionId)
-                cleanupScope.cancel()
+                try {
+                    observeSessionUseCase.disconnect(sessionId)
+                } finally {
+                    cleanupScope.cancel()
+                }
             }
         } else {
             cleanupScope.cancel()

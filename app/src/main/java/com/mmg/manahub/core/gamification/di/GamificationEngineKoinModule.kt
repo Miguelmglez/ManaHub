@@ -100,7 +100,7 @@ fun gamificationEngineKoinModule(
     single { gamificationStatsDao }
 
     // ── System clock/timezone — trivial, constructed directly (previously Hilt @Provides). ──
-    single { Clock.System }
+    single<Clock> { Clock.System }
     single { TimeZone.currentSystemDefault() }
 
     // ── Sync infra: SyncPreferencesStore is stateless, constructed natively (see KDoc above). ──

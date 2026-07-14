@@ -25,7 +25,6 @@ import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.Companion.MAX_EQUIPPED_BADGES
 import com.mmg.manahub.core.ui.theme.AppTheme
-import com.mmg.manahub.core.util.PriceFormatter.isEuropeanLocale
 import com.mmg.manahub.core.model.PersistedWidget
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.WidgetSize
@@ -155,7 +154,7 @@ class UserPreferencesDataStore @Inject constructor(
                 add("en")
                 if (deviceLang == "es" || deviceLang == "de") add(deviceLang)
             }
-            val defaultCurrency = if (isEuropeanLocale()) "EUR" else "USD"
+            val defaultCurrency = "EUR"
 
             UserPreferences(
                 appLanguage = AppLanguage.fromCode(
@@ -279,7 +278,7 @@ class UserPreferencesDataStore @Inject constructor(
         appLanguage = AppLanguage.ENGLISH,
         cardLanguage = CardLanguage.ENGLISH,
         newsLanguages = setOf(NewsLanguage.ENGLISH),
-        preferredCurrency = if (isEuropeanLocale()) PreferredCurrency.EUR else PreferredCurrency.USD,
+        preferredCurrency = PreferredCurrency.EUR,
         collectionViewMode = CollectionViewMode.GRID,
     )
 
@@ -337,10 +336,10 @@ class UserPreferencesDataStore @Inject constructor(
                 "PYROMANCER"        -> AppTheme.MedievalGrimoire
                 "HYDROMANCY"        -> AppTheme.GlacialEdge
 
-                else                -> AppTheme.NeonVoid
+                else                -> AppTheme.ArcaneCosmos
             }
         }
-        .catch { emit(AppTheme.NeonVoid) }
+        .catch { emit(AppTheme.ArcaneCosmos) }
 
     suspend fun savePlayerName(name: String) {
         context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
@@ -511,10 +510,18 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_PUSH_NOTIFICATIONS_ENABLED] = enabled }
     }
 
-    /** Controls whether the Community Decks feature (Archidekt) is exposed. Default: true (enabled for testing). */
+    /**
+     * Controls whether the Community Decks feature (Archidekt browse/import) is exposed.
+     * Default: false (hidden for release, 2026-07-14 — the feature is still being polished). The
+     * screens themselves ([com.mmg.manahub.feature.communitydecks.presentation
+     * .CommunityDecksSearchViewModel]/`CommunityDeckDetailViewModel`) render a graceful
+     * `EmptyState` when this is false; entry points into them are additionally hidden so users
+     * never tap a live-looking button into a disabled screen. [SettingsViewModel] still exposes a
+     * toggle for QA to re-enable locally.
+     */
     val communityDecksEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_COMMUNITY_DECKS_ENABLED] ?: true }
-        .catch { emit(true) }
+        .map { prefs -> prefs[KEY_COMMUNITY_DECKS_ENABLED] ?: false }
+        .catch { emit(false) }
 
     suspend fun setCommunityDecksEnabled(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[KEY_COMMUNITY_DECKS_ENABLED] = enabled }
@@ -704,12 +711,12 @@ class UserPreferencesDataStore @Inject constructor(
     // current state immediately without a network call. The repository is
     // responsible for keeping them in sync after a successful Supabase read/write.
     //
-    // Defaults: collection private (false), wishlist and trade list public (true).
+    // Defaults: collection, wishlist, and trade list are all public (true) by default.
     // These match the Supabase column defaults in the `user_profiles` table.
 
     val collectionPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_COLLECTION_PUBLIC] ?: false }
-        .catch { emit(false) }
+        .map { prefs -> prefs[KEY_COLLECTION_PUBLIC] ?: true }
+        .catch { emit(true) }
 
     val wishlistPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
         .map { prefs -> prefs[KEY_WISHLIST_PUBLIC] ?: true }

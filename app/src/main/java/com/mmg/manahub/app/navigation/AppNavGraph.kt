@@ -57,6 +57,7 @@ import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionTab
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
+import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
@@ -293,10 +294,17 @@ fun AppNavGraph(
                         HomeAction.OpenTournaments -> navController.navigate(Screen.TournamentList.route)
                                     HomeAction.OpenSettings -> navController.navigate(Screen.Settings.route)
                                     HomeAction.OpenProfile -> navController.navigate(Screen.Profile.baseRoute)
-                                    // No "recent deck" is resolved here, so route to the deck list
-                                    // (where the user picks a deck to playtest / improve) rather than the
-                                    // generic Collection card grid.
-                                    HomeAction.PlaytestRecentDeck -> navController.navigate(Screen.Collection.routeWithTab("decks"))
+                                    // PlaytestRecentDeck is resolved into NavigatePlaytest(deckId) inside
+                                    // HomeScreen (the only layer with access to uiState.decks).
+                                    HomeAction.PlaytestRecentDeck -> Unit
+                                    is HomeAction.NavigatePlaytest -> {
+                                        val deckId = action.deckId
+                                        if (deckId != null) {
+                                            navController.navigate(Screen.PlaytestSetup.createRoute(deckId))
+                                        } else {
+                                            navController.navigate(Screen.Collection.routeWithTab("decks"))
+                                        }
+                                    }
                                     HomeAction.ImproveRecentDeck -> navController.navigate(Screen.Collection.routeWithTab("decks"))
                                     // CustomizeQuickStart, SaveQuickStart, DismissAccountNudge, RateApp are
                                     // handled inside HomeScreen / HomeViewModel.
@@ -392,7 +400,7 @@ fun AppNavGraph(
                             onCardClick = { id ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                             },
-                            onScannerClick = { navController.navigate(Screen.CollectionScanner.route) },
+                            onAddCardClick = { navController.navigate(Screen.CollectionAddCard.route) },
                             onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
                             onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
                             onPlaytestClick = { id ->
@@ -422,6 +430,8 @@ fun AppNavGraph(
                             onNavigateToCardDetail = { scryfallId ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                             },
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = this@composable
                         )
                     }
 
@@ -492,6 +502,9 @@ fun AppNavGraph(
                         navController.navigate(Screen.DeckStudio.createRoute(deckId)) {
                             popUpTo(Screen.CommunityDeckDetail.route) { inclusive = true }
                         }
+                    },
+                    onCardClick = { scryfallId ->
+                        navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                     },
                 )
             }
@@ -1074,7 +1087,13 @@ fun AppNavGraph(
                 ),
             ) {
                 // Redirect: any navigation to the old LobbyHost route lands back on GameSetup.
+                // When online sessions are flag-disabled, surface a toast first — a stale
+                // bookmark/back-stack entry should read as "feature unavailable", not a silent
+                // no-op that looks like nothing happened.
                 LaunchedEffect(Unit) {
+                    if (!OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                        inviteToastState.show(context.getString(R.string.online_sessions_unavailable), MagicToastType.INFO)
+                    }
                     navController.navigate(Screen.GameSetup.baseRoute) {
                         popUpTo(Screen.LobbyHost.route) { inclusive = true }
                     }
@@ -1092,8 +1111,16 @@ fun AppNavGraph(
             ) { backStackEntry ->
                 val code = backStackEntry.arguments?.getString("code") ?: ""
                 // Redirect: carry the join code to GameSetup so it can auto-open the join sheet.
+                // When online sessions are flag-disabled, drop the code and surface a toast instead
+                // of silently landing on GameSetup as if the manahub://join/{code} deep link never
+                // arrived — see OnlineFeatureFlags' KDoc.
                 LaunchedEffect(code) {
-                    val dest = if (code.isNotBlank()) {
+                    val dest = if (!OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                        if (code.isNotBlank()) {
+                            inviteToastState.show(context.getString(R.string.online_sessions_unavailable), MagicToastType.INFO)
+                        }
+                        Screen.GameSetup.baseRoute
+                    } else if (code.isNotBlank()) {
                         Screen.GameSetup.routeWithJoinCode(code)
                     } else {
                         Screen.GameSetup.baseRoute

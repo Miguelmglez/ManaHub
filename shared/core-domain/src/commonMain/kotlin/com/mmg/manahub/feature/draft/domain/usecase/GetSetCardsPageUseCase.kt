@@ -13,10 +13,15 @@ import com.mmg.manahub.core.domain.repository.DraftRepository
 class GetSetCardsPageUseCase(
     private val repository: DraftRepository,
 ) {
-    /** @return the page's cards paired with whether more pages remain. */
+    /**
+     * @param extraPoolSets Additional Scryfall set codes to widen the pool query to (see
+     * [com.mmg.manahub.core.domain.repository.DraftRepository.getSetCardsPage]).
+     * @return the page's cards paired with whether more pages remain.
+     */
     suspend operator fun invoke(
         setCode: String,
         page: Int = 1,
+        extraPoolSets: List<String> = emptyList(),
     ): DataResult<Pair<List<Card>, Boolean>> =
-        repository.getSetCardsPage(setCode, page)
+        repository.getSetCardsPage(setCode, page, extraPoolSets)
 }

@@ -98,6 +98,38 @@ class ScryfallRemoteDataSource(
             }
         }
 
+    suspend fun searchCardsPaginated(
+        query: String,
+        page: Int = 1,
+        bypassCache: Boolean = false,
+    ): Result<com.mmg.manahub.core.model.PaginatedCards> =
+        safeCall {
+            val loader: suspend () -> com.mmg.manahub.core.model.PaginatedCards = {
+                val response = requestQueue.execute {
+                    if (bypassCache) {
+                        api.searchCardsNoCache(query, order = "random", page = page)
+                    } else {
+                        api.searchCards(query, page = page)
+                    }
+                }
+                val cards = response.data.toDomain()
+                cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
+                com.mmg.manahub.core.model.PaginatedCards(cards, response.hasMore)
+            }
+            if (bypassCache) {
+                loader()
+            } else {
+                val cacheKey = "paginated:${query.lowercase().trim()}:$page"
+                // Using a temporary cache in Searches for PaginatedCards isn't safe due to type mismatch
+                // Wait, cache.searches is TimedLruCache<String, List<Card>>.
+                // If we don't want to add a new cache property just for this, we can just use the loader directly without searches caching for the pagination metadata, but we DO want caching to avoid hitting Scryfall repeatedly for pagination.
+                // Let's just bypass the searches cache for now, or fetch from searches cache and assume hasMore=true if not last page?
+                // Actually, let's just do loader() directly, individual cards are still cached in cache.cards.
+                // F-10 says: surface has_more.
+                loader()
+            }
+        }
+
     suspend fun getCardById(scryfallId: String): Result<Card> =
         safeCall {
             cache.cards.getOrFetch(scryfallId) {
@@ -214,8 +246,12 @@ class ScryfallRemoteDataSource(
             val safeName = name.replace("\"", "").replace("\\", "").trim()
             if (safeName.isBlank()) return@safeCall emptyList()
             cache.artVariants.getOrFetch(safeName.lowercase()) {
+                // unique=art collapses every reprint sharing an illustration down to ONE result.
+                // We want every paper-printed version, so use unique=prints (Scryfall's
+                // "all printings" mode) restricted to game:paper (excludes Arena/MTGO-only
+                // digital variants that were never actually printed).
                 val cards = requestQueue.execute {
-                    api.searchCards(query = "!\"$safeName\"", unique = "art", order = "released")
+                    api.searchCards(query = "!\"$safeName\" (game:paper)", unique = "prints", order = "released")
                 }.data.toDomain()
                 cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
                 cards

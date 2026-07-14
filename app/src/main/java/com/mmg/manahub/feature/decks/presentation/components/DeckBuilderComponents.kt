@@ -94,8 +94,8 @@ fun DeckCardRow(
         )
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text     = card.name,
+            CardName(
+                name     = card.name,
                 style    = MaterialTheme.magicTypography.bodyMedium,
                 color    = mc.textPrimary,
                 maxLines = 1,
@@ -456,8 +456,8 @@ fun CommanderSearchSheet(
                                     .background(mc.surfaceVariant),
                             )
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text     = card.name,
+                                CardName(
+                                    name     = card.name,
                                     style    = MaterialTheme.magicTypography.bodyMedium,
                                     color    = mc.textPrimary,
                                     maxLines = 1,

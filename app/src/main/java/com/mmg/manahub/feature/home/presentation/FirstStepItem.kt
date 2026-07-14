@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
@@ -67,14 +68,22 @@ const val STEP_FIRST_COMPLETE_PROFILE = "first_complete_profile"
 const val STEP_FIRST_RATE_APP        = "first_rate_app"
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Full ordered catalogue of all possible steps.
+//  Full ordered catalogue of all possible steps — ordered by the ACTIVATION FUNNEL
+//  (Home feature overhaul Phase 2.2): immediate value first (scan/add a card → build
+//  a deck → play a game → playtest), then account creation, then social/trade steps
+//  (now reachable via real friendCount/openForTradeCount/wishlistCount data), then
+//  discovery extras last.
 //
 //  Show-conditions are evaluated in HomeViewModel.buildVisibleSteps() — not here.
-//  This list is purely declarative: icon, copy, and CTA action per step.
+//  This list is purely declarative: icon, copy, and CTA action per step. Each entry
+//  below documents whether its condition is DATA-DRIVEN (auto-hides once the
+//  underlying data proves the step is done) or DISMISS-ONLY (no reliable completion
+//  signal exists — the user can only dismiss it via the carousel's dismiss affordance).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Ordered catalogue of all 17 possible first-step definitions. */
 val ALL_FIRST_STEPS: List<FirstStepItem> = listOf(
+    // DATA-DRIVEN: hidden once the local collection has at least one unique card.
     FirstStepItem(
         id = STEP_FIRST_ADD_CARD,
         titleRes = R.string.first_step_add_card_title,
@@ -82,6 +91,8 @@ val ALL_FIRST_STEPS: List<FirstStepItem> = listOf(
         icon = StepIcon.Vector(Icons.Default.LibraryBooks),
         action = HomeAction.OpenLibrary,
     ),
+    // DISMISS-ONLY: "scanned a card" isn't distinguishable from "added a card" in the
+    // collection data, so this can't auto-hide independently of STEP_FIRST_ADD_CARD.
     FirstStepItem(
         id = STEP_FIRST_SCAN_CARD,
         titleRes = R.string.first_step_scan_card_title,
@@ -89,13 +100,7 @@ val ALL_FIRST_STEPS: List<FirstStepItem> = listOf(
         icon = StepIcon.Vector(Icons.Default.Camera),
         action = HomeAction.ScanCard,
     ),
-    FirstStepItem(
-        id = STEP_FIRST_CREATE_ACCOUNT,
-        titleRes = R.string.first_step_create_account_title,
-        subtitleRes = R.string.first_step_create_account_subtitle,
-        icon = StepIcon.Vector(Icons.Default.AccountCircle),
-        action = HomeAction.CreateAccount,
-    ),
+    // DATA-DRIVEN: hidden once the user has at least one deck.
     FirstStepItem(
         id = STEP_FIRST_CREATE_DECK,
         titleRes = R.string.first_step_create_deck_title,
@@ -103,27 +108,7 @@ val ALL_FIRST_STEPS: List<FirstStepItem> = listOf(
         icon = StepIcon.Vector(Icons.Default.Style),
         action = HomeAction.CreateDeck,
     ),
-   /* FirstStepItem(
-        id = STEP_FIRST_PLAYTEST_DECK,
-        titleRes = R.string.first_step_playtest_deck_title,
-        subtitleRes = R.string.first_step_playtest_deck_subtitle,
-        icon = StepIcon.Vector(Icons.Default.PlayArrow),
-        action = HomeAction.OpenDecks,
-    ),*/
-    FirstStepItem(
-        id = STEP_FIRST_ADD_FRIEND,
-        titleRes = R.string.first_step_add_friend_title,
-        subtitleRes = R.string.first_step_add_friend_subtitle,
-        icon = StepIcon.Vector(Icons.Default.People),
-        action = HomeAction.OpenFriends,
-    ),
-    FirstStepItem(
-        id = STEP_FIRST_REVIEW_FRIEND,
-        titleRes = R.string.first_step_review_friend_title,
-        subtitleRes = R.string.first_step_review_friend_subtitle,
-        icon = StepIcon.Vector(Icons.Default.Group),
-        action = HomeAction.OpenFriends,
-    ),
+    // DISMISS-ONLY: no per-source game-count signal to detect "played from Home" vs. elsewhere.
     FirstStepItem(
         id = STEP_FIRST_PLAY_GAME,
         titleRes = R.string.first_step_play_game_title,
@@ -131,55 +116,26 @@ val ALL_FIRST_STEPS: List<FirstStepItem> = listOf(
         icon = StepIcon.Drawable(R.drawable.ic_battle),
         action = HomeAction.StartGame,
     ),
+    // DATA-DRIVEN (REACTIVATED — Phase 2.2): visible once the user has ≥1 deck; auto-hides
+    // once the user has saved ≥1 playtest session anywhere (PlaytestRepository.observeTotalTestCount
+    // — the save flow IS reachable in the current build, see HomeViewModel KDoc). CTA resolves the
+    // most-recent deck via HomeAction.NavigatePlaytest (see HomeScreen's PlaytestRecentDeck handling).
     FirstStepItem(
-        id = STEP_FIRST_COLLECTION_STATS,
-        titleRes = R.string.first_step_collection_stats_title,
-        subtitleRes = R.string.first_step_collection_stats_subtitle,
-        icon = StepIcon.Vector(Icons.Default.BarChart),
-        action = HomeAction.OpenStats,
+        id = STEP_FIRST_PLAYTEST_DECK,
+        titleRes = R.string.first_step_playtest_deck_title,
+        subtitleRes = R.string.first_step_playtest_deck_subtitle,
+        icon = StepIcon.Vector(Icons.Default.PlayArrow),
+        action = HomeAction.PlaytestRecentDeck,
     ),
+    // DATA-DRIVEN: hidden once the user is authenticated (non-anonymous).
     FirstStepItem(
-        id = STEP_FIRST_DRAFT_GUIDE,
-        titleRes = R.string.first_step_draft_guide_title,
-        subtitleRes = R.string.first_step_draft_guide_subtitle,
-        icon = StepIcon.Vector(Icons.Default.SportsEsports),
-        action = HomeAction.DraftGuide,
+        id = STEP_FIRST_CREATE_ACCOUNT,
+        titleRes = R.string.first_step_create_account_title,
+        subtitleRes = R.string.first_step_create_account_subtitle,
+        icon = StepIcon.Vector(Icons.Default.AccountCircle),
+        action = HomeAction.CreateAccount,
     ),
-    FirstStepItem(
-        id = STEP_FIRST_NEWS,
-        titleRes = R.string.first_step_news_title,
-        subtitleRes = R.string.first_step_news_subtitle,
-        icon = StepIcon.Vector(Icons.Default.Newspaper),
-        action = HomeAction.OpenNews,
-    ),
-    FirstStepItem(
-        id = STEP_FIRST_CREATE_TRADE,
-        titleRes = R.string.first_step_create_trade_title,
-        subtitleRes = R.string.first_step_create_trade_subtitle,
-        icon = StepIcon.Vector(Icons.Default.SwapHoriz),
-        action = HomeAction.OpenTrades,
-    ),
-    FirstStepItem(
-        id = STEP_FIRST_ADD_WISHLIST,
-        titleRes = R.string.first_step_add_wishlist_title,
-        subtitleRes = R.string.first_step_add_wishlist_subtitle,
-        icon = StepIcon.Vector(Icons.Default.Favorite),
-        action = HomeAction.OpenWishlist,
-    ),
-    FirstStepItem(
-        id = STEP_FIRST_OPEN_FOR_TRADE,
-        titleRes = R.string.first_step_open_for_trade_title,
-        subtitleRes = R.string.first_step_open_for_trade_subtitle,
-        icon = StepIcon.Vector(Icons.Default.SwapHoriz),
-        action = HomeAction.OpenTrades,
-    ),
-    FirstStepItem(
-        id = STEP_FIRST_PREFERENCES,
-        titleRes = R.string.first_step_preferences_title,
-        subtitleRes = R.string.first_step_preferences_subtitle,
-        icon = StepIcon.Vector(Icons.Default.Settings),
-        action = HomeAction.OpenSettings,
-    ),
+    // DATA-DRIVEN: hidden once the profile has an avatar + a non-default player name.
     FirstStepItem(
         id = STEP_FIRST_COMPLETE_PROFILE,
         titleRes = R.string.first_step_complete_profile_title,
@@ -187,6 +143,82 @@ val ALL_FIRST_STEPS: List<FirstStepItem> = listOf(
         icon = StepIcon.Vector(Icons.Default.AccountCircle),
         action = HomeAction.OpenProfile,
     ),
+    // DATA-DRIVEN: signed-in with a real FriendRepository.observeFriendCount() now wired to
+    // Home — hidden once the user has ≥1 accepted friend.
+    FirstStepItem(
+        id = STEP_FIRST_ADD_FRIEND,
+        titleRes = R.string.first_step_add_friend_title,
+        subtitleRes = R.string.first_step_add_friend_subtitle,
+        icon = StepIcon.Vector(Icons.Default.People),
+        action = HomeAction.OpenFriends,
+    ),
+    // DATA-DRIVEN: only reachable once friendCount > 0 (real data — Phase 1.2.d). DISMISS-ONLY
+    // for "reviewed a friend" specifically (no such signal exists), but the pre-condition itself
+    // is real.
+    FirstStepItem(
+        id = STEP_FIRST_REVIEW_FRIEND,
+        titleRes = R.string.first_step_review_friend_title,
+        subtitleRes = R.string.first_step_review_friend_subtitle,
+        icon = StepIcon.Vector(Icons.Default.Group),
+        action = HomeAction.OpenFriends,
+    ),
+    // DATA-DRIVEN: requires friendCount > 0 AND cardCount > 0 (real data throughout).
+    FirstStepItem(
+        id = STEP_FIRST_CREATE_TRADE,
+        titleRes = R.string.first_step_create_trade_title,
+        subtitleRes = R.string.first_step_create_trade_subtitle,
+        icon = StepIcon.Vector(Icons.Default.SwapHoriz),
+        action = HomeAction.OpenTrades,
+    ),
+    // DATA-DRIVEN: hidden once OpenForTradeRepository.observeLocal() has ≥1 entry.
+    FirstStepItem(
+        id = STEP_FIRST_OPEN_FOR_TRADE,
+        titleRes = R.string.first_step_open_for_trade_title,
+        subtitleRes = R.string.first_step_open_for_trade_subtitle,
+        icon = StepIcon.Vector(Icons.Default.SwapHoriz),
+        action = HomeAction.OpenTrades,
+    ),
+    // DATA-DRIVEN: hidden once the wishlist has ≥1 entry (WishlistStats.count).
+    FirstStepItem(
+        id = STEP_FIRST_ADD_WISHLIST,
+        titleRes = R.string.first_step_add_wishlist_title,
+        subtitleRes = R.string.first_step_add_wishlist_subtitle,
+        icon = StepIcon.Vector(Icons.Default.Favorite),
+        action = HomeAction.OpenWishlist,
+    ),
+    // DATA-DRIVEN: hidden once the collection is non-empty (there's something to show stats for).
+    FirstStepItem(
+        id = STEP_FIRST_COLLECTION_STATS,
+        titleRes = R.string.first_step_collection_stats_title,
+        subtitleRes = R.string.first_step_collection_stats_subtitle,
+        icon = StepIcon.Vector(Icons.Default.BarChart),
+        action = HomeAction.OpenStats,
+    ),
+    // DISMISS-ONLY: discovery extra, no completion signal.
+    FirstStepItem(
+        id = STEP_FIRST_DRAFT_GUIDE,
+        titleRes = R.string.first_step_draft_guide_title,
+        subtitleRes = R.string.first_step_draft_guide_subtitle,
+        icon = StepIcon.Vector(Icons.Default.SportsEsports),
+        action = HomeAction.DraftGuide,
+    ),
+    // DISMISS-ONLY: discovery extra, no completion signal.
+    FirstStepItem(
+        id = STEP_FIRST_NEWS,
+        titleRes = R.string.first_step_news_title,
+        subtitleRes = R.string.first_step_news_subtitle,
+        icon = StepIcon.Vector(Icons.Default.Newspaper),
+        action = HomeAction.OpenNews,
+    ),
+    // DISMISS-ONLY: discovery extra, no completion signal.
+    FirstStepItem(
+        id = STEP_FIRST_PREFERENCES,
+        titleRes = R.string.first_step_preferences_title,
+        subtitleRes = R.string.first_step_preferences_subtitle,
+        icon = StepIcon.Vector(Icons.Default.Settings),
+        action = HomeAction.OpenSettings,
+    ),
+    // DISMISS-ONLY: intentionally last — only worth asking once the user is already engaged.
     FirstStepItem(
         id = STEP_FIRST_RATE_APP,
         titleRes = R.string.first_step_rate_app_title,

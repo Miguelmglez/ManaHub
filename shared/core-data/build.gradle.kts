@@ -73,6 +73,11 @@ kotlin {
                 // Pure-coroutine concurrency primitives (RateLimitedQueue) need runTest/virtual-time
                 // control to test min-delay spacing and Mutex serialisation deterministically.
                 implementation(libs.coroutines.test)
+                // Ktor MockEngine — lets repository tests (e.g. ArchidektTrendingRepositoryImplTest)
+                // exercise the real Ktor client stack (ArchidektClient) against canned JSON responses
+                // instead of hitting the network, per the KMP-first testing convention (Ktor code is
+                // tested with MockEngine, never MockWebServer, so it also runs on wasmJs).
+                implementation(libs.ktor.client.mock)
             }
         }
         // androidMain / wasmJsMain intentionally have minimal code yet (placeholders for future actuals).

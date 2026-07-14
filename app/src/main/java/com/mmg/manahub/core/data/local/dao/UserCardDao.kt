@@ -91,6 +91,18 @@ interface UserCardCollectionDao {
     @Query("SELECT * FROM user_card_collection WHERE is_deleted = 0 ORDER BY created_at DESC")
     fun observeAllLocal(): Flow<List<UserCardWithCard>>
 
+    // Newest-first, capped stream for the Home dashboard's Recently Added widget.
+    // Reuses the existing created_at index — no schema change (UserCardCollectionEntity
+    // already carries createdAt/updatedAt).
+    @Transaction
+    @Query("SELECT * FROM user_card_collection WHERE (user_id = :userId OR user_id IS NULL) AND is_deleted = 0 ORDER BY created_at DESC LIMIT :limit")
+    fun observeRecent(userId: String?, limit: Int): Flow<List<UserCardWithCard>>
+
+    // Guest/logged-out variant: all local rows regardless of userId, capped.
+    @Transaction
+    @Query("SELECT * FROM user_card_collection WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT :limit")
+    fun observeRecentLocal(limit: Int): Flow<List<UserCardWithCard>>
+
     // Reactive stream for all variants of a single scryfall card.
     @Query("SELECT * FROM user_card_collection WHERE scryfall_id = :scryfallId AND (user_id = :userId OR user_id IS NULL) AND is_deleted = 0")
     fun observeByScryfall(scryfallId: String, userId: String?): Flow<List<UserCardCollectionEntity>>

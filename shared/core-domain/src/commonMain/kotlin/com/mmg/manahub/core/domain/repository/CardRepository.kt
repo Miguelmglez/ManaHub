@@ -21,12 +21,26 @@ interface CardRepository {
         page: Int = 1,
         bypassCache: Boolean = false,
     ): DataResult<List<Card>>
+
+    /**
+     * Searches Scryfall for cards matching [query]. Returns paginated results with a [hasMore] flag.
+     *
+     * @param bypassCache when true, skips the in-memory search cache and always re-fetches.
+     */
+    suspend fun searchCardsPaginated(
+        query: String,
+        page: Int = 1,
+        bypassCache: Boolean = false,
+    ): DataResult<com.mmg.manahub.core.model.PaginatedCards>
     suspend fun getCardById(scryfallId: String): DataResult<Card>
+
+    /** Fetches a card by set code and collector number (returns English version by default). */
+    suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card>
 
     /** Fetches all prints (versions) of a card by its exact English name. */
     suspend fun getCardPrints(name: String): DataResult<List<Card>>
 
-    /** Fetches all unique art variants of a card by its exact English name. */
+    /** Fetches all paper-printed versions (prints) of a card by its exact English name. */
     suspend fun getCardArtVariants(name: String): DataResult<List<Card>>
 
     /** Fetches a card by its exact English name (e.g. "Lightning Bolt"). */
@@ -34,6 +48,9 @@ interface CardRepository {
 
     /** Executes a raw Scryfall query string and returns matching cards. */
     suspend fun searchWithRawQuery(query: String): List<Card>
+
+    /** Fetches a list of playable Magic sets sorted by release date descending. */
+    suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>>
 
     /** Batch-resolves [scryfallIds] to [Card]s from the local cache. IDs not found locally are silently skipped (no network fetch). */
     suspend fun getCardsByIds(scryfallIds: List<String>): List<Card>

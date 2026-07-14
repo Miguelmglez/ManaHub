@@ -36,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.model.Friend
@@ -295,7 +296,7 @@ private fun MatchHistoryCard(
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = SmallCardShape,
         color = mc.surface,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -417,7 +418,7 @@ private fun TradeHistoryRow(
     val receivedCount = proposal.items.count { it.fromUserId == proposal.receiverId }
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = SmallCardShape,
         color = mc.surface,
         modifier = Modifier
             .fillMaxWidth()

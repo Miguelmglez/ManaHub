@@ -107,6 +107,7 @@ import com.mmg.manahub.core.ui.components.search.SetPickerSheet
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.TimeAgoFormatter
 import java.util.Locale
@@ -260,7 +261,6 @@ private fun CollectionStatsContent(
                 spacing = 8.dp,
                 itemSize = 48.dp,
                 symbolSize = 32.dp,
-                horizontalArrangement = Arrangement.SpaceBetween
             )
 
             SetFilterRow(
@@ -279,7 +279,8 @@ private fun CollectionStatsContent(
                     showSetPicker = false
                 },
                 onDismiss = { showSetPicker = false },
-                availableSets = uiState.availableSets
+                availableSets = uiState.availableSets,
+                singleSelection = true
             )
         }
 
@@ -551,6 +552,7 @@ private fun CombatMechanicsSection(stats: CollectionStats) {
 @Composable
 private fun CombatStatsBox(avgPower: Double, avgToughness: Double, modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
+    val sp = MaterialTheme.spacing
     Card(
         modifier = modifier.height(100.dp),
         shape = RoundedCornerShape(topStart = 4.dp, bottomEnd = 4.dp, topEnd = 16.dp, bottomStart = 16.dp),
@@ -559,11 +561,15 @@ private fun CombatStatsBox(avgPower: Double, avgToughness: Double, modifier: Mod
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxSize().padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = sp.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_battle),
                         contentDescription = null,
@@ -572,24 +578,29 @@ private fun CombatStatsBox(avgPower: Double, avgToughness: Double, modifier: Mod
                     )
                     Text(
                         text = "%.1f".format(avgPower),
-                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 26.sp),
+                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 24.sp),
                         color = mc.textPrimary
                     )
                     Text(
-                        text = stringResource(R.string.stats_label_avg_power).uppercase(),
-                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 8.sp),
-                        color = mc.textSecondary
+                        text = "AVG\nPOWER",
+                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 9.sp, lineHeight = 10.sp),
+                        color = mc.textSecondary,
+                        textAlign = TextAlign.Center
                     )
                 }
                 
                 Text(
                     text = "/",
-                    style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 26.sp),
+                    style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 24.sp),
                     color = mc.goldMtg,
-                    modifier = Modifier.padding(horizontal = 12.dp).padding(top = 16.dp) // Align with numbers
+                    modifier = Modifier.padding(horizontal = sp.sm)
                 )
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Icon(
                         imageVector = Icons.Default.Shield,
                         contentDescription = null,
@@ -598,13 +609,14 @@ private fun CombatStatsBox(avgPower: Double, avgToughness: Double, modifier: Mod
                     )
                     Text(
                         text = "%.1f".format(avgToughness),
-                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 26.sp),
+                        style = MaterialTheme.magicTypography.displayMedium.copy(fontSize = 24.sp),
                         color = mc.textPrimary
                     )
                     Text(
-                        text = stringResource(R.string.stats_label_avg_toughness).uppercase(),
-                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 8.sp),
-                        color = mc.textSecondary
+                        text = "AVG\nTOUGHNESS",
+                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 9.sp, lineHeight = 10.sp),
+                        color = mc.textSecondary,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -993,7 +1005,7 @@ private fun MostValuableSection(
                         )
                     },
                     supportingContent = if (card.isFoil) {
-                        { Text(stringResource(R.string.addcard_confirm_foil), style = MaterialTheme.magicTypography.labelSmall, color = mc.goldMtg.copy(alpha = 0.7f)) }
+                        { Text(stringResource(R.string.shared_foil), style = MaterialTheme.magicTypography.labelSmall, color = mc.goldMtg.copy(alpha = 0.7f)) }
                     } else null,
                 )
                 if (index < filteredCards.size - 1) HorizontalDivider(thickness = 0.5.dp, color = mc.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.padding(horizontal = 16.dp))
@@ -1065,6 +1077,7 @@ private fun CircularDistributionSection(
 ) {
     if (data.isEmpty()) return
     val mc = MaterialTheme.magicColors
+    val sp = MaterialTheme.spacing
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
@@ -1077,7 +1090,7 @@ private fun CircularDistributionSection(
                 data = data,
                 colorMapper = colorMapper,
                 isColor = isColor,
-                modifier = Modifier.padding(20.dp)
+                modifier = Modifier.padding(vertical = sp.md, horizontal = sp.lg)
             )
         }
     }

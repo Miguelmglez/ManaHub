@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Feed
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MilitaryTech
@@ -110,6 +111,16 @@ enum class HomeWidgetType(
         audience = WidgetAudience.ACCOUNT_GATED,
         icon = Icons.Default.AutoAwesome,
     ),
+    /** Newest cards added to the local collection (Home feature overhaul Phase 2.1). Works
+     * fully offline — no account required. */
+    RECENTLY_ADDED(
+        persistedId = "recently_added",
+        defaultTitleRes = R.string.widget_title_recently_added,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.COLLECTION,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.History,
+    ),
 
     // ── Discover ──────────────────────────────────────────────────────────────────
     DISCOVER_CARDS(
@@ -123,7 +134,7 @@ enum class HomeWidgetType(
     CARD_OF_THE_DAY(
         persistedId = "card_of_the_day",
         defaultTitleRes = R.string.widget_title_card_of_day,
-        supportedSizes = setOf(WidgetSize.MEDIUM, WidgetSize.LARGE),
+        supportedSizes = setOf(WidgetSize.MEDIUM),
         category = WidgetCategory.DISCOVER,
         audience = WidgetAudience.ALL,
         icon = Icons.Default.AutoAwesome,

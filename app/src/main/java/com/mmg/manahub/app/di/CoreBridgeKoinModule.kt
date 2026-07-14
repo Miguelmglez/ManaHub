@@ -8,13 +8,16 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.repository.DeckRepositoryImpl
+import com.mmg.manahub.core.data.repository.StatsRepositoryImpl
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -36,6 +39,7 @@ import com.mmg.manahub.feature.trades.data.repository.TradesRepositoryImpl
 import com.mmg.manahub.feature.trades.data.repository.WishlistRepositoryImpl
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
@@ -86,22 +90,19 @@ import org.koin.dsl.module
  * (excluded online/voice/scanner/nearby trees + every `@HiltWorker`) — no Hilt-only consumer found, so
  * it needs no reverse bridge.
  *
- * ## KMP migration — Hilt→Koin cutover batch 5
- * [AuthRepository] is now NATIVELY Koin-built here too (the feature-private Hilt `AuthModule` was
- * DELETED). It is built from [AuthRepositoryImpl], deriving its [io.github.jan.supabase.auth.Auth] dep
- * directly from the already-bridged [SupabaseClient] single (`get<SupabaseClient>().auth`) rather than
- * a separate `Auth` bridge/single. Its `@Named("supabase")` [OkHttpClient] and
- * `UserProfileClient`/`UserProfileDataSource` deps are natively Koin-built in `authKoinModule` —
- * resolved cross-module via `get()`; `applicationScope` reuses the single already registered by
- * `decksKoinModule` (legacy `DeckMagicDetailViewModel`) rather than a second `CoroutineScope` single.
- * `AuthRepository` has THREE surviving Hilt-only consumers — `core.sync.CollectionSyncWorker`,
- * `core.sync.CollectionStatsSyncWorker` and `core.gamification.data.sync.GamificationSyncWorker`
- * (all `@HiltWorker`) plus the excluded `feature.online` lobby ViewModels — reverse-bridged in
- * `KoinToHiltBridgeModule`.
+ * ## KMP migration — Hilt→Koin cutover batch 6
+ * [FriendRepository] and [GameSessionRepository] are now NATIVELY Koin-built here too (their impls lost
+ * `@Inject`/`@Singleton`; the feature-private Hilt `FriendModule`/`GameModule` were deleted). [FriendDao]
+ * and [GameSessionDao] are newly forward-bridged (Room stays androidMain) to build them.
+ *
+ * ## KMP migration — Hilt→Koin cutover batch 7
+ * [StatsRepository] is now NATIVELY Koin-built here too (lost its `@Inject constructor`; its Hilt binding
+ * in `RepositoryModule` was deleted). This breaks the startup-ordering hazard where `ManaHubApp`'s own
+ * eager Hilt injection of this repository triggered Koin's reverse bridge (and thus
+ * `GlobalContext.get()`) before `startKoin()` had run. [StatsDao] is newly forward-bridged to build it.
  *
  * @param userPreferencesRepo the Hilt-owned [UserPreferencesRepository] singleton (Settings + Stats).
  * @param userPrefsDataStore the Hilt-owned [UserPreferencesDataStore] singleton (Settings + Profile + Home).
- * @param statsRepository the Hilt-owned [StatsRepository] singleton (Profile + Home).
  * @param scryfallRemoteDataSource the Hilt-owned [ScryfallRemoteDataSource] singleton (Stats + Home).
  * @param cardRepository the Hilt-owned [CardRepository] singleton (Home + CommunityDecks + CardDetail).
  * @param analyticsHelper the Hilt-owned [AnalyticsHelper] singleton (Settings + CardDetail).
@@ -111,32 +112,45 @@ import org.koin.dsl.module
  *   [FriendRepositoryImpl] natively.
  * @param gameSessionDao the Hilt/Room-owned [GameSessionDao] singleton (Room stays androidMain) — needed
  *   to build [GameSessionRepositoryImpl] natively.
+ * @param statsDao the Hilt/Room-owned [StatsDao] singleton (Room stays androidMain) — needed to build
+ *   [StatsRepositoryImpl] natively.
  * @param okHttpClient the Hilt-owned app-wide [OkHttpClient] singleton — needed to build
  *   `NewsFeedService` (`newsKoinModule`); ALSO still used directly by `ManaHubApp` for the Coil image
  *   loader (unchanged).
  * @param supabaseClient the Hilt-owned [SupabaseClient] singleton (`SupabaseModule`) — needed to build
  *   the five trades remote data sources (`tradesKoinModule`) and the Trades/Wishlist/OpenForTrade
  *   repositories below.
+ * @param userCardRepository the Hilt-owned [UserCardRepository] provider (CardDetail + Trades).
  * @return a Koin [Module] exposing the cross-island bridged singletons plus the natively-Koin-constructed
  *   [TournamentRepository]/[DeckRepository]/[DraftRepository]/[DraftSimRepository]/[TradesRepository]/
- *   [WishlistRepository]/[OpenForTradeRepository]/[FriendRepository]/[GameSessionRepository].
+ *   [WishlistRepository]/[OpenForTradeRepository]/[FriendRepository]/[GameSessionRepository]/[StatsRepository].
  */
 fun coreBridgeKoinModule(
     userPreferencesRepo: UserPreferencesRepository,
     userPrefsDataStore: UserPreferencesDataStore,
-    statsRepository: StatsRepository,
     scryfallRemoteDataSource: ScryfallRemoteDataSource,
     cardRepository: CardRepository,
     analyticsHelper: AnalyticsHelper,
     deckDao: DeckDao,
     friendDao: FriendDao,
     gameSessionDao: GameSessionDao,
+    statsDao: StatsDao,
     okHttpClient: OkHttpClient,
     supabaseClient: SupabaseClient,
+    userCardRepository: () -> UserCardRepository,
 ): Module = module {
     // ── KMP platform abstractions (not Hilt-owned — instantiated directly). ──
     single<CrashReporter> { provideCrashReporter() }
     single { DispatcherProvider() }
+
+    // ── Named IO dispatcher qualifier (Trades audit finding 4.2, 2026-07-10). Koin-built classes
+    //    should resolve `get(named("io"))` instead of passing `Dispatchers.IO` literally: a literal
+    //    (a) is not available on wasmJs and (b) can't be swapped for a `TestDispatcher` in ViewModel
+    //    tests without changing the DI graph. Mirrors the still-Hilt `DispatcherModule.provideIoDispatcher()`
+    //    — the two coexist during the migration; this is NOT yet wired to every Koin island's existing
+    //    `Dispatchers.IO` literal (only `tradesKoinModule` consumes it so far — a broader sweep is a
+    //    separate follow-up, out of this fix's scope). ──
+    single<CoroutineDispatcher>(named("io")) { Dispatchers.IO }
 
     // ── AuthRepository: natively Koin-constructed (KMP migration batch 5; Hilt `AuthModule` deleted).
     //    Shared across nearly every island — registered exactly once here. `Auth` is derived directly
@@ -160,15 +174,16 @@ fun coreBridgeKoinModule(
     // Draft + Tournament + Trades + Decks islands — each registered exactly once.
     single { userPreferencesRepo }
     single { userPrefsDataStore }
-    single { statsRepository }
     single { scryfallRemoteDataSource }
     single { cardRepository }
     single { analyticsHelper }
     single { deckDao }
     single { friendDao }
     single { gameSessionDao }
+    single { statsDao }
     single { okHttpClient }
     single { supabaseClient }
+    single { userCardRepository() }
 
     // Natively constructed (batch 4) — the SAME instance the whole gamification engine graph
     // (gamificationEngineKoinModule) and ManaHubApp's own direct emission share.
@@ -223,6 +238,16 @@ fun coreBridgeKoinModule(
         )
     }
 
+    // ── StatsRepository: natively Koin-constructed (KMP migration batch 7; Residual binding deleted
+    //    from RepositoryModule). Shared across nearly every island — registered exactly once here. ──
+    single<StatsRepository> {
+        StatsRepositoryImpl(
+            statsDao = get(),
+            deckDao = get(),
+            authRepository = get(),
+        )
+    }
+
     // ── DraftRepository / DraftSimRepository: natively Koin-constructed (KMP migration batch 3;
     //    Hilt `DraftModule` deleted). Shared by Home + Draft — registered exactly once here.
     //    `ScryfallClient`/`ScryfallRequestQueue` come from `SharedDomainKoinModule`; `YouTubeClient`/
@@ -268,6 +293,7 @@ fun coreBridgeKoinModule(
         TradesRepositoryImpl(
             remote = get(),
             cardDao = get(),
+            cardRepository = get(),
             progressionEventBus = get(),
         )
     }

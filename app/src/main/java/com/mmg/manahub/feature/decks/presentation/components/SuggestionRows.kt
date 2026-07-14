@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -126,8 +127,8 @@ fun CutSuggestionRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
             ) {
-                Text(
-                    text = fit.card.name,
+                CardName(
+                    name = fit.card.name,
                     style = ty.titleMedium,
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -193,8 +194,8 @@ fun AddSuggestionRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
             ) {
-                Text(
-                    text = fit.card.name,
+                CardName(
+                    name = fit.card.name,
                     style = ty.titleMedium,
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -291,6 +292,9 @@ fun CommunityAddSuggestionRow(
     onViewDecks: () -> Unit,
     onCardTap: () -> Unit,
     modifier: Modifier = Modifier,
+    // Community Decks (browse/import) feature flag — hides just this row's "view decks" affordance
+    // when that feature is disabled, independent of the Motor B community suggestion it sits on.
+    showViewDecksAction: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -314,8 +318,8 @@ fun CommunityAddSuggestionRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
             ) {
-                Text(
-                    text = card.name,
+                CardName(
+                    name = card.name,
                     style = ty.titleMedium,
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -347,12 +351,14 @@ fun CommunityAddSuggestionRow(
                 }
             }
 
-            IconButton(onClick = onViewDecks, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = stringResource(R.string.deck_doctor_community_view_decks_cd, card.name),
-                    tint = mc.textSecondary,
-                )
+            if (showViewDecksAction) {
+                IconButton(onClick = onViewDecks, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = stringResource(R.string.deck_doctor_community_view_decks_cd, card.name),
+                        tint = mc.textSecondary,
+                    )
+                }
             }
             IconButton(onClick = onAdd, modifier = Modifier.size(48.dp)) {
                 Icon(

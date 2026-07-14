@@ -153,6 +153,10 @@ class DeckStudioViewModelTest {
         // in init (mirrors playerNameFlow's own construction-time collection) — default OFF so
         // these pre-existing tests keep exercising the byte-identical pre-Phase-4 Motor-A-only path.
         every { userPreferences.communityEngineEnabledFlow } returns flowOf(false)
+        // communityDecksEnabledFlow is ALSO collected at construction time (sibling stateIn
+        // property, mirrors playerNameFlow/communityEngineEnabledFlow above) — hidden-for-release
+        // default OFF, unrelated to these pre-existing tests.
+        every { userPreferences.communityDecksEnabledFlow } returns flowOf(false)
         // getDeckGameStatsUseCase is relaxed → returns an empty Flow<Result> by default; the
         // deckStatsFlow (WhileSubscribed) is lazy and unsubscribed in these tests, so no explicit stub.
         // deckRepository.createDeck returns a stable id by default (overridden per test as needed).
@@ -995,7 +999,7 @@ class DeckStudioViewModelTest {
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWith(elfCard)))
             coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(listOf(elfCard))
+            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
             val vm = createVm()
             advanceUntilIdle()
 
@@ -1031,7 +1035,7 @@ class DeckStudioViewModelTest {
         // Arrange
         every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
         every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-        coEvery { searchCardsUseCase(any()) } returns DataResult.Success(listOf(elfCard))
+        coEvery { searchCardsUseCase(any()) } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
         val vm = createVm()
         advanceUntilIdle()
         vm.searchScryfallDirect("elf")
@@ -1790,7 +1794,7 @@ class DeckStudioViewModelTest {
             // Arrange — prime the sheet with a live search state.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(listOf(elfCard))
+            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
             val vm = createVm()
             advanceUntilIdle()
             vm.openSeedSheet()
@@ -1907,7 +1911,7 @@ class DeckStudioViewModelTest {
             // Arrange — first populate results so we can verify they get cleared.
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("el") } returns DataResult.Success(listOf(elfCard))
+            coEvery { searchCardsUseCase("el") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
             val vm = createVm()
             advanceUntilIdle()
             // Prime with a 2-char query that fires.
@@ -1932,7 +1936,7 @@ class DeckStudioViewModelTest {
             // Arrange
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(listOf(elfCard))
+            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
             val vm = createVm()
             advanceUntilIdle()
 
@@ -1979,8 +1983,8 @@ class DeckStudioViewModelTest {
             // Arrange
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("el") } returns DataResult.Success(listOf(elfCard))
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(listOf(elfCard, commander))
+            coEvery { searchCardsUseCase("el") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
+            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard, commander), false))
             val vm = createVm()
             advanceUntilIdle()
 

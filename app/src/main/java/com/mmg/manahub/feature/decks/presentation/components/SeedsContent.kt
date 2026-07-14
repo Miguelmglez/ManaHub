@@ -53,7 +53,9 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -326,7 +328,7 @@ private fun SeedResultRow(card: Card, onAdd: () -> Unit) {
                 modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(ChipShape),
             )
             Column(Modifier.weight(1f)) {
-                Text(card.name, style = ty.bodyMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                CardName(name = card.name, style = ty.bodyMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(card.setName, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onAdd, modifier = Modifier.size(48.dp)) {
@@ -358,7 +360,7 @@ private fun SeedHeroRow(card: Card, onRemove: () -> Unit) {
                 modifier = Modifier.size(width = 64.dp, height = 46.dp).clip(ChipShape),
             )
             Column(Modifier.weight(1f)) {
-                Text(card.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                CardName(name = card.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(card.typeLine, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
@@ -420,30 +422,10 @@ private fun InferredIdentityCard(identity: InferredIdentity) {
     }
 }
 
-/** A single colored mana pip with its letter. */
+/** A single colored mana pip using ManaSymbolImage. */
 @Composable
 private fun ManaPip(color: ManaColor) {
-    val mc = MaterialTheme.magicColors
-    val pipColor: Color = when (color) {
-        ManaColor.W -> mc.manaW
-        ManaColor.U -> mc.manaU
-        ManaColor.B -> mc.manaB
-        ManaColor.R -> mc.manaR
-        ManaColor.G -> mc.manaG
-        ManaColor.C -> mc.manaC
-    }
-    Box(
-        modifier = Modifier.size(24.dp).clip(CircleShape).background(pipColor),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = color.symbol,
-            style = MaterialTheme.magicTypography.labelSmall,
-            // Pip backgrounds are saturated; the symbol uses textPrimary which reads on every theme's pips.
-            color = mc.textPrimary,
-            fontWeight = FontWeight.Bold,
-        )
-    }
+    ManaSymbolImage(token = color.symbol, size = 24.dp)
 }
 
 /** Preview of the role skeleton the generated deck will target (ideal counts per functional role). */

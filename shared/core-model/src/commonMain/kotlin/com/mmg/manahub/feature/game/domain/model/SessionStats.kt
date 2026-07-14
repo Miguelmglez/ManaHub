@@ -31,6 +31,8 @@ data class SessionHistoryEntry(
     val localIsWinner: Boolean,
     val localDeckId: String?,
     val localDeckName: String?,
+    /** Number of OTHER seats in the session (total seats - the local seat itself). */
+    val opponentCount: Int = 0,
 )
 
 /** Summary projection of a game session (no players). */

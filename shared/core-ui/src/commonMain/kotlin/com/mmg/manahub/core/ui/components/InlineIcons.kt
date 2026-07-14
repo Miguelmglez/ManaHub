@@ -80,26 +80,47 @@ internal val AlchemyIcon: ImageVector by lazy {
 }
 
 /**
- * Diamond/gem shape used as fallback icon for set symbols.
+ * Shield shape with a slash through it, used for protection or counters.
  * Replaces `R.drawable.ic_counter` which is an Android resource.
  */
-internal val SetSymbolFallbackIcon: ImageVector by lazy {
+internal val CounterIcon: ImageVector by lazy {
     ImageVector.Builder(
-        name = "SetSymbolFallback",
-        defaultWidth = 24.dp,
-        defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
+        name = "Counter",
+        defaultWidth = 54.dp,
+        defaultHeight = 100.dp,
+        viewportWidth = 54f,
+        viewportHeight = 100f,
     ).apply {
         path(fill = SolidColor(Color.Black)) {
-            moveTo(12f, 2f)
-            lineTo(22f, 12f)
-            lineTo(12f, 22f)
-            lineTo(2f, 12f)
-            close()
+            moveTo(0f, 50.25f)
+            lineToRelative(0.16f, -1.97f)
+            horizontalLineToRelative(-0.06f)
+            lineToRelative(0.06f, -0.03f)
+            lineToRelative(2.06f, -26.24f)
+            reflectiveCurveTo(3.25f, 40.16f, 6.31f, 45.4f)
+            curveTo(7.62f, 44.88f, 8.96f, 44.42f, 10.31f, 44f)
+            curveToRelative(3.31f, -8.66f, 4.47f, -34.38f, 4.47f, -34.38f)
+            reflectiveCurveToRelative(0.77f, 23.43f, 3.68f, 32.53f)
+            curveToRelative(1.6f, -0.24f, 3.22f, -0.41f, 4.87f, -0.51f)
+            curveToRelative(3.01f, -11.19f, 3.82f, -41.64f, 3.82f, -41.64f)
+            reflectiveCurveToRelative(0.99f, 30.52f, 3.95f, 41.67f)
+            curveToRelative(1.58f, 0.11f, 3.13f, 0.29f, 4.65f, 0.53f)
+            curveToRelative(2.87f, -9.06f, 4.02f, -32.6f, 4.02f, -32.6f)
+            reflectiveCurveToRelative(0.93f, 25.86f, 3.94f, 34.45f)
+            curveToRelative(1.32f, 0.41f, 2.62f, 0.87f, 3.89f, 1.38f)
+            curveToRelative(3.34f, -5.18f, 4.51f, -23.39f, 4.51f, -23.39f)
+            lineToRelative(1.59f, 26.22f)
+            lineToRelative(0.07f, 0.03f)
+            horizontalLineToRelative(-0.06f)
+            lineToRelative(0.12f, 1.95f)
+            reflectiveCurveToRelative(-26.69f, 8.69f, -26.69f, 49.49f)
+            curveToRelative(0f, -40.6f, -27.15f, -49.49f, -27.15f, -49.49f)
         }
     }.build()
 }
+
+/** Alias for [CounterIcon] used as fallback icon for set symbols. */
+val SetSymbolFallbackIcon: ImageVector get() = CounterIcon
 
 /**
  * Magnifying glass icon (Material "Search").

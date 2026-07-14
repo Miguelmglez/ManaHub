@@ -10,6 +10,13 @@ data class BoosterConfig(
     val boosters: List<BoosterVariant>,
     /** Named sheets (e.g. "common", "uncommon", "rareMythic", "foil"). */
     val sheets: Map<String, BoosterSheet>,
+    /**
+     * Additional Scryfall set codes whose cards appear in [sheets] alongside [setCode]'s own
+     * cards (e.g. SOS's `mysticalArchive` sheet draws from Scryfall set `soa`). The card-pool
+     * fetch widens its Scryfall query to include these sets. Empty for the vast majority of
+     * sets, which draw every sheet from their own set code only.
+     */
+    val extraPoolSets: List<String> = emptyList(),
 )
 
 /** One weighted booster variant; [contents] maps sheet name to slot count. */

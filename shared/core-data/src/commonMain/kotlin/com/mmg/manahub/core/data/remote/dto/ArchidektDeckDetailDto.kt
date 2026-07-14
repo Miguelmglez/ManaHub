@@ -35,7 +35,29 @@ data class ArchidektCardEntryDto(
 @Serializable
 data class ArchidektCardDto(
     val oracleCard: ArchidektOracleCardDto? = null,
+    // The Scryfall PRINTING uuid of this exact card (distinct from `oracleCard.uid`, which is
+    // the oracle-card uuid shared across all printings) — verified live 2026-07-13, see
+    // docs/adr/ADR-004-community-api-contracts.md. Used to build the Scryfall image CDN URL
+    // and to resolve the exact printing on tap (no extra Scryfall API call).
     val uid: String = "",
+    val edition: ArchidektEditionDto? = null,
+    val collectorNumber: String = "",
+    val rarity: String = "",
+    val prices: ArchidektPricesDto? = null,
+)
+
+/** The specific set/printing this card entry belongs to. */
+@Serializable
+data class ArchidektEditionDto(
+    val editioncode: String = "",
+    val editionname: String = "",
+)
+
+/** Only the two price sources this app consumes; other keys are ignored. */
+@Serializable
+data class ArchidektPricesDto(
+    val tcg: Double? = null,
+    val cm: Double? = null,
 )
 
 @Serializable
@@ -46,6 +68,10 @@ data class ArchidektOracleCardDto(
     val manaCost: String = "",
     val types: List<String> = emptyList(),
     val text: String = "",
+    val cmc: Double = 0.0,
+    val superTypes: List<String> = emptyList(),
+    val subTypes: List<String> = emptyList(),
+    val layout: String = "normal",
 )
 
 @Serializable

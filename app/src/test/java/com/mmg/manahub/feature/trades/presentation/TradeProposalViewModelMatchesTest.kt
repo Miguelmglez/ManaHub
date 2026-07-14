@@ -300,6 +300,11 @@ class TradeProposalViewModelMatchesTest {
             friendRepository = friendRepository,
             analyticsHelper = analyticsHelper,
             ioDispatcher = testDispatcher,
+            // §6.3 fix: the debounced search-list rebuild hops onto `defaultDispatcher` via
+            // `withContext`. It must be the SAME virtual-time `StandardTestDispatcher` as Main
+            // (not a real `Dispatchers.Default`) so `advanceUntilIdle()` deterministically drives
+            // both the debounce delay and the rebuild itself.
+            defaultDispatcher = testDispatcher,
         )
     }
 

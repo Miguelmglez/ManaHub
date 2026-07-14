@@ -40,6 +40,7 @@ fun addCardKoinModule(): Module = module {
             searchCards = get(),
             userPreferences = get(),
             buildScryfallQuery = get(),
+            getSpotlightFeed = get(),
         )
     }
 }

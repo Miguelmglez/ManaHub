@@ -24,9 +24,23 @@ data class AddCardRow(
     val wishlistEntry: WishlistEntry? = null,
     val offerEntry: OpenForTradeEntry? = null,
 ) {
+    /**
+     * A key stable and unique enough to use as a lazy-list item key.
+     *
+     * [offerEntry] is checked before [wishlistEntry] on purpose: when a row represents a
+     * trade match (both [offerEntry] and [wishlistEntry] set — see
+     * `TradeProposalViewModel.computeProposerMatches`/`computeReceiverMatches`), the
+     * `wishlistEntry` is the *best-matching* wish for that offer and can be the SAME wish
+     * entry shared by several distinct offer variants (e.g. two of my open-for-trade copies,
+     * foil and non-foil, both matching the friend's one non-variant-specific wishlist row).
+     * Keying on `wishlistEntry.id` first collapsed those rows onto one key. `offerEntry` is
+     * always the row's own distinguishing copy in both match-computation paths, so it must
+     * win the priority order. Every other call site only ever sets one of the two fields, so
+     * this reordering is a no-op for them.
+     */
     val uniqueKey: String get() = when {
-        wishlistEntry != null -> "wishlist_${wishlistEntry.id}"
         offerEntry != null -> "offer_${offerEntry.id}"
+        wishlistEntry != null -> "wishlist_${wishlistEntry.id}"
         else -> "scryfall_${card.scryfallId}"
     }
 

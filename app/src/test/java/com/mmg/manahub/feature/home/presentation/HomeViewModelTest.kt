@@ -41,6 +41,18 @@ import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeItem
+import com.mmg.manahub.core.model.TradeStatus
+import com.mmg.manahub.core.model.CommunityStats
+import com.mmg.manahub.core.model.CommunityEntry
+import com.mmg.manahub.core.model.CommunityMilestone
+import com.mmg.manahub.core.model.ArchidektTrendingDeck
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.FriendRequest
+import com.mmg.manahub.core.model.Tournament
+import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -62,6 +74,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -124,6 +137,15 @@ class HomeViewModelTest {
     private val wishlistRepository: WishlistRepository = mockk(relaxed = true)
     private val gamificationRepository: GamificationRepository = mockk(relaxed = true)
 
+    // Home feature overhaul (2026-07-13) — new real data sources.
+    private val userCardRepository: com.mmg.manahub.core.domain.repository.UserCardRepository = mockk(relaxed = true)
+    private val tradesRepository: com.mmg.manahub.core.data.repository.TradesRepository = mockk(relaxed = true)
+    private val openForTradeRepository: com.mmg.manahub.core.domain.repository.OpenForTradeRepository = mockk(relaxed = true)
+    private val tradeSuggestionsRepository: com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository = mockk(relaxed = true)
+    private val friendRepository: com.mmg.manahub.core.domain.repository.FriendRepository = mockk(relaxed = true)
+    private val archidektTrendingRepository: com.mmg.manahub.core.domain.repository.ArchidektTrendingRepository = mockk(relaxed = true)
+    private val playtestRepository: com.mmg.manahub.core.domain.repository.PlaytestRepository = mockk(relaxed = true)
+
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
@@ -181,11 +203,29 @@ class HomeViewModelTest {
         // Wishlist default: empty.
         every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
 
+        // Home feature overhaul (2026-07-13) — new real data sources, defaulted to empty/zero.
+        every { tradesRepository.observeActiveProposals() } returns flowOf(emptyList())
+        // Home dashboard audit (HIGH) — VM init warms the trades cache in the background; stub the
+        // success path so tests that don't care about it don't crash on MockK's `Result<Unit>`
+        // handling (a relaxed mock can't synthesize an inline value class return).
+        coEvery { tradesRepository.refreshProposals(any()) } returns Result.success(Unit)
+        every { openForTradeRepository.observeLocal() } returns flowOf(emptyList())
+        coEvery { tradeSuggestionsRepository.getSuggestions() } returns Result.success(emptyList())
+        every { friendRepository.observeFriendCount() } returns flowOf(0)
+        every { friendRepository.observePendingRequests() } returns flowOf(emptyList())
+        every { archidektTrendingRepository.observeTrendingDecks() } returns flowOf(emptyList())
+        every { userCardRepository.observeRecentlyAdded(any()) } returns flowOf(emptyList())
+        every { playtestRepository.observeTotalTestCount() } returns flowOf(0)
+
         // Gamification (Phase 2): enabled with empty board / zeroed streak / level 1.
         every { userPrefsDataStore.gamificationEnabledFlow } returns gamificationEnabledFlow
         every { gamificationRepository.observeProgression() } returns progressionFlow
         every { gamificationRepository.observeActiveQuests() } returns questBoardFlow
         every { gamificationRepository.observeDailyActivityStreak() } returns streakFlow
+
+        // Community Decks feature flag — hidden for release (2026-07-14), default OFF. Collected
+        // unconditionally in the final uiState combine (mirrors the other flag stubs above).
+        every { userPrefsDataStore.communityDecksEnabledFlow } returns flowOf(false)
 
         // Layout round-trip: homeLayoutFlow decodes the saved tokens (or the supplied
         // default when none are saved); saveHomeLayout writes the tokens.
@@ -232,6 +272,13 @@ class HomeViewModelTest {
         wishlistRepository = wishlistRepository,
         getAccountNudgeUseCase = GetAccountNudgeUseCase(),
         gamificationRepository = gamificationRepository,
+        userCardRepository = userCardRepository,
+        tradesRepository = tradesRepository,
+        openForTradeRepository = openForTradeRepository,
+        tradeSuggestionsRepository = tradeSuggestionsRepository,
+        friendRepository = friendRepository,
+        archidektTrendingRepository = archidektTrendingRepository,
+        playtestRepository = playtestRepository,
     )
 
     /** Builds a quest UI model for tests (title/description are irrelevant for VM logic). */
@@ -864,27 +911,79 @@ class HomeViewModelTest {
 
     // ── Widget board: mutations ────────────────────────────────────────────────
 
-    @Test
-    fun `AddWidget inserts the widget grouped by category and persists`() = runTest(testDispatcher) {
-        sessionStateFlow.value = SessionState.Unauthenticated
-
-        val vm = buildViewModel()
-        backgroundScope.launch { vm.state.collect {} }
-        advanceUntilIdle()
-        assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
-
-        // GAME_STATS_HUB is in the STATS category — it must be inserted into its category run
-        // (after ACTIVITY, before DISCOVER), NOT appended to the end of the layout.
-        vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
-        advanceUntilIdle()
-
-        val layout = vm.state.value.layout
-        assertTrue(layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
-        // The layout stays grouped: every widget's category ordinal is non-decreasing.
-        val ordinals = layout.map { it.type.category.ordinal }
-        assertEquals(ordinals.sorted(), ordinals)
-        coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+    /**
+     * Asserts every category in [layout] forms one unbroken run — a category may not appear,
+     * be interrupted by a different category, then reappear later in the list. This is the real
+     * contiguity invariant [HomeViewModel.addWidget] must uphold; it does NOT require categories
+     * to be in [WidgetCategory] ordinal-ascending order (defaultLayoutSignedIn deliberately is not:
+     * SOCIAL, ordinal 4, sits before DISCOVER, ordinal 3, to match the funnel order).
+     */
+    private fun assertContiguousCategoryRuns(layout: List<WidgetInstance>) {
+        val seenCategories = mutableSetOf<WidgetCategory>()
+        var previousCategory: WidgetCategory? = null
+        for (instance in layout) {
+            val category = instance.type.category
+            if (category != previousCategory) {
+                assertTrue(
+                    "Category $category is not contiguous in $layout — it reappears after another category",
+                    seenCategories.add(category),
+                )
+                previousCategory = category
+            }
+        }
     }
+
+    @Test
+    fun `AddWidget appends to the end when its category has no existing entries in the layout`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Unauthenticated
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+            assertFalse(vm.state.value.layout.any { it.type == HomeWidgetType.GAME_STATS_HUB })
+
+            // defaultLayoutSignedOut has no STATS-category widget, so GAME_STATS_HUB (STATS) has no
+            // existing run to join — it lands at the very end (a brand-new category run of size 1
+            // is trivially contiguous with itself).
+            vm.onAction(HomeAction.AddWidget(HomeWidgetType.GAME_STATS_HUB))
+            advanceUntilIdle()
+
+            val layout = vm.state.value.layout
+            assertEquals(HomeWidgetType.GAME_STATS_HUB, layout.last().type)
+            assertContiguousCategoryRuns(layout)
+            coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+        }
+
+    @Test
+    fun `AddWidget joins the existing category run wherever it sits, regardless of category ordinal`() =
+        runTest(testDispatcher) {
+            // Regression test for the addWidget category-contiguity bug (Home dashboard audit,
+            // CRITICAL): defaultLayoutSignedIn places SOCIAL (ordinal 4) BEFORE DISCOVER (ordinal 3),
+            // so an ordinal-ascending `indexOfLast { ordinal <= newOrdinal }` insertion mis-matched
+            // the last DISCOVER item and split TRADES_HUB away from SOCIAL_HUB, off to the very end.
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+            assertTrue(vm.state.value.layout.any { it.type == HomeWidgetType.SOCIAL_HUB })
+
+            vm.onAction(HomeAction.RemoveWidget(HomeWidgetType.TRADES_HUB))
+            advanceUntilIdle()
+
+            vm.onAction(HomeAction.AddWidget(HomeWidgetType.TRADES_HUB))
+            advanceUntilIdle()
+
+            val layout = vm.state.value.layout
+            val socialIndex = layout.indexOfFirst { it.type == HomeWidgetType.SOCIAL_HUB }
+            val tradesIndex = layout.indexOfFirst { it.type == HomeWidgetType.TRADES_HUB }
+            // TRADES_HUB (also SOCIAL) must land immediately after the remaining SOCIAL_HUB entry —
+            // NOT split off to the end of the board behind the DISCOVER run.
+            assertEquals(socialIndex + 1, tradesIndex)
+            assertContiguousCategoryRuns(layout)
+            coVerify(atLeast = 1) { userPrefsDataStore.saveHomeLayout(any()) }
+        }
 
     @Test
     fun `AddWidget is a no-op when the widget already exists`() = runTest(testDispatcher) {
@@ -1498,4 +1597,989 @@ class HomeViewModelTest {
             type = com.mmg.manahub.core.model.news.SourceType.ARTICLE,
             isEnabled = true, isDefault = true, iconUrl = null, language = language,
         )
+
+    // ── Fixture builders (Home feature overhaul 2026-07-13 test additions) ────
+
+    private fun tradeItem(id: String = "item-1", cardId: String = "c1") = TradeItem(
+        id = id, tradeProposalId = "proposal-1", fromUserId = "uid-2", toUserId = "uid-1",
+        userCardIdRef = "uc-1", quantity = 1, isFoil = false, condition = "NM", language = "en",
+        cardId = cardId, isReviewCollectionPlaceholder = false,
+    )
+
+    private fun tradeProposal(
+        id: String = "proposal-1",
+        status: TradeStatus = TradeStatus.PROPOSED,
+        proposerId: String = "uid-2",
+        receiverId: String = "uid-1",
+        createdAt: Long = 100L,
+        items: List<TradeItem> = listOf(tradeItem()),
+    ) = TradeProposal(
+        id = id, status = status, proposerId = proposerId, receiverId = receiverId,
+        parentProposalId = null, rootProposalId = id, proposalVersion = 1,
+        includesReviewCollectionFromProposer = false, includesReviewCollectionFromReceiver = false,
+        proposerMarkedCompletedAt = null, receiverMarkedCompletedAt = null, cancellationReason = null,
+        items = items, createdAt = createdAt, updatedAt = createdAt,
+    )
+
+    private fun openForTradeEntry(
+        id: String = "oft-1",
+        scryfallId: String = "c1",
+        quantity: Int = 1,
+        priceUsd: Double? = 10.0,
+        priceEur: Double? = 9.0,
+    ) = OpenForTradeEntry(
+        id = id, userId = "uid-1", userCardId = "uc-1", scryfallId = scryfallId,
+        quantity = quantity, isFoil = false, condition = "NM", language = "en", createdAt = 0L,
+        card = discoverCard(scryfallId).let { c ->
+            com.mmg.manahub.core.model.Card(
+                scryfallId = c.scryfallId, name = c.name, printedName = null,
+                manaCost = "{1}", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList(),
+                typeLine = "Creature", printedTypeLine = null, oracleText = null,
+                printedText = null, keywords = emptyList(), power = null,
+                toughness = null, loyalty = null, setCode = "TST",
+                setName = "Test", collectorNumber = "1",
+                rarity = "common", releasedAt = "2020-01-01",
+                frameEffects = emptyList(), promoTypes = emptyList(), lang = "en",
+                imageNormal = c.imageNormal, imageArtCrop = c.imageArtCrop,
+                imageBackNormal = null, priceUsd = priceUsd, priceUsdFoil = null,
+                priceEur = priceEur, priceEurFoil = null,
+                legalityStandard = "legal", legalityPioneer = "legal",
+                legalityModern = "legal", legalityCommander = "legal",
+                flavorText = null, artist = "Artist", scryfallUri = "",
+                tags = emptyList(), userTags = emptyList(), suggestedTags = emptyList(),
+                relatedUris = emptyMap(), purchaseUris = emptyMap(),
+            )
+        },
+    )
+
+    private fun friendRequest(id: String = "fr-1", fromNickname: String = "Alice") = FriendRequest(
+        id = id, fromUserId = "uid-friend", fromNickname = fromNickname,
+        fromGameTag = "#FRIEND", fromAvatarUrl = null,
+    )
+
+    private fun userCardWithCard(rowId: String, scryfallId: String, name: String, quantity: Int = 1) =
+        UserCardWithCard(
+            userCard = UserCard(id = rowId, scryfallId = scryfallId, quantity = quantity),
+            card = discoverCard(scryfallId).let { c ->
+                com.mmg.manahub.core.model.Card(
+                    scryfallId = c.scryfallId, name = name, printedName = null,
+                    manaCost = "{1}", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList(),
+                    typeLine = "Creature", printedTypeLine = null, oracleText = null,
+                    printedText = null, keywords = emptyList(), power = null,
+                    toughness = null, loyalty = null, setCode = "TST",
+                    setName = "Test", collectorNumber = "1",
+                    rarity = "common", releasedAt = "2020-01-01",
+                    frameEffects = emptyList(), promoTypes = emptyList(), lang = "en",
+                    imageNormal = c.imageNormal, imageArtCrop = c.imageArtCrop,
+                    imageBackNormal = null, priceUsd = null, priceUsdFoil = null,
+                    priceEur = null, priceEurFoil = null,
+                    legalityStandard = "legal", legalityPioneer = "legal",
+                    legalityModern = "legal", legalityCommander = "legal",
+                    flavorText = null, artist = "Artist", scryfallUri = "",
+                    tags = emptyList(), userTags = emptyList(), suggestedTags = emptyList(),
+                    relatedUris = emptyMap(), purchaseUris = emptyMap(),
+                )
+            },
+        )
+
+    private fun tradeSuggestion(cardId: String = "c1") = com.mmg.manahub.core.model.TradeSuggestion(
+        wishingUserId = "uid-1", offeringUserId = "uid-2", cardId = cardId,
+        matchAnyVariant = false, userCardId = "uc-1", offerFoil = false,
+        offerCondition = "NM", offerLanguage = "en", suggestionType = "WISHLIST_MATCH",
+    )
+
+    private fun tournament(id: Long = 1L, status: String = "ACTIVE") = Tournament(
+        id = id, name = "Friday Night Magic", format = "COMMANDER", structure = "SWISS",
+        status = status, matchesPerPairing = 1, isRandomPairings = false, createdAt = 0L,
+    )
+
+    // ── TRADES_HUB: Inbox slide (Home feature overhaul Phase 1.1) ─────────────
+
+    @Test
+    fun `tradeSummary reflects pending proposal count and latest item count`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        val newest = tradeProposal(id = "p-newest", createdAt = 500L, items = listOf(tradeItem(), tradeItem(id = "item-2")))
+        val older = tradeProposal(id = "p-older", createdAt = 100L, items = listOf(tradeItem()))
+        every { tradesRepository.observeActiveProposals() } returns flowOf(listOf(older, newest))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val summary = vm.state.value.tradeSummary
+        assertNotNull(summary)
+        assertEquals(2, summary!!.pendingCount)
+        assertEquals(2, summary.latestItemCount) // newest (createdAt=500) has 2 items
+    }
+
+    @Test
+    fun `tradeSummary is zero-count with null preview when there are no pending proposals`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            every { tradesRepository.observeActiveProposals() } returns flowOf(emptyList())
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val summary = vm.state.value.tradeSummary
+            assertNotNull(summary)
+            assertEquals(0, summary!!.pendingCount)
+            assertNull(summary.latestItemCount)
+        }
+
+    @Test
+    fun `tradeSummary excludes proposals not addressed to the current user or not PROPOSED`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            val notMine = tradeProposal(id = "p-not-mine", receiverId = "someone-else")
+            val notProposed = tradeProposal(id = "p-accepted", status = TradeStatus.ACCEPTED)
+            every { tradesRepository.observeActiveProposals() } returns flowOf(listOf(notMine, notProposed))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(0, vm.state.value.tradeSummary!!.pendingCount)
+        }
+
+    @Test
+    fun `tradeSummary is null when observeActiveProposals errors, without collapsing the rest of the board`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            every { tradesRepository.observeActiveProposals() } returns
+                kotlinx.coroutines.flow.flow { throw RuntimeException("boom") }
+            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(5))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertNull(vm.state.value.tradeSummary)
+            // The rest of the board must still resolve.
+            assertTrue(vm.state.value.layout.isNotEmpty())
+            assertEquals(5, vm.state.value.libraryStats?.uniqueCards)
+        }
+
+    @Test
+    fun `init warms the trades cache via refreshProposals when authenticated`() = runTest(testDispatcher) {
+        // Home dashboard audit (HIGH): observeActiveProposals() is in-memory-only and starts empty
+        // on every process start — without an explicit warm-up call TRADES_HUB's Inbox always shows
+        // "0 pending trades" on a fresh Home open, even with real pending proposals waiting.
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        coVerify(atLeast = 1) { tradesRepository.refreshProposals("uid-1") }
+    }
+
+    @Test
+    fun `init never calls refreshProposals when signed out`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { tradesRepository.refreshProposals(any()) }
+    }
+
+    // ── TRADES_HUB: Suggestions slide ──────────────────────────────────────────
+
+    @Test
+    fun `tradeSuggestionsCount reflects the suggestion list size when authenticated`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            coEvery { tradeSuggestionsRepository.getSuggestions() } returns
+                Result.success(listOf(tradeSuggestion("c1"), tradeSuggestion("c2"), tradeSuggestion("c3")))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(3, vm.state.value.tradeSuggestionsCount)
+        }
+
+    @Test
+    fun `tradeSuggestionsCount is zero when unauthenticated and getSuggestions is never called`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Unauthenticated
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(0, vm.state.value.tradeSuggestionsCount)
+            coVerify(exactly = 0) { tradeSuggestionsRepository.getSuggestions() }
+        }
+
+    @Test
+    fun `tradeSuggestionsCount defaults to zero when getSuggestions fails`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        coEvery { tradeSuggestionsRepository.getSuggestions() } returns Result.failure(RuntimeException("network"))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(0, vm.state.value.tradeSuggestionsCount)
+    }
+
+    @Test
+    fun `getSuggestions is invoked exactly once per auth subscription, not per unrelated state change`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            coEvery { tradeSuggestionsRepository.getSuggestions() } returns Result.success(listOf(tradeSuggestion()))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+            assertEquals(1, vm.state.value.tradeSuggestionsCount)
+
+            // Unrelated state changes (not an auth flip) must not re-trigger the lazy suspend fetch.
+            totalGamesFlow.value = 7
+            advanceUntilIdle()
+            deckSummariesFlow.value = listOf(deckSummary("d1"))
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { tradeSuggestionsRepository.getSuggestions() }
+        }
+
+    // ── TRADES_HUB: Open for Trade slide ───────────────────────────────────────
+
+    @Test
+    fun `openForTradeCount and value reflect entries from OpenForTradeRepository`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        every { openForTradeRepository.observeLocal() } returns flowOf(
+            listOf(openForTradeEntry(id = "oft-1", quantity = 2, priceUsd = 10.0, priceEur = 9.0)),
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(2, vm.state.value.openForTradeCount)
+        assertNotNull(vm.state.value.openForTradeValueDisplay)
+    }
+
+    @Test
+    fun `openForTradeValueDisplay is null when total value is zero`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        every { openForTradeRepository.observeLocal() } returns flowOf(
+            listOf(openForTradeEntry(id = "oft-1", priceUsd = null, priceEur = null)),
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(1, vm.state.value.openForTradeCount)
+        assertNull(vm.state.value.openForTradeValueDisplay)
+    }
+
+    @Test
+    fun `openForTradeCount is zero when unauthenticated`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        every { openForTradeRepository.observeLocal() } returns flowOf(listOf(openForTradeEntry()))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(0, vm.state.value.openForTradeCount)
+        assertNull(vm.state.value.openForTradeValueDisplay)
+    }
+
+    // ── SOCIAL_HUB: Friends slide (Phase 1.2.d) ────────────────────────────────
+
+    @Test
+    fun `friendCount and latestFriendRequestName reflect FriendRepository when authenticated`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            every { friendRepository.observeFriendCount() } returns flowOf(3)
+            every { friendRepository.observePendingRequests() } returns
+                flowOf(listOf(friendRequest(fromNickname = "Alice"), friendRequest(id = "fr-2", fromNickname = "Bob")))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(3, vm.state.value.friendCount)
+            assertEquals("Alice", vm.state.value.latestFriendRequestName)
+        }
+
+    @Test
+    fun `friendCount is zero and latestFriendRequestName is null when unauthenticated`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Unauthenticated
+            every { friendRepository.observeFriendCount() } returns flowOf(5)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(0, vm.state.value.friendCount)
+            assertNull(vm.state.value.latestFriendRequestName)
+        }
+
+    @Test
+    fun `latestFriendRequestName is null when there are no pending requests`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        every { friendRepository.observeFriendCount() } returns flowOf(1)
+        every { friendRepository.observePendingRequests() } returns flowOf(emptyList())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.latestFriendRequestName)
+    }
+
+    // ── SOCIAL_HUB: Most Wishlisted + Milestones (community stats RPC) ────────
+
+    @Test
+    fun `communityStats mostWishlisted resolves card names locally and keeps unresolved entries with empty name`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            val payload = CommunityStats(
+                topCommanders = emptyList(), metaArchetypes = emptyList(),
+                mostWishlisted = listOf(
+                    CommunityEntry(id = "c1", name = "", count = 5, percentage = 0.0),
+                    CommunityEntry(id = "unresolvable", name = "", count = 2, percentage = 0.0),
+                ),
+                milestones = emptyList(),
+            )
+            every { communityStatsRepository.observeCommunityStats() } returns flowOf(payload)
+            coEvery { cardRepository.getCardsByIds(listOf("c1", "unresolvable")) } returns
+                listOf(discoverCard("c1")).map {
+                    com.mmg.manahub.core.model.Card(
+                        scryfallId = it.scryfallId, name = "Sol Ring", printedName = null,
+                        manaCost = "{1}", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList(),
+                        typeLine = "Artifact", printedTypeLine = null, oracleText = null,
+                        printedText = null, keywords = emptyList(), power = null,
+                        toughness = null, loyalty = null, setCode = "TST",
+                        setName = "Test", collectorNumber = "1",
+                        rarity = "common", releasedAt = "2020-01-01",
+                        frameEffects = emptyList(), promoTypes = emptyList(), lang = "en",
+                        imageNormal = null, imageArtCrop = null,
+                        imageBackNormal = null, priceUsd = null, priceUsdFoil = null,
+                        priceEur = null, priceEurFoil = null,
+                        legalityStandard = "legal", legalityPioneer = "legal",
+                        legalityModern = "legal", legalityCommander = "legal",
+                        flavorText = null, artist = "Artist", scryfallUri = "",
+                        tags = emptyList(), userTags = emptyList(), suggestedTags = emptyList(),
+                        relatedUris = emptyMap(), purchaseUris = emptyMap(),
+                    )
+                }
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val resolved = vm.state.value.communityStats!!.mostWishlisted
+            // Both entries are kept — "unresolvable" (not in the local cache) is NOT dropped, it
+            // renders degraded with an empty name (Home dashboard audit, HIGH: dropping unresolved
+            // entries emptied the slide out for most users in practice).
+            assertEquals(2, resolved.size)
+            assertEquals("c1", resolved[0].id)
+            assertEquals("Sol Ring", resolved[0].name)
+            assertEquals("unresolvable", resolved[1].id)
+            assertEquals("", resolved[1].name)
+        }
+
+    @Test
+    fun `communityStats milestones pass through with real ids and formatted string values`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            val payload = CommunityStats(
+                topCommanders = emptyList(), metaArchetypes = emptyList(), mostWishlisted = emptyList(),
+                milestones = listOf(
+                    CommunityMilestone(id = "active_collectors", label = "Active collectors", value = "4"),
+                    CommunityMilestone(id = "decks_built", label = "Decks built", value = "29"),
+                ),
+            )
+            every { communityStatsRepository.observeCommunityStats() } returns flowOf(payload)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val milestones = vm.state.value.communityStats!!.milestones
+            assertEquals(listOf("active_collectors", "decks_built"), milestones.map { it.id })
+            assertEquals(listOf("4", "29"), milestones.map { it.value })
+        }
+
+    @Test
+    fun `communityStats is null (not a fake zeroed object) when the repository has no payload`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            every { communityStatsRepository.observeCommunityStats() } returns flowOf(null)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertNull(vm.state.value.communityStats)
+        }
+
+    // ── SOCIAL_HUB: TopCommanders is confirmed removed (no-stub rule) ─────────
+
+    @Test
+    fun `HomeWidgetType has no TopCommanders entry`() {
+        assertTrue(HomeWidgetType.entries.none { it.name.contains("TOP_COMMANDERS") })
+        assertTrue(HomeWidgetType.entries.none { it.persistedId == "top_commanders" })
+    }
+
+    @Test
+    fun `default layouts never include a TopCommanders-style widget`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.layout.none { it.type.persistedId == "top_commanders" })
+    }
+
+    // ── SOCIAL_HUB: Archidekt trending decks (Phase 1.2.c) ─────────────────────
+
+    @Test
+    fun `archidektTrending reflects decks from ArchidektTrendingRepository`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        val decks = listOf(
+            ArchidektTrendingDeck(id = 111, name = "Atraxa Superfriends", viewCount = 5000, deckUrl = "https://archidekt.com/decks/111"),
+        )
+        every { archidektTrendingRepository.observeTrendingDecks() } returns flowOf(decks)
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(decks, vm.state.value.archidektTrending)
+        assertTrue(vm.state.value.archidektTrending.first().deckUrl.startsWith("https://archidekt.com/decks/"))
+    }
+
+    @Test
+    fun `archidektTrending is empty when unauthenticated`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        every { archidektTrendingRepository.observeTrendingDecks() } returns flowOf(
+            listOf(ArchidektTrendingDeck(id = 1, name = "Deck", viewCount = 1, deckUrl = "https://archidekt.com/decks/1")),
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertTrue(vm.state.value.archidektTrending.isEmpty())
+    }
+
+    // ── SOCIAL_HUB: Active tournament round (Phase 1.2.e, fixes F-3) ──────────
+
+    @Test
+    fun `activeTournamentSummary round is derived from observeCurrentRound, never hardcoded 0`() =
+        runTest(testDispatcher) {
+            tournamentsFlow.value = listOf(tournament(id = 1L, status = "ACTIVE"))
+            every { tournamentRepository.observeCurrentRound(1L) } returns flowOf(2)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val summary = vm.state.value.activeTournamentSummary
+            assertNotNull(summary)
+            assertEquals(2, summary!!.round)
+            assertNotEquals(0, summary.round)
+        }
+
+    @Test
+    fun `activeTournamentSummary standing is always null (never a fake value)`() = runTest(testDispatcher) {
+        tournamentsFlow.value = listOf(tournament(id = 1L, status = "ACTIVE"))
+        every { tournamentRepository.observeCurrentRound(1L) } returns flowOf(3)
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.activeTournamentSummary?.standing)
+    }
+
+    @Test
+    fun `activeTournamentSummary is null when there is no ACTIVE or SETUP tournament`() =
+        runTest(testDispatcher) {
+            tournamentsFlow.value = listOf(tournament(id = 1L, status = "FINISHED"))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertNull(vm.state.value.activeTournamentSummary)
+        }
+
+    @Test
+    fun `activeTournamentSummary picks a SETUP tournament when no ACTIVE tournament exists`() =
+        runTest(testDispatcher) {
+            tournamentsFlow.value = listOf(tournament(id = 9L, status = "SETUP"))
+            every { tournamentRepository.observeCurrentRound(9L) } returns flowOf(1)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(9L, vm.state.value.activeTournamentSummary?.tournamentId)
+        }
+
+    // ── RECENTLY_ADDED widget (Phase 2.1) ──────────────────────────────────────
+
+    @Test
+    fun `recentlyAdded reflects rows from observeRecentlyAdded preserving newest-first order`() =
+        runTest(testDispatcher) {
+            val rows = listOf(
+                userCardWithCard(rowId = "row-2", scryfallId = "c2", name = "Newest Card", quantity = 3),
+                userCardWithCard(rowId = "row-1", scryfallId = "c1", name = "Older Card", quantity = 1),
+            )
+            every { userCardRepository.observeRecentlyAdded(any()) } returns flowOf(rows)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val recentlyAdded = vm.state.value.recentlyAdded
+            assertEquals(listOf("row-2", "row-1"), recentlyAdded.map { it.rowId })
+            assertEquals("Newest Card", recentlyAdded.first().card.name)
+            assertEquals(3, recentlyAdded.first().quantity)
+        }
+
+    @Test
+    fun `recentlyAdded is empty when observeRecentlyAdded errors, without collapsing the board`() =
+        runTest(testDispatcher) {
+            every { userCardRepository.observeRecentlyAdded(any()) } returns
+                kotlinx.coroutines.flow.flow { throw RuntimeException("db error") }
+            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(1))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value.recentlyAdded.isEmpty())
+            assertTrue(vm.state.value.layout.isNotEmpty())
+            assertEquals(1, vm.state.value.libraryStats?.uniqueCards)
+        }
+
+    // ── BestDeck colorIdentity (fixes F-6) ─────────────────────────────────────
+
+    @Test
+    fun `bestDeck colorIdentity is joined from the matching deck summary`() = runTest(testDispatcher) {
+        val deckWithColors = deckSummary(id = "deck-red-green").copy(colorIdentity = setOf("R", "G"))
+        deckSummariesFlow.value = listOf(deckWithColors)
+        every { gameSessionRepository.observeDeckStats() } returns flowOf(
+            listOf(
+                com.mmg.manahub.feature.game.domain.model.DeckStats(
+                    deckId = "deck-red-green", deckName = "Gruul Stompy", totalGames = 4, wins = 3,
+                ),
+            ),
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val bestDeck = vm.state.value.bestDeck
+        assertNotNull(bestDeck)
+        assertEquals(setOf("R", "G"), bestDeck!!.colorIdentity)
+    }
+
+    @Test
+    fun `bestDeck colorIdentity is empty when no matching deck summary exists`() = runTest(testDispatcher) {
+        deckSummariesFlow.value = emptyList()
+        every { gameSessionRepository.observeDeckStats() } returns flowOf(
+            listOf(
+                com.mmg.manahub.feature.game.domain.model.DeckStats(
+                    deckId = "missing-deck", deckName = "Ghost Deck", totalGames = 2, wins = 1,
+                ),
+            ),
+        )
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(emptySet<String>(), vm.state.value.bestDeck?.colorIdentity)
+    }
+
+    // ── WishlistProgress estimatedValueDisplay (fixes F-7) ─────────────────────
+
+    @Test
+    fun `wishlistStats estimatedValueDisplay is present and non-blank when cards are priced`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            val entry = WishlistEntry(
+                id = "w1", userId = "u1", cardId = "c1", quantity = 2,
+                matchAnyVariant = false, isFoil = false, condition = "NM", language = "en",
+                createdAt = 123L,
+                card = discoverCard("c1").let { c ->
+                    com.mmg.manahub.core.model.Card(
+                        scryfallId = c.scryfallId, name = c.name, printedName = null,
+                        manaCost = "{1}", cmc = 1.0, colors = emptyList(), colorIdentity = emptyList(),
+                        typeLine = "Creature", printedTypeLine = null, oracleText = null,
+                        printedText = null, keywords = emptyList(), power = null,
+                        toughness = null, loyalty = null, setCode = "TST",
+                        setName = "Test", collectorNumber = "1",
+                        rarity = "common", releasedAt = "2020-01-01",
+                        frameEffects = emptyList(), promoTypes = emptyList(), lang = "en",
+                        imageNormal = c.imageNormal, imageArtCrop = c.imageArtCrop,
+                        imageBackNormal = null, priceUsd = 5.0, priceUsdFoil = null,
+                        priceEur = 4.5, priceEurFoil = null,
+                        legalityStandard = "legal", legalityPioneer = "legal",
+                        legalityModern = "legal", legalityCommander = "legal",
+                        flavorText = null, artist = "Artist", scryfallUri = "",
+                        tags = emptyList(), userTags = emptyList(), suggestedTags = emptyList(),
+                        relatedUris = emptyMap(), purchaseUris = emptyMap(),
+                    )
+                },
+            )
+            every { wishlistRepository.observeLocal() } returns flowOf(listOf(entry))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val stats = vm.state.value.wishlistStats
+            assertNotNull(stats)
+            assertTrue(stats!!.estimatedValueDisplay.isNotBlank())
+        }
+
+    // ── LastGameRecap.opponentCount (fixes F-5) ────────────────────────────────
+
+    @Test
+    fun `lastGameRecap opponentCount reflects the real value from session history`() = runTest(testDispatcher) {
+        val entry = com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry(
+            sessionId = 1L, mode = "FFA", totalTurns = 8, durationMs = 60_000L, playedAt = 1000L,
+            winnerName = "Wizard", surveyStatus = "NONE", localIsWinner = true,
+            localDeckId = "d1", localDeckName = "My Deck", opponentCount = 3,
+        )
+        every { gameSessionRepository.observeLocalSessionHistory(any()) } returns flowOf(listOf(entry))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        assertEquals(3, vm.state.value.lastGameRecap?.opponentCount)
+    }
+
+    // ── First Steps: buildVisibleSteps condition table (Phase 2.2) ─────────────
+
+    @Test
+    fun `STEP_FIRST_ADD_CARD is hidden once the collection has at least one unique card`() =
+        runTest(testDispatcher) {
+            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(1))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertFalse(steps.any { it.id == STEP_FIRST_ADD_CARD })
+        }
+
+    @Test
+    fun `STEP_FIRST_CREATE_DECK is hidden once the user has at least one deck`() = runTest(testDispatcher) {
+        deckSummariesFlow.value = listOf(deckSummary())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+        assertFalse(steps.any { it.id == STEP_FIRST_CREATE_DECK })
+    }
+
+    @Test
+    fun `STEP_FIRST_PLAYTEST_DECK stays hidden while Playtest is flag-disabled, even with a deck and zero playtest sessions`() =
+        runTest(testDispatcher) {
+            // Deck Playtest is hidden for release (2026-07-14, DeckFeatureFlags.PLAYTEST_ENABLED =
+            // false) — this step's CTA is HomeAction.PlaytestRecentDeck, so it must not surface a
+            // shortcut into a hidden feature even when its data condition (deckCount > 0 &&
+            // totalPlaytestCount == 0) is otherwise satisfied. Re-enable this assertion's INVERSE
+            // (assertTrue) once PLAYTEST_ENABLED flips back to true.
+            deckSummariesFlow.value = listOf(deckSummary())
+            every { playtestRepository.observeTotalTestCount() } returns flowOf(0)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertFalse(steps.any { it.id == STEP_FIRST_PLAYTEST_DECK })
+        }
+
+    @Test
+    fun `STEP_FIRST_PLAYTEST_DECK is hidden with no decks even if playtest count is zero`() =
+        runTest(testDispatcher) {
+            deckSummariesFlow.value = emptyList()
+            every { playtestRepository.observeTotalTestCount() } returns flowOf(0)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertFalse(steps.any { it.id == STEP_FIRST_PLAYTEST_DECK })
+        }
+
+    @Test
+    fun `STEP_FIRST_PLAYTEST_DECK auto-hides once at least one playtest session has been saved`() =
+        runTest(testDispatcher) {
+            deckSummariesFlow.value = listOf(deckSummary())
+            every { playtestRepository.observeTotalTestCount() } returns flowOf(1)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertFalse(steps.any { it.id == STEP_FIRST_PLAYTEST_DECK })
+        }
+
+    @Test
+    fun `STEP_FIRST_CREATE_ACCOUNT is hidden once authenticated`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+        assertFalse(steps.any { it.id == STEP_FIRST_CREATE_ACCOUNT })
+    }
+
+    @Test
+    fun `friend-gated steps are reachable once friendCount is real and greater than zero`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            every { friendRepository.observeFriendCount() } returns flowOf(2)
+            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(3))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertTrue(steps.any { it.id == STEP_FIRST_REVIEW_FRIEND })
+            assertTrue(steps.any { it.id == STEP_FIRST_CREATE_TRADE })
+            // ADD_FRIEND is only shown while friendCount == 0.
+            assertFalse(steps.any { it.id == STEP_FIRST_ADD_FRIEND })
+        }
+
+    @Test
+    fun `STEP_FIRST_ADD_FRIEND is visible while friendCount is zero and authenticated`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            every { friendRepository.observeFriendCount() } returns flowOf(0)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertTrue(steps.any { it.id == STEP_FIRST_ADD_FRIEND })
+            assertFalse(steps.any { it.id == STEP_FIRST_REVIEW_FRIEND })
+            assertFalse(steps.any { it.id == STEP_FIRST_CREATE_TRADE })
+        }
+
+    @Test
+    fun `STEP_FIRST_OPEN_FOR_TRADE is hidden once the open-for-trade list has an entry`() =
+        runTest(testDispatcher) {
+            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(1))
+            sessionStateFlow.value = SessionState.Authenticated(authUser())
+            every { openForTradeRepository.observeLocal() } returns flowOf(listOf(openForTradeEntry()))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertFalse(steps.any { it.id == STEP_FIRST_OPEN_FOR_TRADE })
+        }
+
+    @Test
+    fun `STEP_FIRST_ADD_WISHLIST is hidden once the wishlist has an entry`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        val entry = WishlistEntry(
+            id = "w1", userId = "u1", cardId = "c1", quantity = 1,
+            matchAnyVariant = false, isFoil = false, condition = "NM", language = "en",
+            createdAt = 123L, card = null,
+        )
+        every { wishlistRepository.observeLocal() } returns flowOf(listOf(entry))
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+        assertFalse(steps.any { it.id == STEP_FIRST_ADD_WISHLIST })
+    }
+
+    @Test
+    fun `STEP_FIRST_ADD_WISHLIST is hidden when signed out even with an empty wishlist`() =
+        runTest(testDispatcher) {
+            // WISHLIST_PROGRESS is ACCOUNT_GATED and wishlistFlow forces wishlistCount to 0 while
+            // signed out — without an explicit isAuthenticated gate this step would sit forever,
+            // uncompletable, CTA-ing a signed-out user into a widget they can't use pre-auth (Home
+            // dashboard audit, MEDIUM).
+            sessionStateFlow.value = SessionState.Unauthenticated
+            every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertFalse(steps.any { it.id == STEP_FIRST_ADD_WISHLIST })
+        }
+
+    @Test
+    fun `visible first steps preserve the canonical activation-funnel order`() = runTest(testDispatcher) {
+        // Everything hidden by data is left visible: fresh unauthenticated user, empty collection.
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+        val catalogOrder = ALL_FIRST_STEPS.map { it.id }
+        val visibleIds = steps.map { it.id }
+        // The visible subset must appear in the SAME relative order as the full catalog.
+        assertEquals(visibleIds, catalogOrder.filter { it in visibleIds })
+    }
+
+    // ── First Steps: tap = CTA only, dismiss is a separate explicit action ────
+
+    @Test
+    fun `dispatching a step's CTA action does not persist a skip`() = runTest(testDispatcher) {
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        // OpenLibrary is STEP_FIRST_ADD_CARD's CTA — the VM does not intercept navigation
+        // actions, so tapping the CTA must never call skipFirstStep.
+        vm.onAction(HomeAction.OpenLibrary)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { userPrefsDataStore.skipFirstStep(any()) }
+    }
+
+    @Test
+    fun `explicit skipFirstStep persists the dismissal via userPrefsDataStore`() = runTest(testDispatcher) {
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        vm.skipFirstStep(STEP_FIRST_SCAN_CARD)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { userPrefsDataStore.skipFirstStep(STEP_FIRST_SCAN_CARD) }
+    }
+
+    @Test
+    fun `a step present in the skipped set is excluded from visible steps regardless of its condition`() =
+        runTest(testDispatcher) {
+            every { userPrefsDataStore.observeSkippedFirstSteps() } returns flowOf(setOf(STEP_FIRST_ADD_CARD))
+            // Condition would otherwise show this step (collection empty).
+            every { statsRepository.observeCollectionStats(any()) } returns flowOf(collectionStatsWithCards(0))
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
+            assertFalse(steps.any { it.id == STEP_FIRST_ADD_CARD })
+        }
+
+    // ── Default widget layouts: exact ordering + category contiguity ──────────
+
+    @Test
+    fun `signed-out default layout matches the exact overhauled widget order`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Unauthenticated
+        savedLayoutTokens.value = null
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val expected = listOf(
+            HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
+            HomeWidgetType.COLLECTION_STATS_HUB,
+            HomeWidgetType.CARD_OF_THE_DAY, HomeWidgetType.DISCOVER_CARDS,
+            HomeWidgetType.LATEST_SETS, HomeWidgetType.RULES_TIP, HomeWidgetType.MTG_NEWS,
+        )
+        assertEquals(expected, vm.state.value.layout.map { it.type })
+    }
+
+    @Test
+    fun `signed-in default layout matches the exact overhauled widget order`() = runTest(testDispatcher) {
+        sessionStateFlow.value = SessionState.Authenticated(authUser())
+        savedLayoutTokens.value = null
+
+        val vm = buildViewModel()
+        backgroundScope.launch { vm.state.collect {} }
+        advanceUntilIdle()
+
+        val expected = listOf(
+            HomeWidgetType.CONTEXT_HERO, HomeWidgetType.QUICK_ACTIONS,
+            HomeWidgetType.GAME_STATS_HUB,
+            HomeWidgetType.YOUR_DECKS_SHELF, HomeWidgetType.COLLECTION_STATS_HUB, HomeWidgetType.RECENTLY_ADDED,
+            HomeWidgetType.TRADES_HUB, HomeWidgetType.SOCIAL_HUB,
+            HomeWidgetType.LATEST_SETS, HomeWidgetType.MTG_NEWS, HomeWidgetType.RULES_TIP,
+        )
+        assertEquals(expected, vm.state.value.layout.map { it.type })
+    }
+
+    @Test
+    fun `both default layouts keep widget categories contiguous`() = runTest(testDispatcher) {
+        // "Contiguous" means every category's widgets form ONE unbroken run — NOT that categories
+        // appear in WidgetCategory-enum-ordinal ascending order. The signed-in default deliberately
+        // places SOCIAL (ordinal 4: TRADES_HUB/SOCIAL_HUB) before DISCOVER (ordinal 3: LATEST_SETS/
+        // MTG_NEWS/RULES_TIP) — social/trade engagement is meant to outrank evergreen discovery in
+        // the signed-in ordering (see HomeViewModel.defaultLayoutSignedIn's KDoc) — so
+        // `ordinals.sorted() == ordinals` is NOT the right assertion here (it previously failed on
+        // the real signed-in default: [0,0,1,2,2,2,4,4,3,3,3] is a valid "contiguous" layout with a
+        // non-monotonic category order). See feedback_home_default_layout_category_order memory for
+        // the discrepancy this uncovered against the pre-existing "AddWidget..." test's comment.
+        for (authed in listOf(false, true)) {
+            sessionStateFlow.value = if (authed) SessionState.Authenticated(authUser()) else SessionState.Unauthenticated
+            savedLayoutTokens.value = null
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            val categories = vm.state.value.layout.map { it.type.category }
+            val runsPerCategory = categories.distinct().associateWith { category ->
+                // Count how many separate contiguous runs of `category` appear in the list.
+                categories.fold(0 to null as WidgetCategory?) { (runs, prev), current ->
+                    if (current == category && prev != category) runs + 1 to current else runs to current
+                }.first
+            }
+            runsPerCategory.forEach { (category, runCount) ->
+                assertEquals("authed=$authed category=$category should appear as a single run", 1, runCount)
+            }
+        }
+    }
+
+    @Test
+    fun `a persisted layout is never overwritten by the new auth-appropriate defaults`() =
+        runTest(testDispatcher) {
+            sessionStateFlow.value = SessionState.Unauthenticated
+            // A minimal, deliberately non-default persisted layout.
+            savedLayoutTokens.value = "context_hero:MEDIUM,rules_tip:MEDIUM"
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.RULES_TIP),
+                vm.state.value.layout.map { it.type },
+            )
+        }
 }

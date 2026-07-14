@@ -71,6 +71,16 @@ class DraftSimRepositoryImpl(
          * breaks Gson deserialisation; sessions with a different version are discarded.
          */
         const val CURRENT_SCHEMA_VERSION = 1
+
+        /**
+         * Allowlist for `booster.json`'s optional `extraPoolSets` field: each entry must be a
+         * 2-6 char lowercase Scryfall set code. Mirrors `DraftRepositoryImpl.VALID_SET_CODE` —
+         * this string is interpolated directly into a Scryfall search query
+         * (`(set:$setCode or set:$extra) lang:en`), so any entry that doesn't match is dropped
+         * rather than trusted, same discipline as [parseEngineConfig]'s float sanitisation
+         * (the Worker's booster.json is untrusted input).
+         */
+        private val VALID_EXTRA_POOL_SET_CODE = Regex("^[a-z0-9]{2,6}$")
     }
 
     /**
@@ -110,13 +120,27 @@ class DraftSimRepositoryImpl(
                     return@withContext DataResult.Error(DraftError.SetNotDraftable.toString())
                 }
 
-                // 2. Fetch the full card pool, paging until Scryfall reports there are no more
+                // 2. Fetch and parse booster.json BEFORE the card pool. The pool query must know
+                // booster.extraPoolSets (e.g. SOS declares ["soa"] for its Mystical Archive
+                // sheet) so it can be widened up front — fetching the pool first would silently
+                // drop every extra-set card from the very first page.
+                val boosterJson = gson.fromJson(
+                    cloudflareClient.getSetBooster(setCode.lowercase()),
+                    JsonObject::class.java,
+                )
+                val boosterConfig = parseBoosterConfig(boosterJson, setCode)
+
+                // 3. Fetch the full card pool, paging until Scryfall reports there are no more
                 // pages. Using has_more avoids the trailing 422 that occurs when requesting one
-                // page past the last.
+                // page past the last. When boosterConfig.extraPoolSets is non-empty the query is
+                // widened to include those sets too; for every other set (extraPoolSets empty)
+                // this is byte-for-byte the same query as before.
                 val cards = mutableListOf<Card>()
                 var page = 1
                 while (true) {
-                    when (val pageResult = getSetCardsPage(setCode, page)) {
+                    when (
+                        val pageResult = getSetCardsPage(setCode, page, boosterConfig.extraPoolSets)
+                    ) {
                         is DataResult.Success -> {
                             val (pageCards, hasMore) = pageResult.data
                             cards += pageCards
@@ -139,7 +163,7 @@ class DraftSimRepositoryImpl(
                     return@withContext DataResult.Error(DraftError.SetNotDownloaded.toString())
                 }
 
-                // 3. Fetch the tier list and build the scryfallId → TierCard rating map.
+                // 4. Fetch the tier list and build the scryfallId → TierCard rating map.
                 // The tier list is an optional enhancement: the bots already handle an empty
                 // ratings map by falling back to heuristics. A missing or empty tier list must
                 // therefore degrade gracefully (empty map) rather than block the whole feature.
@@ -150,13 +174,6 @@ class DraftSimRepositoryImpl(
                             .associateBy { it.scryfallId }
                     is DataResult.Error -> emptyMap()
                 }
-
-                // 4. Fetch and parse booster.json.
-                val boosterJson = gson.fromJson(
-                    cloudflareClient.getSetBooster(setCode.lowercase()),
-                    JsonObject::class.java,
-                )
-                val boosterConfig = parseBoosterConfig(boosterJson, setCode)
 
                 // 5. Assemble.
                 val draftableSet = DraftableSet(
@@ -325,11 +342,22 @@ class DraftSimRepositoryImpl(
             )
         }
 
+        // extraPoolSets entries are interpolated directly into a Scryfall query string
+        // downstream (DraftRepositoryImpl.buildPoolQuery), so every entry is normalised
+        // (lowercase + trim) and validated against the same set-code allowlist used for the
+        // main setCode; anything that doesn't match is silently dropped rather than trusted.
+        // Missing/null field -> empty list (every pre-existing set is unaffected).
+        val extraPoolSets = dto.extraPoolSets.orEmpty()
+            .map { it.lowercase().trim() }
+            .filter { VALID_EXTRA_POOL_SET_CODE.matches(it) }
+            .distinct()
+
         return BoosterConfig(
             setCode = dto.setCode ?: setCode.lowercase(),
             schemaVersion = dto.schemaVersion ?: 1,
             boosters = boosters,
             sheets = sheets,
+            extraPoolSets = extraPoolSets,
         )
     }
 

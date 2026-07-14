@@ -12,7 +12,6 @@ import com.mmg.manahub.core.data.repository.SharedListsRepositoryImpl
 import com.mmg.manahub.core.data.repository.TradeSuggestionsRepositoryImpl
 import com.mmg.manahub.core.domain.repository.SharedListsRepository
 import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
-import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
@@ -38,6 +37,7 @@ import com.mmg.manahub.feature.trades.presentation.TradesViewModel
 import kotlinx.coroutines.Dispatchers
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -68,6 +68,22 @@ import org.koin.dsl.module
  * this batch. It is now forward-bridged once in `coreBridgeKoinModule` (new `ManaHubApp` field,
  * shared cross-island) and resolved here via `get()`.
  *
+ * ## DI/KMP hygiene pass (Trades audit findings 4.2/4.4/4.5/4.6, 2026-07-10)
+ * - **4.2**: every `ioDispatcher = Dispatchers.IO` literal below was replaced with
+ *   `get(named("io"))`, resolving the `CoroutineDispatcher` qualifier newly registered in
+ *   `coreBridgeKoinModule` — a literal `Dispatchers.IO` is unavailable on `wasmJs` and can't be
+ *   swapped for a `TestDispatcher` in ViewModel tests.
+ * - **4.4**: `GetFriendsUseCase` moved OUT of this module and into `friendsKoinModule` (it depends
+ *   only on `FriendRepository` and belongs with its sibling Friends use cases); `TradesViewModel`
+ *   still resolves it via `get()`, now cross-module.
+ * - **4.5**: [TradeSuggestionsRepository]'s registration is KEPT — it is one of the five canonical
+ *   Trades repositories documented in the project `CLAUDE.md` ("Trades" section), not accidental
+ *   dead wiring. It currently has no ViewModel/use-case consumer (pending feature); see the inline
+ *   comment at its `single { }` below.
+ * - **4.6**: all trades use cases below are `factory { }`, not `single { }` — they are stateless
+ *   wrappers over a repository call, so the idiomatic Koin scope avoids keeping ~17 objects alive
+ *   for the whole app lifetime for no behavioural benefit.
+ *
  * @param tradeCollectionSyncDao the Room/`DatabaseModule`-owned [TradeCollectionSyncDao] (trades-only;
  *   used by [UpdateTradeCollectionUseCase] inside [TradeNegotiationViewModel]).
  * @param localWishlistDao the Room/`DatabaseModule`-owned [LocalWishlistDao] (needed to build
@@ -97,37 +113,39 @@ fun tradesKoinModule(
 
     // ── Trades-only repositories (not shared with any other island). ──
     single<SharedListsRepository> { SharedListsRepositoryImpl(remote = get()) }
+    // Documented as one of the five canonical Trades repositories in CLAUDE.md's "Trades" section —
+    // NOT dead code. It currently has no ViewModel/use-case consumer (pending feature scaffolding;
+    // audit finding 4.5) — kept registered rather than removed so the documented architecture stays
+    // buildable the moment a feature needs it.
     single<TradeSuggestionsRepository> { TradeSuggestionsRepositoryImpl(remote = get()) }
 
-    // ── Trades use cases (stateless; built over the bridged repositories). ──
-    single { GetLocalWishlistUseCase(get()) }
-    single { GetLocalOpenForTradeUseCase(get()) }
-    single { SyncTradeListsFromRemoteUseCase(get(), get()) }
-    single { CreateTradeProposalUseCase(get()) }
-    single { EditProposalUseCase(get()) }
-    single { CounterProposalUseCase(get()) }
-    single { AcceptProposalUseCase(get()) }
-    single { DeclineProposalUseCase(get()) }
-    single { CancelProposalUseCase(get()) }
-    single { RevokeAcceptanceUseCase(get()) }
-    single { MarkCompletedUseCase(get()) }
-    single { GetTradeThreadUseCase(get()) }
-    single { RefreshTradeThreadUseCase(get()) }
-    single { GetActiveTradesUseCase(get()) }
-    single { GetTradeHistoryUseCase(get()) }
-    single { RefreshTradesUseCase(get()) }
-    single {
+    // ── Trades use cases (stateless wrappers over a repository call → `factory`, not `single`;
+    //    audit finding 4.6). ──
+    factory { GetLocalWishlistUseCase(get()) }
+    factory { GetLocalOpenForTradeUseCase(get()) }
+    factory { SyncTradeListsFromRemoteUseCase(get(), get()) }
+    factory { CreateTradeProposalUseCase(get()) }
+    factory { EditProposalUseCase(get()) }
+    factory { CounterProposalUseCase(get()) }
+    factory { AcceptProposalUseCase(get()) }
+    factory { DeclineProposalUseCase(get()) }
+    factory { CancelProposalUseCase(get()) }
+    factory { RevokeAcceptanceUseCase(get()) }
+    factory { MarkCompletedUseCase(get()) }
+    factory { GetTradeThreadUseCase(get()) }
+    factory { RefreshTradeThreadUseCase(get()) }
+    factory { GetActiveTradesUseCase(get()) }
+    factory { GetTradeHistoryUseCase(get()) }
+    factory { RefreshTradesUseCase(get()) }
+    factory {
         UpdateTradeCollectionUseCase(
             userCardRepository = get(),
             wishlistRepository = get(),
             openForTradeRepository = get(),
             syncDao = get(),
-            ioDispatcher = Dispatchers.IO,
+            ioDispatcher = get(named("io")),
         )
     }
-    // Friends use case consumed by TradesViewModel. Friends builds its OWN copies of its use cases
-    // (over the bridged FriendRepository); GetFriendsUseCase is not among them, so register it here.
-    single { GetFriendsUseCase(get()) }
 
     // ── ViewModels (one factory per trades ViewModel; nav args flow via the Koin SavedStateHandle). ──
     viewModel {
@@ -153,7 +171,12 @@ fun tradesKoinModule(
             openForTradeRepository = get(),
             friendRepository = get(),
             analyticsHelper = get(),
-            ioDispatcher = Dispatchers.IO,
+            ioDispatcher = get(named("io")),
+            // §6.3 fix: the debounced add-cards search rebuild runs on `Dispatchers.Default`
+            // (CPU-bound list filtering, not IO) — same literal-injection pattern already used
+            // for `defaultDispatcher` in SharedDomainKoinModule / DraftKoinModule /
+            // GamificationEngineKoinModule (no `named("default")` qualifier is registered).
+            defaultDispatcher = Dispatchers.Default,
         )
     }
     viewModel {
@@ -171,24 +194,25 @@ fun tradesKoinModule(
             updateTradeCollection = get(),
             tradeCollectionSyncDao = get(),
             analyticsHelper = get(),
-            ioDispatcher = Dispatchers.IO,
+            ioDispatcher = get(named("io")),
         )
     }
     viewModel {
         TradesHistoryViewModel(
             authRepository = get(),
             friendRepository = get(),
+            tradesRepository = get(),
             getActive = get(),
             getHistory = get(),
             refreshTrades = get(),
-            ioDispatcher = Dispatchers.IO,
+            ioDispatcher = get(named("io")),
         )
     }
     viewModel {
         TradesSharedListViewModel(
             savedStateHandle = get(),
             sharedListsRepository = get(),
-            ioDispatcher = Dispatchers.IO,
+            ioDispatcher = get(named("io")),
         )
     }
 }

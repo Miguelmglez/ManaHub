@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.remote.ArchidektClient
 import com.mmg.manahub.core.data.remote.ArchidektDirectFallbackSource
 import com.mmg.manahub.core.data.remote.CommunityAggregateApi
+import com.mmg.manahub.core.data.remote.CommunityAggregateApiContract
 import com.mmg.manahub.core.data.remote.SixtyFallbackFetcher
 import com.mmg.manahub.core.data.network.ArchidektRequestQueue
 import com.mmg.manahub.core.data.repository.CommunityAggregateRepositoryImpl
@@ -66,7 +67,7 @@ fun communityAggregateKoinModule(
     // ── Dedicated Ktor HttpClient for the `manahub-community` Worker. Built from scratch (not
     // the app-wide OkHttpClient) so it keeps its own cache/User-Agent/response-size guard,
     // mirroring `provideArchidektClient()` in `communityDecksKoinModule`. ──
-    single {
+    single<CommunityAggregateApiContract> {
         CommunityAggregateApi(
             httpClient = provideCommunityHttpClient(androidContext()),
             baseUrl = BuildConfig.COMMUNITY_WORKER_URL,

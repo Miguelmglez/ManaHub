@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -77,6 +78,7 @@ import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.SetSymbol
+import com.mmg.manahub.core.ui.components.SetSymbolFallbackIcon
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -557,6 +559,7 @@ private fun DraftCardListItem(
                         contentDescription = null,
                         modifier = Modifier.size(28.dp),
                         colorFilter = ColorFilter.tint(mc.textDisabled.copy(alpha = 0.5f)),
+                        error = rememberVectorPainter(SetSymbolFallbackIcon),
                     )
                 }
             }

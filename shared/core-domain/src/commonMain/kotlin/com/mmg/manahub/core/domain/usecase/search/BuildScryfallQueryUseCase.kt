@@ -80,6 +80,8 @@ class BuildScryfallQueryUseCase {
             }
             is SearchCriterion.Keyword ->
                 "kw:${escapeValue(criterion.value)}"
+            is SearchCriterion.Language ->
+                "lang:${criterion.langCode}"
             is SearchCriterion.Artist ->
                 "a:${escapeValue(criterion.value)}"
             is SearchCriterion.FlavorText ->

@@ -1,18 +1,24 @@
 package com.mmg.manahub.feature.trades.data.repository
 
 import app.cash.turbine.test
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistWithCard
 import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import com.mmg.manahub.core.model.WishlistEntry
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,6 +37,9 @@ import org.junit.Test
  *  - GROUP 4: migrateLocalToRemote — success path (3 unsynced rows)
  *  - GROUP 5: migrateLocalToRemote — empty local → returns 0, no remote calls
  *  - GROUP 6: migrateLocalToRemote — remote failure → Result.failure, local NOT marked synced
+ *  - GROUP 7: §2.3 regression — removeLocal is remote-first for synced rows (no resurrection)
+ *  - GROUP 8: §2.11 regression — decrementByAttributes matches the correct variant, never
+ *    an arbitrary `entries.first()`
  */
 class WishlistRepositoryImplTest {
 
@@ -95,6 +104,17 @@ class WishlistRepositoryImplTest {
     @Before
     fun setUp() {
         repository = WishlistRepositoryImpl(dao = dao, remote = remote)
+
+        // decrementByAttributes' no-match branch calls recordSafeNonFatal(), which reaches
+        // FirebaseCrashlytics.getInstance() outside any runCatching — must be mocked so
+        // GROUP 8's no-match test doesn't crash the JVM test process.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -103,9 +123,10 @@ class WishlistRepositoryImplTest {
 
     @Test
     fun `given dao emits entity with matchAnyVariant true when observeLocal then domain entry has matchAnyVariant true`() = runTest {
-        // Arrange
+        // Arrange — observeLocal() reads observeAllWithCard() (the @Relation join used to
+        // enrich each row with its Card), not the card-less observeAll().
         val entity = buildEntity(id = "e-001", scryfallId = "card-xyz", matchAnyVariant = true)
-        every { dao.observeAll() } returns flowOf(listOf(entity))
+        every { dao.observeAllWithCard() } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
 
         // Act + Assert
         repository.observeLocal().test {
@@ -130,7 +151,7 @@ class WishlistRepositoryImplTest {
             condition = "LP",
             language = "ja",
         )
-        every { dao.observeAll() } returns flowOf(listOf(entity))
+        every { dao.observeAllWithCard() } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
 
         // Act + Assert
         repository.observeLocal().test {
@@ -146,7 +167,7 @@ class WishlistRepositoryImplTest {
 
     @Test
     fun `given dao emits empty list when observeLocal then emits empty list`() = runTest {
-        every { dao.observeAll() } returns flowOf(emptyList())
+        every { dao.observeAllWithCard() } returns flowOf(emptyList())
 
         repository.observeLocal().test {
             assertTrue(awaitItem().isEmpty())
@@ -158,7 +179,7 @@ class WishlistRepositoryImplTest {
     fun `given entity when observeLocal then userId in domain entry is empty string`() = runTest {
         // LocalWishlistEntity has no userId column; toDomain() sets userId = ""
         val entity = buildEntity(id = "e-001")
-        every { dao.observeAll() } returns flowOf(listOf(entity))
+        every { dao.observeAllWithCard() } returns flowOf(listOf(LocalWishlistWithCard(entity, card = null)))
 
         repository.observeLocal().test {
             val entry = awaitItem().first()
@@ -173,8 +194,10 @@ class WishlistRepositoryImplTest {
 
     @Test
     fun `given entry with blank id when addLocal then a UUID is generated for the entity`() = runTest {
-        // Arrange: blank id triggers UUID.randomUUID()
+        // Arrange: blank id triggers UUID.randomUUID(). addLocal looks up an existing row for
+        // these attributes first (dedup-by-attributes) — no existing row here, so it inserts.
         val entry = buildEntry(id = "")
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -192,6 +215,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given entry with non-blank id when addLocal then that id is preserved in entity`() = runTest {
         val entry = buildEntry(id = "predefined-id-001")
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -203,6 +227,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given entry when addLocal then entity has synced false`() = runTest {
         val entry = buildEntry()
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -214,6 +239,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given entry with specific cardId when addLocal then entity scryfallId matches cardId`() = runTest {
         val entry = buildEntry(cardId = "target-card-scryfall-001")
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
         val capturedEntity = slot<LocalWishlistEntity>()
         coEvery { dao.insert(capture(capturedEntity)) } returns Unit
 
@@ -259,6 +285,7 @@ class WishlistRepositoryImplTest {
     @Test
     fun `given dao insert throws when addLocal then returns Result failure`() = runTest {
         val entry = buildEntry()
+        coEvery { dao.getByAttributes(any(), any(), any(), any(), any()) } returns null
         coEvery { dao.insert(any()) } throws RuntimeException("disk full")
 
         val result = repository.addLocal(entry)
@@ -358,8 +385,9 @@ class WishlistRepositoryImplTest {
     }
 
     @Test
-    fun `given unsynced rows when migrateLocalToRemote succeeds then clearSynced is called`() = runTest {
-        // Arrange
+    fun `given unsynced rows when migrateLocalToRemote succeeds then rows are marked synced and NOT cleared`() = runTest {
+        // Entries remain in Room after a successful sync (clearSynced removed) so that
+        // observeLocal() continues to show them without re-downloading from remote.
         val unsyncedRows = listOf(buildEntity(id = "u-1"), buildEntity(id = "u-2"))
         coEvery { dao.getUnsynced() } returns unsyncedRows
         coEvery { remote.batchAddWishlistEntries(any()) } returns Result.success(Unit)
@@ -367,9 +395,9 @@ class WishlistRepositoryImplTest {
         // Act
         repository.migrateLocalToRemote(USER_ID)
 
-        // Assert: both markSynced and clearSynced were called
+        // Assert: markSynced was called, clearSynced was NOT
         coVerify(exactly = 1) { dao.markSynced(any()) }
-        coVerify(exactly = 1) { dao.clearSynced() }
+        coVerify(exactly = 0) { dao.clearSynced() }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -436,5 +464,135 @@ class WishlistRepositoryImplTest {
         // Assert: local state unchanged — rows remain unsynced
         coVerify(exactly = 0) { dao.markSynced(any()) }
         coVerify(exactly = 0) { dao.clearSynced() }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 7 — §2.3 regression: removeLocal is remote-first for synced rows
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given removeLocal on a synced row when remote succeeds then the remote removal happens before the local delete`() = runTest {
+        val entity = buildEntity(id = "e-1", synced = true)
+        coEvery { dao.getById("e-1") } returns entity
+        coEvery { remote.removeWishlistEntry("e-1") } returns Result.success(Unit)
+
+        val result = repository.removeLocal("e-1")
+
+        assertTrue(result.isSuccess)
+        coVerifyOrder {
+            remote.removeWishlistEntry("e-1")
+            dao.deleteById("e-1")
+        }
+    }
+
+    @Test
+    fun `given removeLocal on a synced row when the remote call fails then the local row is NOT deleted`() = runTest {
+        // Regression test for §2.3: deleting a synced row locally with no remote call let the
+        // next syncFromRemote() re-download and "resurrect" the entry the user just removed.
+        // Remote-first means a remote failure now leaves the local row untouched.
+        val entity = buildEntity(id = "e-1", synced = true)
+        coEvery { dao.getById("e-1") } returns entity
+        coEvery { remote.removeWishlistEntry("e-1") } returns Result.failure(RuntimeException("network down"))
+
+        val result = repository.removeLocal("e-1")
+
+        assertTrue(result.isFailure)
+        coVerify(exactly = 0) { dao.deleteById(any()) }
+    }
+
+    @Test
+    fun `given removeLocal on an UNSYNCED row then no remote call is made and the local row is deleted directly`() = runTest {
+        val entity = buildEntity(id = "e-1", synced = false)
+        coEvery { dao.getById("e-1") } returns entity
+
+        val result = repository.removeLocal("e-1")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { remote.removeWishlistEntry(any()) }
+        coVerify(exactly = 1) { dao.deleteById("e-1") }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — §2.11 regression: decrementByAttributes matches the correct variant
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given an exact attribute match exists when decrementByAttributes then that exact entry is decremented`() = runTest {
+        val exactMatch = buildEntity(id = "exact", scryfallId = "card-x", quantity = 3, matchAnyVariant = false, isFoil = true, condition = "LP", language = "en", synced = false)
+        val otherVariant = buildEntity(id = "other", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = false, condition = "NM", language = "en", synced = false)
+        coEvery { dao.getByScryfallId("card-x") } returns listOf(otherVariant, exactMatch)
+
+        val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = true, condition = "LP", language = "en")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { dao.updateQuantity("exact", 2) }
+        coVerify(exactly = 0) { dao.updateQuantity("other", any()) }
+        coVerify(exactly = 0) { dao.deleteById(any()) }
+    }
+
+    @Test
+    fun `given no exact match but a matchAnyVariant entry exists when decrementByAttributes then the matchAnyVariant entry is decremented`() = runTest {
+        val anyVariant = buildEntity(id = "any", scryfallId = "card-x", quantity = 2, matchAnyVariant = true, isFoil = null, condition = null, language = null, synced = false)
+        val wrongVariant = buildEntity(id = "wrong", scryfallId = "card-x", quantity = 5, matchAnyVariant = false, isFoil = true, condition = "LP", language = "de", synced = false)
+        coEvery { dao.getByScryfallId("card-x") } returns listOf(wrongVariant, anyVariant)
+
+        val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { dao.updateQuantity("any", 1) }
+        coVerify(exactly = 0) { dao.updateQuantity("wrong", any()) }
+    }
+
+    @Test
+    fun `given no exact match and no matchAnyVariant entry when decrementByAttributes then it no-ops instead of decrementing an arbitrary entry`() = runTest {
+        // Regression test for §2.11: the old fallback was entries.first(), which could
+        // silently decrement a completely different variant than the one actually traded.
+        val wrongVariant1 = buildEntity(id = "w1", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = true, condition = "LP", language = "de")
+        val wrongVariant2 = buildEntity(id = "w2", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = true, condition = "MP", language = "fr")
+        coEvery { dao.getByScryfallId("card-x") } returns listOf(wrongVariant1, wrongVariant2)
+
+        val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { dao.updateQuantity(any(), any()) }
+        coVerify(exactly = 0) { dao.deleteById(any()) }
+    }
+
+    @Test
+    fun `given no wishlist entries for the scryfallId when decrementByAttributes then it no-ops without hitting the dao`() = runTest {
+        coEvery { dao.getByScryfallId("card-x") } returns emptyList()
+
+        val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { dao.updateQuantity(any(), any()) }
+        coVerify(exactly = 0) { dao.deleteById(any()) }
+    }
+
+    @Test
+    fun `given an exact match whose resulting quantity drops to zero when decrementByAttributes then the entry is deleted not updated`() = runTest {
+        val exactMatch = buildEntity(id = "exact", scryfallId = "card-x", quantity = 1, matchAnyVariant = false, isFoil = false, condition = "NM", language = "en", synced = false)
+        coEvery { dao.getByScryfallId("card-x") } returns listOf(exactMatch)
+
+        val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) { dao.deleteById("exact") }
+        coVerify(exactly = 0) { dao.updateQuantity(any(), any()) }
+    }
+
+    @Test
+    fun `given the matched entry is synced when decrementByAttributes then the remote update fires before the local quantity update`() = runTest {
+        val exactMatch = buildEntity(id = "exact", scryfallId = "card-x", quantity = 3, matchAnyVariant = false, isFoil = false, condition = "NM", language = "en", synced = true)
+        coEvery { dao.getByScryfallId("card-x") } returns listOf(exactMatch)
+        coEvery { remote.updateWishlistQuantity("exact", 2) } returns Result.success(Unit)
+
+        val result = repository.decrementByAttributes("card-x", quantity = 1, isFoil = false, condition = "NM", language = "en")
+
+        assertTrue(result.isSuccess)
+        coVerifyOrder {
+            remote.updateWishlistQuantity("exact", 2)
+            dao.updateQuantity("exact", 2)
+        }
     }
 }

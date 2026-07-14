@@ -108,4 +108,7 @@ class PlaytestRepositoryImpl(
 
     override fun observeTestCountForDeck(deckId: String): Flow<Int> =
         playtestDao.observeTestCountForDeck(deckId)
+
+    override fun observeTotalTestCount(): Flow<Int> =
+        playtestDao.observeTotalTestCount()
 }

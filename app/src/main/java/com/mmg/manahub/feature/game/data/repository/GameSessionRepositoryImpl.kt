@@ -112,6 +112,7 @@ class GameSessionRepositoryImpl(
                     localIsWinner = row.localIsWinner,
                     localDeckId   = row.localDeckId,
                     localDeckName = row.localDeckName,
+                    opponentCount = row.opponentCount.coerceAtLeast(0),
                 )
             }
         }

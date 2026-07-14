@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -19,6 +20,11 @@ import java.util.UUID
  * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
  * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared across the Trades,
  * Home, CardDetail, Collection and Decks Koin islands).
+ *
+ * Uses `java.util.UUID` / `System.currentTimeMillis()` (JVM-only, not available on `wasmJs`).
+ * Deferred (trades audit §4.3, 2026-07-10) for the same reason as
+ * [com.mmg.manahub.feature.trades.data.repository.OpenForTradeRepositoryImpl]: swap alongside the
+ * eventual `androidMain`/`wasmJsMain` data-source split for this repository, not in isolation.
  */
 class WishlistRepositoryImpl(
     private val dao: LocalWishlistDao,
@@ -58,13 +64,30 @@ class WishlistRepositoryImpl(
     }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
+        // A synced row also exists server-side — deleting it locally only, with no remote
+        // call, means the next syncFromRemote() re-downloads and "resurrects" the entry the
+        // user just removed. Remote-first (mirrors the OpenForTrade §2.2 fix): only delete
+        // locally once the server row is confirmed gone (trades audit §2.3, 2026-07-10).
+        val existing = dao.getById(id)
+        if (existing?.synced == true) {
+            remote.removeWishlistEntry(id).getOrThrow()
+        }
         dao.deleteById(id)
     }
 
     override suspend fun updateQuantityLocal(id: String, quantity: Int): Result<Unit> = runCatching {
+        val existing = dao.getById(id)
         if (quantity <= 0) {
+            if (existing?.synced == true) {
+                remote.removeWishlistEntry(id).getOrThrow()
+            }
             dao.deleteById(id)
         } else {
+            // Same remote-first resurrection guard as removeLocal() above, for the
+            // decrement-not-delete path (trades audit §2.3, 2026-07-10).
+            if (existing?.synced == true) {
+                remote.updateWishlistQuantity(id, quantity).getOrThrow()
+            }
             dao.updateQuantity(id, quantity)
         }
     }
@@ -108,8 +131,13 @@ class WishlistRepositoryImpl(
                 condition = dto.condition,
                 language = dto.language,
                 synced = true,
+                // Project-wide fallback convention (trades audit §2.13, 2026-07-10): an
+                // unparseable createdAt falls back to epoch (0L), not "now" — deterministic,
+                // and it sorts a malformed timestamp to the bottom of a recency-DESC list
+                // instead of falsely surfacing it as newest. Mirrors OpenForTradeRepositoryImpl
+                // and TradesRepositoryImpl.parseIso().
                 createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilliseconds() }
-                    .getOrDefault(System.currentTimeMillis()),
+                    .getOrDefault(0L),
             )
         }
         dao.upsertAll(entities)
@@ -127,9 +155,13 @@ class WishlistRepositoryImpl(
             val entries = dao.getByScryfallId(scryfallId)
             entries.forEach { entry ->
                 val newQty = entry.quantity - quantity
+                // Remote-first resurrection guard for synced rows, same as removeLocal() /
+                // updateQuantityLocal() above (trades audit §2.3, 2026-07-10).
                 if (newQty <= 0) {
+                    if (entry.synced) remote.removeWishlistEntry(entry.id).getOrThrow()
                     dao.deleteById(entry.id)
                 } else {
+                    if (entry.synced) remote.updateWishlistQuantity(entry.id, newQty).getOrThrow()
                     dao.updateQuantity(entry.id, newQty)
                 }
             }
@@ -150,13 +182,34 @@ class WishlistRepositoryImpl(
                 (e.language == null || e.language.equals(language, ignoreCase = true))
         }
         val anyVariant = entries.firstOrNull { it.matchAnyVariant }
-        val target = exactMatch ?: anyVariant ?: entries.first()
+        val target = exactMatch ?: anyVariant
+        if (target == null) {
+            // No confident match for this scryfallId's variant (foil/condition/language). The
+            // old fallback (entries.first()) could decrement a completely different variant
+            // than the one actually traded — a silent data-corruption risk. No-op instead and
+            // report so genuine drift (a wishlist row that should match but never does) is
+            // caught (trades audit §2.11, 2026-07-10).
+            recordSafeNonFatal(
+                "wishlist_decrement_no_match",
+                IllegalStateException("scryfallId has ${entries.size} candidate(s), none matched"),
+            )
+            return@runCatching
+        }
         val newQty = target.quantity - quantity
-        if (newQty <= 0) dao.deleteById(target.id) else dao.updateQuantity(target.id, newQty)
+        if (newQty <= 0) {
+            if (target.synced) remote.removeWishlistEntry(target.id).getOrThrow()
+            dao.deleteById(target.id)
+        } else {
+            if (target.synced) remote.updateWishlistQuantity(target.id, newQty).getOrThrow()
+            dao.updateQuantity(target.id, newQty)
+        }
     }
 
-    override suspend fun addAndSync(entry: WishlistEntry, userId: String): Result<Unit> =
-        addMutex.withLock {
+    override suspend fun addAndSync(entry: WishlistEntry, userId: String): Result<Unit> {
+        // Only the local read-modify-write is serialised by the mutex — the remote push runs
+        // outside the lock so one slow network call doesn't block every other concurrent
+        // wishlist add (trades audit §2.12, 2026-07-10).
+        val entity = addMutex.withLock {
             runCatching {
                 val existing = dao.getByAttributes(
                     scryfallId = entry.cardId,
@@ -165,16 +218,26 @@ class WishlistRepositoryImpl(
                     condition = entry.condition,
                     language = entry.language,
                 )
-                val entity: LocalWishlistEntity = if (existing != null) {
+                if (existing != null) {
                     existing.copy(quantity = existing.quantity + entry.quantity)
                         .also { dao.update(it) }
                 } else {
                     entry.toEntity().also { dao.insert(it) }
                 }
-                remote.batchAddWishlistEntries(listOf(entity.toDto(userId))).getOrThrow()
-                dao.markSynced(listOf(entity.id))
             }
-        }
+        }.getOrElse { return Result.failure(it) }
+
+        // The local write already succeeded — the card IS on the wishlist at this point. A
+        // remote failure here is sync lag, not a user-facing failure: report it as a non-fatal
+        // instead of returning Result.failure (which previously made the caller show an error
+        // even though the add worked locally). The row stays synced=false and is retried by the
+        // next migrateLocalToRemote()/addAndSync call (trades audit §2.12, 2026-07-10).
+        remote.batchAddWishlistEntries(listOf(entity.toDto(userId)))
+            .onSuccess { dao.markSynced(listOf(entity.id)) }
+            .onFailure { e -> recordSafeNonFatal("wishlist_add_and_sync_remote_failed", e) }
+
+        return Result.success(Unit)
+    }
 
     private fun LocalWishlistEntity.toDomain() = WishlistEntry(
         id = id,
