@@ -8,6 +8,7 @@ import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsViewModel
 import com.mmg.manahub.feature.news.presentation.NewsViewModel
+import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -26,7 +27,9 @@ import org.koin.dsl.module
  * ## Bridge / shared singletons (all resolved via `get()`)
  * - `GetNewsFeedUseCase`, `RefreshNewsFeedUseCase`, `ManageSourcesUseCase` — natively Koin-built in
  *   `SharedDomainKoinModule` (batch 2).
- * - `UserPreferencesDataStore` — already in `coreBridgeKoinModule`.
+ * - `UserPreferencesDataStore` — already in `coreBridgeKoinModule`; now also consumed by
+ *   [NewsRepositoryImpl] itself (News feature improvements Phase 5, F6) to prune a deleted custom
+ *   source's id out of the persisted filter allowlist.
  * - `OkHttpClient` — the app-wide client, promoted into `coreBridgeKoinModule` this batch (was only a
  *   Hilt `ManaHubApp` field used for the Coil image loader; now also feeds [NewsFeedService]).
  *
@@ -50,6 +53,7 @@ fun newsKoinModule(
             feedService = get(),
             rssParser = get(),
             ytParser = get(),
+            userPrefsDataStore = get(),
         )
     }
 
@@ -64,6 +68,7 @@ fun newsKoinModule(
     viewModel {
         NewsSourcesSettingsViewModel(
             manageSources = get(),
+            context = androidContext(),
         )
     }
 }

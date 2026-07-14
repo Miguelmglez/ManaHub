@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -30,6 +29,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,15 +48,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.model.news.ContentSource
+import com.mmg.manahub.feature.news.presentation.components.languageLabelRes
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +74,7 @@ fun NewsSourcesSettingsScreen(
     val addState by viewModel.addState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     val articleSources = sources.filter { it.type == SourceType.ARTICLE }
     val videoSources = sources.filter { it.type == SourceType.VIDEO }
@@ -83,7 +90,7 @@ fun NewsSourcesSettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                        .padding(horizontal = spacing.xs, vertical = spacing.sm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) {
@@ -97,7 +104,7 @@ fun NewsSourcesSettingsScreen(
                         text = stringResource(R.string.news_sources_title),
                         style = mt.titleLarge,
                         color = mc.textPrimary,
-                        modifier = Modifier.padding(start = 12.dp)
+                        modifier = Modifier.padding(start = spacing.md)
                     )
                 }
             }
@@ -107,9 +114,9 @@ fun NewsSourcesSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
+                .padding(horizontal = spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            contentPadding = PaddingValues(vertical = spacing.lg),
         ) {
             // ── Article Sources ──────────────────────────────────────────
             item {
@@ -117,7 +124,7 @@ fun NewsSourcesSettingsScreen(
                     text = stringResource(R.string.news_sources_section_articles),
                     style = mt.titleMedium,
                     color = mc.primaryAccent,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    modifier = Modifier.padding(vertical = spacing.xs)
                 )
             }
             items(articleSources, key = { it.id }) { source ->
@@ -130,13 +137,13 @@ fun NewsSourcesSettingsScreen(
             }
 
             // ── Video Sources ────────────────────────────────────────────
-            item { Spacer(Modifier.height(8.dp)) }
+            item { Spacer(Modifier.height(spacing.sm)) }
             item {
                 Text(
                     text = stringResource(R.string.news_sources_section_videos),
                     style = mt.titleMedium,
                     color = mc.primaryAccent,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    modifier = Modifier.padding(vertical = spacing.xs)
                 )
             }
             items(videoSources, key = { it.id }) { source ->
@@ -149,13 +156,13 @@ fun NewsSourcesSettingsScreen(
             }
 
             // ── Add Custom Source ────────────────────────────────────────
-            item { Spacer(Modifier.height(16.dp)) }
+            item { Spacer(Modifier.height(spacing.lg)) }
             item {
                 Text(
                     text = stringResource(R.string.news_sources_add_title),
                     style = mt.titleMedium,
                     color = mc.primaryAccent,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    modifier = Modifier.padding(vertical = spacing.xs)
                 )
             }
             item {
@@ -164,6 +171,7 @@ fun NewsSourcesSettingsScreen(
                     onNameChanged = viewModel::onNameChanged,
                     onFeedUrlChanged = viewModel::onFeedUrlChanged,
                     onTypeChanged = viewModel::onTypeChanged,
+                    onLanguageChanged = viewModel::onLanguageChanged,
                     onValidateAndAdd = viewModel::validateAndAdd,
                 )
             }
@@ -180,13 +188,14 @@ private fun SourceItem(
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CardShape)
             .background(mc.surface)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = spacing.lg, vertical = spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -199,7 +208,7 @@ private fun SourceItem(
                 )
             }
         }
-        
+
         Switch(
             checked = source.isEnabled,
             onCheckedChange = onToggle,
@@ -212,7 +221,7 @@ private fun SourceItem(
         if (!source.isDefault) {
             IconButton(
                 onClick = onDelete,
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.padding(start = spacing.sm)
             ) {
                 Icon(
                     Icons.Default.Delete,
@@ -230,18 +239,20 @@ private fun AddCustomSourceSection(
     onNameChanged: (String) -> Unit,
     onFeedUrlChanged: (String) -> Unit,
     onTypeChanged: (SourceType) -> Unit,
+    onLanguageChanged: (String) -> Unit,
     onValidateAndAdd: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CardShape)
             .background(mc.surface)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(spacing.md)
     ) {
         OutlinedTextField(
             value = state.name,
@@ -261,7 +272,7 @@ private fun AddCustomSourceSection(
                 focusedTextColor = mc.textPrimary,
                 unfocusedTextColor = mc.textPrimary,
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = CardShape,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -283,14 +294,14 @@ private fun AddCustomSourceSection(
                 focusedTextColor = mc.textPrimary,
                 unfocusedTextColor = mc.textPrimary,
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = CardShape,
             modifier = Modifier.fillMaxWidth(),
         )
 
         // Type radio
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(spacing.xl),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SourceType.entries.forEach { type ->
@@ -313,7 +324,43 @@ private fun AddCustomSourceSection(
                         },
                         style = mt.bodyMedium,
                         color = if (state.type == type) mc.textPrimary else mc.textSecondary,
-                        modifier = Modifier.padding(start = 4.dp)
+                        modifier = Modifier.padding(start = spacing.xs)
+                    )
+                }
+            }
+        }
+
+        // Language selector — F3: pick the content language for the new source (default EN).
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            Text(
+                text = stringResource(R.string.news_sources_language_label),
+                style = mt.labelMedium,
+                color = mc.textSecondary,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES.forEach { code ->
+                    FilterChip(
+                        selected = state.language == code,
+                        onClick = { onLanguageChanged(code) },
+                        label = { Text(stringResource(languageLabelRes(code)), style = mt.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
+                            selectedLabelColor = mc.primaryAccent,
+                            containerColor = mc.surfaceVariant,
+                            labelColor = mc.textSecondary,
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = mc.surfaceVariant.copy(alpha = 0.5f),
+                            selectedBorderColor = mc.primaryAccent,
+                            enabled = true,
+                            selected = state.language == code,
+                            borderWidth = 1.dp,
+                            selectedBorderWidth = 1.5.dp,
+                        ),
+                        shape = ChipShape,
                     )
                 }
             }
@@ -352,21 +399,21 @@ private fun AddCustomSourceSection(
                 containerColor = mc.primaryAccent,
                 disabledContainerColor = mc.primaryAccent.copy(alpha = 0.3f)
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = ButtonShape,
             modifier = Modifier.fillMaxWidth(),
         ) {
             if (state.isValidating) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    color = mc.textPrimary,
+                    color = mc.background,
                     strokeWidth = 2.dp,
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(spacing.sm))
             }
             Text(
                 text = stringResource(R.string.news_sources_validate_add),
                 style = mt.labelLarge,
-                color = if (state.isValidating) mc.textPrimary else Color.Black
+                color = mc.background,
             )
         }
     }
