@@ -7,6 +7,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -41,6 +45,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -77,7 +82,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -86,9 +90,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -100,14 +102,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.decode.SvgDecoder
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.svg.SvgDecoder
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.domain.model.DraftSet
-import com.mmg.manahub.core.domain.model.MagicSet
-import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.ui.isReducedMotionEnabled
 import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.DraftSetCard
@@ -124,6 +129,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Home widget host + container + shared chrome
@@ -137,6 +143,29 @@ import kotlinx.coroutines.launch
 
 /** Minimum height for a MEDIUM widget — the only supported size after consolidation. */
 private val MediumMinHeight: Dp = 160.dp
+
+// ── F-12 (Home feature overhaul Phase 3 hygiene): named, documented font-size constants for the
+// few spots that don't fit an existing magicTypography token exactly. Hoisted here rather than
+// left as inline `9.sp`/`32.sp`/`17.sp` literals scattered through the file. ──
+
+/** Compact caption size for [StatBox]/[AnimatedStatKPI] labels — smaller than `labelSmall`'s
+ * default, needed so a 2x2 stat grid's uppercase captions don't wrap on narrow devices. */
+private val CompactCaptionSize = 9.sp
+
+/** Large numeral size for [StatKPI]'s hero value — bigger than `displayMedium`'s default so a
+ * single KPI number reads as the focal point of its row. */
+private val StatKpiValueSize = 32.sp
+
+/** Slightly taller line height for the Rules Tip body text (readability for multi-line tips
+ * rendered through [OracleText], which can include inline mana-symbol icons). */
+private val RulesTipBodyLineHeight = 17.sp
+
+/**
+ * Fixed seed for the Rules Tip catalog's daily-order shuffle (Home feature overhaul Phase 2.4).
+ * A hardcoded, constant seed keeps the permutation stable across app restarts/recompositions and
+ * identical for every user — only the epoch-day index into it changes.
+ */
+private const val RULES_TIP_SHUFFLE_SEED = 20260713L
 
 /**
  * Minimal container for widgets. Removes the solid background box to let the
@@ -307,19 +336,32 @@ fun AccountGatedPlaceholder(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Host — dispatch on widget type (exhaustive over the 13 HomeWidgetTypes)
+//  Host — dispatch on widget type (exhaustive over all HomeWidgetType entries)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
+@OptIn(ExperimentalSharedTransitionApi::class)
 fun HomeWidgetHost(
     widget: WidgetInstance,
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    // Deck Doctor Community/Archetype plan, Phase 5 — kept OUTSIDE HomeUiState on purpose, see
+    // [com.mmg.manahub.feature.home.presentation.HomeViewModel.trendingFlow]'s KDoc.
+    trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
 ) {
     val spacing = MaterialTheme.spacing
     // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
     // in the persisted layout (so they reappear if re-enabled) but are not shown.
     if (widget.type.isGamification && !uiState.gamificationEnabled) return
+    // Phase 5: silently hidden (never an error state) while there's no trending data yet / the
+    // community engine is off / the Worker is unreachable — see HomeWidgetType.TRENDING_COMMANDERS'
+    // KDoc. Also hidden while Community Decks browsing itself is flag-disabled (its onClick
+    // navigates into that screen) — the two flags can be re-enabled on different timelines.
+    if (widget.type == HomeWidgetType.TRENDING_COMMANDERS &&
+        (trending.isNullOrEmptyTrending() || !uiState.communityDecksEnabled)
+    ) return
 
     Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
         if (widget.type != HomeWidgetType.CONTEXT_HERO) {
@@ -332,20 +374,104 @@ fun HomeWidgetHost(
         
         when (widget.type) {
             HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
-            HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(uiState.quickStartActions, onAction)
+            HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
+                // A previously-pinned COMMUNITY_DECKS shortcut is filtered out (not force-removed
+                // from the persisted preference) while the feature is flag-disabled — reappears
+                // automatically if re-enabled, matching the gamification widgets' convention.
+                actions = uiState.quickStartActions.filter {
+                    it != QuickStartAction.COMMUNITY_DECKS || uiState.communityDecksEnabled
+                },
+                onAction = onAction,
+            )
             HomeWidgetType.PROGRESSION_HUB -> ProgressionHubWidget(uiState.gamification, onAction)
             HomeWidgetType.QUESTS_HUB -> QuestsHubWidget(uiState.gamification, onAction)
             HomeWidgetType.GAME_STATS_HUB -> GameStatsHubWidget(uiState, onAction)
             HomeWidgetType.COLLECTION_STATS_HUB -> CollectionStatsHubWidget(uiState, onAction)
             HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
-            HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(uiState.wishlistStats, uiState.isAuthenticated, onAction)
-            HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(uiState.discoverCards, uiState.discoverLoadState, onAction)
-            HomeWidgetType.CARD_OF_THE_DAY -> RandomCardWidget(uiState.cardOfTheDay, uiState.randomCardLoadState, onAction)
+            HomeWidgetType.RECENTLY_ADDED -> RecentlyAddedWidget(
+                entries = uiState.recentlyAdded,
+                onAction = onAction,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+            HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(
+                stats = uiState.wishlistStats,
+                isAuthenticated = uiState.isAuthenticated,
+                onAction = onAction,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+            HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(
+                cards = uiState.discoverCards,
+                loadState = uiState.discoverLoadState,
+                onAction = onAction,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+            HomeWidgetType.CARD_OF_THE_DAY -> RandomCardWidget(
+                card = uiState.cardOfTheDay,
+                loadState = uiState.randomCardLoadState,
+                onAction = onAction,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
             HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
             HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
             HomeWidgetType.RULES_TIP -> RulesTipWidget()
             HomeWidgetType.SOCIAL_HUB -> SocialHubWidget(uiState, onAction)
             HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
+            HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
+        }
+    }
+}
+
+/** `true` when there is no trending data to show (null snapshot or an empty commanders list) —
+ * the single guard [HomeWidgetHost] uses to hide [HomeWidgetType.TRENDING_COMMANDERS] entirely. */
+private fun com.mmg.manahub.core.model.TrendingSnapshot?.isNullOrEmptyTrending(): Boolean =
+    this == null || topCommanders.isEmpty()
+
+/**
+ * Top-3 trending commanders of the week (Deck Doctor Community/Archetype plan, Phase 5). Tapping
+ * ANY row (or the widget as a whole) navigates into the Community Hub via
+ * [HomeAction.OpenCommunityDecks] — the Hub lands on its Discover section by default whenever
+ * `communityEngineEnabledFlow` is on (see [com.mmg.manahub.feature.communitydecks.presentation
+ * .CommunityDecksSearchViewModel]'s `hubTab` default), so no new nav action was needed.
+ */
+@Composable
+private fun TrendingCommandersWidget(
+    trending: com.mmg.manahub.core.model.TrendingSnapshot?,
+    onAction: (HomeAction) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val topThree = trending?.topCommanders.orEmpty().take(3)
+    if (topThree.isEmpty()) return
+
+    WidgetShell(onClick = { onAction(HomeAction.OpenCommunityDecks) }, onClickLabel = stringResourceSafe(R.string.widget_title_trending_commanders)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            topThree.forEachIndexed { index, commander ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = ty.labelMedium,
+                        color = mc.primaryAccent,
+                        modifier = Modifier.width(20.dp),
+                    )
+                    Text(
+                        text = commander.name,
+                        style = ty.bodyMedium,
+                        color = mc.textPrimary,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }
@@ -364,7 +490,7 @@ private fun widgetHeaderTrailingContent(
         {
             WidgetHeaderIconButton(
                 icon = Icons.Default.Edit,
-                contentDescription = "Customize shortcuts",
+                contentDescription = stringResourceSafe(R.string.home_customize_shortcuts_a11y),
                 onClick = { onAction(HomeAction.CustomizeQuickStart) },
             )
         }
@@ -507,22 +633,21 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
     // Delegate to the carousel / completion card when the hero is the Welcome state.
     if (hero is HomeHeroState.Welcome) {
         if (hero.steps.isEmpty()) {
-            // FirstStepsCompletedCard is hidden per user request
-            return
+            // All first steps are done or explicitly dismissed (F-8: this state IS reachable —
+            // give it real UI rather than a render-nothing branch).
+            FirstStepsCompletedCard()
         } else {
             FirstStepsCarousel(
                 steps = hero.steps,
                 onAction = onAction,
-                onSkip = { stepId -> onAction(HomeAction.SkipFirstStep(stepId)) },
+                onDismiss = { stepId -> onAction(HomeAction.SkipFirstStep(stepId)) },
             )
         }
         return
     }
 
-    if (hero is HomeHeroState.Summary) {
-        // Welcome back widget is hidden per user request
-        return
-    }
+    // Summary falls through to the generic hero card below (F-8): heroWidgetCopy/heroSectionLabel
+    // already have full copy for HomeHeroState.Summary ("Welcome back, X" / "N games tracked").
 
     // Quests-ready suggestion uses string resources, so it is rendered here (the generic copy
     // helpers below are not @Composable). Highest priority — opens the Profile Quests tab.
@@ -538,12 +663,14 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
     val isActive = hero is HomeHeroState.ActiveGame || hero is HomeHeroState.ActiveDraft
 
     val infiniteTransition = rememberInfiniteTransition(label = "hero-pulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
+    val animatedPulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.35f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
         label = "pulse",
     )
+    // F-13: reduced-motion users see the static end state (full opacity), not a pulsing dot.
+    val pulseAlpha = if (isReducedMotionEnabled()) 1f else animatedPulseAlpha
 
     Surface(
         color = mc.surface.copy(alpha = 0.6f),
@@ -610,22 +737,28 @@ private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Uni
 /**
  * Auto-advancing onboarding carousel backed by a [HorizontalPager].
  *
- * Each page shows an icon badge, a slide counter, a title, a subtitle, a full-width
- * CTA button, and a "Skip" affordance. The pager auto-advances every 3 seconds while
- * the user is not actively swiping ([androidx.compose.foundation.pager.PagerState.isScrollInProgress]
- * pauses the timer automatically). Progress dots track the current page.
+ * Each page shows an icon badge, a title, a subtitle, and a small top-right dismiss
+ * affordance (≥48dp touch target). The pager auto-advances every 4 seconds while the user is not
+ * actively swiping ([androidx.compose.foundation.pager.PagerState.isScrollInProgress] pauses the
+ * timer automatically). Chevron nav icons let the user browse without waiting.
  *
  * Stateless — driven entirely by the pager state and the two callback lambdas.
  *
+ * **Tap semantics (Home feature overhaul Phase 2.2): tapping a slide fires ONLY its CTA — it no
+ * longer also dismisses the step.** A step disappears when its data-driven completion condition
+ * is met, or when the user explicitly taps the dismiss affordance ([onDismiss]). Previously-
+ * skipped ids remain skipped (no migration/data reset — [onDismiss] persists through the same
+ * `observeSkippedFirstSteps` DataStore mechanism as before).
+ *
  * @param steps    Non-empty list of visible steps to display.
  * @param onAction Called when the user taps the CTA; receives the step's [HomeAction].
- * @param onSkip   Called when the user taps "Skip"; receives the step's id.
+ * @param onDismiss Called when the user taps the dismiss affordance; receives the step's id.
  */
 @Composable
 internal fun FirstStepsCarousel(
     steps: List<FirstStepItem>,
     onAction: (HomeAction) -> Unit,
-    onSkip: (String) -> Unit,
+    onDismiss: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -683,60 +816,85 @@ internal fun FirstStepsCarousel(
                             blurRadius = 24.dp
                         )
                         .clip(CardShape)
-                        .clickable {
-                            onSkip(step.id)
-                            onAction(step.action)
-                        }
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = spacing.lg, vertical = spacing.xl),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(spacing.md)
-                    ) {
-                        Box(
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        // Tap = CTA only (Phase 2.2). Dismiss is a SEPARATE affordance below.
+                        Column(
                             modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(mc.primaryAccent.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .clickable(
+                                    onClickLabel = stringResourceSafe(step.titleRes),
+                                    role = Role.Button,
+                                ) { onAction(step.action) }
+                                .padding(horizontal = spacing.lg, vertical = spacing.xl),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(spacing.md)
                         ) {
-                            when (val icon = step.icon) {
-                                is StepIcon.Vector -> Icon(
-                                    imageVector = icon.imageVector,
-                                    contentDescription = null,
-                                    tint = mc.primaryAccent,
-                                    modifier = Modifier.size(32.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(mc.primaryAccent.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                when (val icon = step.icon) {
+                                    is StepIcon.Vector -> Icon(
+                                        imageVector = icon.imageVector,
+                                        contentDescription = null,
+                                        tint = mc.primaryAccent,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    is StepIcon.Drawable -> Icon(
+                                        painter = painterResource(id = icon.resId),
+                                        contentDescription = null,
+                                        tint = mc.primaryAccent,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                            ) {
+                                Text(
+                                    text = stringResourceSafe(step.titleRes),
+                                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = mc.textPrimary,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                is StepIcon.Drawable -> Icon(
-                                    painter = painterResource(id = icon.resId),
-                                    contentDescription = null,
-                                    tint = mc.primaryAccent,
-                                    modifier = Modifier.size(32.dp)
+                                Text(
+                                    text = stringResourceSafe(step.subtitleRes),
+                                    style = ty.bodySmall,
+                                    color = mc.textSecondary,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                        // Dismiss affordance (Phase 2.2): subtle, top-right, ≥48dp touch target
+                        // via minimumInteractiveComponentSize. Persists through the same
+                        // observeSkippedFirstSteps DataStore mechanism as before.
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .minimumInteractiveComponentSize()
+                                .clip(CircleShape)
+                                .clickable(
+                                    onClickLabel = stringResourceSafe(R.string.first_step_dismiss),
+                                    role = Role.Button,
+                                ) { onDismiss(step.id) },
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                text = stringResourceSafe(step.titleRes),
-                                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = mc.textPrimary,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = stringResourceSafe(step.subtitleRes),
-                                style = ty.bodySmall,
-                                color = mc.textSecondary,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResourceSafe(R.string.first_step_dismiss),
+                                tint = mc.textSecondary.copy(alpha = 0.6f),
+                                modifier = Modifier.size(16.dp),
                             )
                         }
                     }
@@ -753,7 +911,7 @@ internal fun FirstStepsCarousel(
                 ) {
                     Icon(
                         imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = null,
+                        contentDescription = stringResourceSafe(R.string.home_carousel_previous),
                         tint = mc.primaryAccent.copy(alpha = 0.5f),
                         modifier = Modifier
                             .size(28.dp)
@@ -767,7 +925,7 @@ internal fun FirstStepsCarousel(
                     )
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
+                        contentDescription = stringResourceSafe(R.string.home_carousel_next),
                         tint = mc.primaryAccent.copy(alpha = 0.5f),
                         modifier = Modifier
                             .size(28.dp)
@@ -1055,7 +1213,7 @@ private fun HomeQuestRow(quest: HomeQuest) {
                 verticalArrangement = Arrangement.spacedBy(spacing.xxs),
             ) {
                 Text(
-                    text = stringResourceSafe(quest.titleRes),
+                    text = quest.title,
                     style = ty.labelMedium,
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -1291,7 +1449,7 @@ private fun <T> AutoSlideHub(
             ) {
                 Icon(
                     imageVector = Icons.Default.ChevronLeft,
-                    contentDescription = null,
+                    contentDescription = stringResourceSafe(R.string.home_carousel_previous),
                     tint = mc.primaryAccent.copy(alpha = 0.25f),
                     modifier = Modifier
                         .size(28.dp)
@@ -1305,7 +1463,7 @@ private fun <T> AutoSlideHub(
                 )
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
+                    contentDescription = stringResourceSafe(R.string.home_carousel_next),
                     tint = mc.primaryAccent.copy(alpha = 0.25f),
                     modifier = Modifier
                         .size(28.dp)
@@ -1404,7 +1562,7 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                             letterSpacing = 1.sp
                         )
                         Text(
-                            text = "WIN RATE",
+                            text = stringResourceSafe(R.string.home_win_rate_caption),
                             style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = mc.textPrimary
                         )
@@ -1423,12 +1581,14 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             val infiniteTransition = rememberInfiniteTransition(label = "best-deck-glow")
-                            val glowScale by infiniteTransition.animateFloat(
+                            val animatedGlowScale by infiniteTransition.animateFloat(
                                 initialValue = 1f,
                                 targetValue = 1.4f,
                                 animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
                                 label = "glow"
                             )
+                            // F-13: reduced-motion users see the static end state, not a pulsing glow.
+                            val glowScale = if (isReducedMotionEnabled()) 1.4f else animatedGlowScale
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -1448,7 +1608,7 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "BEST PERFORMER",
+                                text = stringResourceSafe(R.string.home_best_performer_caption),
                                 style = ty.labelSmall,
                                 color = mc.lifePositive,
                                 letterSpacing = 1.sp
@@ -1488,7 +1648,7 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "CURRENT NEMESIS",
+                                text = stringResourceSafe(R.string.home_current_nemesis_caption),
                                 style = ty.labelSmall,
                                 color = mc.lifeNegative,
                                 letterSpacing = 1.sp
@@ -1552,7 +1712,7 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                         AnimatedResultPulse(recap.won)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "LATEST BATTLE",
+                                text = stringResourceSafe(R.string.home_latest_battle_caption),
                                 style = ty.labelSmall,
                                 color = mc.textSecondary,
                                 letterSpacing = 1.sp
@@ -1564,7 +1724,12 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            Text("${recap.mode} · ${formatDuration(recap.durationMs)}", style = ty.labelSmall, color = mc.textSecondary)
+                            val modeLine = if (recap.opponentCount > 0) {
+                                stringResourceSafe(R.string.home_last_game_mode_vs_opponents, recap.mode, formatDuration(recap.durationMs), recap.opponentCount)
+                            } else {
+                                stringResourceSafe(R.string.home_last_game_mode_duration, recap.mode, formatDuration(recap.durationMs))
+                            }
+                            Text(modeLine, style = ty.labelSmall, color = mc.textSecondary)
                         }
                         Icon(Icons.Default.History, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(20.dp))
                     }
@@ -1583,12 +1748,18 @@ private fun AnimatedWinRateRing(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val progress = remember { Animatable(0f) }
-    
-    LaunchedEffect(percentage) {
-        progress.animateTo(
-            targetValue = percentage / 100f,
-            animationSpec = tween(1200, easing = FastOutSlowInEasing)
-        )
+    // F-13: reduced-motion users see the final ring value immediately, no sweep animation.
+    val reducedMotion = isReducedMotionEnabled()
+
+    LaunchedEffect(percentage, reducedMotion) {
+        if (reducedMotion) {
+            progress.snapTo(percentage / 100f)
+        } else {
+            progress.animateTo(
+                targetValue = percentage / 100f,
+                animationSpec = tween(1200, easing = FastOutSlowInEasing)
+            )
+        }
     }
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -1648,7 +1819,7 @@ private fun AnimatedStatKPI(
             )
             Text(
                 text = label.uppercase(),
-                style = ty.labelSmall.copy(fontSize = 9.sp),
+                style = ty.labelSmall.copy(fontSize = CompactCaptionSize),
                 color = mc.textSecondary,
                 letterSpacing = 0.5.sp
             )
@@ -1662,13 +1833,15 @@ private fun AnimatedResultPulse(won: Boolean) {
     val color = if (won) mc.lifePositive else mc.lifeNegative
     
     val infiniteTransition = rememberInfiniteTransition(label = "result-pulse")
-    val alpha by infiniteTransition.animateFloat(
+    val animatedAlpha by infiniteTransition.animateFloat(
         initialValue = 0.2f,
         targetValue = 0.6f,
         animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
         label = "pulse"
     )
-    
+    // F-13: reduced-motion users see the static end state, not a pulsing halo.
+    val alpha = if (isReducedMotionEnabled()) 0.6f else animatedAlpha
+
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
         Box(
             modifier = Modifier
@@ -1758,6 +1931,10 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             }
         }
         is CollectionSlide.Colors -> {
+            // F-12: these hex values are the official, fixed MTG brand WUBRG colors (mirroring
+            // the Stats screen's own pie chart) — never tokenized, since they represent the game's
+            // color pie identity itself rather than app theming, and stay constant across all 12
+            // ManaHub themes by design.
             val colorWhite = stringResourceSafe(R.string.stats_color_white)
             val colorBlue = stringResourceSafe(R.string.stats_color_blue)
             val colorBlack = stringResourceSafe(R.string.stats_color_black)
@@ -1800,6 +1977,7 @@ private fun CollectionSlideContent(slide: CollectionSlide, onAction: (HomeAction
             }
         }
         is CollectionSlide.Rarity -> {
+            // F-12: fixed rarity brand colors (silver/steel/gold/orange), same rationale as above.
             val rarityCommon = stringResourceSafe(R.string.home_rarity_common)
             val rarityUncommon = stringResourceSafe(R.string.home_rarity_uncommon)
             val rarityRare = stringResourceSafe(R.string.home_rarity_rare)
@@ -1865,7 +2043,7 @@ private fun StatBox(
             )
             Text(
                 text = label.uppercase(),
-                style = ty.labelSmall.copy(fontSize = 9.sp),
+                style = ty.labelSmall.copy(fontSize = CompactCaptionSize),
                 color = mc.textSecondary,
                 textAlign = TextAlign.Center,
                 letterSpacing = 0.5.sp
@@ -1890,10 +2068,11 @@ private fun DecksShelfWidget(decks: List<DeckSummary>, onAction: (HomeAction) ->
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             items(decks, key = { it.id }) { deck ->
                 DeckItem(
-                    deck = deck,
-                    onClick = { onAction(HomeAction.OpenDeck(deck.id)) },
-                    reduced = true,
-                    modifier = Modifier.width(160.dp),
+                    deck            = deck,
+                    onClick         = { onAction(HomeAction.OpenDeck(deck.id)) },
+                    reduced         = true,
+                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    modifier        = Modifier.width(160.dp),
                 )
             }
         }
@@ -1901,11 +2080,83 @@ private fun DecksShelfWidget(decks: List<DeckSummary>, onAction: (HomeAction) ->
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  RECENTLY_ADDED (Home feature overhaul Phase 2.1) — newest local collection additions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun RecentlyAddedWidget(
+    entries: List<RecentlyAddedCard>,
+    onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+) {
+    val spacing = MaterialTheme.spacing
+    WidgetShell(onClick = { onAction(HomeAction.OpenLibrary) }) {
+        if (entries.isEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                WidgetEmptyBody(stringResourceSafe(R.string.home_recently_added_empty))
+                PillButton(
+                    label = stringResourceSafe(R.string.home_recently_added_cta),
+                    icon = Icons.Default.Camera,
+                    onClick = { onAction(HomeAction.ScanCard) },
+                )
+            }
+            return@WidgetShell
+        }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            items(entries, key = { it.rowId }) { entry ->
+                Box {
+                    DiscoverCardThumb(
+                        card = entry.card,
+                        onClick = { onAction(HomeAction.OpenCardDetail(entry.card.scryfallId)) },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                    if (entry.quantity > 1) {
+                        QuantityBadge(
+                            quantity = entry.quantity,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(spacing.xxs),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Small accent-filled circular badge showing a copy count (e.g. "x3"), top-corner overlay. */
+@Composable
+private fun QuantityBadge(quantity: Int, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(
+        modifier = modifier,
+        color = mc.primaryAccent,
+        shape = ChipShape,
+    ) {
+        Text(
+            text = stringResourceSafe(R.string.home_recently_added_quantity, quantity),
+            style = ty.labelSmall,
+            color = mc.background,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  WISHLIST_PROGRESS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun WishlistWidget(stats: WishlistStats?, isAuthenticated: Boolean, onAction: (HomeAction) -> Unit) {
+private fun WishlistWidget(
+    stats: WishlistStats?,
+    isAuthenticated: Boolean,
+    onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+) {
     if (!isAuthenticated) {
         AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_wishlist)) { onAction(HomeAction.CreateAccount) }
         return
@@ -1919,20 +2170,44 @@ private fun WishlistWidget(stats: WishlistStats?, isAuthenticated: Boolean, onAc
             return@WidgetShell
         }
         
+        val showValue = stats.estimatedValueDisplay.isNotBlank()
         if (stats.cards.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                items(stats.cards.toList(), key = { it.id }) { card ->
-                    DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                if (showValue) {
+                    Text(
+                        text = stringResourceSafe(R.string.home_wishlist_value, stats.estimatedValueDisplay),
+                        style = ty.labelMedium,
+                        color = mc.goldMtg,
+                    )
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                    items(stats.cards.toList(), key = { it.id }) { card ->
+                        DiscoverCardThumb(
+                            card = card,
+                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
                 }
             }
         } else {
-            StatKPI(
-                value = stats.count.toString(),
-                label = stringResourceSafe(R.string.widget_title_wishlist),
-                color = mc.goldMtg,
-                icon = Icons.Default.Star,
-                onClick = { onAction(HomeAction.OpenWishlist) }
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                StatKPI(
+                    value = stats.count.toString(),
+                    label = stringResourceSafe(R.string.widget_title_wishlist),
+                    color = mc.goldMtg,
+                    icon = Icons.Default.Star,
+                    onClick = { onAction(HomeAction.OpenWishlist) }
+                )
+                if (showValue) {
+                    Text(
+                        text = stringResourceSafe(R.string.home_wishlist_value, stats.estimatedValueDisplay),
+                        style = ty.labelSmall,
+                        color = mc.goldMtg,
+                    )
+                }
+            }
         }
     }
 }
@@ -1941,11 +2216,14 @@ private fun WishlistWidget(stats: WishlistStats?, isAuthenticated: Boolean, onAc
 //  DISCOVER_CARDS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun DiscoverCardsWidget(
     cards: List<DiscoverCard>,
     loadState: DiscoverLoadState,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
@@ -1975,7 +2253,12 @@ private fun DiscoverCardsWidget(
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                     items(cards, key = { it.id }) { card ->
-                        DiscoverCardThumb(card, onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) })
+                        DiscoverCardThumb(
+                            card = card,
+                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
                     }
                 }
             }
@@ -1983,8 +2266,14 @@ private fun DiscoverCardsWidget(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
+private fun DiscoverCardThumb(
+    card: DiscoverCard,
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+) {
     val mc = MaterialTheme.magicColors
     Box(
         modifier = Modifier
@@ -1992,6 +2281,18 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
             // Full MTG card aspect ratio (745:1040) so the whole card is shown.
             .aspectRatio(0.717f)
             .clip(CardShape)
+            .then(
+                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                    with(sharedTransitionScope) {
+                        Modifier.sharedBounds(
+                            sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            clipInOverlayDuringTransition = OverlayClip(CardShape),
+                            renderInOverlayDuringTransition = true,
+                        )
+                    }
+                } else Modifier
+            )
             .background(mc.surfaceVariant)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -2013,11 +2314,14 @@ private fun DiscoverCardThumb(card: DiscoverCard, onClick: () -> Unit) {
 //  CARD_OF_THE_DAY (enum) → Random card widget: a single full card image, centered
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun RandomCardWidget(
     card: DiscoverCard?,
     loadState: DiscoverLoadState,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
     WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId)) } }) {
@@ -2042,6 +2346,18 @@ private fun RandomCardWidget(
                     // Full MTG card aspect ratio (745:1040).
                     .aspectRatio(0.717f)
                     .clip(CardShape)
+                    .then(
+                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                            with(sharedTransitionScope) {
+                                Modifier.sharedBounds(
+                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    clipInOverlayDuringTransition = OverlayClip(CardShape),
+                                    renderInOverlayDuringTransition = true,
+                                )
+                            }
+                        } else Modifier
+                    )
                     .background(mc.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2164,6 +2480,7 @@ private fun NewsWidget(
                     NewsItemCard(
                         item = item,
                         orientation = NewsItemOrientation.VERTICAL,
+                        placeholderPainter = painterResource(R.drawable.mtg_card_back),
                         modifier = Modifier.width(220.dp),
                         onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
                     )
@@ -2232,16 +2549,22 @@ private fun RulesTipWidget() {
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
-    // Today's tip index (changes once per day), used as the pager's starting page.
-    val tipIndex = remember { (System.currentTimeMillis() / 86_400_000L % MTG_TIPS.size).toInt() }
-    val pagerState = rememberPagerState(initialPage = tipIndex, pageCount = { MTG_TIPS.size })
+    // Deterministic, dependency-free daily ordering (Home feature overhaul Phase 2.4): a
+    // fixed-seed shuffle avoids long same-category streaks (the catalog is grouped by category)
+    // while staying stable across recompositions and identical for every user on a given UTC day.
+    // Cycle length = catalog size; today's index is the epoch-day modulus INTO the shuffled list.
+    val shuffledTips = remember { MTG_TIPS_CATALOG.shuffled(Random(RULES_TIP_SHUFFLE_SEED)) }
+    val tipIndex = remember(shuffledTips) { (System.currentTimeMillis() / 86_400_000L % shuffledTips.size).toInt() }
+    val pagerState = rememberPagerState(initialPage = tipIndex, pageCount = { shuffledTips.size })
 
     WidgetShell {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxWidth()
         ) { page ->
-            val (title, body) = MTG_TIPS[page]
+            val tip = shuffledTips[page]
+            val title = tip.title
+            val body = tip.body
             Surface(
                 color = mc.surfaceVariant.copy(alpha = 0.25f),
                 shape = CardShape,
@@ -2298,7 +2621,21 @@ private fun RulesTipWidget() {
                                 style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = mc.textPrimary,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        // Category chip (Phase 2.4): uppercase labelSmall, accent-tinted, token-based.
+                        Surface(
+                            color = mc.primaryAccent.copy(alpha = 0.12f),
+                            shape = ChipShape,
+                        ) {
+                            Text(
+                                text = stringResourceSafe(tip.category.labelRes).uppercase(),
+                                style = ty.labelSmall,
+                                color = mc.primaryAccent,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
                             )
                         }
 
@@ -2306,7 +2643,7 @@ private fun RulesTipWidget() {
                             text = body,
                             style = ty.bodySmall.copy(
                                 color = mc.textSecondary,
-                                lineHeight = 17.sp
+                                lineHeight = RulesTipBodyLineHeight
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -2322,11 +2659,14 @@ private fun RulesTipWidget() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 private sealed interface SocialSlide {
-    data class FriendsActivity(val text: String) : SocialSlide
-    data class TopCommanders(val entries: List<com.mmg.manahub.core.domain.model.CommunityEntry>) : SocialSlide
-    data class MostWishlisted(val entries: List<com.mmg.manahub.core.domain.model.CommunityEntry>) : SocialSlide
+    /** Real friend count + optional newest pending-request headline (Home feature overhaul
+     * Phase 1.2.d — replaces the old permanent data-less tile). */
+    data class FriendsActivity(val friendCount: Int, val latestRequestName: String?) : SocialSlide
+    data class MostWishlisted(val entries: List<com.mmg.manahub.core.model.CommunityEntry>) : SocialSlide
     data class ActiveTournament(val summary: TournamentSummary) : SocialSlide
-    data class Milestones(val milestones: List<com.mmg.manahub.core.domain.model.CommunityMilestone>) : SocialSlide
+    data class Milestones(val milestones: List<com.mmg.manahub.core.model.CommunityMilestone>) : SocialSlide
+    /** A popular Archidekt Commander deck (Phase 1.2.c) — mandatory "via Archidekt" attribution. */
+    data class TrendingDeck(val deck: com.mmg.manahub.core.model.ArchidektTrendingDeck) : SocialSlide
 }
 
 @Composable
@@ -2336,13 +2676,13 @@ private fun SocialHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
         return
     }
     val community = uiState.communityStats
-    val slides = remember(community, uiState.activeTournamentSummary) {
+    val slides = remember(community, uiState.activeTournamentSummary, uiState.friendCount, uiState.latestFriendRequestName, uiState.archidektTrending) {
         buildList {
-            add(SocialSlide.FriendsActivity(""))
-            community?.topCommanders?.takeIf { it.isNotEmpty() }?.let { add(SocialSlide.TopCommanders(it)) }
+            add(SocialSlide.FriendsActivity(uiState.friendCount, uiState.latestFriendRequestName))
             community?.mostWishlisted?.takeIf { it.isNotEmpty() }?.let { add(SocialSlide.MostWishlisted(it)) }
             uiState.activeTournamentSummary?.let { add(SocialSlide.ActiveTournament(it)) }
             community?.milestones?.takeIf { it.isNotEmpty() }?.let { add(SocialSlide.Milestones(it)) }
+            uiState.archidektTrending.forEach { add(SocialSlide.TrendingDeck(it)) }
         }
     }
     WidgetShell {
@@ -2366,19 +2706,16 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
                     HubBadge(Icons.Default.Group, mc.primaryAccent)
                     Column {
                         Text(stringResourceSafe(R.string.home_social_friends_title), style = ty.titleMedium, color = mc.textPrimary)
-                        Text(stringResourceSafe(R.string.home_friends_empty), style = ty.labelSmall, color = mc.textSecondary)
-                    }
-                }
-            }
-        }
-        is SocialSlide.TopCommanders -> HubSlide {
-            ClickableBox(onClick = { onAction(HomeAction.OpenStats) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.Default.Star, mc.goldMtg)
-                    Column {
-                        Text(stringResourceSafe(R.string.widget_title_community_commanders), style = ty.titleMedium, color = mc.textPrimary)
-                        slide.entries.take(1).forEach { entry ->
-                            Text("${entry.name} · ${entry.percentage.toInt()}%", style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        when {
+                            slide.latestRequestName != null ->
+                                Text(
+                                    stringResourceSafe(R.string.home_friends_pending_request, slide.latestRequestName),
+                                    style = ty.labelSmall, color = mc.primaryAccent, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                )
+                            slide.friendCount > 0 ->
+                                Text(stringResourceSafe(R.string.home_friends_count, slide.friendCount), style = ty.labelSmall, color = mc.textSecondary)
+                            else ->
+                                Text(stringResourceSafe(R.string.home_friends_empty), style = ty.labelSmall, color = mc.textSecondary)
                         }
                     }
                 }
@@ -2391,7 +2728,18 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
                     Column {
                         Text(stringResourceSafe(R.string.widget_title_most_wishlisted), style = ty.titleMedium, color = mc.textPrimary)
                         slide.entries.take(1).forEach { entry ->
-                            Text("${entry.name} · ${entry.count} pilots", style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // The card name resolves ONLY from the local cache (HomeViewModel.withResolvedCardNames);
+                            // an entry the user never cached locally has an empty name — render a count-only
+                            // fallback instead of an empty/blank name (Home dashboard audit, HIGH).
+                            val row = if (entry.name.isNotBlank()) {
+                                stringResourceSafe(R.string.home_most_wishlisted_row, entry.name, entry.count)
+                            } else {
+                                stringResourceSafe(R.string.home_most_wishlisted_row_unnamed, entry.count)
+                            }
+                            Text(
+                                row,
+                                style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
@@ -2425,6 +2773,21 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
                 }
             }
         }
+        is SocialSlide.TrendingDeck -> HubSlide {
+            val deck = slide.deck
+            ClickableBox(onClick = { onAction(HomeAction.OpenNewsUrl(deck.deckUrl)) }) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+                    HubBadge(Icons.Default.Style, mc.primaryAccent)
+                    Column {
+                        Text(deck.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            stringResourceSafe(R.string.home_archidekt_deck_subtitle, deck.viewCount),
+                            style = ty.labelSmall, color = mc.textSecondary,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2434,8 +2797,8 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
 
 private sealed interface TradesSlide {
     data class Inbox(val summary: TradeSummary?) : TradesSlide
-    object Suggestions : TradesSlide
-    object OpenForTrade : TradesSlide
+    data class Suggestions(val count: Int) : TradesSlide
+    data class OpenForTrade(val count: Int, val valueDisplay: String?) : TradesSlide
 }
 
 @Composable
@@ -2444,11 +2807,11 @@ private fun TradesHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
         AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_trades_hub)) { onAction(HomeAction.CreateAccount) }
         return
     }
-    val slides = remember(uiState.tradeSummary) {
+    val slides = remember(uiState.tradeSummary, uiState.tradeSuggestionsCount, uiState.openForTradeCount, uiState.openForTradeValueDisplay) {
         listOf(
             TradesSlide.Inbox(uiState.tradeSummary),
-            TradesSlide.Suggestions,
-            TradesSlide.OpenForTrade,
+            TradesSlide.Suggestions(uiState.tradeSuggestionsCount),
+            TradesSlide.OpenForTrade(uiState.openForTradeCount, uiState.openForTradeValueDisplay),
         )
     }
     WidgetShell {
@@ -2477,6 +2840,12 @@ private fun TradesSlideContent(slide: TradesSlide, onAction: (HomeAction) -> Uni
                             Text(stringResourceSafe(R.string.home_trade_inbox_empty), style = ty.labelSmall, color = mc.textSecondary)
                         } else {
                             Text(stringResourceSafe(R.string.home_trade_inbox_count, summary.pendingCount), style = ty.titleMedium, color = mc.primaryAccent)
+                            summary.latestItemCount?.let { itemCount ->
+                                Text(
+                                    stringResourceSafe(R.string.home_trade_inbox_preview, itemCount),
+                                    style = ty.labelSmall, color = mc.textSecondary,
+                                )
+                            }
                         }
                     }
                 }
@@ -2488,7 +2857,11 @@ private fun TradesSlideContent(slide: TradesSlide, onAction: (HomeAction) -> Uni
                     HubBadge(Icons.Default.AutoAwesome, mc.primaryAccent)
                     Column {
                         Text(stringResourceSafe(R.string.widget_title_trade_suggestions), style = ty.titleMedium, color = mc.textPrimary)
-                        Text(stringResourceSafe(R.string.home_trade_suggestions_empty), style = ty.labelSmall, color = mc.textSecondary)
+                        if (slide.count == 0) {
+                            Text(stringResourceSafe(R.string.home_trade_suggestions_empty), style = ty.labelSmall, color = mc.textSecondary)
+                        } else {
+                            Text(stringResourceSafe(R.string.home_trade_suggestions_count, slide.count), style = ty.titleMedium, color = mc.primaryAccent)
+                        }
                     }
                 }
             }
@@ -2499,7 +2872,17 @@ private fun TradesSlideContent(slide: TradesSlide, onAction: (HomeAction) -> Uni
                     HubBadge(Icons.Default.Style, mc.primaryAccent)
                     Column {
                         Text(stringResourceSafe(R.string.widget_title_open_for_trade), style = ty.titleMedium, color = mc.textPrimary)
-                        Text(stringResourceSafe(R.string.home_open_for_trade_empty), style = ty.labelSmall, color = mc.textSecondary)
+                        if (slide.count == 0) {
+                            Text(stringResourceSafe(R.string.home_open_for_trade_empty), style = ty.labelSmall, color = mc.textSecondary)
+                        } else {
+                            Text(stringResourceSafe(R.string.home_open_for_trade_count, slide.count), style = ty.titleMedium, color = mc.primaryAccent)
+                            slide.valueDisplay?.let {
+                                Text(
+                                    stringResourceSafe(R.string.home_open_for_trade_value, it),
+                                    style = ty.labelSmall, color = mc.goldMtg,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -2545,7 +2928,7 @@ private fun StatKPI(
             Column {
                 Text(
                     text = value,
-                    style = ty.displayMedium.copy(fontSize = 32.sp),
+                    style = ty.displayMedium.copy(fontSize = StatKpiValueSize),
                     color = mc.textPrimary
                 )
                 Text(
@@ -2590,18 +2973,6 @@ private fun HubBadge(icon: ImageVector, tint: Color) {
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
     }
-}
-
-/** Win/loss result dot (green/red circle). */
-@Composable
-private fun ResultDot(won: Boolean) {
-    val mc = MaterialTheme.magicColors
-    Box(
-        modifier = Modifier
-            .size(16.dp)
-            .clip(CircleShape)
-            .background(if (won) mc.lifePositive else mc.lifeNegative),
-    )
 }
 
 /** Small WUBRG color-identity dots for a deck. */
@@ -2655,29 +3026,58 @@ private fun PillButton(label: String, icon: ImageVector, onClick: () -> Unit, mo
 //  Display helpers (pure)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+@Composable
+@ReadOnlyComposable
 private fun heroSectionLabel(hero: HomeHeroState): String = when (hero) {
-    is HomeHeroState.ActiveGame -> "ACTIVE SESSION"
-    is HomeHeroState.ActiveDraft -> "DRAFT IN PROGRESS"
-    is HomeHeroState.Summary -> "WELCOME BACK"
-    is HomeHeroState.Welcome -> "GET STARTED" // handled by FirstStepsCarousel; kept for exhaustiveness
+    is HomeHeroState.ActiveGame -> stringResourceSafe(R.string.home_hero_label_active_session)
+    is HomeHeroState.ActiveDraft -> stringResourceSafe(R.string.home_hero_label_draft_in_progress)
+    is HomeHeroState.Summary -> stringResourceSafe(R.string.home_hero_label_welcome_back)
+    // Welcome is handled by FirstStepsCarousel/FirstStepsCompletedCard; kept for exhaustiveness.
+    is HomeHeroState.Welcome -> stringResourceSafe(R.string.home_hero_label_get_started)
     // QuestsReady is rendered by QuestsReadyHero before this is called; kept for exhaustiveness.
-    is HomeHeroState.QuestsReady -> "REWARDS READY"
-    HomeHeroState.Loading -> "LOADING"
+    is HomeHeroState.QuestsReady -> stringResourceSafe(R.string.home_hero_quests_ready_label)
+    HomeHeroState.Loading -> stringResourceSafe(R.string.home_hero_label_loading)
 }
 
+@Composable
+@ReadOnlyComposable
 private fun heroWidgetCopy(hero: HomeHeroState): Triple<String, String, String> = when (hero) {
-    is HomeHeroState.ActiveGame -> Triple("Game in progress", "${hero.mode} · ${hero.playerCount} players", "Resume game")
-    is HomeHeroState.ActiveDraft -> Triple("Draft in progress", "Set ${hero.setName}", "Resume draft")
-    is HomeHeroState.Summary -> Triple(
-        "Welcome back, ${hero.playerName}",
-        if (hero.totalGames == 1) "1 game tracked" else "${hero.totalGames} games tracked",
-        "Start a game",
+    is HomeHeroState.ActiveGame -> Triple(
+        stringResourceSafe(R.string.home_hero_active_game_title),
+        stringResourceSafe(R.string.home_hero_active_game_subtitle, hero.mode, hero.playerCount),
+        stringResourceSafe(R.string.home_hero_active_game_cta),
     )
-    HomeHeroState.Loading -> Triple("Loading…", "Getting your dashboard ready", "Start a game")
+    is HomeHeroState.ActiveDraft -> Triple(
+        stringResourceSafe(R.string.home_hero_active_draft_title),
+        stringResourceSafe(R.string.home_hero_active_draft_subtitle, hero.setName),
+        stringResourceSafe(R.string.home_hero_active_draft_cta),
+    )
+    is HomeHeroState.Summary -> Triple(
+        stringResourceSafe(R.string.home_hero_summary_title, hero.playerName),
+        if (hero.totalGames == 1) {
+            stringResourceSafe(R.string.home_hero_summary_subtitle_one)
+        } else {
+            stringResourceSafe(R.string.home_hero_summary_subtitle_many, hero.totalGames)
+        },
+        stringResourceSafe(R.string.home_hero_summary_cta),
+    )
+    HomeHeroState.Loading -> Triple(
+        stringResourceSafe(R.string.home_hero_loading_title),
+        stringResourceSafe(R.string.home_hero_loading_subtitle),
+        stringResourceSafe(R.string.home_hero_summary_cta),
+    )
     // Welcome is rendered by FirstStepsCarousel/FirstStepsCompletedCard before this is called.
-    is HomeHeroState.Welcome -> Triple("Welcome to ManaHub", "Track games, scan cards, and build decks.", "Start a game")
+    is HomeHeroState.Welcome -> Triple(
+        stringResourceSafe(R.string.home_hero_welcome_title),
+        stringResourceSafe(R.string.home_hero_welcome_subtitle),
+        stringResourceSafe(R.string.home_hero_summary_cta),
+    )
     // QuestsReady is rendered by QuestsReadyHero before this is called; kept for exhaustiveness.
-    is HomeHeroState.QuestsReady -> Triple("Rewards ready", "Claim your completed quests.", "Claim rewards")
+    is HomeHeroState.QuestsReady -> Triple(
+        stringResourceSafe(R.string.home_hero_quests_ready_title, hero.count),
+        stringResourceSafe(R.string.home_hero_quests_ready_subtitle),
+        stringResourceSafe(R.string.home_hero_quests_ready_cta),
+    )
 }
 
 private fun heroWidgetCta(hero: HomeHeroState): HomeAction = when (hero) {
@@ -2707,22 +3107,26 @@ private val QuickStartAction.navIcon: ImageVector
         QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
+        QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Group
         QuickStartAction.SETTINGS -> Icons.Default.Settings
     }
 
 /** Human label for a Quick Start action. */
 private val QuickStartAction.navLabel: String
+    @Composable
+    @ReadOnlyComposable
     get() = when (this) {
-        QuickStartAction.SCAN_CARD -> "Scan Card"
-        QuickStartAction.CREATE_DECK -> "Deck Builder"
-        QuickStartAction.DRAFT_GUIDE -> "Draft Guides"
-        QuickStartAction.SEARCH_CARD -> "Search Card"
-        QuickStartAction.DECKS -> "My Decks"
-        QuickStartAction.NEWS -> "News"
-        QuickStartAction.STATS -> "My Stats"
-        QuickStartAction.FRIENDS -> "Friends"
-        QuickStartAction.TRADES -> "Trades"
-        QuickStartAction.SETTINGS -> "Settings"
+        QuickStartAction.SCAN_CARD -> stringResourceSafe(R.string.quick_start_scan_card)
+        QuickStartAction.CREATE_DECK -> stringResourceSafe(R.string.quick_start_deck_builder)
+        QuickStartAction.DRAFT_GUIDE -> stringResourceSafe(R.string.quick_start_draft_guides)
+        QuickStartAction.SEARCH_CARD -> stringResourceSafe(R.string.quick_start_search_card)
+        QuickStartAction.DECKS -> stringResourceSafe(R.string.quick_start_my_decks)
+        QuickStartAction.NEWS -> stringResourceSafe(R.string.quick_start_news)
+        QuickStartAction.STATS -> stringResourceSafe(R.string.quick_start_my_stats)
+        QuickStartAction.FRIENDS -> stringResourceSafe(R.string.quick_start_friends)
+        QuickStartAction.TRADES -> stringResourceSafe(R.string.quick_start_trades)
+        QuickStartAction.COMMUNITY_DECKS -> stringResourceSafe(R.string.quick_start_community)
+        QuickStartAction.SETTINGS -> stringResourceSafe(R.string.quick_start_settings)
     }
 
 /** Maps a Quick Start action to its navigation intent. */
@@ -2736,6 +3140,7 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.STATS -> HomeAction.OpenStats
     QuickStartAction.FRIENDS -> HomeAction.OpenFriends
     QuickStartAction.TRADES -> HomeAction.OpenTrades
+    QuickStartAction.COMMUNITY_DECKS -> HomeAction.OpenCommunityDecks
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
 }
 
@@ -2743,106 +3148,33 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
 //  Container — registers root bounds for drag hit-testing in the gallery
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Renders a single placed widget. F-9 (Home feature overhaul Phase 3): the bounds-registry /
+ * drag hit-testing API this used to expose (`onRegisterBounds` + the module-level
+ * `findTargetIndex()`) was removed — the board itself is static; only the gallery sheet owns
+ * add/remove/reorder, via its own local drag state (`WidgetGallerySheet.kt`).
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeWidgetContainer(
     widget: WidgetInstance,
     uiState: HomeUiState,
-    onRegisterBounds: (String, androidx.compose.ui.geometry.Rect) -> Unit,
     onAction: (HomeAction) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     modifier: Modifier = Modifier,
+    // Deck Doctor Community/Archetype plan, Phase 5.
+    trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
 ) {
-    Box(
-        modifier = modifier
-            .onGloballyPositioned { coords -> onRegisterBounds(widget.type.persistedId, coords.boundsInRoot()) },
-    ) {
-        HomeWidgetHost(widget, uiState, onAction)
+    Box(modifier = modifier) {
+        HomeWidgetHost(
+            widget = widget,
+            uiState = uiState,
+            onAction = onAction,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
+            trending = trending,
+        )
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Drag hit-testing helper (used by the gallery reorder section)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Hit-tests the ghost's center against registered widget bounds to find the index
- * of the widget currently under the dragged ghost. Returns -1 when over nothing.
- */
-fun findTargetIndex(
-    ghostCenter: Offset,
-    bounds: Map<String, androidx.compose.ui.geometry.Rect>,
-    layout: List<WidgetInstance>,
-): Int {
-    layout.forEachIndexed { index, widget ->
-        val rect = bounds[widget.type.persistedId] ?: return@forEachIndexed
-        if (rect.contains(ghostCenter)) return index
-    }
-    return -1
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  MTG rules tips — (title, body) pairs surfaced by RULES_TIP, one per day
-// ═══════════════════════════════════════════════════════════════════════════════
-
-private val MTG_TIPS = listOf(
-    "Stack Resolution" to "Spells and abilities resolve last-in, first-out. The last spell cast is the first to resolve.",
-    "State-Based Actions" to "The game checks for creatures with 0 toughness, lethal damage, and legend rule violations continuously — without using the stack.",
-    "Deathtouch & Trample" to "A creature with deathtouch only needs to deal 1 damage to a blocking creature with trample. The rest tramples over.",
-    "Hexproof vs Shroud" to "Hexproof protects from opponents' targeting only. Shroud protects from ALL targeting, including your own.",
-    "Legend Rule" to "If you control two permanents with the same legendary name, you choose one and put the other in the graveyard.",
-    "Flash" to "Permanents with Flash can be played at instant speed — during opponent's turn, in response to spells, even during combat.",
-    "Vigilance" to "Attacking doesn't cause vigilant creatures to tap — they can still block next turn.",
-    "Haste" to "Creatures need to be on the battlefield since the beginning of your turn to attack or use tap abilities — unless they have Haste.",
-    "Flying & Reach" to "Flying creatures can only be blocked by creatures with Flying or Reach. Don't forget your Reach creatures can block fliers!",
-    "Lifelink Timing" to "Lifelink causes life gain simultaneously with damage dealing — not after combat. This matters for effects that trigger on life gain.",
-    "First Strike & Deathtouch" to "First strike + deathtouch is a devastating combo: the creature deals lethal damage in first-strike step, and the other creature dies before dealing its damage.",
-    "Double Strike" to "Double strike creatures deal first-strike damage AND regular combat damage. Combined with pump spells, this doubles the bonus.",
-    "Menace" to "A creature with Menace requires TWO or more blockers — great for forcing through damage late game.",
-    "Indestructible Limits" to "Indestructible doesn't mean invincible! It can still be exiled, bounced, sacrificed, or have its toughness reduced to 0.",
-    "Protection" to "Protection (from a quality) means the creature can't be Blocked, Damaged, Enchanted/Equipped, or Targeted by sources with that quality — BDET.",
-    "Phasing" to "Phased-out permanents are treated as if they don't exist. Auras and Equipment attached to them phase out too, and phase back in together.",
-    "Cascade" to "Cascade triggers when you cast the spell. You reveal cards until you find one with lesser mana value, then cast it for free — at instant speed if it's an instant.",
-    "Morph" to "Face-down morphed creatures are 2/2 colorless creatures with no name, type, or abilities. Opponents must allow you to turn them face-up for the morph cost.",
-    "Storm" to "Storm copies the spell for each spell cast before it this turn. Rituals and cantrips earlier in the turn all count!",
-    "Flashback" to "Flashback lets you cast a spell from the graveyard by paying its flashback cost. The spell is then exiled, not returned to the graveyard.",
-    "Dredge" to "Dredge is a replacement effect — when you would draw a card, you may instead mill yourself equal to the dredge value and return the dredge card to hand.",
-    "Delve" to "You can exile any number of cards from your graveyard when paying for Delve — each exiled card pays for {1} of generic mana.",
-    "Convoke" to "Tapping a creature for Convoke can pay for one generic mana or one mana of the creature's color. All tap abilities are mana abilities.",
-    "Suspend" to "Suspending is casting without paying the mana cost. The spell sits in exile with time counters, one removed each upkeep, then cast for free when the last is removed.",
-    "Escape" to "Escape lets you recast cards from the graveyard by paying the escape cost and exiling a set number of other graveyard cards.",
-    "Foretell" to "Cards can be foretold face-down in exile for {2} on any turn. The reduced foretell cost can be paid on later turns at sorcery speed (or instant speed if it's an instant).",
-    "Ward" to "Ward is a triggered ability — it triggers when an opponent targets the permanent. They must pay the ward cost or the spell/ability is countered.",
-    "Boast" to "Boast abilities can only be activated once per turn, and only if the creature attacked this turn. They're not tap abilities.",
-    "Sagas" to "Sagas trigger on your precombat main phase. Chapter I triggers when it enters, subsequent chapters on later turns. The saga sacrifices itself after the final chapter.",
-    "MDFCs" to "Modal Double-Faced Cards can be played as either face. The back face can only be played as a land (or whatever its type is), not cast normally from hand.",
-    "Mana Burn" to "Mana burn was removed in Magic 2010. Unused mana in your mana pool at end of step or phase simply disappears — it doesn't cause damage.",
-    "Colorless vs Generic" to "Generic mana ({1}, {2}) can be paid by any mana. Colorless mana ({C}) can ONLY be paid by colorless sources — they're different!",
-    "Planeswalker Combat" to "Attackers can target planeswalkers directly. Any damage dealt removes that many loyalty counters. The planeswalker is removed if it reaches 0.",
-    "Loyalty Abilities" to "You can activate only one loyalty ability per planeswalker per turn, only at sorcery speed, only when you have priority.",
-    "Token Rules" to "Tokens cease to exist when they leave the battlefield. A token 'returning to hand' just disappears — it never actually reaches the hand.",
-    "Copy Spells" to "Copying a spell doesn't count as casting it. Effects that trigger 'when you cast' won't trigger from a copy.",
-    "Split Second" to "While a spell with Split Second is on the stack, players can't cast spells or activate non-mana abilities. Triggered abilities still trigger!",
-    "Priority" to "Active player gets priority first in each step and phase, then each other player in turn order. A player must pass priority before the stack can resolve.",
-    "Mana Abilities" to "Mana abilities (producing mana) don't use the stack and can't be responded to. They resolve immediately when activated.",
-    "Regenerate" to "Regeneration is a replacement effect — if a creature would be destroyed, instead tap it, remove all damage, and remove from combat. It's a shield, not actual death.",
-    "Tapped Creatures" to "Tapped creatures cannot block, but they can still attack next turn if untapped during the untap step. Tapping a blocker mid-combat after blocks are declared doesn't remove the block.",
-    "Blocking Rules" to "Once a block is declared, the blocked creature remains 'blocked' even if all blockers are removed. A 0/1 can still block a 10/10.",
-    "Trample Assignment" to "When a trampling creature attacks, the attacker must assign lethal damage to each blocker before assigning excess to the defending player.",
-    "Deathtouch Blocking" to "When multiple creatures block a deathtouch attacker, the attacker can assign 1 damage to each blocker (lethal) and still trample if it has trample.",
-    "Commander Damage" to "In Commander format, 21 combat damage from the SAME commander to the same player is lethal — regardless of their life total.",
-    "Commander Tax" to "Each time a commander is cast from the command zone, it costs {2} more. The tax stacks — a third cast costs {4} more than the base cost.",
-    "Color Identity" to "A card's color identity includes all mana symbols in its mana cost AND its rules text. You can't include cards outside your commander's color identity.",
-    "Tutors" to "Cards that 'search your library' are called tutors. Remember to shuffle your library after searching, even if you didn't find anything.",
-    "Landfall" to "Landfall triggers when a land enters the battlefield under your control — including extra lands played, fetched lands, and bounced/replayed lands.",
-    "Kicker" to "Kicker is an optional additional cost. You choose to pay it as you cast the spell — you can't pay it after casting. Some cards have multiple kicker costs.",
-    "Morph vs Manifests" to "Morphs are cast face-down (you can turn them face-up anytime). Manifests are put into play face-down from effects — different rules apply for turning them over.",
-    "Cycling" to "Cycling can be activated at instant speed. You discard the card first (mandatory), then draw. This can fill your graveyard for synergies.",
-    "Split Cards" to "A split card in hand or on the stack has the combined characteristics of both halves. Its mana value is the sum of both sides.",
-    "Adventures" to "Adventure cards can be cast as the Adventure (exile it), then cast the creature later from exile. While in exile, it's still a card you own.",
-    "Investigate" to "Clue tokens are artifacts. You can sacrifice them and pay {2} to draw a card. Multiple clues mean multiple potential draws.",
-    "Food Tokens" to "Food tokens are artifacts. Pay {2} and sacrifice to gain 3 life. They synergize with anything caring about artifacts or sacrifice effects.",
-    "Treasure Tokens" to "Treasure tokens produce one mana of any color when tapped and sacrificed. They're temporary mana rocks that count as artifacts.",
-    "Undergrowth" to "Undergrowth counts creature cards in your graveyard — not tokens (they cease to exist when they leave the battlefield).",
-    "Afterlife" to "Afterlife X creates X 1/1 white and black flying Spirit tokens when the creature dies. Each token has flying.",
-    "Amass" to "Amass creates a Zombie Army token if you don't have one, then puts +1/+1 counters on it. You can only have one Army at a time.",
-    "Proliferate" to "Proliferate lets you choose any number of permanents and players with counters on them, then add one more counter of a kind already there. Great with planeswalkers!",
-)

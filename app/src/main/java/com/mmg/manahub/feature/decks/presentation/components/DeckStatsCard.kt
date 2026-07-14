@@ -45,10 +45,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -281,8 +283,8 @@ private fun CardScoreGrid(
                         .clip(RoundedCornerShape(6.dp)),
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = score.card.name,
+                CardName(
+                    name = score.card.name,
                     style = ty.labelSmall,
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -343,8 +345,8 @@ private fun WeakCardGrid(
                         .clickable { onCardClick(score.card.scryfallId) },
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = score.card.name,
+                CardName(
+                    name = score.card.name,
                     style = ty.labelSmall,
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -369,12 +371,12 @@ private fun WeakCardGrid(
 }
 
 /**
- * A single row representing one [com.mmg.manahub.core.data.local.dao.SessionSummary].
+ * A single row representing one [com.mmg.manahub.feature.game.domain.model.DeckSessionSummary].
  * Shows relative date, win/loss badge, survey status chip, and a trailing icon.
  */
 @Composable
 private fun SessionRow(
-    session: com.mmg.manahub.core.data.local.dao.SessionSummary,
+    session: com.mmg.manahub.feature.game.domain.model.DeckSessionSummary,
     playerName: String,
     onReviewSurvey: (Long) -> Unit,
 ) {

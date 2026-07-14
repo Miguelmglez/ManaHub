@@ -19,6 +19,21 @@ data class DeckEntity(
     @ColumnInfo(name = "is_deleted") val isDeleted: Boolean = false,
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
+    // ── Community Decks attribution (v41) ──────────────────────────────────
+    // Populated when a deck is imported from an external community source
+    // (e.g. Archidekt). All nullable so locally-created decks remain unaffected.
+    @ColumnInfo(name = "source_url") val sourceUrl: String? = null,
+    @ColumnInfo(name = "source_author") val sourceAuthor: String? = null,
+    @ColumnInfo(name = "source_service") val sourceService: String? = null,
+    @ColumnInfo(name = "imported_at") val importedAt: Long? = null,
+    // ── Archetype-aware Deck Doctor (v43) ──────────────────────────────────
+    // Nullable: null = the engine infers the macro archetype every analysis. A raw enum-name
+    // string (ArchetypeId.name), never persisted as anything richer — parsed defensively via
+    // `entries.firstOrNull { ... }` at every read site (CLAUDE.md: never `.valueOf()`).
+    @ColumnInfo(name = "archetype_override") val archetypeOverride: String? = null,
+    // JSON array of theme enum-name strings (ThemeId.name), e.g. `["TRIBAL","ARISTOCRATS"]`.
+    // Null/blank = no theme pin. At most 2 entries (enforced at the UI/use-case layer, not here).
+    @ColumnInfo(name = "themes_override") val themesOverride: String? = null,
 )
 
 /** Cross-reference: which cards belong to which deck (mainboard + sideboard). */

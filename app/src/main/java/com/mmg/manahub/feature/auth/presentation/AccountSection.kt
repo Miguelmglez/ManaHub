@@ -53,14 +53,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.auth.domain.model.AuthUser
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
 
 /**
  * Profile-screen section that renders different content based on [sessionState]:
@@ -514,10 +515,11 @@ private fun AuthenticatedCard(
                             }
                         }
                     }
-                    if (user.email != null) {
+                    val email: String? = user.email
+                    if (email != null) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = user.email,
+                            text = email,
                             style = ty.bodySmall,
                             color = mc.textSecondary,
                             maxLines = 1,

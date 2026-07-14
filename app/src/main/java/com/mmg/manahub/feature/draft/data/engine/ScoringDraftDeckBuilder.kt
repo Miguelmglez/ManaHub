@@ -1,16 +1,15 @@
 package com.mmg.manahub.feature.draft.data.engine
 
-import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder.Companion.BASIC_LANDS_TOTAL
-import com.mmg.manahub.feature.draft.domain.engine.DraftDeckBuilder
-import com.mmg.manahub.feature.draft.domain.model.BasicLandSlot
-import com.mmg.manahub.feature.draft.domain.model.DraftDeck
-import com.mmg.manahub.feature.draft.domain.model.DraftSeat
-import javax.inject.Inject
+import com.mmg.manahub.core.domain.engine.DraftDeckBuilder
+import com.mmg.manahub.core.model.BasicLandSlot
+import com.mmg.manahub.core.model.DraftDeck
+import com.mmg.manahub.core.model.DraftSeat
 
 /**
  * Builds a 40-card limited deck (23 non-land picks + 17 basic lands) from a finished [DraftSeat].
@@ -21,8 +20,12 @@ import javax.inject.Inject
  * 2. Score every non-land card in the pool with [DeckScorer] against those colors and take the
  *    23 highest combined scores.
  * 3. Allocate 17 basic lands across the two colors proportionally to their commitment weights.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`); built as a native Koin
+ * `single` in [com.mmg.manahub.feature.draft.di.draftKoinModule], sharing the SAME [DeckScorer]
+ * singleton the Decks island builds (`feature.decks.di.decksKoinModule`).
  */
-class ScoringDraftDeckBuilder @Inject constructor(
+class ScoringDraftDeckBuilder(
     private val deckScorer: DeckScorer,
 ) : DraftDeckBuilder {
 

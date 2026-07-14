@@ -23,8 +23,17 @@ Full file-type / frontmatter / index conventions live in the **`memory-protocol`
 
 ## Project overview
 
-ManaHub is a Magic: The Gathering companion Android app (package `com.mmg.manahub`). Single-module
-Gradle project: Kotlin, Jetpack Compose, Clean Architecture, Hilt DI, Room.
+ManaHub is a Magic: The Gathering companion app (package `com.mmg.manahub`), currently single-module
+Gradle (Kotlin, Jetpack Compose, Clean Architecture, Hilt DI, Room) **migrating to Kotlin
+Multiplatform**.
+
+**DIRECTIVE — KMP-oriented Clean Architecture (effective 2026-06-20).** From now on the app targets
+**Android + Web** and ALL new code MUST be written in **Clean Architecture oriented to KMP**:
+platform-agnostic domain/data/ViewModel/UI in `commonMain` by default, with anything Android- or
+web-specific isolated behind `expect`/`actual` or interfaces in `androidMain`/`wasmJsMain`. Do not
+write new code that hard-couples to Android (`Context`, AndroidX-only APIs, Room/DataStore directly,
+Hilt) unless it genuinely belongs in `androidMain`. DI is **Koin** (not Hilt) for all new/migrated
+code. See the **Kotlin Multiplatform migration** section below + `docs/plans/kmp-migration-plan.md`.
 
 ## Language rules
 
@@ -51,7 +60,10 @@ output; do not restore `es`/`de` locale branches. → memory: `feedback_language
 
 ## Architecture
 
-**MVVM + Clean Architecture** within a single Gradle module (`:app`).
+**MVVM + Clean Architecture.** The tree below is the **current/legacy** single-module (`:app`) layout.
+**New code is KMP-first** (Koin DI, `commonMain` by default) per the directive above and the "Kotlin
+Multiplatform migration" section below — do not add new Hilt/single-module code; follow the KMP source-set
+rules. The legacy structure stays as-is until each feature is migrated.
 
 ```
 com.mmg.manahub/
@@ -69,6 +81,43 @@ com.mmg.manahub/
 Most features: a `Screen.kt` Composable, a `ViewModel.kt` (`@HiltViewModel`), optional sub-composables.
 Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` sub-packages.
 
+## Kotlin Multiplatform migration (IN PROGRESS — Android + Web)
+
+The project is migrating to **KMP, targeting Android + Web (Compose Multiplatform / `wasmJs`)**.
+iOS/Desktop are out of scope for now but the structure must not preclude them. **DI is moving Hilt →
+Koin.** Master plan (status, decisions, Android debt, web roadmap): `docs/plans/kmp-migration-plan.md`;
+living tracker: `docs/plans/kmp-migration-progress.md`; spike findings + wasm/library gotchas live in memory
+`project_kmp_spike_findings`. **Read these before any KMP-tagged work.** Until a feature is
+migrated, existing Hilt/Room/androidx-Compose code stays as-is — do not pre-emptively KMP-ify
+unrelated code.
+
+**Sequencing (2026-06-20): get the ANDROID app working on KMP FIRST, then build the web version
+incrementally.** Three platform-heavy features are EXCLUDED from the migration for now and left
+untouched (Hilt + Android Compose, no shared move, no web actuals yet): **online games
+(`feature/online`), voice control (`core/voice` + in-game voice), and the camera card scanner
+(`feature/scanner`).** They migrate in a later wave once the Android-KMP base + core web are working.
+
+Broadly-applicable rules (feature-specific detail → memory):
+- **Source sets:** `commonMain` (shared) / `androidMain` / `wasmJsMain` (+ `commonTest`). `commonMain`
+  **never** imports an Android/AndroidX or browser API — those go behind `expect`/`actual` or an
+  interface. Target modules: `:shared:{core-model,core-common,core-domain,core-data,core-ui,feature-*}`,
+  `:androidApp`, `:webApp`.
+- **Room has no wasm target** → Room DAOs/entities/migrations stay in `androidMain`; DAO/repository
+  **interfaces in `commonMain`**; web data source (Supabase-remote-first + IndexedDB/`localStorage`
+  cache) in `wasmJsMain` behind the same interface.
+- **No `androidx.paging.PagingData` and no `R.string`/Android resources in shared code** — use a common
+  pagination model and the CMP `Res` resource system.
+- **Networking:** Retrofit → Ktor (js/wasm engine), Gson → kotlinx-serialization. Rate-limit queues
+  (`ScryfallRequestQueue`, `ArchidektRequestQueue`) become pure-coroutine `Mutex` impls in `commonMain`.
+- **DI:** Koin modules per feature; `koinViewModel()` not `hiltViewModel()`. Migrate per-feature (pure
+  features first, platform-heavy last) — never a big-bang swap that breaks compilation between commits.
+- **Definition of done:** Android stays shippable (compiles + tests green vs. the documented baseline),
+  the web target builds (`./gradlew wasmJsBrowserDistribution`), and no Android/browser import leaked
+  into `commonMain`. `.gradle.kts`/KMP build config is owned by `android-kotlin-architect` (build DSL
+  exception to the `.kt`-only delegation rule).
+- → memory: `project_modularization_blockers` (5 blockers are a PREREQUISITE, resolve first),
+  `project_kmp_spike_findings`
+
 ## Key architectural decisions
 
 ### CardDao upsert
@@ -76,12 +125,16 @@ Features with their own data layer (Draft, News) add `data/`, `domain/`, `di/` s
 and silently deletes all `UserCardEntity` rows for that card. The DAO uses INSERT OR IGNORE + `@Update`
 in a `@Transaction`. Regression test: `CardDao CASCADE regression`.
 
-### Database (Room v40)
+### Database (Room v42)
 - DB file `mtg_collection.db`. `UserCardEntity` FK to `CardEntity` is `ON DELETE RESTRICT` (v38).
-- Migration chain 1→40, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
-  not safe for production data). v39 = 6 gamification tables; **v40 = additive `legality_legacy`/
-  `legality_vintage`/`legality_pauper` on `cards`** (Deck Doctor Phase 4 D2; `MIGRATION_39_40`, top-level
-  `val`, `ADD COLUMN … TEXT NOT NULL DEFAULT 'not_legal'`, CardDao upsert untouched → no CASCADE risk).
+- Migration chain 1→42, gaps at 7–10 and 15–17 covered by `fallbackToDestructiveMigration()` (dev-only;
+  not safe for production data). v39 = 6 gamification tables; v40 = additive `legality_legacy`/
+  `legality_vintage`/`legality_pauper` on `cards` (Deck Doctor Phase 4 D2); v41 = Community Decks
+  attribution columns on `decks` + `community_deck_cache` table; **v42 = additive `produced_mana`
+  (compact WUBRG string, not JSON) on `cards`** (Deck Doctor Community/Archetype plan Phase 0.3, D14).
+  Every migration since v39 follows the same pattern: a top-level `val MIGRATION_x_y` in its own file,
+  `ADD COLUMN … TEXT NOT NULL DEFAULT '…'` guarded by a `columnExists` check, CardDao upsert untouched
+  → no CASCADE risk. → memory: `project_card_model_produced_mana`
 - Schema: `app/schemas/com.mmg.manahub.core.data.local.MtgDatabase/` (latest version json gitignored —
   regenerate locally).
 
@@ -117,9 +170,20 @@ Routes are a sealed class in `Screen.kt`; forward-slash hierarchy (e.g. `"collec
 Bottom tabs: Collection, Stats, [central FAB = Game], Profile.
 
 ### DI
-All ViewModels `@HiltViewModel`. `RepositoryModule` binds interfaces→impls (singleton).
-`DispatcherModule` provides named dispatchers. Feature modules are separate
-`@InstallIn(SingletonComponent::class)` modules.
+**New/migrated code uses Koin** (`koinViewModel()`, Koin modules per feature) — this is the default for
+all new work (see the KMP migration section). The Hilt setup below is **legacy/unmigrated only**: existing
+ViewModels are `@HiltViewModel`, `RepositoryModule` binds interfaces→impls (singleton), `DispatcherModule`
+provides named dispatchers, feature modules are separate `@InstallIn(SingletonComponent::class)` modules.
+Do not add new Hilt modules for new code; bridge Koin↔Hilt during the transition rather than expanding Hilt.
+
+**Koin `single`/`factory` type must match the consumer's declared param type.** If any consumer's
+constructor parameter is typed as an interface, the binding producing it MUST be
+`single<Interface> { Impl(...) }`, not a bare `single { Impl(...) }` (which registers under the
+concrete class). This mismatch compiles cleanly — Koin resolves by type only at runtime — and
+surfaces as `NoDefinitionFoundException` the first time that graph path is exercised (e.g. on app
+launch, for a start-destination ViewModel's dependency chain). Bare `single { }` is only safe when
+every consumer's param type is the exact concrete return type. → memory:
+`feedback_koin_single_concrete_type_mismatch`
 
 ### Utilities
 `core/util/TimeAgoFormatter` for relative dates (English only) — don't write inline `SimpleDateFormat`.
@@ -146,6 +210,23 @@ To build/redesign UI use the **`compose-ui`** skill; to audit/polish, delegate t
 ## Feature notes
 
 Each section is a minimal pointer — read the linked memory before changing the feature.
+
+### Add Card (`feature/addcard/`)
+Search-first entry point (redesigned 2026-07-13). Idle state (no query, no filters) shows a
+`LazyVerticalGrid` discovery surface of shuffled cards from one Scryfall set at a time
+(`GetSpotlightFeedUseCase`, paginates to the next set on scroll) — mirrors Home's Discover Cards
+widget, not a text list. The camera scanner is a `FloatingActionButton` on the `Scaffold`, not an
+inline list item or a `SearchSurface` trailing icon. The search field's trailing icon (query empty)
+is the flag emoji for the active search language (`CardConstants.getFlag`/`languages`) and opens a
+`ModalBottomSheet` (`LanguageSelectorSheet`) — this replaced the old `ManaHubSelector` dropdown row.
+"Recent searches" was removed end-to-end (not just hidden): `GetRecentSearchesUseCase`/
+`SaveRecentSearchUseCase`/`ClearRecentSearchesUseCase` and `RecentSearchRepository` are gone: only
+delete a use case's Koin binding — always grep the feature's OWN `di/` module too (`AddCardKoinModule.kt`
+had its own reference the main task list didn't mention). Both the spotlight grid tiles and the
+results-list `SearchResultItem` thumbnails participate in the shared-element transition into
+`CardDetailScreen` via the shared key `"card-image-${card.scryfallId}"` — any new card-image surface
+in this screen must reuse that exact key format to stay connected to the transition.
+→ memory: `project_addcard_redesign_2026-07-13`
 
 ### Trades
 Data layer split across five repositories by concern: `TradesRepository` (proposals/thread),
@@ -187,7 +268,9 @@ Identify which owns a behavior before adding methods.
   `feedback_tournament_single_write_path_2026-06-16`
 
 ### Deck Playtest (`feature/playtest/`, Phase 1 + Phase 2 battlefield complete)
-Room v35→v36 added `playtest_sessions`, `playtest_card_stats`, `playtest_survey_answers`. Must-know:
+**Hidden for release (2026-07-14) via `DeckFeatureFlags.PLAYTEST_ENABLED = false`** — code intact,
+all entry points gated (flip back to `true` to re-enable). Room v35→v36 added `playtest_sessions`,
+`playtest_card_stats`, `playtest_survey_answers`. Must-know:
 - **Explicit-save-only**: redraw/mulligan loops are in-memory; nothing persists until "Save test" via
   `PlaytestDao.saveTestAtomically(@Transaction)` (the only sanctioned write path).
 - `deck_id` is plain indexed TEXT, **not** a FK (decks are soft-deleted). Card stats are INT counts,
@@ -228,7 +311,11 @@ Room v35→v36 added `playtest_sessions`, `playtest_card_stats`, `playtest_surve
   `feedback_playtest_bugs_2026-05-28`
 
 ### Online sessions
-**HTTP polling (3 s) is the primary mechanism; Supabase Realtime CDC is an optional fast-path** — never
+**Hidden for release (2026-07-14) via new `feature/online/presentation/OnlineFeatureFlags
+.ONLINE_SESSIONS_ENABLED = false`** — code intact, only the online-specific UI (GameSetup's "Play
+with friends", TournamentsSheet's online rows, `LobbyHost`/`LobbyJoin`/join-deep-link redirects) is
+gated; local/offline same-device play and local tournaments are untouched. Flip back to `true` to
+re-enable. **HTTP polling (3 s) is the primary mechanism; Supabase Realtime CDC is an optional fast-path** — never
 a correctness dependency. Must-know:
 - `startLobbyPolling()` runs unconditionally after create/join/resume; `connectAndObserve()` failure is
   silent (log only). **Never replace the participant list with a raw snapshot — always MERGE by id.**
@@ -280,8 +367,11 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   `WeightedBoosterGenerator` matches `variant.contents` keys to `sheets[name]`). Never collapse names —
   matching `"foil"` before `"land"` misfiles `foilLand`/`nonFoilLand` as foil and **deletes the land slot**.
   Booster sheet ids are oracle-collapse-remapped onto the app pool (`set:<code> lang:en unique:cards`) so
-  everything resolves on-device with no app change; external sheets (`specialGuest`) are dropped and their
-  slot re-homed to `common`.
+  everything resolves on-device. Cross-product uuids resolve via MTGJSON `sourceSetCodes`; a source set the
+  tier list RATES joins the pool as top-level `extraPoolSets: [...]` in booster.json (SOS → `["soa"]`
+  Mystical Archive — the app widens the pool query to `(set:x or set:y) lang:en`, entries sanitised against
+  `^[a-z0-9]{2,6}$` at BOTH parse and query build), while unrated external sheets (`specialGuest`) are
+  dropped and their slot re-homed to `common`.
 - **Bot/suggested-pick engine must be archetype-based, not 2-color commitment** (the old
   `HeuristicBotDrafter` forces a 2-color pool and breaks 3+ color sets like TDM's wedges). Target: a
   data-driven `engine.json` per set + a generic `ArchetypeAwareBotDrafter`, with `HeuristicBotDrafter` as
@@ -307,9 +397,19 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   stripped and the card's own name is replaced with `~` before matching.
 - **Tag keys are persisted user data — NEVER rename an existing key.** User overrides use the
   rule-line syntax: terms joined by ` + ` are ANDed, `!term` excludes.
-- → memory: `project_tagging_engine_v2`
+- **D12 — system dictionary entries are read-only for users.** The editor shows system rows
+  view-only (label + rules, no edit/delete); users can only create/edit/delete their OWN tags, under
+  the `custom_` key prefix (`TagDictionaryRepository.CUSTOM_KEY_PREFIX`) — `upsert` rejects any other
+  key. `StrategyAnalyzer.analyze()` returns empty on a blank `oracleText` BEFORE evaluating any rule,
+  including `typeLineAnyOf`-only ones — a type-line-only detector still needs a non-blank oracle text
+  fixture to be exercised in tests.
+- → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
+**Suggestions tab + seed-build hidden for release (2026-07-14)**: `DeckFeatureFlags
+.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` and `.DECK_STUDIO_BUILD_FROM_SEED_ENABLED` flipped back to
+`false` (had been `true` since 2026-07-12 for the Community/Archetype plan launch) — code intact,
+flip back to `true` to re-enable. Manual editing, Import, and Discoveries are unaffected.
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
 `Screen.DeckStudio.createRoute(deckId?)` (null ⇒ fresh draft). The old `CreateDeckBottomSheet` + the
@@ -325,26 +425,69 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
   guard added when existing decks started routing through Studio; without it, opening a real empty deck and
   backing out deleted it.) Delete completes BEFORE nav.
 - Free-text budget: **never build `BudgetConstraints` from raw `TextField` text** — raw String + last-valid +
-  error flag, parse-guard in the VM. Deck Doctor incremental `AnalysisCache`/`GapSignature` is DUPLICATED
-  here (not shared with `DeckImprovementViewModel`).
+  error flag, parse-guard in the VM. The Deck Doctor incremental `AnalysisCache`/`GapSignature`/
+  `loadAnalysis`/`recomputeIncremental`/`recomputeAdds` machinery lives in `DeckDoctorOrchestrator`
+  (`shared/core-domain/.../feature/decks/domain/orchestrator/`, commonMain) — `DeckStudioViewModel`
+  constructs one instance per session and delegates to it; VM-internal LOGIC gates must read
+  `deckDoctorOrchestrator.state.value` directly (never the merged `_uiState`) to stay race-free.
 - Migrated from the legacy editor: inline `CardDetailSheet` (deck-card taps; search-result taps still nav to
   CardDetail), basic-land suggestions (`landDeltas`/`applyLandSuggestions`), stateless `WarningOverlay`
   (over-limit/color-identity/non-legendary-commander + acknowledge), deck game-stats card, playtest button.
   `CardDetailSheet`/`WarningOverlay`/`DeckFormatChipRow` are reusable composables in `presentation/components/`.
 - `DeckMagicDetailScreen` (in `DeckBuilderScreen.kt`) + `DeckBuilderViewModel` + `Screen.DeckDetail` route are
-  now an UNUSED fallback (kept compiling until parity confirmed in real use — then delete). `DeckImprovementScreen`
-  unchanged (still reachable as a secondary path; the Studio Suggestions tab covers the same engine inline).
-- → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`
+  now an UNUSED fallback (kept compiling until parity confirmed in real use — then delete).
+  **`DeckImprovementScreen`/`DeckImprovementViewModel`/`Screen.DeckImprovement` were RETIRED (D10)** — the
+  Studio Suggestions tab is the sole Deck Doctor UI surface; `DeckMagicDetailScreen.onImproveDeck`
+  re-points to `Screen.DeckStudio`.
+- **Motor B (community suggestions, Phase 4) + community seed-build (Phase 5)**: the Suggestions tab
+  gains a flag-gated (`communityEngineEnabledFlow`, D4) "Popular in similar decks" section +
+  "Decks like yours" carousel, entirely additive to Motor A; the seed sheet gains a flag-gated
+  "Use community data" toggle that re-orders `BuildDeckFromSeedsUseCase`'s fill priority. Flag off =
+  zero community UI, byte-identical to pre-Phase-4.
+- → memory: `project_deck_studio`, `feedback_budget_input_free_text_pattern`,
+  `project_deck_doctor_orchestrator_extraction`, `project_deck_studio_improvement_retirement`,
+  `project_motor_b_community_suggestions`, `project_community_hub_seedbuild_trending`
 
 ### Incomplete / quirks
 - **SetPickerViewModel**: `clearFilters()` calls `applyFilters()` to respect `restrictedSets` — do not
   assign `filteredSets = allSets`.
 
 ### Deck Doctor
-Original 8 phases complete; a separate **engine-quality plan** is in progress (see below). Key invariants:
+Original 8 phases complete; a separate **engine-quality plan** is complete (see below), and the
+**archetype-aware Community/Archetype plan** (`docs/claude-code-prompt-deck-doctor-community.md`)
+Phases 1-3 are complete: Phase 1 added a new archetype/theme skeleton layer
+(`ArchetypeDefinition`/`ThemeDefinition`/`ArchetypeSkeletonResolver`/`ArchetypeEvaluator`/
+`ArchetypeRoleClassifier`/`InferDeckArchetypeUseCase`) sitting ADDITIVELY on top of the engine
+below, in the SAME `shared/core-domain` commonMain package as the rest of it (not `:app`'s
+`feature/decks/domain/engine` — that location is stale, the whole engine was promoted to
+`shared/core-domain` during the KMP migration). `EvaluateDeckUseCase` resolves the deck's archetype
+(`Deck.archetypeOverride`/`themesOverride` pin, else classifier inference) and only computes
+archetype-aware warnings when non-GENERIC/themed — a GENERIC deck's evaluation is byte-identical to
+before. Deck Studio's Suggestions header carries a "Deck plan" chip/sheet (still behind the same
+`DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flag). Phase 2 added **Motor A**
+(`SuggestAddsFromCollectionUseCase`, same package): the offline, always-on, collection-only add
+source, now `DeckDoctorOrchestrator`'s SOLE adds source (it REPLACED, not supplemented,
+`SuggestAddsWithBudgetUseCase`). → memory: `project_archetype_engine`, `project_deck_doctor_phase2_motor_a`.
+Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
 - `generateFromSeeds()` captures inputs atomically inside `_uiState.update { }` (double-tap + stale-snapshot guards).
-- `loadAnalysis()` cancels via `analysisJob?.cancel()` before relaunching; sets `isLoading` only when `health == null`.
+- `DeckDoctorOrchestrator.loadAnalysis()` cancels its own `analysisJob` before relaunching (the
+  incremental-analysis machinery lives there now, not inline in the ViewModel — see the Deck Studio
+  section above).
+- `CandidatePoolGenerator`/`BudgetOptimizer`/`SuggestAddsWithBudgetUseCase` (D5) are DORMANT — still
+  Koin-registered but no longer referenced by any live class since Motor A replaced them in
+  `DeckDoctorOrchestrator` (Phase 2); do not delete. `Card.colors`/`colorIdentity`/`producedMana`
+  (D14) are persisted as compact WUBRG-subset strings (not JSON); Motor A's pip-intensity multiplier
+  and unknown-color-identity fail-closed filter (Commander only) consume them. → memory:
+  `project_dormant_budget_pool`, `project_card_model_produced_mana`, `project_deck_doctor_phase2_motor_a`
+- **Phase 3** added a new Cloudflare Worker `cloudflare/manahub-community/` (TypeScript, Wrangler,
+  vitest+miniflare) aggregating community deck data — EDHREC for Commander, Archidekt for 60-card
+  (D16) — behind KV (7-day snapshot TTL) + D1 (anonymous weekly trending counters, no PII), plus a
+  full `commonMain` client stack (`CommunityAggregateApi`/`CommunityAggregateRepositoryImpl`/
+  `CommunityAggregate` domain model). **Not deployed** — `wrangler.toml` KV/D1 bindings are
+  placeholder ids pending human-authorized provisioning. Consumed by nothing yet (Motor B/UI is
+  Phase 4); androidMain Room cache + `communityEngineEnabledFlow` DataStore flag (D4) + Koin wiring
+  are the remaining plumbing. → memory: `project_community_aggregate_worker`
 - `CandidatePoolGenerator.legalityFragment()` returns `String?`; `DRAFT → null` (no legality restriction).
 - `BudgetConstraints` has an `init` block validating finite/positive values.
 - `SeedStrategy.TOKENS` test requires all 3 primary tags (TOKENS+AGGRO+TRIBAL) to beat AGGRO's tie.
@@ -466,6 +609,15 @@ Original 8 phases complete; a separate **engine-quality plan** is in progress (s
   `project_deck_doctor_phase7_inference_flow`, `project_deck_doctor_phase4`, `project_deck_doctor_phase5`,
   `project_deck_doctor_phase8`
 
+**Deck Doctor Community/Archetype plan** (`docs/claude-code-prompt-deck-doctor-community.md`, gitignored/
+pending deletion once this branch ships — durable record lives in memory + `docs/adr/ADR-004-*`): archetype-
+aware skeletons (Phase 1) + Motor A collection suggestions (Phase 2) + the `manahub-community` Cloudflare
+Worker (Phase 3, not deployed) + Motor B community suggestions (Phase 4) + Community Hub Discover/seed-build
+priority/Home trending widget (Phase 5) + unified import pipeline (Phase 6) are ALL COMPLETE, entirely
+flag-gated behind `communityEngineEnabledFlow` (D4, default OFF). → memory: `project_archetype_engine`,
+`project_deck_doctor_phase2_motor_a`, `project_community_aggregate_worker`, `project_motor_b_community_suggestions`,
+`project_community_hub_seedbuild_trending`, `project_import_unification`
+
 ### Home dashboard (`feature/home/`)
 Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-know:
 - **Start destination is `Screen.Home`** (not `Screen.Collection`). BottomBar is 3-slot: [Home] [⚔ FAB] [Library].
@@ -475,38 +627,62 @@ Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-
 - `onBackHome`: `popUpTo(0) { inclusive = true }` (not `popUpTo(Screen.Collection.route)`) to avoid back-stack corruption on fresh install.
 - → memory: `project_home_dashboard_redesign`, `feedback_home_stateIn_test_pattern`
 
-### Home widget board (`feature/home/`, 3 phases complete 2026-06-09)
-The dashboard is a **fully customizable widget board** (`LazyVerticalGrid` of 2 cols). ~40 widget
+### Home widget board (`feature/home/`, overhauled 2026-07-13 — no-stub rule now in force)
+The dashboard is a **fully customizable widget board** (`LazyVerticalGrid` of 2 cols). 17 widget
 types in `HomeWidgetType` (each carries `persistedId`, `defaultTitleRes`, `supportedSizes`,
-`category`, `audience`, `isAlwaysPresent`). Layout = ordered `List<WidgetInstance>(type,size)`. Must-know:
+`category`, `audience`, `isAlwaysPresent`). Layout = ordered `List<WidgetInstance>(type,size)`.
+**THE NO-STUB RULE (Home invariant, added 2026-07-13): a widget/slide may only ship if its data
+path is real end-to-end (upstream source → repo flow → ViewModel → UI); anything that can't be
+wired must be deleted (composable + model + copy + DI binding), never left as a placeholder.**
+Every widget/slide is real as of the 2026-07-13 overhaul except `RULES_TIP` (intentionally static
+content). Must-know:
 - **Layout persists in DataStore only** (`home_widget_layout` = ordered `"persistedId:SIZE"` tokens;
   unknown id/size tokens are silently skipped on decode; empty → auth-appropriate default). No new
   Room tables. `homeLayoutFlow(default)` takes the default as a param so the DataStore stays unaware
-  of auth; the VM picks `defaultLayoutSignedIn/Out` via `isAuthenticatedFlow.flatMapLatest`.
-- **Edit mode is transient** (`editModeFlow`, never persisted; resets each session). All layout
-  reducers (`add/remove/move/resize/reset`) read the latest layout from `uiState.value.layout`,
-  produce a new list, and `saveHomeLayout` immediately — DataStore re-emits as the single source of
-  truth (no separate in-memory copy to drift). `CONTEXT_HERO.isAlwaysPresent` → cannot be removed.
-  `ResizeWidget` rejects sizes not in `type.supportedSizes`.
-- **Drag-to-reorder ghost lifts from the item's registered top-left + finger delta** (NOT the
-  Playtest `centerInRoot` pattern, which snaps to center and jumps on corner-press). Container
-  registers bounds via `onGloballyPositioned{boundsInRoot()}`; the dragged item is `alpha(0)`; a
-  floating ghost at `zIndex(Float.MAX_VALUE)` is positioned at `bounds.topLeft + dragDelta`. On drag,
-  `findTargetIndex(ghostCenter,...)` hit-tests and emits `MoveWidget`, then resets `dragDelta` to 0.
-- **ViewModel combine arity**: slices are bundled (`CoreSnapshot`, `DataBundle{board,stats,discover,
-  social}`) and folded with typed (non-vararg) `combine` overloads to avoid `Array<Any?>` erasure.
-  `performanceFlow` MUST be declared before `statsSnapshotFlow` (property init order). Every data flow
-  is `.catch{emit(empty/null)}`-isolated so one source failing never collapses the board.
-- **Phase 2 data** derives from existing repos (win rate/best deck/nemesis/heatmap/matchups from
-  `GameSessionRepository`, colors/rarity from `CollectionStats`, sets from `DraftRepository`). **Phase
-  3 is stubbed**: `CommunityStatsRepository` (interface + `CommunityStatsRepositoryStub`→`flowOf(null)`
-  bound in `CommunityModule`); trade/wishlist flows are `flowOf(null)` with TODOs. Account-gated
+  of auth; the VM picks `defaultLayoutSignedIn/Out` via `isAuthenticatedFlow.flatMapLatest` — the
+  2026-07-13 overhaul replaced both default lists (Phase 2.3); `TRENDING_COMMANDERS` is intentionally
+  NOT in either default (gallery-only, board-length discipline).
+- **Sizes are vestigial but only PARTLY cleaned up**: every widget renders at a single MEDIUM width
+  (`CARD_OF_THE_DAY` now only declares `WidgetSize.MEDIUM`, matching the rest); the board's old
+  bounds-registry/drag-hit-testing API (`HomeWidgetContainer.onRegisterBounds`, module-level
+  `findTargetIndex()`, `HomeScreen`'s `itemBounds` map) was DELETED as dead code — the gallery sheet
+  owns add/remove/reorder via its own local drag state, the board itself is static. Removing
+  `WidgetSize` from `WidgetInstance`/`PersistedWidget` entirely (and making the decoder legacy-token
+  tolerant) is DEFERRED — do this as its own tested pass, not bundled into a larger change.
+- **ViewModel combine arity**: slices are bundled (`CoreSnapshot` 7 flows, `DataBundle{layout,stats,
+  discover,social,gamification,recentlyAdded}` 6 flows) via the vararg-destructure `combine(vararg){
+  args -> @Suppress("UNCHECKED_CAST") ... }` pattern once a bundle exceeds 5 flows (Kotlin's typed
+  combine overloads cap at 5); inner sub-bundles (`socialSnapshotFlow`'s `TradesSnapshot`/
+  `SocialExtras`) stay on the typed non-vararg overloads. `performanceFlow` MUST be declared before
+  `statsSnapshotFlow` (property init order). Every data flow is `.catch{emit(empty/null)}`-isolated
+  so one source failing never collapses the board.
+- **Every data source is real** (2026-07-13 overhaul, Phase 1): `CommunityStatsRepositoryImpl`
+  (Supabase RPC `get_community_stats()`, cache-first via `CommunityAggregateCache`, replaces the
+  deleted `CommunityStatsRepositoryStub`); `ArchidektTrendingRepository` (reuses the existing
+  `ArchidektClient`); Trades Hub wired to `TradesRepository`/`OpenForTradeRepository`/
+  `TradeSuggestionsRepository`; `friendCount` wired to `FriendRepository.observeFriendCount()`;
+  tournament round wired to a new read-only `TournamentRepository.observeCurrentRound()`. Account-gated
   widgets render `AccountGatedPlaceholder` (→ `CreateAccount`) when `!isAuthenticated`.
-- `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` adds bounds/edit overlay; all
-  widgets share `WidgetShell` (surface+CardShape+min height S=96/M=132/L=220dp). No `success`/`error`
-  tokens exist — win=`lifePositive`, loss=`lifeNegative`. Community null→spinner, empty→empty body.
-- Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + edit pencil (Edit↔Done) + avatar.
-- → memory: `project_home_widget_board`
+- `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` just wraps it (no bounds
+  registry, see above); all widgets share `WidgetShell` (flat Column, no card surface). No
+  `success`/`error` tokens exist — win=`lifePositive`, loss=`lifeNegative`.
+- **`RECENTLY_ADDED`** (new 2026-07-13): newest local collection additions,
+  `UserCardRepository.observeRecentlyAdded(10)` — no Room migration (`created_at`/`updated_at`
+  already existed on `UserCardCollectionEntity`). Keyed by the `user_card_collection` row id (NOT
+  scryfallId — duplicate copies of the same card would collide on scryfallId).
+- **`TRENDING_COMMANDERS` (Deck Doctor Community/Archetype plan Phase 5)**: its `TrendingSnapshot?`
+  data is kept OUTSIDE the `HomeUiState` combine chain (a separate `HomeViewModel.trendingFlow`
+  `stateIn`, threaded as its own param through `HomeScreen`→`HomeWidgetContainer`→`HomeWidgetHost`) —
+  see `project_community_hub_seedbuild_trending` memory for why. Silently hidden (never an error
+  state) on any failure/flag-off. Distinct from the new SOCIAL_HUB "Popular on Archidekt" slides —
+  different backend (Cloudflare Worker vs. direct Archidekt API), never conflate the two.
+- **First Steps carousel**: tap = CTA only (2026-07-13 — no longer also dismisses); a dedicated
+  top-right dismiss affordance (`Icons.Default.Close`, ≥48dp) calls the same `SkipFirstStep`/
+  `observeSkippedFirstSteps` DataStore mechanism as before. Most step conditions are data-driven
+  (see `ALL_FIRST_STEPS` in `FirstStepItem.kt` for the per-step DATA-DRIVEN/DISMISS-ONLY doc).
+- Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + avatar (→ `OpenProfile`).
+- → memory: `project_home_widget_board`, `project_home_feature_overhaul_2026-07-13`,
+  `feedback_home_dashboard_audit_fixes_2026-07-13`, `feedback_archidekt_trending_stale_cache_bug`
 
 ### Gamification (`core/gamification/`, multi-phase — Phase 0 + Phase 1 complete)
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine. **Local-first** (works 100%
@@ -655,8 +831,20 @@ file path + line, the exact problem/feature, the proposed solution logic, and an
 Non-Kotlin work (Python `scripts/draftsim_py/`, Worker JS, Gradle, docs, memory) is handled directly.
 → memory: `feedback_delegate_kotlin_to_architect`
 
+**All WEB-target work (implement / translate / fix) goes through the `kmp-web-fullstack-dev` agent** —
+this is the web-side counterpart to `android-kotlin-architect`. Any agent or process that is going to
+write, port, or fix web code MUST delegate to it. Its domain: the `wasmJsMain` source set, web `actual`
+implementations behind `commonMain` interfaces, Compose Multiplatform / `wasmJs` rendering + bundle, the
+`:webApp` target, Ktor js/wasm engine wiring, and any `commonMain` change with web implications.
+**Boundary:** `android-kotlin-architect` owns Android (`androidMain`) + pure shared `commonMain`;
+`kmp-web-fullstack-dev` owns the web target + web-implicating shared code. When a `commonMain` change is
+driven by a web need (a new web actual, Ktor/wasm, a web-side interface), route it to
+`kmp-web-fullstack-dev`. The main agent must not edit web `.kt` directly — delegate (passing file path +
+line, the exact problem/feature, the proposed solution logic, and any CLAUDE.md constraints).
+
 When an agent identifies a bug or required fix in Android/Kotlin code, it MUST likewise **delegate the
-fix to the `android-kotlin-architect` agent** rather than implementing it directly.
+fix to the `android-kotlin-architect` agent** (or `kmp-web-fullstack-dev` for web-target code) rather
+than implementing it directly.
 
 After any bug fix, security finding, or architectural/design decision, the agent MUST record the
 learning per the **`memory-protocol` skill** (memory-file-first; update CLAUDE.md only when the rule is

@@ -1,12 +1,13 @@
 ﻿package com.mmg.manahub.feature.collection
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.CollectionViewMode
-import com.mmg.manahub.core.domain.model.ComparisonOperator
-import com.mmg.manahub.core.domain.model.SearchCriterion
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.CollectionViewMode
+import com.mmg.manahub.core.model.ComparisonOperator
+import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -14,12 +15,12 @@ import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
 import com.mmg.manahub.feature.collection.presentation.SortOrder
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import com.mmg.manahub.util.TestFixtures
@@ -155,6 +156,7 @@ class CollectionViewModelTest {
         coEvery { migrateLocalTradeLists(any()) } returns Result.success(0)
 
         return CollectionViewModel(
+            savedStateHandle       = SavedStateHandle(),
             getCollection          = getCollection,
             cardRepository         = cardRepository,
             userCardRepository     = userCardRepository,

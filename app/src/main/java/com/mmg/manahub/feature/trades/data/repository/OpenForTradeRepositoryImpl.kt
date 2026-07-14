@@ -1,25 +1,44 @@
 package com.mmg.manahub.feature.trades.data.repository
 
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeWithCard
-import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
-import com.mmg.manahub.feature.trades.data.remote.OpenForTradeRemoteDataSource
-import com.mmg.manahub.feature.trades.data.remote.dto.OpenForTradeEntryDto
-import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeWithCard
+import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
+import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.dto.OpenForTradeEntryDto
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.time.Instant
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.Instant
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class OpenForTradeRepositoryImpl @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared across the Trades,
+ * CardDetail and Collection Koin islands).
+ *
+ * Uses `java.util.UUID` / `System.currentTimeMillis()` (JVM-only, not available on `wasmJs`).
+ * Deferred (trades audit §4.3, 2026-07-10): swapping to `kotlin.uuid.Uuid` /
+ * `kotlinx.datetime.Clock` here is safe on its own, but this class also builds
+ * [LocalOpenForTradeEntity] directly (a Room entity whose `id`/`createdAt` columns are
+ * `String`/`Long`) — do this together with the eventual `androidMain`/`wasmJsMain` data-source
+ * split for this repository, not in isolation, to avoid a partial type mismatch between the two
+ * platform mappers.
+ */
+class OpenForTradeRepositoryImpl(
     private val dao: LocalOpenForTradeDao,
     private val remote: OpenForTradeRemoteDataSource,
 ) : OpenForTradeRepository {
+
+    // Serialises concurrent addLocal/addAndSync calls to prevent the TOCTOU race on the
+    // read-modify-write by collection id. Without this, two rapid taps for the same
+    // localCollectionId both see null from getByCollectionId() and both insert, producing
+    // duplicate rows instead of a single upserted one. Mirrors WishlistRepositoryImpl.addMutex
+    // (trades audit §2.1, 2026-07-10).
+    private val addMutex = Mutex()
 
     override fun observeLocal(): Flow<List<OpenForTradeEntry>> =
         dao.observeAllWithCard().map { list ->
@@ -65,33 +84,35 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         isFoil: Boolean,
         condition: String,
         language: String,
-    ): Result<Unit> = runCatching {
-        val existing = dao.getByCollectionId(localCollectionId)
-        if (existing != null) {
-            // Update existing entry with new quantity and attributes
-            dao.upsert(
-                existing.copy(
-                    quantity = quantity,
-                    isFoil = isFoil,
-                    condition = condition,
-                    language = language,
-                    synced = false,
+    ): Result<Unit> = addMutex.withLock {
+        runCatching {
+            val existing = dao.getByCollectionId(localCollectionId)
+            if (existing != null) {
+                // Update existing entry with new quantity and attributes
+                dao.upsert(
+                    existing.copy(
+                        quantity = quantity,
+                        isFoil = isFoil,
+                        condition = condition,
+                        language = language,
+                        synced = false,
+                    )
                 )
-            )
-        } else {
-            dao.upsert(
-                LocalOpenForTradeEntity(
-                    id = UUID.randomUUID().toString(),
-                    localCollectionId = localCollectionId,
-                    scryfallId = scryfallId,
-                    quantity = quantity,
-                    isFoil = isFoil,
-                    condition = condition,
-                    language = language,
-                    synced = false,
-                    createdAt = System.currentTimeMillis(),
+            } else {
+                dao.upsert(
+                    LocalOpenForTradeEntity(
+                        id = UUID.randomUUID().toString(),
+                        localCollectionId = localCollectionId,
+                        scryfallId = scryfallId,
+                        quantity = quantity,
+                        isFoil = isFoil,
+                        condition = condition,
+                        language = language,
+                        synced = false,
+                        createdAt = System.currentTimeMillis(),
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -100,8 +121,12 @@ class OpenForTradeRepositoryImpl @Inject constructor(
 
     override suspend fun removeByCollectionIdAndSync(localCollectionId: String): Result<Unit> =
         runCatching {
-            dao.deleteByCollectionId(localCollectionId)
+            // Remote-first: only delete the local row after the server row is confirmed gone.
+            // The old local-then-remote order could leave the server row alive after a failed
+            // remote call, and the next syncFromRemote() would re-insert ("resurrect") the entry
+            // the user just removed (trades audit §2.2, 2026-07-10).
             remote.removeByUserCardId(localCollectionId).getOrThrow()
+            dao.deleteByCollectionId(localCollectionId)
         }
 
     override suspend fun removeLocal(id: String): Result<Unit> = runCatching {
@@ -137,32 +162,34 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         condition: String,
         language: String,
         userId: String,
-    ): Result<Unit> = runCatching {
-        val existing = dao.getByCollectionId(localCollectionId)
-        val entity: LocalOpenForTradeEntity = if (existing != null) {
-            existing.copy(
-                quantity = quantity,
-                isFoil = isFoil,
-                condition = condition,
-                language = language,
-                synced = false,
-            ).also { dao.upsert(it) }
-        } else {
-            LocalOpenForTradeEntity(
-                id = UUID.randomUUID().toString(),
-                localCollectionId = localCollectionId,
-                scryfallId = scryfallId,
-                quantity = quantity,
-                isFoil = isFoil,
-                condition = condition,
-                language = language,
-                synced = false,
-                createdAt = System.currentTimeMillis(),
-            ).also { dao.upsert(it) }
+    ): Result<Unit> = addMutex.withLock {
+        runCatching {
+            val existing = dao.getByCollectionId(localCollectionId)
+            val entity: LocalOpenForTradeEntity = if (existing != null) {
+                existing.copy(
+                    quantity = quantity,
+                    isFoil = isFoil,
+                    condition = condition,
+                    language = language,
+                    synced = false,
+                ).also { dao.upsert(it) }
+            } else {
+                LocalOpenForTradeEntity(
+                    id = UUID.randomUUID().toString(),
+                    localCollectionId = localCollectionId,
+                    scryfallId = scryfallId,
+                    quantity = quantity,
+                    isFoil = isFoil,
+                    condition = condition,
+                    language = language,
+                    synced = false,
+                    createdAt = System.currentTimeMillis(),
+                ).also { dao.upsert(it) }
+            }
+            // localCollectionId == user_card_collection.id in Supabase — no lookup needed.
+            remote.batchAddOpenForTradeEntries(listOf(entity.localCollectionId)).getOrThrow()
+            dao.markSynced(listOf(entity.id))
         }
-        // localCollectionId == user_card_collection.id in Supabase — no lookup needed.
-        remote.batchAddOpenForTradeEntries(listOf(entity.localCollectionId)).getOrThrow()
-        dao.markSynced(listOf(entity.id))
     }
 
     override suspend fun syncFromRemote(userId: String): Result<Unit> = runCatching {
@@ -178,8 +205,13 @@ class OpenForTradeRepositoryImpl @Inject constructor(
                 condition = dto.condition ?: "NM",
                 language = dto.language ?: "en",
                 synced = true,
-                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilli() }
-                    .getOrDefault(System.currentTimeMillis()),
+                // Project-wide fallback convention (trades audit §2.13, 2026-07-10): an
+                // unparseable createdAt falls back to epoch (0L), not "now" — deterministic,
+                // and it sorts a malformed timestamp to the bottom of a recency-DESC list
+                // instead of falsely surfacing it as newest. Mirrors WishlistRepositoryImpl
+                // and TradesRepositoryImpl.parseIso().
+                createdAt = runCatching { Instant.parse(dto.createdAt).toEpochMilliseconds() }
+                    .getOrDefault(0L),
             )
         }
         dao.upsertAll(entities)
@@ -217,6 +249,6 @@ class OpenForTradeRepositoryImpl @Inject constructor(
         isFoil = isFoil ?: false,
         condition = condition ?: "NM",
         language = language ?: "en",
-        createdAt = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrDefault(0L),
+        createdAt = runCatching { Instant.parse(createdAt).toEpochMilliseconds() }.getOrDefault(0L),
     )
 }

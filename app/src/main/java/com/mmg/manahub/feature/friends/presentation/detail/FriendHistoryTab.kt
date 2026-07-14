@@ -36,16 +36,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.model.TradeStatus
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendMatchHistory
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * History tab on the friend detail screen.
@@ -286,14 +286,17 @@ private fun MatchHistoryCard(
 
     val lastPlayedFormatted = remember(history.lastPlayedAt) {
         if (history.lastPlayedAt == 0L) null
-        else DateTimeFormatter
-            .ofPattern("dd MMM yyyy", Locale.ENGLISH)
-            .withZone(ZoneId.systemDefault())
-            .format(Instant.ofEpochMilli(history.lastPlayedAt))
+        else {
+            val local = Instant.fromEpochMilliseconds(history.lastPlayedAt)
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+            val month = local.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+            val day = local.dayOfMonth.toString().padStart(2, '0')
+            "$day $month ${local.year}"
+        }
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = SmallCardShape,
         color = mc.surface,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -402,10 +405,11 @@ private fun TradeHistoryRow(
     }
 
     val dateFormatted = remember(proposal.updatedAt) {
-        val formatter = DateTimeFormatter
-            .ofPattern("dd MMM yyyy", Locale.ENGLISH)
-            .withZone(ZoneId.systemDefault())
-        formatter.format(Instant.ofEpochMilli(proposal.updatedAt))
+        val local = Instant.fromEpochMilliseconds(proposal.updatedAt)
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+        val month = local.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+        val day = local.dayOfMonth.toString().padStart(2, '0')
+        "$day $month ${local.year}"
     }
 
     // Items offered = cards moving FROM the proposer (proposerId is the sender side).
@@ -414,7 +418,7 @@ private fun TradeHistoryRow(
     val receivedCount = proposal.items.count { it.fromUserId == proposal.receiverId }
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = SmallCardShape,
         color = mc.surface,
         modifier = Modifier
             .fillMaxWidth()

@@ -73,13 +73,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -88,7 +88,7 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.presentation.AccountSection
 import com.mmg.manahub.feature.auth.presentation.AuthUiState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
@@ -96,6 +96,7 @@ import com.mmg.manahub.feature.auth.presentation.LoginSheet
 import com.mmg.manahub.feature.gamification.presentation.AvatarFrameRing
 import com.mmg.manahub.feature.gamification.presentation.BadgeEmblem
 import com.mmg.manahub.feature.gamification.presentation.TitleText
+import org.koin.androidx.compose.koinViewModel
 import kotlin.math.roundToInt
 
 /** Tabs shown under the Profile hero (Phase 2 adds Quests; Phase 3 adds Rewards). */
@@ -104,8 +105,8 @@ enum class ProfileTab { OVERVIEW, ACHIEVEMENTS, QUESTS, REWARDS }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    viewModel: ProfileViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel(),
+    viewModel: ProfileViewModel = koinViewModel(),
+    authViewModel: AuthViewModel = koinViewModel(),
     onSettingsClick: () -> Unit,
     onStatsClick: () -> Unit,
     onFriendsClick: () -> Unit,
@@ -683,7 +684,7 @@ private fun ProfileHeroSection(
         val resolvedName = name.ifEmpty { stringResource(R.string.game_setup_default_player_name) }
         val badgeCount = equippedBadges.size
             .coerceAtMost(com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.MAX_EQUIPPED_BADGES)
-        val equippedTitleName = equippedTitle?.let { stringResource(it.displayNameRes) }
+        val equippedTitleName = equippedTitle?.displayName
         val badgesEquippedText = if (badgeCount > 0) {
             pluralStringResource(R.plurals.profile_hero_badges_equipped, badgeCount, badgeCount)
         } else {
@@ -725,7 +726,7 @@ private fun ProfileHeroSection(
                 if (equippedTitle != null) {
                     TitleText(
                         renderSpec = equippedTitle.renderSpec,
-                        text = stringResource(equippedTitle.displayNameRes),
+                        text = equippedTitle.displayName,
                         style = MaterialTheme.magicTypography.labelLarge,
                         modifier = Modifier.padding(top = 2.dp),
                     )

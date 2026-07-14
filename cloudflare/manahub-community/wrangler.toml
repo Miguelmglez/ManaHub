@@ -1,0 +1,34 @@
+# Cloudflare Worker: manahub-community
+#
+# Serves read-only, cached community deck aggregates (Archidekt + EDHREC) for the
+# Deck Doctor Motor B / Community Hub features (see docs/adr/ADR-004-community-api-contracts.md
+# and docs/claude-code-prompt-deck-doctor-community.md Phase 3). No auth, no PII, GET only.
+#
+# PROVISIONED (2026-07-12): KV namespace + D1 database created and deployed, user-authorized.
+name = "manahub-community"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "COMMUNITY_KV"
+id = "e9634f0193f64b6daf57fc345c836ebf"
+preview_id = "8ad9bc57a2db41f3a37ba2d7e279d26c"
+
+[[d1_databases]]
+binding = "COMMUNITY_DB"
+database_name = "manahub-community-db"
+database_id = "a410d6e0-b383-4b20-9c6c-10e9c684048e"
+
+# Weekly cron: prune trending counters older than 8 weeks + pre-warm the top-10 trending
+# commanders (fixes cold start on Monday morning). NOT scheduled/deployed by this change —
+# defining the trigger here is config-as-code only; `wrangler deploy` (out of scope for this
+# phase) is what actually activates it.
+[triggers]
+crons = ["0 6 * * 1"]
+
+# Cloudflare rate-limit rule (dashboard-side, NOT provisioned by this file): a free-plan
+# account should add a "Rate Limiting Rule" on this Worker's route capping requests per IP
+# to protect the free-tier subrequest/CPU budget from abuse (e.g. 60 req/min per IP, GET only,
+# path prefix /v1/). This is a dashboard/Zone-level setting outside Wrangler's config surface —
+# a human must add it manually after deploy; documented here so it isn't forgotten.

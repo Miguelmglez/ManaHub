@@ -4,14 +4,20 @@ import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.entity.TournamentEntity
 import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
 import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.domain.repository.MatchResultOutcome
+import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.feature.tournament.data.repository.TournamentRepositoryImpl
 import com.mmg.manahub.feature.tournament.domain.usecase.GenerateNextRoundUseCase
+import app.cash.turbine.test
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -842,5 +848,56 @@ class TournamentRepositoryImplTest {
 
         // Assert
         assertTrue(!finished)
+    }
+
+    // ── observeCurrentRound (Home feature overhaul Phase 1.2.e, fixes F-3) ────
+    //
+    // Repository-level mapping test: dao.observeMaxRound() is a raw SQL MAX(round) projection that
+    // can return null (no matches generated yet); the repository must default that to 1 so "Round 0"
+    // is never surfaced anywhere downstream (Home dashboard's activeTournamentFlow, tournament UI).
+
+    @Test
+    fun `observeCurrentRound defaults null (no matches yet) to round 1, never round 0`() = runTest {
+        every { dao.observeMaxRound(1L) } returns flowOf(null)
+
+        val round = repository.observeCurrentRound(1L).first()
+
+        assertEquals(1, round)
+    }
+
+    @Test
+    fun `observeCurrentRound passes through the real max round from the DAO`() = runTest {
+        every { dao.observeMaxRound(1L) } returns flowOf(3)
+
+        val round = repository.observeCurrentRound(1L).first()
+
+        assertEquals(3, round)
+    }
+
+    @Test
+    fun `observeCurrentRound is scoped to the requested tournamentId`() = runTest {
+        every { dao.observeMaxRound(1L) } returns flowOf(2)
+        every { dao.observeMaxRound(2L) } returns flowOf(5)
+
+        assertEquals(2, repository.observeCurrentRound(1L).first())
+        assertEquals(5, repository.observeCurrentRound(2L).first())
+    }
+
+    @Test
+    fun `observeCurrentRound re-emits when the underlying max-round flow emits a new value`() = runTest {
+        val roundFlow = MutableStateFlow<Int?>(null)
+        every { dao.observeMaxRound(1L) } returns roundFlow
+
+        repository.observeCurrentRound(1L).test {
+            assertEquals(1, awaitItem()) // null (no matches yet) defaults to round 1
+
+            roundFlow.value = 1 // round 1 generated
+            assertEquals(1, awaitItem())
+
+            roundFlow.value = 2 // round 1 finished, round 2 generated
+            assertEquals(2, awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

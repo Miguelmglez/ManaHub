@@ -368,7 +368,7 @@ private fun HighlightCard(icon: String, label: String, value: String) {
 @Composable
 private fun GameProgressionStrip(
     sessionId: Long,
-    viewModel: GameResultStripViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
+    viewModel: GameResultStripViewModel = org.koin.androidx.compose.koinViewModel(),
 ) {
     androidx.compose.runtime.LaunchedEffect(sessionId) { viewModel.observe(sessionId) }
     val outcome by viewModel.outcome.collectAsStateWithLifecycle()
@@ -396,10 +396,11 @@ private fun GameProgressionStrip(
                         style = MaterialTheme.magicTypography.labelLarge,
                         color = mc.goldMtg,
                     )
-                    if (shown.leveledUp && shown.newLevel != null) {
+                    val newLevel = shown.newLevel
+                    if (shown.leveledUp && newLevel != null) {
                         Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.20f)) {
                             Text(
-                                text = stringResource(R.string.progression_strip_level_up, shown.newLevel),
+                                text = stringResource(R.string.progression_strip_level_up, newLevel),
                                 style = MaterialTheme.magicTypography.labelMedium,
                                 color = mc.primaryAccent,
                                 modifier = Modifier.padding(
@@ -472,7 +473,7 @@ private fun GameProgressionStrip(
                                 ) {
                                     Text(text = unlock.emoji, style = MaterialTheme.magicTypography.bodyMedium)
                                     Text(
-                                        text = stringResource(unlock.titleRes),
+                                        text = unlock.title,
                                         style = MaterialTheme.magicTypography.labelMedium,
                                         color = mc.textPrimary,
                                     )
@@ -493,7 +494,7 @@ private fun GameProgressionStrip(
                         ) {
                             Text(text = delta.emoji, style = MaterialTheme.magicTypography.bodyMedium)
                             Text(
-                                text = stringResource(delta.titleRes),
+                                text = delta.title,
                                 style = MaterialTheme.magicTypography.bodyMedium,
                                 color = mc.textSecondary,
                                 modifier = Modifier.weight(1f),

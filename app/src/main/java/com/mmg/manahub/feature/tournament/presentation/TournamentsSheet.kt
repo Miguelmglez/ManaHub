@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -54,7 +53,9 @@ import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * A bottom sheet that provides the entry points for the tournament flow.
@@ -85,7 +86,7 @@ fun TournamentsSheet(
     onOpenTournament: (Long) -> Unit,
     onNavigateToTournamentList: () -> Unit = {},
     onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
-    viewModel: TournamentListViewModel = hiltViewModel(),
+    viewModel: TournamentListViewModel = koinViewModel(),
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -155,19 +156,23 @@ fun TournamentsSheet(
                     onClick = onCreateLocal,
                 )
 
-                SheetActionRow(
-                    emoji = "🏆",
-                    title = stringResource(R.string.tournaments_sheet_host_online_title),
-                    subtitle = stringResource(R.string.tournaments_sheet_host_online_subtitle),
-                    onClick = { showCreateOnlineStub = true },
-                )
+                // Online tournament rows — hidden while online sessions are flag-disabled. Local
+                // tournament creation (above) is unaffected.
+                if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                    SheetActionRow(
+                        emoji = "🏆",
+                        title = stringResource(R.string.tournaments_sheet_host_online_title),
+                        subtitle = stringResource(R.string.tournaments_sheet_host_online_subtitle),
+                        onClick = { showCreateOnlineStub = true },
+                    )
 
-                SheetActionRow(
-                    emoji = "🔗",
-                    title = stringResource(R.string.tournaments_sheet_join_online_title),
-                    subtitle = stringResource(R.string.tournaments_sheet_join_online_subtitle),
-                    onClick = { showJoinOnlineSheet = true },
-                )
+                    SheetActionRow(
+                        emoji = "🔗",
+                        title = stringResource(R.string.tournaments_sheet_join_online_title),
+                        subtitle = stringResource(R.string.tournaments_sheet_join_online_subtitle),
+                        onClick = { showJoinOnlineSheet = true },
+                    )
+                }
 
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = MaterialTheme.spacing.xl),

@@ -83,6 +83,9 @@ fun WidgetGallerySheet(
     currentLayout: List<WidgetInstance>,
     isAuthenticated: Boolean,
     gamificationEnabled: Boolean,
+    // Mirrors gamificationEnabled's "omit entirely from the gallery, don't show as a greyed row"
+    // convention — Trending Commanders navigates into Community Decks, which is currently disabled.
+    communityDecksEnabled: Boolean = false,
     onAddWidget: (HomeWidgetType) -> Unit,
     onRemoveWidget: (HomeWidgetType) -> Unit,
     onMoveWidget: (from: Int, to: Int) -> Unit,
@@ -111,7 +114,15 @@ fun WidgetGallerySheet(
     val localCategoryOrder = remember { mutableStateListOf<WidgetCategory>() }
     LaunchedEffect(initialCategories) {
         if (localCategoryOrder.isEmpty()) {
-            localCategoryOrder.addAll(initialCategories)
+            localCategoryOrder.addAll(initialCategories.distinct())
+        } else {
+            // Defensive: ensure any new categories added to the app are picked up,
+            // but never introduce duplicates.
+            val current = localCategoryOrder.toSet()
+            val missing = initialCategories.filter { it !in current }
+            if (missing.isNotEmpty()) {
+                localCategoryOrder.addAll(missing)
+            }
         }
     }
 
@@ -128,7 +139,9 @@ fun WidgetGallerySheet(
         // Sync from source-of-truth only when NOT actively dragging an item.
         if (draggedId == null) {
             localLayout.clear()
-            localLayout.addAll(currentLayout)
+            // Defensive: ensure we don't pick up duplicates from the source of truth
+            // if a race condition occurs in the ViewModel's state emission.
+            localLayout.addAll(currentLayout.distinctBy { it.type.persistedId })
         }
     }
 
@@ -137,7 +150,9 @@ fun WidgetGallerySheet(
 
     // No remember(key) — localLayout is snapshot state, so Compose tracks reads here automatically.
     // Recomputing map{}.toSet() over a ~15-item list each recomposition is trivial.
-    val addedTypes = localLayout.map { it.type }.toSet()
+    // Use currentLayout (source of truth) for added status to ensure UI responsiveness 
+    // when adding/removing, as localLayout is primarily for drag reordering.
+    val addedTypes = remember(currentLayout) { currentLayout.map { it.type }.toSet() }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -194,13 +209,16 @@ fun WidgetGallerySheet(
                         .filter { it.type.category == category }
                         .map { it.type }
                         .filter { gamificationEnabled || !it.isGamification }
+                        .filter { communityDecksEnabled || it != HomeWidgetType.TRENDING_COMMANDERS }
+                        .distinct()
 
                     val notAdded = HomeWidgetType.entries
                         .filter { it.category == category }
                         .filter { gamificationEnabled || !it.isGamification }
+                        .filter { communityDecksEnabled || it != HomeWidgetType.TRENDING_COMMANDERS }
                         .filter { it !in addedTypes }
 
-                    val widgets = addedInOrder + notAdded
+                    val widgets = (addedInOrder + notAdded).distinctBy { it.persistedId }
                     // Skip categories with no visible widget types (e.g. TOURNAMENT / COMMUNITY have
                     // no types assigned, and gamification-only categories vanish when the toggle is off)
                     // so we never render an orphaned header.
@@ -256,7 +274,7 @@ fun WidgetGallerySheet(
                         )
                     }
 
-                    items(widgets, key = { it.persistedId }) { type ->
+                    items(widgets, key = { "gallery_${it.persistedId}" }) { type ->
                         val isAdded = type in addedTypes
                         val isFixed = type.isAlwaysPresent
                         val isDraggingItem = draggedId == type.persistedId
@@ -271,7 +289,7 @@ fun WidgetGallerySheet(
                             isDragging = isDraggingItem || isDraggingInBlock,
                             modifier = Modifier
                                 .then(if (isDraggingItem || isDraggingInBlock) Modifier else Modifier.animateItem())
-                                .zIndex(if (isDraggingItem) 11f else categoryZIndex)
+                                .zIndex(if (isDraggingItem) 11f else (if (draggedCategory == category) 10f else 1f))
                                 .graphicsLayer {
                                     translationY = if (isDraggingItem || isDraggingInBlock) dragAccumY else 0f
                                 },
@@ -479,7 +497,7 @@ private fun CatalogRow(
                     modifier = Modifier.padding(end = spacing.sm),
                 )
                 isFixed -> Text(
-                    text = "FIXED",
+                    text = stringResource(R.string.home_widget_fixed),
                     style = ty.labelSmall,
                     color = mc.textDisabled,
                     modifier = Modifier.padding(end = spacing.sm)
@@ -542,14 +560,16 @@ private fun ActionChip(
 }
 
 private val WidgetCategory.displayName: String
+    @Composable
+    @ReadOnlyComposable
     get() = when (this) {
-        WidgetCategory.ACTIVITY -> "Activity"
-        WidgetCategory.STATS -> "Stats"
-        WidgetCategory.COLLECTION -> "Collection"
-        WidgetCategory.DISCOVER -> "Discover"
-        WidgetCategory.SOCIAL -> "Social"
-        WidgetCategory.TOURNAMENT -> "Tournament"
-        WidgetCategory.COMMUNITY -> "Community"
+        WidgetCategory.ACTIVITY -> stringResource(R.string.home_gallery_category_activity)
+        WidgetCategory.STATS -> stringResource(R.string.home_gallery_category_stats)
+        WidgetCategory.COLLECTION -> stringResource(R.string.home_gallery_category_collection)
+        WidgetCategory.DISCOVER -> stringResource(R.string.home_gallery_category_discover)
+        WidgetCategory.SOCIAL -> stringResource(R.string.home_gallery_category_social)
+        WidgetCategory.TOURNAMENT -> stringResource(R.string.home_gallery_category_tournament)
+        WidgetCategory.COMMUNITY -> stringResource(R.string.home_gallery_category_community)
     }
 
 private val WidgetCategory.icon: androidx.compose.ui.graphics.vector.ImageVector
@@ -568,19 +588,21 @@ private val HomeWidgetType.description: String
     @Composable
     @ReadOnlyComposable
     get() = when (this) {
-        HomeWidgetType.CONTEXT_HERO -> "Your most relevant next action"
-        HomeWidgetType.QUICK_ACTIONS -> "One-tap shortcuts"
+        HomeWidgetType.CONTEXT_HERO -> stringResource(R.string.home_widget_desc_context_hero)
+        HomeWidgetType.QUICK_ACTIONS -> stringResource(R.string.home_widget_desc_quick_actions)
         HomeWidgetType.PROGRESSION_HUB -> stringResource(R.string.home_widget_desc_progression_hub)
         HomeWidgetType.QUESTS_HUB -> stringResource(R.string.home_widget_desc_quests_hub)
-        HomeWidgetType.GAME_STATS_HUB -> "Win rate, best deck and nemesis"
-        HomeWidgetType.COLLECTION_STATS_HUB -> "Cards, decks, value and color split"
-        HomeWidgetType.YOUR_DECKS_SHELF -> "Quick access to your decks"
-        HomeWidgetType.WISHLIST_PROGRESS -> "Your wishlist at a glance"
-        HomeWidgetType.DISCOVER_CARDS -> "Discover cards — pick a set or refresh"
-        HomeWidgetType.CARD_OF_THE_DAY -> "A random card — tap refresh for another"
-        HomeWidgetType.LATEST_SETS -> "Newest sets to draft"
-        HomeWidgetType.MTG_NEWS -> "Latest MTG headlines"
-        HomeWidgetType.RULES_TIP -> "A rules tip each day"
-        HomeWidgetType.SOCIAL_HUB -> "Friends, community and online play"
-        HomeWidgetType.TRADES_HUB -> "Trade inbox and suggestions"
+        HomeWidgetType.GAME_STATS_HUB -> stringResource(R.string.home_widget_desc_game_stats_hub)
+        HomeWidgetType.COLLECTION_STATS_HUB -> stringResource(R.string.home_widget_desc_collection_stats_hub)
+        HomeWidgetType.YOUR_DECKS_SHELF -> stringResource(R.string.home_widget_desc_decks_shelf)
+        HomeWidgetType.WISHLIST_PROGRESS -> stringResource(R.string.home_widget_desc_wishlist)
+        HomeWidgetType.RECENTLY_ADDED -> stringResource(R.string.home_widget_desc_recently_added)
+        HomeWidgetType.DISCOVER_CARDS -> stringResource(R.string.home_widget_desc_discover)
+        HomeWidgetType.CARD_OF_THE_DAY -> stringResource(R.string.home_widget_desc_card_of_day)
+        HomeWidgetType.LATEST_SETS -> stringResource(R.string.home_widget_desc_latest_sets)
+        HomeWidgetType.MTG_NEWS -> stringResource(R.string.home_widget_desc_news)
+        HomeWidgetType.RULES_TIP -> stringResource(R.string.home_widget_desc_rules_tip)
+        HomeWidgetType.SOCIAL_HUB -> stringResource(R.string.home_widget_desc_social_hub)
+        HomeWidgetType.TRADES_HUB -> stringResource(R.string.home_widget_desc_trades_hub)
+        HomeWidgetType.TRENDING_COMMANDERS -> stringResource(R.string.home_widget_desc_trending_commanders)
     }

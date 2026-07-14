@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,10 +39,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -51,13 +56,15 @@ fun DeckListScreen(
     onDeckClick:       (deckId: String) -> Unit,
     onCreateDeck:      () -> Unit,
     onPlaytestClick:   (deckId: String) -> Unit = {},
-    viewModel:         DeckViewModel = hiltViewModel(),
+    onBrowseCommunityDecks: () -> Unit = {},
+    viewModel:         DeckViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isCommunityDecksEnabled by viewModel.isCommunityDecksEnabled.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
     Scaffold(
-        containerColor = Color.Transparent,
+        containerColor = mc.background,
         contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
             if (uiState.decks.isNotEmpty()) {
@@ -74,6 +81,7 @@ fun DeckListScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(mc.background)
                 .padding(padding)
         ) {
             when {
@@ -84,6 +92,8 @@ fun DeckListScreen(
 
                 uiState.decks.isEmpty() -> EmptyDecksState(
                     onCreateClick = onCreateDeck,
+                    onBrowseCommunityDecks = onBrowseCommunityDecks,
+                    showBrowseCommunityDecks = isCommunityDecksEnabled,
                     modifier      = Modifier.align(Alignment.Center),
                 )
 
@@ -95,10 +105,11 @@ fun DeckListScreen(
                     ) {
                         items(uiState.decks, key = { it.id }) { deck ->
                             DeckItem(
-                                deck        = deck,
-                                onClick     = { onDeckClick(deck.id) },
-                                onDelete    = { viewModel.deleteDeck(deck.id) },
-                                onPlaytest  = if (DeckFeatureFlags.PLAYTEST_ENABLED) ({ onPlaytestClick(deck.id) }) else null,
+                                deck             = deck,
+                                onClick          = { onDeckClick(deck.id) },
+                                onDelete         = { viewModel.deleteDeck(deck.id) },
+                                onPlaytest       = if (DeckFeatureFlags.PLAYTEST_ENABLED) ({ onPlaytestClick(deck.id) }) else null,
+                                cardBackPainter  = painterResource(R.drawable.mtg_card_back),
                             )
                         }
                     }
@@ -128,6 +139,8 @@ fun DeckListScreen(
 @Composable
 private fun EmptyDecksState(
     onCreateClick: () -> Unit,
+    onBrowseCommunityDecks: () -> Unit,
+    showBrowseCommunityDecks: Boolean = true,
     modifier:      Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -176,12 +189,26 @@ private fun EmptyDecksState(
             onClick = onCreateClick,
             colors  = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
             border  = BorderStroke(1.dp, mc.primaryAccent),
-            shape   = RoundedCornerShape(12.dp)
+            shape   = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text(
                 stringResource(R.string.decklist_empty_action),
                 style = ty.labelLarge,
             )
+        }
+        
+        if (showBrowseCommunityDecks) {
+            TextButton(
+                onClick = onBrowseCommunityDecks,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Browse Community Decks",
+                    style = ty.labelLarge,
+                    color = mc.textSecondary
+                )
+            }
         }
     }
 }

@@ -1,0 +1,114 @@
+{
+  "header": "Atraxa, Praetors' Voice (Commander)",
+  "creature": 24,
+  "instant": 10,
+  "sorcery": 8,
+  "artifact": 9,
+  "enchantment": 7,
+  "battle": 0,
+  "planeswalker": 6,
+  "land": 35,
+  "basic": 12,
+  "nonbasic": 23,
+  "similar": [
+    "Atraxa, Grand Unifier",
+    "Ixhel, Scion of Atraxa",
+    "Reyhan, Last of the Abzan"
+  ],
+  "bracket_counts": { "3": 3388, "2": 3357, "4": 2211, "1": 134, "5": 141 },
+  "budget_counts": { "middle": 33965, "expensive": 4245, "budget": 4245 },
+  "tag_counts": {
+    "Infect": 4864,
+    "Planeswalkers": 2713,
+    "+1/+1 Counters": 2458,
+    "Superfriends": 74
+  },
+  "container": {
+    "breadcrumb": [],
+    "description": "",
+    "keywords": [],
+    "title": "Atraxa, Praetors' Voice",
+    "json_dict": {
+      "card": {
+        "num_decks": 42455,
+        "rank": 4,
+        "cmc": 4.0,
+        "color_identity": ["G", "W", "U", "B"],
+        "id": "d0d33d52-3d28-4635-b985-51e126289259",
+        "name": "Atraxa, Praetors' Voice",
+        "type_line": "Legendary Creature - Phyrexian Angel Horror",
+        "combos": true,
+        "is_commander": true,
+        "legal_commander": true,
+        "precon": "Breed Lethality"
+      },
+      "cardlists": [
+        {
+          "tag": "gamechangers",
+          "header": "Game Changers",
+          "cardviews": [
+            {
+              "id": "sol-ring-uid",
+              "name": "Sol Ring",
+              "sanitized": "sol-ring",
+              "slug": "sol-ring",
+              "url": "/cards/sol-ring",
+              "synergy": -0.14,
+              "num_decks": 40000,
+              "potential_decks": 42455,
+              "trend_zscore": 0.0
+            }
+          ]
+        },
+        {
+          "tag": "highsynergycards",
+          "header": "High Synergy Cards",
+          "cardviews": [
+            {
+              "id": "209855ee-d531-4b58-926b-8da171d46619",
+              "name": "The Serpent Society",
+              "sanitized": "the-serpent-society",
+              "slug": "the-serpent-society",
+              "url": "/cards/the-serpent-society",
+              "synergy": 0.0077,
+              "num_decks": 69,
+              "potential_decks": 3572,
+              "trend_zscore": 0.0
+            }
+          ]
+        },
+        {
+          "tag": "utilitylands",
+          "header": "Utility Lands",
+          "cardviews": [
+            {
+              "id": "command-tower-uid",
+              "name": "Command Tower",
+              "sanitized": "command-tower",
+              "slug": "command-tower",
+              "url": "/cards/command-tower",
+              "synergy": -0.05,
+              "num_decks": 39000,
+              "potential_decks": 42455,
+              "trend_zscore": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "panels": {
+    "articles": [],
+    "combocounts": {},
+    "mana_curve": { "0": 1, "1": 8, "2": 18, "3": 16, "4": 10, "5": 6, "6": 4, "7": 1 },
+    "piechart": {},
+    "rank_over_time": {
+      "2026-05-01": { "commander_count": 1500, "perc_of_decks_overall": 0.6, "perc_of_decks_overall_ma": 0.59, "rank": 6, "rank_ma": 7 },
+      "2026-06-01": { "commander_count": 1600, "perc_of_decks_overall": 0.62, "perc_of_decks_overall_ma": 0.6, "rank": 4, "rank_ma": 6 }
+    },
+    "taglinks": [
+      { "count": 4864, "slug": "infect", "value": "Infect" },
+      { "count": 2713, "slug": "planeswalkers", "value": "Planeswalkers" }
+    ]
+  }
+}

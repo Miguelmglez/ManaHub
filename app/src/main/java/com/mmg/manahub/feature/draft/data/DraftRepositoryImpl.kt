@@ -6,31 +6,29 @@ import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.data.remote.ScryfallApi
+import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.mapper.toDomain
-import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.DraftSet
-import com.mmg.manahub.core.network.ScryfallRequestQueue
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.feature.draft.data.DraftRepositoryImpl.Companion.VALID_SET_CODE
-import com.mmg.manahub.feature.draft.data.local.DraftSetDao
-import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
-import com.mmg.manahub.feature.draft.data.remote.YouTubeApi
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.remote.CloudflareContentClient
+import com.mmg.manahub.core.data.remote.YouTubeClient
 import com.mmg.manahub.feature.draft.data.remote.toDomain
 import com.mmg.manahub.feature.draft.data.remote.toEntity
-import com.mmg.manahub.feature.draft.domain.model.ArchetypeGuide
-import com.mmg.manahub.feature.draft.domain.model.ArchetypeKeyCard
-import com.mmg.manahub.feature.draft.domain.model.DraftVideo
-import com.mmg.manahub.feature.draft.domain.model.MechanicExamples
-import com.mmg.manahub.feature.draft.domain.model.MechanicGuide
-import com.mmg.manahub.feature.draft.domain.model.MechanicKeyCard
-import com.mmg.manahub.feature.draft.domain.model.SetDraftGuide
-import com.mmg.manahub.feature.draft.domain.model.SetTierList
-import com.mmg.manahub.feature.draft.domain.model.TierCard
-import com.mmg.manahub.feature.draft.domain.model.TierGroup
-import com.mmg.manahub.feature.draft.domain.repository.DraftRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
+import com.mmg.manahub.core.model.ArchetypeGuide
+import com.mmg.manahub.core.model.ArchetypeKeyCard
+import com.mmg.manahub.core.model.DraftVideo
+import com.mmg.manahub.core.model.MechanicExamples
+import com.mmg.manahub.core.model.MechanicGuide
+import com.mmg.manahub.core.model.MechanicKeyCard
+import com.mmg.manahub.core.model.SetDraftGuide
+import com.mmg.manahub.core.model.SetTierList
+import com.mmg.manahub.core.model.TierCard
+import com.mmg.manahub.core.model.TierGroup
+import com.mmg.manahub.core.domain.repository.DraftRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,9 +36,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
 
 /**
  * Implementation of [DraftRepository] that fetches draft content from the Cloudflare Worker
@@ -54,18 +49,20 @@ import javax.inject.Singleton
  *   Worker publishes a new version.
  *
  * No assets/ reads. If Cloudflare is unreachable and no local file exists, an error is returned.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule].
  */
-@Singleton
-class DraftRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val scryfallApi: ScryfallApi,
+class DraftRepositoryImpl(
+    private val context: Context,
+    private val scryfallApi: ScryfallClient,
     private val scryfallQueue: ScryfallRequestQueue,
-    private val youTubeApi: YouTubeApi,
-    private val cloudflareApi: CloudflareContentApi,
+    private val youTubeClient: YouTubeClient,
+    private val cloudflareClient: CloudflareContentClient,
     private val draftSetDao: DraftSetDao,
     private val gson: Gson,
-    @Named("draft_prefs") private val draftPrefs: SharedPreferences,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val draftPrefs: SharedPreferences,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : DraftRepository {
 
     companion object {
@@ -103,7 +100,7 @@ class DraftRepositoryImpl @Inject constructor(
                     }
                 }
 
-                val response = cloudflareApi.getSetsIndex()
+                val response = cloudflareClient.getSetsIndex()
                 val entities = response.sets.map { it.toEntity() }
                 draftSetDao.replaceAll(entities)
 
@@ -136,8 +133,8 @@ class DraftRepositoryImpl @Inject constructor(
                         (remoteVersion != null && remoteVersion != storedVersion)
 
                     if (needsRefresh) {
-                        val json = cloudflareApi.getSetGuide(safeCode)
-                        saveJsonToFile(json, localFile)
+                        val jsonString = cloudflareClient.getSetGuide(safeCode)
+                        saveJsonToFile(jsonString, localFile)
                         if (remoteVersion != null) {
                             draftPrefs.edit()
                                 .putString(PREF_GUIDE_VERSION.format(safeCode), remoteVersion)
@@ -175,8 +172,8 @@ class DraftRepositoryImpl @Inject constructor(
                         (remoteVersion != null && remoteVersion != storedVersion)
 
                     if (needsRefresh) {
-                        val json = cloudflareApi.getSetTierList(safeCode)
-                        saveJsonToFile(json, localFile)
+                        val jsonString = cloudflareClient.getSetTierList(safeCode)
+                        saveJsonToFile(jsonString, localFile)
                         if (remoteVersion != null) {
                             draftPrefs.edit()
                                 .putString(PREF_TIER_VERSION.format(safeCode), remoteVersion)
@@ -222,12 +219,14 @@ class DraftRepositoryImpl @Inject constructor(
     override suspend fun getSetCardsPage(
         setCode: String,
         page: Int,
+        extraPoolSets: List<String>,
     ): DataResult<Pair<List<Card>, Boolean>> {
         return withContext(ioDispatcher) {
             try {
+                val poolQuery = buildPoolQuery(setCode, extraPoolSets)
                 val result = scryfallQueue.execute {
                     scryfallApi.searchCards(
-                        query = "set:$setCode lang:en",
+                        query = poolQuery,
                         order = "set",
                         unique = "cards",
                         page = page,
@@ -240,9 +239,10 @@ class DraftRepositoryImpl @Inject constructor(
                 // Retrofit throws HttpException(304) in that case. Retry once without cache so
                 // Scryfall returns a full 200 response.
                 try {
+                    val poolQuery = buildPoolQuery(setCode, extraPoolSets)
                     val result = scryfallQueue.execute {
                         scryfallApi.searchCardsNoCache(
-                            query = "set:$setCode lang:en",
+                            query = poolQuery,
                             order = "set",
                             unique = "cards",
                             page = page,
@@ -254,6 +254,27 @@ class DraftRepositoryImpl @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Builds the Scryfall pool query for [setCode], widened to also include [extraPoolSets]
+     * when non-empty (e.g. SOS's booster.json declares `extraPoolSets = ["soa"]` for its
+     * Mystical Archive sheet). Every set code is re-sanitized here via [sanitizeSetCode] even
+     * though [DraftSimRepositoryImpl.parseBoosterConfig] already filters `extraPoolSets` against
+     * the same allowlist — defense in depth, since this string is interpolated directly into a
+     * Scryfall query. When [extraPoolSets] is empty the query is unchanged from before this
+     * feature: `set:$setCode lang:en`.
+     */
+    private fun buildPoolQuery(setCode: String, extraPoolSets: List<String>): String {
+        val safeSetCode = sanitizeSetCode(setCode)
+        val safeExtras = extraPoolSets.mapNotNull { code ->
+            runCatching { sanitizeSetCode(code) }.getOrNull()
+        }
+        if (safeExtras.isEmpty()) {
+            return "set:$safeSetCode lang:en"
+        }
+        val setClause = (listOf(safeSetCode) + safeExtras).joinToString(" or ") { "set:$it" }
+        return "($setClause) lang:en"
     }
 
     // -------------------------------------------------------------------------
@@ -275,11 +296,11 @@ class DraftRepositoryImpl @Inject constructor(
             try {
                 val query = "$setName MTG draft guide"
                 val enResults = runCatching {
-                    youTubeApi.searchVideos(query = query, language = "en")
+                    youTubeClient.searchVideos(query = query, language = "en")
                 }.getOrNull()?.items ?: emptyList()
 
                 val esResults = runCatching {
-                    youTubeApi.searchVideos(query = query, language = "es")
+                    youTubeClient.searchVideos(query = query, language = "es")
                 }.getOrNull()?.items ?: emptyList()
 
                 val seenIds = mutableSetOf<String>()
@@ -371,14 +392,14 @@ class DraftRepositoryImpl @Inject constructor(
         File(draftDir(setCode), "tier-list.json")
 
     /**
-     * Writes [json] to [file] atomically: first writes to a sibling `.tmp` file,
+     * Writes [jsonString] to [file] atomically: first writes to a sibling `.tmp` file,
      * then renames it into place. This prevents a partially-written file from being
      * read as valid JSON if the process is killed mid-write.
      */
-    private fun saveJsonToFile(json: JsonObject, file: File) {
+    private fun saveJsonToFile(jsonString: String, file: File) {
         val tmp = File(file.parent, "${file.name}.tmp")
         try {
-            tmp.writeText(gson.toJson(json))
+            tmp.writeText(jsonString)
             if (!tmp.renameTo(file)) {
                 file.writeText(tmp.readText())
             }

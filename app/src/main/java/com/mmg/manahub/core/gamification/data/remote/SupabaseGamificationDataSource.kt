@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.gamification.data.remote
 
-import com.mmg.manahub.core.di.IoDispatcher
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineDispatcher
@@ -9,8 +8,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Supabase implementation of [GamificationRemoteDataSource] (ADR-002 §11).
@@ -23,10 +20,9 @@ import javax.inject.Singleton
  *
  * The user is resolved server-side via `auth.uid()`; no user_id is sent in any payload.
  */
-@Singleton
-class SupabaseGamificationDataSource @Inject constructor(
+class SupabaseGamificationDataSource(
     private val supabaseClient: SupabaseClient,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : GamificationRemoteDataSource {
 
     private val json = Json { ignoreUnknownKeys = true }

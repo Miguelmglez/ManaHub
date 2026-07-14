@@ -1,14 +1,18 @@
 package com.mmg.manahub.feature.collection.presentation
 
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.CollectionViewMode
-import com.mmg.manahub.core.domain.model.ComparisonOperator
-import com.mmg.manahub.core.domain.model.SearchCriterion
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.CollectionViewMode
+import com.mmg.manahub.core.model.groupByCard
+import com.mmg.manahub.core.model.ComparisonOperator
+import com.mmg.manahub.core.model.SearchCriterion
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -17,20 +21,18 @@ import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * ViewModel for the collection screen.
@@ -42,8 +44,8 @@ import javax.inject.Inject
  * All push/pull details, watermarks, and LWW conflict resolution are handled
  * internally by [SyncManager] — this ViewModel only reports the state to the UI.
  */
-@HiltViewModel
-class CollectionViewModel @Inject constructor(
+class CollectionViewModel(
+    private val savedStateHandle: SavedStateHandle,
     private val getCollection: GetCollectionUseCase,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
@@ -57,6 +59,9 @@ class CollectionViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val analyticsHelper: AnalyticsHelper,
 ) : ViewModel() {
+
+    val gridState = LazyGridState()
+    val listState = LazyListState()
 
     private val _uiState = MutableStateFlow(CollectionUiState())
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
@@ -81,6 +86,15 @@ class CollectionViewModel @Inject constructor(
     private var openForTradeUnsyncedCount = 0
 
     init {
+        // Initialize tab from SavedStateHandle ("tab" nav arg)
+        val tabArg = savedStateHandle.get<String>("tab")?.lowercase()
+        val initialTab = when (tabArg) {
+            "decks" -> CollectionTab.DECKS
+            "trades" -> CollectionTab.TRADES
+            else -> CollectionTab.CARDS
+        }
+        _uiState.update { it.copy(selectedTab = initialTab) }
+
         observeCollection()
         observeWishlistIds()
         observeTradeListUnsyncedCounts()
@@ -322,6 +336,7 @@ class CollectionViewModel @Inject constructor(
     }
 
     fun onTabSelected(tab: CollectionTab) {
+        if (_uiState.value.selectedTab == tab) return
         _uiState.update { it.copy(selectedTab = tab) }
     }
 
@@ -474,7 +489,7 @@ class CollectionViewModel @Inject constructor(
     }
 
     private fun matchesFormat(
-        card: com.mmg.manahub.core.domain.model.Card,
+        card: com.mmg.manahub.core.model.Card,
         format: String,
         legal: Boolean,
     ): Boolean {

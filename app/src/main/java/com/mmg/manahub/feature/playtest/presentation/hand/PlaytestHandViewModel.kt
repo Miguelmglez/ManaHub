@@ -6,21 +6,19 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.playtest.domain.model.BattlefieldState
-import com.mmg.manahub.feature.playtest.domain.model.HandSnapshot
-import com.mmg.manahub.feature.playtest.domain.model.PlayCard
-import com.mmg.manahub.feature.playtest.domain.model.PlayZone
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestPhase
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSetup
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSurveyAnswers
+import com.mmg.manahub.core.model.BattlefieldState
+import com.mmg.manahub.core.model.HandSnapshot
+import com.mmg.manahub.core.model.PlayCard
+import com.mmg.manahub.core.model.PlayZone
+import com.mmg.manahub.core.model.PlaytestPhase
+import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.core.model.PlaytestSurveyAnswers
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestSurveyUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -32,7 +30,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 data class PlaytestHandUiState(
     val isLoading: Boolean = true,
@@ -69,8 +66,7 @@ sealed class PlaytestHandEvent {
     data class ShowInfo(val stringResName: String) : PlaytestHandEvent()
 }
 
-@HiltViewModel
-class PlaytestHandViewModel @Inject constructor(
+class PlaytestHandViewModel(
     private val deckRepository: DeckRepository,
     private val cardDao: CardDao,
     private val buildLibraryUseCase: BuildLibraryUseCase,
@@ -78,7 +74,7 @@ class PlaytestHandViewModel @Inject constructor(
     private val londonMulliganUseCase: LondonMulliganUseCase,
     private val savePlaytestUseCase: SavePlaytestUseCase,
     private val savePlaytestSurveyUseCase: SavePlaytestSurveyUseCase,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlaytestHandUiState())
@@ -267,7 +263,20 @@ class PlaytestHandViewModel @Inject constructor(
     // ── Drag-and-drop reorder ─────────────────────────────────────────────────
 
     fun onReorderHand(fromIndex: Int, toIndex: Int) {
-        val snapshot = _uiState.value.snapshot ?: return
+        val ui = _uiState.value
+        if (ui.phase == PlaytestPhase.PLAY) {
+            val bf = ui.battlefield ?: return
+            if (fromIndex == toIndex) return
+            // Guard against out-of-range drag indices delivered by gesture callbacks.
+            if (fromIndex !in bf.hand.indices || toIndex !in 0..bf.hand.lastIndex) return
+            val newHand = bf.hand.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+            _uiState.update { it.copy(battlefield = bf.copy(hand = newHand)) }
+            return
+        }
+
+        val snapshot = ui.snapshot ?: return
         if (fromIndex == toIndex) return
         // Guard against out-of-range drag indices delivered by gesture callbacks.
         if (fromIndex !in snapshot.hand.indices || toIndex !in 0..snapshot.hand.lastIndex) return
@@ -456,9 +465,12 @@ class PlaytestHandViewModel @Inject constructor(
                 return@update state
             }
             val newCard = PlayCard(instanceId = ++instanceIdCounter, card = bf.library.first())
+            val newHand = bf.hand.toMutableList().apply {
+                add(size / 2, newCard)
+            }
             state.copy(
                 battlefield = bf.copy(
-                    hand    = bf.hand + newCard,
+                    hand    = newHand,
                     library = bf.library.drop(1),
                 ),
             )
@@ -476,6 +488,7 @@ class PlaytestHandViewModel @Inject constructor(
      * not found in any zone.
      */
     fun moveCard(instanceId: Long, toZone: PlayZone) {
+        Log.d("PlaytestViewModel", "moveCard: instanceId=$instanceId toZone=$toZone")
         // Read AND write the same atomic snapshot to avoid stale-capture races (two rapid
         // moves operating on the same base state would lose one of the mutations).
         _uiState.update { state ->
@@ -491,6 +504,8 @@ class PlaytestHandViewModel @Inject constructor(
                 PlayZone.LANDS      -> battlefield.copy(lands = battlefield.lands.filterNot { it.instanceId == instanceId })
                 PlayZone.PERMANENTS -> battlefield.copy(permanents = battlefield.permanents.filterNot { it.instanceId == instanceId })
                 PlayZone.GRAVEYARD  -> battlefield.copy(graveyard = battlefield.graveyard.filterNot { it.instanceId == instanceId })
+                PlayZone.EXILE      -> battlefield.copy(exile = battlefield.exile.filterNot { it.instanceId == instanceId })
+                PlayZone.LIBRARY    -> battlefield
             }
 
             // Returning a card to hand untaps it; otherwise preserve tap state.
@@ -502,6 +517,8 @@ class PlaytestHandViewModel @Inject constructor(
                 PlayZone.LANDS      -> withoutCard.copy(lands = withoutCard.lands + moved)
                 PlayZone.PERMANENTS -> withoutCard.copy(permanents = withoutCard.permanents + moved)
                 PlayZone.GRAVEYARD  -> withoutCard.copy(graveyard = withoutCard.graveyard + moved)
+                PlayZone.EXILE      -> withoutCard.copy(exile = withoutCard.exile + moved)
+                PlayZone.LIBRARY    -> withoutCard
             }
             state.copy(battlefield = updated)
         }
@@ -534,6 +551,31 @@ class PlaytestHandViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Updates the free-form drop coordinates of a card.
+     */
+    fun updateCardOffset(instanceId: Long, x: Float, y: Float) {
+        _uiState.update { state ->
+            val battlefield = state.battlefield ?: return@update state
+            val (_, zone) = findCard(battlefield, instanceId) ?: return@update state
+            if (zone != PlayZone.LANDS && zone != PlayZone.PERMANENTS) return@update state
+
+            val updated = when (zone) {
+                PlayZone.LANDS -> battlefield.copy(
+                    lands = battlefield.lands.map {
+                        if (it.instanceId == instanceId) it.copy(xOffset = x, yOffset = y) else it
+                    },
+                )
+                else -> battlefield.copy(
+                    permanents = battlefield.permanents.map {
+                        if (it.instanceId == instanceId) it.copy(xOffset = x, yOffset = y) else it
+                    },
+                )
+            }
+            state.copy(battlefield = updated)
+        }
+    }
+
     /** Locates a [PlayCard] across all zones, returning it with its current zone. */
     private fun findCard(
         battlefield: BattlefieldState,
@@ -543,6 +585,7 @@ class PlaytestHandViewModel @Inject constructor(
         battlefield.lands.find { it.instanceId == instanceId }?.let { return it to PlayZone.LANDS }
         battlefield.permanents.find { it.instanceId == instanceId }?.let { return it to PlayZone.PERMANENTS }
         battlefield.graveyard.find { it.instanceId == instanceId }?.let { return it to PlayZone.GRAVEYARD }
+        battlefield.exile.find { it.instanceId == instanceId }?.let { return it to PlayZone.EXILE }
         return null
     }
 

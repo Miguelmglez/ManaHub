@@ -1,11 +1,11 @@
 package com.mmg.manahub.feature.draft.engine
 
 import com.mmg.manahub.feature.draft.data.engine.WeightedBoosterGenerator
-import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
-import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
-import com.mmg.manahub.feature.draft.domain.model.BoosterSheet
-import com.mmg.manahub.feature.draft.domain.model.BoosterVariant
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
+import com.mmg.manahub.core.model.BoosterCardEntry
+import com.mmg.manahub.core.model.BoosterConfig
+import com.mmg.manahub.core.model.BoosterSheet
+import com.mmg.manahub.core.model.BoosterVariant
+import com.mmg.manahub.core.model.DraftConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

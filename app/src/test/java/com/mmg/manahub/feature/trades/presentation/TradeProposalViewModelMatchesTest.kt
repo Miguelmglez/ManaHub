@@ -2,24 +2,24 @@ package com.mmg.manahub.feature.trades.presentation
 
 import androidx.lifecycle.SavedStateHandle
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.UserCard
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.AuthUser
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
-import com.mmg.manahub.feature.trades.domain.model.TradeSide
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.TradeSide
+import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
@@ -300,6 +300,11 @@ class TradeProposalViewModelMatchesTest {
             friendRepository = friendRepository,
             analyticsHelper = analyticsHelper,
             ioDispatcher = testDispatcher,
+            // §6.3 fix: the debounced search-list rebuild hops onto `defaultDispatcher` via
+            // `withContext`. It must be the SAME virtual-time `StandardTestDispatcher` as Main
+            // (not a real `Dispatchers.Default`) so `advanceUntilIdle()` deterministically drives
+            // both the debounce delay and the rebuild itself.
+            defaultDispatcher = testDispatcher,
         )
     }
 

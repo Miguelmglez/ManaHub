@@ -266,7 +266,7 @@ fun QuestRow(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val title = stringResource(quest.titleRes)
+    val title = quest.title
     val a11y = stringResource(
         R.string.quests_row_a11y,
         title,
@@ -315,7 +315,7 @@ fun QuestRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = stringResource(quest.descRes),
+                    text = quest.description,
                     style = MaterialTheme.magicTypography.bodySmall,
                     color = mc.textSecondary,
                     maxLines = 2,

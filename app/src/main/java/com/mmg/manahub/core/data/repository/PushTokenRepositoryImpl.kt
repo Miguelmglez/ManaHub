@@ -2,8 +2,8 @@ package com.mmg.manahub.core.data.repository
 
 import android.util.Log
 import androidx.work.WorkManager
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.messaging.FirebaseMessaging
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
@@ -19,6 +19,7 @@ class PushTokenRepositoryImpl @Inject constructor(
     private val dataSource: PushTokenRemoteDataSource,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val workManager: WorkManager,
+    private val crashReporter: CrashReporter,
 ) : PushTokenRepository {
 
     override suspend fun register(token: String) {
@@ -26,7 +27,7 @@ class PushTokenRepositoryImpl @Inject constructor(
         runCatching { dataSource.upsert(token, locale) }
             .onFailure {
                 Log.w(TAG, "register failed, enqueuing retry worker", it)
-                FirebaseCrashlytics.getInstance().recordException(it)
+                crashReporter.recordException(it)
                 RegisterPushTokenWorker.enqueue(workManager, token, locale)
             }
     }
@@ -35,7 +36,7 @@ class PushTokenRepositoryImpl @Inject constructor(
         runCatching { dataSource.delete(token) }
             .onFailure {
                 Log.w(TAG, "unregister failed, enqueuing retry worker", it)
-                FirebaseCrashlytics.getInstance().recordException(it)
+                crashReporter.recordException(it)
                 UnregisterPushTokenWorker.enqueue(workManager, token)
             }
     }

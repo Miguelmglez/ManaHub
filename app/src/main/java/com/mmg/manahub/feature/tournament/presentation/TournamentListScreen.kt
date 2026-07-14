@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,10 +53,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
-import com.mmg.manahub.core.data.local.entity.TournamentEntity
+import com.mmg.manahub.core.model.Tournament
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -71,7 +73,7 @@ fun TournamentListScreen(
     onNavigateBack:     () -> Unit,
     onCreateTournament: () -> Unit,
     onOpenTournament:   (Long) -> Unit,
-    viewModel:          TournamentListViewModel = hiltViewModel(),
+    viewModel:          TournamentListViewModel = koinViewModel(),
 ) {
     val tournaments by viewModel.tournaments.collectAsStateWithLifecycle()
     val mc           = MaterialTheme.magicColors
@@ -134,18 +136,23 @@ fun TournamentListScreen(
                     verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
                 ) {
                     itemsIndexed(tournaments, key = { _, t -> t.id }) { index, tournament ->
-                        var visible by remember(tournament.id) { mutableStateOf(false) }
+                        var visible by rememberSaveable(key = tournament.id.toString()) { mutableStateOf(false) }
                         LaunchedEffect(tournament.id) { visible = true }
                         val delay = (index % 10) * 40
-                        AnimatedVisibility(
-                            visible = visible,
-                            enter   = fadeIn(tween(400, delayMillis = delay)) +
-                                      scaleIn(tween(400, delayMillis = delay), initialScale = 0.95f),
-                        ) {
-                            TournamentListItem(
-                                tournament = tournament,
-                                onClick    = { onOpenTournament(tournament.id) },
-                            )
+                        
+                        // Wrap in a Box with min height to prevent LazyColumn collapse/scroll reset
+                        // when returning to this screen and animations are re-triggered.
+                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp)) {
+                            AnimatedVisibility(
+                                visible = visible,
+                                enter = fadeIn(tween(400, delayMillis = delay)) +
+                                        scaleIn(tween(400, delayMillis = delay), initialScale = 0.95f),
+                            ) {
+                                TournamentListItem(
+                                    tournament = tournament,
+                                    onClick = { onOpenTournament(tournament.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -156,7 +163,7 @@ fun TournamentListScreen(
 
 @Composable
 private fun TournamentListItem(
-    tournament: TournamentEntity,
+    tournament: Tournament,
     onClick:    () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors

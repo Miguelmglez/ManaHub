@@ -5,9 +5,10 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
+import com.mmg.manahub.core.tagging.createStrategyAnalyzer
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -42,7 +43,7 @@ class CardRepositoryImplTest {
     private val userPrefs = mockk<UserPreferencesDataStore>()
 
     // Pure use-cases — construct real instances to avoid fragile mock setup.
-    private val computeCardTags = ComputeCardTagsUseCase(SuggestTagsUseCase())
+    private val computeCardTags = ComputeCardTagsUseCase(SuggestTagsUseCase(createStrategyAnalyzer()))
 
     private lateinit var repository: CardRepositoryImpl
 

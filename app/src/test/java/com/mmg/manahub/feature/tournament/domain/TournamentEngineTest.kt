@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.tournament.domain
 
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.model.TournamentMatch
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
 import com.mmg.manahub.feature.tournament.domain.engine.SingleEliminationEngine
 import com.mmg.manahub.feature.tournament.domain.engine.StandingsCalculator
 import com.mmg.manahub.feature.tournament.domain.engine.SwissEngine
@@ -19,8 +19,8 @@ class TournamentEngineTest {
 
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
-    private fun player(id: Long, name: String = "P$id"): TournamentPlayerEntity =
-        TournamentPlayerEntity(id = id, tournamentId = 1L, playerName = name, playerColor = "#FFF", seed = id.toInt())
+    private fun player(id: Long, name: String = "P$id"): TournamentPlayer =
+        TournamentPlayer(id = id, tournamentId = 1L, playerName = name, playerColor = "#FFF", seed = id.toInt())
 
     private fun finishedMatch(
         id:        Long,
@@ -29,7 +29,7 @@ class TournamentEngineTest {
         winnerId:  Long?,
         round:     Int = 1,
         order:     Int = 0,
-    ): TournamentMatchEntity = TournamentMatchEntity(
+    ): TournamentMatch = TournamentMatch(
         id             = id,
         tournamentId   = 1L,
         round          = round,
@@ -39,8 +39,8 @@ class TournamentEngineTest {
         scheduledOrder = order,
     )
 
-    private fun byeMatch(id: Long, playerId: Long, round: Int = 1, order: Int = 0): TournamentMatchEntity =
-        TournamentMatchEntity(
+    private fun byeMatch(id: Long, playerId: Long, round: Int = 1, order: Int = 0): TournamentMatch =
+        TournamentMatch(
             id             = id,
             tournamentId   = 1L,
             round          = round,
@@ -50,7 +50,7 @@ class TournamentEngineTest {
             scheduledOrder = order,
         )
 
-    private fun standing(player: TournamentPlayerEntity, points: Int = 0): TournamentStanding =
+    private fun standing(player: TournamentPlayer, points: Int = 0): TournamentStanding =
         TournamentStanding(
             player        = player,
             wins          = points / 3,
@@ -234,9 +234,9 @@ class TournamentEngineTest {
     @Test
     fun `Standings draw gives 1 point to each player`() {
         val p1 = player(1); val p2 = player(2)
-        val draw = TournamentMatchEntity(
+        val draw = TournamentMatch(
             id = 1L, tournamentId = 1L, round = 1,
-            playerIds = "[1,2]", winnerId = null, status = "FINISHED", finalLifeTotals = "",
+            playerIds = "[1,2]", winnerId = null, status = "FINISHED",
         )
         val standings = StandingsCalculator.calculate(listOf(p1, p2), listOf(draw))
         val s1 = standings.find { it.player.id == 1L }!!

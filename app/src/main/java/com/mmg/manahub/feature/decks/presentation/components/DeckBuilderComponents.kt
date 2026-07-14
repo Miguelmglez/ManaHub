@@ -50,11 +50,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.BasicLandDistribution
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DeckCard
+import com.mmg.manahub.core.model.BasicLandDistribution
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -94,8 +94,8 @@ fun DeckCardRow(
         )
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text     = card.name,
+            CardName(
+                name     = card.name,
                 style    = MaterialTheme.magicTypography.bodyMedium,
                 color    = mc.textPrimary,
                 maxLines = 1,
@@ -456,8 +456,8 @@ fun CommanderSearchSheet(
                                     .background(mc.surfaceVariant),
                             )
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text     = card.name,
+                                CardName(
+                                    name     = card.name,
                                     style    = MaterialTheme.magicTypography.bodyMedium,
                                     color    = mc.textPrimary,
                                     maxLines = 1,

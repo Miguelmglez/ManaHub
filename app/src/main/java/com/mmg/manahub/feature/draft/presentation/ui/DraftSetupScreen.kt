@@ -43,7 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardRarity
@@ -57,9 +57,9 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftError
-import com.mmg.manahub.feature.draft.domain.model.DraftMode
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftError
+import com.mmg.manahub.core.model.DraftMode
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 
@@ -87,7 +87,7 @@ private val PlayerInfoIconSize = 18.dp
 fun DraftSetupScreen(
     onNavigateToDrafting: () -> Unit,
     onBack: () -> Unit,
-    viewModel: DraftSimViewModel = hiltViewModel(),
+    viewModel: DraftSimViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

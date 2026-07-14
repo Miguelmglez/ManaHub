@@ -50,6 +50,14 @@ abstract class TournamentDao {
     @Query("SELECT * FROM tournament_players WHERE tournamentId = :tournamentId")
     abstract fun observePlayers(tournamentId: Long): Flow<List<TournamentPlayerEntity>>
 
+    /**
+     * Current round number for [tournamentId]: the max `round` among its generated matches, or
+     * null when no matches exist yet. Read-only projection (no schema change) — the repository
+     * defaults a null result to 1 so callers never see "Round 0" (Home dashboard fix, F-3).
+     */
+    @Query("SELECT MAX(round) FROM tournament_matches WHERE tournamentId = :tournamentId")
+    abstract fun observeMaxRound(tournamentId: Long): Flow<Int?>
+
     // ── Matches ───────────────────────────────────────────────────────────────
 
     @Insert

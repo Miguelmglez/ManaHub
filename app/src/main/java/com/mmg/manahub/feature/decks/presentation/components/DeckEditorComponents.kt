@@ -63,13 +63,14 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
-import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
-import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.DeckSlotEntry
+import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
@@ -563,7 +564,7 @@ private fun DeckFormatPill(
             style = ty.bodyMedium,
         )
         Text(
-            text = stringResource(format.displayNameRes),
+            text = format.displayName,
             style = ty.labelLarge,
             color = if (selected) mc.primaryAccent else mc.textPrimary,
             textAlign = TextAlign.Center,
@@ -643,7 +644,7 @@ internal fun groupCards(cards: List<DeckSlotEntry>, mode: GroupingMode): List<Pa
                     tagMap.getOrPut("Untagged") { mutableListOf() }.add(entry)
                 } else {
                     tags.forEach { tag ->
-                        tagMap.getOrPut(tag.label) { mutableListOf() }.add(entry)
+                        tagMap.getOrPut(tag.label()) { mutableListOf() }.add(entry)
                     }
                 }
             }

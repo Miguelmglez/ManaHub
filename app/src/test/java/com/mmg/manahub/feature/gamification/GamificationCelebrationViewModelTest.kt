@@ -26,7 +26,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Unit tests for [GamificationCelebrationViewModel] (ADR-002, Phase 1, Chunk B).
@@ -52,7 +52,7 @@ class GamificationCelebrationViewModelTest {
         level = level,
         xpIntoLevel = 0L,
         xpForNextLevel = 100L,
-        updatedAt = Instant.EPOCH,
+        updatedAt = Instant.fromEpochMilliseconds(0L),
     )
 
     @Before
@@ -76,8 +76,8 @@ class GamificationCelebrationViewModelTest {
     private fun model(id: String, unlockedAt: Long) = AchievementUiModel(
         id = id,
         category = AchievementCategory.GAMES,
-        titleRes = 0,
-        descRes = 0,
+        title = "",
+        description = "",
         emoji = "⚔️",
         tierThresholds = listOf(1),
         currentValue = 1,

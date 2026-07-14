@@ -1,7 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
@@ -84,7 +84,7 @@ class SuggestAddsWithBudgetUseCaseTest {
                 limit = any(),
             )
         } answers {
-            val candidates = firstArg<List<com.mmg.manahub.core.domain.model.Card>>()
+            val candidates = firstArg<List<com.mmg.manahub.core.model.Card>>()
             val ownedIds = thirdArg<Set<String>>()
             val limit = arg<Int>(4)
             candidates.take(limit).map { c ->

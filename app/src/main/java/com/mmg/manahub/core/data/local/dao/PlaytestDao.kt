@@ -120,6 +120,16 @@ abstract class PlaytestDao {
     @Query("SELECT COUNT(*) FROM playtest_sessions WHERE deck_id = :deckId")
     abstract suspend fun getTestCountForDeck(deckId: String): Int
 
+    // ── Aggregate: total saved tests across ALL decks ──────────────────────────
+
+    /**
+     * Total saved playtest sessions across every deck. Backs the Home dashboard's
+     * STEP_FIRST_PLAYTEST_DECK first-step, which auto-hides once the user has saved at least
+     * one test anywhere (Home feature overhaul Phase 2.2).
+     */
+    @Query("SELECT COUNT(*) FROM playtest_sessions")
+    abstract fun observeTotalTestCount(): Flow<Int>
+
     // ── Aggregate: per-card opening-hand stats (all cards in a deck) ───────────
 
     /**

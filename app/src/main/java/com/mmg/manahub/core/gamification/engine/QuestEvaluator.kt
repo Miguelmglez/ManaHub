@@ -7,10 +7,10 @@ import com.mmg.manahub.core.gamification.domain.catalog.QuestCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.QuestTemplate
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.QuestProgressDelta
-import java.time.Clock
-import java.time.ZoneId
-import javax.inject.Inject
-import javax.inject.Singleton
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Advances active quest progress for an event (ADR-002, Phase 2).
@@ -24,11 +24,10 @@ import javax.inject.Singleton
  * Pure period math comes from [QuestPeriodKeys]; [clock] + [zoneId] are injected so tests can pin the
  * period. The DAO upsert (INSERT-OR-IGNORE + @Update) never uses REPLACE.
  */
-@Singleton
-class QuestEvaluator @Inject constructor(
+class QuestEvaluator(
     private val dao: GamificationDao,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    private val timeZone: TimeZone,
 ) {
 
     /**
@@ -38,7 +37,7 @@ class QuestEvaluator @Inject constructor(
      */
     suspend fun process(event: ProgressionEvent): List<QuestProgressDelta> {
         val templates = QuestCatalog.templatesByEventType[event::class] ?: return emptyList()
-        val today = clock.instant().atZone(zoneId).toLocalDate()
+        val today = clock.now().toLocalDateTime(timeZone).date
 
         val deltas = mutableListOf<QuestProgressDelta>()
         for (template in templates) {
@@ -63,7 +62,7 @@ class QuestEvaluator @Inject constructor(
                 QuestProgressDelta(
                     instanceId = instanceId,
                     templateId = template.id,
-                    titleRes = template.titleRes,
+                    title = template.title,
                     emoji = template.emoji,
                     newProgress = newProgress,
                     target = instance.target,
@@ -74,7 +73,7 @@ class QuestEvaluator @Inject constructor(
         return deltas
     }
 
-    private fun periodKeyFor(template: QuestTemplate, today: java.time.LocalDate): String =
+    private fun periodKeyFor(template: QuestTemplate, today: LocalDate): String =
         when (template.period) {
             QuestPeriod.DAILY -> QuestPeriodKeys.dailyKey(today)
             QuestPeriod.WEEKLY -> QuestPeriodKeys.weeklyKey(today)

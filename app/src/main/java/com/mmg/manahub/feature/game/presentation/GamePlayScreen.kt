@@ -120,7 +120,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -132,15 +132,16 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.game.domain.model.CounterIconKey
+import com.mmg.manahub.core.model.CounterIconKey
+import com.mmg.manahub.core.model.PlayerSlot
 import com.mmg.manahub.feature.game.domain.model.CounterType
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.feature.game.domain.model.GridSlotPosition
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
+import com.mmg.manahub.core.model.GridSlotPosition
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.Player
-import com.mmg.manahub.feature.game.domain.model.ScreenedGridSlotPosition
-import com.mmg.manahub.feature.game.domain.model.toDefaultDegrees
+import com.mmg.manahub.core.model.ScreenedGridSlotPosition
+import com.mmg.manahub.core.model.toDefaultDegrees
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -156,7 +157,7 @@ fun GamePlayScreen(
     onExitGame: () -> Unit = {},
     onSurvey: (sessionId: Long) -> Unit = {},
     onTournamentClick: (() -> Unit)? = null,
-    viewModel: GameViewModel = hiltViewModel(),
+    viewModel: GameViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toolsState by viewModel.toolsState.collectAsStateWithLifecycle()
@@ -310,7 +311,7 @@ private fun GamePlayContent(
             CmdDamagePanel(
                 target = target,
                 allPlayers = uiState.players,
-                onDamage = { srcId, d -> onCmdDamage(targetId, srcId, d) },
+                onDamage = onCmdDamage,
                 onDismiss = { onCmdPanel(null) },
             )
         }
@@ -1522,34 +1523,37 @@ private fun EliminatedOverlay(player: Player, mode: GameMode) {
 private fun CmdDamagePanel(
     target: Player,
     allPlayers: List<Player>,
-    onDamage: (sourceId: Int, Int) -> Unit,
+    onDamage: (targetId: Int, sourceId: Int, delta: Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val mt = MaterialTheme.magicTypography
     val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden }
     )
+    
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
-        contentWindowInsets = { WindowInsets(0) },
         dragHandle = null,
     ) {
         Column(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             // Header Row
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.offset(x = (-12).dp)
+                    modifier = Modifier.padding(end = 8.dp)
                 ) {
                     Icon(
                         Icons.Default.Close,
@@ -1557,48 +1561,143 @@ private fun CmdDamagePanel(
                         tint = mc.textSecondary
                     )
                 }
+                Text(
+                    text = "${target.name} - Commander",
+                    style = mt.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Text(
-                stringResource(R.string.game_cmd_damage_title, target.name),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
-            allPlayers.filter { it.id != target.id && !it.defeated }.forEach { source ->
-                val damage = target.commanderDamage[source.id] ?: 0
-                val srcTheme = source.theme
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(srcTheme.accent)
-                    )
-                    Spacer(Modifier.width(8.dp))
+
+            val activeOpponents = allPlayers.filter { it.id != target.id && !it.defeated }
+            
+            if (activeOpponents.isNotEmpty()) {
+                // Damage Dealt
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        source.name,
-                        style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textPrimary,
-                        modifier = Modifier.weight(1f),
+                        "Damage Dealt",
+                        style = mt.titleMedium,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
-                    if (damage >= 21) {
-                        Text(
-                            stringResource(R.string.game_caution_symbol),
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.lifeNegative
-                        )
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = mc.surface,
+                        border = BorderStroke(1.dp, mc.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            activeOpponents.forEachIndexed { index, opponent ->
+                                if (index > 0) {
+                                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                                }
+                                val damage = opponent.commanderDamage[target.id] ?: 0
+                                val oppTheme = opponent.theme
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(oppTheme.accent)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        opponent.name,
+                                        style = mt.bodyLarge,
+                                        color = mc.textPrimary,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (damage >= 21) {
+                                        Text(
+                                            stringResource(R.string.game_caution_symbol),
+                                            style = mt.bodyLarge,
+                                            color = mc.lifeNegative,
+                                            modifier = Modifier.padding(end = 12.dp)
+                                        )
+                                    }
+                                    CounterRow(
+                                        value = damage,
+                                        theme = oppTheme,
+                                        onDecrement = { onDamage(opponent.id, target.id, -1) },
+                                        onIncrement = { onDamage(opponent.id, target.id, +1) },
+                                    )
+                                }
+                            }
+                        }
                     }
-                    CounterRow(
-                        value = damage,
-                        theme = srcTheme,
-                        onDecrement = { onDamage(source.id, -1) },
-                        onIncrement = { onDamage(source.id, +1) },
+                }
+
+                // Damage Received
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Damage Received",
+                        style = mt.titleMedium,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = mc.surface,
+                        border = BorderStroke(1.dp, mc.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            activeOpponents.forEachIndexed { index, opponent ->
+                                if (index > 0) {
+                                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                                }
+                                val damage = target.commanderDamage[opponent.id] ?: 0
+                                val oppTheme = opponent.theme
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(oppTheme.accent)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        opponent.name,
+                                        style = mt.bodyLarge,
+                                        color = mc.textPrimary,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (damage >= 21) {
+                                        Text(
+                                            stringResource(R.string.game_caution_symbol),
+                                            style = mt.bodyLarge,
+                                            color = mc.lifeNegative,
+                                            modifier = Modifier.padding(end = 12.dp)
+                                        )
+                                    }
+                                    CounterRow(
+                                        value = damage,
+                                        theme = oppTheme,
+                                        onDecrement = { onDamage(target.id, opponent.id, -1) },
+                                        onIncrement = { onDamage(target.id, opponent.id, +1) },
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -1607,7 +1706,7 @@ private fun CmdDamagePanel(
 //  Counters panel — full-featured bottom sheet with icon support
 // ─────────────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun CountersPanel(
     player: Player,
@@ -1623,9 +1722,12 @@ private fun CountersPanel(
     val theme = player.theme
     var newCounterName by remember { mutableStateOf("") }
     var selectedIconKey by remember { mutableStateOf(CounterIconKey.DEFAULT) }
+    var isIconDropdownExpanded by remember { mutableStateOf(false) }
+
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden }
     )
 
@@ -1637,20 +1739,20 @@ private fun CountersPanel(
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(horizontal = 24.dp, vertical = 16.dp)
                 .navigationBarsPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             // Header Row
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.offset(x = (-12).dp)
+                    modifier = Modifier.padding(end = 8.dp)
                 ) {
                     Icon(
                         Icons.Default.Close,
@@ -1658,167 +1760,254 @@ private fun CountersPanel(
                         tint = mc.textSecondary
                     )
                 }
+                Text(
+                    text = stringResource(R.string.game_counters_title, player.name),
+                    style = mt.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Text(
-                stringResource(R.string.game_counters_title, player.name),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
 
-            // ── Built-in counters with icons ──────────────────────────────────
-            BuiltInCounterRow(
-                iconKey = CounterIconKey.POISON,
-                label = stringResource(R.string.game_poison_label),
-                value = player.poison,
-                theme = theme,
-                onDelta = { onCounter(CounterType.POISON, it) },
-            )
-            BuiltInCounterRow(
-                iconKey = CounterIconKey.EXPERIENCE,
-                label = stringResource(R.string.game_experience_label),
-                value = player.experience,
-                theme = theme,
-                onDelta = { onCounter(CounterType.EXPERIENCE, it) },
-            )
-            BuiltInCounterRow(
-                iconKey = CounterIconKey.ENERGY,
-                label = stringResource(R.string.game_energy_label),
-                value = player.energy,
-                theme = theme,
-                onDelta = { onCounter(CounterType.ENERGY, it) },
-            )
-
+            // ── Built-in counters ──────────────────────────────────
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = mc.surface,
+                border = BorderStroke(1.dp, mc.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    BuiltInCounterRow(
+                        iconKey = CounterIconKey.POISON,
+                        label = stringResource(R.string.game_poison_label),
+                        value = player.poison,
+                        theme = theme,
+                        onDelta = { onCounter(CounterType.POISON, it) },
+                    )
+                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                    BuiltInCounterRow(
+                        iconKey = CounterIconKey.EXPERIENCE,
+                        label = stringResource(R.string.game_experience_label),
+                        value = player.experience,
+                        theme = theme,
+                        onDelta = { onCounter(CounterType.EXPERIENCE, it) },
+                    )
+                    HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                    BuiltInCounterRow(
+                        iconKey = CounterIconKey.ENERGY,
+                        label = stringResource(R.string.game_energy_label),
+                        value = player.energy,
+                        theme = theme,
+                        onDelta = { onCounter(CounterType.ENERGY, it) },
+                    )
+                }
+            }
 
             // ── Custom counters ───────────────────────────────────────────────
             if (player.customCounters.isNotEmpty()) {
-                HorizontalDivider(color = mc.surfaceVariant)
-                player.customCounters.forEach { counter ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = mc.surface,
+                    border = BorderStroke(1.dp, mc.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        CounterIconView(
-                            iconKey = counter.iconKey,
-                            tint = theme.accent,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            counter.name,
-                            style = MaterialTheme.magicTypography.bodyMedium,
-                            color = mc.textPrimary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = { onCustomRemove(counter.id) },
-                            modifier = Modifier.size(24.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.action_remove),
-                                tint = mc.textDisabled,
-                                modifier = Modifier.size(14.dp),
-                            )
+                        player.customCounters.forEachIndexed { index, counter ->
+                            if (index > 0) {
+                                HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                CounterIconView(
+                                    iconKey = counter.iconKey,
+                                    tint = theme.accent,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    counter.name,
+                                    style = mt.bodyLarge,
+                                    color = mc.textPrimary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                IconButton(
+                                    onClick = { onCustomRemove(counter.id) },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.action_remove),
+                                        tint = mc.textDisabled,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                                CounterRow(
+                                    value = counter.value,
+                                    theme = theme,
+                                    onDecrement = { onCustomChange(counter.id, -1) },
+                                    onIncrement = { onCustomChange(counter.id, +1) },
+                                )
+                            }
                         }
-                        CounterRow(
-                            value = counter.value,
-                            theme = theme,
-                            onDecrement = { onCustomChange(counter.id, -1) },
-                            onIncrement = { onCustomChange(counter.id, +1) },
-                        )
                     }
                 }
             }
 
             // ── Add custom counter ────────────────────────────────────────────
-            HorizontalDivider(color = mc.surfaceVariant)
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = theme.accent.copy(alpha = 0.04f),
+                border = BorderStroke(1.dp, theme.accent.copy(alpha = 0.15f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = newCounterName,
-                    onValueChange = { newCounterName = it },
-                    placeholder = {
-                        Text(
-                            stringResource(R.string.game_custom_counter_hint),
-                            color = mc.textDisabled
-                        )
-                    },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = mc.primaryAccent,
-                        unfocusedBorderColor = mc.surfaceVariant,
-                        focusedTextColor = mc.textPrimary,
-                        unfocusedTextColor = mc.textPrimary,
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .onFocusChanged {
-                            if (it.isFocused) {
-                                scope.launch {
-                                    bringIntoViewRequester.bringIntoView()
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.game_custom_counter_hint),
+                        style = mt.labelLarge,
+                        color = theme.accent
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
+                    ) {
+                        // Dropdown logic for Icon Picker
+                        Box {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = mc.backgroundSecondary,
+                                border = BorderStroke(1.dp, theme.accent.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clickable { isIconDropdownExpanded = true },
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    CounterIconView(
+                                        iconKey = selectedIconKey,
+                                        tint = theme.accent,
+                                        modifier = Modifier.size(26.dp),
+                                    )
+                                    Icon(
+                                        Icons.Default.ArrowDownward,
+                                        contentDescription = null,
+                                        tint = theme.accent.copy(alpha = 0.5f),
+                                        modifier = Modifier.align(Alignment.BottomEnd).size(14.dp).padding(2.dp)
+                                    )
                                 }
                             }
-                        },
-                )
-                IconButton(
-                    onClick = {
-                        if (newCounterName.isNotBlank()) {
-                            onAddCustom(newCounterName, selectedIconKey)
-                            newCounterName = ""
-                            selectedIconKey = CounterIconKey.DEFAULT
+                            
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = isIconDropdownExpanded,
+                                onDismissRequest = { isIconDropdownExpanded = false },
+                                modifier = Modifier
+                                    .background(mc.surface)
+                                    .padding(8.dp)
+                                    .width(280.dp)
+                            ) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    CounterIconKey.ALL.forEach { key ->
+                                        val isSelected = key == selectedIconKey
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSelected) theme.accent.copy(alpha = 0.2f) else mc.backgroundSecondary)
+                                                .border(
+                                                    width = if (isSelected) 2.dp else 1.dp,
+                                                    color = if (isSelected) theme.accent else mc.surfaceVariant,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable {
+                                                    selectedIconKey = key
+                                                    isIconDropdownExpanded = false
+                                                }
+                                        ) {
+                                            CounterIconView(
+                                                iconKey = key,
+                                                tint = if (isSelected) theme.accent else mc.textSecondary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    },
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add),
-                        tint = mc.primaryAccent
-                    )
-                }
-            }
 
-            // Icon picker
-            Text(
-                stringResource(R.string.game_counter_choose_icon),
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textSecondary,
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(CounterIconKey.ALL, key = { it }) { key ->
-                    val isSelected = key == selectedIconKey
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isSelected) mc.primaryAccent.copy(alpha = 0.20f)
-                                else mc.surface
-                            )
-                            .border(
-                                width = if (isSelected) 1.5.dp else 0.5.dp,
-                                color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
-                                shape = RoundedCornerShape(8.dp),
-                            )
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { selectedIconKey = key },
-                    ) {
-                        CounterIconView(
-                            iconKey = key,
-                            tint = if (isSelected) mc.primaryAccent else mc.textSecondary,
-                            modifier = Modifier.size(20.dp),
+                        OutlinedTextField(
+                            value = newCounterName,
+                            onValueChange = { newCounterName = it },
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.game_custom_counter_hint),
+                                    color = mc.textDisabled,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = mt.bodyLarge
+                                )
+                            },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = theme.accent,
+                                unfocusedBorderColor = mc.surfaceVariant,
+                                focusedTextColor = mc.textPrimary,
+                                unfocusedTextColor = mc.textPrimary,
+                            ),
+                            textStyle = mt.bodyLarge,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(54.dp)
+                                .onFocusChanged {
+                                    if (it.isFocused) {
+                                        scope.launch {
+                                            bringIntoViewRequester.bringIntoView()
+                                        }
+                                    }
+                                },
+                            shape = RoundedCornerShape(12.dp)
                         )
+
+                        IconButton(
+                            onClick = {
+                                if (newCounterName.isNotBlank()) {
+                                    onAddCustom(newCounterName, selectedIconKey)
+                                    newCounterName = ""
+                                    selectedIconKey = CounterIconKey.DEFAULT
+                                }
+                            },
+                            modifier = Modifier
+                                .size(54.dp)
+                                .background(theme.accent, RoundedCornerShape(12.dp))
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = stringResource(R.string.action_add),
+                                tint = mc.background,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
@@ -1843,12 +2032,12 @@ private fun BuiltInCounterRow(
         CounterIconView(
             iconKey = iconKey,
             tint = theme.accent,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(24.dp),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
             label,
-            style = MaterialTheme.magicTypography.bodyMedium,
+            style = MaterialTheme.magicTypography.bodyLarge,
             color = mc.textPrimary,
             modifier = Modifier.weight(1f),
         )
@@ -1871,34 +2060,34 @@ private fun CounterRow(
     val mc = MaterialTheme.magicColors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(28.dp)
+                .size(36.dp)
                 .clip(CircleShape)
                 .background(theme.accent.copy(alpha = 0.15f))
                 .clickable(onClick = onDecrement),
         ) {
-            Text(stringResource(R.string.action_remove_symbol), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+            Text(stringResource(R.string.action_remove_symbol), style = MaterialTheme.magicTypography.titleLarge, color = theme.accent)
         }
         Text(
             value.toString(),
-            style = MaterialTheme.magicTypography.titleMedium,
+            style = MaterialTheme.magicTypography.titleLarge,
             color = mc.textPrimary,
-            modifier = Modifier.widthIn(min = 32.dp),
+            modifier = Modifier.widthIn(min = 36.dp),
             textAlign = TextAlign.Center,
         )
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(28.dp)
+                .size(36.dp)
                 .clip(CircleShape)
                 .background(theme.accent.copy(alpha = 0.15f))
                 .clickable(onClick = onIncrement),
         ) {
-            Text(stringResource(R.string.action_add_symbol), style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
+            Text(stringResource(R.string.action_add_symbol), style = MaterialTheme.magicTypography.titleLarge, color = theme.accent)
         }
     }
 }
@@ -2209,57 +2398,47 @@ private fun ManageTab(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize()
                 .heightIn(min = 140.dp),
             contentAlignment = Alignment.TopCenter
         ) {
-            AnimatedContent(
-                targetState = selectedPlayer,
-                transitionSpec = {
-                    (fadeIn() + expandVertically()) togetherWith
-                            (fadeOut() + shrinkVertically())
-                },
-                label = "propertyTransition"
-            ) { targetPlayer ->
-                if (targetPlayer != null) {
-                    Column(
+            if (selectedPlayer != null) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                stringResource(R.string.game_manage_properties_title),
-                                style = MaterialTheme.magicTypography.titleMedium,
-                                color = mc.textPrimary,
-                            )
-                            TextButton(onClick = { selectedSlotId = null }) {
-                                Text(stringResource(R.string.action_cancel), color = mc.primaryAccent)
-                            }
-                        }
-                        PlayerPropertyRow(
-                            player = targetPlayer,
-                            onRename = { name -> onRenamePlayer(targetPlayer.id, name) },
-                            onUpdateTheme = { theme -> onUpdateTheme(targetPlayer.id, theme) },
-                        )
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp),
-                        contentAlignment = Alignment.Center
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.game_manage_positions_hint),
-                            style = MaterialTheme.magicTypography.labelMedium,
-                            color = mc.textDisabled,
-                            textAlign = TextAlign.Center
+                            stringResource(R.string.game_manage_properties_title),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textPrimary,
                         )
+                        TextButton(onClick = { selectedSlotId = null }) {
+                            Text(stringResource(R.string.action_cancel), color = mc.primaryAccent)
+                        }
                     }
+                    PlayerPropertyRow(
+                        player = selectedPlayer,
+                        onRename = { name -> onRenamePlayer(selectedPlayer.id, name) },
+                        onUpdateTheme = { theme -> onUpdateTheme(selectedPlayer.id, theme) },
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.game_manage_positions_hint),
+                        style = MaterialTheme.magicTypography.labelMedium,
+                        color = mc.textDisabled,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -2347,7 +2526,7 @@ private fun MiniGamePlayerGrid(
 
 @Composable
 private fun MiniPlayerSlot(
-    slot: com.mmg.manahub.feature.game.domain.model.PlayerSlot,
+    slot: PlayerSlot,
     players: List<Player>,
     gridAssignment: Map<Int, Int>,
     isSelected: Boolean,

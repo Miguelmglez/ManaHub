@@ -117,4 +117,14 @@ data class CardEntity(
      */
     @ColumnInfo(name = "card_faces")
     val cardFaces: String? = null,
+
+    /**
+     * D14 (Deck Doctor Community/Archetype plan, Phase 0.3). Compact WUBRG-subset string
+     * (e.g. "WU"), NOT a JSON blob — the colours this card's mana ability(ies) can produce.
+     * Empty string for cards that produce no mana. Additive column (v42): existing rows
+     * backfill to '' and pick up the real value lazily on their next Scryfall refresh via
+     * [com.mmg.manahub.core.data.repository.CachePolicy] — never a mass re-fetch.
+     */
+    @ColumnInfo(name = "produced_mana", defaultValue = "")
+    val producedMana: String = "",
 )

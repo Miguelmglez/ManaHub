@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.playtest.domain.usecase
 
-import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.DeckWithCards
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestEligibility
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckWithCards
+import com.mmg.manahub.core.model.PlaytestEligibility
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -11,7 +11,7 @@ import org.junit.Test
 /**
  * Unit tests for [CanPlaytestDeckUseCase].
  *
- * Verifies format-specific thresholds (standard / draft / commander),
+ * Verifies format-specific thresholds (standard / casual / draft / commander),
  * exact-size enforcement for commander, unsupported formats, and
  * case-insensitive format matching.
  */
@@ -66,6 +66,32 @@ class CanPlaytestDeckUseCaseTest {
     @Test
     fun `given standard format with 0 cards then Ineligible`() {
         val result = useCase(deckWith("standard"), mainboardCount = 0)
+        assertTrue(result is PlaytestEligibility.Ineligible)
+    }
+
+    // ── Group 1b: Casual (same 60-card threshold as Standard) ──────────────────
+
+    @Test
+    fun `given casual format with exactly 60 cards then Eligible`() {
+        val result = useCase(deckWith("casual"), mainboardCount = 60)
+        assertEquals(PlaytestEligibility.Eligible, result)
+    }
+
+    @Test
+    fun `given casual format with more than 60 cards then Eligible`() {
+        val result = useCase(deckWith("casual"), mainboardCount = 100)
+        assertEquals(PlaytestEligibility.Eligible, result)
+    }
+
+    @Test
+    fun `given casual format with 59 cards then Ineligible`() {
+        val result = useCase(deckWith("casual"), mainboardCount = 59)
+        assertTrue(result is PlaytestEligibility.Ineligible)
+    }
+
+    @Test
+    fun `given casual format with 0 cards then Ineligible`() {
+        val result = useCase(deckWith("casual"), mainboardCount = 0)
         assertTrue(result is PlaytestEligibility.Ineligible)
     }
 
@@ -158,12 +184,6 @@ class CanPlaytestDeckUseCaseTest {
     }
 
     // ── Group 5: Unsupported formats ──────────────────────────────────────────
-
-    @Test
-    fun `given casual format then Ineligible`() {
-        val result = useCase(deckWith("casual"), mainboardCount = 100)
-        assertTrue(result is PlaytestEligibility.Ineligible)
-    }
 
     @Test
     fun `given pioneer format then Ineligible`() {

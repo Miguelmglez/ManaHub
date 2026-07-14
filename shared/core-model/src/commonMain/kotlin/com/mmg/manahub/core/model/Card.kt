@@ -1,0 +1,92 @@
+package com.mmg.manahub.core.model
+
+data class Card(
+    val scryfallId: String,
+    val name: String,
+    val printedName: String?,
+    val manaCost: String?,
+    val cmc: Double,
+    val colors: List<String>,
+    val colorIdentity: List<String>,
+    val typeLine: String,
+    val printedTypeLine: String?,
+    val oracleText: String?,
+    val printedText: String?,
+    val keywords: List<String>,
+    val power: String?,
+    val toughness: String?,
+    val loyalty: String?,
+    val setCode: String,
+    val setName: String,
+    val collectorNumber: String,
+    val rarity: String,
+    val releasedAt: String,
+    val frameEffects: List<String>,  // e.g. ["showcase"], ["extendedart"]
+    val promoTypes: List<String>,  // e.g. ["boosterfun"]
+    val lang: String,
+    val imageNormal: String?,
+    val imageArtCrop: String?,
+    val imageBackNormal: String?,       // non-null only for double-faced cards
+    val priceUsd: Double?,
+    val priceUsdFoil: Double?,
+    val priceEur: Double?,
+    val priceEurFoil: Double?,
+    val legalityStandard: String,
+    val legalityPioneer: String,
+    val legalityModern: String,
+    val legalityCommander: String,
+    /**
+     * Format legalities added in Deck Doctor Phase 4 (D2). Default to `"not_legal"` so
+     * pre-existing call sites and rows that have not been re-fetched from Scryfall still
+     * construct safely; correct values arrive on the next Scryfall fetch.
+     */
+    val legalityLegacy: String = "not_legal",
+    val legalityVintage: String = "not_legal",
+    val legalityPauper: String = "not_legal",
+    val flavorText: String?,
+    val artist: String?,
+    val scryfallUri: String,
+    val isStale: Boolean = false,
+    val staleReason: String? = null,
+    val cachedAt: Long = 0L,
+    /** Auto-confirmed tags from the tagging engine. Persisted in Room as JSON. */
+    val tags: List<CardTag> = emptyList(),
+    /** Tags added manually by the user from the tag picker or custom input. */
+    val userTags: List<CardTag> = emptyList(),
+    /**
+     * Tags the auto-tagging engine *suggests* for this card but whose confidence
+     * was below the auto-add threshold. Surfaced in CardDetail for the user to
+     * confirm or dismiss; never auto-applied to [tags].
+     */
+    val suggestedTags: List<SuggestedTag> = emptyList(),
+    /** Links to this card on external sites (Gatherer, EDHREC, TCGPlayer articles…). */
+    val relatedUris: Map<String, String> = emptyMap(),
+    /** Purchase links for this card (TCGPlayer, Cardmarket, Cardhoarder). */
+    val purchaseUris: Map<String, String> = emptyMap(),
+    /** True when Scryfall marks this card as a "Game Changer" in its format. */
+    val gameChanger: Boolean = false,
+    /**
+     * EDHREC popularity rank (lower = more played). Null when Scryfall does not
+     * provide a rank for this card. Consumed by [EdhrecPowerResolver] to derive a
+     * power signal for the Deck Doctor scoring engine.
+     */
+    val edhrecRank: Int? = null,
+    /** Penny Dreadful popularity rank (lower = more played). Null when absent. */
+    val pennyRank: Int? = null,
+    /**
+     * Full per-face data for double-faced cards (DFCs), meld cards, etc.
+     * Null for single-faced cards.  [imageBackNormal] remains as a fast-access
+     * shortcut for the most common DFC use-case (displaying the back image).
+     */
+    val cardFaces: List<CardFace>? = null,
+    /**
+     * D14: the WUBRG colours this card can PRODUCE (mana abilities), as a compact
+     * subset string in canonical W-U-B-R-G order — e.g. `"WU"`, never a JSON blob.
+     * Populated from Scryfall's `produced_mana` (root card object; see
+     * [com.mmg.manahub.core.data.remote.mapper.toDomain]). Empty for cards that
+     * produce no mana. Persisted at the card level; for multi-face cards the
+     * Scryfall root already unions both faces' production, so no per-face merge
+     * is needed here.
+     */
+    val producedMana: String = "",
+)

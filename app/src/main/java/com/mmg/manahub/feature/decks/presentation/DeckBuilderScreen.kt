@@ -52,6 +52,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -82,15 +83,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import org.koin.androidx.compose.koinViewModel
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.BASIC_LAND_NAMES
-import com.mmg.manahub.core.domain.model.DeckCard
-import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
+import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.model.DeckCard
+import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardSearchSheet
@@ -118,7 +121,7 @@ fun DeckMagicDetailScreen(
     onImproveDeck: (String) -> Unit,
     onReviewSurvey: (Long) -> Unit = {},
     onPlaytest: (deckId: String) -> Unit = {},
-    viewModel: DeckMagicDetailViewModel = hiltViewModel()
+    viewModel: DeckMagicDetailViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
@@ -188,14 +191,32 @@ fun DeckMagicDetailScreen(
                         }
                     }
 
-                    // Playtest button — launches setup screen for this deck.
-                    uiState.deck?.id?.let { deckId ->
-                        IconButton(onClick = { onPlaytest(deckId) }) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = "Playtest deck",
-                                tint = mc.primaryAccent,
-                            )
+                    // Playtest button — launches setup screen for this deck. Hidden entirely
+                    // (not just disabled) while DeckFeatureFlags.PLAYTEST_ENABLED is false.
+                    if (DeckFeatureFlags.PLAYTEST_ENABLED) {
+                        uiState.deck?.id?.let { deckId ->
+                            FilledTonalButton(
+                                onClick = { onPlaytest(deckId) },
+                                modifier = Modifier.padding(end = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = mc.primaryAccent.copy(alpha = 0.15f),
+                                    contentColor = mc.primaryAccent
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "PLAYTEST",
+                                    style = ty.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
@@ -412,7 +433,7 @@ private fun ViewStepContent(
     onAddBasicLands: () -> Unit,
     onChooseCommander: () -> Unit,
     onReviewSurvey: (Long) -> Unit,
-    onReplaceCard: (com.mmg.manahub.core.domain.model.Card) -> Unit,
+    onReplaceCard: (com.mmg.manahub.core.model.Card) -> Unit,
     deckStats: com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase.Result?,
     playerName: String,
     modifier: Modifier = Modifier,
@@ -757,12 +778,12 @@ private fun CardDetailSheet(
      * buttons are shown instead.
      */
     isCommanderSelectionContext: Boolean,
-    tags: List<com.mmg.manahub.core.domain.model.CardTag>,
+    tags: List<com.mmg.manahub.core.model.CardTag>,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
     onDelete: () -> Unit,
     /** Called with the resolved Card when the user taps "Choose as commander". */
-    onChooseAsCommander: (com.mmg.manahub.core.domain.model.Card) -> Unit,
+    onChooseAsCommander: (com.mmg.manahub.core.model.Card) -> Unit,
     /** Called when the user taps "Remove commander" inside the commander-selection context. */
     onRemoveCommander: () -> Unit,
     onDismiss: () -> Unit,
@@ -868,7 +889,7 @@ private fun CardDetailSheet(
                                     border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f))
                                 ) {
                                     Text(
-                                        text = tag.label,
+                                        text = tag.label(),
                                         style = ty.labelSmall,
                                         color = mc.textSecondary,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)

@@ -7,11 +7,10 @@ import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainDeck
-import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.DeckSlot
-import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.domain.model.DeckWithCards
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckSlot
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -19,10 +18,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.time.Instant
+import kotlinx.datetime.Clock
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Local-first implementation of [DeckRepository].
@@ -35,12 +32,14 @@ import javax.inject.Singleton
  * so deletions are propagated to Supabase on the next push.
  *
  * RPCs have been removed entirely from this class — they are SyncManager's responsibility.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule] (shared across many islands).
  */
-@Singleton
-class DeckRepositoryImpl @Inject constructor(
+class DeckRepositoryImpl(
     private val deckDao: DeckDao,
     private val progressionEventBus: ProgressionEventBus,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) : DeckRepository {
 
     private val gson = Gson()
@@ -108,7 +107,7 @@ class DeckRepositoryImpl @Inject constructor(
             ProgressionEvent.DeckCreated(
                 deckId = id,
                 format = format,
-                occurredAt = Instant.now(),
+                occurredAt = Clock.System.now(),
             )
         )
         id
@@ -132,7 +131,7 @@ class DeckRepositoryImpl @Inject constructor(
             ProgressionEvent.DeckSaved(
                 deckId = deck.id,
                 cardCount = 0,
-                occurredAt = Instant.now(),
+                occurredAt = Clock.System.now(),
             )
         )
     }
@@ -215,6 +214,40 @@ class DeckRepositoryImpl @Inject constructor(
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
             }
+        }
+    }
+
+    override suspend fun updateDeckAttribution(
+        deckId: String,
+        sourceUrl: String?,
+        sourceAuthor: String?,
+        sourceService: String?,
+        importedAt: Long?,
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.updateDeckAttribution(
+                deckId = deckId,
+                sourceUrl = sourceUrl,
+                sourceAuthor = sourceAuthor,
+                sourceService = sourceService,
+                importedAt = importedAt,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    override suspend fun updateArchetypeOverride(
+        deckId: String,
+        archetypeOverride: String?,
+        themesOverride: List<String>,
+    ) {
+        withContext(ioDispatcher) {
+            deckDao.updateArchetypeOverride(
+                deckId = deckId,
+                archetypeOverride = archetypeOverride,
+                themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                updatedAt = System.currentTimeMillis(),
+            )
         }
     }
 

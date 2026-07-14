@@ -4,19 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class ProfileEditViewModel @Inject constructor(
+/**
+ * KMP migration — Phase 1 Hilt->Koin cutover. Resolved via `koinViewModel()` from
+ * `profileKoinModule` (Profile is already a Koin island — see `feature/profile/di/ProfileKoinModule.kt`).
+ * All three constructor deps are already bridged Hilt-owned singletons in `coreBridgeKoinModule`,
+ * resolved via `get()` — no new bridging needed.
+ */
+class ProfileEditViewModel(
     private val scryfallRemoteDataSource: ScryfallRemoteDataSource,
     private val userPreferencesDataStore: UserPreferencesDataStore,
-    private val authRepository: com.mmg.manahub.feature.auth.domain.repository.AuthRepository,
+    private val authRepository: com.mmg.manahub.core.domain.auth.AuthRepository,
 ) : ViewModel() {
 
     data class PlaneswalkerArt(
@@ -62,7 +65,7 @@ class ProfileEditViewModel @Inject constructor(
         viewModelScope.launch {
             // Observe session for gameTag
             authRepository.sessionState.collect { session ->
-                if (session is com.mmg.manahub.feature.auth.domain.model.SessionState.Authenticated) {
+                if (session is com.mmg.manahub.core.domain.auth.SessionState.Authenticated) {
                     _uiState.update { it.copy(gameTag = session.user.gameTag) }
                 } else {
                     _uiState.update { it.copy(gameTag = null) }

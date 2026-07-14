@@ -12,9 +12,7 @@ import com.mmg.manahub.core.gamification.domain.catalog.Family
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.AchievementUnlock
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
-import java.time.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
+import kotlinx.datetime.Clock
 import kotlin.math.floor
 
 /**
@@ -35,8 +33,7 @@ import kotlin.math.floor
  *
  * @return the list of tier unlocks produced by THIS event (for [com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome]).
  */
-@Singleton
-class AchievementEvaluator @Inject constructor(
+class AchievementEvaluator(
     private val dao: GamificationDao,
     private val statsDao: GamificationStatsDao,
     private val clock: Clock,
@@ -85,7 +82,7 @@ class AchievementEvaluator @Inject constructor(
         }
 
         val newTier = def.tierReachedFor(newValue)
-        val nowMillis = clock.millis()
+        val nowMillis = clock.now().toEpochMilliseconds()
 
         // unlocked_at: set ONCE on the first time any tier is reached; NEVER overwrite an existing
         // value (the regression fix). A backfill may have already stamped it.
@@ -111,7 +108,7 @@ class AchievementEvaluator @Inject constructor(
             grantTierXp(def.id, tier, tierDef.xpReward)
             unlocks += AchievementUnlock(
                 id = def.id,
-                titleRes = def.titleRes,
+                title = def.title,
                 emoji = def.emoji,
                 tier = tier,
                 xpReward = tierDef.xpReward,
@@ -185,7 +182,7 @@ class AchievementEvaluator @Inject constructor(
         val key = "achievement:$achievementId:tier:$tier"
         if (dao.hasTransaction(key)) return
 
-        val nowMillis = clock.millis()
+        val nowMillis = clock.now().toEpochMilliseconds()
         // Delta-based grant: the new total/level are computed inside the transaction (race-safe).
         dao.grantXpAtomically(
             txn = XpTransactionEntity(

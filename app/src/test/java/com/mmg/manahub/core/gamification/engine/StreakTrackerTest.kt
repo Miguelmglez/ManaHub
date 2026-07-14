@@ -8,10 +8,13 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 
 /**
  * Unit tests for the PURE [StreakTracker.advance] (ADR-002 §Context, Phase 2): same-day no-op,
@@ -23,15 +26,15 @@ class StreakTrackerTest {
 
     private lateinit var tracker: StreakTracker
 
-    private val today: LocalDate = LocalDate.of(2026, 6, 12)
+    private val today: LocalDate = LocalDate(2026, 6, 12)
 
     @Before
     fun setUp() {
         // The DAO/clock/zone are irrelevant for the pure `advance`; supply stubs so we can construct.
         tracker = StreakTracker(
             mockk<GamificationDao>(relaxed = true),
-            Clock.fixed(Instant.parse("2026-06-12T10:00:00Z"), ZoneId.of("UTC")),
-            ZoneId.of("UTC"),
+            FixedClock(Instant.parse("2026-06-12T10:00:00Z")),
+            TimeZone.UTC,
         )
     }
 
@@ -66,7 +69,7 @@ class StreakTrackerTest {
 
     @Test
     fun `consecutive day increments current and tracks longest`() {
-        val existing = streak(current = 3, longest = 3, lastDate = today.minusDays(1), tokens = 0)
+        val existing = streak(current = 3, longest = 3, lastDate = today.minus(1, DateTimeUnit.DAY), tokens = 0)
         val result = tracker.advance(existing, today)
         assertEquals(4, result.current)
         assertEquals(4, result.longest)
@@ -74,7 +77,7 @@ class StreakTrackerTest {
 
     @Test
     fun `consecutive day does not lower an already-higher longest`() {
-        val existing = streak(current = 2, longest = 10, lastDate = today.minusDays(1), tokens = 0)
+        val existing = streak(current = 2, longest = 10, lastDate = today.minus(1, DateTimeUnit.DAY), tokens = 0)
         val result = tracker.advance(existing, today)
         assertEquals(3, result.current)
         assertEquals(10, result.longest)
@@ -83,7 +86,7 @@ class StreakTrackerTest {
     @Test
     fun `reaching a 7-day multiple regenerates one freeze token (capped)`() {
         // current 6 → 7 (a multiple of 7) regenerates a token, capped at MAX.
-        val existing = streak(current = 6, longest = 6, lastDate = today.minusDays(1), tokens = 0)
+        val existing = streak(current = 6, longest = 6, lastDate = today.minus(1, DateTimeUnit.DAY), tokens = 0)
         val result = tracker.advance(existing, today)
         assertEquals(7, result.current)
         assertEquals(1, result.freezeTokens)
@@ -91,7 +94,7 @@ class StreakTrackerTest {
 
     @Test
     fun `token regen never exceeds the cap`() {
-        val existing = streak(current = 6, longest = 6, lastDate = today.minusDays(1),
+        val existing = streak(current = 6, longest = 6, lastDate = today.minus(1, DateTimeUnit.DAY),
             tokens = StreakTracker.MAX_FREEZE_TOKENS)
         val result = tracker.advance(existing, today)
         assertEquals(StreakTracker.MAX_FREEZE_TOKENS, result.freezeTokens)
@@ -99,7 +102,7 @@ class StreakTrackerTest {
 
     @Test
     fun `a non-multiple-of-7 consecutive day does not regenerate a token`() {
-        val existing = streak(current = 4, longest = 4, lastDate = today.minusDays(1), tokens = 0)
+        val existing = streak(current = 4, longest = 4, lastDate = today.minus(1, DateTimeUnit.DAY), tokens = 0)
         val result = tracker.advance(existing, today)
         assertEquals(5, result.current)
         assertEquals(0, result.freezeTokens)
@@ -110,7 +113,7 @@ class StreakTrackerTest {
     @Test
     fun `a single missed day consumes one freeze token and preserves the streak`() {
         // last active 2 days ago → 1 missed day. tokens 2 → 1.
-        val existing = streak(current = 5, longest = 5, lastDate = today.minusDays(2), tokens = 2)
+        val existing = streak(current = 5, longest = 5, lastDate = today.minus(2, DateTimeUnit.DAY), tokens = 2)
         val result = tracker.advance(existing, today)
         assertEquals(6, result.current)
         assertEquals(1, result.freezeTokens)
@@ -121,7 +124,7 @@ class StreakTrackerTest {
     @Test
     fun `multiple missed days beyond available tokens resets the streak to one`() {
         // last active 4 days ago → 3 missed days, only 2 tokens → reset.
-        val existing = streak(current = 12, longest = 12, lastDate = today.minusDays(4), tokens = 2)
+        val existing = streak(current = 12, longest = 12, lastDate = today.minus(4, DateTimeUnit.DAY), tokens = 2)
         val result = tracker.advance(existing, today)
         assertEquals(1, result.current)
         assertEquals(12, result.longest) // longest is preserved
@@ -131,7 +134,7 @@ class StreakTrackerTest {
     @Test
     fun `a gap exactly covered by tokens preserves the streak and zeroes the tokens`() {
         // 2 missed days, exactly 2 tokens → consume both, continue.
-        val existing = streak(current = 8, longest = 8, lastDate = today.minusDays(3), tokens = 2)
+        val existing = streak(current = 8, longest = 8, lastDate = today.minus(3, DateTimeUnit.DAY), tokens = 2)
         val result = tracker.advance(existing, today)
         assertEquals(9, result.current)
         assertEquals(0, result.freezeTokens)
@@ -144,7 +147,7 @@ class StreakTrackerTest {
         // current 6, 1 missed day (last active 2 days ago) consumes 1 token → 0, then current → 7
         // (a 7-day multiple) regenerates 1. Net tokens = 1, streak preserved. Before the fix this
         // branch never regenerated, silently skipping the milestone token.
-        val existing = streak(current = 6, longest = 6, lastDate = today.minusDays(2), tokens = 1)
+        val existing = streak(current = 6, longest = 6, lastDate = today.minus(2, DateTimeUnit.DAY), tokens = 1)
         val result = tracker.advance(existing, today)
         assertEquals(7, result.current)
         assertEquals(1, result.freezeTokens)
@@ -154,7 +157,7 @@ class StreakTrackerTest {
     fun `milestone regen in the freeze branch still respects the cap`() {
         // current 6 → 7 (milestone), 1 missed day consumes 1 token from 2 → 1, then +1 regen = 2
         // (already at cap, must not exceed MAX_FREEZE_TOKENS).
-        val existing = streak(current = 6, longest = 6, lastDate = today.minusDays(2),
+        val existing = streak(current = 6, longest = 6, lastDate = today.minus(2, DateTimeUnit.DAY),
             tokens = StreakTracker.MAX_FREEZE_TOKENS)
         val result = tracker.advance(existing, today)
         assertEquals(7, result.current)
@@ -164,7 +167,7 @@ class StreakTrackerTest {
     @Test
     fun `a non-milestone freeze-covered gap does not regenerate a token`() {
         // current 4 → 5 (not a multiple of 7), 1 missed day consumes 1 token from 2 → 1, no regen.
-        val existing = streak(current = 4, longest = 4, lastDate = today.minusDays(2), tokens = 2)
+        val existing = streak(current = 4, longest = 4, lastDate = today.minus(2, DateTimeUnit.DAY), tokens = 2)
         val result = tracker.advance(existing, today)
         assertEquals(5, result.current)
         assertEquals(1, result.freezeTokens)
@@ -175,7 +178,7 @@ class StreakTrackerTest {
     @Test
     fun `two opens on the same calendar day advance the streak only once`() {
         // First open of the day: consecutive from yesterday → current 3 → 4.
-        val afterYesterday = streak(current = 3, longest = 3, lastDate = today.minusDays(1), tokens = 0)
+        val afterYesterday = streak(current = 3, longest = 3, lastDate = today.minus(1, DateTimeUnit.DAY), tokens = 0)
         val firstOpen = tracker.advance(afterYesterday, today)
         assertEquals(4, firstOpen.current)
 
@@ -189,7 +192,7 @@ class StreakTrackerTest {
 
     @Test
     fun `current never drops below one and tokens never go negative on reset`() {
-        val existing = streak(current = 1, longest = 1, lastDate = today.minusDays(10), tokens = 0)
+        val existing = streak(current = 1, longest = 1, lastDate = today.minus(10, DateTimeUnit.DAY), tokens = 0)
         val result = tracker.advance(existing, today)
         assertTrue(result.current >= 1)
         assertTrue(result.freezeTokens >= 0)
@@ -210,7 +213,7 @@ class StreakTrackerTest {
     @Test
     fun `a clock that moved backwards is treated as same-day no-op`() {
         // today is BEFORE lastActiveDate (dayDelta < 0) → no change.
-        val existing = streak(current = 4, longest = 4, lastDate = today.plusDays(2), tokens = 1)
+        val existing = streak(current = 4, longest = 4, lastDate = today.plus(2, DateTimeUnit.DAY), tokens = 1)
         val result = tracker.advance(existing, today)
         assertSame(existing, result)
     }

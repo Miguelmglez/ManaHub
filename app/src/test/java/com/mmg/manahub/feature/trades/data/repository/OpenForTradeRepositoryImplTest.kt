@@ -1,15 +1,19 @@
 package com.mmg.manahub.feature.trades.data.repository
 
-import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.feature.trades.data.local.entity.LocalOpenForTradeEntity
-import com.mmg.manahub.feature.trades.data.remote.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.entity.LocalOpenForTradeEntity
+import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -25,6 +29,10 @@ import org.junit.Test
  *  - GROUP 3: migrateLocalToRemote — uses localCollectionId as the userCardId for remote
  *  - GROUP 4: migrateLocalToRemote — empty local → success(0), no remote calls
  *  - GROUP 5: migrateLocalToRemote — remote failure → Result.failure, local not cleared
+ *  - GROUP 6: §2.1 regression — concurrent addLocal/addAndSync for the same collection id
+ *    are serialized by the mutex into a single row, never a duplicate
+ *  - GROUP 7: §2.2 regression — removeByCollectionIdAndSync is remote-first; a remote
+ *    failure must never delete the local row (the old resurrection window)
  */
 class OpenForTradeRepositoryImplTest {
 
@@ -68,9 +76,11 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given scryfallId and localCollectionId when addLocal then entity is inserted with those values`() = runTest {
-        // Arrange
+        // Arrange — addLocal looks up any existing row for this collection id first (§2.1
+        // upsert-by-collection-id pattern); no existing row here, so it upserts a new entity.
+        coEvery { dao.getByCollectionId(any()) } returns null
         val capturedEntity = slot<LocalOpenForTradeEntity>()
-        coEvery { dao.insert(capture(capturedEntity)) } returns Unit
+        coEvery { dao.upsert(capture(capturedEntity)) } returns Unit
 
         // Act
         val result = repository.addLocal(
@@ -87,8 +97,9 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given addLocal when called then entity is inserted with synced false`() = runTest {
+        coEvery { dao.getByCollectionId(any()) } returns null
         val capturedEntity = slot<LocalOpenForTradeEntity>()
-        coEvery { dao.insert(capture(capturedEntity)) } returns Unit
+        coEvery { dao.upsert(capture(capturedEntity)) } returns Unit
 
         repository.addLocal(scryfallId = "card-001", localCollectionId = "col-001")
 
@@ -97,8 +108,9 @@ class OpenForTradeRepositoryImplTest {
 
     @Test
     fun `given addLocal when called then entity receives a non-blank UUID id`() = runTest {
+        coEvery { dao.getByCollectionId(any()) } returns null
         val capturedEntity = slot<LocalOpenForTradeEntity>()
-        coEvery { dao.insert(capture(capturedEntity)) } returns Unit
+        coEvery { dao.upsert(capture(capturedEntity)) } returns Unit
 
         repository.addLocal(scryfallId = "card-001", localCollectionId = "col-001")
 
@@ -113,10 +125,11 @@ class OpenForTradeRepositoryImplTest {
         val capturedFirst  = slot<LocalOpenForTradeEntity>()
         val capturedSecond = slot<LocalOpenForTradeEntity>()
 
-        coEvery { dao.insert(capture(capturedFirst)) } returns Unit
+        coEvery { dao.getByCollectionId(any()) } returns null
+        coEvery { dao.upsert(capture(capturedFirst)) } returns Unit
         repository.addLocal(scryfallId = "card-a", localCollectionId = "col-a")
 
-        coEvery { dao.insert(capture(capturedSecond)) } returns Unit
+        coEvery { dao.upsert(capture(capturedSecond)) } returns Unit
         repository.addLocal(scryfallId = "card-b", localCollectionId = "col-b")
 
         assertTrue(
@@ -126,8 +139,9 @@ class OpenForTradeRepositoryImplTest {
     }
 
     @Test
-    fun `given dao insert throws when addLocal then returns Result failure`() = runTest {
-        coEvery { dao.insert(any()) } throws RuntimeException("constraint violation")
+    fun `given dao upsert throws when addLocal then returns Result failure`() = runTest {
+        coEvery { dao.getByCollectionId(any()) } returns null
+        coEvery { dao.upsert(any()) } throws RuntimeException("constraint violation")
 
         val result = repository.addLocal("card-001", "col-001")
 
@@ -197,13 +211,16 @@ class OpenForTradeRepositoryImplTest {
     }
 
     @Test
-    fun `given unsynced rows when migrateLocalToRemote succeeds then clearSynced is called`() = runTest {
+    fun `given unsynced rows when migrateLocalToRemote succeeds then rows are marked synced and NOT cleared`() = runTest {
+        // Entries remain in Room after a successful sync (clearSynced removed) so that
+        // observeLocal() continues to show them without re-downloading from remote.
         coEvery { dao.getUnsynced() } returns listOf(buildEntity(id = "oft-1"))
         coEvery { remote.batchAddOpenForTradeEntries(any()) } returns Result.success(Unit)
 
         repository.migrateLocalToRemote(USER_ID)
 
-        coVerify(exactly = 1) { dao.clearSynced() }
+        coVerify(exactly = 1) { dao.markSynced(listOf("oft-1")) }
+        coVerify(exactly = 0) { dao.clearSynced() }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -264,5 +281,96 @@ class OpenForTradeRepositoryImplTest {
 
         coVerify(exactly = 0) { dao.markSynced(any()) }
         coVerify(exactly = 0) { dao.clearSynced() }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6 — §2.1 regression: concurrent addLocal/addAndSync serialization
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given two concurrent addLocal calls for the same localCollectionId then the mutex serializes them into a single row`() = runTest {
+        // Simulate a real DB: getByCollectionId reflects whatever the last upsert wrote.
+        var stored: LocalOpenForTradeEntity? = null
+        val upsertedIds = mutableListOf<String>()
+        coEvery { dao.getByCollectionId("col-shared") } answers { stored }
+        coEvery { dao.upsert(any()) } coAnswers {
+            val entity = firstArg<LocalOpenForTradeEntity>()
+            upsertedIds += entity.id
+            stored = entity
+        }
+
+        // Act — two "concurrent" addLocal calls racing for the SAME collection id.
+        coroutineScope {
+            launch { repository.addLocal(scryfallId = "card-a", localCollectionId = "col-shared", quantity = 1) }
+            launch { repository.addLocal(scryfallId = "card-a", localCollectionId = "col-shared", quantity = 2) }
+        }
+
+        // Assert — without the mutex, both calls would race getByCollectionId(), both see
+        // null, and both insert a brand-new random-UUID row (a duplicate). The mutex forces
+        // full serialization, so the SECOND call always sees the FIRST one's row and updates
+        // it in place — both upserts target the SAME entity id.
+        assertEquals(2, upsertedIds.size)
+        assertEquals(
+            "Both upserts must target the same row id (no duplicate row created)",
+            upsertedIds[0],
+            upsertedIds[1],
+        )
+        assertNotNull(stored)
+    }
+
+    @Test
+    fun `given two concurrent addAndSync calls for the same localCollectionId then the mutex serializes them into a single row`() = runTest {
+        var stored: LocalOpenForTradeEntity? = null
+        val upsertedIds = mutableListOf<String>()
+        coEvery { dao.getByCollectionId("col-shared") } answers { stored }
+        coEvery { dao.upsert(any()) } coAnswers {
+            val entity = firstArg<LocalOpenForTradeEntity>()
+            upsertedIds += entity.id
+            stored = entity
+        }
+        coEvery { remote.batchAddOpenForTradeEntries(any()) } returns Result.success(Unit)
+
+        coroutineScope {
+            launch { repository.addAndSync(scryfallId = "card-a", localCollectionId = "col-shared", quantity = 1, userId = USER_ID) }
+            launch { repository.addAndSync(scryfallId = "card-a", localCollectionId = "col-shared", quantity = 2, userId = USER_ID) }
+        }
+
+        assertEquals(2, upsertedIds.size)
+        assertEquals(
+            "Both upserts must target the same row id (no duplicate row created)",
+            upsertedIds[0],
+            upsertedIds[1],
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 7 — §2.2 regression: removeByCollectionIdAndSync is remote-first
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given removeByCollectionIdAndSync when remote succeeds then the remote delete happens before the local row is removed`() = runTest {
+        coEvery { remote.removeByUserCardId("col-1") } returns Result.success(Unit)
+
+        val result = repository.removeByCollectionIdAndSync("col-1")
+
+        assertTrue(result.isSuccess)
+        coVerifyOrder {
+            remote.removeByUserCardId("col-1")
+            dao.deleteByCollectionId("col-1")
+        }
+    }
+
+    @Test
+    fun `given removeByCollectionIdAndSync when the remote call fails then the local row is NOT deleted`() = runTest {
+        // Regression test for §2.2: the old local-then-remote order deleted the local row
+        // FIRST, so a remote failure left the server row alive — the next syncFromRemote()
+        // would resurrect the entry the user just removed. Remote-first means a remote
+        // failure now leaves the local row untouched, so there is nothing to resurrect.
+        coEvery { remote.removeByUserCardId("col-1") } returns Result.failure(RuntimeException("network down"))
+
+        val result = repository.removeByCollectionIdAndSync("col-1")
+
+        assertTrue(result.isFailure)
+        coVerify(exactly = 0) { dao.deleteByCollectionId(any()) }
     }
 }

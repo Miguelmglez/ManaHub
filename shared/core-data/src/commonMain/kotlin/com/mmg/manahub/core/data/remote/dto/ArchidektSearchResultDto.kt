@@ -1,0 +1,42 @@
+package com.mmg.manahub.core.data.remote.dto
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/**
+ * Paged search response from `GET /api/decks/v3/` (Phase 2).
+ *
+ * [next] is the absolute URL of the next page (null on the last page). Every field is
+ * defaulted so the deserializer tolerates missing/unknown keys.
+ */
+@Serializable
+data class ArchidektSearchResultDto(
+    val count: Int = 0,
+    val next: String? = null,
+    val results: List<ArchidektDeckSummaryDto> = emptyList(),
+)
+
+@Serializable
+data class ArchidektDeckSummaryDto(
+    val id: Int,
+    val name: String = "",
+    val size: Int = 0,
+    @SerialName("deckFormat") val deckFormat: Int = 7,
+    val owner: ArchidektOwnerDto? = null,
+    val viewCount: Int = 0,
+    val createdAt: String = "",
+    val updatedAt: String = "",
+    val colors: Map<String, Int> = emptyMap(),
+    // Added for Phase 3 (community aggregate sanitization) — verified live 2026-07-11,
+    // see docs/adr/ADR-004-community-api-contracts.md §1. Additive, defaulted: existing
+    // callers (CommunityDecksRepositoryImpl) are unaffected.
+    val edhBracket: Int? = null,
+    val private: Boolean = false,
+    val unlisted: Boolean = false,
+    val theorycrafted: Boolean = false,
+    // Added 2026-07-13 for rich card display (thumbnails on search/browse results):
+    // an art-crop image URL of the deck's featured card. [customFeatured] wins over
+    // [featured] when non-blank (user-picked override) — see CommunityDeckMappers.
+    val featured: String = "",
+    val customFeatured: String = "",
+)

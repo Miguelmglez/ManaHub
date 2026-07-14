@@ -5,23 +5,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.di.DefaultDispatcher
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.draft.domain.engine.BotDrafter
-import com.mmg.manahub.feature.draft.domain.model.BoosterPack
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftConfig
-import com.mmg.manahub.feature.draft.domain.model.DraftError
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftStatus
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.domain.engine.BotDrafter
+import com.mmg.manahub.core.model.BoosterPack
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftConfig
+import com.mmg.manahub.core.model.DraftError
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftStatus
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSimSetUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.MakePickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.ObserveDraftUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.StartDraftUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,7 +29,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Drives the Draft Simulator flow (setup → drafting → result).
@@ -40,9 +38,12 @@ import javax.inject.Inject
  * does not rely on shared in-memory state across instances: instead it collects
  * [ObserveDraftUseCase], which emits the single active [DraftState] persisted by the use cases.
  * Drafting and Result screens therefore reconstruct their UI purely from the observed session.
+ *
+ * KMP migration — Phase 1: resolved by Koin (`koinViewModel()`), not Hilt. The [SavedStateHandle] is
+ * Koin-injected and carries the current `NavBackStackEntry` arguments, so the `setCode`/`sessionId`
+ * routing behaviour is identical to the previous Hilt-scoped instance.
  */
-@HiltViewModel
-class DraftSimViewModel @Inject constructor(
+class DraftSimViewModel(
     savedStateHandle: SavedStateHandle,
     private val startDraft: StartDraftUseCase,
     private val makePick: MakePickUseCase,
@@ -104,7 +105,7 @@ class DraftSimViewModel @Inject constructor(
     }
 
     /**
-     * Resolves the [com.mmg.manahub.feature.draft.domain.model.DraftableSet] for [code] and
+     * Resolves the [com.mmg.manahub.core.model.DraftableSet] for [code] and
      * transitions to [DraftSimUiState.SetupReady] on success.
      */
     fun loadSet(code: String) {

@@ -1,9 +1,11 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.annotation.StringRes
-import com.mmg.manahub.core.domain.model.DeckSummary
-import com.mmg.manahub.core.domain.model.DraftSet
-import com.mmg.manahub.core.domain.model.news.NewsItem
+import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.NudgeTrigger
+import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.news.NewsItem
 // FirstStepItem is defined in the same package — no explicit import needed.
 
 /**
@@ -52,25 +54,50 @@ data class HomeUiState(
     /** Set code the Discover cards row is currently scoped to, or null when unfiltered. */
     val discoverSetCode: String? = null,
     /**
-     * The full [com.mmg.manahub.core.domain.model.MagicSet] the Discover row is scoped to, or null
+     * The full [com.mmg.manahub.core.model.MagicSet] the Discover row is scoped to, or null
      * when unfiltered. Drives the set-icon + code affordance in the widget header.
      */
-    val discoverSet: com.mmg.manahub.core.domain.model.MagicSet? = null,
+    val discoverSet: com.mmg.manahub.core.model.MagicSet? = null,
     val latestSets: List<DraftSet> = emptyList(),
     val wishlistStats: WishlistStats? = null,
     /** All of the user's decks, newest-first. Drives the Your Decks shelf widget. */
     val decks: List<DeckSummary> = emptyList(),
+    /**
+     * Newest-first collection additions for the RECENTLY_ADDED widget (Home feature overhaul
+     * Phase 2.1). Empty while loading or when the collection has no cards yet.
+     */
+    val recentlyAdded: List<RecentlyAddedCard> = emptyList(),
 
     // ── Phase 3 data slices ────────────────────────────────────────────────────
-    val communityStats: com.mmg.manahub.core.domain.model.CommunityStats? = null,
+    val communityStats: com.mmg.manahub.core.model.CommunityStats? = null,
     val tradeSummary: TradeSummary? = null,
+    /** Count of TradeSuggestionsRepository matches for the Trades Hub Suggestions slide. */
+    val tradeSuggestionsCount: Int = 0,
+    /** Count of the local Open-for-Trade list, for the Trades Hub Open-for-Trade slide. */
+    val openForTradeCount: Int = 0,
+    /** Estimated total value of the open-for-trade cards, currency-formatted, or null if 0/unknown. */
+    val openForTradeValueDisplay: String? = null,
     val activeTournamentSummary: TournamentSummary? = null,
+    /** Real accepted-friend count (Home feature overhaul Phase 1.2.d — replaces the old hardcoded 0). */
+    val friendCount: Int = 0,
+    /** Newest pending friend request headline for the Social Hub friends slide, or null. */
+    val latestFriendRequestName: String? = null,
+    /** Up to 3 popular Commander decks fetched from Archidekt (Home feature overhaul Phase 1.2.c). */
+    val archidektTrending: List<com.mmg.manahub.core.model.ArchidektTrendingDeck> = emptyList(),
 
     // ── Gamification (Phase 2) ──────────────────────────────────────────────────
     /** Master toggle. When false every gamification surface (widgets + hero suggestion) is hidden. */
     val gamificationEnabled: Boolean = true,
     /** Level / XP / streak / quest summary for the Home gamification widgets; null until loaded. */
     val gamification: HomeGamification? = null,
+
+    /**
+     * Whether the Community Decks feature (Archidekt browse/import) is exposed. When false, hides
+     * the Trending Commanders widget, the Community Decks Quick Start action (both the rendered
+     * shortcut and the customize-sheet option), and its entry in the widget gallery — mirrors
+     * [gamificationEnabled]'s "stays in persisted layout, just not shown" convention.
+     */
+    val communityDecksEnabled: Boolean = false,
 )
 
 /**
@@ -107,7 +134,7 @@ data class HomeGamification(
 /** A single quest preview row for the Home Quests widget. */
 data class HomeQuest(
     val instanceId: String,
-    @StringRes val titleRes: Int,
+    val title: String,
     val emoji: String,
     val progress: Int,
     val target: Int,
@@ -193,6 +220,20 @@ data class DiscoverCard(
     val typeLine: String? = null,
 )
 
+/**
+ * A single collection row for the RECENTLY_ADDED widget (Home feature overhaul Phase 2.1).
+ *
+ * @param rowId The unique `user_card_collection` row id — used as the LazyRow key so duplicate
+ *   scryfallIds (e.g. two separately-added copies) never collide, unlike [DiscoverCard.id].
+ * @param card The resolved card image/name/typeLine for display + tap-through to Card Detail.
+ * @param quantity Quantity on the row; drives the small badge when > 1.
+ */
+data class RecentlyAddedCard(
+    val rowId: String,
+    val card: DiscoverCard,
+    val quantity: Int,
+)
+
 /** Wishlist summary (account-gated). */
 data class WishlistStats(
     val count: Int,
@@ -200,10 +241,16 @@ data class WishlistStats(
     val cards: Set<DiscoverCard> = emptySet(),
 )
 
-/** Trade inbox summary (account-gated). */
+/**
+ * Trade inbox summary (account-gated).
+ *
+ * @param latestItemCount Item count of the newest pending proposal, rendered via
+ *   `R.string.home_trade_inbox_preview` (a formatted template, not a VM-composed string) — null
+ *   when there is no pending proposal.
+ */
 data class TradeSummary(
     val pendingCount: Int,
-    val latestPreview: String?,
+    val latestItemCount: Int?,
 )
 
 /** Active-tournament summary for the tournament widget. */
@@ -274,10 +321,6 @@ data class AccountNudge(
     @StringRes val messageRes: Int = 0,
     val trigger: NudgeTrigger,
 )
-
-enum class NudgeTrigger {
-    COLLECTION_MILESTONE, DECK_MILESTONE, GAME_MILESTONE, SYNC_PENDING, ACTION_REQUIRED
-}
 
 /** Simplified news wrapper removed in favor of rich NewsItem. */
 // data class NewsItem(val id: String, val title: String, val imageUrl: String?)

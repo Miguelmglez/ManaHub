@@ -4,18 +4,17 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.data.local.entity.TournamentEntity
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
-import com.mmg.manahub.core.domain.repository.MatchResultOutcome
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.core.model.Tournament
+import com.mmg.manahub.core.model.TournamentMatch
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
+import com.mmg.manahub.feature.tournament.domain.repository.MatchResultOutcome
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.tournament.domain.usecase.CalculateStandingsUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,10 +23,16 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class TournamentViewModel @Inject constructor(
+/**
+ * KMP migration — Phase 1 Hilt→Koin cutover. Plain (non-Hilt) ViewModel resolved by Koin via
+ * `koinViewModel()`; constructed in `tournamentKoinModule`. The `tournamentId` nav arg flows in via a
+ * Koin-injected [SavedStateHandle] (`savedStateHandle = get()`), populated from the NavBackStackEntry's
+ * `CreationExtras` exactly as Hilt did — so the `> 0L` construction guard, the single finish-and-advance
+ * write path ([RecordMatchResultUseCase] → [TournamentRepository.finishMatch]) and the viewModelScope
+ * create flow are all unchanged. Only the DI annotations were removed.
+ */
+class TournamentViewModel(
     private val repository:             TournamentRepository,
     private val calculateStandings:     CalculateStandingsUseCase,
     private val recordMatchResultUseCase: RecordMatchResultUseCase,
@@ -39,12 +44,12 @@ class TournamentViewModel @Inject constructor(
     ) { "TournamentViewModel requires a positive tournamentId" }
 
     data class UiState(
-        val tournament:      TournamentEntity?            = null,
+        val tournament:      Tournament?                  = null,
         val standings:       List<TournamentStanding>     = emptyList(),
-        val matches:         List<TournamentMatchEntity>   = emptyList(),
-        val players:         List<TournamentPlayerEntity>  = emptyList(),
-        val nextMatch:       TournamentMatchEntity?        = null,
-        val activeMatch:     TournamentMatchEntity?        = null,
+        val matches:         List<TournamentMatch>         = emptyList(),
+        val players:         List<TournamentPlayer>        = emptyList(),
+        val nextMatch:       TournamentMatch?              = null,
+        val activeMatch:     TournamentMatch?              = null,
         val isFinished:      Boolean                      = false,
         val isPaused:        Boolean                      = false,
         val isLoading:       Boolean                      = true,

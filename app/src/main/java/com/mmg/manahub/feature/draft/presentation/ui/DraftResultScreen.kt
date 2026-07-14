@@ -60,9 +60,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -80,8 +80,8 @@ import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftState
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 
@@ -94,7 +94,7 @@ import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 fun DraftResultScreen(
     onDeckSaved: () -> Unit,
     onBack: () -> Unit,
-    viewModel: DraftSimViewModel = hiltViewModel(),
+    viewModel: DraftSimViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors

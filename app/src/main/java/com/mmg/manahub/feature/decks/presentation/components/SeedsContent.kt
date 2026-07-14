@@ -36,6 +36,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,10 +50,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -62,7 +66,8 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
-import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetFilterBar
+// BudgetFilterBar lives in this same package (feature/decks/presentation/components/) since
+// Phase 0.5 relocated it out of improvement/components/ — no import needed.
 
 /**
  * SEEDS step content: pick 1+ seed cards, see the inferred color identity + detected strategy + the
@@ -82,6 +87,12 @@ import com.mmg.manahub.feature.decks.presentation.improvement.components.BudgetF
  * @param budgetSlot optional custom budget UI rendered in place of the default [BudgetFilterBar]
  *        (the Deck Studio passes its free-text [com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar]);
  *        when null the default chip-based [BudgetFilterBar] driven by [budget]/[onBudgetChanged] is shown.
+ * @param useCommunityData current state of the "Use community data" toggle (Deck Doctor
+ *        Community/Archetype plan, Phase 5). Only meaningful when [onToggleUseCommunityData] is
+ *        non-null (see that param's KDoc).
+ * @param onToggleUseCommunityData when non-null, the toggle row IS SHOWN and this callback flips
+ *        [useCommunityData]; when null (the master `communityEngineEnabledFlow` is off) the row is
+ *        hidden entirely — this is the Phase 5 flag gate.
  */
 @Composable
 fun SeedsContent(
@@ -100,6 +111,8 @@ fun SeedsContent(
     onBudgetChanged: (BudgetConstraints) -> Unit,
     onGenerate: () -> Unit,
     budgetSlot: (@Composable () -> Unit)? = null,
+    useCommunityData: Boolean = false,
+    onToggleUseCommunityData: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -172,6 +185,13 @@ fun SeedsContent(
                 }
                 item(key = "skeleton") {
                     SkeletonPreviewCard(skeleton = skeleton)
+                }
+            }
+
+            // Community-data toggle (Phase 5) — only rendered when the master flag is on.
+            if (onToggleUseCommunityData != null) {
+                item(key = "use_community_data") {
+                    UseCommunityDataRow(checked = useCommunityData, onToggle = onToggleUseCommunityData)
                 }
             }
 
@@ -308,7 +328,7 @@ private fun SeedResultRow(card: Card, onAdd: () -> Unit) {
                 modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(ChipShape),
             )
             Column(Modifier.weight(1f)) {
-                Text(card.name, style = ty.bodyMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                CardName(name = card.name, style = ty.bodyMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(card.setName, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onAdd, modifier = Modifier.size(48.dp)) {
@@ -340,7 +360,7 @@ private fun SeedHeroRow(card: Card, onRemove: () -> Unit) {
                 modifier = Modifier.size(width = 64.dp, height = 46.dp).clip(ChipShape),
             )
             Column(Modifier.weight(1f)) {
-                Text(card.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                CardName(name = card.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(card.typeLine, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
@@ -402,30 +422,10 @@ private fun InferredIdentityCard(identity: InferredIdentity) {
     }
 }
 
-/** A single colored mana pip with its letter. */
+/** A single colored mana pip using ManaSymbolImage. */
 @Composable
 private fun ManaPip(color: ManaColor) {
-    val mc = MaterialTheme.magicColors
-    val pipColor: Color = when (color) {
-        ManaColor.W -> mc.manaW
-        ManaColor.U -> mc.manaU
-        ManaColor.B -> mc.manaB
-        ManaColor.R -> mc.manaR
-        ManaColor.G -> mc.manaG
-        ManaColor.C -> mc.manaC
-    }
-    Box(
-        modifier = Modifier.size(24.dp).clip(CircleShape).background(pipColor),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = color.symbol,
-            style = MaterialTheme.magicTypography.labelSmall,
-            // Pip backgrounds are saturated; the symbol uses textPrimary which reads on every theme's pips.
-            color = mc.textPrimary,
-            fontWeight = FontWeight.Bold,
-        )
-    }
+    ManaSymbolImage(token = color.symbol, size = 24.dp)
 }
 
 /** Preview of the role skeleton the generated deck will target (ideal counts per functional role). */
@@ -485,6 +485,54 @@ private fun SkeletonBar(role: DeckRole, ideal: Int, maxIdeal: Int) {
             )
         }
         Text(text = ideal.toString(), style = ty.labelMedium, color = mc.textPrimary, modifier = Modifier.width(24.dp))
+    }
+}
+
+/**
+ * "Use community data" toggle row (Deck Doctor Community/Archetype plan, Phase 5): when on, the
+ * seed-build prioritizes cards popular in community decks for the picked seeds' commander/
+ * signature cards (see [com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase]'s
+ * "Community priority" section) before falling back to the pre-Phase-5 heuristic fill.
+ */
+@Composable
+private fun UseCommunityDataRow(checked: Boolean, onToggle: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(
+        onClick = onToggle,
+        shape = CardShape,
+        color = mc.backgroundSecondary,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(MaterialTheme.spacing.md)
+                .heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.deck_seeds_use_community_data_title),
+                    style = ty.bodyMedium,
+                    color = mc.textPrimary,
+                )
+                Text(
+                    text = stringResource(R.string.deck_seeds_use_community_data_subtitle),
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = { onToggle() },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = mc.onAccent,
+                    checkedTrackColor = mc.primaryAccent,
+                    uncheckedThumbColor = mc.textDisabled,
+                    uncheckedTrackColor = mc.surfaceVariant,
+                ),
+            )
+        }
     }
 }
 

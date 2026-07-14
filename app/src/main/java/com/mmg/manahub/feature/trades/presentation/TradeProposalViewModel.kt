@@ -1,45 +1,57 @@
 package com.mmg.manahub.feature.trades.presentation
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.AddCardRow
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.R
+import com.mmg.manahub.core.model.AddCardRow
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemRequestDto
-import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
-import com.mmg.manahub.feature.trades.domain.model.TradeError
-import com.mmg.manahub.feature.trades.domain.model.TradeSide
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
-import com.mmg.manahub.feature.trades.domain.model.toUserFacingMessage
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.data.remote.dto.TradeItemRequestDto
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.TradeError
+import com.mmg.manahub.core.model.TradeSide
+import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.model.toUserFacingMessage
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.model.ReviewFlags
+import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
-import javax.inject.Inject
 
 data class TradeItemDraft(
     val id: String = UUID.randomUUID().toString(),
@@ -64,6 +76,35 @@ data class TradeItemDraft(
     val isInCollection: Boolean = true,
 )
 
+/**
+ * One-shot events emitted by [TradeProposalViewModel].
+ *
+ * Delivered through a buffered [Channel] rather than nullable `StateFlow` fields (project
+ * standard — CLAUDE.md Playtest section; mirrors [TradeNegotiationViewModel]'s `NegotiationEvent`):
+ * a `StateFlow` equality-collapses two consecutive identical events (e.g. two "select a friend
+ * first" errors from a fast double-tap) and can drop events emitted while the screen's lifecycle
+ * is paused. [CreateTradeProposalScreen] resolves every string resource in ONE place — the
+ * ViewModel never carries a raw literal sentinel key like the old `errorMessage = "NO_RECEIVER"`.
+ */
+sealed class ProposalEvent {
+    /** A draft was saved, or a proposal was sent/countered — navigate to its thread. */
+    data class NavigateToThread(val proposalId: String, val rootProposalId: String) : ProposalEvent()
+
+    /** An edit/counter was submitted successfully — pop back to the previous screen. */
+    object NavigateBack : ProposalEvent()
+
+    /** A local (VM-side) validation failure. Always has a static, resource-backed message. */
+    data class ShowValidationError(@StringRes val messageRes: Int) : ProposalEvent()
+
+    /**
+     * A failure surfaced by the repository/use-case layer. [message] is already resolved to
+     * friendly text via [toUserFacingMessage] for a typed [TradeError]; it is null for any
+     * other (untyped/unexpected) exception so the screen falls back to a generic string —
+     * the raw [Throwable.message] is never shown to the user (audit §5.1).
+     */
+    data class ShowRemoteError(val message: String?) : ProposalEvent()
+}
+
 data class ProposalEditorUiState(
     val receiverId: String = "",
     val proposerItems: List<TradeItemDraft> = emptyList(),
@@ -76,10 +117,12 @@ data class ProposalEditorUiState(
     val rootProposalId: String = "",
     val currentVersion: Int = 1,
     val isSaving: Boolean = false,
-    val errorMessage: String? = null,
-    val snackbarMessage: String? = null,
-    val navigateToThread: Pair<String, String>? = null, // (proposalId, rootProposalId)
-    val navigateBack: Boolean = false,
+    /** True while the counter/edit prefill (§2.9) is loading the source proposal. */
+    val isPrefillLoading: Boolean = false,
+    /** True when the prefill could not resolve the source proposal even after a network
+     *  refresh — the editor form is hidden entirely so a save can never wipe the real
+     *  proposal's items from a blank draft (audit §2.9). */
+    val prefillFailed: Boolean = false,
 
     // Search / Add cards state
     val addCardsQuery: String = "",
@@ -106,27 +149,10 @@ data class ProposalEditorUiState(
     val proposerMatches: List<AddCardRow> = emptyList(),
     /** Cards I should request: friend's offerCards whose scryfallId is in my wishlist. */
     val receiverMatches: List<AddCardRow> = emptyList(),
-) {
-    val totalProposerValueUsd: Double get() = proposerItems.sumOf { 
-        val price = if (it.isFoil) (it.priceUsdFoil ?: it.priceUsd ?: 0.0) else (it.priceUsd ?: 0.0)
-        price * it.quantity 
-    }
-    val totalReceiverValueUsd: Double get() = receiverItems.sumOf { 
-        val price = if (it.isFoil) (it.priceUsdFoil ?: it.priceUsd ?: 0.0) else (it.priceUsd ?: 0.0)
-        price * it.quantity 
-    }
-    val totalProposerValueEur: Double get() = proposerItems.sumOf { 
-        val price = if (it.isFoil) (it.priceEurFoil ?: it.priceEur ?: 0.0) else (it.priceEur ?: 0.0)
-        price * it.quantity 
-    }
-    val totalReceiverValueEur: Double get() = receiverItems.sumOf { 
-        val price = if (it.isFoil) (it.priceEurFoil ?: it.priceEur ?: 0.0) else (it.priceEur ?: 0.0)
-        price * it.quantity 
-    }
-}
+)
 
-@HiltViewModel
-class TradeProposalViewModel @Inject constructor(
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+class TradeProposalViewModel(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
     private val tradesRepository: TradesRepository,
@@ -139,16 +165,45 @@ class TradeProposalViewModel @Inject constructor(
     private val openForTradeRepository: OpenForTradeRepository,
     private val friendRepository: FriendRepository,
     private val analyticsHelper: AnalyticsHelper,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProposalEditorUiState())
     val uiState: StateFlow<ProposalEditorUiState> = _uiState.asStateFlow()
 
+    private val _events = Channel<ProposalEvent>(Channel.BUFFERED)
+    val events: Flow<ProposalEvent> = _events.receiveAsFlow()
+
+    /**
+     * Raw search-box text, decoupled from [ProposalEditorUiState.addCardsQuery] (audit §6.3).
+     * The text field itself still echoes every keystroke synchronously via `addCardsQuery`
+     * (see [onAddCardsQueryChange]); only the expensive [updateSearchLists] rebuild — which
+     * filters + maps 4+ lists, potentially thousands of collection cards — is throttled
+     * through this flow's [kotlinx.coroutines.flow.debounce] collector in `init`.
+     */
+    private val searchQueryFlow = MutableStateFlow("")
+
     private var currentUserId: String = ""
-    private var collectionCards: List<Card> = emptyList()
-    private var wishlistEntries: List<WishlistEntry> = emptyList()
-    private var offerEntries: List<OpenForTradeEntry> = emptyList()
+
+    // §6.3 fix: the debounced search-list rebuild (see `searchQueryFlow` below) now runs
+    // `updateSearchLists` on `defaultDispatcher`, off the Main thread these are written from
+    // (the `observe*` collectors). `@Volatile` guarantees the background reader sees the latest
+    // write without needing its own synchronization — the same reasoning already applied to
+    // `friendData` below, which is written on `ioDispatcher` and read from `updateSearchLists`.
+    @Volatile private var collectionCards: List<Card> = emptyList()
+    @Volatile private var wishlistEntries: List<WishlistEntry> = emptyList()
+    @Volatile private var offerEntries: List<OpenForTradeEntry> = emptyList()
+
+    private companion object {
+        /** Matches the debounce window already used elsewhere in the app (News, Friend search). */
+        const val SEARCH_DEBOUNCE_MS = 300L
+    }
+
+    // Captured at init so a failed prefill (§2.9) can be retried from the screen.
+    private var prefillProposalId: String? = null
+    private var prefillRootProposalId: String = ""
+    private var prefillReceiverId: String = ""
 
     // Friend data fetched via get_friend_collection RPC (unified endpoint).
     // Written on ioDispatcher and read on Main; @Volatile + single-copy assignment
@@ -185,6 +240,17 @@ class TradeProposalViewModel @Inject constructor(
         observeWishlist()
         observeOffers()
         observeFriends()
+
+        // §6.3 fix: debounce the per-keystroke search-list rebuild and run it off Main.
+        // `collectLatest` also cancels any rebuild still in flight for a now-superseded query.
+        viewModelScope.launch {
+            searchQueryFlow
+                .debounce(SEARCH_DEBOUNCE_MS)
+                .collectLatest { query ->
+                    withContext(defaultDispatcher) { updateSearchLists(query) }
+                }
+        }
+
         val receiverId = savedStateHandle.get<String>("receiverId") ?: ""
         val parentProposalId = savedStateHandle.get<String>("parentProposalId")
         val editingProposalId = savedStateHandle.get<String>("editingProposalId")
@@ -201,116 +267,179 @@ class TradeProposalViewModel @Inject constructor(
 
         val proposalToPreFill = editingProposalId ?: parentProposalId
         if (proposalToPreFill != null && rootProposalId.isNotBlank()) {
+            prefillProposalId = proposalToPreFill
+            prefillRootProposalId = rootProposalId
+            prefillReceiverId = receiverId
             viewModelScope.launch(ioDispatcher) {
-                val proposals = tradesRepository.observeProposalThread(rootProposalId).first()
-                val proposal = proposals.find { it.id == proposalToPreFill } ?: return@launch
-
-                val allCardIds = proposal.items
-                    .filter { !it.isReviewCollectionPlaceholder }
-                    .map { it.cardId }
-                    .distinct()
-                val imageMap = buildMap<String, Card?> {
-                    allCardIds.forEach { id ->
-                        val r = cardRepository.getCardById(id)
-                        if (r is DataResult.Success) put(id, r.data)
-                    }
-                }
-
-                val myItems = proposal.items
-                    .filter { it.fromUserId != receiverId && !it.isReviewCollectionPlaceholder }
-                    .map { item ->
-                        val card = imageMap[item.cardId]
-                        TradeItemDraft(
-                            cardId = item.cardId,
-                            cardName = item.cardName,
-                            imageUrl = card?.imageArtCrop ?: card?.imageNormal,
-                            typeLine = card?.typeLine,
-                            setCode = card?.setCode,
-                            setName = card?.setName,
-                            rarity = card?.rarity,
-                            quantity = item.quantity ?: 1,
-                            isFoil = item.isFoil ?: false,
-                            condition = item.condition ?: "NM",
-                            language = item.language ?: "en",
-                            userCardIdRef = item.userCardIdRef,
-                            isInCollection = true,
-                        )
-                    }
-                val theirItems = proposal.items
-                    .filter { it.fromUserId == receiverId && !it.isReviewCollectionPlaceholder }
-                    .map { item ->
-                        val card = imageMap[item.cardId]
-                        TradeItemDraft(
-                            cardId = item.cardId,
-                            cardName = item.cardName,
-                            imageUrl = card?.imageArtCrop ?: card?.imageNormal,
-                            typeLine = card?.typeLine,
-                            setCode = card?.setCode,
-                            setName = card?.setName,
-                            rarity = card?.rarity,
-                            quantity = item.quantity ?: 1,
-                            isFoil = item.isFoil ?: false,
-                            condition = item.condition ?: "NM",
-                            language = item.language ?: "en",
-                            userCardIdRef = item.userCardIdRef,
-                            isInCollection = true,
-                        )
-                    }
-
-                val iAmProposer = receiverId == proposal.receiverId
-                _uiState.update { s ->
-                    s.copy(
-                        proposerItems = myItems,
-                        receiverItems = theirItems,
-                        includesReviewFromProposer = if (iAmProposer) proposal.includesReviewCollectionFromProposer else proposal.includesReviewCollectionFromReceiver,
-                        includesReviewFromReceiver = if (iAmProposer) proposal.includesReviewCollectionFromReceiver else proposal.includesReviewCollectionFromProposer,
-                        currentVersion = proposal.proposalVersion,
-                    )
-                }
+                loadPrefillProposal(proposalToPreFill, rootProposalId, receiverId)
             }
+        }
+    }
+
+    /**
+     * Loads the source proposal for the counter/edit editor from [TradesRepository]'s
+     * proposals cache.
+     *
+     * The cache is an in-memory singleton with no persistence (audit §2.9): after process
+     * death it starts empty, so `observeProposalThread(...).first()` finds nothing and, before
+     * this fix, the editor opened silently blank — saving from that state could wipe the real
+     * proposal's items via [editProposal]. On a cache miss this now triggers an explicit
+     * [TradesRepository.refreshProposalThread] and retries once; if that also fails, the editor
+     * form is kept hidden ([ProposalEditorUiState.prefillFailed]) with a retry affordance
+     * instead of ever exposing a blank, savable draft.
+     */
+    private suspend fun loadPrefillProposal(proposalToPreFill: String, rootProposalId: String, receiverId: String) {
+        _uiState.update { it.copy(isPrefillLoading = true, prefillFailed = false) }
+
+        var proposal = tradesRepository.observeProposalThread(rootProposalId).first()
+            .find { it.id == proposalToPreFill }
+
+        if (proposal == null) {
+            val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
+            if (userId.isNullOrBlank()) {
+                recordNonFatal("trade_proposal_prefill_no_session")
+                _uiState.update { it.copy(isPrefillLoading = false, prefillFailed = true) }
+                return
+            }
+
+            val refreshResult = tradesRepository.refreshProposalThread(rootProposalId, userId)
+            refreshResult.exceptionOrNull()?.let { recordSafeNonFatal("trade_proposal_prefill_refresh_failed", it) }
+            if (refreshResult.isFailure) {
+                _uiState.update { it.copy(isPrefillLoading = false, prefillFailed = true) }
+                return
+            }
+
+            proposal = tradesRepository.observeProposalThread(rootProposalId).first()
+                .find { it.id == proposalToPreFill }
+            if (proposal == null) {
+                recordNonFatal("trade_proposal_prefill_not_found_after_refresh")
+                _uiState.update { it.copy(isPrefillLoading = false, prefillFailed = true) }
+                return
+            }
+        }
+
+        val allCardIds = proposal.items
+            .filter { !it.isReviewCollectionPlaceholder }
+            .map { it.cardId }
+            .distinct()
+        val imageMap = buildMap<String, Card?> {
+            allCardIds.forEach { id ->
+                val r = cardRepository.getCardById(id)
+                if (r is DataResult.Success) put(id, r.data)
+            }
+        }
+
+        val myItems = proposal.items
+            .filter { it.fromUserId != receiverId && !it.isReviewCollectionPlaceholder }
+            .map { item ->
+                val card = imageMap[item.cardId]
+                TradeItemDraft(
+                    cardId = item.cardId,
+                    cardName = item.cardName,
+                    imageUrl = card?.imageArtCrop ?: card?.imageNormal,
+                    typeLine = card?.typeLine,
+                    setCode = card?.setCode,
+                    setName = card?.setName,
+                    rarity = card?.rarity,
+                    quantity = item.quantity ?: 1,
+                    isFoil = item.isFoil ?: false,
+                    condition = item.condition ?: "NM",
+                    language = item.language ?: "en",
+                    userCardIdRef = item.userCardIdRef,
+                    isInCollection = true,
+                )
+            }
+        val theirItems = proposal.items
+            .filter { it.fromUserId == receiverId && !it.isReviewCollectionPlaceholder }
+            .map { item ->
+                val card = imageMap[item.cardId]
+                TradeItemDraft(
+                    cardId = item.cardId,
+                    cardName = item.cardName,
+                    imageUrl = card?.imageArtCrop ?: card?.imageNormal,
+                    typeLine = card?.typeLine,
+                    setCode = card?.setCode,
+                    setName = card?.setName,
+                    rarity = card?.rarity,
+                    quantity = item.quantity ?: 1,
+                    isFoil = item.isFoil ?: false,
+                    condition = item.condition ?: "NM",
+                    language = item.language ?: "en",
+                    userCardIdRef = item.userCardIdRef,
+                    isInCollection = true,
+                )
+            }
+
+        val iAmProposer = receiverId == proposal.receiverId
+        _uiState.update { s ->
+            s.copy(
+                isPrefillLoading = false,
+                prefillFailed = false,
+                proposerItems = myItems,
+                receiverItems = theirItems,
+                includesReviewFromProposer = if (iAmProposer) proposal.includesReviewCollectionFromProposer else proposal.includesReviewCollectionFromReceiver,
+                includesReviewFromReceiver = if (iAmProposer) proposal.includesReviewCollectionFromReceiver else proposal.includesReviewCollectionFromProposer,
+                currentVersion = proposal.proposalVersion,
+            )
+        }
+    }
+
+    /** Retries the counter/edit prefill after a failure (§2.9); called from the screen's retry action. */
+    fun retryPrefill() {
+        val proposalId = prefillProposalId ?: return
+        viewModelScope.launch(ioDispatcher) {
+            loadPrefillProposal(proposalId, prefillRootProposalId, prefillReceiverId)
         }
     }
 
     private fun observeCollection() {
         viewModelScope.launch {
-            userCardRepository.observeCollection().collect { collection ->
-                collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
-                val ids = collectionCards.map { it.scryfallId }.toSet()
-                _uiState.update { it.copy(collectionIds = ids) }
-                updateSearchLists(_uiState.value.addCardsQuery)
-            }
+            userCardRepository.observeCollection()
+                .catch { e -> recordSafeNonFatal("trade_proposal_observe_collection_failed", e) }
+                .collect { collection ->
+                    collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
+                    val ids = collectionCards.map { it.scryfallId }.toSet()
+                    _uiState.update { it.copy(collectionIds = ids) }
+                    updateSearchLists(_uiState.value.addCardsQuery)
+                }
         }
     }
 
     private fun observeWishlist() {
         viewModelScope.launch {
-            wishlistRepository.observeLocal().collect { wishlist ->
-                wishlistEntries = wishlist.filter { it.card != null }.sortedBy { it.card?.name }
-                updateSearchLists(_uiState.value.addCardsQuery)
-            }
+            wishlistRepository.observeLocal()
+                .catch { e -> recordSafeNonFatal("trade_proposal_observe_wishlist_failed", e) }
+                .collect { wishlist ->
+                    wishlistEntries = wishlist.filter { it.card != null }.sortedBy { it.card?.name }
+                    updateSearchLists(_uiState.value.addCardsQuery)
+                }
         }
     }
 
     private fun observeOffers() {
         viewModelScope.launch {
-            openForTradeRepository.observeLocal().collect { offers ->
-                offerEntries = offers.filter { it.card != null }.sortedBy { it.card?.name }
-                updateSearchLists(_uiState.value.addCardsQuery)
-            }
+            openForTradeRepository.observeLocal()
+                .catch { e -> recordSafeNonFatal("trade_proposal_observe_offers_failed", e) }
+                .collect { offers ->
+                    offerEntries = offers.filter { it.card != null }.sortedBy { it.card?.name }
+                    updateSearchLists(_uiState.value.addCardsQuery)
+                }
         }
     }
 
     private fun observeFriends() {
         viewModelScope.launch {
-            friendRepository.observeFriends().collect { friends ->
-                _uiState.update { it.copy(friends = friends) }
-                // Auto-select receiver if they are a friend
-                val receiverId = _uiState.value.receiverId
-                val receiverFriend = friends.find { it.userId == receiverId }
-                if (receiverFriend != null && _uiState.value.selectedFriend == null) {
-                    onFriendSelected(receiverFriend)
+            friendRepository.observeFriends()
+                .catch { e -> recordSafeNonFatal("trade_proposal_observe_friends_failed", e) }
+                .collect { friends ->
+                    _uiState.update { it.copy(friends = friends) }
+                    // Auto-select receiver if they are a friend
+                    val receiverId = _uiState.value.receiverId
+                    val receiverFriend = friends.find { it.userId == receiverId }
+                    if (receiverFriend != null && _uiState.value.selectedFriend == null) {
+                        onFriendSelected(receiverFriend)
+                    }
                 }
-            }
         }
     }
 
@@ -326,68 +455,63 @@ class TradeProposalViewModel @Inject constructor(
     }
 
     /**
-     * Fetches the selected friend's wishlist and open-for-trade list via the unified
-     * get_friend_collection RPC. This RPC is SECURITY DEFINER and enforces both
+     * Fetches the selected friend's wishlist, open-for-trade list, and public collection via
+     * the unified get_friend_collection RPC. This RPC is SECURITY DEFINER and enforces both
      * friendship checks and per-list privacy flags (wishlist_public / trade_list_public),
      * unlike direct table queries which only check friendship.
      *
-     * The previous [Job] is cancelled before starting a new fetch so that switching
-     * friends quickly never applies stale data from the previous selection.
+     * The previous [Job] is cancelled before starting a new fetch, and [friendData] is reset
+     * immediately (audit §6.2) so switching friends quickly never briefly shows the *previous*
+     * friend's lists while the new fetch is in flight. The three RPCs are launched concurrently
+     * with [async]/[coroutineScope] (previously sequential — the selector could take up to 3x
+     * as long as the slowest single call).
      */
     private fun fetchFriendData(userId: String) {
         friendDataJob?.cancel()
+        friendData = FriendData()
+        updateSearchLists(_uiState.value.addCardsQuery)
+
         friendDataJob = viewModelScope.launch(ioDispatcher) {
-            // Wishlist via unified RPC — single atomic copy update to avoid partial-state reads
-            friendRepository.getFriendCollection(userId, "wishlist", "")
-                .onSuccess { cards ->
-                    friendData = friendData.copy(wishlist = cards.sortedBy { it.name })
-                    updateSearchLists(_uiState.value.addCardsQuery)
-                }
-                .onFailure { e ->
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("trade_friend_wishlist_load_failed: userId=$userId")
-                        recordException(RuntimeException("[TradeProposal] Friend wishlist fetch failed", e))
-                    }
-                    friendData = friendData.copy(wishlist = emptyList())
-                }
+            coroutineScope {
+                val wishlistDeferred = async { friendRepository.getFriendCollection(userId, "wishlist", "") }
+                val offersDeferred = async { friendRepository.getFriendCollection(userId, "trade", "") }
+                val collectionDeferred = async { friendRepository.getFriendCollection(userId, "collection", "") }
 
-            // Open-for-trade via unified RPC
-            friendRepository.getFriendCollection(userId, "trade", "")
-                .onSuccess { cards ->
-                    friendData = friendData.copy(offers = cards.sortedBy { it.name })
-                    updateSearchLists(_uiState.value.addCardsQuery)
-                }
-                .onFailure { e ->
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("trade_friend_offers_load_failed: userId=$userId")
-                        recordException(RuntimeException("[TradeProposal] Friend offers fetch failed", e))
+                wishlistDeferred.await()
+                    .onSuccess { cards -> friendData = friendData.copy(wishlist = cards.sortedBy { it.name }) }
+                    .onFailure { e ->
+                        recordSafeNonFatal("trade_friend_wishlist_load_failed", e)
+                        friendData = friendData.copy(wishlist = emptyList())
                     }
-                    friendData = friendData.copy(offers = emptyList())
-                }
 
-            // Public collection via unified RPC — used in the "You get" side Offer tab
-            friendRepository.getFriendCollection(userId, "collection", "")
-                .onSuccess { cards ->
-                    friendData = friendData.copy(
-                        collection = cards.mapNotNull { it.toCard() }.sortedBy { it.name }
-                    )
-                    updateSearchLists(_uiState.value.addCardsQuery)
-                }
-                .onFailure { e ->
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("trade_friend_collection_load_failed: userId=$userId")
-                        recordException(RuntimeException("[TradeProposal] Friend collection fetch failed", e))
+                offersDeferred.await()
+                    .onSuccess { cards -> friendData = friendData.copy(offers = cards.sortedBy { it.name }) }
+                    .onFailure { e ->
+                        recordSafeNonFatal("trade_friend_offers_load_failed", e)
+                        friendData = friendData.copy(offers = emptyList())
                     }
-                    friendData = friendData.copy(collection = emptyList())
-                }
 
+                collectionDeferred.await()
+                    .onSuccess { cards ->
+                        friendData = friendData.copy(
+                            collection = cards.mapNotNull { it.toCard() }.sortedBy { it.name }
+                        )
+                    }
+                    .onFailure { e ->
+                        recordSafeNonFatal("trade_friend_collection_load_failed", e)
+                        friendData = friendData.copy(collection = emptyList())
+                    }
+            }
             updateSearchLists(_uiState.value.addCardsQuery)
         }
     }
 
     fun onAddCardsQueryChange(query: String) {
+        // The text field echoes every keystroke immediately via `addCardsQuery`; the actual
+        // (expensive) list rebuild is debounced through `searchQueryFlow` (audit §6.3, see the
+        // collector wired in `init`).
         _uiState.update { it.copy(addCardsQuery = query) }
-        updateSearchLists(query)
+        searchQueryFlow.value = query
     }
 
     fun onOpenSearch(side: TradeSide) {
@@ -399,16 +523,24 @@ class TradeProposalViewModel @Inject constructor(
         _uiState.update { it.copy(isNavigatingToDetail = isNavigating) }
     }
 
+    /**
+     * Rebuilds every add-cards search list ([ProposalEditorUiState.offerResults] /
+     * [ProposalEditorUiState.addCardsResults] / [ProposalEditorUiState.wishlistResults] /
+     * match suggestions) for the given [query].
+     *
+     * Filters + maps 4+ lists (the user's collection can be thousands of cards), so callers
+     * driven by user typing MUST go through the debounced [searchQueryFlow] (see
+     * [onAddCardsQueryChange]) rather than calling this directly — this function itself stays
+     * synchronous so programmatic callers (collection/wishlist/offer refresh, friend switch,
+     * item add/remove) keep updating the search lists immediately with no added latency
+     * (audit §6.3).
+     */
     private fun updateSearchLists(query: String) {
-        val state = _uiState.value
-        val isFriendSelected = state.selectedFriend != null
-        val searchingSide = state.searchingSide
-
         // My collection is always the source for the addCardsResults (collection browser).
+        // Pure function of `query` + the plain backing fields below (none of which live in
+        // `_uiState`), so it's safe to compute once outside the atomic update.
         val filteredCollection = if (query.isBlank()) collectionCards
             else collectionCards.filter { it.name.contains(query, ignoreCase = true) }
-
-        val ownedIds = state.collectionIds
 
         // ── Correct side-aware mapping ─────────────────────────────────────────
         // PROPOSER (A → B): A offers cards to B.
@@ -422,6 +554,19 @@ class TradeProposalViewModel @Inject constructor(
         //   addCardsResults → MY collection (collectionCards) — fallback search
 
         _uiState.update { s ->
+            // §6.3 fix: `isFriendSelected` / `searchingSide` / `ownedIds` are derived from
+            // `_uiState` and MUST be read from this lambda's `s` snapshot, never captured in a
+            // `val` before `_uiState.update {}` — `update {}` retries its lambda against the
+            // latest value on contention, so a `val` captured beforehand can go stale mid-flight
+            // (e.g. a concurrent `onOpenSearch`/`onFriendSelected` changes `searchingSide`
+            // between the outer read and this lambda committing) and the results computed for
+            // the OLD side would be applied on top of the NEW state. This is the project's
+            // banned stale-snapshot pattern (CLAUDE.md's Deck Doctor `generateFromSeeds`
+            // atomic-capture precedent).
+            val isFriendSelected = s.selectedFriend != null
+            val searchingSide = s.searchingSide
+            val ownedIds = s.collectionIds
+
             // Only count items from the active side so the "selected" indicator and
             // over-limit warning reflect what's been added to THIS side of the trade.
             val sideItems = when (searchingSide) {
@@ -874,41 +1019,57 @@ class TradeProposalViewModel @Inject constructor(
         // A missing receiver ID would send an empty string to the RPC, which
         // either fails with a cryptic server error or creates a malformed proposal.
         if (!state.isCounterMode && state.receiverId.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
+            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_no_receiver))
             return
         }
         if (!state.isCounterMode && state.receiverId == state.currentUserId) {
-            _uiState.update { it.copy(errorMessage = "SELF_TRADE") }
+            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_self_trade))
             return
         }
         if (!validateInitialProposal(state)) {
-            _uiState.update { it.copy(errorMessage = "INITIAL_ASYMMETRY") }
+            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_initial_asymmetry))
             return
         }
+
+        // Atomic capture-and-flip: bail if a save/send is already in flight so a fast
+        // double-tap can never create two proposals (audit §2.7). The button's
+        // `enabled = !isSaving` alone is not sufficient — it updates asynchronously and
+        // leaves a window between two taps. Mirrors the DeckStudioViewModel.generateFromSeeds
+        // precedent (CLAUDE.md).
+        var captured: ProposalEditorUiState? = null
+        _uiState.update { s ->
+            if (s.isSaving) return@update s
+            captured = s
+            s.copy(isSaving = true)
+        }
+        val snapshot = captured ?: return
+
         viewModelScope.launch(ioDispatcher) {
-            _uiState.update { it.copy(isSaving = true) }
             val result = createProposal(
-                receiverId = state.receiverId,
-                items = buildItemRequestDtos(state),
-                includesReviewFromProposer = state.includesReviewFromProposer,
-                includesReviewFromReceiver = state.includesReviewFromReceiver,
+                receiverId = snapshot.receiverId,
+                items = buildItemRequestDtos(snapshot),
+                includesReviewFromProposer = snapshot.includesReviewFromProposer,
+                includesReviewFromReceiver = snapshot.includesReviewFromReceiver,
                 autoSend = false,
             )
-            _uiState.update { s ->
-                result.fold(
-                    onSuccess = { proposalId ->
-                        s.copy(isSaving = false, navigateToThread = Pair(proposalId, proposalId))
-                    },
-                    onFailure = { e ->
-                        FirebaseCrashlytics.getInstance().apply {
-                            log("trade_proposal_save_draft_failed")
-                            setCustomKey("trade_proposer_item_count", s.proposerItems.size)
-                            recordException(e)
-                        }
-                        s.copy(isSaving = false, errorMessage = e.toUserFacingMessage() ?: e.message)
+            result.fold(
+                onSuccess = { proposalId ->
+                    _uiState.update { it.copy(isSaving = false) }
+                    _events.trySend(ProposalEvent.NavigateToThread(proposalId, proposalId))
+                },
+                onFailure = { e ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("trade_proposal_save_draft_failed")
+                        setCustomKey("trade_proposer_item_count", snapshot.proposerItems.size)
+                        recordException(e)
                     }
-                )
-            }
+                    _uiState.update { it.copy(isSaving = false) }
+                    // Only a typed TradeError's pre-resolved friendly text reaches the user;
+                    // any other exception's raw message is never shown (audit §5.1) — the
+                    // screen falls back to a generic string when this is null.
+                    _events.trySend(ProposalEvent.ShowRemoteError(if (e is TradeError) e.toUserFacingMessage() else null))
+                }
+            )
         }
     }
 
@@ -919,67 +1080,78 @@ class TradeProposalViewModel @Inject constructor(
 
         // Guard: a proposal requires both participants to be identified.
         if (myId.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Not logged in") }
+            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_not_logged_in))
             return
         }
         if (receiverId.isBlank() && !state.isCounterMode && state.editingProposalId == null) {
-            _uiState.update { it.copy(errorMessage = "NO_RECEIVER") }
+            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_no_receiver))
             return
         }
         if (!state.isCounterMode && state.editingProposalId == null && receiverId == myId) {
-            _uiState.update { it.copy(errorMessage = "SELF_TRADE") }
+            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_self_trade))
+            return
+        }
+        if (!validateInitialProposal(state)) {
+            _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_initial_asymmetry))
             return
         }
 
-        if (!validateInitialProposal(state)) {
-            _uiState.update { it.copy(errorMessage = "INITIAL_ASYMMETRY") }
-            return
+        // Atomic capture-and-flip — see onSaveDraft() for rationale (audit §2.7).
+        var captured: ProposalEditorUiState? = null
+        _uiState.update { s ->
+            if (s.isSaving) return@update s
+            captured = s
+            s.copy(isSaving = true)
         }
+        val snapshot = captured ?: return
 
         viewModelScope.launch(ioDispatcher) {
-            _uiState.update { it.copy(isSaving = true) }
-
-            val editingId = state.editingProposalId
-            val parentId = state.parentProposalId
-            val items = buildItemRequestDtos(state)
+            val editingId = snapshot.editingProposalId
+            val parentId = snapshot.parentProposalId
+            val items = buildItemRequestDtos(snapshot)
             val reviewFlags = ReviewFlags(
-                state.includesReviewFromProposer,
-                state.includesReviewFromReceiver,
+                snapshot.includesReviewFromProposer,
+                snapshot.includesReviewFromReceiver,
             )
 
-            FirebaseCrashlytics.getInstance().apply {
-                log("trade_proposal_send_attempt: isCounter=${state.isCounterMode}, proposerItems=${state.proposerItems.size}, receiverItems=${state.receiverItems.size}")
-                setCustomKey("trade_my_id", myId)
-                setCustomKey("trade_receiver_id", receiverId)
-            }
+            FirebaseCrashlytics.getInstance().log(
+                "trade_proposal_send_attempt: isCounter=${snapshot.isCounterMode}, proposerItems=${snapshot.proposerItems.size}, receiverItems=${snapshot.receiverItems.size}"
+            )
 
             // Each branch is handled separately so every Result stays properly typed
             // and no unchecked casts or vacuous .map { it } calls are needed.
             val handleError: (Throwable) -> Unit = { e ->
-                val msg = when (e) {
-                    is TradeError.ProposalVersionMismatch    -> "PROPOSAL_VERSION_MISMATCH"
-                    is TradeError.InitialAsymmetryNotAllowed -> "INITIAL_ASYMMETRY"
+                when (e) {
+                    is TradeError.ProposalVersionMismatch ->
+                        _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_version_mismatch))
+                    is TradeError.InitialAsymmetryNotAllowed ->
+                        _events.trySend(ProposalEvent.ShowValidationError(R.string.trades_error_initial_asymmetry))
                     else -> {
                         FirebaseCrashlytics.getInstance().apply {
-                            log("trade_proposal_send_failed: isCounter=${state.isCounterMode}")
-                            setCustomKey("trade_proposer_item_count", state.proposerItems.size)
-                            setCustomKey("trade_receiver_item_count", state.receiverItems.size)
+                            log("trade_proposal_send_failed: isCounter=${snapshot.isCounterMode}")
+                            setCustomKey("trade_proposer_item_count", snapshot.proposerItems.size)
+                            setCustomKey("trade_receiver_item_count", snapshot.receiverItems.size)
                             recordException(e)
                         }
-                        e.toUserFacingMessage() ?: e.message ?: "Unknown error"
+                        // Raw e.message is never surfaced — only a typed TradeError's
+                        // pre-resolved friendly text is (audit §5.1).
+                        _events.trySend(ProposalEvent.ShowRemoteError(if (e is TradeError) e.toUserFacingMessage() else null))
                     }
                 }
-                _uiState.update { it.copy(isSaving = false, errorMessage = msg) }
+                _uiState.update { it.copy(isSaving = false) }
             }
 
             when {
                 editingId != null -> editProposal(
                     proposalId = editingId,
-                    expectedVersion = state.currentVersion,
+                    expectedVersion = snapshot.currentVersion,
                     newItems = items,
                     newReviewFlags = reviewFlags,
                 ).fold(
-                    onSuccess = { _uiState.update { it.copy(isSaving = false, navigateBack = true) } },
+                    onSuccess = {
+                        _uiState.update { it.copy(isSaving = false) }
+                        _events.trySend(ProposalEvent.NavigateBack)
+                    },
                     onFailure = handleError,
                 )
 
@@ -989,12 +1161,11 @@ class TradeProposalViewModel @Inject constructor(
                     reviewFlags = reviewFlags,
                 ).fold(
                     onSuccess = { newId ->
-                        _uiState.update { s ->
-                            s.copy(
-                                isSaving = false,
-                                navigateToThread = if (newId.isNotBlank()) Pair(newId, s.rootProposalId) else null,
-                                navigateBack = newId.isBlank(),
-                            )
+                        _uiState.update { it.copy(isSaving = false) }
+                        if (newId.isNotBlank()) {
+                            _events.trySend(ProposalEvent.NavigateToThread(newId, snapshot.rootProposalId))
+                        } else {
+                            _events.trySend(ProposalEvent.NavigateBack)
                         }
                     },
                     onFailure = handleError,
@@ -1003,23 +1174,22 @@ class TradeProposalViewModel @Inject constructor(
                 else -> createProposal(
                     receiverId = receiverId,
                     items = items,
-                    includesReviewFromProposer = state.includesReviewFromProposer,
-                    includesReviewFromReceiver = state.includesReviewFromReceiver,
+                    includesReviewFromProposer = snapshot.includesReviewFromProposer,
+                    includesReviewFromReceiver = snapshot.includesReviewFromReceiver,
                     autoSend = true,
                 ).fold(
                     onSuccess = { newId ->
                         analyticsHelper.logEvent("trade_proposal_sent", mapOf(
-                            "proposer_item_count" to state.proposerItems.size,
-                            "receiver_item_count" to state.receiverItems.size,
-                            "has_review_proposer" to state.includesReviewFromProposer,
-                            "has_review_receiver" to state.includesReviewFromReceiver,
+                            "proposer_item_count" to snapshot.proposerItems.size,
+                            "receiver_item_count" to snapshot.receiverItems.size,
+                            "has_review_proposer" to snapshot.includesReviewFromProposer,
+                            "has_review_receiver" to snapshot.includesReviewFromReceiver,
                         ))
-                        _uiState.update { s ->
-                            s.copy(
-                                isSaving = false,
-                                navigateToThread = if (newId.isNotBlank()) Pair(newId, newId) else null,
-                                navigateBack = newId.isBlank(),
-                            )
+                        _uiState.update { it.copy(isSaving = false) }
+                        if (newId.isNotBlank()) {
+                            _events.trySend(ProposalEvent.NavigateToThread(newId, newId))
+                        } else {
+                            _events.trySend(ProposalEvent.NavigateBack)
                         }
                     },
                     onFailure = handleError,
@@ -1027,10 +1197,6 @@ class TradeProposalViewModel @Inject constructor(
             }
         }
     }
-
-    fun onErrorDismissed() = _uiState.update { it.copy(errorMessage = null) }
-    fun onSnackbarDismissed() = _uiState.update { it.copy(snackbarMessage = null) }
-    fun onNavigationConsumed() = _uiState.update { it.copy(navigateToThread = null, navigateBack = false) }
 
     private fun buildItemRequestDtos(state: ProposalEditorUiState): List<TradeItemRequestDto> {
         val myId = state.currentUserId

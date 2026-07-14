@@ -17,8 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,47 +39,49 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.model.TradeStatus
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
+import com.mmg.manahub.core.util.TimeAgoFormatter
 
+/** Reserves room above the bottom bar for [TradesScreen]'s FloatingActionButton, which overlays
+ *  this list from the parent screen. Mirrors `TradesScreen.FabClearance`. */
+private val FabClearance = 88.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TradesHistoryScreen(
     onOpenThread: (proposalId: String, rootProposalId: String) -> Unit,
     onLoginClick: () -> Unit = {},
-    viewModel: TradesHistoryViewModel = hiltViewModel(),
+    viewModel: TradesHistoryViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
 
     LaunchedEffect(Unit) { viewModel.refreshIfStale() }
 
-    LaunchedEffect(uiState.snackbarMessage) {
-        val msg = uiState.snackbarMessage ?: return@LaunchedEffect
-        toastState.show(msg)
-        viewModel.onSnackbarDismissed()
-    }
-
-    LaunchedEffect(uiState.navigateToThread) {
-        val nav = uiState.navigateToThread ?: return@LaunchedEffect
-        onOpenThread(nav.first, nav.second)
-        viewModel.onNavigationConsumed()
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is TradesHistoryEvent.ShowMessage -> event.message?.let { toastState.show(it) }
+                is TradesHistoryEvent.NavigateToThread ->
+                    onOpenThread(event.proposalId, event.rootProposalId)
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -110,6 +112,7 @@ private fun HistoryContent(
         isRefreshing = uiState.isRefreshing,
         onRefresh     = onRefresh,
     )
+    val spacing = MaterialTheme.spacing
 
     Column(
         modifier = Modifier
@@ -123,16 +126,19 @@ private fun HistoryContent(
 
         LazyColumn(
             modifier        = Modifier.fillMaxSize(),
-            contentPadding  = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding  = PaddingValues(start = spacing.lg, top = spacing.sm, end = spacing.lg, bottom = FabClearance),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             // ── Telegram-style pull-to-refresh header ─────────────────────────
             if (pullState.headerHeightDp > 0.dp) {
                 item(key = "pull_header") {
                     PullRefreshHeader(
-                        height       = pullState.headerHeightDp,
-                        isRefreshing = uiState.isRefreshing,
-                        dragFraction = pullState.dragFraction,
+                        height              = pullState.headerHeightDp,
+                        isRefreshing        = uiState.isRefreshing,
+                        dragFraction        = pullState.dragFraction,
+                        refreshingText      = stringResource(R.string.trades_history_refreshing),
+                        pullIcon            = Icons.Default.KeyboardArrowDown,
+                        pullHintDescription = stringResource(R.string.trades_history_pull_to_refresh),
                     )
                 }
             }
@@ -182,9 +188,10 @@ private fun FilterRow(
     onSelect: (HistoryFilter) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     LazyRow(
-        contentPadding        = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding        = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         items(HistoryFilter.entries, key = { it.name }) { filter ->
             FilterChip(
@@ -227,28 +234,30 @@ private fun HistoryProposalRow(
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     val isProposer = proposal.proposerId == currentUserId
     val otherPartyId = if (isProposer) proposal.receiverId else proposal.proposerId
     val otherPartyFriend = friends.find { it.userId == otherPartyId }
-    val otherPartyLabel = otherPartyFriend?.nickname ?: otherPartyId
+    // Falls back to a localized "Unknown trader" string rather than the raw counterparty UUID
+    // (trades audit §3.2, 2026-07-10) — the id is an internal identifier, not user-facing text.
+    val unknownTraderLabel = stringResource(R.string.trades_history_unknown_trader)
+    val otherPartyLabel = otherPartyFriend?.nickname ?: unknownTraderLabel
     val otherPartyAvatarUrl = otherPartyFriend?.avatarUrl
     val statusTint = proposal.status.tint(mc)
-    val dateLabel = remember(proposal.updatedAt) {
-        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(proposal.updatedAt))
-    }
+    val dateLabel = remember(proposal.updatedAt) { TimeAgoFormatter.format(proposal.updatedAt) }
 
     val isAwaitingTheirResponse = isProposer && proposal.status == TradeStatus.PROPOSED
     val isYourTurn = !isProposer && proposal.status == TradeStatus.PROPOSED
 
     Surface(
-        shape    = RoundedCornerShape(12.dp),
+        shape    = CardShape,
         color    = mc.surface,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier          = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier          = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OtherPartyAvatar(
@@ -257,7 +266,7 @@ private fun HistoryProposalRow(
                 statusTint = statusTint,
                 mc         = mc,
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text  = otherPartyLabel,
@@ -271,7 +280,7 @@ private fun HistoryProposalRow(
                 )
                 when {
                     isAwaitingTheirResponse -> {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(spacing.xs))
                         Text(
                             text  = stringResource(R.string.trades_history_awaiting_response),
                             style = MaterialTheme.magicTypography.labelSmall,
@@ -279,22 +288,22 @@ private fun HistoryProposalRow(
                         )
                     }
                     isYourTurn -> {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(spacing.xs))
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
+                            shape = ChipShape,
                             color = mc.primaryAccent.copy(alpha = 0.15f),
                         ) {
                             Text(
                                 text     = stringResource(R.string.trades_history_your_turn),
                                 style    = MaterialTheme.magicTypography.labelSmall,
                                 color    = mc.primaryAccent,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
                             )
                         }
                     }
                 }
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(spacing.sm))
             StatusBadge(status = proposal.status)
         }
     }
@@ -338,15 +347,16 @@ private fun OtherPartyAvatar(
 @Composable
 private fun StatusBadge(status: TradeStatus) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = ChipShape,
         color = status.tint(mc).copy(alpha = 0.15f),
     ) {
         Text(
             text     = status.label(),
             style    = MaterialTheme.magicTypography.labelSmall,
             color    = status.tint(mc),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xs),
         )
     }
 }
@@ -385,6 +395,7 @@ private fun EmptyHistory(
     isLoggedIn: Boolean,
     onLoginClick: () -> Unit,
 ) {
+    val spacing = MaterialTheme.spacing
     if (!isLoggedIn) {
         EmptyState(
             icon        = Icons.Default.SwapHoriz,
@@ -394,18 +405,18 @@ private fun EmptyHistory(
             onAction    = onLoginClick,
             modifier    = Modifier
                 .fillMaxWidth()
-                .padding(top = 64.dp, start = 32.dp, end = 32.dp),
+                .padding(top = spacing.xxl * 2, start = spacing.xxl, end = spacing.xxl),
         )
     } else {
         Box(
             modifier         = Modifier
                 .fillMaxWidth()
-                .padding(top = 64.dp, start = 32.dp, end = 32.dp),
+                .padding(top = spacing.xxl * 2, start = spacing.xxl, end = spacing.xxl),
             contentAlignment = Alignment.Center,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 Text(
                     text      = stringResource(R.string.trades_history_empty),
@@ -413,7 +424,7 @@ private fun EmptyHistory(
                     color     = MaterialTheme.magicColors.textSecondary,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(spacing.xs))
                 Text(
                     text      = stringResource(R.string.trades_history_empty_hint),
                     style     = MaterialTheme.magicTypography.labelSmall,

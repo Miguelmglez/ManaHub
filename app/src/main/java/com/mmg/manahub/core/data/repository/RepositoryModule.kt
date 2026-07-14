@@ -5,10 +5,6 @@ import com.mmg.manahub.core.data.remote.collection.SupabaseCollectionDataSource
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
-import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.core.domain.repository.TournamentRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import dagger.Binds
@@ -33,17 +29,16 @@ abstract class RepositoryModule {
     @Binds @Singleton
     abstract fun bindDeckRemoteDataSource(impl: SupabaseDeckDataSource): DeckRemoteDataSource
 
-    @Binds @Singleton
-    abstract fun bindDeckRepository(impl: DeckRepositoryImpl): DeckRepository
+    // bindDeckRepository was REMOVED (KMP migration — Hilt→Koin cutover batch 3): DeckRepositoryImpl
+    // lost its @Inject constructor and is now a native Koin `single` in
+    // com.mmg.manahub.app.di.coreBridgeKoinModule. DeckRemoteDataSource stays Hilt-bound below (still
+    // consumed by the still-Hilt SyncManager); DeckRepositoryImpl no longer uses it directly.
 
-    @Binds @Singleton
-    abstract fun bindStatsRepository(impl: StatsRepositoryImpl): StatsRepository
-
-    @Binds @Singleton
-    abstract fun bindGameSessionRepository(impl: GameSessionRepositoryImpl): GameSessionRepository
-
-    @Binds @Singleton
-    abstract fun bindTournamentRepository(impl: TournamentRepositoryImpl): TournamentRepository
+    // bindStatsRepository was REMOVED (KMP migration — Hilt→Koin cutover batch 7): StatsRepositoryImpl
+    // lost its @Inject constructor and is now a native Koin `single` in
+    // com.mmg.manahub.app.di.coreBridgeKoinModule. This breaks the Hilt startup-ordering hazard
+    // where ManaHubApp's own @Inject statsRepository field triggered GlobalContext.get()
+    // before startKoin() had run.
 
     @Binds @Singleton
     abstract fun bindUserPreferencesRepository(impl: com.mmg.manahub.core.data.local.UserPreferencesDataStore): UserPreferencesRepository

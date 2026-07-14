@@ -11,8 +11,14 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
 
     // ── Collection (bottom tab 1) ────────────────────────────────────────────
-    /** Bottom-tab root — also hosts the Cards/Decks sub-tab row. */
-    object Collection : Screen("collection")
+    /** Bottom-tab root — also hosts the Cards/Decks/Trades sub-tab row. */
+    object Collection : Screen("collection?tab={tab}") {
+        /** Base route for the bottom-tab destination. */
+        const val baseRoute = "collection"
+
+        /** Builds a route that opens the collection with a specific tab selected. */
+        fun routeWithTab(tab: String) = "collection?tab=$tab"
+    }
     object CollectionAddCard  : Screen("collection/add")
     object CollectionScanner  : Screen("collection/scanner")
     object CollectionCardDetail : Screen("collection/detail/{scryfallId}") {
@@ -20,7 +26,6 @@ sealed class Screen(val route: String) {
     }
 
     // ── Decks (sub-section of Collection) ────────────────────────────────────
-    object DeckList    : Screen("collection/decks")
     object DeckDetail  : Screen("collection/deckmagic/{deckId}") {
         fun createRoute(deckId: String) = "collection/deckmagic/$deckId"
     }
@@ -46,8 +51,23 @@ sealed class Screen(val route: String) {
     object DeckAddCards : Screen("collection/decks/{deckId}/add") {
         fun createRoute(deckId: String) = "collection/decks/$deckId/add"
     }
-    object DeckImprovement : Screen("collection/decks/{deckId}/improvement") {
-        fun createRoute(deckId: String) = "collection/decks/$deckId/improvement"
+    // Screen.DeckImprovement (the standalone Deck Doctor screen) was RETIRED in Phase 0.5 of
+    // docs/claude-code-prompt-deck-doctor-community.md (D10) — Deck Studio's Suggestions tab
+    // is now the sole Deck Doctor UI surface. DeckMagicDetailScreen.onImproveDeck navigates to
+    // Screen.DeckStudio instead (see AppNavGraph.kt).
+
+    // ── Community Decks (Archidekt browse + import) ──────────────────────────
+    /** Community Decks landing / browse screen. */
+    object CommunityDecks : Screen("community/decks")
+
+    /** Detail view for a single community deck, identified by its Archidekt numeric id. */
+    object CommunityDeckDetail : Screen("community/decks/detail/{archidektId}") {
+        fun createRoute(archidektId: Int) = "community/decks/detail/$archidektId"
+    }
+
+    /** Community decks that contain a specific card (deep-linkable from card detail). */
+    object CommunityDecksByCard : Screen("community/decks/bycard/{cardName}") {
+        fun createRoute(cardName: String) = "community/decks/bycard/${Uri.encode(cardName)}"
     }
 
     // ── Stats (bottom tab 2) ─────────────────────────────────────────────────
@@ -184,9 +204,6 @@ sealed class Screen(val route: String) {
     object Puzzle : Screen("puzzle")
 
     // ── Trades (sub-section of Collection, also handles deep links) ───────────
-    /** Root trades route — rendered as a sub-tab inside CollectionScreen. */
-    object Trades : Screen("trades")
-
     /**
      * Deep link target for shared wishlist / open-for-trade lists.
      * App Link pattern: https://miguelmglez.github.io/list/{shareId}

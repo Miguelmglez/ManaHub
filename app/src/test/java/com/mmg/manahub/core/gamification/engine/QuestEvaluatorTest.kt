@@ -15,9 +15,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 
 /**
  * Unit tests for [QuestEvaluator]: it advances only the matching active instances for the CURRENT
@@ -38,7 +38,7 @@ class QuestEvaluatorTest {
     @Before
     fun setUp() {
         dao = mockk(relaxed = true)
-        evaluator = QuestEvaluator(dao, Clock.fixed(fixedInstant, ZoneId.of("UTC")), ZoneId.of("UTC"))
+        evaluator = QuestEvaluator(dao, FixedClock(fixedInstant), TimeZone.UTC)
         coEvery { dao.getQuest(any()) } returns null
         coEvery { dao.upsertQuest(any()) } just Runs
     }

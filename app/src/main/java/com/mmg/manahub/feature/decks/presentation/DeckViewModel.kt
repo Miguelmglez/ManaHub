@@ -2,25 +2,34 @@ package com.mmg.manahub.feature.decks.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.domain.model.DeckSummary
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class DeckViewModel @Inject constructor(
+/**
+ * Backs the deck list screen ([DeckListScreen]). Resolved by Koin via `koinViewModel()`
+ * (KMP Phase 1 Hilt→Koin cutover, Decks island).
+ */
+class DeckViewModel(
     private val deckRepo: DeckRepository,
     private val cardRepo: com.mmg.manahub.core.domain.repository.CardRepository,
+    private val userPreferences: UserPreferencesDataStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckListUiState())
     val uiState: StateFlow<DeckListUiState> = _uiState.asStateFlow()
+
+    /** Feature flag — gates the "Browse community decks" entry point in the empty state. */
+    val isCommunityDecksEnabled: StateFlow<Boolean> = userPreferences.communityDecksEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
         viewModelScope.launch {
@@ -75,7 +84,7 @@ class DeckViewModel @Inject constructor(
         isSideboard: Boolean,
     ) {
         val result = cardRepo.searchCardByName(line.name)
-        if (result is com.mmg.manahub.core.domain.model.DataResult.Success) {
+        if (result is com.mmg.manahub.core.model.DataResult.Success) {
             deckRepo.addCardToDeck(
                 deckId      = deckId,
                 scryfallId  = result.data.scryfallId,
