@@ -66,7 +66,6 @@ import com.mmg.manahub.core.tagging.TagDictionaryRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
-import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
@@ -105,6 +104,7 @@ import com.mmg.manahub.feature.survey.di.surveyKoinModule
 import com.mmg.manahub.feature.tagdictionary.di.tagDictionaryKoinModule
 import com.mmg.manahub.feature.tournament.di.tournamentKoinModule
 import com.mmg.manahub.feature.trades.di.tradesKoinModule
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.github.jan.supabase.SupabaseClient
 import org.koin.android.ext.koin.androidContext
@@ -204,7 +204,7 @@ class ManaHubApp : Application(), KoinComponent {
     @Inject lateinit var gameSessionDao: GameSessionDao  // shared: Stats + Profile + Home (via GameSessionRepository)
     // KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem). StatsDao (Room, stays
     // androidMain / Hilt-DatabaseModule-owned) is a NEW forward-bridge, needed by the Koin-registered
-    // CollectionStatsSyncWorker in core.sync.di.syncKoinModule.
+    // CollectionStatsSyncWorker in core.sync.di.syncKoinModule AND by StatsRepositoryImpl (batch 7).
     @Inject lateinit var statsDao: StatsDao
 
     // Profile island (Phase 1) bridge deps. (userPreferencesDataStore + authRepository are shared with
@@ -214,7 +214,6 @@ class ManaHubApp : Application(), KoinComponent {
     // field needed for it anymore. friendRepository/gamificationRepository likewise dropped: FriendRepository
     // is natively Koin-built in coreBridgeKoinModule via `friendDao` below; GamificationRepository is
     // natively Koin-built in gamificationEngineKoinModule.
-    @Inject lateinit var statsRepository: StatsRepository  // shared: Profile + Home
     @Inject lateinit var surveyAnswerDao: SurveyAnswerDao
 
     // Home island (Phase 1) bridge deps. The shared deps (userPreferencesDataStore, authRepository,
@@ -254,7 +253,7 @@ class ManaHubApp : Application(), KoinComponent {
     // AddCardToCollectionUseCase/AddToWishlistUseCase moved to SharedDomainKoinModule (batch 2) —
     // cardDetailKoinModule now resolves both via get(). AddToWishlistUseCase is ALSO consumed by the
     // still-Hilt (excluded) ScannerViewModel, via KoinToHiltBridgeModule's reverse bridge.
-    @Inject lateinit var userCardRepository: UserCardRepository
+    @Inject lateinit var userCardRepository: Lazy<UserCardRepository>
 
     // Friends island (Phase 1) bridge deps. FriendRepository is shared with Profile → natively Koin-built
     // in coreBridgeKoinModule as of batch 4 (Hilt `FriendModule` deleted); `friendDao` below (Room, stays
@@ -393,15 +392,16 @@ class ManaHubApp : Application(), KoinComponent {
                 coreBridgeKoinModule(
                     userPreferencesRepo = userPreferencesRepository,
                     userPrefsDataStore = userPreferencesDataStore,
-                    statsRepository = statsRepository,
                     scryfallRemoteDataSource = scryfallRemoteDataSource,
                     cardRepository = cardRepository,
                     analyticsHelper = analyticsHelper,
                     deckDao = deckDao,
                     friendDao = friendDao,
                     gameSessionDao = gameSessionDao,
+                    statsDao = statsDao,
                     okHttpClient = okHttpClient,
                     supabaseClient = supabaseClient,
+                    userCardRepository = { userCardRepository.get() },
                 ),
                 // The gamification engine graph (ADR-002), natively Koin-built (batch 4; Hilt
                 // `core.gamification.di.GamificationModule` deleted). Must load alongside coreBridgeKoinModule
@@ -440,9 +440,7 @@ class ManaHubApp : Application(), KoinComponent {
                 communityAggregateKoinModule(
                     cacheDao = communityAggregateDao,
                 ),
-                cardDetailKoinModule(
-                    userCardRepository = userCardRepository,
-                ),
+                cardDetailKoinModule(),
                 friendsKoinModule(
                     pendingInviteStore = pendingInviteStore,
                 ),

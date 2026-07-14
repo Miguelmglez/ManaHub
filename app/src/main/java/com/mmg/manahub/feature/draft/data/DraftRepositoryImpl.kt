@@ -219,12 +219,14 @@ class DraftRepositoryImpl(
     override suspend fun getSetCardsPage(
         setCode: String,
         page: Int,
+        extraPoolSets: List<String>,
     ): DataResult<Pair<List<Card>, Boolean>> {
         return withContext(ioDispatcher) {
             try {
+                val poolQuery = buildPoolQuery(setCode, extraPoolSets)
                 val result = scryfallQueue.execute {
                     scryfallApi.searchCards(
-                        query = "set:$setCode lang:en",
+                        query = poolQuery,
                         order = "set",
                         unique = "cards",
                         page = page,
@@ -237,9 +239,10 @@ class DraftRepositoryImpl(
                 // Retrofit throws HttpException(304) in that case. Retry once without cache so
                 // Scryfall returns a full 200 response.
                 try {
+                    val poolQuery = buildPoolQuery(setCode, extraPoolSets)
                     val result = scryfallQueue.execute {
                         scryfallApi.searchCardsNoCache(
-                            query = "set:$setCode lang:en",
+                            query = poolQuery,
                             order = "set",
                             unique = "cards",
                             page = page,
@@ -251,6 +254,27 @@ class DraftRepositoryImpl(
                 }
             }
         }
+    }
+
+    /**
+     * Builds the Scryfall pool query for [setCode], widened to also include [extraPoolSets]
+     * when non-empty (e.g. SOS's booster.json declares `extraPoolSets = ["soa"]` for its
+     * Mystical Archive sheet). Every set code is re-sanitized here via [sanitizeSetCode] even
+     * though [DraftSimRepositoryImpl.parseBoosterConfig] already filters `extraPoolSets` against
+     * the same allowlist — defense in depth, since this string is interpolated directly into a
+     * Scryfall query. When [extraPoolSets] is empty the query is unchanged from before this
+     * feature: `set:$setCode lang:en`.
+     */
+    private fun buildPoolQuery(setCode: String, extraPoolSets: List<String>): String {
+        val safeSetCode = sanitizeSetCode(setCode)
+        val safeExtras = extraPoolSets.mapNotNull { code ->
+            runCatching { sanitizeSetCode(code) }.getOrNull()
+        }
+        if (safeExtras.isEmpty()) {
+            return "set:$safeSetCode lang:en"
+        }
+        val setClause = (listOf(safeSetCode) + safeExtras).joinToString(" or ") { "set:$it" }
+        return "($setClause) lang:en"
     }
 
     // -------------------------------------------------------------------------

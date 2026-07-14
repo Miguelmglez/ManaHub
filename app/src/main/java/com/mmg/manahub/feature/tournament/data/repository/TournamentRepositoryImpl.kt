@@ -374,6 +374,9 @@ class TournamentRepositoryImpl(
     override fun observePlayers(tournamentId: Long): Flow<List<TournamentPlayer>> =
         dao.observePlayers(tournamentId).map { list -> list.map { it.toDomain() } }
 
+    override fun observeCurrentRound(tournamentId: Long): Flow<Int> =
+        dao.observeMaxRound(tournamentId).map { it ?: 1 }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun parsePlayerIds(json: String): List<Long> = TournamentIdCodec.decodeIds(json)

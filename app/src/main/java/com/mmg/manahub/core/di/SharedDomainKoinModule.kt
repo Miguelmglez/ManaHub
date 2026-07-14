@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.tagging.StrategyAnalyzer
 import com.mmg.manahub.core.data.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
+import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
@@ -86,6 +87,7 @@ fun sharedDomainKoinModule(
 
     // ── AddCard / Collection / Stats use cases. ──
     single { SearchCardsUseCase(repository = get()) }
+    single { GetSpotlightFeedUseCase(cardRepository = get()) }
     single { BuildScryfallQueryUseCase() }
     single { GetCollectionSetCodesUseCase(repository = get()) }
     single { GetCollectionStatsUseCase(repository = get()) }

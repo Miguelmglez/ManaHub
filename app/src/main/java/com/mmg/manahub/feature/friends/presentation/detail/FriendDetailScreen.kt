@@ -363,7 +363,7 @@ private fun FriendDetailHeader(
                             modifier = Modifier
                                 .background(
                                     color = mc.primaryAccent.copy(alpha = 0.25f),
-                                    shape = RoundedCornerShape(6.dp)
+                                    shape = RoundedCornerShape(4.dp)
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )

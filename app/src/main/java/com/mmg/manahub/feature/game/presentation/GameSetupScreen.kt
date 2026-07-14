@@ -105,6 +105,7 @@ import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineHostSheet
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
 import com.mmg.manahub.feature.tournament.presentation.TournamentsSheet
@@ -207,9 +208,12 @@ private fun GameSetupScreenContent(
     var showVoiceLanguagesSheet by remember { mutableStateOf(false) }
     var editingPlayerIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Auto-open join sheet when a prefilled code arrives (deep link path).
+    // Auto-open join sheet when a prefilled code arrives (deep link path). Defense-in-depth: the
+    // manahub://join/{code} deep link is already redirected without a code in AppNavGraph when
+    // online sessions are flag-disabled, but guard here too so this composable never auto-opens
+    // an online sheet regardless of how prefilledJoinCode was populated.
     LaunchedEffect(prefilledJoinCode) {
-        if (!prefilledJoinCode.isNullOrBlank()) {
+        if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED && !prefilledJoinCode.isNullOrBlank()) {
             showOnlineJoinSheet = true
         }
     }
@@ -341,17 +345,25 @@ private fun GameSetupScreenContent(
                         }
 
                         // ── Play with friends button ──────────────────────────────────────
-                        OutlinedButton(
-                            onClick = { showFriendsSheet = true },
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.gamesetup_play_with_friends),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                                color = mc.primaryAccent,
-                            )
+                        // Hidden entirely (not just disabled) while online sessions are
+                        // flag-disabled: FriendsRoutingSheet currently offers ONLY online actions
+                        // (Host / Join with code — the local "Tournaments" row is already
+                        // commented out above), so there is no local pass-and-play option this
+                        // button would otherwise expose. Local same-device play stays reachable via
+                        // the "Begin Game" button above, unaffected by this flag.
+                        if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                            OutlinedButton(
+                                onClick = { showFriendsSheet = true },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.gamesetup_play_with_friends),
+                                    style = MaterialTheme.magicTypography.labelLarge,
+                                    color = mc.primaryAccent,
+                                )
+                            }
                         }
                     }
                 }

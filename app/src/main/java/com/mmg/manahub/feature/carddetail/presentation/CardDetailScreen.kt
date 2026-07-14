@@ -485,6 +485,7 @@ private fun CardDetailContent(
                         // Force hardware layer during transition to prevent "snapping"
                         compositingStrategy = CompositingStrategy.Offscreen
                     }
+                    .clip(CardShape)
                     .then(
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                             with(sharedTransitionScope) {
@@ -496,7 +497,7 @@ private fun CardDetailContent(
                                     renderInOverlayDuringTransition = true,
                                 )
                             }
-                        } else Modifier.clip(CardShape)
+                        } else Modifier
                     )
                     .then(
                         if (card.imageBackNormal != null)
@@ -606,6 +607,23 @@ private fun CardDetailContent(
                                 color = MaterialTheme.magicColors.textSecondary,
                             )
                         }
+
+                        // Set Icon + Set Name
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            SetSymbol(
+                                setCode = card.setCode,
+                                rarity = CardRarity.fromString(card.rarity),
+                                size = 20.dp,
+                            )
+                            Text(
+                                text = card.setName,
+                                style = MaterialTheme.magicTypography.bodySmall,
+                                color = MaterialTheme.magicColors.textSecondary,
+                            )
+                        }
                     }
 
                     // Oracle / printed text
@@ -640,6 +658,53 @@ private fun CardDetailContent(
                         }
                     }
 
+                    // Flavor text
+                    FaceFlippable(rotation = rotation) { isBack ->
+                        val flavorText = if (isBack) backFace?.flavorText else frontFace?.flavorText ?: card.flavorText
+                        flavorText?.let {
+                            Text(
+                                text = "\"$it\"",
+                                style = MaterialTheme.magicTypography.bodySmall,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.magicColors.textSecondary,
+                            )
+                        }
+                    }
+
+                    // Power/Toughness or Loyalty
+                    FaceFlippable(rotation = rotation) { isBack ->
+                        val face = if (isBack) backFace else frontFace
+                        val ptOrLoyalty = when {
+                            face != null -> {
+                                when {
+                                    face.power != null && face.toughness != null -> "${face.power}/${face.toughness}"
+                                    face.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, face.loyalty!!)
+                                    else -> null
+                                }
+                            }
+                            card.power != null && card.toughness != null -> "${card.power}/${card.toughness}"
+                            card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty!!)
+                            else -> null
+                        }
+
+                        if (ptOrLoyalty != null) {
+                            val mc = MaterialTheme.magicColors
+                            Surface(
+                                color = mc.secondaryAccent.copy(alpha = 0.08f),
+                                border = BorderStroke(1.dp, mc.secondaryAccent),
+                                shape = RoundedCornerShape(8.dp),
+                            ) {
+                                Text(
+                                    text = ptOrLoyalty,
+                                    style = MaterialTheme.magicTypography.titleMedium,
+                                    color = mc.secondaryAccent,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+
                     // Prices + Collection Section (grouped for fluid entry)
                     Column(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -653,6 +718,61 @@ private fun CardDetailContent(
                     ) {
                         PriceSection(card = card)
                         HorizontalDivider()
+                        // Improved Variants & Prints Section
+                        Surface(
+                            onClick = onShowVariantSelector,
+                            color = MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.08f),
+                            shape = CardShape,
+                            border = BorderStroke(1.dp, MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.2f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Icon with a soft circular highlight
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(
+                                            MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.15f),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.magicColors.primaryAccent,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.carddetail_other_prints_title),
+                                        style = MaterialTheme.magicTypography.titleMedium,
+                                        color = MaterialTheme.magicColors.textPrimary
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.carddetail_other_prints_desc),
+                                        style = MaterialTheme.magicTypography.labelSmall,
+                                        color = MaterialTheme.magicColors.textSecondary
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.magicColors.textDisabled,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        HorizontalDivider()
+
                         CollectionSection(
                             userCards = userCards,
                             tradeQuantities = tradeQuantities,
@@ -698,6 +818,23 @@ private fun CardDetailContent(
                             color = MaterialTheme.magicColors.textSecondary,
                         )
                     }
+
+                    // Set Icon + Set Name
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SetSymbol(
+                            setCode = card.setCode,
+                            rarity = CardRarity.fromString(card.rarity),
+                            size = 20.dp,
+                        )
+                        Text(
+                            text = card.setName,
+                            style = MaterialTheme.magicTypography.bodySmall,
+                            color = MaterialTheme.magicColors.textSecondary,
+                        )
+                    }
                 }
                 // Oracle
                 FaceFlippable(rotation = rotation) { isBack ->
@@ -739,125 +876,6 @@ private fun CardDetailContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            HorizontalDivider()
-
-            // Set Icon + Set Name
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SetSymbol(
-                    setCode = card.setCode,
-                    rarity = CardRarity.fromString(card.rarity),
-                    size = 20.dp,
-                )
-                Text(
-                    text = card.setName,
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = MaterialTheme.magicColors.textSecondary,
-                )
-            }
-
-            // Flavor text
-            FaceFlippable(rotation = rotation) { isBack ->
-                val flavorText = if (isBack) backFace?.flavorText else frontFace?.flavorText ?: card.flavorText
-                flavorText?.let {
-                    Text(
-                        text = "\"$it\"",
-                        style = MaterialTheme.magicTypography.bodySmall,
-                        fontStyle = FontStyle.Italic,
-                        color = MaterialTheme.magicColors.textSecondary,
-                    )
-                }
-            }
-
-            // Power/Toughness or Loyalty
-            FaceFlippable(rotation = rotation) { isBack ->
-                val face = if (isBack) backFace else frontFace
-                val ptOrLoyalty = when {
-                    face != null -> {
-                        when {
-                            face.power != null && face.toughness != null -> "${face.power}/${face.toughness}"
-                            face.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, face.loyalty!!)
-                            else -> null
-                        }
-                    }
-                    card.power != null && card.toughness != null -> "${card.power}/${card.toughness}"
-                    card.loyalty != null -> stringResource(R.string.carddetail_loyalty_value, card.loyalty!!)
-                    else -> null
-                }
-
-                if (ptOrLoyalty != null) {
-                    val mc = MaterialTheme.magicColors
-                    Surface(
-                        color = mc.secondaryAccent.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, mc.secondaryAccent),
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Text(
-                            text = ptOrLoyalty,
-                            style = MaterialTheme.magicTypography.titleMedium,
-                            color = mc.secondaryAccent,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-
-            // Improved Variants & Prints Section
-            Surface(
-                onClick = onShowVariantSelector,
-                color = MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.08f),
-                shape = CardShape,
-                border = BorderStroke(1.dp, MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.2f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Icon with a soft circular highlight
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.15f),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = MaterialTheme.magicColors.primaryAccent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.carddetail_other_prints_title),
-                            style = MaterialTheme.magicTypography.titleMedium,
-                            color = MaterialTheme.magicColors.textPrimary
-                        )
-                        Text(
-                            text = stringResource(R.string.carddetail_other_prints_desc),
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = MaterialTheme.magicColors.textSecondary
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.magicColors.textDisabled,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
             HorizontalDivider()
 
             // Wishlist section

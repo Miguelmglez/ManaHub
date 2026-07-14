@@ -25,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -46,6 +47,7 @@ fun DraftSetCard(
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
+    val fallbackPainter = rememberVectorPainter(SetSymbolFallbackIcon)
 
     Surface(
         modifier = modifier
@@ -65,6 +67,8 @@ fun DraftSetCard(
                 modifier = Modifier.size(48.dp),
                 contentScale = ContentScale.Fit,
                 colorFilter = ColorFilter.tint(colors.textPrimary),
+                error = fallbackPainter,
+                fallback = fallbackPainter,
             )
             Spacer(Modifier.height(8.dp))
             Text(

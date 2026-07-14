@@ -50,6 +50,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -282,8 +283,8 @@ private fun CardScoreGrid(
                         .clip(RoundedCornerShape(6.dp)),
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = score.card.name,
+                CardName(
+                    name = score.card.name,
                     style = ty.labelSmall,
                     color = mc.textPrimary,
                     maxLines = 1,
@@ -344,8 +345,8 @@ private fun WeakCardGrid(
                         .clickable { onCardClick(score.card.scryfallId) },
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = score.card.name,
+                CardName(
+                    name = score.card.name,
                     style = ty.labelSmall,
                     color = mc.textPrimary,
                     maxLines = 1,

@@ -65,12 +65,15 @@ import com.mmg.manahub.feature.communitydecks.presentation.components.communityD
  *
  * @param onBack pops the back stack.
  * @param onNavigateToDeck opens the freshly-imported local deck (in Deck Studio).
+ * @param onCardClick opens a single card's detail screen by its resolved Scryfall id
+ *   (lazy lookup — nothing is prefetched; see [CommunityDeckDetailContent]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityDeckDetailScreen(
     onBack: () -> Unit,
     onNavigateToDeck: (String) -> Unit,
+    onCardClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CommunityDeckDetailViewModel = koinViewModel(),
 ) {
@@ -177,6 +180,7 @@ fun CommunityDeckDetailScreen(
                             isStale = state.isStale,
                             onImport = viewModel::importDeck,
                             onOpenSource = uriHandler::openUri,
+                            onCardClick = onCardClick,
                             contentPadding = padding,
                         )
                     }
@@ -199,6 +203,7 @@ private fun CommunityDeckDetailContent(
     isStale: Boolean,
     onImport: () -> Unit,
     onOpenSource: (String) -> Unit,
+    onCardClick: (String) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -286,7 +291,7 @@ private fun CommunityDeckDetailContent(
                 }
             } else {
                 // Grouped card sections composed into THIS single lazy list (no nesting).
-                communityDeckCardItems(deck.cards)
+                communityDeckCardItems(deck.cards, onCardClick = onCardClick)
             }
         }
 

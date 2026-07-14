@@ -44,4 +44,11 @@ interface TradesRepository {
     suspend fun acceptProposal(proposalId: String): Result<Unit>
     suspend fun revokeAcceptance(proposalId: String): Result<Unit>
     suspend fun markCompleted(proposalId: String): Result<Unit>
+    /**
+     * Clears the in-memory proposals cache. Call on sign-out (or before a different account signs
+     * in) so the previous account's proposals are never briefly visible to the next account
+     * (trades audit §2.10, 2026-07-10) — the cache is a process-lifetime singleton with no
+     * per-user partitioning.
+     */
+    fun clearCache()
 }

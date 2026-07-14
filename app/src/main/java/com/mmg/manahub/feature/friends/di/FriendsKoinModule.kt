@@ -6,6 +6,7 @@ import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.feature.friends.domain.usecase.AcceptInviteUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
+import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
 import com.mmg.manahub.feature.friends.presentation.FriendsViewModel
@@ -40,11 +41,19 @@ import org.koin.dsl.module
  * - `AuthRepository` — shared with Settings + Profile + Home + CardDetail.
  * - `AnalyticsHelper` — shared with Settings + CardDetail.
  *
- * The four use cases all depend only on `FriendRepository` (resolved via the bridge `get()`), so they
- * are simple Koin factories registered as `single { }` here (none appears in any other loaded module).
- * `TradesRepository` was originally a Friends-only `single` here; the Trades island PROMOTED it into
- * `coreBridgeKoinModule` (shared with Trades + the still-Hilt Home/FriendDetail), so it is now resolved
- * via `get()` and this module was shrunk accordingly. [PendingInviteStore] is still Friends-only here.
+ * The five use cases all depend only on `FriendRepository` (resolved via the bridge `get()`), so they
+ * are simple Koin factories registered as `single { }` here. `TradesRepository` was originally a
+ * Friends-only `single` here; the Trades island PROMOTED it into `coreBridgeKoinModule` (shared with
+ * Trades + the still-Hilt Home/FriendDetail), so it is now resolved via `get()` and this module was
+ * shrunk accordingly. [PendingInviteStore] is still Friends-only here.
+ *
+ * ## Cross-island consumer: `GetFriendsUseCase`
+ * [GetFriendsUseCase] is registered here even though nothing in THIS file's ViewModels consumes it —
+ * `TradesViewModel` (`tradesKoinModule`) resolves it via `get()`. It was moved here from
+ * `tradesKoinModule` (Trades audit finding 4.4, 2026-07-10): it depends only on `FriendRepository`, so
+ * it belongs with its sibling Friends use cases rather than as a one-off cross-feature registration in
+ * an unrelated module — and registering a Friends-domain use case anywhere else risks a future
+ * `DefinitionOverrideException` if Friends ever adds its own definition.
  *
  * ## KMP migration — Hilt→Koin cutover batch 4
  * [FriendshipClient] and [FriendRemoteDataSource] are now NATIVELY Koin-built here (the feature-private
@@ -86,6 +95,8 @@ fun friendsKoinModule(
     single { SendFriendRequestUseCase(get()) }
     single { GetFriendCollectionUseCase(get()) }
     single { AcceptInviteUseCase(get()) }
+    // Consumed cross-module by TradesViewModel (tradesKoinModule) via get() — see KDoc above.
+    single { GetFriendsUseCase(get()) }
 
     // ── The Koin island: all three Friends ViewModels are now resolved by Koin, not Hilt. ──
     viewModel {

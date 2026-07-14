@@ -154,7 +154,7 @@ fun decksKoinModule(
 
     // ── ViewModels (the Decks island) ──────────────────────────────────────────────
     // DeckViewModel: backs the deck list.
-    viewModel { DeckViewModel(deckRepo = get(), cardRepo = get()) }
+    viewModel { DeckViewModel(deckRepo = get(), cardRepo = get(), userPreferences = get()) }
 
     // DeckStudioViewModel: the unified create+edit surface. `savedStateHandle = get()` carries
     // the optional "deckId" nav arg ("" ⇒ fresh draft) populated from the NavBackStackEntry.

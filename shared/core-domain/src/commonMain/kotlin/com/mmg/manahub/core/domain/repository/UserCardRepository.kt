@@ -50,6 +50,12 @@ interface UserCardRepository {
     /** Total number of (non-deleted) collection entries. */
     fun observeCount(userId: String?): Flow<Int>
 
+    /**
+     * Emits the [limit] most-recently-added (non-deleted) collection rows, newest first.
+     * Backs the Home dashboard's Recently Added widget (Home feature overhaul Phase 2.1).
+     */
+    fun observeRecentlyAdded(limit: Int): Flow<List<UserCardWithCard>>
+
     // ── Mutations ─────────────────────────────────────────────────────────────
 
     /**

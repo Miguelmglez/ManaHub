@@ -23,6 +23,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)          // Kotlin compose compiler
 }
 
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "com.mmg.manahub.core.ui"
+}
+
 kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {

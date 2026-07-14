@@ -28,11 +28,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class StatsRepositoryImpl @Inject constructor(
+class StatsRepositoryImpl(
     private val statsDao: StatsDao,
     private val deckDao: DeckDao,
     private val authRepository: AuthRepository,

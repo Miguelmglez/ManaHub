@@ -53,6 +53,7 @@ import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
 import org.koin.androidx.compose.koinViewModel
 
@@ -155,19 +156,23 @@ fun TournamentsSheet(
                     onClick = onCreateLocal,
                 )
 
-                SheetActionRow(
-                    emoji = "🏆",
-                    title = stringResource(R.string.tournaments_sheet_host_online_title),
-                    subtitle = stringResource(R.string.tournaments_sheet_host_online_subtitle),
-                    onClick = { showCreateOnlineStub = true },
-                )
+                // Online tournament rows — hidden while online sessions are flag-disabled. Local
+                // tournament creation (above) is unaffected.
+                if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                    SheetActionRow(
+                        emoji = "🏆",
+                        title = stringResource(R.string.tournaments_sheet_host_online_title),
+                        subtitle = stringResource(R.string.tournaments_sheet_host_online_subtitle),
+                        onClick = { showCreateOnlineStub = true },
+                    )
 
-                SheetActionRow(
-                    emoji = "🔗",
-                    title = stringResource(R.string.tournaments_sheet_join_online_title),
-                    subtitle = stringResource(R.string.tournaments_sheet_join_online_subtitle),
-                    onClick = { showJoinOnlineSheet = true },
-                )
+                    SheetActionRow(
+                        emoji = "🔗",
+                        title = stringResource(R.string.tournaments_sheet_join_online_title),
+                        subtitle = stringResource(R.string.tournaments_sheet_join_online_subtitle),
+                        onClick = { showJoinOnlineSheet = true },
+                    )
+                }
 
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = MaterialTheme.spacing.xl),

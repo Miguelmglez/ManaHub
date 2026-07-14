@@ -51,6 +51,16 @@ import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.ArchidektTrendingRepository
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.model.ArchidektTrendingDeck
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +69,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
@@ -104,6 +115,14 @@ class HomeViewModel(
     private val wishlistRepository: WishlistRepository,
     private val getAccountNudgeUseCase: GetAccountNudgeUseCase,
     private val gamificationRepository: GamificationRepository,
+    // Home feature overhaul (2026-07-13) — real data sources replacing Phase 1/2/3 stubs.
+    private val userCardRepository: UserCardRepository,
+    private val tradesRepository: TradesRepository,
+    private val openForTradeRepository: OpenForTradeRepository,
+    private val tradeSuggestionsRepository: TradeSuggestionsRepository,
+    private val friendRepository: FriendRepository,
+    private val archidektTrendingRepository: ArchidektTrendingRepository,
+    private val playtestRepository: PlaytestRepository,
     // Deck Doctor Community/Archetype plan, Phase 5 — appended last (see `project_archetype_engine`
     // memory's "append new optional params at the end" rule for classes with positional-arg call
     // sites; this project's tests use named args throughout, but the convention is kept anyway).
@@ -171,6 +190,12 @@ class HomeViewModel(
         authRepository.sessionState
             .map { it is SessionState.Authenticated && !it.user.isAnonymous }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Current authenticated user id, or null while signed out. Used for Trades inbox filtering. */
+    private val currentUserIdFlow: StateFlow<String?> =
+        authRepository.sessionState
+            .map { (it as? SessionState.Authenticated)?.user?.id }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     // ── Derived source flows ────────────────────────────────────────────────────
 
@@ -348,20 +373,49 @@ class HomeViewModel(
             )
         }
 
-    /** Social/community slice. Community stats are stubbed; trade summary not wired yet. */
+    /**
+     * Trade-suggestions count for the Suggestions slide. [TradeSuggestionsRepository.getSuggestions]
+     * is suspend-only (no Flow exists yet on the repository). Declared as a member [StateFlow] (via
+     * [stateIn], not a bare `flow{}` invoked fresh per combine) for the SAME reason documented on
+     * [latestSetsFlow] above: a cold flow that emits once and completes never refreshes once
+     * collected — it freezes at whatever value it produced on first subscription instead of
+     * re-fetching (e.g. after Home is re-subscribed following the 5s [SharingStarted.WhileSubscribed]
+     * grace window). Declared BEFORE [socialSnapshotFlow] (property init order — it's referenced
+     * transitively through [tradesSnapshotFlow], which [socialSnapshotFlow]'s initializer calls).
+     */
+    private val suggestionsCountFlow: StateFlow<Int> =
+        isAuthenticatedFlow.flatMapLatest { authed ->
+            if (!authed) flowOf(0)
+            else flow {
+                val count = tradeSuggestionsRepository.getSuggestions().getOrNull()?.size ?: 0
+                emit(count)
+            }
+        }.catch {
+            crashlytics.setCustomKey("home_flow_error_source", "trade_suggestions")
+            recordSafeNonFatal("home_flow_trade_suggestions", it)
+            emit(0)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /**
+     * Social/community slice. Every source here is real (Home feature overhaul Phase 1):
+     * community stats (Supabase RPC, name-resolved), the Trades Hub bundle, the round-aware active
+     * tournament, the wishlist snapshot, and the friend-count/Archidekt-trending extras.
+     */
     private val socialSnapshotFlow: Flow<SocialSnapshot> =
         isAuthenticatedFlow.flatMapLatest { authed ->
             combine(
-                communityStatsRepository.observeCommunityStats().catch { emit(null) },
-                tradeSummaryFlow(authed),
+                communityStatsFlow(authed),
+                tradesSnapshotFlow(authed),
                 activeTournamentFlow(authed),
                 wishlistFlow(authed),
-            ) { community, trade, tournament, wishlist ->
+                socialExtrasFlow(authed),
+            ) { community, trades, tournament, wishlist, extras ->
                 SocialSnapshot(
                     community = community,
-                    tradeSummary = trade,
+                    trades = trades,
                     activeTournament = tournament,
                     wishlist = wishlist,
+                    extras = extras,
                 )
             }
         }
@@ -395,16 +449,155 @@ class HomeViewModel(
             }
         }
 
-    // TODO(home-trades): wire to TradesRepository pending-proposal count once exposed as a Flow.
-    private fun tradeSummaryFlow(authed: Boolean): Flow<TradeSummary?> = flowOf(null)
+    /**
+     * Trade inbox summary: pending proposals addressed TO the current user
+     * (`status == PROPOSED && receiverId == currentUserId`), reusing the SAME
+     * [TradesRepository.observeActiveProposals] flow the Trades screen itself observes — no
+     * second data path (Home feature overhaul Phase 1.1, fixes F-1).
+     */
+    private fun tradeSummaryFlow(authed: Boolean): Flow<TradeSummary?> =
+        if (!authed) flowOf(null)
+        else currentUserIdFlow.flatMapLatest { userId ->
+            if (userId == null) flowOf(null)
+            else tradesRepository.observeActiveProposals().map { proposals ->
+                val pending = proposals.filter { it.status == TradeStatus.PROPOSED && it.receiverId == userId }
+                if (pending.isEmpty()) {
+                    TradeSummary(pendingCount = 0, latestItemCount = null)
+                } else {
+                    val newest = pending.maxByOrNull { it.createdAt }
+                    TradeSummary(pendingCount = pending.size, latestItemCount = newest?.items?.size)
+                }
+            }
+        }.catch {
+            crashlytics.setCustomKey("home_flow_error_source", "trade_summary")
+            recordSafeNonFatal("home_flow_trade_summary", it)
+            emit(null)
+        }
 
-    // Tournaments are local, so this is available regardless of auth state.
+    /** Bundles the Open-for-Trade count + estimated value for [tradesSnapshotFlow]'s inner combine. */
+    private data class OpenForTradeSummary(val count: Int, val valueDisplay: String?)
+
+    private fun openForTradeSummaryFlow(authed: Boolean): Flow<OpenForTradeSummary> =
+        if (!authed) flowOf(OpenForTradeSummary(0, null))
+        else combine(openForTradeRepository.observeLocal(), currencyFlow) { entries, currency ->
+            if (entries.isEmpty()) return@combine OpenForTradeSummary(0, null)
+            val totalUsd = entries.sumOf { (it.card?.priceUsd ?: 0.0) * it.quantity }
+            val totalEur = entries.sumOf { (it.card?.priceEur ?: 0.0) * it.quantity }
+            val display = if (totalUsd <= 0.0 && totalEur <= 0.0) {
+                null
+            } else {
+                PriceFormatter.formatFromScryfall(priceUsd = totalUsd, priceEur = totalEur, preferredCurrency = currency)
+            }
+            OpenForTradeSummary(count = entries.sumOf { it.quantity }, valueDisplay = display)
+        }.catch {
+            crashlytics.setCustomKey("home_flow_error_source", "open_for_trade")
+            recordSafeNonFatal("home_flow_open_for_trade", it)
+            emit(OpenForTradeSummary(0, null))
+        }
+
+    /**
+     * Bundles the three Trades Hub data sources into one typed combine (non-vararg, per the
+     * project's combine-arity convention) so [socialSnapshotFlow]'s outer combine stays a typed
+     * 5-arg overload.
+     */
+    private data class TradesSnapshot(
+        val summary: TradeSummary?,
+        val suggestionsCount: Int,
+        val openForTrade: OpenForTradeSummary,
+    )
+
+    private fun tradesSnapshotFlow(authed: Boolean): Flow<TradesSnapshot> = combine(
+        tradeSummaryFlow(authed),
+        suggestionsCountFlow,
+        openForTradeSummaryFlow(authed),
+    ) { summary, suggestionsCount, openForTrade ->
+        TradesSnapshot(summary, suggestionsCount, openForTrade)
+    }
+
+    /**
+     * Bundles the friend count + latest pending friend request + Archidekt trending decks —
+     * everything else [socialSnapshotFlow]'s outer combine needs beyond community stats / trades
+     * / tournament / wishlist — so that combine stays a typed 5-arg overload (Home feature
+     * overhaul Phase 1.2.c/1.2.d).
+     */
+    private data class SocialExtras(
+        val friendCount: Int,
+        val latestFriendRequestName: String?,
+        val archidektTrending: List<ArchidektTrendingDeck>,
+    )
+
+    private fun socialExtrasFlow(authed: Boolean): Flow<SocialExtras> =
+        if (!authed) {
+            flowOf(SocialExtras(friendCount = 0, latestFriendRequestName = null, archidektTrending = emptyList()))
+        } else {
+            combine(
+                friendRepository.observeFriendCount().catch { emit(0) },
+                friendRepository.observePendingRequests().catch { emit(emptyList()) },
+                archidektTrendingRepository.observeTrendingDecks().catch { emit(emptyList()) },
+            ) { friendCount, pendingRequests, trending ->
+                SocialExtras(
+                    friendCount = friendCount,
+                    latestFriendRequestName = pendingRequests.firstOrNull()?.fromNickname,
+                    archidektTrending = trending,
+                )
+            }
+        }
+
+    /**
+     * Community stats, resolved to real card names client-side (the RPC always returns a null
+     * name — the server-side `cards` catalog table is unpopulated). Names are resolved from the
+     * LOCAL card cache only ([CardRepository.getCardsByIds] never hits the network); an entry whose
+     * name cannot be resolved locally is KEPT with an empty name (Home feature overhaul Phase
+     * 1.2.b) rather than dropped — see [withResolvedCardNames] and the corresponding degraded
+     * rendering in [com.mmg.manahub.feature.home.presentation.SocialSlideContent].
+     */
+    private fun communityStatsFlow(authed: Boolean): Flow<CommunityStats?> =
+        if (!authed) flowOf(null)
+        else communityStatsRepository.observeCommunityStats()
+            .map { it?.withResolvedCardNames() }
+            .catch {
+                crashlytics.setCustomKey("home_flow_error_source", "community_stats")
+                recordSafeNonFatal("home_flow_community_stats", it)
+                emit(null)
+            }
+
+    private suspend fun CommunityStats.withResolvedCardNames(): CommunityStats {
+        if (mostWishlisted.isEmpty()) return this
+        val ids = mostWishlisted.map { it.id }
+        val cards = runCatching { cardRepository.getCardsByIds(ids) }.getOrElse { emptyList() }
+        val nameById = cards.associate { it.scryfallId to it.name }
+        // "Most wishlisted across the community" routinely includes cards the current user never
+        // viewed/cached locally (names resolve ONLY from the local cache — see the class doc above),
+        // so dropping unresolved entries emptied the slide out for most users in practice. Keep every
+        // entry; one with no locally-resolved name gets an empty name and renders degraded
+        // (count-only, e.g. "N wishlists") instead of being filtered out (Home dashboard audit, HIGH).
+        val resolved = mostWishlisted.map { entry ->
+            entry.copy(name = nameById[entry.id] ?: "")
+        }
+        return copy(mostWishlisted = resolved)
+    }
+
+    /**
+     * Current-round-aware active-tournament summary (Home feature overhaul Phase 1.2.e, fixes
+     * F-3). Tournaments are local, so this is available regardless of auth state. The round is a
+     * READ-ONLY query ([TournamentRepository.observeCurrentRound]) — never a write inside this
+     * combine transformer. Standing is intentionally omitted (no cheap per-player standing
+     * computation is available here) rather than showing a fake value.
+     */
     private fun activeTournamentFlow(authed: Boolean): Flow<TournamentSummary?> =
         tournamentRepository.observeTournaments()
-            .map { tournaments -> tournaments.firstActiveSummary() }
+            .map { tournaments -> tournaments.firstOrNull { it.status == "ACTIVE" || it.status == "SETUP" } }
+            .flatMapLatest { active ->
+                if (active == null) {
+                    flowOf(null)
+                } else {
+                    tournamentRepository.observeCurrentRound(active.id)
+                        .map { round -> TournamentSummary(tournamentId = active.id, name = active.name, round = round, standing = null) }
+                }
+            }
             .catch { emit(null) }
 
-    // TODO(home-wishlist): wire to WishlistRepository count/value once exposed as a Flow.
+    // Wired to WishlistRepository.observeLocal() (count + currency-formatted estimated value).
     private fun wishlistFlow(authed: Boolean): Flow<WishlistStats?> =
         if (!authed) flowOf(null)
         else combine(
@@ -444,6 +637,43 @@ class HomeViewModel(
             crashlytics.log("home_flow_error: wishlist")
             emit(null)
         }
+
+    /**
+     * Newest-first collection additions for the RECENTLY_ADDED widget (Home feature overhaul
+     * Phase 2.1). Card image/name resolve through the existing Room join
+     * ([UserCardRepository.observeRecentlyAdded]) — no network call. Catch-isolated so a failing
+     * source never collapses the board.
+     */
+    private val recentlyAddedFlow: Flow<List<RecentlyAddedCard>> =
+        userCardRepository.observeRecentlyAdded(RECENTLY_ADDED_LIMIT)
+            .map { rows ->
+                rows.map { row ->
+                    RecentlyAddedCard(
+                        rowId = row.userCard.id,
+                        quantity = row.userCard.quantity,
+                        card = DiscoverCard(
+                            id = row.card.scryfallId,
+                            scryfallId = row.card.scryfallId,
+                            name = row.card.name,
+                            imageUrl = row.card.imageNormal ?: row.card.imageArtCrop,
+                            typeLine = row.card.typeLine,
+                        ),
+                    )
+                }
+            }
+            .catch {
+                crashlytics.setCustomKey("home_flow_error_source", "recently_added")
+                recordSafeNonFatal("home_flow_recently_added", it)
+                emit(emptyList())
+            }
+
+    /**
+     * Total saved playtest sessions across every deck — drives STEP_FIRST_PLAYTEST_DECK's
+     * auto-hide condition (Home feature overhaul Phase 2.2). Catch-isolated: a failure degrades
+     * to 0 (step stays visible) rather than collapsing the board.
+     */
+    private val totalPlaytestCountFlow: Flow<Int> =
+        playtestRepository.observeTotalTestCount().catch { emit(0) }
 
     private val uiState: StateFlow<HomeUiState> = run {
         val libraryFlow = combine(
@@ -489,8 +719,9 @@ class HomeViewModel(
             userPrefsDataStore.observeQuickStartActions(),
             userPrefsDataStore.playerNameFlow,
             skippedFirstStepsFlow,
+            totalPlaytestCountFlow,
         ) { args ->
-            // combine(6 flows) uses the vararg overload — destructure manually.
+            // combine(7 flows) uses the vararg overload — destructure manually.
             @Suppress("UNCHECKED_CAST")
             val library    = args[0] as LibrarySnapshot
             @Suppress("UNCHECKED_CAST")
@@ -503,27 +734,45 @@ class HomeViewModel(
             val playerName = args[4] as String
             @Suppress("UNCHECKED_CAST")
             val skipped    = args[5] as Set<String>
+            @Suppress("UNCHECKED_CAST")
+            val playtestTotal = args[6] as Int
 
             val effectivePlayerName = account.nickname ?: playerName
-            CoreSnapshot(library, activity, account, quickStart, effectivePlayerName, skipped)
+            CoreSnapshot(library, activity, account, quickStart, effectivePlayerName, skipped, playtestTotal)
         }
 
-        // Bundle the Phase 2/3 data slices into one typed combine, then fold that
-        // bundle into the core slice. Using only the typed (non-vararg) combine
-        // overloads keeps element types intact (no Array<Any?> erasure / casts).
+        // Bundle the Phase 2/3 data slices (+ recentlyAddedFlow, Home feature overhaul Phase 2.1)
+        // into one combine, then fold that bundle into the core slice. Six flows exceeds the
+        // typed combine overloads (max 5) — uses the SAME vararg-destructure pattern as coreFlow
+        // above, kept internally typed via the manual casts.
         val dataFlow = combine(
             layoutFlow,
             statsSnapshotFlow,
             discoverSnapshotFlow,
             socialSnapshotFlow,
             gamificationSnapshotFlow,
-        ) { layout, stats, discover, social, gamification ->
+            recentlyAddedFlow,
+        ) { args ->
+            @Suppress("UNCHECKED_CAST")
+            val layout       = args[0] as List<WidgetInstance>
+            @Suppress("UNCHECKED_CAST")
+            val stats        = args[1] as StatsSnapshot
+            @Suppress("UNCHECKED_CAST")
+            val discover     = args[2] as DiscoverSnapshot
+            @Suppress("UNCHECKED_CAST")
+            val social       = args[3] as SocialSnapshot
+            @Suppress("UNCHECKED_CAST")
+            val gamification = args[4] as GamificationSnapshot
+            @Suppress("UNCHECKED_CAST")
+            val recentlyAdded = args[5] as List<RecentlyAddedCard>
+
             DataBundle(
                 layout = layout,
                 stats = stats,
                 discover = discover,
                 social = social,
                 gamification = gamification,
+                recentlyAdded = recentlyAdded,
             )
         }
 
@@ -533,7 +782,10 @@ class HomeViewModel(
             NewsBundle(items = news, filtersActive = filtersActive)
         }
 
-        combine(coreFlow, newsFlow, dataFlow) { core, news, data ->
+        // A plain boolean gate (mirrors gamificationEnabledFlow) — appended as a 4th argument to
+        // the FINAL typed combine (still ≤5, no vararg/cast needed) rather than threaded into the
+        // already-fragile coreFlow/dataFlow vararg bundles above.
+        combine(coreFlow, newsFlow, dataFlow, userPrefsDataStore.communityDecksEnabledFlow) { core, news, data, communityDecksEnabled ->
             buildUiState(
                 core = core,
                 news = news.items,
@@ -543,6 +795,8 @@ class HomeViewModel(
                 discover = data.discover,
                 social = data.social,
                 gamification = data.gamification,
+                recentlyAdded = data.recentlyAdded,
+                communityDecksEnabled = communityDecksEnabled,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -604,6 +858,25 @@ class HomeViewModel(
             runCatching { refreshNewsFeedUseCase() }.exceptionOrNull()?.let { error ->
                 recordSafeNonFatal("home_news_refresh", error)
                 crashlytics.log("home_news_refresh_failed")
+            }
+        }
+        // Trigger a background trades refresh so TRADES_HUB's Inbox has real pending-proposal data
+        // even on first open, before the user has ever visited Trades or a friend's profile (the
+        // only other callers of TradesRepository.refreshProposals — observeActiveProposals() is
+        // in-memory-only and starts empty on every process start). Guarded to authenticated,
+        // non-anonymous users (mirrors isAuthenticatedFlow's gate); waits past the initial Loading
+        // session state so a still-resolving session isn't mistaken for signed-out. Mirrors the news
+        // warm-up above — never blocks startup.
+        viewModelScope.launch {
+            val session = authRepository.sessionState.first { it !is SessionState.Loading }
+            val userId = (session as? SessionState.Authenticated)
+                ?.takeIf { !it.user.isAnonymous }
+                ?.user?.id
+            if (userId != null) {
+                runCatching { tradesRepository.refreshProposals(userId) }.exceptionOrNull()?.let { error ->
+                    recordSafeNonFatal("home_trades_refresh", error)
+                    crashlytics.log("home_trades_refresh_failed")
+                }
             }
         }
         // Pick a random playable set (>10 cards) to seed the Discover row BEFORE the first fetch,
@@ -861,11 +1134,17 @@ class HomeViewModel(
         val current = uiState.value.layout
         if (current.any { it.type == type }) return
         val newInstance = WidgetInstance(type, type.defaultSize())
-        // Insert so the layout stays grouped by the canonical WidgetCategory order: place the
-        // new widget at the END of its own category's run (after the last existing widget whose
-        // category ordinal <= the new type's). This keeps each category contiguous and ordered.
-        val newOrdinal = type.category.ordinal
-        val insertIndex = current.indexOfLast { it.type.category.ordinal <= newOrdinal } + 1
+        // Insert immediately after the LAST existing entry of the same category, wherever that
+        // category's run currently sits in the layout — NOT by comparing WidgetCategory.ordinal
+        // globally. The persisted/default layout is NOT sorted by ordinal (e.g. defaultLayoutSignedIn
+        // deliberately places SOCIAL, ordinal 4, before DISCOVER, ordinal 3, to match the funnel
+        // order), so an ordinal-ascending `indexOfLast { ordinal <= newOrdinal }` can match the LAST
+        // item of an unrelated, lower-ordinal category that sits AFTER this category's own run —
+        // splitting the new widget away from its category and breaking the contiguity invariant the
+        // gallery's drag&drop relies on. When the category has no existing entries yet, append at
+        // the end (a brand-new category run of size 1 is trivially contiguous with itself).
+        val lastSameCategoryIndex = current.indexOfLast { it.type.category == type.category }
+        val insertIndex = if (lastSameCategoryIndex >= 0) lastSameCategoryIndex + 1 else current.size
         val mutable = current.toMutableList()
         mutable.add(insertIndex, newInstance)
         persistLayout(mutable)
@@ -903,6 +1182,8 @@ class HomeViewModel(
         discover: DiscoverSnapshot,
         social: SocialSnapshot,
         gamification: GamificationSnapshot,
+        recentlyAdded: List<RecentlyAddedCard>,
+        communityDecksEnabled: Boolean,
     ): HomeUiState {
         val collectionStats = core.library.stats
         val deckCount = core.library.decks.size
@@ -920,7 +1201,7 @@ class HomeViewModel(
 
         val cardCount = collectionStats.uniqueCards
         val deckCountForSteps = deckCount
-        val friendCount = 0 // Phase 3: communityStats friend count not yet exposed as a Flow.
+        val friendCount = social.extras.friendCount
         val isProfileComplete = !core.account.avatarUrl.isNullOrBlank()
             && core.playerName != "Wizard"
             && core.playerName.isNotBlank()
@@ -931,6 +1212,9 @@ class HomeViewModel(
             deckCount = deckCountForSteps,
             friendCount = friendCount,
             isProfileComplete = isProfileComplete,
+            totalPlaytestCount = core.totalPlaytestCount,
+            openForTradeCount = social.trades.openForTrade.count,
+            wishlistCount = social.wishlist?.count ?: 0,
             skipped = core.skippedFirstSteps,
         )
 
@@ -964,7 +1248,7 @@ class HomeViewModel(
             lastGameRecap = stats.history.firstOrNull()?.toRecap(),
             playStreak = stats.history.toPlayStreak(),
             winRate = toWinRate(stats),
-            bestDeck = toBestDeck(stats),
+            bestDeck = toBestDeck(stats, core.library.decks),
             nemesis = toNemesis(stats),
             performanceDetails = stats.performance,
             collectionByColor = collectionStats.byColor.toColorMap(),
@@ -978,13 +1262,21 @@ class HomeViewModel(
             latestSets = discover.latestSets,
             wishlistStats = social.wishlist,
             decks = core.library.decks,
+            recentlyAdded = recentlyAdded,
             // Phase 3
             communityStats = social.community,
-            tradeSummary = social.tradeSummary,
+            tradeSummary = social.trades.summary,
+            tradeSuggestionsCount = social.trades.suggestionsCount,
+            openForTradeCount = social.trades.openForTrade.count,
+            openForTradeValueDisplay = social.trades.openForTrade.valueDisplay,
             activeTournamentSummary = social.activeTournament,
+            friendCount = friendCount,
+            latestFriendRequestName = social.extras.latestFriendRequestName,
+            archidektTrending = social.extras.archidektTrending,
             // Gamification (Phase 2)
             gamificationEnabled = gamification.enabled,
             gamification = gamification.data,
+            communityDecksEnabled = communityDecksEnabled,
         )
     }
 
@@ -1000,18 +1292,26 @@ class HomeViewModel(
         )
     }
 
-    private fun toBestDeck(stats: StatsSnapshot): BestDeckStats? {
+    /**
+     * @param decks The user's decks (already loaded in [LibrarySnapshot]) — joined here to
+     *   populate [BestDeckStats.colorIdentity] (fixes F-6). [DeckStats] itself carries no color
+     *   data, so the identity is looked up by id from the already-available deck list rather than
+     *   adding a new DAO projection.
+     */
+    private fun toBestDeck(stats: StatsSnapshot, decks: List<DeckSummary>): BestDeckStats? {
         val best = stats.deckStats
             .filter { it.totalGames > 0 && !it.deckName.isNullOrBlank() }
             .maxByOrNull { row ->
                 // Rank by win rate, breaking ties by total games played.
                 (row.wins.toDouble() / row.totalGames) * 1000 + row.totalGames
             } ?: return null
+        val colorIdentity = decks.firstOrNull { it.id == best.deckId }?.colorIdentity ?: emptySet()
         return BestDeckStats(
             deckId = best.deckId,
             deckName = best.deckName ?: "",
             wins = best.wins,
             losses = (best.totalGames - best.wins).coerceAtLeast(0),
+            colorIdentity = colorIdentity,
         )
     }
 
@@ -1051,17 +1351,26 @@ class HomeViewModel(
 
     /**
      * Filters [ALL_FIRST_STEPS] down to the steps that:
-     *   1. Have not been skipped by the user ([skipped] set), and
+     *   1. Have not been explicitly dismissed by the user ([skipped] set — tap-to-CTA no longer
+     *      dismisses a step; only the carousel's dedicated dismiss affordance does, Home feature
+     *      overhaul Phase 2.2), and
      *   2. Meet their show condition based on the current app state.
      *
-     * The output list preserves the canonical order defined in [ALL_FIRST_STEPS].
+     * The output list preserves the canonical activation-funnel order defined in
+     * [ALL_FIRST_STEPS]. Every condition below is documented as DATA-DRIVEN or DISMISS-ONLY
+     * alongside its [FirstStepItem] declaration.
      *
      * @param isAuthenticated Whether the user is signed in (non-anonymous).
      * @param cardCount       Number of unique cards in the local collection.
      * @param deckCount       Number of decks the user has created.
-     * @param friendCount     Number of accepted friends; default 0 when not yet loaded.
+     * @param friendCount     Number of accepted friends — now REAL data (Home feature overhaul
+     *   Phase 1.2.d), no longer hardcoded to 0.
      * @param isProfileComplete True when avatar + non-default name are set.
-     * @param skipped         Set of step IDs the user has already skipped.
+     * @param totalPlaytestCount Total saved playtest sessions across every deck.
+     * @param openForTradeCount Count of the local Open-for-Trade list.
+     * @param wishlistCount   Count of the local wishlist (0 when signed out — the widget itself
+     *   is account-gated).
+     * @param skipped         Set of step IDs the user has explicitly dismissed.
      */
     private fun buildVisibleSteps(
         isAuthenticated: Boolean,
@@ -1069,26 +1378,37 @@ class HomeViewModel(
         deckCount: Int,
         friendCount: Int,
         isProfileComplete: Boolean,
+        totalPlaytestCount: Int,
+        openForTradeCount: Int,
+        wishlistCount: Int,
         skipped: Set<String>,
     ): List<FirstStepItem> = ALL_FIRST_STEPS.filter { step ->
         if (step.id in skipped) return@filter false
         when (step.id) {
             STEP_FIRST_ADD_CARD        -> cardCount == 0
             STEP_FIRST_SCAN_CARD       -> true
-            STEP_FIRST_CREATE_ACCOUNT  -> !isAuthenticated
             STEP_FIRST_CREATE_DECK     -> deckCount == 0
-            STEP_FIRST_PLAYTEST_DECK   -> deckCount > 0
-            STEP_FIRST_ADD_FRIEND      -> isAuthenticated
-            STEP_FIRST_REVIEW_FRIEND   -> isAuthenticated && friendCount > 0
             STEP_FIRST_PLAY_GAME       -> true
+            // Hidden while Deck Playtest itself is flag-disabled (DeckFeatureFlags.PLAYTEST_ENABLED)
+            // — otherwise this step's CTA (HomeAction.PlaytestRecentDeck) would surface a shortcut
+            // into a hidden feature.
+            STEP_FIRST_PLAYTEST_DECK   -> com.mmg.manahub.feature.decks.presentation.DeckFeatureFlags.PLAYTEST_ENABLED &&
+                deckCount > 0 && totalPlaytestCount == 0
+            STEP_FIRST_CREATE_ACCOUNT  -> !isAuthenticated
+            STEP_FIRST_COMPLETE_PROFILE -> isAuthenticated && !isProfileComplete
+            STEP_FIRST_ADD_FRIEND      -> isAuthenticated && friendCount == 0
+            STEP_FIRST_REVIEW_FRIEND   -> isAuthenticated && friendCount > 0
+            STEP_FIRST_CREATE_TRADE    -> isAuthenticated && friendCount > 0 && cardCount > 0
+            STEP_FIRST_OPEN_FOR_TRADE  -> cardCount > 0 && openForTradeCount == 0
+            // WISHLIST_PROGRESS is ACCOUNT_GATED and wishlistFlow forces wishlistCount to 0 while
+            // signed out — without the isAuthenticated gate this step could never auto-hide for a
+            // signed-out user (it would sit forever, uncompletable, CTA-ing into a widget they can't
+            // use pre-auth). Matches the STEP_FIRST_ADD_FRIEND/STEP_FIRST_REVIEW_FRIEND style above.
+            STEP_FIRST_ADD_WISHLIST    -> isAuthenticated && wishlistCount == 0
             STEP_FIRST_COLLECTION_STATS -> cardCount > 0
             STEP_FIRST_DRAFT_GUIDE     -> true
             STEP_FIRST_NEWS            -> true
-            STEP_FIRST_CREATE_TRADE    -> isAuthenticated && friendCount > 0 && cardCount > 0
-            STEP_FIRST_ADD_WISHLIST    -> true
-            STEP_FIRST_OPEN_FOR_TRADE  -> cardCount > 0
             STEP_FIRST_PREFERENCES     -> true
-            STEP_FIRST_COMPLETE_PROFILE -> isAuthenticated && !isProfileComplete
             STEP_FIRST_RATE_APP        -> true
             else                       -> false
         }
@@ -1166,28 +1486,50 @@ class HomeViewModel(
     private fun defaultLayoutFor(authenticated: Boolean): List<WidgetInstance> =
         if (authenticated) defaultLayoutSignedIn else defaultLayoutSignedOut
 
+    /**
+     * Default widget layouts (Home feature overhaul Phase 2.3 — replaces the pre-overhaul
+     * defaults). Applies ONLY when the user has never persisted a layout ([layoutFlow] passes
+     * this as the DataStore default, which is never re-applied once a layout exists).
+     *
+     * Signed-out: demonstrate value fast and support the first-steps funnel with what works
+     * without an account — the local collection (reinforces "add your first card") and evergreen
+     * discovery content. Signed-in: lead with the user's own data (stats, decks, collection),
+     * then social/trade engagement, then evergreen discovery last. Both keep widget categories
+     * contiguous ([WidgetCategory] ordinal order) per the VM's category-contiguity invariant.
+     * WISHLIST_PROGRESS, CARD_OF_THE_DAY (signed-in), DISCOVER_CARDS (signed-in), the gamification
+     * widgets, and TRENDING_COMMANDERS stay gallery-only for signed-in defaults (board length
+     * discipline) — all remain fully functional widgets, just not auto-added.
+     */
     private val defaultLayoutSignedOut = listOf(
+        // Activity
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
+        // Collection — the local collection works fully offline and reinforces "add your first card".
+        WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
+        // Discover
+        WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.DISCOVER_CARDS, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.LARGE),
-        WidgetInstance(HomeWidgetType.TRENDING_COMMANDERS, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.LATEST_SETS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.MTG_NEWS, WidgetSize.MEDIUM),
     )
 
     private val defaultLayoutSignedIn = listOf(
+        // Activity
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
+        // Stats
         WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
+        // Collection
         WidgetInstance(HomeWidgetType.YOUR_DECKS_SHELF, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.TRENDING_COMMANDERS, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.SOCIAL_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.RECENTLY_ADDED, WidgetSize.MEDIUM),
+        // Social
         WidgetInstance(HomeWidgetType.TRADES_HUB, WidgetSize.MEDIUM),
-        WidgetInstance(HomeWidgetType.MTG_NEWS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.SOCIAL_HUB, WidgetSize.MEDIUM),
+        // Discover
         WidgetInstance(HomeWidgetType.LATEST_SETS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.MTG_NEWS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
     )
 
@@ -1201,6 +1543,8 @@ class HomeViewModel(
         val playerName: String,
         /** Step IDs the user has explicitly skipped in the First Steps carousel. */
         val skippedFirstSteps: Set<String> = emptySet(),
+        /** Total saved playtest sessions across every deck (STEP_FIRST_PLAYTEST_DECK condition). */
+        val totalPlaytestCount: Int = 0,
     )
 
     private data class LibrarySnapshot(
@@ -1229,6 +1573,7 @@ class HomeViewModel(
         val discover: DiscoverSnapshot,
         val social: SocialSnapshot,
         val gamification: GamificationSnapshot,
+        val recentlyAdded: List<RecentlyAddedCard>,
     )
 
     /**
@@ -1275,9 +1620,10 @@ class HomeViewModel(
 
     private data class SocialSnapshot(
         val community: CommunityStats?,
-        val tradeSummary: TradeSummary?,
+        val trades: TradesSnapshot,
         val activeTournament: TournamentSummary?,
         val wishlist: WishlistStats?,
+        val extras: SocialExtras,
     )
 
     companion object {
@@ -1305,6 +1651,9 @@ class HomeViewModel(
         private const val MIN_DISCOVER_SET_CARDS = 10
 
         private const val WISHLIST_PREVIEW_LIMIT = 10
+
+        /** Max rows shown by the RECENTLY_ADDED widget (Home feature overhaul Phase 2.1). */
+        private const val RECENTLY_ADDED_LIMIT = 10
 
         /** Max quests previewed in the Home Quests widget. */
         private const val HOME_QUEST_PREVIEW_LIMIT = 3
@@ -1344,7 +1693,7 @@ private fun SessionHistoryEntry.toRecap(): LastGameRecap = LastGameRecap(
     deckName = localDeckName,
     mode = mode,
     durationMs = durationMs,
-    opponentCount = 0, // opponent count is not exposed by the history row
+    opponentCount = opponentCount,
 )
 
 /** Streak from most-recent-first history: counts the leading run of wins; longest run anywhere. */
@@ -1381,17 +1730,6 @@ private fun Map<Rarity, Int>.toRarityMap(): Map<String, Int> =
             put(rarity.name, this@toRarityMap[rarity] ?: 0)
         }
     }
-
-/** Resolves the first active/setup tournament into a compact summary, or null. */
-private fun List<com.mmg.manahub.core.model.Tournament>.firstActiveSummary(): TournamentSummary? {
-    val active = firstOrNull { it.status == "ACTIVE" || it.status == "SETUP" } ?: return null
-    return TournamentSummary(
-        tournamentId = active.id,
-        name = active.name,
-        round = 0, // current round is not denormalised on the entity
-        standing = null,
-    )
-}
 
 /** The size used when a widget is added from the gallery: MEDIUM if supported, else its first size. */
 private fun HomeWidgetType.defaultSize(): WidgetSize =

@@ -5,6 +5,8 @@ import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Remote data source for the user wishlist.
@@ -41,6 +43,22 @@ class WishlistRemoteDataSource(
             runCatching {
                 supabaseClient.postgrest["wishlists"]
                     .delete { filter { eq("id", id) } }
+                Unit
+            }
+        }
+
+    /**
+     * Partial update of a synced wishlist row's quantity only (no full [WishlistEntryDto]
+     * needed — the row already exists server-side and `user_id` never changes). Used to
+     * propagate a local quantity decrement/edit to an already-synced entry instead of letting
+     * the next [getWishlist] resurrect the stale server value (trades audit §2.3, 2026-07-10).
+     */
+    suspend fun updateWishlistQuantity(id: String, quantity: Int): Result<Unit> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                supabaseClient.postgrest["wishlists"].update(
+                    buildJsonObject { put("quantity", quantity) }
+                ) { filter { eq("id", id) } }
                 Unit
             }
         }

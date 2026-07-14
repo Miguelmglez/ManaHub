@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -56,7 +58,9 @@ class CardDetailViewModel(
     private val helper: AnalyticsHelper,
 ) : ViewModel() {
 
-    private val scryfallId: String = checkNotNull(savedStateHandle["scryfallId"])
+    private val initialScryfallId: String = checkNotNull(savedStateHandle["scryfallId"])
+    private val scryfallIdFlow = MutableStateFlow(initialScryfallId)
+    private val scryfallId: String get() = scryfallIdFlow.value
 
     private val _uiState = MutableStateFlow(CardDetailUiState())
     val uiState: StateFlow<CardDetailUiState> = _uiState.asStateFlow()
@@ -90,27 +94,63 @@ class CardDetailViewModel(
 
     private fun observeDecks() {
         viewModelScope.launch {
-            deckRepo.observeDecksContainingCard(scryfallId)
-                .catch { /* decks section is non-critical */ }
+            scryfallIdFlow.flatMapLatest { id ->
+                deckRepo.observeDecksContainingCard(id)
+            }.catch { /* decks section is non-critical */ }
                 .collect { decks -> _uiState.update { it.copy(decksContainingCard = decks) } }
         }
     }
 
     private fun loadCard() {
         viewModelScope.launch {
-            when (val result = cardRepo.getCardById(scryfallId)) {
-                is DataResult.Success -> _uiState.update {
-                    it.copy(card = result.data, isLoading = false, isStale = result.isStale)
-                }
+            scryfallIdFlow.collectLatest { id ->
+                when (val result = cardRepo.getCardById(id)) {
+                    is DataResult.Success -> {
+                        val card = result.data
+                        if (card.lang != "en") {
+                            // If it's not English, try to load the English version (F-13).
+                            // Fast path: same set + collector number, just lang=en. This works
+                            // whenever the set itself has an English printing.
+                            val sameSetEnglish = cardRepo.getCardBySetAndNumber(card.setCode, card.collectorNumber)
+                            if (sameSetEnglish is DataResult.Success && sameSetEnglish.data.lang == "en") {
+                                scryfallIdFlow.value = sameSetEnglish.data.scryfallId
+                                return@collectLatest
+                            }
+                            // Fallback: some sets (e.g. Salvat 2011, a Spanish-exclusive promo
+                            // set) were NEVER printed in English, so set+number never resolves to
+                            // an English print. Note that `/cards/:set/:number` is a COORDINATE
+                            // lookup, not a language filter: it returns Success with whatever
+                            // single printing exists at that set+number, which for a
+                            // foreign-exclusive set is the same non-English card we started with.
+                            // Checking `.data.lang == "en"` above (not just Success) is required,
+                            // or this falls through to a no-op self-assignment below.
+                            // Scryfall's `name` field is always the English oracle name
+                            // regardless of `lang` (only `printedName` is localized), so look up
+                            // the English print by exact oracle name across all sets instead.
+                            val exactNameResult = cardRepo.getCardByExactName(card.name)
+                            val exactNameCard = exactNameResult.getOrNull()
+                            if (exactNameCard != null) {
+                                scryfallIdFlow.value = exactNameCard.scryfallId
+                                return@collectLatest
+                            }
+                            // Both lookups failed: fall back to displaying the original
+                            // foreign-language card (should not really happen for real cards).
+                            _uiState.update { it.copy(card = card, isLoading = false, isStale = result.isStale) }
+                        } else {
+                            _uiState.update { it.copy(card = card, isLoading = false, isStale = result.isStale) }
+                        }
+                    }
 
-                is DataResult.Error -> _uiState.update {
-                    it.copy(error = result.message, isLoading = false)
+                    is DataResult.Error -> _uiState.update {
+                        it.copy(error = result.message, isLoading = false)
+                    }
                 }
             }
         }
         viewModelScope.launch {
-            cardRepo.observeCard(scryfallId)
-                .filterNotNull()
+            scryfallIdFlow.flatMapLatest { id ->
+                cardRepo.observeCard(id)
+            }.filterNotNull()
                 .collect { card ->
                     _uiState.update {
                         it.copy(
@@ -124,33 +164,38 @@ class CardDetailViewModel(
 
     private fun observeUserCards() {
         viewModelScope.launch {
-            authRepository.sessionState
-                .flatMapLatest { state ->
-                    val userId = (state as? SessionState.Authenticated)?.user?.id
-                    userCardRepo.observeByScryfallId(scryfallId, userId)
-                }
-                .collect { cards ->
-                    _uiState.update { it.copy(userCards = cards) }
-                }
+            combine(
+                authRepository.sessionState,
+                scryfallIdFlow
+            ) { state, id ->
+                val userId = (state as? SessionState.Authenticated)?.user?.id
+                Pair(id, userId)
+            }.flatMapLatest { (id, userId) ->
+                userCardRepo.observeByScryfallId(id, userId)
+            }.collect { cards ->
+                _uiState.update { it.copy(userCards = cards) }
+            }
         }
     }
 
     private fun observeWishlistEntries() {
         viewModelScope.launch {
-            wishlistRepo.observeByScryfallId(scryfallId)
-                .collect { entries ->
-                    _uiState.update { it.copy(wishlistEntries = entries) }
-                }
+            scryfallIdFlow.flatMapLatest { id ->
+                wishlistRepo.observeByScryfallId(id)
+            }.collect { entries ->
+                _uiState.update { it.copy(wishlistEntries = entries) }
+            }
         }
     }
 
     private fun observeTradeEntries() {
         viewModelScope.launch {
-            openForTradeRepo.observeByScryfallId(scryfallId)
-                .collect { entries ->
-                    val qtyMap = entries.associate { it.userCardId to it.quantity }
-                    _uiState.update { it.copy(tradeQuantities = qtyMap) }
-                }
+            scryfallIdFlow.flatMapLatest { id ->
+                openForTradeRepo.observeByScryfallId(id)
+            }.collect { entries ->
+                val qtyMap = entries.associate { it.userCardId to it.quantity }
+                _uiState.update { it.copy(tradeQuantities = qtyMap) }
+            }
         }
     }
 

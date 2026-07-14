@@ -1,12 +1,22 @@
 package com.mmg.manahub.feature.home.di
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.data.remote.ArchidektClient
+import com.mmg.manahub.core.data.remote.CommunityStatsRemoteDataSource
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.data.repository.CommunityStatsRepositoryStub
+import com.mmg.manahub.core.data.repository.ArchidektTrendingRepositoryImpl
+import com.mmg.manahub.core.data.repository.CommunityStatsRepositoryImpl
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.ArchidektTrendingRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
@@ -48,7 +58,9 @@ import org.koin.dsl.module
  *
  * `CommunityStatsRepository` was PROMOTED off this bridge (KMP migration batch — 2026-07): the
  * feature-private Hilt `CommunityModule` had exactly one consumer (this island), so it is now
- * natively Koin-built here as `CommunityStatsRepositoryStub()` instead of bridged from Hilt.
+ * natively Koin-built here as the real, Supabase-RPC-backed [CommunityStatsRepositoryImpl] (see the
+ * Home feature overhaul Phase 1.2.b block below) instead of bridged from Hilt. It replaced the old
+ * always-null `CommunityStatsRepositoryStub()` this comment previously described.
  *
  * `GetNewsFeedUseCase`/`RefreshNewsFeedUseCase`/`ManageSourcesUseCase` (KMP migration batch 2) are now
  * natively Koin-built in `SharedDomainKoinModule` — resolved below via `get()`, not registered here
@@ -63,14 +75,40 @@ import org.koin.dsl.module
 fun homeKoinModule(): Module = module {
     // ── Bridged shared singletons (UserPreferencesDataStore, AuthRepository, GameSessionRepository,
     //    StatsRepository, DeckRepository, ScryfallRemoteDataSource, GamificationRepository,
-    //    CardRepository, DraftRepository, DraftSimRepository, TournamentRepository, WishlistRepository)
-    //    live in coreBridgeKoinModule; the three news use cases are singles in SharedDomainKoinModule.
-    //    All resolved below via get(). ──
+    //    CardRepository, DraftRepository, DraftSimRepository, TournamentRepository, WishlistRepository,
+    //    UserCardRepository, TradesRepository, OpenForTradeRepository) live in coreBridgeKoinModule;
+    //    FriendRepository is also bridged there (shared with Trades). TradeSuggestionsRepository is a
+    //    single in tradesKoinModule. PlaytestRepository is a single in playtestKoinModule.
+    //    ArchidektClient is a single in communityDecksKoinModule. CommunityAggregateCache is a single
+    //    in communityAggregateKoinModule. All these modules load unconditionally in the same
+    //    ManaHubApp `modules(...)` call, so they are all resolved below via get(). ──
     single { GetAccountNudgeUseCase() }
 
-    // ── CommunityStatsRepository: natively Koin-built (Hilt CommunityModule deleted). ──
-    // Single consumer (this island) — no promotion to coreBridgeKoinModule needed.
-    single<CommunityStatsRepository> { CommunityStatsRepositoryStub() }
+    // ── CommunityStatsRepository (Home feature overhaul Phase 1.2.b): real Supabase-RPC-backed
+    //    impl, replacing the old always-null CommunityStatsRepositoryStub. Single consumer (this
+    //    island) — no promotion to coreBridgeKoinModule needed. ──
+    single { CommunityStatsRemoteDataSource(supabaseClient = get()) }
+    single<CommunityStatsRepository> {
+        CommunityStatsRepositoryImpl(
+            remote = get(),
+            cache = get(),
+            crashReporter = get(),
+            now = { System.currentTimeMillis() },
+        )
+    }
+
+    // ── ArchidektTrendingRepository (Home feature overhaul Phase 1.2.c): reuses the existing
+    //    ArchidektClient (communityDecksKoinModule) and CommunityAggregateCache
+    //    (communityAggregateKoinModule) — no parallel network stack. ──
+    single<ArchidektTrendingRepository> {
+        ArchidektTrendingRepositoryImpl(
+            client = get<ArchidektClient>(),
+            cache = get(),
+            crashReporter = get(),
+            dispatcherProvider = get(),
+            now = { System.currentTimeMillis() },
+        )
+    }
 
     // ── The Koin island: HomeViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
@@ -92,6 +130,13 @@ fun homeKoinModule(): Module = module {
             wishlistRepository = get(),
             getAccountNudgeUseCase = get(),
             gamificationRepository = get(),
+            userCardRepository = get(),
+            tradesRepository = get(),
+            openForTradeRepository = get(),
+            tradeSuggestionsRepository = get(),
+            friendRepository = get(),
+            archidektTrendingRepository = get(),
+            playtestRepository = get(),
             // Deck Doctor Community/Archetype plan, Phase 5 — from communityAggregateKoinModule
             // (loaded in the same ManaHubApp `modules(...)` call).
             communityAggregateRepository = get(),

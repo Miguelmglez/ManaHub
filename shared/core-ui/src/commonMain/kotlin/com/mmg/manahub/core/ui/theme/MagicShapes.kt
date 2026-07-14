@@ -12,6 +12,9 @@ import androidx.compose.ui.unit.dp
 /** MTG card thumbnails, player life-counter cards, collection grid items. */
 val CardCornerRadius         = 12.dp
 
+/** Smaller MTG card thumbnails in lists or tight layouts. */
+val SmallCardCornerRadius    = 6.dp
+
 /** Filter chips, badges, quantity indicators, mana pip containers. */
 val ChipCornerRadius         = 8.dp
 
@@ -25,6 +28,7 @@ val BottomSheetCornerRadius  = 24.dp
 // Pre-built for direct use in Modifier.clip() or shape parameters.
 
 val CardShape         = RoundedCornerShape(CardCornerRadius)
+val SmallCardShape    = RoundedCornerShape(SmallCardCornerRadius)
 val ChipShape         = RoundedCornerShape(ChipCornerRadius)
 val ButtonShape       = RoundedCornerShape(ButtonCornerRadius)
 val BottomSheetShape  = RoundedCornerShape(

@@ -72,6 +72,8 @@ sealed class SearchCriterion {
 
     data class Keyword(val value: String) : SearchCriterion()
 
+    data class Language(val langCode: String) : SearchCriterion()
+
     data class Artist(val value: String) : SearchCriterion()
 
     data class FlavorText(val value: String) : SearchCriterion()

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -36,8 +35,10 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.model.SharedListResult
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ fun TradesSharedListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
 
     Scaffold(
         containerColor      = mc.background,
@@ -73,7 +75,7 @@ fun TradesSharedListScreen(
                     modifier          = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                        .padding(horizontal = spacing.xs, vertical = spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
@@ -83,8 +85,10 @@ fun TradesSharedListScreen(
                             tint               = mc.textPrimary,
                         )
                     }
+                    // Landing screen for a shared trade LIST link — was previously mislabeled
+                    // with the unrelated "Exploration" tab string (trades audit §5.9, 2026-07-10).
                     Text(
-                        text  = stringResource(R.string.trades_tab_exploration),
+                        text  = stringResource(R.string.trades_shared_list_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
@@ -145,10 +149,11 @@ private fun MessageWithBack(
     onBack:  () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     Column(
-        modifier            = Modifier.padding(32.dp),
+        modifier            = Modifier.padding(spacing.xxl),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(spacing.lg),
     ) {
         Text(
             text      = message,
@@ -171,6 +176,7 @@ private fun SharedListContent(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     Column(modifier = modifier) {
         Text(
             text = if (result.ownerNickname.isNotBlank())
@@ -179,29 +185,34 @@ private fun SharedListContent(
                 stringResource(R.string.trades_shared_list_title),
             style    = MaterialTheme.magicTypography.titleMedium,
             color    = mc.textPrimary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
         )
         Text(
             text     = result.listType.name,
             style    = MaterialTheme.magicTypography.labelSmall,
             color    = mc.textSecondary,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = spacing.lg),
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(spacing.sm))
 
         // Phase 2: render raw map entries; Phase 3 will fetch card details.
         LazyColumn(
-            contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding      = PaddingValues(horizontal = spacing.lg, vertical = spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs + spacing.xxs),
         ) {
-            // Each item is a Map<String,String> with no stable unique field; index key is appropriate.
+            // Each item is a Map<String,String?> with no stable unique field; index key is appropriate.
             itemsIndexed(result.items) { idx, itemMap ->
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = ChipShape,
                     color = mc.surface,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(spacing.md)) {
+                        // `value` is a nullable String (`Map<String, String?>` — Phase 2 payload from
+                        // the server may omit fields); the elvis fallback is NOT dead code here
+                        // (verified against SharedListResult.Ok.items, trades audit §5.9 correction,
+                        // 2026-07-10 — the audit's claim that `value` is non-null did not match the
+                        // actual model).
                         itemMap.forEach { (key, value) ->
                             Text(
                                 text  = "$key: ${value ?: "—"}",

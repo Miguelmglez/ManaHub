@@ -34,4 +34,9 @@ data class ArchidektDeckSummaryDto(
     val private: Boolean = false,
     val unlisted: Boolean = false,
     val theorycrafted: Boolean = false,
+    // Added 2026-07-13 for rich card display (thumbnails on search/browse results):
+    // an art-crop image URL of the deck's featured card. [customFeatured] wins over
+    // [featured] when non-blank (user-picked override) — see CommunityDeckMappers.
+    val featured: String = "",
+    val customFeatured: String = "",
 )

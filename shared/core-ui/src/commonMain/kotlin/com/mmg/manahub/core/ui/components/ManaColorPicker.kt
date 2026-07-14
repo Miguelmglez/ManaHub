@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ fun ManaColorPicker(
                 onClick = { onToggleColor(color) },
                 itemSize = itemSize,
                 symbolSize = symbolSize,
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -71,7 +73,7 @@ fun ManaColorItem(
 
     Box(
         modifier = modifier
-            .size(itemSize)
+            .aspectRatio(1f)
             .clip(CircleShape)
             .then(
                 if (isSelected) {
@@ -85,7 +87,7 @@ fun ManaColorItem(
     ) {
         if (color == "All") {
             androidx.compose.material3.Icon(
-                painter = androidx.compose.ui.graphics.vector.rememberVectorPainter(SetSymbolFallbackIcon),
+                painter = androidx.compose.ui.graphics.vector.rememberVectorPainter(CounterIcon),
                 contentDescription = "All",
                 modifier = Modifier.size(symbolSize),
                 tint = mc.goldMtg

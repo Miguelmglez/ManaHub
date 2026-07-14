@@ -61,4 +61,10 @@ interface PlaytestRepository {
 
     /** Emits the total number of saved tests for a deck. */
     fun observeTestCountForDeck(deckId: String): Flow<Int>
+
+    /**
+     * Emits the total number of saved tests across ALL decks. Backs the Home dashboard's
+     * STEP_FIRST_PLAYTEST_DECK first-step auto-hide condition (Home feature overhaul Phase 2.2).
+     */
+    fun observeTotalTestCount(): Flow<Int>
 }

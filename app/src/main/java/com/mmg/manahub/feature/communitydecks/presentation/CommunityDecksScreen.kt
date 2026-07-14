@@ -22,7 +22,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,7 +31,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
@@ -60,25 +61,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.ManaCostImages
+import com.mmg.manahub.core.ui.components.ManaHubSelector
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.MagicColors
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -225,14 +233,15 @@ private fun CommunityDecksSearchBody(
             ),
         )
 
-        CommunityDeckFormatChips(
+        CommunityDeckFormatSelector(
             selected = state.selectedFormat,
             onSelect = onFormatSelected,
+            modifier = Modifier.padding(horizontal = spacing.lg),
         )
 
         Spacer(Modifier.height(spacing.xs))
 
-        CommunityDeckSortRow(
+        CommunityDeckSortSelector(
             selected = state.selectedSort,
             onSelect = onSortSelected,
             modifier = Modifier.padding(horizontal = spacing.lg),
@@ -318,115 +327,42 @@ private fun CommunityDeckSearchBar(
     }
 }
 
-/** Horizontally-scrollable format filter chips. */
+/** Format selector following the ManaHub design system. */
 @Composable
-private fun CommunityDeckFormatChips(
+private fun CommunityDeckFormatSelector(
     selected: CommunityDeckFormatFilter,
     onSelect: (CommunityDeckFormatFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = spacing.lg),
-        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-    ) {
-        items(
-            items = CommunityDeckFormatFilter.entries,
-            key = { it.name },
-        ) { format ->
-            val isSelected = format == selected
-            Surface(
-                onClick = { onSelect(format) },
-                shape = ChipShape,
-                color = if (isSelected) mc.primaryAccent else mc.surface,
-                contentColor = if (isSelected) mc.onAccent else mc.textSecondary,
-                border = if (isSelected) {
-                    null
-                } else {
-                    BorderStroke(1.dp, mc.surfaceVariant)
-                },
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.padding(
-                        horizontal = spacing.md,
-                        vertical = spacing.sm,
-                    ),
-                ) {
-                    Text(
-                        text = format.label,
-                        style = ty.labelMedium,
-                    )
-                }
-            }
-        }
-    }
+    ManaHubSelector(
+        icon = Icons.Default.FilterList,
+        label = stringResource(R.string.community_deck_format_label),
+        valueText = selected.label,
+        items = CommunityDeckFormatFilter.entries,
+        selectedItem = selected,
+        onSelect = onSelect,
+        itemLabel = { it.label },
+        modifier = modifier
+    )
 }
 
-/** Compact sort selector with a dropdown menu. */
+/** Sort selector following the ManaHub design system. */
 @Composable
-private fun CommunityDeckSortRow(
+private fun CommunityDeckSortSelector(
     selected: CommunityDeckSort,
     onSelect: (CommunityDeckSort) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .clip(ChipShape)
-                .clickable { expanded = true }
-                .heightIn(min = 48.dp)
-                .padding(horizontal = spacing.sm, vertical = spacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
-        ) {
-            Text(
-                text = stringResource(
-                    R.string.community_deck_sort_label,
-                    stringResource(selected.labelRes),
-                ),
-                style = ty.labelMedium,
-                color = mc.textSecondary,
-            )
-            Icon(
-                imageVector = Icons.Default.ArrowDropDown,
-                contentDescription = null,
-                tint = mc.textSecondary,
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            CommunityDeckSort.entries.forEach { sort ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = stringResource(sort.labelRes),
-                            style = ty.bodyMedium,
-                            color = if (sort == selected) mc.primaryAccent else mc.textPrimary,
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onSelect(sort)
-                    },
-                )
-            }
-        }
-    }
+    ManaHubSelector(
+        icon = Icons.AutoMirrored.Filled.Sort,
+        label = stringResource(R.string.community_deck_sort_label_base),
+        valueText = stringResource(selected.labelRes),
+        items = CommunityDeckSort.entries,
+        selectedItem = selected,
+        onSelect = onSelect,
+        itemLabel = { stringResource(it.labelRes) },
+        modifier = modifier
+    )
 }
 
 /** Resolves the right state (initial / loading / error / empty / results). */
@@ -598,101 +534,82 @@ private fun CommunityDeckSummaryCard(
             .fillMaxWidth()
             .heightIn(min = 48.dp),
     ) {
-        Column(modifier = Modifier.padding(spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = deck.name,
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+        Row(
+            modifier = Modifier.padding(spacing.md),
+            verticalAlignment = Alignment.Top,
+        ) {
+            // Art-crop thumbnail of the deck's featured card, when Archidekt supplied one.
+            // Decorative only — the card's name already carries the accessible label — and
+            // gracefully omitted (layout unchanged) when there is nothing to show.
+            if (deck.featuredImageUrl != null) {
+                AsyncImage(
+                    model = deck.featuredImageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(width = 64.dp, height = 48.dp)
+                        .clip(SmallCardShape)
+                        .background(mc.surfaceVariant),
                 )
                 Spacer(Modifier.width(spacing.sm))
-                ColorIdentityDots(colors = deck.colorIdentity)
             }
 
-            Spacer(Modifier.height(spacing.xs))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CardName(
+                        name = deck.name,
+                        style = ty.titleMedium,
+                        color = mc.textPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(spacing.sm))
+                    val identityString = deck.colorIdentity.joinToString("") { "{${it.uppercase()}}" }
+                    ManaCostImages(manaCost = identityString, symbolSize = 14.dp)
+                }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.height(spacing.xs))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = deck.format,
+                        style = ty.labelSmall,
+                        color = mc.primaryAccent,
+                    )
+                    Spacer(Modifier.width(spacing.md))
+                    Text(
+                        text = stringResource(R.string.community_deck_cards_count, deck.size),
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                    Spacer(Modifier.width(spacing.md))
+                    Icon(
+                        imageVector = Icons.Default.Visibility,
+                        contentDescription = null,
+                        tint = mc.textDisabled,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(spacing.xxs))
+                    Text(
+                        text = "${deck.viewCount}",
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+
+                Spacer(Modifier.height(spacing.xxs))
+
                 Text(
-                    text = deck.format,
-                    style = ty.labelSmall,
-                    color = mc.primaryAccent,
-                )
-                Spacer(Modifier.width(spacing.md))
-                Text(
-                    text = stringResource(R.string.community_deck_cards_count, deck.size),
+                    text = deck.owner.username,
                     style = ty.bodySmall,
-                    color = mc.textSecondary,
-                )
-                Spacer(Modifier.width(spacing.md))
-                Icon(
-                    imageVector = Icons.Default.Visibility,
-                    contentDescription = null,
-                    tint = mc.textDisabled,
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(Modifier.width(spacing.xxs))
-                Text(
-                    text = "${deck.viewCount}",
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                )
-            }
-
-            Spacer(Modifier.height(spacing.xxs))
-
-            Text(
-                text = deck.owner.username,
-                style = ty.bodySmall,
-                color = mc.textDisabled,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/** Small colored dots for a deck's color identity (W/U/B/R/G). */
-@Composable
-private fun ColorIdentityDots(
-    colors: List<String>,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-
-    if (colors.isEmpty()) return
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        colors.forEach { symbol ->
-            val color = symbol.toManaColor(mc)
-            if (color != null) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(color)
-                        .border(1.dp, mc.textDisabled.copy(alpha = 0.4f), CircleShape),
+                    color = mc.textDisabled,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
     }
-}
-
-/** Maps a WUBRG symbol to its MagicColors mana token. Returns null for unknown symbols. */
-private fun String.toManaColor(mc: MagicColors): Color? = when (uppercase()) {
-    "W" -> mc.manaW
-    "U" -> mc.manaU
-    "B" -> mc.manaB
-    "R" -> mc.manaR
-    "G" -> mc.manaG
-    else -> null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -836,7 +753,7 @@ private fun TrendingTermChip(term: NamedCount, onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
             modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
         ) {
-            Text(text = term.name, style = ty.labelMedium, color = mc.textPrimary)
+            CardName(name = term.name, style = ty.labelMedium, color = mc.textPrimary)
         }
     }
 }

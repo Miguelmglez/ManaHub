@@ -18,6 +18,8 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -48,7 +50,12 @@ class CardRepositoryImpl @Inject constructor(
                 cardDao.upsert(entityWithComputedTags(card))
                 DataResult.Success(card)
             } else {
-                DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
             }
         }
 
@@ -63,7 +70,32 @@ class CardRepositoryImpl @Inject constructor(
                 cardDao.upsertAll(entities)
                 DataResult.Success(cards)
             } else {
-                DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
+            }
+        }
+
+    override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<com.mmg.manahub.core.model.PaginatedCards> =
+        withContext(ioDispatcher) {
+            val result = remote.searchCardsPaginated(query, page, bypassCache)
+            if (result.isSuccess) {
+                val paginated = result.getOrThrow()
+                // Single batch DB read for existing cache entries; tag computation on defaultDispatcher.
+                val cachedMap = cardDao.getByIds(paginated.cards.map { it.scryfallId }).associateBy { it.scryfallId }
+                val entities = entitiesWithComputedTagsBatch(paginated.cards, cachedMap)
+                cardDao.upsertAll(entities)
+                DataResult.Success(paginated)
+            } else {
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
             }
         }
 
@@ -75,7 +107,12 @@ class CardRepositoryImpl @Inject constructor(
             if (result.isSuccess) {
                 DataResult.Success(result.getOrThrow())
             } else {
-                DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
             }
         }
 
@@ -132,10 +169,44 @@ class CardRepositoryImpl @Inject constructor(
         }
 
     override suspend fun getCardByExactName(name: String): Result<Card> =
-        withContext(ioDispatcher) { remote.getCardByExactName(name) }
+        withContext(ioDispatcher) {
+            remote.getCardByExactName(name).also { result ->
+                // Persist to Room so callers that re-key an observeCard()-style flow off the
+                // returned scryfallId (e.g. CardDetailViewModel's foreign->English fallback)
+                // find a row waiting for them instead of blocking forever on an empty flow.
+                result.getOrNull()?.let { card -> cardDao.upsert(entityWithComputedTags(card)) }
+            }
+        }
+
+    override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> =
+        withContext(ioDispatcher) {
+            val result = remote.getCardBySetAndNumber(set, number)
+            if (result.isSuccess) {
+                val card = result.getOrThrow()
+                cardDao.upsert(entityWithComputedTags(card))
+                DataResult.Success(card)
+            } else {
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
+            }
+        }
 
     override suspend fun searchWithRawQuery(query: String): List<Card> =
         withContext(ioDispatcher) { remote.searchWithRawQuery(query) }
+
+    override suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>> =
+        withContext(ioDispatcher) {
+            try {
+                val sets = remote.getAllSets()
+                DataResult.Success(sets)
+            } catch (e: Exception) {
+                DataResult.Error(e.message ?: "Unknown error")
+            }
+        }
 
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = withContext(ioDispatcher) {
         if (scryfallIds.isEmpty()) return@withContext emptyList()

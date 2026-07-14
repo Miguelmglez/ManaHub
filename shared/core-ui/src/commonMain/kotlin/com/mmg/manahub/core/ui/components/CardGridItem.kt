@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -71,6 +73,7 @@ fun CardGridItem(
                 val imageModifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(4f / 3f)
+                    .clip(CardShape)
 
                 val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {
@@ -85,7 +88,7 @@ fun CardGridItem(
                         )
                     }
                 } else {
-                    imageModifier.clip(CardShape)
+                    imageModifier
                 }
 
                 AsyncImage(
@@ -111,7 +114,7 @@ fun CardGridItem(
                     )
                     if (item.distinctCopies > 1) {
                             Icon(
-                                imageVector = StackedCardsIcon,
+                                imageVector = Icons.Default.Style,
                                 contentDescription = null,
                                 modifier = Modifier.size(12.dp),
                                 tint = mc.primaryAccent
@@ -163,6 +166,15 @@ fun CardGridItem(
                         setCode = card.setCode,
                         rarity = CardRarity.fromString(card.rarity),
                         size = 14.dp,
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = card.setCode.uppercase(),
+                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 10.sp),
+                        color = mc.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
 
                     Spacer(modifier = Modifier.weight(1f))

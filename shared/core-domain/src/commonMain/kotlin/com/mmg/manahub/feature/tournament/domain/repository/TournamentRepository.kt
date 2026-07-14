@@ -61,6 +61,14 @@ interface TournamentRepository {
     /** Emits the current player roster for [tournamentId]. */
     fun observePlayers(tournamentId: Long): Flow<List<TournamentPlayer>>
 
+    /**
+     * Emits the current round number for [tournamentId] — the max `round` among its generated
+     * matches. Read-only (never call from inside a `combine` transformer's write path). Defaults
+     * to 1 when no matches have been generated yet, so "Round 0" is never emitted (Home feature
+     * overhaul Phase 1.2.e, fixes F-3).
+     */
+    fun observeCurrentRound(tournamentId: Long): Flow<Int>
+
     suspend fun startTournament(tournamentId: Long)
     suspend fun pauseTournament(tournamentId: Long)
     suspend fun startMatch(matchId: Long)

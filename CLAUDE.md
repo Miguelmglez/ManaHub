@@ -176,6 +176,15 @@ ViewModels are `@HiltViewModel`, `RepositoryModule` binds interfaces→impls (si
 provides named dispatchers, feature modules are separate `@InstallIn(SingletonComponent::class)` modules.
 Do not add new Hilt modules for new code; bridge Koin↔Hilt during the transition rather than expanding Hilt.
 
+**Koin `single`/`factory` type must match the consumer's declared param type.** If any consumer's
+constructor parameter is typed as an interface, the binding producing it MUST be
+`single<Interface> { Impl(...) }`, not a bare `single { Impl(...) }` (which registers under the
+concrete class). This mismatch compiles cleanly — Koin resolves by type only at runtime — and
+surfaces as `NoDefinitionFoundException` the first time that graph path is exercised (e.g. on app
+launch, for a start-destination ViewModel's dependency chain). Bare `single { }` is only safe when
+every consumer's param type is the exact concrete return type. → memory:
+`feedback_koin_single_concrete_type_mismatch`
+
 ### Utilities
 `core/util/TimeAgoFormatter` for relative dates (English only) — don't write inline `SimpleDateFormat`.
 
@@ -201,6 +210,23 @@ To build/redesign UI use the **`compose-ui`** skill; to audit/polish, delegate t
 ## Feature notes
 
 Each section is a minimal pointer — read the linked memory before changing the feature.
+
+### Add Card (`feature/addcard/`)
+Search-first entry point (redesigned 2026-07-13). Idle state (no query, no filters) shows a
+`LazyVerticalGrid` discovery surface of shuffled cards from one Scryfall set at a time
+(`GetSpotlightFeedUseCase`, paginates to the next set on scroll) — mirrors Home's Discover Cards
+widget, not a text list. The camera scanner is a `FloatingActionButton` on the `Scaffold`, not an
+inline list item or a `SearchSurface` trailing icon. The search field's trailing icon (query empty)
+is the flag emoji for the active search language (`CardConstants.getFlag`/`languages`) and opens a
+`ModalBottomSheet` (`LanguageSelectorSheet`) — this replaced the old `ManaHubSelector` dropdown row.
+"Recent searches" was removed end-to-end (not just hidden): `GetRecentSearchesUseCase`/
+`SaveRecentSearchUseCase`/`ClearRecentSearchesUseCase` and `RecentSearchRepository` are gone: only
+delete a use case's Koin binding — always grep the feature's OWN `di/` module too (`AddCardKoinModule.kt`
+had its own reference the main task list didn't mention). Both the spotlight grid tiles and the
+results-list `SearchResultItem` thumbnails participate in the shared-element transition into
+`CardDetailScreen` via the shared key `"card-image-${card.scryfallId}"` — any new card-image surface
+in this screen must reuse that exact key format to stay connected to the transition.
+→ memory: `project_addcard_redesign_2026-07-13`
 
 ### Trades
 Data layer split across five repositories by concern: `TradesRepository` (proposals/thread),
@@ -242,7 +268,9 @@ Identify which owns a behavior before adding methods.
   `feedback_tournament_single_write_path_2026-06-16`
 
 ### Deck Playtest (`feature/playtest/`, Phase 1 + Phase 2 battlefield complete)
-Room v35→v36 added `playtest_sessions`, `playtest_card_stats`, `playtest_survey_answers`. Must-know:
+**Hidden for release (2026-07-14) via `DeckFeatureFlags.PLAYTEST_ENABLED = false`** — code intact,
+all entry points gated (flip back to `true` to re-enable). Room v35→v36 added `playtest_sessions`,
+`playtest_card_stats`, `playtest_survey_answers`. Must-know:
 - **Explicit-save-only**: redraw/mulligan loops are in-memory; nothing persists until "Save test" via
   `PlaytestDao.saveTestAtomically(@Transaction)` (the only sanctioned write path).
 - `deck_id` is plain indexed TEXT, **not** a FK (decks are soft-deleted). Card stats are INT counts,
@@ -283,7 +311,11 @@ Room v35→v36 added `playtest_sessions`, `playtest_card_stats`, `playtest_surve
   `feedback_playtest_bugs_2026-05-28`
 
 ### Online sessions
-**HTTP polling (3 s) is the primary mechanism; Supabase Realtime CDC is an optional fast-path** — never
+**Hidden for release (2026-07-14) via new `feature/online/presentation/OnlineFeatureFlags
+.ONLINE_SESSIONS_ENABLED = false`** — code intact, only the online-specific UI (GameSetup's "Play
+with friends", TournamentsSheet's online rows, `LobbyHost`/`LobbyJoin`/join-deep-link redirects) is
+gated; local/offline same-device play and local tournaments are untouched. Flip back to `true` to
+re-enable. **HTTP polling (3 s) is the primary mechanism; Supabase Realtime CDC is an optional fast-path** — never
 a correctness dependency. Must-know:
 - `startLobbyPolling()` runs unconditionally after create/join/resume; `connectAndObserve()` failure is
   silent (log only). **Never replace the participant list with a raw snapshot — always MERGE by id.**
@@ -374,6 +406,10 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
 - → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
+**Suggestions tab + seed-build hidden for release (2026-07-14)**: `DeckFeatureFlags
+.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` and `.DECK_STUDIO_BUILD_FROM_SEED_ENABLED` flipped back to
+`false` (had been `true` since 2026-07-12 for the Community/Archetype plan launch) — code intact,
+flip back to `true` to re-enable. Manual editing, Import, and Discoveries are unaffected.
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
 `Screen.DeckStudio.createRoute(deckId?)` (null ⇒ fresh draft). The old `CreateDeckBottomSheet` + the
@@ -591,43 +627,62 @@ Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-
 - `onBackHome`: `popUpTo(0) { inclusive = true }` (not `popUpTo(Screen.Collection.route)`) to avoid back-stack corruption on fresh install.
 - → memory: `project_home_dashboard_redesign`, `feedback_home_stateIn_test_pattern`
 
-### Home widget board (`feature/home/`, 3 phases complete 2026-06-09)
-The dashboard is a **fully customizable widget board** (`LazyVerticalGrid` of 2 cols). ~40 widget
+### Home widget board (`feature/home/`, overhauled 2026-07-13 — no-stub rule now in force)
+The dashboard is a **fully customizable widget board** (`LazyVerticalGrid` of 2 cols). 17 widget
 types in `HomeWidgetType` (each carries `persistedId`, `defaultTitleRes`, `supportedSizes`,
-`category`, `audience`, `isAlwaysPresent`). Layout = ordered `List<WidgetInstance>(type,size)`. Must-know:
+`category`, `audience`, `isAlwaysPresent`). Layout = ordered `List<WidgetInstance>(type,size)`.
+**THE NO-STUB RULE (Home invariant, added 2026-07-13): a widget/slide may only ship if its data
+path is real end-to-end (upstream source → repo flow → ViewModel → UI); anything that can't be
+wired must be deleted (composable + model + copy + DI binding), never left as a placeholder.**
+Every widget/slide is real as of the 2026-07-13 overhaul except `RULES_TIP` (intentionally static
+content). Must-know:
 - **Layout persists in DataStore only** (`home_widget_layout` = ordered `"persistedId:SIZE"` tokens;
   unknown id/size tokens are silently skipped on decode; empty → auth-appropriate default). No new
   Room tables. `homeLayoutFlow(default)` takes the default as a param so the DataStore stays unaware
-  of auth; the VM picks `defaultLayoutSignedIn/Out` via `isAuthenticatedFlow.flatMapLatest`.
-- **Edit mode is transient** (`editModeFlow`, never persisted; resets each session). All layout
-  reducers (`add/remove/move/resize/reset`) read the latest layout from `uiState.value.layout`,
-  produce a new list, and `saveHomeLayout` immediately — DataStore re-emits as the single source of
-  truth (no separate in-memory copy to drift). `CONTEXT_HERO.isAlwaysPresent` → cannot be removed.
-  `ResizeWidget` rejects sizes not in `type.supportedSizes`.
-- **Drag-to-reorder ghost lifts from the item's registered top-left + finger delta** (NOT the
-  Playtest `centerInRoot` pattern, which snaps to center and jumps on corner-press). Container
-  registers bounds via `onGloballyPositioned{boundsInRoot()}`; the dragged item is `alpha(0)`; a
-  floating ghost at `zIndex(Float.MAX_VALUE)` is positioned at `bounds.topLeft + dragDelta`. On drag,
-  `findTargetIndex(ghostCenter,...)` hit-tests and emits `MoveWidget`, then resets `dragDelta` to 0.
-- **ViewModel combine arity**: slices are bundled (`CoreSnapshot`, `DataBundle{board,stats,discover,
-  social}`) and folded with typed (non-vararg) `combine` overloads to avoid `Array<Any?>` erasure.
-  `performanceFlow` MUST be declared before `statsSnapshotFlow` (property init order). Every data flow
-  is `.catch{emit(empty/null)}`-isolated so one source failing never collapses the board.
-- **Phase 2 data** derives from existing repos (win rate/best deck/nemesis/heatmap/matchups from
-  `GameSessionRepository`, colors/rarity from `CollectionStats`, sets from `DraftRepository`). **Phase
-  3 is stubbed**: `CommunityStatsRepository` (interface + `CommunityStatsRepositoryStub`→`flowOf(null)`
-  bound in `CommunityModule`); trade/wishlist flows are `flowOf(null)` with TODOs. Account-gated
+  of auth; the VM picks `defaultLayoutSignedIn/Out` via `isAuthenticatedFlow.flatMapLatest` — the
+  2026-07-13 overhaul replaced both default lists (Phase 2.3); `TRENDING_COMMANDERS` is intentionally
+  NOT in either default (gallery-only, board-length discipline).
+- **Sizes are vestigial but only PARTLY cleaned up**: every widget renders at a single MEDIUM width
+  (`CARD_OF_THE_DAY` now only declares `WidgetSize.MEDIUM`, matching the rest); the board's old
+  bounds-registry/drag-hit-testing API (`HomeWidgetContainer.onRegisterBounds`, module-level
+  `findTargetIndex()`, `HomeScreen`'s `itemBounds` map) was DELETED as dead code — the gallery sheet
+  owns add/remove/reorder via its own local drag state, the board itself is static. Removing
+  `WidgetSize` from `WidgetInstance`/`PersistedWidget` entirely (and making the decoder legacy-token
+  tolerant) is DEFERRED — do this as its own tested pass, not bundled into a larger change.
+- **ViewModel combine arity**: slices are bundled (`CoreSnapshot` 7 flows, `DataBundle{layout,stats,
+  discover,social,gamification,recentlyAdded}` 6 flows) via the vararg-destructure `combine(vararg){
+  args -> @Suppress("UNCHECKED_CAST") ... }` pattern once a bundle exceeds 5 flows (Kotlin's typed
+  combine overloads cap at 5); inner sub-bundles (`socialSnapshotFlow`'s `TradesSnapshot`/
+  `SocialExtras`) stay on the typed non-vararg overloads. `performanceFlow` MUST be declared before
+  `statsSnapshotFlow` (property init order). Every data flow is `.catch{emit(empty/null)}`-isolated
+  so one source failing never collapses the board.
+- **Every data source is real** (2026-07-13 overhaul, Phase 1): `CommunityStatsRepositoryImpl`
+  (Supabase RPC `get_community_stats()`, cache-first via `CommunityAggregateCache`, replaces the
+  deleted `CommunityStatsRepositoryStub`); `ArchidektTrendingRepository` (reuses the existing
+  `ArchidektClient`); Trades Hub wired to `TradesRepository`/`OpenForTradeRepository`/
+  `TradeSuggestionsRepository`; `friendCount` wired to `FriendRepository.observeFriendCount()`;
+  tournament round wired to a new read-only `TournamentRepository.observeCurrentRound()`. Account-gated
   widgets render `AccountGatedPlaceholder` (→ `CreateAccount`) when `!isAuthenticated`.
-- `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` adds bounds/edit overlay; all
-  widgets share `WidgetShell` (surface+CardShape+min height S=96/M=132/L=220dp). No `success`/`error`
-  tokens exist — win=`lifePositive`, loss=`lifeNegative`. Community null→spinner, empty→empty body.
+- `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` just wraps it (no bounds
+  registry, see above); all widgets share `WidgetShell` (flat Column, no card surface). No
+  `success`/`error` tokens exist — win=`lifePositive`, loss=`lifeNegative`.
+- **`RECENTLY_ADDED`** (new 2026-07-13): newest local collection additions,
+  `UserCardRepository.observeRecentlyAdded(10)` — no Room migration (`created_at`/`updated_at`
+  already existed on `UserCardCollectionEntity`). Keyed by the `user_card_collection` row id (NOT
+  scryfallId — duplicate copies of the same card would collide on scryfallId).
 - **`TRENDING_COMMANDERS` (Deck Doctor Community/Archetype plan Phase 5)**: its `TrendingSnapshot?`
   data is kept OUTSIDE the `HomeUiState` combine chain (a separate `HomeViewModel.trendingFlow`
   `stateIn`, threaded as its own param through `HomeScreen`→`HomeWidgetContainer`→`HomeWidgetHost`) —
   see `project_community_hub_seedbuild_trending` memory for why. Silently hidden (never an error
-  state) on any failure/flag-off.
-- Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + edit pencil (Edit↔Done) + avatar.
-- → memory: `project_home_widget_board`
+  state) on any failure/flag-off. Distinct from the new SOCIAL_HUB "Popular on Archidekt" slides —
+  different backend (Cloudflare Worker vs. direct Archidekt API), never conflate the two.
+- **First Steps carousel**: tap = CTA only (2026-07-13 — no longer also dismisses); a dedicated
+  top-right dismiss affordance (`Icons.Default.Close`, ≥48dp) calls the same `SkipFirstStep`/
+  `observeSkippedFirstSteps` DataStore mechanism as before. Most step conditions are data-driven
+  (see `ALL_FIRST_STEPS` in `FirstStepItem.kt` for the per-step DATA-DRIVEN/DISMISS-ONLY doc).
+- Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + avatar (→ `OpenProfile`).
+- → memory: `project_home_widget_board`, `project_home_feature_overhaul_2026-07-13`,
+  `feedback_home_dashboard_audit_fixes_2026-07-13`, `feedback_archidekt_trending_stale_cache_bug`
 
 ### Gamification (`core/gamification/`, multi-phase — Phase 0 + Phase 1 complete)
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine. **Local-first** (works 100%

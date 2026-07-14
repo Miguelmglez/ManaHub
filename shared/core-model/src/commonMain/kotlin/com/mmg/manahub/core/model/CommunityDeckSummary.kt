@@ -11,6 +11,9 @@ package com.mmg.manahub.core.model
  *   numeric `deckFormat` via [ArchidektFormat]).
  * @property colorIdentity the deck's color identity, derived from the search DTO's
  *   `colors` map keys (e.g. `["W", "U"]`).
+ * @property featuredImageUrl an art-crop thumbnail URL for this deck's featured card, when
+ *   Archidekt supplied one (preferring a user-picked `customFeatured` over the automatic
+ *   `featured`); null when neither is available.
  */
 data class CommunityDeckSummary(
     val archidektId: Int,
@@ -22,4 +25,5 @@ data class CommunityDeckSummary(
     val createdAt: String,
     val updatedAt: String,
     val colorIdentity: List<String>,
+    val featuredImageUrl: String? = null,
 )

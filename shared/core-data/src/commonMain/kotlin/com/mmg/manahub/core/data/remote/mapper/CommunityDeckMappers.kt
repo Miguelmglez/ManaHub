@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.remote.mapper
 
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckSummaryDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektOracleCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
 import com.mmg.manahub.core.model.ArchidektFormat
 import com.mmg.manahub.core.model.CommunityDeck
@@ -21,12 +22,24 @@ fun ArchidektDeckDetailDto.toDomain(): CommunityDeck {
         // Keep only entries that carry a resolvable oracle card.
         .filter { it.card?.oracleCard != null }
         .map { entry ->
-            val oracle = entry.card!!.oracleCard!!
+            val cardDto = entry.card!!
+            val oracle = cardDto.oracleCard!!
             CommunityDeckCard(
                 name = oracle.name,
                 quantity = entry.quantity,
                 categories = entry.categories ?: emptyList(),
                 oracleId = oracle.uid,
+                // `cardDto.uid` is the Scryfall PRINTING uuid (distinct from `oracle.uid`,
+                // the oracle-card uuid shared across printings) — verified live 2026-07-13.
+                scryfallId = cardDto.uid,
+                manaCost = oracle.manaCost,
+                typeLine = buildTypeLine(oracle),
+                cmc = oracle.cmc,
+                rarity = cardDto.rarity,
+                setCode = cardDto.edition?.editioncode ?: "",
+                setName = cardDto.edition?.editionname ?: "",
+                priceUsd = cardDto.prices?.tcg,
+                priceEur = cardDto.prices?.cm,
             )
         }
 
@@ -61,6 +74,8 @@ fun ArchidektDeckSummaryDto.toDomain(): CommunityDeckSummary = CommunityDeckSumm
     createdAt = createdAt,
     updatedAt = updatedAt,
     colorIdentity = colors.keys.toList(),
+    // A user-picked `customFeatured` wins over the automatic `featured` crop when present.
+    featuredImageUrl = customFeatured.takeIf { it.isNotBlank() } ?: featured.takeIf { it.isNotBlank() },
 )
 
 /** Maps a paged Archidekt search response to the domain [CommunityDeckSearchResult]. */
@@ -69,3 +84,17 @@ fun ArchidektSearchResultDto.toDomain(): CommunityDeckSearchResult = CommunityDe
     hasMore = next != null,
     decks = results.map { it.toDomain() },
 )
+
+/**
+ * Composes the canonical MTG type line ("Supertype Type — Subtype") from Archidekt's oracle
+ * card fields. The em-dash + subtype segment is only appended when [ArchidektOracleCardDto.subTypes]
+ * is non-empty (e.g. instants/sorceries have no subtypes to show).
+ */
+private fun buildTypeLine(oracle: ArchidektOracleCardDto): String {
+    val mainPart = (oracle.superTypes + oracle.types).joinToString(" ")
+    return if (oracle.subTypes.isNotEmpty()) {
+        "$mainPart — ${oracle.subTypes.joinToString(" ")}"
+    } else {
+        mainPart
+    }
+}

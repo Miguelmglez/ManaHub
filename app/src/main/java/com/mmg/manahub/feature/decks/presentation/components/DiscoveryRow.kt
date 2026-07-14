@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -79,8 +80,8 @@ internal fun DiscoveryRow(
         shape = CardShape,
     ) {
         Column(modifier = Modifier.padding(spacing.md)) {
-            Text(
-                text = discovery.label,
+            CardName(
+                name = discovery.label,
                 style = ty.titleMedium,
                 color = mc.textPrimary,
             )

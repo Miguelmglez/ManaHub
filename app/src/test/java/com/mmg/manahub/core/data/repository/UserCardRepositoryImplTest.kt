@@ -6,6 +6,7 @@ import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.AddOutcome
 import io.github.jan.supabase.SupabaseClient
 import io.mockk.coEvery
 import io.mockk.every
@@ -171,6 +172,41 @@ class UserCardRepositoryImplTest {
         repository.addOrIncrement("card-001", false, "NM", "en", false, null)
 
         assertNull(captured.captured.userId)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 1b — addOrIncrement: restore-from-soft-delete bumps createdAt
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a soft-deleted row when addOrIncrement restores it then createdAt is bumped to now`() = runTest {
+        val deletedRow = buildEntity(
+            id         = "e-001",
+            scryfallId = "card-001",
+            userId     = "user-001",
+            isDeleted  = true,
+            createdAt  = 500L,
+            updatedAt  = 500L,
+            quantity   = 0,
+        )
+        every {
+            userCardCollectionDao.getByCompositeKey("user-001", "card-001", false, "NM", "en")
+        } returns deletedRow
+        val captured = slot<UserCardCollectionEntity>()
+        every { userCardCollectionDao.upsert(capture(captured)) } returns 1L
+
+        val before = System.currentTimeMillis()
+        val outcome = repository.addOrIncrement("card-001", false, "NM", "en", false, "user-001")
+        val after = System.currentTimeMillis()
+
+        val entity = captured.captured
+        // Restoring a soft-deleted card is reported as a new add (AddOutcome.CREATED_NEW), and
+        // RECENTLY_ADDED sorts strictly by created_at DESC — createdAt must follow that "new add"
+        // semantics rather than staying pinned to the original (now stale) acquisition date.
+        assertEquals(AddOutcome.CREATED_NEW, outcome)
+        assertTrue("createdAt must be bumped into the test window", entity.createdAt in before..after)
+        assertFalse(entity.isDeleted)
+        assertEquals("e-001", entity.id) // same row restored, no duplicate UUID
     }
 
     // ══════════════════════════════════════════════════════════════════════════

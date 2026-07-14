@@ -1,0 +1,17 @@
+# graphify corpus excludes — data caches and binary icon assets, not architecture
+tools/embedding-generator/image_cache/
+app/src/main/res/mipmap-*/
+app/src/main/res/drawable*/*.png
+app/src/main/res/drawable*/*.webp
+app/src/main/res/drawable*/*.jpg
+app/src/main/ic_launcher-playstore.png
+
+# Room schema JSON dumps (generated, not source), build/tool caches, client config, ephemeral agent scratch
+app/schemas/
+.wrangler/
+.well-known/
+app/google-services.json
+.claude/settings.json
+.claude/settings.local.json
+.claude/agent-memory/
+.artifacts/

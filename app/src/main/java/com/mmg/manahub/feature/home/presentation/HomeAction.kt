@@ -107,4 +107,13 @@ sealed interface HomeAction {
 
     /** Open the full draft guide detail for a specific set. */
     data class OpenDraftSetDetail(val set: com.mmg.manahub.core.model.DraftSet) : HomeAction
+
+    /**
+     * Navigates into the Deck Playtest setup screen for [deckId], or the deck list when
+     * [deckId] is null (no decks yet). Resolved from [PlaytestRecentDeck] inside [HomeScreen]'s
+     * stateful entry point (the only place with access to [HomeUiState.decks]) — the static
+     * [FirstStepItem] catalog cannot bake a dynamic deck id into its declarative action, so
+     * [PlaytestRecentDeck] stays a payload-less trigger and this carries the resolved id.
+     */
+    data class NavigatePlaytest(val deckId: String?) : HomeAction
 }
