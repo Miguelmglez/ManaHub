@@ -64,12 +64,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
-import com.mmg.manahub.core.data.local.entity.TournamentMatchEntity
-import com.mmg.manahub.core.data.local.entity.TournamentPlayerEntity
-import com.mmg.manahub.core.data.local.entity.projection.TournamentStanding
+import com.mmg.manahub.core.model.TournamentMatch
+import com.mmg.manahub.core.model.TournamentPlayer
+import com.mmg.manahub.core.model.TournamentStanding
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardCornerRadius
@@ -79,6 +78,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.tournament.domain.engine.TournamentIdCodec
+import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,12 +87,12 @@ fun TournamentScreen(
     tournamentId:   Long,
     onNavigateBack: () -> Unit,
     onStartMatch:   (matchId: Long, tournamentId: Long) -> Unit,
-    viewModel:      TournamentViewModel = hiltViewModel(),
+    viewModel:      TournamentViewModel = koinViewModel(),
 ) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
     val mc           = MaterialTheme.magicColors
     var selectedTab  by rememberSaveable { mutableIntStateOf(0) }
-    var recordResultForMatch by remember { mutableStateOf<TournamentMatchEntity?>(null) }
+    var recordResultForMatch by remember { mutableStateOf<TournamentMatch?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(mc.background)) {
         HexGridBackground(modifier = Modifier.fillMaxSize(), color = mc.primaryAccent.copy(alpha = 0.05f))
@@ -241,8 +241,8 @@ fun TournamentScreen(
 private fun StandingsTab(
     standings:           List<TournamentStanding>,
     isFinished:          Boolean,
-    nextMatch:           TournamentMatchEntity?,
-    activeMatch:         TournamentMatchEntity?,
+    nextMatch:           TournamentMatch?,
+    activeMatch:         TournamentMatch?,
     onStartNextMatch:    () -> Unit,
     onResumeActiveMatch: (Long) -> Unit,
     mc:                  com.mmg.manahub.core.ui.theme.MagicColors
@@ -536,12 +536,12 @@ private fun StandingRow(
 
 @Composable
 private fun MatchesTab(
-    matches:        List<TournamentMatchEntity>,
-    players:        List<TournamentPlayerEntity>,
+    matches:        List<TournamentMatch>,
+    players:        List<TournamentPlayer>,
     onStartMatch:   (Long) -> Unit,
     onResumeMatch:  (Long) -> Unit,
     onResetMatch:   (Long) -> Unit,
-    onRecordResult: (TournamentMatchEntity) -> Unit,
+    onRecordResult: (TournamentMatch) -> Unit,
     mc:             com.mmg.manahub.core.ui.theme.MagicColors
 ) {
     val playerMap = remember(players) { players.associateBy { it.id } }
@@ -586,8 +586,8 @@ private fun MatchesTab(
 
 @Composable
 private fun MatchRow(
-    match:          TournamentMatchEntity,
-    playerMap:      Map<Long, TournamentPlayerEntity>,
+    match:          TournamentMatch,
+    playerMap:      Map<Long, TournamentPlayer>,
     onStart:        (() -> Unit)?,
     onResume:       (() -> Unit)?,
     onReset:        (() -> Unit)?,
@@ -735,8 +735,8 @@ private fun MatchRow(
 
 @Composable
 private fun RecordResultDialog(
-    p1:        TournamentPlayerEntity?,
-    p2:        TournamentPlayerEntity?,
+    p1:        TournamentPlayer?,
+    p2:        TournamentPlayer?,
     allowDraw: Boolean,
     onConfirm: (winnerId: Long) -> Unit,
     onDraw:    () -> Unit,
@@ -796,8 +796,8 @@ private fun RecordResultDialog(
 
 @Composable
 private fun PlayerMatchSlot(
-    player:   TournamentPlayerEntity?,
-    match:    TournamentMatchEntity,
+    player:   TournamentPlayer?,
+    match:    TournamentMatch,
     isP1:     Boolean,
     modifier: Modifier = Modifier,
 ) {

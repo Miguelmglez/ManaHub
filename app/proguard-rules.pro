@@ -44,6 +44,10 @@
 # ── App models (Room entities, domain models) ────────────────────────────────
 -keep class com.mmg.manahub.core.data.local.entity.** { *; }
 -keep class com.mmg.manahub.core.domain.model.** { *; }
+# KMP migration — all shared pure-Kotlin models extracted to :shared:core-model (Phase 1). Includes
+# enums persisted by name (CollectionViewMode, GroupingMode, QuickStartAction, DeckFormat, WidgetSize,
+# ContentType, SourceType, ...) and the .news subpackage. Wildcard covers the whole package.
+-keep class com.mmg.manahub.core.model.** { *; }
 -keep class com.mmg.manahub.feature.game.model.** { *; }
 
 # ── Coil ─────────────────────────────────────────────────────────────────────
@@ -133,6 +137,14 @@
 # Catch-all for any nested model used inside the DraftState JSON tree
 # (BoosterConfig, BoosterSheet, BoosterVariant, BoosterCardEntry, DraftableSet, …).
 -keepclassmembers class com.mmg.manahub.feature.draft.domain.model.** { *; }
+
+# ── Koin DI (KMP migration — Phase 0 Spike D, coexists with Hilt) ─────────────
+# The Settings "Koin island" constructs SettingsViewModel via an explicit `viewModel { }` lambda
+# (no reflection on the VM itself), but Koin's core uses reflective KClass lookups for scope/
+# definition resolution. Keep Koin's runtime and don't warn on its optional integrations.
+-keep class org.koin.** { *; }
+-keepclassmembers class org.koin.** { *; }
+-dontwarn org.koin.**
 
 # ── Strip all logs in release ─────────────────────────────────────────────────
 -assumenosideeffects class android.util.Log {

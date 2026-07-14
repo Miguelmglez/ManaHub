@@ -1,16 +1,13 @@
 package com.mmg.manahub.feature.trades.domain.usecase
 
-import com.mmg.manahub.core.di.IoDispatcher
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.feature.trades.data.local.entity.TradeCollectionSyncEntity
-import com.mmg.manahub.feature.trades.domain.model.TradeItem
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
+import com.mmg.manahub.core.model.TradeItem
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Syncs the local collection after a trade completes or is reversed on revoke.
@@ -34,16 +31,22 @@ import javax.inject.Singleton
  * Additionally, in normal mode sent items also remove the corresponding [OpenForTradeRepository]
  * entry (the card is no longer in the collection so it should not remain offered for trade), and
  * received items are matched against the best-fitting wishlist entry by attributes before
- * decrementing (foil / condition / language), falling back to a matchAnyVariant entry
- * or any entry for that scryfallId when no exact match exists.
+ * decrementing (foil / condition / language), falling back to a matchAnyVariant entry. If neither
+ * matches, [WishlistRepository.decrementByAttributes] no-ops rather than guessing at an arbitrary
+ * entry (trades audit §2.11, 2026-07-10) — decrementing the wrong variant would be silent data
+ * corruption, worse than leaving one stale wishlist row.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`/
+ * `@IoDispatcher`); built natively by `tradesKoinModule` (trades audit §4.1, 2026-07-10 — the
+ * annotations had survived the batch-3 cutover even though this class had no remaining Hilt-only
+ * consumer; `javax.inject` also blocks a future `commonMain` move for this use case).
  */
-@Singleton
-class UpdateTradeCollectionUseCase @Inject constructor(
+class UpdateTradeCollectionUseCase(
     private val userCardRepository: UserCardRepository,
     private val wishlistRepository: WishlistRepository,
     private val openForTradeRepository: OpenForTradeRepository,
     private val syncDao: TradeCollectionSyncDao,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
 ) {
 
     /**

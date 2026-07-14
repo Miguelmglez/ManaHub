@@ -1,18 +1,24 @@
 package com.mmg.manahub.feature.trades.data.repository
 
 import app.cash.turbine.test
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
-import com.mmg.manahub.feature.trades.data.remote.TradesRemoteDataSource
-import com.mmg.manahub.feature.trades.data.remote.dto.TradeItemDto
-import com.mmg.manahub.feature.trades.data.remote.dto.TradeProposalDto
-import com.mmg.manahub.feature.trades.domain.model.TradeError
-import com.mmg.manahub.feature.trades.domain.model.TradeStatus
-import com.mmg.manahub.feature.trades.domain.repository.ReviewFlags
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
+import com.mmg.manahub.core.data.remote.dto.TradeItemDto
+import com.mmg.manahub.core.data.remote.dto.TradeProposalDto
+import com.mmg.manahub.core.model.TradeError
+import com.mmg.manahub.core.model.TradeStatus
+import com.mmg.manahub.core.model.ReviewFlags
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -39,6 +45,7 @@ class TradesRepositoryImplTest {
 
     private val remote = mockk<TradesRemoteDataSource>(relaxed = true)
     private val cardDao = mockk<CardDao>(relaxed = true)
+    private val cardRepository = mockk<CardRepository>(relaxed = true)
     private val progressionEventBus = mockk<ProgressionEventBus>(relaxed = true)
 
     private lateinit var repository: TradesRepositoryImpl
@@ -82,10 +89,21 @@ class TradesRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = TradesRepositoryImpl(remote, cardDao, progressionEventBus)
+        // toDomain()'s unknown-status fallback path (§2.6) calls recordSafeNonFatal(), which
+        // hits FirebaseCrashlytics.getInstance() outside a runCatching block.
+        mockkStatic(FirebaseCrashlytics::class)
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
+
+        repository = TradesRepositoryImpl(remote, cardDao, cardRepository, progressionEventBus)
 
         // Default: fetchProposalItems returns empty list for any proposal id
         coEvery { remote.fetchProposalItems(any()) } returns Result.success(emptyList<TradeItemDto>())
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -161,8 +179,9 @@ class TradesRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given cache with active and terminal proposals when observeProposalHistory then all are emitted`() = runTest {
-        // Arrange
+    fun `given cache with active and terminal proposals when observeProposalHistory then only the terminal one is emitted`() = runTest {
+        // observeProposalHistory() filters to isTerminal proposals only — the active (PROPOSED)
+        // one belongs on observeActiveProposals()/observeAllProposals(), not here.
         val active = buildProposalDto(id = "a-001", status = "PROPOSED")
         val terminal = buildProposalDto(id = "t-001", status = "COMPLETED")
         coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(active, terminal))
@@ -171,7 +190,8 @@ class TradesRepositoryImplTest {
         // Act + Assert
         repository.observeProposalHistory().test {
             val items = awaitItem()
-            assertEquals(2, items.size)
+            assertEquals(1, items.size)
+            assertEquals("t-001", items.first().id)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -239,7 +259,8 @@ class TradesRepositoryImplTest {
 
     @Test
     fun `given remote returns proposals when refreshProposals succeeds then cache is populated`() = runTest {
-        // Arrange
+        // Arrange — both dtos default to status "PROPOSED" (active), so read the unfiltered
+        // cache via observeAllProposals() rather than the terminal-only observeProposalHistory().
         val dto1 = buildProposalDto(id = "p-001")
         val dto2 = buildProposalDto(id = "p-002")
         coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto1, dto2))
@@ -249,7 +270,7 @@ class TradesRepositoryImplTest {
 
         // Assert
         assertTrue(result.isSuccess)
-        repository.observeProposalHistory().test {
+        repository.observeAllProposals().test {
             assertEquals(2, awaitItem().size)
             cancelAndIgnoreRemainingEvents()
         }
@@ -269,7 +290,9 @@ class TradesRepositoryImplTest {
 
     @Test
     fun `given remote fetchProposals fails when refreshProposals then cache retains previous value`() = runTest {
-        // Arrange: first populate the cache
+        // Arrange: first populate the cache. Default status "PROPOSED" is active, so read the
+        // unfiltered cache via observeAllProposals() rather than the terminal-only
+        // observeProposalHistory().
         val dto = buildProposalDto(id = "p-001")
         coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
         repository.refreshProposals(USER_ID)
@@ -279,15 +302,17 @@ class TradesRepositoryImplTest {
         repository.refreshProposals(USER_ID)
 
         // Cache must still hold the previous proposal
-        repository.observeProposalHistory().test {
+        repository.observeAllProposals().test {
             assertEquals(1, awaitItem().size)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `given fetchProposals returns dto with invalid status string when refreshProposals then status defaults to DRAFT`() = runTest {
-        // toDomain() uses runCatching { TradeStatus.valueOf(status) }.getOrDefault(TradeStatus.DRAFT)
+    fun `given fetchProposals returns dto with invalid status string when refreshProposals then status defaults to CANCELLED not DRAFT`() = runTest {
+        // §2.6 fix: an unrecognised status must NOT fall back to DRAFT — DRAFT is the most
+        // permissive state (shows proposer Edit/Cancel). It falls back to the terminal/inert
+        // CANCELLED instead, via toTradeStatusOrFallback().
         val dto = buildProposalDto(id = "p-001", status = "TOTALLY_UNKNOWN_STATUS")
         coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
 
@@ -295,7 +320,8 @@ class TradesRepositoryImplTest {
 
         repository.observeProposalHistory().test {
             val items = awaitItem()
-            assertEquals(TradeStatus.DRAFT, items.first().status)
+            assertEquals(TradeStatus.CANCELLED, items.first().status)
+            assertTrue(items.first().status.isTerminal)
             cancelAndIgnoreRemainingEvents()
         }
     }

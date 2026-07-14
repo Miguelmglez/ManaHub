@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier

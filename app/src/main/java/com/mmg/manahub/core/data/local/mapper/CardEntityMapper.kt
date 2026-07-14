@@ -3,11 +3,11 @@ package com.mmg.manahub.core.data.local.mapper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.data.local.entity.CardEntity
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardFace
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.SuggestedTag
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardFace
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.SuggestedTag
+import com.mmg.manahub.core.model.TagCategory
 
 private val gson = Gson()
 private val listType      = object : TypeToken<List<String>>() {}.type
@@ -117,6 +117,7 @@ fun CardEntity.toDomainCard(): Card = Card(
         runCatching { gson.fromJson<List<CardFace>>(it, cardFacesType) }
             .getOrNull()
     },
+    producedMana = producedMana,
 )
 
 fun Card.toEntityCard(): CardEntity = CardEntity(
@@ -172,6 +173,7 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     edhrecRank = edhrecRank,
     pennyRank = pennyRank,
     cardFaces = cardFaces?.let { gson.toJson(it) },
+    producedMana = producedMana,
 )
 
 fun List<CardEntity>.toDomainCardList(): List<Card> = map { it.toDomainCard() }

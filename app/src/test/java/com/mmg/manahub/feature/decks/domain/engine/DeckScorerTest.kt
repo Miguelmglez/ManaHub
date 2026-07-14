@@ -1,6 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
-import com.mmg.manahub.core.domain.model.DeckFormat
+import com.mmg.manahub.core.model.DeckFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

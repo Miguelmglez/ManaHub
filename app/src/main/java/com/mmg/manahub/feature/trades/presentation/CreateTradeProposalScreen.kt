@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -48,7 +47,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -67,32 +65,37 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.AddCardRow
+import com.mmg.manahub.core.model.AddCardRow
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.auth.domain.model.SessionState
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.trades.domain.model.TradeSide
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.TradeSide
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,43 +105,33 @@ fun CreateTradeProposalScreen(
     onNavigateToCardDetail: (scryfallId: String) -> Unit = {},
     onNavigateToLogin: () -> Unit = {},
     onNavigateToAddFriends: () -> Unit = {},
-    viewModel: TradeProposalViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel(),
+    viewModel: TradeProposalViewModel = koinViewModel(),
+    authViewModel: AuthViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
     val mc = MaterialTheme.magicColors
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
 
-    LaunchedEffect(uiState.snackbarMessage) {
-        val msg = uiState.snackbarMessage ?: return@LaunchedEffect
-        toastState.show(msg, MagicToastType.SUCCESS)
-        viewModel.onSnackbarDismissed()
-    }
-
-    LaunchedEffect(uiState.errorMessage) {
-        val err = uiState.errorMessage ?: return@LaunchedEffect
-        val message = when (err) {
-            "NO_RECEIVER"               -> "Please select a friend to trade with"
-            "INITIAL_ASYMMETRY"         -> "Both sides must have at least one item"
-            "PROPOSAL_VERSION_MISMATCH" -> "Proposal was modified; please refresh"
-            "SELF_TRADE"                -> "You cannot trade with yourself"
-            else                        -> err.ifBlank { "An unexpected error occurred" }
-        }
-        toastState.show(message, MagicToastType.ERROR)
-        viewModel.onErrorDismissed()
-    }
-
-    LaunchedEffect(uiState.navigateToThread) {
-        val nav = uiState.navigateToThread ?: return@LaunchedEffect
-        onNavigateToThread(nav.first, nav.second)
-        viewModel.onNavigationConsumed()
-    }
-
-    LaunchedEffect(uiState.navigateBack) {
-        if (uiState.navigateBack) {
-            onBack()
-            viewModel.onNavigationConsumed()
+    // §5.2 fix: one-shot navigation/toast effects are delivered through a buffered Channel
+    // (viewModel.events), never nullable StateFlow fields — a StateFlow equality-collapses two
+    // consecutive identical events (e.g. two "select a friend first" errors from a fast
+    // double-tap) and can drop emissions made while the screen's lifecycle is paused. All string
+    // resolution happens HERE, in ONE place (§5.1 fix) — the ViewModel emits semantic outcomes
+    // only, never a raw literal sentinel key like the old `errorMessage = "NO_RECEIVER"`.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ProposalEvent.ShowValidationError ->
+                    toastState.show(context.getString(event.messageRes), MagicToastType.ERROR)
+                is ProposalEvent.ShowRemoteError -> {
+                    val msg = event.message ?: context.getString(R.string.trades_error_generic_body)
+                    toastState.show(msg, MagicToastType.ERROR)
+                }
+                is ProposalEvent.NavigateToThread -> onNavigateToThread(event.proposalId, event.rootProposalId)
+                ProposalEvent.NavigateBack -> onBack()
+            }
         }
     }
 
@@ -165,7 +158,7 @@ fun CreateTradeProposalScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .statusBarsPadding()
-                                .padding(horizontal = 4.dp, vertical = 4.dp)
+                                .padding(horizontal = MaterialTheme.spacing.xs, vertical = MaterialTheme.spacing.xs)
                                 .heightIn(min = 56.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -186,15 +179,9 @@ fun CreateTradeProposalScreen(
                                 ),
                                 style = MaterialTheme.magicTypography.titleMedium,
                                 color = mc.textPrimary,
-                                modifier = Modifier.weight(1f).padding(start = 8.dp)
+                                modifier = Modifier.weight(1f).padding(start = MaterialTheme.spacing.sm)
                             )
-
-                            /*TradeBalanceIndicator(
-                                proposerValue = if (preferredCurrency == PreferredCurrency.EUR) uiState.totalProposerValueEur else uiState.totalProposerValueUsd,
-                                receiverValue = if (preferredCurrency == PreferredCurrency.EUR) uiState.totalReceiverValueEur else uiState.totalReceiverValueUsd,
-                                currency = preferredCurrency
-                            )*/
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(MaterialTheme.spacing.sm))
                         }
                     }
                 }
@@ -204,15 +191,15 @@ fun CreateTradeProposalScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(horizontal = MaterialTheme.spacing.lg, vertical = MaterialTheme.spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                 ) {
                     Button(
                         onClick  = viewModel::onSendProposal,
                         enabled  = !uiState.isSaving,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        shape    = RoundedCornerShape(12.dp)
+                        shape    = ButtonShape
                     ) {
                         if (uiState.isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), color = mc.background, strokeWidth = 2.dp)
@@ -232,7 +219,7 @@ fun CreateTradeProposalScreen(
                             onClick  = viewModel::onSaveDraft,
                             enabled  = !uiState.isSaving,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape    = RoundedCornerShape(12.dp),
+                            shape    = ButtonShape,
                             border   = BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.2f)),
                             colors   = ButtonDefaults.outlinedButtonColors(contentColor = mc.textSecondary)
                         ) {
@@ -245,15 +232,40 @@ fun CreateTradeProposalScreen(
                 }
             },
         ) { innerPadding ->
-            val isLocked = uiState.editingProposalId != null || uiState.isCounterMode
+            // §2.9 fix: the counter/edit prefill can miss the in-memory proposals cache (e.g.
+            // after process death) and must warm it via a network refresh before showing the
+            // form — while that's in flight, or if it ultimately fails, the editor form itself
+            // is hidden entirely so a save can never wipe the real proposal's items from a
+            // blank draft.
+            when {
+                uiState.isPrefillLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(innerPadding),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = mc.primaryAccent)
+                    }
+                }
 
-            LazyColumn(
-                modifier       = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
+                uiState.prefillFailed -> {
+                    FullErrorState(
+                        message = stringResource(R.string.trades_error_prefill_failed),
+                        retryLabel = stringResource(R.string.action_retry),
+                        onRetry = viewModel::retryPrefill,
+                        modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    )
+                }
+
+                else -> {
+                    val isLocked = uiState.editingProposalId != null || uiState.isCounterMode
+
+                    LazyColumn(
+                        modifier       = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
+                        contentPadding = PaddingValues(MaterialTheme.spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xl),
+                    ) {
                 // ── Proposer identity card ────────────────────────────────────────
                 item(key = "proposer_identity") {
                     ProposerIdentityCard(
@@ -359,7 +371,7 @@ fun CreateTradeProposalScreen(
 
                 item(key = "divider") {
                     HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 8.dp),
+                        modifier = Modifier.padding(vertical = MaterialTheme.spacing.sm),
                         color = mc.textDisabled.copy(alpha = 0.2f)
                     )
                 }
@@ -468,7 +480,9 @@ fun CreateTradeProposalScreen(
                     }
                 }
 
-                item(key = "bottom_spacer") { Spacer(Modifier.height(16.dp)) }
+                item(key = "bottom_spacer") { Spacer(Modifier.height(MaterialTheme.spacing.lg)) }
+                    }
+                }
             }
         }
 
@@ -641,20 +655,19 @@ private fun FriendSelector(
 ) {
     var showSheet by remember { mutableStateOf(false) }
     val mc = MaterialTheme.magicColors
-    val sheetState = rememberModalBottomSheetState()
 
     Surface(
         onClick = { if (!isLocked) showSheet = true },
         enabled = !isLocked,
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         color = mc.surface.copy(alpha = if (isLocked) 0.3f else 0.5f),
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.dp, mc.textDisabled.copy(alpha = if (isLocked) 0.06f else 0.1f))
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(MaterialTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)
         ) {
             Box(
                 modifier = Modifier
@@ -713,9 +726,9 @@ private fun FriendSelector(
     }
 
     if (showSheet && !isLocked) {
-        val sheetState = rememberModalBottomSheetState(
-            confirmValueChange = { it != SheetValue.Hidden }
-        )
+        // §5.7 fix: no documented reason to block swipe/scrim dismissal — the sheet now
+        // dismisses like every other bottom sheet in the app (default confirmValueChange).
+        val sheetState = rememberModalBottomSheetState()
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
@@ -726,12 +739,12 @@ private fun FriendSelector(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .padding(horizontal = MaterialTheme.spacing.xl, vertical = MaterialTheme.spacing.sm)
                     .navigationBarsPadding(),
             ) {
                 // Header Row
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = MaterialTheme.spacing.sm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
@@ -749,7 +762,7 @@ private fun FriendSelector(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
                 ) {
                     Text(
                         text = stringResource(R.string.trades_friend_selector_sheet_title),
@@ -760,8 +773,8 @@ private fun FriendSelector(
                     when {
                         sessionState is SessionState.Unauthenticated -> {
                             EmptyState(
-                                title = "Log in to trade with your friends and sync your collection across devices.",
-                                actionLabel = "Log In",
+                                title = stringResource(R.string.trades_friend_sheet_login_title),
+                                actionLabel = stringResource(R.string.trades_friend_sheet_login_action),
                                 onAction = {
                                     showSheet = false
                                     onNavigateToLogin()
@@ -771,8 +784,8 @@ private fun FriendSelector(
                         }
                         friends.isEmpty() -> {
                             EmptyState(
-                                title = "You don't have any friends yet. Add friends to start trading!",
-                                actionLabel = "Add Friends",
+                                title = stringResource(R.string.trades_friend_sheet_no_friends_title),
+                                actionLabel = stringResource(R.string.trades_friend_sheet_no_friends_action),
                                 onAction = {
                                     showSheet = false
                                     onNavigateToAddFriends()
@@ -787,13 +800,13 @@ private fun FriendSelector(
                                     onFriendSelected(null)
                                     showSheet = false
                                 },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = CardShape,
                                 color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
                                     stringResource(R.string.trades_friend_none_option),
-                                    modifier = Modifier.padding(16.dp),
+                                    modifier = Modifier.padding(MaterialTheme.spacing.lg),
                                     style = MaterialTheme.magicTypography.bodyMedium,
                                     color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
                                 )
@@ -805,14 +818,14 @@ private fun FriendSelector(
                                         onFriendSelected(friend)
                                         showSheet = false
                                     },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = CardShape,
                                     color = if (selectedFriend?.userId == friend.userId) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(12.dp),
+                                        modifier = Modifier.padding(MaterialTheme.spacing.md),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)
                                     ) {
                                         AsyncImage(
                                             model = friend.avatarUrl,
@@ -847,15 +860,15 @@ private fun FriendSelector(
 private fun ProposerIdentityCard(nickname: String, avatarUrl: String? = null) {
     val mc = MaterialTheme.magicColors
     Surface(
-        shape    = RoundedCornerShape(12.dp),
+        shape    = CardShape,
         color    = mc.surface.copy(alpha = 0.3f),
         modifier = Modifier.fillMaxWidth(),
         border   = androidx.compose.foundation.BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.06f)),
     ) {
         Row(
-            modifier              = Modifier.padding(12.dp),
+            modifier              = Modifier.padding(MaterialTheme.spacing.md),
             verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
         ) {
             Box(
                 modifier         = Modifier
@@ -904,7 +917,7 @@ private fun TradeItemDraftRow(
     val mc = MaterialTheme.magicColors
 
     Surface(
-        shape    = RoundedCornerShape(12.dp),
+        shape    = CardShape,
         color    = mc.surface.copy(alpha = 0.7f),
         border   = androidx.compose.foundation.BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.1f)),
         modifier = Modifier.fillMaxWidth(),
@@ -917,10 +930,10 @@ private fun TradeItemDraftRow(
                     tint = mc.goldMtg,
                     modifier = Modifier.size(10.dp)
                 )
-                Spacer(Modifier.width(2.dp))
+                Spacer(Modifier.width(MaterialTheme.spacing.xxs))
                 Text(
                     text = stringResource(R.string.trades_warning_not_in_collection),
-                    style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 9.sp),
+                    style = MaterialTheme.magicTypography.labelSmall,
                     color = mc.goldMtg,
                 )
             }
@@ -943,7 +956,7 @@ private fun TradeItemDraftRow(
                 containerColor = androidx.compose.ui.graphics.Color.Transparent,
                 extraSupportingContent = if (!item.isInCollection) extraContent else null,
             )
-            IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector        = Icons.Default.Close,
                     contentDescription = stringResource(R.string.action_remove),
@@ -965,15 +978,15 @@ private fun EmptySidePlaceholder(
     val contentAlpha = if (enabled) 1f else 0.5f
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         color = mc.surface.copy(alpha = if (enabled) 0.3f else 0.15f),
         border = androidx.compose.foundation.BorderStroke(1.dp, mc.textDisabled.copy(alpha = 0.1f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(MaterialTheme.spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
@@ -1006,29 +1019,29 @@ private fun ReviewCollectionToggle(
 
     Surface(
         onClick = onToggle,
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         color = surfaceColor,
         border = BorderStroke(width = if (checked) 1.5.dp else 1.dp, color = borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .shadow(
                 elevation = shadowElevation,
-                shape = RoundedCornerShape(12.dp),
+                shape = CardShape,
                 ambientColor = accentColor.copy(alpha = 0.2f),
                 spotColor = accentColor.copy(alpha = 0.3f),
             ),
         shadowElevation = 0.dp, // handled manually via Modifier.shadow above
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
         ) {
             // ── Collection icon badge ──────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(ChipShape)
                     .background(
                         if (checked) accentColor.copy(alpha = 0.22f)
                         else mc.backgroundSecondary.copy(alpha = 0.5f)
@@ -1044,7 +1057,7 @@ private fun ReviewCollectionToggle(
             }
 
             // ── Label + subtitle ───────────────────────────────────────────────────
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)) {
                 Text(
                     text = label,
                     style = MaterialTheme.magicTypography.bodySmall,
@@ -1053,7 +1066,7 @@ private fun ReviewCollectionToggle(
                 )
                 Text(
                     text = stringResource(R.string.trades_review_collection_subtitle),
-                    style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 10.sp),
+                    style = MaterialTheme.magicTypography.labelSmall,
                     color = if (checked) accentColor.copy(alpha = 0.75f) else mc.textSecondary,
                 )
             }
@@ -1081,17 +1094,17 @@ private fun InlineSuggestionsRow(
     onCardClick: (String) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
         Text(
             text = label,
             style = MaterialTheme.magicTypography.labelSmall,
             color = mc.goldMtg,
-            modifier = Modifier.padding(horizontal = 4.dp)
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xs)
         )
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
+            contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.xs, vertical = MaterialTheme.spacing.xxs)
         ) {
             items(matches, key = { "sug_${it.uniqueKey}" }) { row ->
                 SuggestionCardItem(
@@ -1135,7 +1148,7 @@ private fun SuggestionCardItem(
     val addTint = if (isExact) mc.goldMtg else mc.primaryAccent
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         color = mc.surface.copy(alpha = 0.4f),
         border = BorderStroke(if (isExact || isPartial) 2.dp else 1.dp, borderBrush),
         modifier = modifier.fillMaxWidth(),
@@ -1153,7 +1166,7 @@ private fun SuggestionCardItem(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(end = 4.dp)
+                modifier = Modifier.padding(end = MaterialTheme.spacing.xs)
             ) {
                 CardListItem(
                     name = row.card.name,
@@ -1173,7 +1186,7 @@ private fun SuggestionCardItem(
                 )
                 IconButton(
                     onClick = onAdd,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
@@ -1197,12 +1210,12 @@ private fun AddItemButton(
     OutlinedButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = ButtonShape,
         colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent.copy(alpha = contentAlpha)),
         border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f * contentAlpha))
     ) {
         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(MaterialTheme.spacing.sm))
         Text(
             stringResource(R.string.trades_add_item),
             style = MaterialTheme.magicTypography.labelLarge,

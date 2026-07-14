@@ -13,15 +13,23 @@ import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import com.mmg.manahub.core.online.domain.usecase.JoinSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState as AuthSessionState
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -75,6 +83,14 @@ class LobbyJoinViewModelTest {
         const val SESSION_ID   = "session-xyz-999"
         const val SESSION_CODE = "123456"
         const val SLOT_INDEX   = 2
+        val TEST_USER = AuthUser(
+            id = "user-test",
+            email = null,
+            nickname = null,
+            gameTag = null,
+            avatarUrl = null,
+            provider = "anonymous",
+        )
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -143,6 +159,12 @@ class LobbyJoinViewModelTest {
             Result.success(buildSnapshot(snapshotMode, snapshotPlayerCount))
         // init block calls userPreferencesDataStore.playerNameFlow.first()
         coEvery { userPreferencesDataStore.playerNameFlow } returns flowOf("")
+        // Already-authenticated by default so joinSession's `.first { it !is Loading }` await
+        // (audit finding #20) resolves immediately instead of suspending on a Flow the relaxed
+        // mock never emits on. A real StateFlow always has a current value ready for the first
+        // collector, matching production behaviour.
+        every { authRepository.sessionState } returns
+            MutableStateFlow(AuthSessionState.Authenticated(TEST_USER))
         return LobbyJoinViewModel(
             joinSessionUseCase       = joinSessionUseCase,
             observeSessionUseCase    = observeSessionUseCase,
@@ -159,11 +181,18 @@ class LobbyJoinViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+
+        // Prevent FirebaseCrashlytics.getInstance() from crashing in this plain JVM unit test —
+        // the ViewModel calls it as a field initializer and in several log/recordException call
+        // sites outside runCatching (see CLAUDE.md testing conventions).
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -223,27 +252,30 @@ class LobbyJoinViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given not yet joined when prefillCode called then code is set`() = runTest {
-        // Arrange — sessionId is null (not yet joined)
+    fun `given not yet joined when prefillCode called then only digits are kept`() = runTest {
+        // Arrange — sessionId is null (not yet joined). Codes are strictly 6-digit numeric
+        // (audit finding #16 — prefillCode must digit-filter like onCodeChanged, not just
+        // uppercase, since uppercasing a numeric code was a no-op leftover from an
+        // alphanumeric-code era that no longer exists).
         val vm = createViewModel()
 
         // Act
         vm.prefillCode("abc456")
 
         // Assert
-        assertEquals("ABC456", vm.uiState.value.codeInput)
+        assertEquals("456", vm.uiState.value.codeInput)
     }
 
     @Test
-    fun `given prefillCode with code longer than 6 then truncated and uppercased`() = runTest {
+    fun `given prefillCode with digits beyond 6 then truncated to first 6 digits`() = runTest {
         // Arrange
         val vm = createViewModel()
 
         // Act
-        vm.prefillCode("abcdefxyz")
+        vm.prefillCode("ab12cd3456xyz")
 
-        // Assert
-        assertEquals("ABCDEF", vm.uiState.value.codeInput)
+        // Assert — non-digit characters are dropped, remaining digits capped at 6
+        assertEquals("123456", vm.uiState.value.codeInput)
     }
 
     @Test
@@ -963,6 +995,93 @@ class LobbyJoinViewModelTest {
             "displayName must be capped at 32 characters",
             32,
             vm.uiState.value.displayName.length,
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 12 — Audit regression tests (2026-07-10 online-feature audit):
+    //  double-ACTIVE guard (#3), failed-initial-snapshot self-heal (#5),
+    //  poll-vs-realtime merge-by-id (#4)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given ACTIVE event received twice then onGameStart is invoked only once`() = runTest {
+        // Arrange
+        coEvery { joinSessionUseCase(any(), any(), any()) } returns
+            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+        val vm = createViewModel()
+        vm.onCodeChanged(SESSION_CODE)
+        var gameStartCount = 0
+        vm.joinSession { _, _, _, _ -> gameStartCount++ }
+        advanceUntilIdle()
+
+        // Act — a lagging Realtime CDC event can redeliver the same ACTIVE transition after
+        // the poll loop (or a first Realtime delivery) already fired onGameStart once.
+        eventFlow.emit(SessionEvent.SessionStatusChanged(OnlineSessionStatus.ACTIVE))
+        advanceUntilIdle()
+        eventFlow.emit(SessionEvent.SessionStatusChanged(OnlineSessionStatus.ACTIVE))
+        advanceUntilIdle()
+
+        // Assert — onGameStart must fire exactly once, not once per event (audit finding #3)
+        assertEquals(1, gameStartCount)
+    }
+
+    @Test
+    fun `given initial post-join snapshot fails then sessionMode and playerCount self-heal from the next poll`() = runTest {
+        // Arrange — the immediate post-join getSnapshot() call fails (flaky network), but the
+        // 3s poll must recover sessionMode/sessionPlayerCount from its own snapshot instead of
+        // leaving the "STANDARD"/2 defaults in place for the rest of the session (audit finding #5).
+        coEvery { joinSessionUseCase(any(), any(), any()) } returns
+            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+        val vm = createViewModel()
+        coEvery { observeSessionUseCase.getSnapshot(any()) } returnsMany listOf(
+            Result.failure(RuntimeException("network blip")),
+            Result.success(buildSnapshot(mode = "BRAWL", playerCount = 3)),
+        )
+        vm.onCodeChanged(SESSION_CODE)
+
+        // Act
+        vm.joinSession { _, _, _, _ -> }
+        advanceUntilIdle() // consumes the failing initial getSnapshot() call
+
+        // Pre-condition: defaults still in place right after the failed initial call
+        assertEquals("STANDARD", vm.uiState.value.sessionMode)
+        assertEquals(2, vm.uiState.value.sessionPlayerCount)
+
+        advanceTimeBy(3_100L) // trigger one poll cycle
+        advanceUntilIdle()
+
+        // Assert — self-healed from the poll's own snapshot
+        assertEquals("BRAWL", vm.uiState.value.sessionMode)
+        assertEquals(3, vm.uiState.value.sessionPlayerCount)
+    }
+
+    @Test
+    fun `given a Realtime-only participant when the next poll snapshot omits it then it is preserved`() = runTest {
+        // Arrange — a participant that arrived via a fast Realtime event must survive one poll
+        // cycle even if the lagging HTTP snapshot doesn't include it yet: merge by id, never a
+        // raw replace (audit finding #4 — this is the CLAUDE.md-documented invariant).
+        coEvery { joinSessionUseCase(any(), any(), any()) } returns
+            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+        val vm = createViewModel()
+        vm.onCodeChanged(SESSION_CODE)
+        vm.joinSession { _, _, _, _ -> }
+        advanceUntilIdle()
+
+        val realtimeOnly = buildParticipant("p-fast", slotIndex = 1)
+        eventFlow.emit(SessionEvent.ParticipantUpdated(realtimeOnly))
+        advanceUntilIdle()
+        assertEquals(1, vm.uiState.value.participants.size)
+
+        // Act — the next poll's snapshot lags behind and does not include "p-fast" yet
+        // (createViewModel() stubs getSnapshot() to always return an empty participants list)
+        advanceTimeBy(3_100L)
+        advanceUntilIdle()
+
+        // Assert — not erased by the raw snapshot
+        assertTrue(
+            "A Realtime-only participant must survive one poll cycle, never be wiped by a raw replace",
+            vm.uiState.value.participants.any { it.id == "p-fast" },
         )
     }
 }

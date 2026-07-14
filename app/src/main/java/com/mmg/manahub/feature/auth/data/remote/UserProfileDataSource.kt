@@ -2,31 +2,17 @@ package com.mmg.manahub.feature.auth.data.remote
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.util.recordSafeNonFatal
-import com.mmg.manahub.feature.auth.domain.model.AuthUser
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.data.remote.UserProfileClient
+import com.mmg.manahub.core.data.remote.dto.CompleteUserProfileDto
+import com.mmg.manahub.core.data.remote.dto.GetProfileByUserIdDto
+import com.mmg.manahub.core.data.remote.dto.UpsertUserProfileDto
+import com.mmg.manahub.core.data.remote.dto.UserProfileDto
+import com.mmg.manahub.core.domain.auth.AuthUser
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-
-/**
- * DTO for Supabase SDK (kotlinx-serialization) calls against `user_profiles`.
- *
- * [profileCompleted] mirrors the `profile_completed` column that is set to FALSE by the
- * [handle_new_user] trigger on row creation and to TRUE only after the user explicitly
- * finishes the sign-up flow via the [complete_user_profile] RPC.
- *
- * The [gameTag] column is auto-generated server-side and must never be sent by the client.
- */
-@Serializable
-data class UserProfileDto(
-    @SerialName("id") val id: String,
-    @SerialName("nickname") val nickname: String?,
-    @SerialName("game_tag") val gameTag: String?,
-    @SerialName("avatar_url") val avatarUrl: String?,
-    @SerialName("provider") val provider: String?,
-    @SerialName("profile_completed") val profileCompleted: Boolean = false,
-)
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Outcome of [UserProfileDataSource.getProfileByUserId].
@@ -57,13 +43,14 @@ sealed interface ProfileFetchResult {
 /**
  * Data source for the `user_profiles` Supabase table.
  *
- * All network calls are performed via [SupabaseUserProfileService] (Retrofit + OkHttp),
+ * All network calls are performed via [UserProfileClient] (Ktor + OkHttp engine),
  * which is authenticated through an OkHttp interceptor that injects the Supabase
  * apikey and the current user's Bearer token.
  */
 class UserProfileDataSource(
-    private val service: SupabaseUserProfileService,
+    private val client: UserProfileClient,
     private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) {
 
     /**
@@ -79,9 +66,8 @@ class UserProfileDataSource(
             return@withContext null
         }
         try {
-            service.fetchProfile("eq.$userId")
+            client.fetchProfile("eq.$userId")
                 .firstOrNull()
-                ?.toUserProfileDto()
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) {
                 Log.w(TAG, "fetchUserProfile failed for user $userId", e)
@@ -113,16 +99,18 @@ class UserProfileDataSource(
             return@withContext ProfileFetchResult.Failure(IllegalArgumentException("Invalid UUID"))
         }
         try {
-            val dto = service.getProfileByUserId(GetProfileByUserIdDto(pUserId = userId))
+            val dto = client.getProfileByUserId(GetProfileByUserIdDto(pUserId = userId))
                 .firstOrNull()
-                ?.toUserProfileDto()
             if (dto != null) ProfileFetchResult.Found(dto) else ProfileFetchResult.NotFound
         } catch (e: Exception) {
             // Surface these in production dashboards: a spike here means the OkHttp
             // interceptor is falling back to the anon key (session not yet propagated
-            // after signInWith(IDToken)), which the RPC rejects. recordSafeNonFatal
-            // strips the message so no PII (user id, token) reaches Crashlytics.
-            recordSafeNonFatal("auth_profile_fetch_failed", e)
+            // after signInWith(IDToken)), which the RPC rejects. The message is stripped
+            // (mirrors the old recordSafeNonFatal helper) so no PII (user id, token)
+            // reaches the crash reporter.
+            crashReporter.recordException(
+                RuntimeException("[auth_profile_fetch_failed] ${e::class.simpleName}", e),
+            )
             if (BuildConfig.DEBUG) {
                 Log.w(TAG, "getProfileByUserId failed for user $userId", e)
             } else {
@@ -154,7 +142,7 @@ class UserProfileDataSource(
             "completeUserProfile called with a blank nickname for user ${user.id}"
         }
 
-        val profileDto = service.completeUserProfile(
+        val profileDto = client.completeUserProfile(
             CompleteUserProfileDto(pNickname = trimmedNickname)
         ).firstOrNull()
         user.copy(
@@ -180,7 +168,7 @@ class UserProfileDataSource(
             return@withContext user
         }
         try {
-            service.upsertProfile(
+            client.upsertProfile(
                 profile = UpsertUserProfileDto(
                     id = user.id,
                     email = user.email,
@@ -192,7 +180,7 @@ class UserProfileDataSource(
             )
 
             // Read back the full row to retrieve the server-generated game_tag.
-            val profile = service.fetchProfile("eq.${user.id}").firstOrNull()
+            val profile = client.fetchProfile("eq.${user.id}").firstOrNull()
             if (profile != null) {
                 user.copy(gameTag = profile.gameTag)
             } else {
@@ -232,21 +220,17 @@ class UserProfileDataSource(
         tradeListPublic: Boolean? = null,
     ): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
-            // Build a sparse map so that only the fields that actually changed are sent.
-            // This prevents Gson's serializeNulls from writing null into NOT NULL columns.
-            val body = buildMap<String, Any> {
-                if (collectionPublic != null) put("collection_public", collectionPublic)
-                if (wishlistPublic != null) put("wishlist_public", wishlistPublic)
-                if (tradeListPublic != null) put("trade_list_public", tradeListPublic)
+            // Build a sparse JsonObject so that only the fields that actually changed are sent.
+            val body = buildJsonObject {
+                if (collectionPublic != null) put("collection_public", JsonPrimitive(collectionPublic))
+                if (wishlistPublic != null) put("wishlist_public", JsonPrimitive(wishlistPublic))
+                if (tradeListPublic != null) put("trade_list_public", JsonPrimitive(tradeListPublic))
             }
             check(body.isNotEmpty()) { "updatePrivacySettings called with all-null arguments" }
-            val response = service.updatePrivacySettings(
+            client.updatePrivacySettings(
                 idFilter = "eq.$userId",
                 body = body,
             )
-            if (!response.isSuccessful) {
-                error("HTTP ${response.code()} updating privacy settings for user $userId")
-            }
         }.onFailure { e ->
             if (BuildConfig.DEBUG) {
                 Log.w(TAG, "updatePrivacySettings failed for user $userId", e)
@@ -255,17 +239,6 @@ class UserProfileDataSource(
             }
         }
     }
-
-    // ── Mappers ───────────────────────────────────────────────────────────────
-
-    private fun UserProfileRetrofitDto.toUserProfileDto() = UserProfileDto(
-        id = id,
-        nickname = nickname,
-        gameTag = gameTag,
-        avatarUrl = avatarUrl,
-        provider = provider,
-        profileCompleted = profileCompleted,
-    )
 
     private companion object {
         private const val TAG = "UserProfileDataSource"

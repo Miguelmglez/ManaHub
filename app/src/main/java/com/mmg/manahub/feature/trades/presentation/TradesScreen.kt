@@ -10,12 +10,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExpandLess
@@ -38,11 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.AvatarImage
@@ -51,14 +50,20 @@ import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import com.mmg.manahub.feature.auth.presentation.LoginSheet
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.trades.domain.model.OpenForTradeEntry
-import com.mmg.manahub.feature.trades.domain.model.WishlistEntry
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.model.WishlistEntry
 import java.util.Locale
+
+/** Reserves room above the bottom bar for the screen's FloatingActionButton (matches the
+ *  named-constant convention used elsewhere, e.g. `DeckStudioScreen.FabClearance`). */
+private val FabClearance = 88.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,17 +71,21 @@ fun TradesScreen(
     onCardClick: (scryfallId: String) -> Unit,
     onNavigateToProposal: (receiverId: String) -> Unit = {},
     onNavigateToThread: (proposalId: String, rootProposalId: String) -> Unit = { _, _ -> },
-    viewModel: TradesViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel(),
+    viewModel: TradesViewModel = koinViewModel(),
+    authViewModel: AuthViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
     var showLoginSheet by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.snackbarMessage) {
-        val msg = uiState.snackbarMessage ?: return@LaunchedEffect
-        toastState.show(msg)
-        viewModel.onSnackbarDismissed()
+    val syncFailedMessage = stringResource(R.string.trades_sync_failed)
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is TradesEvent.ShowMessage -> event.message?.let { toastState.show(it) }
+                TradesEvent.SyncFailed -> toastState.show(syncFailedMessage)
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -104,8 +113,6 @@ fun TradesScreen(
                         TradesMainTab.MY_LIST -> MyListContent(
                             uiState = uiState,
                             onCardClick = onCardClick,
-                            onWishlistSelect = viewModel::onToggleWishlistSelect,
-                            onOfferSelect = viewModel::onToggleOfferSelect,
                         )
 
                         TradesMainTab.FRIENDS -> FriendsContent(
@@ -133,9 +140,12 @@ fun TradesScreen(
                 contentColor = mc.background,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(16.dp)
+                    .padding(MaterialTheme.spacing.lg)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.trades_create_proposal_content_description),
+                )
             }
         }
 
@@ -164,11 +174,12 @@ private fun TradesSubNavigation(
     onTabSelected: (TradesMainTab) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = spacing.lg, vertical = spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
     ) {
         TradesMainTab.entries.forEach { tab ->
             val label = when (tab) {
@@ -213,15 +224,14 @@ private fun TradesSubNavigation(
 private fun MyListContent(
     uiState: TradesUiState,
     onCardClick: (String) -> Unit,
-    onWishlistSelect: (String) -> Unit,
-    onOfferSelect: (String) -> Unit,
 ) {
     var wishlistExpanded by remember { mutableStateOf(true) }
     var offersExpanded by remember { mutableStateOf(true) }
+    val spacing = MaterialTheme.spacing
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 88.dp),
+        contentPadding = PaddingValues(bottom = FabClearance),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         // ── My Wishlist section ───────────────────────────────────────────────
@@ -231,7 +241,7 @@ private fun MyListContent(
                 count = uiState.wishlist.size,
                 expanded = wishlistExpanded,
                 onToggle = { wishlistExpanded = !wishlistExpanded },
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = spacing.lg)
             )
         }
         if (wishlistExpanded) {
@@ -241,23 +251,21 @@ private fun MyListContent(
                         text = stringResource(R.string.state_empty),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = MaterialTheme.magicColors.textDisabled,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
                     )
                 }
             } else {
                 items(uiState.wishlist, key = { "w_${it.id}" }) { entry ->
                     WishlistEntryRow(
                         entry = entry,
-                        isSelected = entry.id in uiState.selectedWishlistIds,
                         onCardClick = onCardClick,
-                        onSelect = { onWishlistSelect(entry.id) },
                     )
                     HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
                 }
             }
         }
 
-        item(key = "spacer_1") { Spacer(Modifier.height(8.dp)) }
+        item(key = "spacer_1") { Spacer(Modifier.height(spacing.sm)) }
 
         // ── My Offers section ─────────────────────────────────────────────────
         item(key = "offers_header") {
@@ -266,7 +274,7 @@ private fun MyListContent(
                 count = uiState.openForTrade.size,
                 expanded = offersExpanded,
                 onToggle = { offersExpanded = !offersExpanded },
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = spacing.lg)
             )
         }
         if (offersExpanded) {
@@ -276,16 +284,14 @@ private fun MyListContent(
                         text = stringResource(R.string.state_empty),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = MaterialTheme.magicColors.textDisabled,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
                     )
                 }
             } else {
                 items(uiState.openForTrade, key = { "o_${it.id}" }) { entry ->
                     OfferEntryRow(
                         entry = entry,
-                        isSelected = entry.id in uiState.selectedOfferIds,
                         onCardClick = onCardClick,
-                        onSelect = { onOfferSelect(entry.id) },
                     )
                     HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
                 }
@@ -304,21 +310,22 @@ private fun FriendsContent(
     onFriendClick: (Friend) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     if (friends.isEmpty()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
+                .padding(spacing.xxl),
             contentAlignment = Alignment.Center,
         ) {
             Surface(
-                shape = RoundedCornerShape(16.dp),
+                shape = CardShape,
                 color = mc.surface,
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
                     Text(
                         text = stringResource(R.string.trades_no_friends_cta),
@@ -332,8 +339,8 @@ private fun FriendsContent(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 88.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(start = spacing.lg, top = spacing.sm, end = spacing.lg, bottom = FabClearance),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             items(friends, key = { it.id }) { friend ->
                 FriendDashboardRow(
@@ -351,15 +358,16 @@ private fun FriendDashboardRow(
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = CardShape,
         color = mc.surface,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AvatarImage(
@@ -367,7 +375,7 @@ private fun FriendDashboardRow(
                 initials = friend.nickname.take(1).uppercase(Locale.getDefault()),
                 size = 40,
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = friend.nickname,
@@ -406,8 +414,8 @@ private fun CollapsibleSectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(vertical = 8.dp),
+            .heightIn(min = 48.dp) // project rule: every interactive element >= 48dp touch target
+            .clickable(onClick = onToggle),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -432,11 +440,8 @@ private fun CollapsibleSectionHeader(
 @Composable
 private fun WishlistEntryRow(
     entry:      WishlistEntry,
-    isSelected: Boolean,
     onCardClick: (String) -> Unit,
-    onSelect:   () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
     val card = entry.card
 
     CardListItem(
@@ -446,7 +451,6 @@ private fun WishlistEntryRow(
         priceEur = if (entry.isFoil == true) card?.priceEurFoil else card?.priceEur,
         quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
         onClick = { onCardClick(entry.cardId) },
-        containerColor = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else Color.Transparent,
         hasFoil = entry.isFoil == true,
         isStale = card?.isStale ?: false,
         setCode = card?.setCode,
@@ -457,7 +461,7 @@ private fun WishlistEntryRow(
         language = entry.language,
         extraSupportingContent = {
             if (entry.matchAnyVariant) {
-                CopyBadge(label = "Any variant")
+                CopyBadge(label = stringResource(R.string.trades_any_variant))
             }
         }
     )
@@ -470,11 +474,8 @@ private fun WishlistEntryRow(
 @Composable
 private fun OfferEntryRow(
     entry:      OpenForTradeEntry,
-    isSelected: Boolean,
     onCardClick: (String) -> Unit,
-    onSelect:   () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
     val card = entry.card
 
     CardListItem(
@@ -484,7 +485,6 @@ private fun OfferEntryRow(
         priceEur = if (entry.isFoil) card?.priceEurFoil else card?.priceEur,
         quantityText = if (entry.quantity > 1) "×${entry.quantity}" else null,
         onClick = { onCardClick(entry.scryfallId) },
-        containerColor = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else Color.Transparent,
         hasFoil = entry.isFoil,
         isStale = card?.isStale ?: false,
         setCode = card?.setCode,

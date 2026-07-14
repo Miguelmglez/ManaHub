@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.push
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -11,17 +10,19 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 
 /**
  * Background retry for a failed token de-registration. Calls [PushTokenRemoteDataSource.delete]
  * and retries (up to 3 attempts) while a network connection is available.
+ *
+ * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
+ * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `core.push.di.pushKoinModule`
+ * ([dataSource] is forward-bridged there from the same Hilt-built singleton
+ * [PushTokenRepositoryImpl][com.mmg.manahub.core.data.repository.PushTokenRepositoryImpl] still uses).
  */
-@HiltWorker
-class UnregisterPushTokenWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters,
+class UnregisterPushTokenWorker(
+    appContext: Context,
+    workerParams: WorkerParameters,
     private val dataSource: PushTokenRemoteDataSource,
 ) : CoroutineWorker(appContext, workerParams) {
 

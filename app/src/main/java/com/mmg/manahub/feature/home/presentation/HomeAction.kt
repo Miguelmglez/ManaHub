@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
+import com.mmg.manahub.core.model.QuickStartAction
+
 /**
  * All user intents emitted by the Home screen.
  *
@@ -20,6 +22,7 @@ sealed interface HomeAction {
     object OpenStats : HomeAction
     object OpenFriends : HomeAction
     object OpenTrades : HomeAction
+    object OpenCommunityDecks : HomeAction
     object OpenTournaments : HomeAction
     object OpenSettings : HomeAction
     object OpenProfile : HomeAction
@@ -80,7 +83,7 @@ sealed interface HomeAction {
      *
      * @param set the set to scope to, or null to clear the filter and use the default random query.
      */
-    data class SelectDiscoverSet(val set: com.mmg.manahub.core.domain.model.MagicSet?) : HomeAction
+    data class SelectDiscoverSet(val set: com.mmg.manahub.core.model.MagicSet?) : HomeAction
 
     /**
      * Resets the persisted News filters (languages/types/sources) back to their defaults
@@ -103,5 +106,14 @@ sealed interface HomeAction {
     data class OpenNewsUrl(val url: String) : HomeAction
 
     /** Open the full draft guide detail for a specific set. */
-    data class OpenDraftSetDetail(val set: com.mmg.manahub.core.domain.model.DraftSet) : HomeAction
+    data class OpenDraftSetDetail(val set: com.mmg.manahub.core.model.DraftSet) : HomeAction
+
+    /**
+     * Navigates into the Deck Playtest setup screen for [deckId], or the deck list when
+     * [deckId] is null (no decks yet). Resolved from [PlaytestRecentDeck] inside [HomeScreen]'s
+     * stateful entry point (the only place with access to [HomeUiState.decks]) — the static
+     * [FirstStepItem] catalog cannot bake a dynamic deck id into its declarative action, so
+     * [PlaytestRecentDeck] stays a payload-less trigger and this carries the resolved id.
+     */
+    data class NavigatePlaytest(val deckId: String?) : HomeAction
 }

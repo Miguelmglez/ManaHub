@@ -81,20 +81,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.decode.SvgDecoder
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.svg.SvgDecoder
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.AdvancedSearchQuery
-import com.mmg.manahub.core.domain.model.ComparisonOperator
-import com.mmg.manahub.core.domain.model.SearchDirection
-import com.mmg.manahub.core.domain.model.SearchOrder
+import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.ComparisonOperator
+import com.mmg.manahub.core.model.SearchDirection
+import com.mmg.manahub.core.model.SearchOrder
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -102,7 +104,7 @@ fun AdvancedSearchSheet(
     onDismiss: () -> Unit,
     onSearch: (advancedQuery: AdvancedSearchQuery, rawScryfall: String) -> Unit,
     isCollectionMode: Boolean = false,
-    viewModel: AdvancedSearchViewModel = hiltViewModel(),
+    viewModel: AdvancedSearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
@@ -849,12 +851,12 @@ fun AdvancedSearchSheet(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                com.mmg.manahub.core.domain.model.CardTag.canonical.forEach { tag ->
+                                com.mmg.manahub.core.model.CardTag.canonical.forEach { tag ->
                                     val isSelected = uiState.filterTags.contains(tag.key)
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = { viewModel.toggleFilterTag(tag.key) },
-                                        label = { Text(tag.label, style = ty.labelMedium) },
+                                        label = { Text(tag.label(), style = ty.labelMedium) },
                                     )
                                 }
                             }

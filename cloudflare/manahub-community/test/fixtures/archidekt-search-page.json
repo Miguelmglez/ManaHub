@@ -1,0 +1,98 @@
+{
+  "count": 1000,
+  "next": "http://archidekt.com/api/decks/v3/?cardName=Krenko%2C+Mob+Boss&deckFormat=3&page=2&pageSize=60",
+  "results": [
+    {
+      "id": 24261502,
+      "name": "Commander's I Enjoy",
+      "size": 100,
+      "deckFormat": 3,
+      "owner": {
+        "id": 52889,
+        "username": "fake_user_1",
+        "avatar": "https://example.invalid/avatar.svg"
+      },
+      "viewCount": 1,
+      "createdAt": "2026-07-11T07:42:35.333710Z",
+      "updatedAt": "2026-07-11T14:28:07.044410Z",
+      "colors": { "W": 0, "U": 0, "B": 0, "R": 51, "G": 0 },
+      "tags": [{ "id": 2668303, "tag": 85, "deck": 24261502, "name": "Goblins", "position": "M-500000" }],
+      "edhBracket": null,
+      "private": false,
+      "unlisted": false,
+      "theorycrafted": false
+    },
+    {
+      "id": 15845995,
+      "name": "Krenko, Mob Boss",
+      "size": 100,
+      "deckFormat": 3,
+      "owner": {
+        "id": 681126,
+        "username": "fake_user_2",
+        "avatar": "https://example.invalid/avatar.png"
+      },
+      "viewCount": 356,
+      "createdAt": "2025-09-07T15:47:40.847437Z",
+      "updatedAt": "2026-07-11T13:08:15.911593Z",
+      "colors": { "W": 0, "U": 0, "B": 0, "R": 54, "G": 0 },
+      "tags": [],
+      "edhBracket": 4,
+      "private": false,
+      "unlisted": false,
+      "theorycrafted": false
+    },
+    {
+      "id": 24264353,
+      "name": "Krenko, Mob Boss (theorycrafted)",
+      "size": 100,
+      "deckFormat": 3,
+      "owner": {
+        "id": 1068699,
+        "username": "fake_user_3",
+        "avatar": "https://example.invalid/avatar.svg"
+      },
+      "viewCount": 1,
+      "createdAt": "2026-07-11T11:58:49.763856Z",
+      "updatedAt": "2026-07-11T13:45:24.437551Z",
+      "colors": { "W": 0, "U": 0, "B": 0, "R": 49, "G": 0 },
+      "tags": [],
+      "edhBracket": null,
+      "private": false,
+      "unlisted": false,
+      "theorycrafted": true
+    },
+    {
+      "id": 22912077,
+      "name": "Private one",
+      "size": 114,
+      "deckFormat": 3,
+      "owner": { "id": 810499, "username": "fake_user_4", "avatar": "" },
+      "viewCount": 1,
+      "createdAt": "2026-05-25T14:28:26.870124Z",
+      "updatedAt": "2026-07-11T12:35:25.032209Z",
+      "colors": { "W": 0, "U": 0, "B": 0, "R": 60, "G": 0 },
+      "tags": [],
+      "edhBracket": 4,
+      "private": true,
+      "unlisted": false,
+      "theorycrafted": false
+    },
+    {
+      "id": 19510753,
+      "name": "12-card pile",
+      "size": 12,
+      "deckFormat": 3,
+      "owner": { "id": 376431, "username": "fake_user_5", "avatar": "" },
+      "viewCount": 265,
+      "createdAt": "2026-01-31T01:34:36.028562Z",
+      "updatedAt": "2026-07-11T14:28:06.763815Z",
+      "colors": { "W": 0, "U": 0, "B": 43, "R": 22, "G": 17 },
+      "tags": [],
+      "edhBracket": null,
+      "private": false,
+      "unlisted": false,
+      "theorycrafted": false
+    }
+  ]
+}

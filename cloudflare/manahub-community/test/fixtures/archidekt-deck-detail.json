@@ -1,0 +1,66 @@
+{
+  "id": 24261502,
+  "name": "Commander's I Enjoy",
+  "description": "",
+  "deckFormat": 3,
+  "edhBracket": null,
+  "private": false,
+  "unlisted": false,
+  "theorycrafted": false,
+  "deckTags": [],
+  "owner": { "id": 52889, "username": "fake_user_1", "avatar": "" },
+  "viewCount": 1,
+  "createdAt": "2026-07-11T07:42:35.333710Z",
+  "updatedAt": "2026-07-11T14:28:07.044410Z",
+  "cards": [
+    {
+      "quantity": 1,
+      "categories": ["Commander"],
+      "card": {
+        "uid": "605afac4-d2e5-4e68-97d2-3ac2ead5f3a9",
+        "oracleCard": {
+          "id": 49583,
+          "uid": "977f9390-e01d-4e9d-8e9c-e543b1266972",
+          "name": "Krenko, Mob Boss",
+          "cmc": 3,
+          "colorIdentity": ["Red"],
+          "colors": ["Red"],
+          "manaCost": "{2}{R}",
+          "types": ["Creature"],
+          "text": "Whenever Krenko, Mob Boss attacks, create X 1/1 red Goblin creature tokens, where X is Krenko's power.",
+          "legalities": {
+            "commander": "legal",
+            "modern": "not_legal",
+            "legacy": "legal",
+            "vintage": "legal",
+            "pauper": "not_legal",
+            "standard": "not_legal"
+          }
+        }
+      }
+    },
+    {
+      "quantity": 1,
+      "categories": ["Land"],
+      "card": {
+        "uid": "d0d33d52-3d28-4635-b985-51e126289259",
+        "oracleCard": {
+          "id": 1,
+          "uid": "sol-ring-uid",
+          "name": "Sol Ring",
+          "cmc": 1,
+          "colorIdentity": [],
+          "colors": [],
+          "manaCost": "{1}",
+          "types": ["Artifact"],
+          "text": "Add {C}{C}.",
+          "legalities": { "commander": "legal" }
+        }
+      }
+    }
+  ],
+  "categories": [
+    { "name": "Commander", "isPremier": true, "includedInDeck": true },
+    { "name": "Land", "isPremier": false, "includedInDeck": true }
+  ]
+}

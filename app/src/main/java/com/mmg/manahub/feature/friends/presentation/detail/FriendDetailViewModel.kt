@@ -3,18 +3,19 @@ package com.mmg.manahub.feature.friends.presentation.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.model.Condition
+import com.mmg.manahub.core.model.FolderFilters
 import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
-import com.mmg.manahub.feature.friends.domain.model.FriendStats
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.FriendMatchHistory
+import com.mmg.manahub.core.model.FriendStats
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.repository.TradesRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.data.repository.TradesRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +34,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /** Top-level tabs displayed on the friend detail screen. */
 enum class FriendTab { FOLDER, STATS, HISTORY }
@@ -49,31 +49,19 @@ enum class FolderSubTab(val listValue: String) {
     TRADE("trade"),
 }
 
-enum class Condition(val label: String) {
-    NM("NM"), LP("LP"), MP("MP"), HP("HP"), DMG("DMG")
-}
-
-data class FolderFilters(
-    val sets: Set<String> = emptySet(),
-    val rarities: Set<com.mmg.manahub.core.domain.model.Rarity> = emptySet(),
-    val colors: Set<com.mmg.manahub.core.domain.model.MtgColor> = emptySet(),
-    val foilOnly: Boolean = false,
-    val conditions: Set<Condition> = emptySet(),
-    val languages: Set<String> = emptySet()
-) {
-    val hasFilters: Boolean
-        get() = sets.isNotEmpty() || rarities.isNotEmpty() || colors.isNotEmpty() || foilOnly || conditions.isNotEmpty() || languages.isNotEmpty()
-}
-
 /**
  * ViewModel for the friend detail screen.
  *
  * Reads the friend's auth UUID from [SavedStateHandle] under key `"userId"`, looks up
  * the matching [Friend] domain model from the local friends cache, and reactively
  * loads card lists whenever the selected sub-tab or search query changes.
+ *
+ * KMP migration — Phase 1 Hilt→Koin cutover: this VM is resolved by Koin (`koinViewModel()`) via
+ * [com.mmg.manahub.feature.friends.di.friendsKoinModule]. Its `savedStateHandle` is the Koin-injected
+ * [SavedStateHandle] (`savedStateHandle = get()`), which carries the `"userId"` nav arg exactly as the
+ * Hilt-injected one did — so nav-arg behaviour is unchanged.
  */
-@HiltViewModel
-class FriendDetailViewModel @Inject constructor(
+class FriendDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val friendRepo: FriendRepository,
     private val getFriendCollectionUseCase: GetFriendCollectionUseCase,
@@ -385,8 +373,8 @@ class FriendDetailViewModel @Inject constructor(
 
     fun toggleFilter(
         sets: Set<String>? = null,
-        rarities: Set<com.mmg.manahub.core.domain.model.Rarity>? = null,
-        colors: Set<com.mmg.manahub.core.domain.model.MtgColor>? = null,
+        rarities: Set<com.mmg.manahub.core.model.Rarity>? = null,
+        colors: Set<com.mmg.manahub.core.model.MtgColor>? = null,
         foilOnly: Boolean? = null,
         conditions: Set<Condition>? = null,
         languages: Set<String>? = null,

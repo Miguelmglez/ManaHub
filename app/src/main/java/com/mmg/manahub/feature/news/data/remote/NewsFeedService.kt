@@ -6,11 +6,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class NewsFeedService @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.feature.news.di.newsKoinModule].
+ */
+class NewsFeedService(
     private val client: OkHttpClient,
 ) {
     suspend fun fetchFeed(url: String): Result<String> = withContext(Dispatchers.IO) {

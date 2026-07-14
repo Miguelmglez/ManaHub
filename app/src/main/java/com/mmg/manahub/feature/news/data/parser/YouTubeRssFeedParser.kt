@@ -1,14 +1,12 @@
 package com.mmg.manahub.feature.news.data.parser
 
 import android.util.Xml
-import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
+import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class YouTubeRssFeedParser @Inject constructor() {
+/** KMP migration — Hilt→Koin cutover batch 3. Plain class; a native Koin `single`. */
+class YouTubeRssFeedParser {
 
     fun parse(xml: String, sourceId: String, sourceName: String): List<NewsVideoEntity> {
         val videos = mutableListOf<NewsVideoEntity>()

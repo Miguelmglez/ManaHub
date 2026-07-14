@@ -96,28 +96,23 @@
     <string name="collection_sort_cmc">Mana cost</string>
     <string name="collection_view_grid">Grid view</string>
     <string name="collection_view_list">List view</string>
+    <string name="collection_sort_label">Sort by:</string>
 
     <!-- ══════════════════════════════════════════
          ADD CARD SCREEN
     ═══════════════════════════════════════════ -->
     <string name="addcard_title">Add Card</string>
-    <string name="addcard_tab_search">Search</string>
-    <string name="addcard_tab_scanner">Scanner</string>
     <string name="addcard_search_hint">Card name…</string>
     <string name="addcard_search_min_chars">Type at least 2 characters to search</string>
     <string name="addcard_no_results">No cards found</string>
     <string name="addcard_no_results_subtitle">Try searching in another language\nor check the spelling</string>
-    <string name="addcard_scanner_title">Scan card</string>
-    <string name="addcard_scanner_subtitle">Point the camera at cards art</string>
     <string name="addcard_scanner_button">Open Scanner</string>
-    <string name="addcard_confirm_title">Add</string>
-    <string name="addcard_confirm_quantity">Quantity</string>
-    <string name="addcard_confirm_foil">Foil</string>
-    <string name="addcard_confirm_condition">Condition</string>
-    <string name="addcard_confirm_language">Language</string>
-    <string name="addcard_confirm_button">Add</string>
+    <string name="addcard_spotlight_header">Latest Set: %1$s</string>
+    <string name="addcard_language_button">Search language: %1$s. Tap to change.</string>
+    <string name="addcard_language_sheet_title">Search language</string>
+    <string name="shared_foil">Foil</string>
 
-    <string name="addcard_added_success">%1$s added to collection</string>
+
 
     <string name="card_condition_m">Mint</string>
     <string name="card_condition_nm">Near Mint</string>
@@ -231,7 +226,7 @@
          TAG DICTIONARY SCREEN
     ═══════════════════════════════════════════ -->
     <string name="tagdictionary_title">Tag Dictionary</string>
-    <string name="tagdictionary_reset_all_description">Reset all</string>
+    <string name="tagdictionary_reset_all_description">Delete all custom tags</string>
     <string name="tagdictionary_search_hint">Search tag…</string>
     <string name="tagdictionary_edit_title">Edit: %1$s</string>
     <string name="tagdictionary_thresholds_title">Precision Thresholds</string>
@@ -244,6 +239,16 @@
     <string name="tagdictionary_labels_section">Labels</string>
     <string name="tagdictionary_patterns_hint">One rule per line. Combine required terms with \' + \'. Prefix a term with \'!\' to exclude. Example: gain + life + !gain control</string>
     <string name="tagdictionary_patterns_en_label">Patterns</string>
+    <string name="tagdictionary_system_readonly">System tag · read-only</string>
+    <string name="tagdictionary_create_custom_tag">Create custom tag</string>
+    <string name="tagdictionary_create_custom_tag_description">Create custom tag</string>
+    <string name="tagdictionary_create_label_hint">Give your custom tag a name</string>
+    <string name="tagdictionary_reset_all_confirm_title">Delete all custom tags?</string>
+    <string name="tagdictionary_reset_all_confirm_message">This deletes every tag you created. System tags are never affected.</string>
+    <string name="tagdictionary_reset_all_confirm_action">Delete all</string>
+    <string name="tagdictionary_reset_all_success_toast">All custom tags deleted</string>
+    <string name="tagdictionary_empty_title">No tags found</string>
+    <string name="tagdictionary_empty_subtitle">Try a different search, or create a custom tag.</string>
 
     <!-- ══════════════════════════════════════════
          SCANNER SCREEN
@@ -678,6 +683,11 @@
     <string name="deck_health_warning_color_source_shortage">Not enough %1$s sources: %2$d (aim for about %3$d to cast your %1$s spells reliably).</string>
     <string name="deck_health_warning_unfixed_splash">Your %1$s is unfixed: almost no lands make %1$s mana. Add fixing or cut the color.</string>
 
+    <!-- Archetype-aware warnings (Deck Doctor Community/Archetype plan, Phase 1.6) -->
+    <string name="deck_health_warning_archetype_role_gap">Missing %1$s for this plan — aim for about %2$d (have %3$d).</string>
+    <string name="deck_health_warning_archetype_anti_role">Too many %1$s for this plan: %2$d (aim for at most %3$d).</string>
+    <string name="deck_health_warning_curve_outside_archetype_band">Mana curve (avg %1$s) is outside this plan\'s expected %2$s-%3$s range.</string>
+
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
     ═══════════════════════════════════════════ -->
@@ -706,6 +716,16 @@
     <!-- Origin badges -->
     <string name="deck_doctor_origin_wishlist">Wishlist</string>
     <string name="deck_doctor_origin_new">New</string>
+
+    <!-- Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) -->
+    <string name="deck_studio_suggestions_community_header">Popular in similar decks</string>
+    <string name="deck_studio_suggestions_similar_decks_header">Decks like yours</string>
+    <string name="deck_doctor_community_inclusion">%1$d%% of %2$s decks</string>
+    <string name="deck_doctor_community_fills_gap">Fills a gap</string>
+    <string name="deck_doctor_community_color_match">%1$d%% color match</string>
+    <string name="deck_doctor_community_view_decks_cd">View decks containing %1$s</string>
+    <string name="deck_doctor_community_unavailable">Community data unavailable</string>
+    <string name="deck_doctor_community_empty">No community data for this deck yet.</string>
 
     <!-- Budget filter bar (Phase 6) -->
     <string name="deck_doctor_budget_title">Budget</string>
@@ -739,6 +759,8 @@
     <string name="deck_seeds_skeleton_title">Deck skeleton</string>
     <string name="deck_seeds_generate_cta">Generate deck →</string>
     <string name="deck_seeds_generating">Generating…</string>
+    <string name="deck_seeds_use_community_data_title">Use community data</string>
+    <string name="deck_seeds_use_community_data_subtitle">Prioritize cards popular in decks like this one</string>
 
     <!-- Deck Studio — unified hybrid deck builder (manual + suggestions + seed auto-build) -->
     <string name="deck_studio_title">Deck Studio</string>
@@ -760,11 +782,24 @@
     <string name="deck_studio_suggestions_tab_health">Health</string>
     <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
     <string name="deck_studio_suggestions_tab_adds">Adds</string>
+    <string name="deck_studio_suggestions_from_collection">From your collection</string>
+    <string name="deck_studio_suggestions_from_collection_empty_subtitle">Nothing in your collection fits this deck\'s gaps right now.</string>
     <string name="deck_studio_card_added">Added %1$s</string>
     <string name="deck_studio_card_cut">Removed %1$s</string>
-    <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Check your connection and try again.</string>
+    <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Please try again.</string>
     <string name="deck_studio_tab_build">Build</string>
     <string name="deck_studio_tab_suggestions">Suggestions</string>
+
+    <!-- Archetype plan (Deck Doctor Community/Archetype plan, Phase 1.7) -->
+    <string name="deck_studio_archetype_chip_prefix">Deck plan: %1$s</string>
+    <string name="deck_studio_archetype_chip_action">Edit deck plan</string>
+    <string name="deck_studio_archetype_low_confidence_hint">Set your deck\'s plan for better advice</string>
+    <string name="deck_studio_archetype_sheet_title">Deck plan</string>
+    <string name="deck_studio_archetype_sheet_macro_label">Archetype</string>
+    <string name="deck_studio_archetype_sheet_themes_label">Themes (up to 2)</string>
+    <string name="deck_studio_archetype_auto_detect">Auto-detect</string>
+    <string name="deck_studio_archetype_apply">Apply</string>
+    <string name="deck_studio_archetype_plan_updated">Deck plan updated</string>
     <string name="deck_studio_empty_title">Your deck is empty</string>
     <string name="deck_studio_empty_subtitle">Add cards with the + button, or import an existing list.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
@@ -839,6 +874,7 @@
     <string name="gamesetup_friends_join_subtitle">Enter a 6-digit room code</string>
     <string name="gamesetup_friends_tournaments_title">Tournaments</string>
     <string name="gamesetup_friends_tournaments_subtitle">Create or join a tournament</string>
+    <string name="online_sessions_unavailable">Online play is not available yet</string>
     <string name="gamesetup_settings_title">Settings</string>
     <string name="gamesetup_land_reminder_title">Land Reminder</string>
     <string name="gamesetup_land_reminder_subtitle">Show land-played indicator on active player</string>
@@ -1283,8 +1319,8 @@
     <!-- Battlefield (PLAY phase) -->
     <string name="playtest_battle_title">Battlefield</string>
     <string name="playtest_battle_action_end_test">End Test</string>
-    <string name="playtest_battle_confirm_end_title">End this test?</string>
-    <string name="playtest_battle_confirm_end_body">Your progress won\'t be saved.</string>
+    <string name="playtest_battle_confirm_end_title">End playtest?</string>
+    <string name="playtest_battle_confirm_end_body">All progress will be lost.</string>
     <string name="playtest_battle_confirm_end_confirm">End Test</string>
     <string name="playtest_battle_confirm_end_cancel">Keep Playing</string>
     <string name="playtest_battle_zone_lands">Lands</string>
@@ -1673,6 +1709,7 @@
     <string name="advsearch_power_hint">*</string>
     <string name="advsearch_toughness_hint">*</string>
     <string name="advsearch_price_hint">0.00</string>
+    <string name="advsearch_section_language">Language</string>
 
     <!-- ══════════════════════════════════════════
          ERRORS Y MENSAJES GENÉRICOS
@@ -2209,6 +2246,11 @@
     <string name="trades_login_required_subtitle">Build your wishlist, list cards you\'re open to trade, and discover smart matches with friends. Sign in to get started.</string>
     <string name="trades_login_required_action">Log in / Sign up</string>
 
+    <!-- Trades list / history — one-shot events and misc UI (audit 2026-07-10) -->
+    <string name="trades_sync_failed">Couldn\'t sync your trade lists. Try again later.</string>
+    <string name="trades_history_unknown_trader">Unknown trader</string>
+    <string name="trades_create_proposal_content_description">Create trade proposal</string>
+
     <!-- Phase 3: status badges (canonical, used in detail screens) -->
     <string name="trade_status_draft">Draft</string>
     <string name="trade_status_proposed">Proposed</string>
@@ -2254,6 +2296,20 @@
     <string name="trades_tab_friend_offers">%1$s\'s offers</string>
     <string name="trades_tab_your_offers">Your offers</string>
     <string name="trades_tab_all_cards">All cards</string>
+
+    <!-- Proposal editor: typed VM feedback (audit §5.1 — replaces the old hardcoded
+         sentinel-to-English mapping in CreateTradeProposalScreen) -->
+    <string name="trades_error_no_receiver">Please select a friend to trade with</string>
+    <string name="trades_error_initial_asymmetry">Both sides must have at least one item</string>
+    <string name="trades_error_self_trade">You cannot trade with yourself</string>
+    <string name="trades_error_not_logged_in">You must be logged in to trade</string>
+    <string name="trades_error_prefill_failed">Couldn\'t load this proposal. Please try again.</string>
+
+    <!-- Proposal editor: friend-selector sheet empty states (audit §5.1) -->
+    <string name="trades_friend_sheet_login_title">Log in to trade with your friends and sync your collection across devices.</string>
+    <string name="trades_friend_sheet_login_action">Log In</string>
+    <string name="trades_friend_sheet_no_friends_title">You don\'t have any friends yet. Add friends to start trading!</string>
+    <string name="trades_friend_sheet_no_friends_action">Add Friends</string>
 
     <!-- Phase 3: negotiation screen -->
     <string name="trades_negotiation_title">Trade Negotiation</string>
@@ -2308,6 +2364,7 @@
     <string name="trades_update_collection">Update Collection</string>
     <string name="trades_collection_updated">✓ Collection updated</string>
     <string name="trades_collection_update_success">Collection updated successfully</string>
+    <string name="trades_collection_update_failed">Failed to update collection</string>
     <string name="trades_history_awaiting_response">Awaiting their response</string>
     <string name="trades_history_your_turn">Your turn</string>
     <string name="trades_history_refreshing">Updating…</string>
@@ -2384,6 +2441,10 @@
     <string name="lobby_host_default_name">Host</string>
     <string name="lobby_player_default_name">Player</string>
     <string name="lobby_existing_session_abandon">Abandon &amp; create new</string>
+    <string name="lobby_session_finished_msg">The game has ended.</string>
+    <string name="lobby_session_abandoned_msg">The host closed the room.</string>
+    <string name="lobby_action_close_room">Close room</string>
+    <string name="lobby_action_leave_room">Leave room</string>
 
     <!-- Home widget board -->
     <string name="home_greeting_morning">Good morning, %s</string>
@@ -2502,8 +2563,136 @@
     <string name="home_tournament_empty">No active tournament.</string>
     <string name="home_community_empty">Community stats coming soon.</string>
 
+    <!-- Home feature overhaul (2026-07-13) — Trades Hub real data -->
+    <string name="home_trade_inbox_preview">New offer · %1$d cards</string>
+    <string name="home_trade_suggestions_count">%1$d matches</string>
+    <string name="home_open_for_trade_count">%1$d cards</string>
+    <string name="home_open_for_trade_value">Est. value: %1$s</string>
+
+    <!-- Home feature overhaul — Social Hub real data -->
+    <string name="home_friends_pending_request">New request from %1$s</string>
+    <string name="home_friends_count">%1$d friends</string>
+    <string name="home_most_wishlisted_row">%1$s · %2$d wishlists</string>
+    <!-- Degraded MostWishlisted row when the card's name could not be resolved from the local cache. -->
+    <string name="home_most_wishlisted_row_unnamed">%1$d wishlists</string>
+    <string name="home_archidekt_deck_subtitle">%1$d views · via Archidekt</string>
+    <string name="home_wishlist_value">Value: %1$s</string>
+
+    <!-- Home feature overhaul — Recently Added widget -->
+    <string name="widget_title_recently_added">Recently added</string>
+    <string name="home_recently_added_empty">Scan or add your first card to see it here.</string>
+    <string name="home_recently_added_cta">Scan a card</string>
+    <string name="home_recently_added_quantity">x%1$d</string>
+
+    <!-- Home feature overhaul — First Steps dismiss affordance -->
+    <string name="first_step_dismiss">Dismiss</string>
+
+    <!-- Home feature overhaul — Context Hero copy (hero states) -->
+    <string name="home_hero_label_active_session">ACTIVE SESSION</string>
+    <string name="home_hero_label_draft_in_progress">DRAFT IN PROGRESS</string>
+    <string name="home_hero_label_welcome_back">WELCOME BACK</string>
+    <string name="home_hero_label_get_started">GET STARTED</string>
+    <string name="home_hero_label_loading">LOADING</string>
+    <string name="home_hero_active_game_title">Game in progress</string>
+    <string name="home_hero_active_game_subtitle">%1$s · %2$d players</string>
+    <string name="home_hero_active_game_cta">Resume game</string>
+    <string name="home_hero_active_draft_title">Draft in progress</string>
+    <string name="home_hero_active_draft_subtitle">Set %1$s</string>
+    <string name="home_hero_active_draft_cta">Resume draft</string>
+    <string name="home_hero_summary_title">Welcome back, %1$s</string>
+    <string name="home_hero_summary_subtitle_one">1 game tracked</string>
+    <string name="home_hero_summary_subtitle_many">%1$d games tracked</string>
+    <string name="home_hero_summary_cta">Start a game</string>
+    <string name="home_hero_loading_title">Loading…</string>
+    <string name="home_hero_loading_subtitle">Getting your dashboard ready</string>
+    <string name="home_hero_welcome_title">Welcome to ManaHub</string>
+    <string name="home_hero_welcome_subtitle">Track games, scan cards, and build decks.</string>
+
+    <!-- Home feature overhaul — Game Stats Hub captions -->
+    <string name="home_win_rate_caption">WIN RATE</string>
+    <string name="home_best_performer_caption">BEST PERFORMER</string>
+    <string name="home_current_nemesis_caption">CURRENT NEMESIS</string>
+    <string name="home_latest_battle_caption">LATEST BATTLE</string>
+    <string name="home_last_game_mode_duration">%1$s · %2$s</string>
+    <string name="home_last_game_mode_vs_opponents">%1$s · %2$s · vs %3$d opponents</string>
+
+    <!-- Home feature overhaul — widget gallery hygiene (F-11) -->
+    <string name="home_widget_fixed">FIXED</string>
+    <string name="home_gallery_category_activity">Activity</string>
+    <string name="home_gallery_category_stats">Stats</string>
+    <string name="home_gallery_category_collection">Collection</string>
+    <string name="home_gallery_category_discover">Discover</string>
+    <string name="home_gallery_category_social">Social</string>
+    <string name="home_gallery_category_tournament">Tournament</string>
+    <string name="home_gallery_category_community">Community</string>
+    <string name="home_widget_desc_context_hero">Your most relevant next action</string>
+    <string name="home_widget_desc_quick_actions">One-tap shortcuts</string>
+    <string name="home_widget_desc_game_stats_hub">Win rate, best deck and nemesis</string>
+    <string name="home_widget_desc_collection_stats_hub">Cards, decks, value and color split</string>
+    <string name="home_widget_desc_decks_shelf">Quick access to your decks</string>
+    <string name="home_widget_desc_wishlist">Your wishlist at a glance</string>
+    <string name="home_widget_desc_recently_added">Newest cards added to your collection</string>
+    <string name="home_widget_desc_discover">Discover cards — pick a set or refresh</string>
+    <string name="home_widget_desc_card_of_day">A random card — tap refresh for another</string>
+    <string name="home_widget_desc_latest_sets">Newest sets to draft</string>
+    <string name="home_widget_desc_news">Latest MTG headlines</string>
+    <string name="home_widget_desc_rules_tip">A rules tip each day</string>
+    <string name="home_widget_desc_social_hub">Friends, community and popular decks</string>
+    <string name="home_widget_desc_trades_hub">Trade inbox and suggestions</string>
+    <string name="home_widget_desc_trending_commanders">This week\'s most popular commanders</string>
+
+    <!-- Home feature overhaul — Quick Start labels (widget tiles) -->
+    <string name="quick_start_scan_card">Scan Card</string>
+    <string name="quick_start_deck_builder">Deck Builder</string>
+    <string name="quick_start_draft_guides">Draft Guides</string>
+    <string name="quick_start_search_card">Search Card</string>
+    <string name="quick_start_my_decks">My Decks</string>
+    <string name="quick_start_news">News</string>
+    <string name="quick_start_my_stats">My Stats</string>
+    <string name="quick_start_friends">Friends</string>
+    <string name="quick_start_trades">Trades</string>
+    <string name="quick_start_community">Community</string>
+    <string name="quick_start_settings">Settings</string>
+
+    <!-- Home feature overhaul — Quick Start customization sheet -->
+    <string name="quick_start_sheet_title">Pick 4 shortcuts</string>
+    <string name="quick_start_sheet_subtitle">Selected %1$d of 4. Tap to add or remove.</string>
+    <string name="quick_start_sheet_save">Save</string>
+    <string name="quick_start_sheet_scan_card">Scan card</string>
+    <string name="quick_start_sheet_build_deck">Build deck</string>
+    <string name="quick_start_sheet_draft_guide">Draft guide</string>
+    <string name="quick_start_sheet_search_card">Search card</string>
+    <string name="quick_start_sheet_decks">Decks</string>
+    <string name="quick_start_sheet_news">News</string>
+    <string name="quick_start_sheet_stats">Stats</string>
+    <string name="quick_start_sheet_friends">Friends</string>
+    <string name="quick_start_sheet_trades">Trades</string>
+    <string name="quick_start_sheet_community">Community</string>
+    <string name="quick_start_sheet_settings">Settings</string>
+
+    <!-- Home feature overhaul — account nudge card -->
+    <string name="home_nudge_title">Protect &amp; connect</string>
+    <string name="home_nudge_dismiss">Maybe later</string>
+
+    <!-- Home feature overhaul — accessibility labels (F-13) -->
+    <string name="home_open_profile_a11y">Open profile</string>
+    <string name="home_customize_shortcuts_a11y">Customize shortcuts</string>
+    <string name="home_carousel_previous">Previous</string>
+    <string name="home_carousel_next">Next</string>
+
     <!-- Rules tips (rotated by day) -->
     <string name="home_rules_tip_label">Did you know?</string>
+
+    <!-- Rules tip categories (Home feature overhaul Phase 2.4) -->
+    <string name="tip_category_fundamentals">Fundamentals</string>
+    <string name="tip_category_stack_timing">Stack &amp; Timing</string>
+    <string name="tip_category_combat">Combat</string>
+    <string name="tip_category_keywords">Keywords</string>
+    <string name="tip_category_game_state">Game State</string>
+    <string name="tip_category_commander">Commander</string>
+    <string name="tip_category_tokens_counters">Tokens &amp; Counters</string>
+    <string name="tip_category_deckbuilding">Deckbuilding</string>
+    <string name="tip_category_modern_mechanics">Modern Mechanics</string>
 
     <!-- Widget titles -->
     <string name="widget_title_context_hero">Today</string>
@@ -2529,6 +2718,7 @@
     <string name="widget_title_collection_stats_hub">My Collection</string>
     <string name="widget_title_social_hub">Community</string>
     <string name="widget_title_trades_hub">Trades</string>
+    <string name="widget_title_trending_commanders">Trending Commanders</string>
     <string name="home_edit_widgets">Edit Widgets</string>
     <string name="widget_title_wishlist">Wishlist</string>
     <string name="widget_title_discover">Discover cards</string>
@@ -2854,5 +3044,58 @@
     <string name="reward_cell_a11y_equipped">%1$s, equipped. Tap to unequip.</string>
     <string name="reward_cell_a11y_owned">%1$s, owned. Tap to equip.</string>
     <string name="reward_cell_a11y_locked">%1$s, locked. %2$s.</string>
+
+    <!-- Community Decks -->
+    <string name="community_decks_title">Community Decks</string>
+    <string name="community_deck_detail_title">Deck Details</string>
+    <string name="community_deck_attribution">Created by %1$s on Archidekt</string>
+    <string name="community_deck_view_original">View on Archidekt</string>
+    <string name="community_deck_import">Import Deck</string>
+    <string name="community_deck_importing">Importing deck…</string>
+    <string name="community_deck_import_progress">Resolving cards: %1$d / %2$d</string>
+    <string name="community_deck_import_success">Deck imported successfully</string>
+    <string name="community_deck_import_partial">Deck imported (%1$d of %2$d cards resolved)</string>
+    <string name="community_deck_import_failed">Failed to import deck</string>
+    <string name="community_deck_error_not_found">Deck not found on Archidekt</string>
+    <string name="community_deck_error_network">Could not reach Archidekt. Please try again.</string>
+    <string name="community_deck_error_bot_protection">Archidekt is temporarily unavailable. Please try again later.</string>
+    <string name="community_deck_error_timeout">Request timed out. Please try again.</string>
+    <string name="community_deck_empty_cards">This deck has no cards</string>
+    <string name="community_deck_feature_disabled">Community Decks is not available yet</string>
+    <string name="community_decks_disclaimer">Community deck data is provided by Archidekt. ManaHub is not affiliated with Archidekt. Deck content is user-submitted and does not represent the views of ManaHub.</string>
+    <string name="community_decks_mtg_disclaimer">Magic: The Gathering is a trademark of Wizards of the Coast / Hasbro. ManaHub is unofficial Fan Content permitted under the Fan Content Policy, not approved or endorsed by Wizards of the Coast.</string>
+    <string name="community_deck_cards_mainboard">Mainboard (%1$d)</string>
+    <string name="community_deck_cards_sideboard">Sideboard (%1$d)</string>
+    <string name="community_deck_cards_commander">Commander</string>
+    <string name="community_deck_views">%1$d views</string>
+    <string name="community_deck_format">Format: %1$s</string>
+
+    <!-- Community Decks — Search (Phase 2) -->
+    <string name="community_deck_search_hint">Search by card name…</string>
+    <string name="community_deck_search_button">Search</string>
+    <string name="community_deck_search_empty">No decks found</string>
+    <string name="community_deck_search_empty_with_filter">No decks found with this filter. Try removing the format filter.</string>
+    <string name="community_deck_search_timeout">Search timed out. Try a more specific query or remove the format filter.</string>
+    <string name="community_deck_search_initial">Search for a card to find community decks that include it</string>
+    <string name="community_deck_load_more">Load More</string>
+    <string name="community_deck_result_count">%1$d decks found</string>
+    <string name="community_deck_cards_count">%1$d cards</string>
+    <string name="community_deck_sort_popular">Most Popular</string>
+    <string name="community_deck_sort_recent">Most Recent</string>
+    <string name="community_deck_sort_updated">Recently Updated</string>
+    <string name="community_deck_filter_all_formats">All Formats</string>
+    <string name="community_deck_find_decks">Find Community Decks</string>
+    <string name="community_deck_search_title">Community Decks</string>
+    <string name="community_deck_sort_label">Sort: %1$s</string>
+    <string name="community_deck_sort_label_base">Sort by:</string>
+    <string name="community_deck_format_label">Format:</string>
+
+    <!-- Community Hub — Discover (Deck Doctor Community/Archetype plan, Phase 5) -->
+    <string name="community_hub_tab_discover">Discover</string>
+    <string name="community_hub_tab_search">Search</string>
+    <string name="community_hub_discover_unavailable">Community data unavailable</string>
+    <string name="community_hub_trending_commanders">Top commanders this week</string>
+    <string name="community_hub_trending_cards">Most searched cards</string>
+    <string name="community_hub_popular_decks">Popular decks</string>
 
 </resources>

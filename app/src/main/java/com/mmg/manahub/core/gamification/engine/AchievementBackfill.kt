@@ -4,7 +4,6 @@ import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
 import com.mmg.manahub.core.data.local.entity.XpTransactionEntity
-import com.mmg.manahub.core.di.DefaultDispatcher
 import com.mmg.manahub.core.gamification.domain.LevelCurve
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementCatalog
 import com.mmg.manahub.core.gamification.domain.catalog.AchievementDef
@@ -13,9 +12,7 @@ import com.mmg.manahub.core.gamification.domain.catalog.Family
 import com.mmg.manahub.core.gamification.domain.model.XpSourceCategory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import java.time.Clock
-import javax.inject.Inject
-import javax.inject.Singleton
+import kotlinx.datetime.Clock
 import kotlin.math.floor
 
 /**
@@ -33,12 +30,11 @@ import kotlin.math.floor
  * Family-B (COUNTER) achievements are intentionally NOT backfilled — streaks and remote-backed
  * social/tournament counts cannot be reconstructed from local Room data.
  */
-@Singleton
-class AchievementBackfill @Inject constructor(
+class AchievementBackfill(
     private val dao: GamificationDao,
     private val statsDao: GamificationStatsDao,
     private val clock: Clock,
-    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
+    private val defaultDispatcher: CoroutineDispatcher,
 ) {
 
     private companion object {
@@ -57,7 +53,7 @@ class AchievementBackfill @Inject constructor(
      * `unlocked_at` values are preserved and tier XP is ledger-deduped.
      */
     suspend fun run(): Int = withContext(defaultDispatcher) {
-        val now = clock.millis()
+        val now = clock.now().toEpochMilliseconds()
         val derivedDefs = AchievementCatalog.all.filter { it.family == Family.DERIVED }
 
         val resolved: Map<String, Int> = derivedDefs.associate { def ->

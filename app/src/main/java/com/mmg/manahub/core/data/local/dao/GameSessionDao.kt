@@ -59,6 +59,8 @@ data class LocalSessionHistoryRow(
     val localIsWinner: Boolean,
     val localDeckId: String?,
     val localDeckName: String?,
+    /** Number of OTHER seats in the session (total seats - the local seat itself). */
+    val opponentCount: Int,
 )
 
 /** Matchup win-rate aggregate grouped by the opponent seat's classified archetype. */
@@ -142,7 +144,8 @@ abstract class GameSessionDao {
                gs.surveyStatus,
                ps.isWinner AS localIsWinner,
                ps.deck_id  AS localDeckId,
-               ps.deckName AS localDeckName
+               ps.deckName AS localDeckName,
+               (SELECT COUNT(*) FROM player_sessions ps2 WHERE ps2.sessionId = gs.id) - 1 AS opponentCount
         FROM game_sessions gs
         INNER JOIN player_sessions ps ON ps.sessionId = gs.id AND ps.is_local = 1
         ORDER BY gs.playedAt DESC

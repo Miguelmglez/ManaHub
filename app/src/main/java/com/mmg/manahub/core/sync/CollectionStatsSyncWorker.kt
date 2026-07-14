@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.sync
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -12,10 +11,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.StatsDao
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -30,11 +27,16 @@ import java.util.concurrent.TimeUnit
  * Scheduling is managed by [CollectionStatsSyncWorker.scheduleDailySync], which
  * uses [ExistingPeriodicWorkPolicy.KEEP] so that the period is never reset when the
  * app restarts.
+ *
+ * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
+ * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `core.sync.di.syncKoinModule`.
+ * [authRepo]/[friendRepo] are native Koin singles in `coreBridgeKoinModule`, [syncPrefs] is a native
+ * single in `gamificationEngineKoinModule`, and [statsDao] (Room, stays androidMain) is a NEW
+ * forward-bridge this batch (see `syncKoinModule`'s KDoc).
  */
-@HiltWorker
-class CollectionStatsSyncWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters,
+class CollectionStatsSyncWorker(
+    appContext: Context,
+    workerParams: WorkerParameters,
     private val authRepo: AuthRepository,
     private val syncPrefs: SyncPreferencesStore,
     private val statsDao: StatsDao,

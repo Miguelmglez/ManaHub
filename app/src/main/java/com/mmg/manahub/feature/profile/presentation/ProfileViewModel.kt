@@ -3,12 +3,12 @@ package com.mmg.manahub.feature.profile.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.local.dao.DeckStatsRow
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
-import com.mmg.manahub.core.data.local.entity.GameSessionWithPlayers
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.game.domain.model.DeckStats
+import com.mmg.manahub.feature.game.domain.model.SessionDetail
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.catalog.UnlockableKind
 import com.mmg.manahub.core.gamification.domain.model.AchievementUiModel
@@ -19,12 +19,12 @@ import com.mmg.manahub.core.gamification.domain.model.RewardUiModel
 import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
-import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.settings.presentation.PreferencesState
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +40,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -54,8 +53,7 @@ enum class PlayStyle(val label: String, val icon: String) {
 // ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@HiltViewModel
-class ProfileViewModel @Inject constructor(
+class ProfileViewModel(
     private val statsRepo: StatsRepository,
     private val gameSessionRepo: GameSessionRepository,
     private val surveyAnswerDao: SurveyAnswerDao,
@@ -63,6 +61,7 @@ class ProfileViewModel @Inject constructor(
     private val friendRepository: FriendRepository,
     private val authRepository: AuthRepository,
     private val gamificationRepository: GamificationRepository,
+    private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
 ) : ViewModel() {
 
     data class UiState(
@@ -90,11 +89,11 @@ class ProfileViewModel @Inject constructor(
         val avgHandRating: Double = 0.0,
         val favoriteWinStyle: String = "",
         // Decks + sessions
-        val deckStats: List<DeckStatsRow> = emptyList(),
-        val recentSessions: List<GameSessionWithPlayers> = emptyList(),
+        val deckStats: List<DeckStats> = emptyList(),
+        val recentSessions: List<SessionDetail> = emptyList(),
         // Achievements (gamification Phase 1 — rich model from the catalog + persisted progress)
         val achievements: List<AchievementUiModel> = emptyList(),
-        val preferredCurrency: com.mmg.manahub.core.domain.model.PreferredCurrency = com.mmg.manahub.core.domain.model.PreferredCurrency.USD,
+        val preferredCurrency: com.mmg.manahub.core.model.PreferredCurrency = com.mmg.manahub.core.model.PreferredCurrency.USD,
         // Friends
         val friendCount: Int = 0,
         val pendingFriendCount: Int = 0,
@@ -375,7 +374,7 @@ class ProfileViewModel @Inject constructor(
      */
     fun claimQuest(instanceId: String) {
         viewModelScope.launch {
-            val result = runCatching { gamificationRepository.claimQuest(instanceId) }
+            val result = runCatching { claimQuestRewardUseCase(instanceId) }
                 .getOrElse { ClaimResult.NotFound }
             val event = when (result) {
                 is ClaimResult.Claimed -> Event.QuestClaimed(result.xpAwarded)

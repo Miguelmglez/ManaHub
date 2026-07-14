@@ -1,7 +1,6 @@
 package com.mmg.manahub.core.sync
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -11,16 +10,19 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.usecase.collection.RefreshCollectionPricesUseCase
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
+import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
-@HiltWorker
-class PriceRefreshWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters,
+/**
+ * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
+ * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `core.sync.di.syncKoinModule`.
+ * [refreshPricesUseCase] is a native Koin single in `SharedDomainKoinModule` (KMP migration batch 2);
+ * [userPreferencesDataStore] is bridged in `coreBridgeKoinModule`.
+ */
+class PriceRefreshWorker(
+    appContext: Context,
+    workerParams: WorkerParameters,
     private val refreshPricesUseCase: RefreshCollectionPricesUseCase,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : CoroutineWorker(appContext, workerParams) {

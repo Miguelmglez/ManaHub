@@ -1,37 +1,35 @@
 package com.mmg.manahub.feature.draft.data
 
 import android.content.Context
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonSyntaxException
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
-import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.draft.data.remote.CloudflareContentApi
+import com.mmg.manahub.core.data.remote.CloudflareContentClient
 import com.mmg.manahub.feature.draft.data.remote.dto.BoosterConfigDto
 import com.mmg.manahub.feature.draft.data.remote.dto.EngineConfigDto
-import com.mmg.manahub.feature.draft.domain.model.BoosterCardEntry
-import com.mmg.manahub.feature.draft.domain.model.BoosterConfig
-import com.mmg.manahub.feature.draft.domain.model.BoosterSheet
-import com.mmg.manahub.feature.draft.domain.model.BoosterVariant
-import com.mmg.manahub.feature.draft.domain.model.DraftError
-import com.mmg.manahub.feature.draft.domain.model.DraftResult
-import com.mmg.manahub.feature.draft.domain.model.DraftState
-import com.mmg.manahub.feature.draft.domain.model.DraftableSet
-import com.mmg.manahub.feature.draft.domain.model.EngineArchetype
-import com.mmg.manahub.feature.draft.domain.model.EngineCardSignals
-import com.mmg.manahub.feature.draft.domain.model.EngineConfig
-import com.mmg.manahub.feature.draft.domain.model.EngineParams
-import com.mmg.manahub.feature.draft.domain.model.TierCard
-import com.mmg.manahub.feature.draft.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.model.BoosterCardEntry
+import com.mmg.manahub.core.model.BoosterConfig
+import com.mmg.manahub.core.model.BoosterSheet
+import com.mmg.manahub.core.model.BoosterVariant
+import com.mmg.manahub.core.model.DraftError
+import com.mmg.manahub.core.model.DraftResult
+import com.mmg.manahub.core.model.DraftState
+import com.mmg.manahub.core.model.DraftableSet
+import com.mmg.manahub.core.model.EngineArchetype
+import com.mmg.manahub.core.model.EngineCardSignals
+import com.mmg.manahub.core.model.EngineConfig
+import com.mmg.manahub.core.model.EngineParams
+import com.mmg.manahub.core.model.TierCard
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
 import com.mmg.manahub.feature.draft.domain.usecase.GetDraftableSetsUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetCardsPageUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.GetSetTierListUseCase
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -39,8 +37,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Implementation of [DraftSimRepository].
@@ -51,18 +47,21 @@ import javax.inject.Singleton
  * sessions as a single JSON blob in `draft_sessions` (see [DraftSessionEntity]).
  *
  * @see DraftSimRepository for the contract and per-method behaviour notes.
+ *
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.app.di.coreBridgeKoinModule].
  */
-@Singleton
-class DraftSimRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val cloudflareApi: CloudflareContentApi,
+class DraftSimRepositoryImpl(
+    private val context: Context,
+    private val cloudflareClient: CloudflareContentClient,
     private val getDraftableSets: GetDraftableSetsUseCase,
     private val getSetTierList: GetSetTierListUseCase,
     private val getSetCardsPage: GetSetCardsPageUseCase,
     private val deckRepository: DeckRepository,
     private val draftSessionDao: DraftSessionDao,
     private val gson: Gson,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) : DraftSimRepository {
 
     companion object {
@@ -72,6 +71,16 @@ class DraftSimRepositoryImpl @Inject constructor(
          * breaks Gson deserialisation; sessions with a different version are discarded.
          */
         const val CURRENT_SCHEMA_VERSION = 1
+
+        /**
+         * Allowlist for `booster.json`'s optional `extraPoolSets` field: each entry must be a
+         * 2-6 char lowercase Scryfall set code. Mirrors `DraftRepositoryImpl.VALID_SET_CODE` —
+         * this string is interpolated directly into a Scryfall search query
+         * (`(set:$setCode or set:$extra) lang:en`), so any entry that doesn't match is dropped
+         * rather than trusted, same discipline as [parseEngineConfig]'s float sanitisation
+         * (the Worker's booster.json is untrusted input).
+         */
+        private val VALID_EXTRA_POOL_SET_CODE = Regex("^[a-z0-9]{2,6}$")
     }
 
     /**
@@ -111,13 +120,27 @@ class DraftSimRepositoryImpl @Inject constructor(
                     return@withContext DataResult.Error(DraftError.SetNotDraftable.toString())
                 }
 
-                // 2. Fetch the full card pool, paging until Scryfall reports there are no more
+                // 2. Fetch and parse booster.json BEFORE the card pool. The pool query must know
+                // booster.extraPoolSets (e.g. SOS declares ["soa"] for its Mystical Archive
+                // sheet) so it can be widened up front — fetching the pool first would silently
+                // drop every extra-set card from the very first page.
+                val boosterJson = gson.fromJson(
+                    cloudflareClient.getSetBooster(setCode.lowercase()),
+                    JsonObject::class.java,
+                )
+                val boosterConfig = parseBoosterConfig(boosterJson, setCode)
+
+                // 3. Fetch the full card pool, paging until Scryfall reports there are no more
                 // pages. Using has_more avoids the trailing 422 that occurs when requesting one
-                // page past the last.
+                // page past the last. When boosterConfig.extraPoolSets is non-empty the query is
+                // widened to include those sets too; for every other set (extraPoolSets empty)
+                // this is byte-for-byte the same query as before.
                 val cards = mutableListOf<Card>()
                 var page = 1
                 while (true) {
-                    when (val pageResult = getSetCardsPage(setCode, page)) {
+                    when (
+                        val pageResult = getSetCardsPage(setCode, page, boosterConfig.extraPoolSets)
+                    ) {
                         is DataResult.Success -> {
                             val (pageCards, hasMore) = pageResult.data
                             cards += pageCards
@@ -140,7 +163,7 @@ class DraftSimRepositoryImpl @Inject constructor(
                     return@withContext DataResult.Error(DraftError.SetNotDownloaded.toString())
                 }
 
-                // 3. Fetch the tier list and build the scryfallId → TierCard rating map.
+                // 4. Fetch the tier list and build the scryfallId → TierCard rating map.
                 // The tier list is an optional enhancement: the bots already handle an empty
                 // ratings map by falling back to heuristics. A missing or empty tier list must
                 // therefore degrade gracefully (empty map) rather than block the whole feature.
@@ -152,12 +175,6 @@ class DraftSimRepositoryImpl @Inject constructor(
                     is DataResult.Error -> emptyMap()
                 }
 
-                // 4. Fetch and parse booster.json.
-                val boosterConfig = parseBoosterConfig(
-                    cloudflareApi.getSetBooster(setCode.lowercase()),
-                    setCode,
-                )
-
                 // 5. Assemble.
                 val draftableSet = DraftableSet(
                     set = set,
@@ -168,7 +185,7 @@ class DraftSimRepositoryImpl @Inject constructor(
 
                 DataResult.Success(draftableSet)
             } catch (e: Exception) {
-                FirebaseCrashlytics.getInstance().recordException(e)
+                crashReporter.recordException(e)
                 DataResult.Error(DraftError.Unexpected(e.message ?: "Failed to load set").toString())
             }
         }
@@ -196,7 +213,11 @@ class DraftSimRepositoryImpl @Inject constructor(
             // heuristic without re-fetching. A duplicate concurrent fetch of the SAME code is
             // acceptable (idempotent); whichever result is stored first wins.
             val config = try {
-                parseEngineConfig(cloudflareApi.getSetEngine(code), code)
+                val engineJson = gson.fromJson(
+                    cloudflareClient.getSetEngine(code),
+                    JsonObject::class.java,
+                )
+                parseEngineConfig(engineJson, code)
             } catch (e: Exception) {
                 null
             }
@@ -321,11 +342,22 @@ class DraftSimRepositoryImpl @Inject constructor(
             )
         }
 
+        // extraPoolSets entries are interpolated directly into a Scryfall query string
+        // downstream (DraftRepositoryImpl.buildPoolQuery), so every entry is normalised
+        // (lowercase + trim) and validated against the same set-code allowlist used for the
+        // main setCode; anything that doesn't match is silently dropped rather than trusted.
+        // Missing/null field -> empty list (every pre-existing set is unaffected).
+        val extraPoolSets = dto.extraPoolSets.orEmpty()
+            .map { it.lowercase().trim() }
+            .filter { VALID_EXTRA_POOL_SET_CODE.matches(it) }
+            .distinct()
+
         return BoosterConfig(
             setCode = dto.setCode ?: setCode.lowercase(),
             schemaVersion = dto.schemaVersion ?: 1,
             boosters = boosters,
             sheets = sheets,
+            extraPoolSets = extraPoolSets,
         )
     }
 
@@ -378,7 +410,7 @@ class DraftSimRepositoryImpl @Inject constructor(
                 // Persisting the session is the only durable record of draft progress;
                 // record the failure as a non-fatal, then rethrow so the caller's
                 // error path still fires (the draft state is not silently lost).
-                FirebaseCrashlytics.getInstance().recordException(e)
+                crashReporter.recordException(e)
                 throw e
             }
         }
@@ -421,7 +453,7 @@ class DraftSimRepositoryImpl @Inject constructor(
                     deckRepository.replaceAllCards(deckId, slots)
                 }.onFailure { e ->
                     runCatching { deckRepository.deleteDeck(deckId) }
-                    FirebaseCrashlytics.getInstance().recordException(e)
+                    crashReporter.recordException(e)
                     throw e
                 }
 
@@ -431,7 +463,7 @@ class DraftSimRepositoryImpl @Inject constructor(
 
                 DataResult.Success(deckId)
             } catch (e: Exception) {
-                FirebaseCrashlytics.getInstance().recordException(e)
+                crashReporter.recordException(e)
                 DataResult.Error(
                     DraftError.Unexpected(e.message ?: "Failed to save deck").toString(),
                 )

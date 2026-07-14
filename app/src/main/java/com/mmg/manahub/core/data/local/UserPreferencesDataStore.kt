@@ -11,25 +11,23 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.mmg.manahub.core.domain.model.AppLanguage
-import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.CollectionViewMode
-import com.mmg.manahub.core.domain.model.NewsLanguage
-import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.ScoreWeightOverrides
-import com.mmg.manahub.core.domain.model.UserDefinedTag
-import com.mmg.manahub.core.domain.model.UserPreferences
-import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
-import com.mmg.manahub.core.domain.model.news.SourceType
+import com.mmg.manahub.core.model.AppLanguage
+import com.mmg.manahub.core.model.CardLanguage
+import com.mmg.manahub.core.model.CollectionViewMode
+import com.mmg.manahub.core.model.NewsLanguage
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.ScoreWeightOverrides
+import com.mmg.manahub.core.model.UserDefinedTag
+import com.mmg.manahub.core.model.UserPreferences
+import com.mmg.manahub.core.model.news.NewsFilterPrefs
+import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics
 import com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.Companion.MAX_EQUIPPED_BADGES
 import com.mmg.manahub.core.ui.theme.AppTheme
-import com.mmg.manahub.core.util.PriceFormatter.isEuropeanLocale
-import com.mmg.manahub.feature.home.presentation.HomeWidgetType
-import com.mmg.manahub.feature.home.presentation.QuickStartAction
-import com.mmg.manahub.feature.home.presentation.WidgetInstance
-import com.mmg.manahub.feature.home.presentation.WidgetSize
+import com.mmg.manahub.core.model.PersistedWidget
+import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.WidgetSize
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -79,6 +77,18 @@ private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hour
 
 // ── Feature flags ─────────────────────────────────────────────────────────
 private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
+/** Master Community Decks switch (Archidekt import/browse). Default: DISABLED until rollout. */
+private val KEY_COMMUNITY_DECKS_ENABLED = booleanPreferencesKey("community_decks_enabled")
+/**
+ * Master Community Engine switch (D4, Deck Doctor Community/Archetype plan, Phase 3.3) — gates
+ * Motor B (EDHREC/Archidekt-backed suggestion aggregates from the `manahub-community` Worker).
+ * DISTINCT from [KEY_COMMUNITY_DECKS_ENABLED] (which gates the unrelated Archidekt deck
+ * browse/import feature). Default: ENABLED as of 2026-07-12 — the Worker is now deployed at a
+ * real URL and the feature has consumer UI (Deck Studio Suggestions tab, Home trending widget);
+ * `CommunityAggregateRepositoryImpl` short-circuits every method to a
+ * [com.mmg.manahub.core.model.DataResult.Error] only while this is explicitly turned off.
+ */
+private val KEY_COMMUNITY_ENGINE_ENABLED = booleanPreferencesKey("community_engine_enabled")
 /**
  * Master gamification switch (XP, levels, achievements, quests). Default: DISABLED — the
  * gamification UI is hidden for this release (see docs/gamification-hidden-for-release.md).
@@ -144,7 +154,7 @@ class UserPreferencesDataStore @Inject constructor(
                 add("en")
                 if (deviceLang == "es" || deviceLang == "de") add(deviceLang)
             }
-            val defaultCurrency = if (isEuropeanLocale()) "EUR" else "USD"
+            val defaultCurrency = "EUR"
 
             UserPreferences(
                 appLanguage = AppLanguage.fromCode(
@@ -268,7 +278,7 @@ class UserPreferencesDataStore @Inject constructor(
         appLanguage = AppLanguage.ENGLISH,
         cardLanguage = CardLanguage.ENGLISH,
         newsLanguages = setOf(NewsLanguage.ENGLISH),
-        preferredCurrency = if (isEuropeanLocale()) PreferredCurrency.EUR else PreferredCurrency.USD,
+        preferredCurrency = PreferredCurrency.EUR,
         collectionViewMode = CollectionViewMode.GRID,
     )
 
@@ -326,10 +336,10 @@ class UserPreferencesDataStore @Inject constructor(
                 "PYROMANCER"        -> AppTheme.MedievalGrimoire
                 "HYDROMANCY"        -> AppTheme.GlacialEdge
 
-                else                -> AppTheme.NeonVoid
+                else                -> AppTheme.ArcaneCosmos
             }
         }
-        .catch { emit(AppTheme.NeonVoid) }
+        .catch { emit(AppTheme.ArcaneCosmos) }
 
     suspend fun savePlayerName(name: String) {
         context.userPrefsDataStore.edit { it[KEY_PLAYER_NAME] = name }
@@ -501,6 +511,38 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     /**
+     * Controls whether the Community Decks feature (Archidekt browse/import) is exposed.
+     * Default: false (hidden for release, 2026-07-14 — the feature is still being polished). The
+     * screens themselves ([com.mmg.manahub.feature.communitydecks.presentation
+     * .CommunityDecksSearchViewModel]/`CommunityDeckDetailViewModel`) render a graceful
+     * `EmptyState` when this is false; entry points into them are additionally hidden so users
+     * never tap a live-looking button into a disabled screen. [SettingsViewModel] still exposes a
+     * toggle for QA to re-enable locally.
+     */
+    val communityDecksEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_COMMUNITY_DECKS_ENABLED] ?: false }
+        .catch { emit(false) }
+
+    suspend fun setCommunityDecksEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_COMMUNITY_DECKS_ENABLED] = enabled }
+    }
+
+    /**
+     * Controls whether the Community Engine (Motor B: EDHREC/Archidekt suggestion aggregates) is
+     * active. Default: true (ENABLED) as of 2026-07-12 — the `manahub-community` Worker is now
+     * deployed at a real URL (see `COMMUNITY_WORKER_URL` in `app/build.gradle.kts`) and the user
+     * explicitly requested the feature be visible. See [KEY_COMMUNITY_ENGINE_ENABLED]. Distinct
+     * from [communityDecksEnabledFlow].
+     */
+    val communityEngineEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_COMMUNITY_ENGINE_ENABLED] ?: true }
+        .catch { emit(true) }
+
+    suspend fun setCommunityEngineEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_COMMUNITY_ENGINE_ENABLED] = enabled }
+    }
+
+    /**
      * Master gamification switch. Default: false (OFF) because the gamification UI is hidden
      * for this release (see docs/gamification-hidden-for-release.md). When false, all
      * gamification UI (XP, levels, achievements, quests) is hidden — the engine keeps recording
@@ -669,12 +711,12 @@ class UserPreferencesDataStore @Inject constructor(
     // current state immediately without a network call. The repository is
     // responsible for keeping them in sync after a successful Supabase read/write.
     //
-    // Defaults: collection private (false), wishlist and trade list public (true).
+    // Defaults: collection, wishlist, and trade list are all public (true) by default.
     // These match the Supabase column defaults in the `user_profiles` table.
 
     val collectionPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_COLLECTION_PUBLIC] ?: false }
-        .catch { emit(false) }
+        .map { prefs -> prefs[KEY_COLLECTION_PUBLIC] ?: true }
+        .catch { emit(true) }
 
     val wishlistPublicFlow: Flow<Boolean> = context.userPrefsDataStore.data
         .map { prefs -> prefs[KEY_WISHLIST_PUBLIC] ?: true }
@@ -788,10 +830,15 @@ class UserPreferencesDataStore @Inject constructor(
      * Emits the user's persisted dashboard layout, or [defaultLayout] when nothing
      * is stored or every stored token is unrecognisable.
      *
+     * Operates on the presentation-agnostic [PersistedWidget] (persistedId + size); the
+     * presentation layer maps these to/from its UI widget instances. Unknown size names
+     * are skipped on decode; widget-id recognition (against the presentation catalog) is
+     * also the caller's responsibility, so this layer cannot import presentation code.
+     *
      * @param defaultLayout the auth-appropriate default, supplied by the caller so
      *  this DataStore stays unaware of which default applies.
      */
-    fun homeLayoutFlow(defaultLayout: List<WidgetInstance>): Flow<List<WidgetInstance>> =
+    fun homeLayoutFlow(defaultLayout: List<PersistedWidget>): Flow<List<PersistedWidget>> =
         context.userPrefsDataStore.data
             .map { prefs ->
                 val raw = prefs[KEY_HOME_LAYOUT]
@@ -800,16 +847,16 @@ class UserPreferencesDataStore @Inject constructor(
                     ?.mapNotNull { token -> decodeWidgetToken(token) }
                     ?: emptyList()
                 // Deduplicate by persistedId: a corrupt stored string could produce two
-                // WidgetInstances with the same key, crashing the LazyVerticalGrid.
-                parsed.distinctBy { it.type.persistedId }.ifEmpty { defaultLayout }
+                // widgets with the same key, crashing the LazyVerticalGrid.
+                parsed.distinctBy { it.persistedId }.ifEmpty { defaultLayout.distinctBy { it.persistedId } }
             }
             .catch { emit(defaultLayout) }
 
     /** Persists [layout] as an ordered "persistedId:SIZE_NAME" token string. */
-    suspend fun saveHomeLayout(layout: List<WidgetInstance>) {
+    suspend fun saveHomeLayout(layout: List<PersistedWidget>) {
         context.userPrefsDataStore.edit { prefs ->
-            prefs[KEY_HOME_LAYOUT] = layout.joinToString(",") { instance ->
-                "${instance.type.persistedId}:${instance.size.name}"
+            prefs[KEY_HOME_LAYOUT] = layout.joinToString(",") { widget ->
+                "${widget.persistedId}:${widget.size.name}"
             }
         }
     }
@@ -824,13 +871,18 @@ class UserPreferencesDataStore @Inject constructor(
         context.userPrefsDataStore.edit { it[KEY_HOME_COACHMARK_SEEN] = true }
     }
 
-    /** Decodes a single "persistedId:SIZE_NAME" token, or null when either half is unknown. */
-    private fun decodeWidgetToken(token: String): WidgetInstance? {
+    /**
+     * Decodes a single "persistedId:SIZE_NAME" token into a [PersistedWidget], or null when
+     * malformed or the size name is unknown. Widget-id validity (against the presentation
+     * catalog) is resolved by the caller so this layer stays presentation-free.
+     */
+    private fun decodeWidgetToken(token: String): PersistedWidget? {
         val parts = token.trim().split(":")
         if (parts.size != 2) return null
-        val type = HomeWidgetType.fromPersistedId(parts[0].trim()) ?: return null
+        val persistedId = parts[0].trim()
+        if (persistedId.isEmpty()) return null
         val size = WidgetSize.entries.firstOrNull { it.name == parts[1].trim() } ?: return null
-        return WidgetInstance(type = type, size = size)
+        return PersistedWidget(persistedId = persistedId, size = size)
     }
 
     // ── Home dashboard: First Steps carousel ─────────────────────────────────

@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Feed
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MilitaryTech
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.WidgetSize
 
 /**
  * The catalog of every widget that can appear on the Home dashboard.
@@ -109,6 +111,16 @@ enum class HomeWidgetType(
         audience = WidgetAudience.ACCOUNT_GATED,
         icon = Icons.Default.AutoAwesome,
     ),
+    /** Newest cards added to the local collection (Home feature overhaul Phase 2.1). Works
+     * fully offline — no account required. */
+    RECENTLY_ADDED(
+        persistedId = "recently_added",
+        defaultTitleRes = R.string.widget_title_recently_added,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.COLLECTION,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.History,
+    ),
 
     // ── Discover ──────────────────────────────────────────────────────────────────
     DISCOVER_CARDS(
@@ -122,7 +134,7 @@ enum class HomeWidgetType(
     CARD_OF_THE_DAY(
         persistedId = "card_of_the_day",
         defaultTitleRes = R.string.widget_title_card_of_day,
-        supportedSizes = setOf(WidgetSize.MEDIUM, WidgetSize.LARGE),
+        supportedSizes = setOf(WidgetSize.MEDIUM),
         category = WidgetCategory.DISCOVER,
         audience = WidgetAudience.ALL,
         icon = Icons.Default.AutoAwesome,
@@ -168,6 +180,20 @@ enum class HomeWidgetType(
         category = WidgetCategory.SOCIAL,
         audience = WidgetAudience.ACCOUNT_GATED,
         icon = Icons.Default.SwapHoriz,
+    ),
+
+    // ── Community (Deck Doctor Community/Archetype plan, Phase 5) ─────────────────
+    /** Top-3 trending commanders of the week; tap navigates into the Community Hub's Discover
+     * section (reuses [HomeAction.OpenCommunityDecks] — the Hub lands on Discover by default when
+     * `communityEngineEnabledFlow` is on). Silently hidden — never an error state — on Worker
+     * failure or when the community engine is off; see [HomeViewModel.trendingFlow]. */
+    TRENDING_COMMANDERS(
+        persistedId = "trending_commanders",
+        defaultTitleRes = R.string.widget_title_trending_commanders,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.COMMUNITY,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.Group,
     );
 
     /** True for widgets that belong to the gamification system (hidden when the toggle is off). */

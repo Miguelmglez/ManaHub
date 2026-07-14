@@ -1,7 +1,9 @@
 package com.mmg.manahub.core.tagging
 
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.TagCategory
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.DetectionRule
+import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.core.model.TagDictionaryEntry
 import com.mmg.manahub.core.tagging.TagDictionary.applyOverrides
 import com.mmg.manahub.core.util.CardTypeTranslator
 import java.util.Locale
@@ -36,48 +38,27 @@ import java.util.Locale
 //  truth for type translations.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * A single English oracle-text detection rule.
- *
- * A rule matches the normalized oracle text when:
- *  - every [allOf] substring is present, AND
- *  - ([anyOf] is empty OR at least one [anyOf] substring is present), AND
- *  - no [noneOf] substring is present, AND
- *  - ([typeLineAnyOf] is empty OR the lowercased type line contains at least one), AND
- *  - the lowercased type line contains none of [typeLineNoneOf].
- *
- * [confidence], when non-null, overrides the owning [TagDictionary.Entry.baseConfidence]
- * for this specific rule.
- */
-data class DetectionRule(
-    val allOf:          List<String> = emptyList(),
-    val anyOf:          List<String> = emptyList(),
-    val noneOf:         List<String> = emptyList(),
-    val typeLineAnyOf:  List<String> = emptyList(),
-    val typeLineNoneOf: List<String> = emptyList(),
-    val confidence:     Float?       = null,
-)
-
 object TagDictionary {
 
-    /** A single dictionary entry — labels by language plus English detection rules. */
-    data class Entry(
-        val key:            String,
-        val category:       TagCategory,
-        val labels:         Map<String, String>,   // lang → label (only "en" populated today)
-        val rules:          List<DetectionRule>,    // English oracle-text rules (empty = no auto-detection)
-        val baseConfidence: Float = 0.85f,
-    )
+    /**
+     * Backwards-compatible alias for [TagDictionaryEntry].
+     *
+     * The data class moved to `:shared:core-model` (`commonMain`) during the KMP migration so
+     * that the shared tagging analyzers can reference it. This alias keeps existing
+     * `TagDictionary.Entry` references inside `:app` compiling without edits.
+     */
+    @Suppress("unused")
+    typealias Entry = TagDictionaryEntry
 
     /** Mutable map so [applyOverrides] can replace entries at runtime. */
     @Volatile
-    private var entries: Map<String, Entry> = baseEntries.associateBy { it.key }
+    private var entries: Map<String, TagDictionaryEntry> = baseEntries.associateBy { it.key }
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    fun all(): Collection<Entry> = entries.values
+    fun all(): Collection<TagDictionaryEntry> = entries.values
 
-    fun get(key: String): Entry? = entries[key]
+    fun get(key: String): TagDictionaryEntry? = entries[key]
 
     /** Localize a CardTag for the current locale. Returns null if unknown. */
     fun localize(tag: CardTag, lang: String = currentLang()): String? = when (tag.category) {
@@ -128,7 +109,7 @@ object TagDictionary {
                 )
             } else {
                 // Net-new entry from the user.
-                merged[ov.key] = Entry(
+                merged[ov.key] = TagDictionaryEntry(
                     key            = ov.key,
                     category       = ov.category ?: TagCategory.STRATEGY,
                     labels         = ov.labels,
@@ -207,7 +188,7 @@ data class TagOverride(
 //  fragments to avoid false positives.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-private val baseEntries: List<TagDictionary.Entry> = buildList {
+private val baseEntries: List<TagDictionaryEntry> = buildList {
 
     // ── KEYWORD entries (labels only; KeywordAnalyzer reads card.keywords) ─────
     // Evergreen + popular recurring/deciduous keywords Scryfall emits in `keywords`.
@@ -618,6 +599,138 @@ private val baseEntries: List<TagDictionary.Entry> = buildList {
         rule(anyOf = listOf("can't attack you", "can't attack you or planeswalkers you control")),
     )))
 
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Phase 0 (0.2) — archetype-role dictionary expansion.
+    //
+    //  These ROLE-category keys back the ArchetypeEngine's RoleSpec matchers landing
+    //  in Phase 1 (see docs/claude-code-prompt-deck-doctor-community.md Appendix A).
+    //  Some overlap in spirit with STRATEGY keys declared above (e.g. death_triggers,
+    //  reanimator, blink, etb, stax, artifacts_matter, enchantress, tokens,
+    //  plus_counters) — tag keys are PERSISTED USER DATA and are never renamed, so a
+    //  close-but-differently-scoped concept gets its OWN new key rather than reusing
+    //  or renaming an existing one. A card can legitimately carry both the STRATEGY
+    //  tag and the ROLE tag for the same textual signal; that duplication is expected.
+    // ════════════════════════════════════════════════════════════════════════════
+
+    add(strat("mana_fix", TagCategory.ROLE, "Mana Fixing", 0.90f, listOf(
+        rule(allOf = listOf("add one mana of any color")),
+        rule(allOf = listOf("add one mana of any type your commander could produce")),
+    )))
+    add(strat("sac_outlet", TagCategory.ROLE, "Sacrifice Outlet", 0.88f, listOf(
+        rule(anyOf = listOf(
+            "sacrifice a creature:", "sacrifice another creature:", "sacrifice a permanent:",
+            "sacrifice an artifact:", "sacrifice a token:",
+        )),
+    )))
+    add(strat("death_payoff", TagCategory.ROLE, "Death Payoff", 0.88f, listOf(
+        // "creature you control dies" (not anchored to "whenever a"/"whenever another") also
+        // catches phrasings like "whenever ~ or another creature you control dies" (Zulaport
+        // Cutthroat-style triggers naming the source card itself).
+        rule(allOf = listOf("creature you control dies")),
+    )))
+    add(strat("graveyard_enabler", TagCategory.ROLE, "Graveyard Enabler", 0.80f, listOf(
+        rule(allOf = listOf("of your library into your graveyard"), confidence = 0.85f),
+        rule(allOf = listOf("you may discard a card"), confidence = 0.60f),
+    )))
+    add(strat("reanimation", TagCategory.ROLE, "Reanimation", 0.90f, listOf(
+        // Deliberately not anchored to an exact "from your/a graveyard" phrase — real
+        // reanimation effects phrase this many ways (Aura-triggered "creature card in a
+        // graveyard... return... to the battlefield", "put target creature card from a
+        // graveyard onto the battlefield", etc.); requiring all three concepts together stays
+        // precise (graveyard hate's "exile all cards..." never contains "creature card").
+        rule(allOf = listOf("creature card", "graveyard", "to the battlefield")),
+    )))
+    add(strat("self_mill_payoff", TagCategory.ROLE, "Self-Mill Payoff", 0.80f, listOf(
+        rule(anyOf = listOf("delirium", "threshold", "for each card in your graveyard")),
+    )))
+    add(strat("stax_piece", TagCategory.ROLE, "Stax Piece", 0.85f, listOf(
+        rule(anyOf = listOf(
+            "can't untap during", "don't untap during", "spells cost {1} more to cast",
+            "players can't", "can't be activated unless", "cost {1} more to cast",
+        )),
+    )))
+    add(strat("landfall_payoff", TagCategory.ROLE, "Landfall Payoff", 0.90f, listOf(
+        rule(allOf = listOf("landfall")),
+    )))
+    add(strat("lifegain_payoff", TagCategory.ROLE, "Lifegain Payoff", 0.95f, listOf(
+        rule(allOf = listOf("whenever you gain life")),
+    )))
+    add(strat("counters_payoff", TagCategory.ROLE, "Counters Payoff", 0.85f, listOf(
+        rule(allOf = listOf("+1/+1 counter")),
+    )))
+    add(strat("spell_payoff", TagCategory.ROLE, "Spell Payoff", 0.85f, listOf(
+        rule(anyOf = listOf(
+            "whenever you cast an instant or sorcery spell",
+            "instant and sorcery spells you cast cost", "magecraft",
+        )),
+    )))
+    add(strat("mill_engine", TagCategory.ROLE, "Mill Engine", 0.85f, listOf(
+        rule(anyOf = listOf("target player mills", "each opponent mills", "that player mills")),
+    )))
+    // threat_early is manual-pick only: early-aggression is a function of mana value
+    // and power/toughness, which DetectionRule cannot express (oracle text + type
+    // line only). Phase 1's RoleSpec combines this key with cheap card facts (MV).
+    add(plain("threat_early", TagCategory.ROLE, "Early Threat"))
+    // equipment / planeswalker / vehicle are pure type-line facts — no oracle-text
+    // condition needed (allOf/anyOf empty = vacuously true, gated by type line only).
+    add(strat("equipment", TagCategory.ROLE, "Equipment", 0.95f, listOf(
+        rule(typeLineAnyOf = listOf("equipment")),
+    )))
+    add(strat("aura_buff", TagCategory.ROLE, "Aura Buff", 0.75f, listOf(
+        // "enchanted creature gets" (a stat/keyword bonus), not just "enchanted creature" —
+        // the bare phrase alone also appears on restriction/debuff auras like Pacifism
+        // ("Enchanted creature can't attack or block."), which must NOT match a buff role.
+        rule(allOf = listOf("enchanted creature gets"), typeLineAnyOf = listOf("aura")),
+    )))
+    add(strat("token_generator", TagCategory.ROLE, "Token Generator", 0.90f, listOf(
+        rule(allOf = listOf("create", "token")),
+    )))
+    add(strat("blink_effect", TagCategory.ROLE, "Blink Effect", 0.85f, listOf(
+        rule(allOf = listOf("exile", "return", "to the battlefield"),
+            anyOf = listOf("you control", "you own")),
+        rule(allOf = listOf("exile up to one target creature", "return"), confidence = 0.90f),
+    )))
+    add(strat("etb_payoff", TagCategory.ROLE, "ETB Payoff", 0.90f, listOf(
+        rule(anyOf = listOf(
+            "whenever a creature you control enters", "whenever another creature you control enters",
+        )),
+    )))
+    add(strat("planeswalker", TagCategory.ROLE, "Planeswalker", 0.99f, listOf(
+        rule(typeLineAnyOf = listOf("planeswalker")),
+    )))
+    add(strat("vehicle", TagCategory.ROLE, "Vehicle", 0.99f, listOf(
+        rule(typeLineAnyOf = listOf("vehicle")),
+    )))
+    add(strat("clone_theft_effect", TagCategory.ROLE, "Clone / Theft Effect", 0.85f, listOf(
+        rule(anyOf = listOf(
+            "gain control of target", "gain control of all", "as a copy of", "becomes a copy of",
+        )),
+    )))
+    add(strat("group_effect", TagCategory.ROLE, "Group Effect", 0.80f, listOf(
+        rule(anyOf = listOf(
+            "each player draws a card", "each player discards a card", "each player may draw",
+            "each player loses", "each player sacrifices",
+        )),
+    )))
+    add(strat("enchantment_payoff", TagCategory.ROLE, "Enchantment Payoff", 0.85f, listOf(
+        rule(anyOf = listOf(
+            "whenever you cast an enchantment spell", "enchantments you control",
+            "for each enchantment you control", "constellation",
+        )),
+    )))
+    add(strat("artifact_payoff", TagCategory.ROLE, "Artifact Payoff", 0.85f, listOf(
+        rule(anyOf = listOf(
+            "whenever an artifact you control enters", "artifacts you control",
+            "for each artifact you control", "whenever you cast an artifact spell", "metalcraft",
+        )),
+    )))
+    add(strat("tribe_payoff", TagCategory.ROLE, "Tribe Payoff", 0.80f, listOf(
+        rule(anyOf = listOf(
+            "creatures you control of the chosen type", "other creatures you control of the chosen type",
+            "that share a creature type with", "choose a creature type",
+        )),
+    )))
+
     // ── ARCHETYPE plains (manual-pick only) ──────────────────────────────────────
     add(plain("aggro",          TagCategory.ARCHETYPE, "Aggro"))
     add(plain("control",        TagCategory.ARCHETYPE, "Control"))
@@ -657,7 +770,7 @@ private val baseEntries: List<TagDictionary.Entry> = buildList {
 // (declared in the strategy/role block) are the single source for those keys.
 
 /** Single-language keyword label entry (KeywordAnalyzer reads card.keywords directly). */
-private fun kw(key: String, en: String) = TagDictionary.Entry(
+private fun kw(key: String, en: String) = TagDictionaryEntry(
     key            = key,
     category       = TagCategory.KEYWORD,
     labels         = mapOf("en" to en),
@@ -672,7 +785,7 @@ private fun strat(
     en: String,
     baseConfidence: Float,
     rules: List<DetectionRule>,
-) = TagDictionary.Entry(
+) = TagDictionaryEntry(
     key            = key,
     category       = category,
     labels         = mapOf("en" to en),
@@ -681,7 +794,7 @@ private fun strat(
 )
 
 /** Manual-pick-only entry (no detection rules). */
-private fun plain(key: String, category: TagCategory, en: String) = TagDictionary.Entry(
+private fun plain(key: String, category: TagCategory, en: String) = TagDictionaryEntry(
     key            = key,
     category       = category,
     labels         = mapOf("en" to en),

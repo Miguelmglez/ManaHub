@@ -58,10 +58,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import org.koin.androidx.compose.koinViewModel
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
@@ -69,11 +69,11 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.AppLanguage
-import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.NewsLanguage
-import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.UserPreferences
+import com.mmg.manahub.core.model.AppLanguage
+import com.mmg.manahub.core.model.CardLanguage
+import com.mmg.manahub.core.model.NewsLanguage
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.UserPreferences
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -89,7 +89,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onManageNewsSources: () -> Unit = {},
     onManageTagDictionary: () -> Unit = {},
-    viewModel: SettingsViewModel = hiltViewModel(),
+    // KMP migration — Phase 0 Spike D: Settings is the first "Koin island". This ViewModel is
+    // resolved by Koin (koinViewModel()) while every other screen still uses hiltViewModel().
+    viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
@@ -256,9 +258,11 @@ fun SettingsScreen(
                 collectionPublic = uiState.collectionPublic,
                 wishlistPublic = uiState.wishlistPublic,
                 tradeListPublic = uiState.tradeListPublic,
+                communityDecksEnabled = uiState.communityDecksEnabled,
                 onCollectionPublicChange = { viewModel.setCollectionPublic(it, privacyErrorMsg) },
                 onWishlistPublicChange = { viewModel.setWishlistPublic(it, privacyErrorMsg) },
                 onTradeListPublicChange = { viewModel.setTradeListPublic(it, privacyErrorMsg) },
+                onCommunityDecksEnabledChange = viewModel::setCommunityDecksEnabled,
             )
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
@@ -355,9 +359,11 @@ private fun PrivacySection(
     collectionPublic: Boolean,
     wishlistPublic: Boolean,
     tradeListPublic: Boolean,
+    communityDecksEnabled: Boolean,
     onCollectionPublicChange: (Boolean) -> Unit,
     onWishlistPublicChange: (Boolean) -> Unit,
     onTradeListPublicChange: (Boolean) -> Unit,
+    onCommunityDecksEnabledChange: (Boolean) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     Column(
@@ -387,6 +393,12 @@ private fun PrivacySection(
             subtitle = stringResource(R.string.settings_privacy_trade_list_subtitle),
             checked = tradeListPublic,
             onCheckedChange = onTradeListPublicChange,
+        )
+        SettingsToggleItem(
+            title = "Community Decks",
+            subtitle = "Show Archidekt browse and import tools",
+            checked = communityDecksEnabled,
+            onCheckedChange = onCommunityDecksEnabledChange,
         )
         Spacer(Modifier.height(8.dp))
         Text(

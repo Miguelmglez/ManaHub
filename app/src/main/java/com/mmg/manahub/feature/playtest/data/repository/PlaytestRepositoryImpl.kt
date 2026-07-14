@@ -1,26 +1,25 @@
 package com.mmg.manahub.feature.playtest.data.repository
 
-import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
 import com.mmg.manahub.core.data.local.entity.PlaytestCardStatEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSessionEntity
 import com.mmg.manahub.core.data.local.entity.PlaytestSurveyAnswerEntity
-import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.feature.playtest.domain.model.PlaytestSurveyAnswers
-import com.mmg.manahub.feature.playtest.domain.repository.PlaytestRepository
+import com.mmg.manahub.core.model.PlaytestSurveyAnswers
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 /**
  * Implements [PlaytestRepository] by delegating to [PlaytestDao].
  *
- * All suspend functions run on [IoDispatcher] to keep Room off the main thread.
+ * All suspend functions run on the supplied IO dispatcher to keep Room off the main thread.
  */
-class PlaytestRepositoryImpl @Inject constructor(
+class PlaytestRepositoryImpl(
     private val playtestDao: PlaytestDao,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val crashReporter: CrashReporter,
 ) : PlaytestRepository {
 
     override suspend fun saveTest(
@@ -62,12 +61,12 @@ class PlaytestRepositoryImpl @Inject constructor(
         runCatching {
             playtestDao.saveTestAtomically(session, cardStats)
         }.onFailure { e ->
-            FirebaseCrashlytics.getInstance().apply {
+            crashReporter.apply {
                 log("playtest_db_save_test_failed: deckId=$deckId format=$deckFormat mulligansUsed=$mulligansUsed drawCount=$configuredDrawCount")
                 setCustomKey("playtest_deck_id", deckId)
                 setCustomKey("playtest_format", deckFormat)
-                setCustomKey("playtest_draw_count", configuredDrawCount)
-                setCustomKey("playtest_mulligans_used", mulligansUsed)
+                setCustomKey("playtest_draw_count", configuredDrawCount.toString())
+                setCustomKey("playtest_mulligans_used", mulligansUsed.toString())
                 recordException(RuntimeException("[PlaytestRepository] saveTestAtomically failed", e))
             }
             throw e
@@ -98,7 +97,7 @@ class PlaytestRepositoryImpl @Inject constructor(
         try {
             playtestDao.replacePlaytestSurveyAnswers(playtestSessionId, entities)
         } catch (e: Exception) {
-            FirebaseCrashlytics.getInstance().apply {
+            crashReporter.apply {
                 log("playtest_db_save_survey_failed: sessionId=$playtestSessionId deckId=$deckId answerCount=${entities.size}")
                 setCustomKey("playtest_deck_id", deckId)
                 recordException(RuntimeException("[PlaytestRepository] replacePlaytestSurveyAnswers failed", e))
@@ -109,4 +108,7 @@ class PlaytestRepositoryImpl @Inject constructor(
 
     override fun observeTestCountForDeck(deckId: String): Flow<Int> =
         playtestDao.observeTestCountForDeck(deckId)
+
+    override fun observeTotalTestCount(): Flow<Int> =
+        playtestDao.observeTotalTestCount()
 }

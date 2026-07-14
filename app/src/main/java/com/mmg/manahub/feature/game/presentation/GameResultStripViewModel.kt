@@ -6,7 +6,6 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.gamification.domain.GamificationEngine
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.domain.model.ProgressionOutcome
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +13,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
  * Supplies the [ProgressionOutcome] for the game the [GameResultScreen] is displaying (ADR-002 §8.3,
@@ -32,8 +30,7 @@ import javax.inject.Inject
  *
  * Usage: call [observe] once (e.g. from a `LaunchedEffect(sessionId)`); read [outcome].
  */
-@HiltViewModel
-class GameResultStripViewModel @Inject constructor(
+class GameResultStripViewModel(
     private val engine: GamificationEngine,
     private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : ViewModel() {

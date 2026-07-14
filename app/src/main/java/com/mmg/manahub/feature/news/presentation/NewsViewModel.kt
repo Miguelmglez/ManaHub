@@ -4,14 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.news.NewsFilterPrefs
-import com.mmg.manahub.core.domain.model.news.NewsItem
-import com.mmg.manahub.core.domain.model.news.SourceType
-import com.mmg.manahub.feature.news.domain.model.ContentSource
+import com.mmg.manahub.core.model.news.NewsFilterPrefs
+import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.model.news.SourceType
+import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,11 +22,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
+/**
+ * KMP migration — Phase 1: resolved by Koin (`koinViewModel()`), not Hilt. The plain constructor lets
+ * `newsKoinModule` build it from the bridged news use cases + the shared `UserPreferencesDataStore`.
+ */
 @OptIn(FlowPreview::class)
-@HiltViewModel
-class NewsViewModel @Inject constructor(
+class NewsViewModel(
     getNewsFeed: GetNewsFeedUseCase,
     private val refreshNewsFeed: RefreshNewsFeedUseCase,
     manageSources: ManageSourcesUseCase,

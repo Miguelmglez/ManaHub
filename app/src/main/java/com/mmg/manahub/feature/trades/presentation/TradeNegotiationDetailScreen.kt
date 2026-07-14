@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -55,26 +57,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberPullRefreshState
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
-import com.mmg.manahub.feature.trades.domain.model.TradeItem
-import com.mmg.manahub.feature.trades.domain.model.TradeProposal
-import com.mmg.manahub.feature.trades.domain.model.TradeStatus
+import com.mmg.manahub.core.model.TradeItem
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,31 +89,44 @@ fun TradeNegotiationDetailScreen(
     onBack: () -> Unit,
     onNavigateToEditor: (EditorNavArgs) -> Unit,
     onNavigateToCardDetail: (String) -> Unit,
-    viewModel: TradeNegotiationViewModel = hiltViewModel(),
+    viewModel: TradeNegotiationViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
     val mc = MaterialTheme.magicColors
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) { viewModel.refresh() }
 
-    LaunchedEffect(uiState.snackbarMessage) {
-        val raw = uiState.snackbarMessage ?: return@LaunchedEffect
-        // Translate internal semantic keys emitted by the ViewModel into
-        // localised strings. Any other message is shown as-is.
-        val msg = when (raw) {
-            "collection_updated" -> "Collection updated successfully"
-            "collection_update_failed" -> "Failed to update collection"
-            else -> raw
+    // §5.2 fix: one-shot navigation/toast effects are delivered through a buffered
+    // Channel (viewModel.events), never a nullable StateFlow field — a StateFlow
+    // equality-collapses two consecutive identical events and can drop emissions made
+    // while the screen's lifecycle is paused. All string resolution happens HERE, in
+    // ONE place (§5.1 fix) — the ViewModel emits semantic outcomes only, never raw
+    // literal sentinel keys like the old "collection_updated" string.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is NegotiationEvent.NavigateToEditor -> onNavigateToEditor(event.args)
+                is NegotiationEvent.CollectionSyncResult -> {
+                    if (event.success) {
+                        toastState.show(
+                            context.getString(R.string.trades_collection_update_success),
+                            MagicToastType.SUCCESS,
+                        )
+                    } else {
+                        toastState.show(
+                            context.getString(R.string.trades_collection_update_failed),
+                            MagicToastType.ERROR,
+                        )
+                    }
+                }
+                is NegotiationEvent.ShowError -> {
+                    val msg = event.message ?: context.getString(R.string.trades_error_generic_body)
+                    toastState.show(msg, MagicToastType.ERROR)
+                }
+            }
         }
-        toastState.show(msg)
-        viewModel.onSnackbarDismissed()
-    }
-
-    LaunchedEffect(uiState.navigateToEditor) {
-        val nav = uiState.navigateToEditor ?: return@LaunchedEffect
-        onNavigateToEditor(nav)
-        viewModel.onNavigationConsumed()
     }
 
     uiState.errorDialog?.let { error ->
@@ -208,15 +228,18 @@ fun TradeNegotiationDetailScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                         .nestedScroll(pullState.nestedScrollConnection),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(MaterialTheme.spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
                 ) {
                     if (pullState.headerHeightDp > 0.dp) {
                         item(key = "pull_header") {
                             PullRefreshHeader(
-                                height = pullState.headerHeightDp,
-                                isRefreshing = uiState.isRefreshing,
-                                dragFraction = pullState.dragFraction,
+                                height              = pullState.headerHeightDp,
+                                isRefreshing        = uiState.isRefreshing,
+                                dragFraction        = pullState.dragFraction,
+                                refreshingText      = stringResource(R.string.trades_history_refreshing),
+                                pullIcon            = Icons.Default.KeyboardArrowDown,
+                                pullHintDescription = stringResource(R.string.trades_history_pull_to_refresh),
                             )
                         }
                     }
@@ -242,7 +265,7 @@ fun TradeNegotiationDetailScreen(
                     item(key = "bottom_spacer") {
                         Spacer(
                             Modifier
-                                .height(16.dp)
+                                .height(MaterialTheme.spacing.lg)
                                 .navigationBarsPadding()
                         )
                     }
@@ -299,11 +322,11 @@ private fun ProposalCard(
     }
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
         color = mc.surface,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(MaterialTheme.spacing.lg)) {
             // Header: status badge + timestamp
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -321,7 +344,7 @@ private fun ProposalCard(
                             tint = mc.textDisabled,
                             modifier = Modifier.size(12.dp)
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(MaterialTheme.spacing.xs))
                         Text(
                             text = relativeTime,
                             style = MaterialTheme.magicTypography.labelSmall,
@@ -331,7 +354,7 @@ private fun ProposalCard(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(MaterialTheme.spacing.lg))
 
             val proposerItems = proposal.items.filter { it.fromUserId == proposal.proposerId }
             val receiverItems = proposal.items.filter { it.fromUserId == proposal.receiverId }
@@ -344,7 +367,7 @@ private fun ProposalCard(
                     reviewPlaceholder = proposal.includesReviewCollectionFromProposer,
                     onCardClick = onCardClick,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(MaterialTheme.spacing.sm))
             }
 
             if (receiverItems.isNotEmpty() || proposal.includesReviewCollectionFromReceiver) {
@@ -358,7 +381,7 @@ private fun ProposalCard(
 
             // Active-state action buttons (accept, decline, cancel, etc.)
             if (proposal.status.isActive) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(MaterialTheme.spacing.lg))
                 ProposalActions(
                     proposal = proposal,
                     isProposer = isProposer,
@@ -376,7 +399,7 @@ private fun ProposalCard(
             // "Update Collection" section — visible only on completed proposals.
             // Shows a confirmation label once the user has already synced.
             if (proposal.status == TradeStatus.COMPLETED) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
                 val isSynced = proposal.id in syncedCollectionProposalIds
                 if (isSynced) {
                     Text(
@@ -391,7 +414,7 @@ private fun ProposalCard(
                         enabled = !isSyncingCollection,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = ButtonShape,
                     ) {
                         if (isSyncingCollection) {
                             CircularProgressIndicator(
@@ -470,14 +493,14 @@ private fun ProposalStatusBadge(status: TradeStatus, mc: MagicColors) {
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = ChipShape,
         color = color.copy(alpha = 0.12f),
         border = BorderStroke(1.dp, color.copy(alpha = 0.2f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)
         ) {
             Icon(
                 imageVector = icon,
@@ -504,36 +527,33 @@ private fun ItemsSection(
     val mc = MaterialTheme.magicColors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(bottom = 6.dp)
+        modifier = Modifier.padding(bottom = MaterialTheme.spacing.xs)
     ) {
         Box(
             modifier = Modifier
                 .size(4.dp, 12.dp)
-                .background(mc.primaryAccent.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                .background(mc.primaryAccent.copy(alpha = 0.4f), CircleShape)
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(MaterialTheme.spacing.sm))
         Text(
             text = label.uppercase(),
-            style = MaterialTheme.magicTypography.labelLarge.copy(
-                letterSpacing = 1.2.sp,
-                fontWeight = FontWeight.Black
-            ),
+            style = MaterialTheme.magicTypography.labelLarge.copy(fontWeight = FontWeight.Bold),
             color = mc.textPrimary.copy(alpha = 0.8f),
         )
     }
     if (reviewPlaceholder) {
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = ChipShape,
             color = mc.secondaryAccent.copy(alpha = 0.1f),
             border = BorderStroke(1.dp, mc.secondaryAccent.copy(alpha = 0.2f)),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
+                .padding(vertical = MaterialTheme.spacing.xs)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)
             ) {
                 Icon(
                     imageVector = Icons.Default.Info,
@@ -587,7 +607,7 @@ private fun ProposalActions(
     when (proposal.status) {
         TradeStatus.DRAFT -> {
             if (isProposer) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                     OutlinedButton(
                         onClick = onEdit,
                         enabled = !isProcessing,
@@ -609,7 +629,7 @@ private fun ProposalActions(
 
         TradeStatus.PROPOSED -> {
             if (isProposer) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                     OutlinedButton(
                         onClick = onEdit,
                         enabled = !isProcessing,
@@ -627,8 +647,8 @@ private fun ProposalActions(
                     }
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                         Button(
                             onClick = onAccept,
                             enabled = !isProcessing,
@@ -671,7 +691,7 @@ private fun ProposalActions(
             } else {
                 proposal.receiverMarkedCompletedAt != null
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
                 if (!alreadyMarked) {
                     Button(
                         onClick = onMarkCompleted,
@@ -782,7 +802,7 @@ private fun MarkCompleteDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)) {
                 if (!hasItems) {
                     Text(
                         stringResource(R.string.trades_complete_dialog_no_cards),
@@ -828,7 +848,7 @@ private fun MarkCompleteDialog(
             }
         },
         confirmButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
                 if (hasItems) {
                     Button(
                         onClick = onUpdateAndComplete,
@@ -901,7 +921,7 @@ private fun RevokeConfirmationDialog(
             )
         },
         confirmButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
                 Button(
                     onClick = if (hasSynced) onRevokeAndReverse else onJustRevoke,
                     colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),

@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 
 /**
  * Legacy alias kept for source compatibility during the migration period.
- * New code should call [MagicTheme] directly.
+ * New code should call [MagicThemeAndroid] (or the shared [MagicTheme]) directly.
  */
 @Composable
 fun MtgCollectionTheme(content: @Composable () -> Unit) =
-    MagicTheme(content = content)
+    MagicThemeAndroid(content = content)

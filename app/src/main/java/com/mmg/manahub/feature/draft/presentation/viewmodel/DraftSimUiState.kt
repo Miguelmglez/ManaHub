@@ -1,8 +1,8 @@
 package com.mmg.manahub.feature.draft.presentation.viewmodel
 
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
-import com.mmg.manahub.feature.draft.domain.model.DraftError
-import com.mmg.manahub.feature.draft.domain.model.DraftState
+import com.mmg.manahub.core.model.DraftCard
+import com.mmg.manahub.core.model.DraftError
+import com.mmg.manahub.core.model.DraftState
 
 /**
  * Single source of truth for the Draft Simulator presentation layer. The same

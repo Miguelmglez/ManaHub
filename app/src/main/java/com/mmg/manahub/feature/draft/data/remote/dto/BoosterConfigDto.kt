@@ -16,6 +16,12 @@ data class BoosterConfigDto(
     @SerializedName("schemaVersion") val schemaVersion: Int?,
     @SerializedName("boosters") val boosters: List<BoosterVariantDto>?,
     @SerializedName("sheets") val sheets: Map<String, BoosterSheetDto>?,
+    /**
+     * Optional list of extra Scryfall set codes whose cards appear in [sheets] (e.g. SOS's
+     * Mystical Archive sheet draws from `soa`). Untrusted Worker input — sanitised in
+     * `DraftSimRepositoryImpl.parseBoosterConfig` before it ever reaches a Scryfall query.
+     */
+    @SerializedName("extraPoolSets") val extraPoolSets: List<String>? = null,
 )
 
 data class BoosterVariantDto(

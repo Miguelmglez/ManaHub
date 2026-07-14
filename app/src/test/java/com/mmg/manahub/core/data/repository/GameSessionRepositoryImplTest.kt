@@ -1,13 +1,16 @@
 package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.dao.GameSessionDao
+import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.entity.GameSessionEntity
 import com.mmg.manahub.core.data.local.entity.PlayerSessionEntity
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.ui.theme.PlayerTheme
+import com.mmg.manahub.feature.game.data.repository.GameSessionRepositoryImpl
 import com.mmg.manahub.feature.game.domain.model.EliminationReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GameResult
+import com.mmg.manahub.feature.game.domain.model.toSessionData
 import com.mmg.manahub.feature.game.domain.model.Player
 import com.mmg.manahub.feature.game.domain.model.PlayerResult
 import io.mockk.coEvery
@@ -38,6 +41,7 @@ class GameSessionRepositoryImplTest {
 
     private val dao = mockk<GameSessionDao>(relaxed = true)
     private val progressionEventBus = mockk<ProgressionEventBus>(relaxed = true)
+    private val surveyAnswerDao = mockk<SurveyAnswerDao>(relaxed = true)
     private lateinit var repository: GameSessionRepositoryImpl
 
     // ── Fixture helpers ───────────────────────────────────────────────────────
@@ -102,7 +106,7 @@ class GameSessionRepositoryImplTest {
 
     @Before
     fun setUp() {
-        repository = GameSessionRepositoryImpl(dao, progressionEventBus, UnconfinedTestDispatcher())
+        repository = GameSessionRepositoryImpl(dao, progressionEventBus, UnconfinedTestDispatcher(), surveyAnswerDao)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -126,7 +130,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), any()) } returns 42L
 
         // Act
-        val sessionId = repository.saveGameSession(result)
+        val sessionId = repository.saveGameSession(result.toSessionData())
 
         // Assert: ONLY the atomic method is called — the two separate methods must NOT be called
         coVerify(exactly = 1) { dao.insertSessionWithPlayers(any(), any()) }
@@ -147,7 +151,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 10L
 
         // Act
-        repository.saveGameSession(gameResult)
+        repository.saveGameSession(gameResult.toSessionData())
 
         // Assert
         assertEquals(4, capturedPlayers.captured.size)
@@ -165,7 +169,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 11L
 
         // Act
-        repository.saveGameSession(gameResult)
+        repository.saveGameSession(gameResult.toSessionData())
 
         // Assert
         assertEquals(6, capturedPlayers.captured.size)
@@ -192,7 +196,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 99L
 
         // Act
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert: every entity MUST arrive at the DAO with sessionId == 0
         // (the @Transaction method is responsible for filling the real id)
@@ -224,7 +228,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(capture(capturedSession), any()) } returns 1L
 
         // Act
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert
         val session = capturedSession.captured
@@ -254,7 +258,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 1L
 
         // Act
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert
         val winnerEntity = capturedPlayers.captured.find { it.playerId == p0.id }
@@ -281,7 +285,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 1L
 
         // Act
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert
         val loserEntity = capturedPlayers.captured.find { it.playerId == p1.id }
@@ -306,7 +310,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 1L
 
         // Act
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert
         val poisonedEntity = capturedPlayers.captured.find { it.playerId == p1.id }
@@ -331,7 +335,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 1L
 
         // Act — must not throw
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert: DAO still called once; player list is empty
         coVerify(exactly = 1) { dao.insertSessionWithPlayers(any(), any()) }
@@ -353,7 +357,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 1L
 
         // Act — must not crash even though winner is absent from playerResults
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert: one entity (the loser) was persisted; no crash
         coVerify(exactly = 1) { dao.insertSessionWithPlayers(any(), any()) }
@@ -370,7 +374,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), any()) } returns 777L
 
         // Act
-        val returnedId = repository.saveGameSession(result)
+        val returnedId = repository.saveGameSession(result.toSessionData())
 
         // Assert
         assertEquals(777L, returnedId)
@@ -392,7 +396,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(capture(capturedSession), any()) } returns 1L
 
         // Act
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert
         assertEquals("COMMANDER", capturedSession.captured.mode)
@@ -417,7 +421,7 @@ class GameSessionRepositoryImplTest {
         coEvery { dao.insertSessionWithPlayers(any(), capture(capturedPlayers)) } returns 1L
 
         // Act
-        repository.saveGameSession(result)
+        repository.saveGameSession(result.toSessionData())
 
         // Assert
         val victimEntity = capturedPlayers.captured.find { it.playerId == p1.id }

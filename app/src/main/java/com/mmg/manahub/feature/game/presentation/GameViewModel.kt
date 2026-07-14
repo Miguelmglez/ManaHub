@@ -6,8 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
-import com.mmg.manahub.core.domain.repository.TournamentRepository
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import com.mmg.manahub.core.nearby.domain.model.NearbyConnectionEvent
 import com.mmg.manahub.core.nearby.domain.model.NearbyGameMessage
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
@@ -34,16 +34,15 @@ import com.mmg.manahub.feature.game.domain.model.EliminationReason
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.feature.game.domain.model.GamePhase
 import com.mmg.manahub.feature.game.domain.model.GameResult
-import com.mmg.manahub.feature.game.domain.model.GridSlotPosition
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplate
-import com.mmg.manahub.feature.game.domain.model.LayoutTemplates
+import com.mmg.manahub.feature.game.domain.model.toSessionData
+import com.mmg.manahub.core.model.GridSlotPosition
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.PhaseStop
 import com.mmg.manahub.feature.game.domain.model.Player
 import com.mmg.manahub.feature.game.domain.model.PlayerResult
 import com.mmg.manahub.feature.game.domain.usecase.EvaluatePlayerEliminationUseCase
 import com.mmg.manahub.feature.tournament.domain.usecase.RecordMatchResultUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -61,7 +60,6 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class GameUiState(
     val players:          List<Player>      = emptyList(),
@@ -105,8 +103,7 @@ data class GameUiState(
     val appUserWon:    Boolean get() = winner?.isAppUser == true
 }
 
-@HiltViewModel
-class GameViewModel @Inject constructor(
+class GameViewModel(
     savedStateHandle:                  SavedStateHandle,
     private val gameSessionRepo:       GameSessionRepository,
     private val tournamentRepo:        TournamentRepository,
@@ -125,7 +122,7 @@ class GameViewModel @Inject constructor(
     private val toggleLandPlayedUseCase:           ToggleLandPlayedUseCase,
     private val voiceCommandRecognizer:            VoiceCommandRecognizer,
     private val evaluatePlayerEliminationUseCase:  EvaluatePlayerEliminationUseCase,
-    @ApplicationContext private val appContext: Context,
+    private val appContext: Context,
 ) : ViewModel() {
 
     private val initMode: GameMode = runCatching {
@@ -177,7 +174,7 @@ class GameViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .collect { result ->
                     launch(Dispatchers.IO) {
-                        runCatching { gameSessionRepo.saveGameSession(result) }
+                        runCatching { gameSessionRepo.saveGameSession(result.toSessionData()) }
                             .onSuccess { id ->
                                 _uiState.update { it.copy(lastSessionId = id, isGameRunning = false) }
                                 recordTournamentResultIfNeeded(id, result)

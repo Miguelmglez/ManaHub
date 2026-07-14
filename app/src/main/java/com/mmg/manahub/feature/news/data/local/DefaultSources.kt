@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.news.data.local
 
+import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
+
 object DefaultSources {
 
     // ── English article sources ───────────────────────────────────────────────

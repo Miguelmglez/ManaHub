@@ -1,7 +1,7 @@
 package com.mmg.manahub.core.domain.usecase
 
 import app.cash.turbine.test
-import com.mmg.manahub.core.domain.model.UserCardWithCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.RemoveCardUseCase

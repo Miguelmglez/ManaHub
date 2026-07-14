@@ -2,18 +2,18 @@ package com.mmg.manahub.feature.news.data
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.domain.model.news.NewsItem
-import com.mmg.manahub.core.domain.model.news.SourceType
-import com.mmg.manahub.feature.news.data.local.ContentSourceEntity
+import com.mmg.manahub.core.model.news.NewsItem
+import com.mmg.manahub.core.model.news.SourceType
+import com.mmg.manahub.core.data.local.entity.ContentSourceEntity
 import com.mmg.manahub.feature.news.data.local.DefaultSources
-import com.mmg.manahub.feature.news.data.local.NewsArticleEntity
-import com.mmg.manahub.feature.news.data.local.NewsDao
-import com.mmg.manahub.feature.news.data.local.NewsVideoEntity
+import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
+import com.mmg.manahub.core.data.local.dao.NewsDao
+import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
 import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.NewsFeedService
-import com.mmg.manahub.feature.news.domain.model.ContentSource
-import com.mmg.manahub.feature.news.domain.repository.NewsRepository
+import com.mmg.manahub.core.model.news.ContentSource
+import com.mmg.manahub.core.domain.repository.NewsRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -21,11 +21,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.util.UUID
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class NewsRepositoryImpl @Inject constructor(
+/**
+ * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`/`@Singleton`); built as a
+ * native Koin `single` in [com.mmg.manahub.feature.news.di.newsKoinModule].
+ */
+class NewsRepositoryImpl(
     private val newsDao: NewsDao,
     private val feedService: NewsFeedService,
     private val rssParser: RssFeedParser,

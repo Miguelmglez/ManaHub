@@ -90,12 +90,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
+import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -115,7 +115,7 @@ private val ContentGap = 8.dp
 @Composable
 fun SurveyScreen(
     onComplete: () -> Unit,
-    viewModel: SurveyViewModel = hiltViewModel(),
+    viewModel: SurveyViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val recap = uiState.recap

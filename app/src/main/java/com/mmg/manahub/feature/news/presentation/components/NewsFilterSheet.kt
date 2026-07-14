@@ -49,14 +49,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.news.SourceType
+import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.feature.news.domain.model.ContentSource
+import com.mmg.manahub.core.model.news.ContentSource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

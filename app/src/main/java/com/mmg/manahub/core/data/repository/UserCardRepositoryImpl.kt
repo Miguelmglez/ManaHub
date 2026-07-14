@@ -13,11 +13,12 @@ import com.mmg.manahub.core.data.local.paging.CollectionRemoteMediator
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.di.IoDispatcher
-import com.mmg.manahub.core.domain.model.UserCard
+import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.domain.repository.AddOutcome
+import com.mmg.manahub.core.domain.repository.CollectionPagerSource
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -27,7 +28,7 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import com.mmg.manahub.core.domain.model.UserCardWithCard as DomainUserCardWithCard
+import com.mmg.manahub.core.model.UserCardWithCard as DomainUserCardWithCard
 
 /**
  * Local-first implementation of [UserCardRepository].
@@ -48,7 +49,7 @@ class UserCardRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient,
     private val authRepository: AuthRepository,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-) : UserCardRepository {
+) : UserCardRepository, CollectionPagerSource {
 
     // Emits null for unauthenticated/loading, userId for authenticated.
     // Used by all observe methods so they re-subscribe when the user changes.
@@ -136,6 +137,17 @@ class UserCardRepositoryImpl @Inject constructor(
     override fun observeCount(userId: String?): Flow<Int> =
         userCardCollectionDao.observeCount(userId)
 
+    @Suppress("OPT_IN_USAGE")
+    override fun observeRecentlyAdded(limit: Int): Flow<List<DomainUserCardWithCard>> =
+        currentUserIdFlow.flatMapLatest { userId ->
+            val source = if (userId != null) {
+                userCardCollectionDao.observeRecent(userId, limit)
+            } else {
+                userCardCollectionDao.observeRecentLocal(limit)
+            }
+            source.map { list -> list.filter { !it.userCard.isDeleted }.mapNotNull { it.toDomain() } }
+        }
+
     @OptIn(ExperimentalPagingApi::class)
     override fun getCollectionPager(userId: String?): Flow<PagingData<UserCardWithCard>> =
         Pager(
@@ -202,11 +214,18 @@ class UserCardRepositoryImpl @Inject constructor(
                 userCardCollectionDao.upsert(
                     // Restore the same row (same UUID) so no duplicate is created.
                     // Quantity resets to the incoming value — the card was gone before.
+                    // createdAt is bumped to `now` too: this branch reports AddOutcome.CREATED_NEW
+                    // (a "new" add from the caller's perspective), but RECENTLY_ADDED orders strictly
+                    // by created_at DESC, so leaving the stale original acquisition date meant a card
+                    // the user just finished re-adding never surfaced at the top (Home dashboard audit,
+                    // HIGH). No other logic in this codebase keys off createdAt staying stable across
+                    // a delete/restore cycle — grep confirms achievements/stats never reference it.
                     existing.copy(
                         quantity   = quantity,
                         isDeleted  = false,
                         isForTrade = isForTrade,
                         updatedAt  = now,
+                        createdAt  = now,
                     )
                 )
                 // A previously soft-deleted card returning counts as a new unique add.

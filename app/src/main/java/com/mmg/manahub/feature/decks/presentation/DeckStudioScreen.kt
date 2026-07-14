@@ -70,15 +70,15 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.DeckCard
-import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
-import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.DeckCard
+import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.DeckSlotEntry
+import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.ui.components.CardSearchSheet
@@ -94,10 +94,15 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
+import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
+import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanChip
+import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanHint
+import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanSheetContent
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
 import com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
@@ -112,16 +117,20 @@ import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
+import com.mmg.manahub.feature.decks.presentation.components.AddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.CommunityAddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.SimilarDeckCard
+import com.mmg.manahub.feature.decks.presentation.components.CutSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
+import com.mmg.manahub.feature.decks.presentation.components.RoleCoverageRow
 import com.mmg.manahub.feature.decks.presentation.components.SeedsContent
+import com.mmg.manahub.feature.decks.presentation.components.WarningChip
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
-import com.mmg.manahub.feature.decks.presentation.improvement.components.AddSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.improvement.components.CutSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.improvement.components.HealthScoreRing
-import com.mmg.manahub.feature.decks.presentation.improvement.components.RoleCoverageRow
-import com.mmg.manahub.feature.decks.presentation.improvement.components.WarningChip
-import com.mmg.manahub.feature.decks.presentation.improvement.components.key
-import com.mmg.manahub.feature.decks.presentation.improvement.components.label
+import com.mmg.manahub.feature.decks.presentation.components.key
+import com.mmg.manahub.feature.decks.presentation.components.label
+import com.mmg.manahub.core.ui.components.InlineErrorState
+import androidx.compose.foundation.lazy.LazyRow
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -147,11 +156,18 @@ fun DeckStudioScreen(
     onCardClick: (String) -> Unit,
     onPlaytest: (deckId: String) -> Unit,
     onReviewSurvey: (sessionId: Long) -> Unit,
-    viewModel: DeckStudioViewModel = hiltViewModel(),
+    // Deck Doctor Community/Archetype plan, Phase 4 (Motor B): navigates to
+    // Screen.CommunityDecksByCard(cardName) / Screen.CommunityDeckDetail(archidektId). Defaulted
+    // to a no-op so every OTHER call site of this screen (none exist besides AppNavGraph today,
+    // but this keeps the signature source-compatible for tests/previews) keeps compiling.
+    onNavigateToCommunityDecksByCard: (String) -> Unit = {},
+    onNavigateToCommunityDeckDetail: (Int) -> Unit = {},
+    viewModel: DeckStudioViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
     val playerName by viewModel.playerNameFlow.collectAsStateWithLifecycle()
+    val communityDecksEnabled by viewModel.communityDecksEnabledFlow.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val context = LocalContext.current
@@ -169,13 +185,16 @@ fun DeckStudioScreen(
     // commander-specific actions instead of the +/- counter).
     var isCardDetailInCommanderContext by remember { mutableStateOf(false) }
 
-    // C3: resolve the tapped card to a DeckSlotEntry from the deck list, commander, or search results.
+    // C3: resolve the tapped card to a DeckSlotEntry from the deck list, commander, search results,
+    // or (Phase 4) a Motor B community suggestion (quantityInDeck is always 0 there — a community
+    // card is by definition not yet in the mainboard).
     val selectedDeckCard = remember(
         selectedCardId,
         uiState.cards,
         uiState.addCardsResults,
         uiState.scryfallResults,
         uiState.commanderCard,
+        uiState.communityAdds,
     ) {
         selectedCardId?.let { id ->
             uiState.cards.find { it.scryfallId == id }
@@ -183,6 +202,8 @@ fun DeckStudioScreen(
                 ?: (uiState.addCardsResults + uiState.scryfallResults)
                     .find { it.card.scryfallId == id }
                     ?.let { row -> DeckSlotEntry(row.card.scryfallId, row.quantityInDeck, false, row.card) }
+                ?: uiState.communityAdds.find { it.card.scryfallId == id }
+                    ?.let { s -> DeckSlotEntry(s.card.scryfallId, 0, false, s.card) }
         }
     }
 
@@ -190,6 +211,7 @@ fun DeckStudioScreen(
     val cardCutMsg = stringResource(R.string.deck_studio_card_cut)
     val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
     val seedBuiltMsg = stringResource(R.string.deck_studio_seed_built)
+    val archetypePlanUpdatedMsg = stringResource(R.string.deck_studio_archetype_plan_updated)
 
     // Screen-entry breadcrumb (no PII).
     LaunchedEffect(Unit) {
@@ -377,6 +399,21 @@ fun DeckStudioScreen(
                             onClearBudget = viewModel::onClearBudget,
                             onAdd = { s -> viewModel.onAddSuggestion(s.fit.card.scryfallId, s.fit.card.name) },
                             onCut = { fit -> viewModel.onCutSuggestion(fit.card.scryfallId, fit.card.name) },
+                            onApplyArchetypePlan = { macro, themes ->
+                                viewModel.onSetArchetypeOverride(macro, themes)
+                                toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
+                            },
+                            onAutoDetectArchetypePlan = {
+                                viewModel.onClearArchetypeOverride()
+                                toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
+                            },
+                            onAddCommunity = { s ->
+                                viewModel.onAddSuggestion(s.card.scryfallId, s.card.name)
+                            },
+                            onCommunityCardTap = { id -> selectedCardId = id },
+                            communityDecksEnabled = communityDecksEnabled,
+                            onViewCommunityDecksForCard = onNavigateToCommunityDecksByCard,
+                            onOpenSimilarDeck = onNavigateToCommunityDeckDetail,
                         )
                     }
                 }
@@ -500,6 +537,13 @@ fun DeckStudioScreen(
                             onOwnedFreeChange = viewModel::onOwnedCardsFreeChange,
                             onClear = viewModel::onClearBudget,
                         )
+                    },
+                    // Phase 5: the toggle row is only shown when the master flag is on.
+                    useCommunityData = uiState.useCommunityDataForSeed,
+                    onToggleUseCommunityData = if (uiState.communityEngineEnabled) {
+                        viewModel::toggleUseCommunityDataForSeed
+                    } else {
+                        null
                     },
                 )
             }
@@ -1333,14 +1377,18 @@ private fun InspirationsSheetContent(
 }
 
 /**
- * The Suggestions surface (Deck Doctor inline, Phase 2): a Health summary, the Cut
- * list, the Add list, and the free-text [BudgetInputBar], all driven by the live
- * deck via [DeckStudioViewModel]. The row composables and string helpers are reused
- * verbatim from the standalone Deck Doctor screen
- * ([com.mmg.manahub.feature.decks.presentation.improvement.components]).
+ * The Suggestions surface (Deck Doctor inline, Phase 1/2): a Health summary, the Cut list, and
+ * the "From your collection" Add list (Motor A, Phase 2 — offline, always available), all driven
+ * by the live deck via [DeckStudioViewModel]. [BudgetInputBar] is NOT shown here (D5 — Motor A
+ * suggestions are already owned, so budget is moot); it stays in the codebase for a different
+ * editing surface. The row composables and string helpers live in
+ * [com.mmg.manahub.feature.decks.presentation.components] — this is now the SOLE Deck Doctor UI
+ * surface; the standalone Deck Improvement screen those composables were originally copied from
+ * was retired in Phase 0.5 (D10).
  *
  * Stateless: all state comes from [uiState]; every mutation is a callback to the VM.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SuggestionsTab(
     uiState: DeckStudioUiState,
@@ -1350,6 +1398,18 @@ private fun SuggestionsTab(
     onClearBudget: () -> Unit,
     onAdd: (AddSuggestion) -> Unit,
     onCut: (CardFit) -> Unit,
+    onApplyArchetypePlan: (ArchetypeId, List<ThemeId>) -> Unit,
+    onAutoDetectArchetypePlan: () -> Unit,
+    // Motor B (Phase 4) — no-op defaults so this composable never has to be re-plumbed in every
+    // call site if a preview/test constructs it without these.
+    onAddCommunity: (com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion) -> Unit = {},
+    onCommunityCardTap: (String) -> Unit = {},
+    // Community Decks feature flag (independent of DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED,
+    // see DeckStudioViewModel.communityDecksEnabledFlow's KDoc) — hides the "View decks" action on
+    // community add suggestions when the browse/import feature itself is disabled.
+    communityDecksEnabled: Boolean = false,
+    onViewCommunityDecksForCard: (String) -> Unit = {},
+    onOpenSimilarDeck: (Int) -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -1373,6 +1433,25 @@ private fun SuggestionsTab(
 
     val evaluation = health.evaluation
     val spacing = MaterialTheme.spacing
+    var showArchetypeSheet by remember { mutableStateOf(false) }
+
+    if (showArchetypeSheet) {
+        val archetypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showArchetypeSheet = false },
+            sheetState = archetypeSheetState,
+            shape = BottomSheetShape,
+            containerColor = mc.background,
+        ) {
+            ArchetypePlanSheetContent(
+                initialMacro = health.archetypeResolution.macro,
+                initialThemes = health.archetypeResolution.themes,
+                onApply = onApplyArchetypePlan,
+                onAutoDetect = onAutoDetectArchetypePlan,
+                onDismiss = { showArchetypeSheet = false },
+            )
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -1380,6 +1459,24 @@ private fun SuggestionsTab(
         contentPadding = PaddingValues(spacing.lg),
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
+        // ── Archetype plan chip (Phase 1.7) ─────────────────────────────────────
+        item(key = "archetype_plan_chip") {
+            ArchetypePlanChip(
+                macro = health.archetypeResolution.macro,
+                themes = health.archetypeResolution.themes,
+                isManualOverride = health.archetypeResolution.isManualOverride,
+                onClick = { showArchetypeSheet = true },
+            )
+        }
+        if (!health.archetypeResolution.isManualOverride &&
+            health.archetypeResolution.macro == ArchetypeId.GENERIC &&
+            health.archetypeResolution.themes.isEmpty()
+        ) {
+            item(key = "archetype_plan_hint") {
+                ArchetypePlanHint(onClick = { showArchetypeSheet = true })
+            }
+        }
+
         // ── Health summary ────────────────────────────────────────────────────
         item(key = "health_ring") {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -1396,7 +1493,7 @@ private fun SuggestionsTab(
             item(key = "health_warnings_header") {
                 SuggestionsSectionHeader(stringResource(R.string.deck_health_section_warnings), mc.lifeNegative)
             }
-            items(evaluation.warnings, key = { "warn_${it.key}" }) { warning ->
+            items(evaluation.warnings.distinctBy { it.key }, key = { "warn_${it.key}" }) { warning ->
                 WarningChip(text = warning.label())
             }
         }
@@ -1419,33 +1516,14 @@ private fun SuggestionsTab(
             }
         }
 
-        // ── Budget + Adds ────────────────────────────────────────────────────────
+        // ── Adds — Motor A (Deck Doctor Community/Archetype plan Phase 2): collection-only,
+        //    offline, always available. `BudgetInputBar` stays in the codebase (D5) but is not
+        //    surfaced here — every Motor A suggestion is already owned, so budget is moot for it.
         item(key = "adds_header") {
-            SuggestionsSectionHeader(stringResource(R.string.deck_studio_suggestions_tab_adds), mc.lifePositive)
-        }
-        item(key = "budget_bar") {
-            BudgetInputBar(
-                perCardText = uiState.rawPerCardText,
-                totalText = uiState.rawTotalText,
-                ownedCardsAreFree = uiState.ownedCardsAreFree,
-                hasError = uiState.budgetError,
-                onPerCardChange = onPerCardBudgetChange,
-                onTotalChange = onTotalBudgetChange,
-                onOwnedFreeChange = onOwnedFreeChange,
-                onClear = onClearBudget,
+            SuggestionsSectionHeader(
+                stringResource(R.string.deck_studio_suggestions_from_collection),
+                mc.lifePositive,
             )
-        }
-        item(key = "budget_summary") {
-            val summaryText = if (uiState.addsCardsToBuy == 0) {
-                stringResource(R.string.deck_doctor_budget_all_owned)
-            } else {
-                stringResource(
-                    R.string.deck_doctor_budget_to_buy,
-                    String.format(java.util.Locale.US, "%.2f", uiState.addsTotalCostEur),
-                    uiState.addsCardsToBuy,
-                )
-            }
-            Text(text = summaryText, style = MaterialTheme.magicTypography.bodySmall, color = mc.textSecondary)
         }
         when {
             uiState.isAddsLoading -> item(key = "adds_loading") {
@@ -1457,14 +1535,84 @@ private fun SuggestionsTab(
                 }
             }
             uiState.adds.isEmpty() -> item(key = "adds_empty") {
-                Text(
-                    text = stringResource(R.string.deck_doctor_add_empty_title),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textSecondary,
+                EmptyState(
+                    title = stringResource(R.string.deck_doctor_add_empty_title),
+                    subtitle = stringResource(R.string.deck_studio_suggestions_from_collection_empty_subtitle),
+                    icon = Icons.Default.AutoAwesome,
                 )
             }
             else -> items(uiState.adds, key = { "add_${it.fit.card.scryfallId}" }) { suggestion ->
                 AddSuggestionRow(suggestion = suggestion, onAdd = { onAdd(suggestion) })
+            }
+        }
+
+        // ── Motor B (Deck Doctor Community/Archetype plan, Phase 4): community suggestions +
+        //    "Decks like yours". Entirely additive — when the flag is off (or nothing loaded yet),
+        //    `communityAdds`/`similarDecks` are simply empty and NOTHING below renders (no header,
+        //    no empty state — the plan's "flag off = nothing community-related" requirement). A
+        //    Worker/aggregate failure (`communityUnavailable`) shows ONE InlineErrorState for this
+        //    section only; Motor A above is never affected.
+        if (uiState.communityEngineEnabled) {
+            item(key = "community_adds_header") {
+                SuggestionsSectionHeader(
+                    stringResource(R.string.deck_studio_suggestions_community_header),
+                    mc.secondaryAccent,
+                )
+            }
+            when {
+                uiState.isCommunityLoading && uiState.communityAdds.isEmpty() -> item(key = "community_adds_loading") {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = spacing.xl),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(color = mc.secondaryAccent)
+                    }
+                }
+                uiState.communityUnavailable -> item(key = "community_unavailable") {
+                    InlineErrorState(message = stringResource(R.string.deck_doctor_community_unavailable))
+                }
+                uiState.communityAdds.isEmpty() -> item(key = "community_adds_empty") {
+                    Text(
+                        text = stringResource(R.string.deck_doctor_community_empty),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                else -> items(uiState.communityAdds, key = { "community_add_${it.card.scryfallId}" }) { suggestion ->
+                    CommunityAddSuggestionRow(
+                        suggestion = suggestion,
+                        sourceLabel = uiState.deck?.name.orEmpty().ifBlank { stringResource(R.string.deck_studio_suggestions_community_header) },
+                        onAdd = { onAddCommunity(suggestion) },
+                        // Community Decks (browse/import) is a SEPARATE flag from Motor B — hide only
+                        // the "View decks" action when it's disabled, the add suggestion itself stays.
+                        showViewDecksAction = communityDecksEnabled,
+                        onViewDecks = { onViewCommunityDecksForCard(suggestion.card.name) },
+                        onCardTap = { onCommunityCardTap(suggestion.card.scryfallId) },
+                    )
+                }
+            }
+
+            // "Decks like yours" navigates straight into Screen.CommunityDeckDetail — hide the whole
+            // carousel (not just the row action) when Community Decks browsing is disabled.
+            if (communityDecksEnabled && uiState.similarDecks.isNotEmpty()) {
+                item(key = "similar_decks_header") {
+                    SuggestionsSectionHeader(
+                        stringResource(R.string.deck_studio_suggestions_similar_decks_header),
+                        mc.secondaryAccent,
+                    )
+                }
+                item(key = "similar_decks_carousel") {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        items(uiState.similarDecks, key = { "similar_${it.archidektId}" }) { result ->
+                            SimilarDeckCard(
+                                result = result,
+                                onClick = { onOpenSimilarDeck(result.archidektId) },
+                            )
+                        }
+                    }
+                }
             }
         }
     }

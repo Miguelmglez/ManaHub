@@ -7,16 +7,15 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.di.ApplicationScope
-import com.mmg.manahub.core.domain.model.AddCardRow
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.CardTag
-import com.mmg.manahub.core.domain.model.DataResult
-import com.mmg.manahub.core.domain.model.Deck
-import com.mmg.manahub.core.domain.model.DeckCard
-import com.mmg.manahub.core.domain.model.DeckFormat
-import com.mmg.manahub.core.domain.model.DeckSlotEntry
-import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.model.AddCardRow
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckCard
+import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.DeckSlotEntry
+import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -27,9 +26,8 @@ import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +45,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class LandDelta(
     val landName: String,
@@ -100,8 +97,7 @@ data class DeckMagicDetailUiState(
 )
 
 @OptIn(FlowPreview::class)
-@HiltViewModel
-class DeckMagicDetailViewModel @Inject constructor(
+class DeckMagicDetailViewModel(
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
@@ -111,7 +107,7 @@ class DeckMagicDetailViewModel @Inject constructor(
     private val userPrefsStore: UserPreferencesDataStore,
     private val syncManager: SyncManager,
     private val workManager: WorkManager,
-    @ApplicationScope private val applicationScope: CoroutineScope,
+    private val applicationScope: CoroutineScope,
     savedStateHandle: SavedStateHandle,
     private val getDeckGameStatsUseCase: GetDeckGameStatsUseCase,
 ) : ViewModel() {
@@ -132,7 +128,9 @@ class DeckMagicDetailViewModel @Inject constructor(
             .map { it.deck?.id }
             .distinctUntilChanged()
             .filterNotNull()
-            .flatMapLatest { id -> getDeckGameStatsUseCase(id) }
+            .flatMapLatest { id ->
+                userPrefsStore.playerNameFlow.flatMapLatest { name -> getDeckGameStatsUseCase(id, name) }
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
@@ -271,17 +269,19 @@ class DeckMagicDetailViewModel @Inject constructor(
             }
             .keys
 
-        val invalidIdentity = if (isCommanderFormat && commanderEntry?.card != null) {
-            val identity = commanderEntry.card.colorIdentity.toSet()
+        val commanderCard = commanderEntry?.card
+        val invalidIdentity = if (isCommanderFormat && commanderCard != null) {
+            val identity = commanderCard.colorIdentity.toSet()
             otherEntries.filter { entry ->
-                entry.card != null && !identity.containsAll(entry.card.colorIdentity)
+                val entryCard = entry.card
+                entryCard != null && !identity.containsAll(entryCard.colorIdentity)
             }.map { it.scryfallId }.toSet()
         } else {
             emptySet()
         }
 
-        val isCommanderInvalid = isCommanderFormat && commanderEntry?.card != null &&
-                !commanderEntry.card.typeLine.contains("Legendary", ignoreCase = true)
+        val isCommanderInvalid = isCommanderFormat && commanderCard != null &&
+                !commanderCard.typeLine.contains("Legendary", ignoreCase = true)
 
         val hasChanges = draftCardsMap != persistedCardsMap || draftDeck != persistedDeck
 

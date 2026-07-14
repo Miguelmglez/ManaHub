@@ -87,14 +87,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.domain.model.Card
-import com.mmg.manahub.core.domain.model.GroupingMode
+import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.ui.components.CardFullScreenDialog
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
@@ -110,7 +111,7 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.draft.domain.model.DraftCard
+import com.mmg.manahub.core.model.DraftCard
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftSimViewModel
 
@@ -135,7 +136,7 @@ private fun rarityOrder(rarity: String): Int = when (rarity.lowercase()) {
 fun DraftingScreen(
     onNavigateToResult: () -> Unit,
     onBack: () -> Unit,
-    viewModel: DraftSimViewModel = hiltViewModel(),
+    viewModel: DraftSimViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
@@ -1094,7 +1095,7 @@ private fun groupDraftCards(cards: List<DraftCard>, mode: GroupingMode): List<Pa
                     tagMap.getOrPut("Untagged") { mutableListOf() }.add(entry)
                 } else {
                     tags.forEach { tag ->
-                        tagMap.getOrPut(tag.label) { mutableListOf() }.add(entry)
+                        tagMap.getOrPut(tag.label()) { mutableListOf() }.add(entry)
                     }
                 }
             }

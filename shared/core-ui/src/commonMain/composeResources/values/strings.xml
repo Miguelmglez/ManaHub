@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CMP composeResources string table for :shared:core-ui (commonMain).
+
+  ManaHub is English-only (see CLAUDE.md "Language rules") — this is the Compose Multiplatform
+  replacement for androidx R.string in shared composables, NOT a localization mechanism. Do NOT
+  add values-xx/ locale variant directories; keep this file single-locale.
+-->
+<resources>
+    <string name="deckbuilder_ideal_curve">Ideal curve</string>
+</resources>

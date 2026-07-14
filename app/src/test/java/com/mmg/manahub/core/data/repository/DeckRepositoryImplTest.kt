@@ -4,7 +4,7 @@ import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
-import com.mmg.manahub.core.domain.model.Deck
+import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import io.mockk.every
 import io.mockk.mockk

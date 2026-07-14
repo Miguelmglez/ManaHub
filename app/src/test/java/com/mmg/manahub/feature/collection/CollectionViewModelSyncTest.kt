@@ -1,8 +1,9 @@
 package com.mmg.manahub.feature.collection
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
 import androidx.work.WorkManager
-import com.mmg.manahub.core.domain.model.CollectionViewMode
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -11,12 +12,12 @@ import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncResult
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.feature.auth.domain.model.AuthUser
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
-import com.mmg.manahub.feature.trades.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.feature.trades.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import io.mockk.coEvery
@@ -108,6 +109,7 @@ class CollectionViewModelSyncTest {
     // ── Builder ───────────────────────────────────────────────────────────────
 
     private fun buildViewModel(): CollectionViewModel = CollectionViewModel(
+        savedStateHandle       = SavedStateHandle(),
         getCollection          = getCollection,
         cardRepository         = cardRepository,
         userCardRepository     = userCardRepository,

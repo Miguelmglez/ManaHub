@@ -3,11 +3,11 @@ package com.mmg.manahub.feature.profile
 import app.cash.turbine.test
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
-import com.mmg.manahub.core.domain.model.CardValue
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.Rarity
-import com.mmg.manahub.core.domain.repository.GameSessionRepository
+import com.mmg.manahub.core.model.CardValue
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.Rarity
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.gamification.domain.QuestPeriod
 import com.mmg.manahub.core.gamification.domain.QuestWeightClass
@@ -19,10 +19,11 @@ import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
 import com.mmg.manahub.core.gamification.domain.model.RewardsBoard
 import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
-import com.mmg.manahub.core.gamification.domain.usecase.ClaimResult
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.gamification.domain.model.ClaimResult
+import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.profile.presentation.PlayStyle
 import com.mmg.manahub.feature.profile.presentation.ProfileViewModel
 import com.mmg.manahub.util.TestFixtures
@@ -85,6 +86,7 @@ class ProfileViewModelTest {
     private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
     private val gamificationRepository   = mockk<GamificationRepository>(relaxed = true)
+    private val claimQuestRewardUseCase  = mockk<ClaimQuestRewardUseCase>()
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Wizard")
@@ -98,7 +100,7 @@ class ProfileViewModelTest {
             level = 1,
             xpIntoLevel = 0L,
             xpForNextLevel = 100L,
-            updatedAt = java.time.Instant.EPOCH,
+            updatedAt = kotlinx.datetime.Instant.fromEpochMilliseconds(0L),
         )
     )
     private val achievementsFlow = MutableStateFlow<List<AchievementUiModel>>(emptyList())
@@ -116,8 +118,8 @@ class ProfileViewModelTest {
     ) = QuestUiModel(
         instanceId = instanceId,
         templateId = "tmpl_$instanceId",
-        titleRes = 0,
-        descRes = 0,
+        title = "",
+        description = "",
         emoji = "⚔",
         period = QuestPeriod.DAILY,
         weightClass = QuestWeightClass.ACCESSIBLE,
@@ -213,6 +215,7 @@ class ProfileViewModelTest {
         friendRepository         = friendRepository,
         authRepository           = authRepository,
         gamificationRepository   = gamificationRepository,
+        claimQuestRewardUseCase  = claimQuestRewardUseCase,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
@@ -437,8 +440,8 @@ class ProfileViewModelTest {
             AchievementUiModel(
                 id = "FIRST_WIN",
                 category = com.mmg.manahub.core.gamification.domain.model.AchievementCategory.GAMES,
-                titleRes = 0,
-                descRes = 0,
+                title = "",
+                description = "",
                 emoji = "⚔️",
                 tierThresholds = listOf(1),
                 currentValue = 1,
@@ -465,8 +468,8 @@ class ProfileViewModelTest {
             AchievementUiModel(
                 id = "SECRET_ONE_LIFE_WIN",
                 category = com.mmg.manahub.core.gamification.domain.model.AchievementCategory.GAMES,
-                titleRes = 0,
-                descRes = 0,
+                title = "",
+                description = "",
                 emoji = "💀",
                 tierThresholds = listOf(1),
                 currentValue = 0,
@@ -637,7 +640,7 @@ class ProfileViewModelTest {
             level = 3,
             xpIntoLevel = 40L,
             xpForNextLevel = 120L,
-            updatedAt = java.time.Instant.EPOCH,
+            updatedAt = kotlinx.datetime.Instant.fromEpochMilliseconds(0L),
         )
         viewModel = buildViewModel()
         advanceUntilIdle()
@@ -707,7 +710,7 @@ class ProfileViewModelTest {
     fun `given a claimable quest when claimQuest succeeds then a QuestClaimed event is emitted`() = runTest {
         // Arrange
         wireDefaultMocks()
-        coEvery { gamificationRepository.claimQuest("q1") } returns
+        coEvery { claimQuestRewardUseCase("q1") } returns
             ClaimResult.Claimed(xpAwarded = 50, newLevel = 2, leveledUp = false)
         viewModel = buildViewModel()
         advanceUntilIdle()
@@ -721,14 +724,14 @@ class ProfileViewModelTest {
             assertEquals(50, (event as ProfileViewModel.Event.QuestClaimed).xpAwarded)
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 1) { gamificationRepository.claimQuest("q1") }
+        coVerify(exactly = 1) { claimQuestRewardUseCase("q1") }
     }
 
     @Test
     fun `given a non-completed quest when claimQuest returns NotCompleted then QuestClaimFailed is emitted`() = runTest {
         // Arrange
         wireDefaultMocks()
-        coEvery { gamificationRepository.claimQuest("q2") } returns ClaimResult.NotCompleted
+        coEvery { claimQuestRewardUseCase("q2") } returns ClaimResult.NotCompleted
         viewModel = buildViewModel()
         advanceUntilIdle()
 
@@ -745,7 +748,7 @@ class ProfileViewModelTest {
     fun `given claimQuest throws then QuestClaimFailed is emitted (no crash)`() = runTest {
         // Arrange
         wireDefaultMocks()
-        coEvery { gamificationRepository.claimQuest("q3") } throws RuntimeException("boom")
+        coEvery { claimQuestRewardUseCase("q3") } throws RuntimeException("boom")
         viewModel = buildViewModel()
         advanceUntilIdle()
 

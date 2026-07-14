@@ -19,12 +19,15 @@ import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
-import com.mmg.manahub.feature.draft.data.local.DraftSetDao
-import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
-import com.mmg.manahub.feature.news.data.local.NewsDao
-import com.mmg.manahub.feature.trades.data.local.dao.LocalOpenForTradeDao
-import com.mmg.manahub.feature.trades.data.local.dao.LocalWishlistDao
-import com.mmg.manahub.feature.trades.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
+import com.mmg.manahub.core.data.local.dao.DraftSetDao
+import com.mmg.manahub.core.data.local.dao.FriendDao
+import com.mmg.manahub.core.data.local.dao.NewsDao
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
+import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
+import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
+import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -93,6 +96,22 @@ object DatabaseModule {
                 // reason). Additive: adds legality_legacy/vintage/pauper to `cards`
                 // (Deck Doctor Phase 4, D2).
                 MIGRATION_39_40,
+                // v40 → v41 lives as a top-level `val` in Migration_40_41.kt (same
+                // reason). Additive: adds attribution columns to `decks` + the
+                // community_deck_cache table (Community Decks, Batch 1).
+                MIGRATION_40_41,
+                // v41 → v42 lives as a top-level `val` in Migration_41_42.kt (same
+                // reason). Additive: adds produced_mana (compact WUBRG string) to
+                // `cards` (Deck Doctor Community/Archetype plan, Phase 0.3, D14).
+                MIGRATION_41_42,
+                // v42 → v43 lives as a top-level `val` in Migration_42_43.kt (same
+                // reason). Additive: adds archetype_override / themes_override to
+                // `decks` (Deck Doctor Community/Archetype plan, Phase 1.5, D2).
+                MIGRATION_42_43,
+                // v43 → v44 lives as a top-level `val` in Migration_43_44.kt (same
+                // reason). Additive: creates the community_aggregate_cache table
+                // (Deck Doctor Community/Archetype plan, Phase 3.3).
+                MIGRATION_43_44,
             )
             .build()
 
@@ -700,6 +719,7 @@ object DatabaseModule {
     @Provides fun provideDeckDao(db: MtgDatabase): DeckDao = db.deckDao()
     @Provides fun provideStatsDao(db: MtgDatabase): StatsDao = db.statsDao()
     @Provides fun provideManaSymbolDao(db: MtgDatabase): ManaSymbolDao = db.manaSymbolDao()
+    @Provides @Singleton fun provideManaSymbolStore(dao: ManaSymbolDao): ManaSymbolStore = ManaSymbolStoreImpl(dao)
     @Provides fun provideGameSessionDao(db: MtgDatabase): GameSessionDao = db.gameSessionDao()
     @Provides fun provideSurveyAnswerDao(db: MtgDatabase): SurveyAnswerDao = db.surveyAnswerDao()
     @Provides fun provideSurveyCardImpactDao(db: MtgDatabase): SurveyCardImpactDao = db.surveyCardImpactDao()
@@ -715,4 +735,6 @@ object DatabaseModule {
     @Provides fun provideDraftSessionDao(db: MtgDatabase): DraftSessionDao = db.draftSessionDao()
     @Provides fun provideGamificationDao(db: MtgDatabase): GamificationDao = db.gamificationDao()
     @Provides fun provideGamificationStatsDao(db: MtgDatabase): GamificationStatsDao = db.gamificationStatsDao()
+    @Provides fun provideCommunityDeckCacheDao(db: MtgDatabase): CommunityDeckCacheDao = db.communityDeckCacheDao()
+    @Provides fun provideCommunityAggregateDao(db: MtgDatabase): CommunityAggregateDao = db.communityAggregateDao()
 }

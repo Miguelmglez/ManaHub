@@ -3,10 +3,10 @@ package com.mmg.manahub.feature.settings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.domain.model.AppLanguage
-import com.mmg.manahub.core.domain.model.CardLanguage
-import com.mmg.manahub.core.domain.model.NewsLanguage
-import com.mmg.manahub.core.domain.model.PreferredCurrency
+import com.mmg.manahub.core.model.AppLanguage
+import com.mmg.manahub.core.model.CardLanguage
+import com.mmg.manahub.core.model.NewsLanguage
+import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -16,8 +16,7 @@ import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelRepository
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -33,10 +32,15 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-import javax.inject.Inject
-
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
+/**
+ * Settings screen ViewModel.
+ *
+ * KMP migration — Phase 0 Spike D: this is the first feature migrated off Hilt. It is no longer
+ * `@HiltViewModel`; it is constructed by Koin via `settingsKoinModule` and resolved in the Composable
+ * with `koinViewModel()`. Its dependencies are bridged from the still-Hilt-owned object graph (see
+ * `SettingsKoinModule`). Every other ViewModel remains `@HiltViewModel` — Hilt and Koin coexist.
+ */
+class SettingsViewModel(
     private val userPrefsDataStore: UserPreferencesDataStore,
     private val userPreferencesRepo: UserPreferencesRepository,
     private val analyticsHelper: AnalyticsHelper,
@@ -118,6 +122,11 @@ class SettingsViewModel @Inject constructor(
 
         userPrefsDataStore.tradeListPublicFlow
             .onEach { value -> _uiState.update { it.copy(tradeListPublic = value) } }
+            .catch { /* ignore */ }
+            .launchIn(viewModelScope)
+
+        userPrefsDataStore.communityDecksEnabledFlow
+            .onEach { value -> _uiState.update { it.copy(communityDecksEnabled = value) } }
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
     }
@@ -254,6 +263,15 @@ class SettingsViewModel @Inject constructor(
      */
     fun setGamificationEnabled(enabled: Boolean) {
         viewModelScope.launch { userPrefsDataStore.setGamificationEnabled(enabled) }
+    }
+
+    /**
+     * Toggles the master Community Decks preference.
+     *
+     * @param enabled `true` to show Community Decks entry points, `false` to hide them.
+     */
+    fun setCommunityDecksEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPrefsDataStore.setCommunityDecksEnabled(enabled) }
     }
 
     /**

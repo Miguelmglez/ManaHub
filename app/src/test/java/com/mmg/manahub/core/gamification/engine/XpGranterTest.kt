@@ -19,11 +19,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Clock
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.ZoneId
-import java.time.temporal.TemporalAdjusters
+import com.mmg.manahub.core.gamification.FixedClock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 import java.util.Locale
 
 /**
@@ -41,7 +44,7 @@ class XpGranterTest {
 
     // Pinned to a Thursday so week-window math is stable across runs.
     private val fixedInstant: Instant = Instant.parse("2026-06-11T12:00:00Z")
-    private val zoneId: ZoneId = ZoneId.of("UTC")
+    private val timeZone: TimeZone = TimeZone.UTC
     private val now: Instant get() = fixedInstant
 
     // Stable per-device id used to scope local-id-derived ledger keys (ADR-002 §L3).
@@ -55,8 +58,8 @@ class XpGranterTest {
         dao = mockk(relaxed = true)
         dataStore = mockk(relaxed = true)
         coEvery { dataStore.getOrCreateGamificationDeviceId() } returns deviceId
-        val clock = Clock.fixed(fixedInstant, zoneId)
-        granter = XpGranter(dao, clock, zoneId, dataStore)
+        val clock = FixedClock(fixedInstant)
+        granter = XpGranter(dao, clock, timeZone, dataStore)
 
         // Default happy-path stubs. Individual tests override as needed.
         coEvery { dao.hasTransaction(any()) } returns false
@@ -276,7 +279,7 @@ class XpGranterTest {
     private suspend fun weeklyWindowStartFor(locale: Locale): Long {
         Locale.setDefault(locale)
         // Re-create the granter so it is constructed under the test locale (no hidden state, but explicit).
-        val granterUnderLocale = XpGranter(dao, Clock.fixed(fixedInstant, zoneId), zoneId, dataStore)
+        val granterUnderLocale = XpGranter(dao, FixedClock(fixedInstant), timeZone, dataStore)
         val sinceSlot = slot<Long>()
         coEvery {
             dao.countDistinctSourceRefForCategorySince(XpSourceCategory.SOCIAL.name, capture(sinceSlot))
@@ -288,9 +291,9 @@ class XpGranterTest {
     @Test
     fun `weekly friend cap window starts on Monday under a Sunday-first locale`() = runTest {
         // The clock is a Thursday (2026-06-11); the ISO-week Monday is 2026-06-08T00:00:00Z.
-        val expectedMonday = fixedInstant.atZone(zoneId).toLocalDate()
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            .atStartOfDay(zoneId).toInstant().toEpochMilli()
+        val today = fixedInstant.toLocalDateTime(timeZone).date
+        val expectedMonday = today.minus(today.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
+            .atStartOfDayIn(timeZone).toEpochMilliseconds()
 
         // Locale.US treats Sunday as the first day of the week; the window must still start on Monday.
         val sinceUs = weeklyWindowStartFor(Locale.US)
@@ -325,7 +328,7 @@ class XpGranterTest {
         }
         val ds = mockk<UserPreferencesDataStore>(relaxed = true)
         coEvery { ds.getOrCreateGamificationDeviceId() } returns deviceUuid
-        XpGranter(freshDao, Clock.fixed(fixedInstant, zoneId), zoneId, ds).grant(event)
+        XpGranter(freshDao, FixedClock(fixedInstant), timeZone, ds).grant(event)
         return keySlot.captured.idempotencyKey
     }
 

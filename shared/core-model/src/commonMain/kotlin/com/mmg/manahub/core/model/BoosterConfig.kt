@@ -1,0 +1,37 @@
+package com.mmg.manahub.core.model
+
+/**
+ * Parsed representation of the Worker's booster.json for a set.
+ * Mirrors the §10 schema: a list of weighted booster variants and named card sheets.
+ */
+data class BoosterConfig(
+    val setCode: String,
+    val schemaVersion: Int,
+    val boosters: List<BoosterVariant>,
+    /** Named sheets (e.g. "common", "uncommon", "rareMythic", "foil"). */
+    val sheets: Map<String, BoosterSheet>,
+    /**
+     * Additional Scryfall set codes whose cards appear in [sheets] alongside [setCode]'s own
+     * cards (e.g. SOS's `mysticalArchive` sheet draws from Scryfall set `soa`). The card-pool
+     * fetch widens its Scryfall query to include these sets. Empty for the vast majority of
+     * sets, which draw every sheet from their own set code only.
+     */
+    val extraPoolSets: List<String> = emptyList(),
+)
+
+/** One weighted booster variant; [contents] maps sheet name to slot count. */
+data class BoosterVariant(
+    val weight: Int,
+    val contents: Map<String, Int>,
+)
+
+data class BoosterSheet(
+    val foil: Boolean,
+    val balanceColors: Boolean,
+    val cards: List<BoosterCardEntry>,
+)
+
+data class BoosterCardEntry(
+    val id: String,
+    val weight: Int,
+)

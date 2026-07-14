@@ -1,40 +1,40 @@
 package com.mmg.manahub.feature.friends.data.repository
 
 import android.util.Log
-import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.domain.model.DataResult
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
-import com.mmg.manahub.feature.friends.data.UNKNOWN_DISPLAY_NAME
-import com.mmg.manahub.feature.friends.data.local.dao.FriendDao
-import com.mmg.manahub.feature.friends.data.local.entity.FriendEntity
-import com.mmg.manahub.feature.friends.data.local.entity.FriendRequestEntity
-import com.mmg.manahub.feature.friends.data.local.entity.OutgoingFriendRequestEntity
-import com.mmg.manahub.feature.friends.data.orNullIfBlank
-import com.mmg.manahub.feature.friends.data.remote.FriendRemoteDataSource
-import com.mmg.manahub.feature.friends.data.remote.FriendRequestWithProfile
-import com.mmg.manahub.feature.friends.data.remote.FriendWithProfile
-import com.mmg.manahub.feature.friends.data.remote.OutgoingRequestWithProfile
-import com.mmg.manahub.feature.friends.domain.model.AcceptInviteResult
-import com.mmg.manahub.feature.friends.domain.model.Friend
-import com.mmg.manahub.feature.friends.domain.model.FriendCard
-import com.mmg.manahub.feature.friends.domain.model.FriendMatchHistory
-import com.mmg.manahub.feature.friends.domain.model.FriendRequest
-import com.mmg.manahub.feature.friends.domain.model.FriendStats
-import com.mmg.manahub.feature.friends.domain.model.OutgoingFriendRequest
-import com.mmg.manahub.feature.friends.domain.repository.FriendRepository
+import com.mmg.manahub.core.data.local.dao.FriendDao
+import com.mmg.manahub.core.data.local.entity.FriendEntity
+import com.mmg.manahub.core.data.local.entity.FriendRequestEntity
+import com.mmg.manahub.core.data.local.entity.OutgoingFriendRequestEntity
+import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
+import com.mmg.manahub.core.data.remote.FriendRequestWithProfile
+import com.mmg.manahub.core.data.remote.FriendWithProfile
+import com.mmg.manahub.core.data.remote.OutgoingRequestWithProfile
+import com.mmg.manahub.core.data.remote.UNKNOWN_DISPLAY_NAME
+import com.mmg.manahub.core.data.remote.orNullIfBlank
+import com.mmg.manahub.core.model.AcceptInviteResult
+import com.mmg.manahub.core.model.FolderFilters
+import com.mmg.manahub.core.model.Friend
+import com.mmg.manahub.core.model.FriendCard
+import com.mmg.manahub.core.model.FriendMatchHistory
+import com.mmg.manahub.core.model.FriendRequest
+import com.mmg.manahub.core.model.FriendStats
+import com.mmg.manahub.core.model.OutgoingFriendRequest
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import retrofit2.HttpException
-import java.time.Instant
-import javax.inject.Inject
+import kotlinx.datetime.Clock
 
-class FriendRepositoryImpl @Inject constructor(
+class FriendRepositoryImpl(
     private val dao: FriendDao,
     private val remote: FriendRemoteDataSource,
     private val cardRepo: CardRepository,
     private val progressionEventBus: ProgressionEventBus,
+    private val crashReporter: CrashReporter,
 ) : FriendRepository {
 
     override fun observeFriends(): Flow<List<Friend>> =
@@ -80,12 +80,12 @@ class FriendRepositoryImpl @Inject constructor(
                 // the next manual refresh, so make it observable (and retry once) instead of
                 // discarding the Result fire-and-forget.
                 refreshFriends(currentUserId).onFailure { firstError ->
-                    FirebaseCrashlytics.getInstance().apply {
+                    crashReporter.apply {
                         log("acceptRequest: refreshFriends failed after ACCEPT (friendshipId=$friendshipId), retrying once")
                         recordException(firstError)
                     }
                     refreshFriends(currentUserId).onFailure { retryError ->
-                        FirebaseCrashlytics.getInstance().apply {
+                        crashReporter.apply {
                             log("acceptRequest: refreshFriends retry also failed (friendshipId=$friendshipId); local friends cache may be stale")
                             recordException(retryError)
                         }
@@ -97,7 +97,7 @@ class FriendRepositoryImpl @Inject constructor(
                 progressionEventBus.emit(
                     ProgressionEvent.FriendAdded(
                         friendId = friendshipId,
-                        occurredAt = Instant.now(),
+                        occurredAt = Clock.System.now(),
                     )
                 )
             }
@@ -146,11 +146,9 @@ class FriendRepositoryImpl @Inject constructor(
         }.recoverCatching { throwable ->
             // Extract only the known semantic token from the Supabase error body, never the
             // raw PostgreSQL message, to avoid leaking internal schema details.
-            val rawBody = if (throwable is HttpException) {
-                throwable.response()?.errorBody()?.string() ?: ""
-            } else {
-                throwable.message ?: ""
-            }
+            // Ktor's ResponseException.message includes the response body text,
+            // so we can extract the semantic token from it regardless of exception type.
+            val rawBody = throwable.message ?: ""
             val token = when {
                 rawBody.contains("SELF_INVITE", ignoreCase = true) -> "SELF_INVITE"
                 rawBody.contains("INVALID_CODE", ignoreCase = true) -> "INVALID_CODE"
@@ -170,7 +168,7 @@ class FriendRepositoryImpl @Inject constructor(
         friendUserId: String,
         list: String,
         query: String,
-        filters: com.mmg.manahub.feature.friends.presentation.detail.FolderFilters?,
+        filters: FolderFilters?,
         limit: Int,
         offset: Int,
     ): Result<List<FriendCard>> = runCatching {
@@ -199,7 +197,7 @@ class FriendRepositoryImpl @Inject constructor(
                 is DataResult.Success -> r.data
                 is DataResult.Error -> {
                     Log.w("FriendRepository", "Card metadata unavailable: ${dto.scryfallId} — ${r.message}")
-                    FirebaseCrashlytics.getInstance().log(
+                    crashReporter.log(
                         "getFriendCollection: card metadata unavailable for ${dto.scryfallId} (list=$list): ${r.message}"
                     )
                     null
@@ -260,7 +258,7 @@ class FriendRepositoryImpl @Inject constructor(
             mostValuableColor = mostValuableColor,
         )
 
-    private fun com.mmg.manahub.feature.friends.data.remote.FriendMatchHistoryDto.toDomain() =
+    private fun com.mmg.manahub.core.data.remote.dto.FriendMatchHistoryDto.toDomain() =
         FriendMatchHistory(
             myWins = myWins,
             opponentWins = opponentWins,
@@ -270,7 +268,7 @@ class FriendRepositoryImpl @Inject constructor(
             } ?: 0L,
         )
 
-    private fun com.mmg.manahub.feature.friends.data.remote.FriendStatsDto.toDomain() =
+    private fun com.mmg.manahub.core.data.remote.dto.FriendStatsDto.toDomain() =
         FriendStats(
             userId = userId,
             uniqueCards = uniqueCards,

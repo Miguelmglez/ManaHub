@@ -14,25 +14,22 @@ import com.mmg.manahub.core.data.local.entity.projection.SetValueProjection
 import com.mmg.manahub.core.data.local.entity.projection.TagProjection
 import com.mmg.manahub.core.data.local.entity.projection.TotalsProjection
 import com.mmg.manahub.core.data.local.entity.projection.TypeCountProjection
-import com.mmg.manahub.core.domain.model.CardType
-import com.mmg.manahub.core.domain.model.CardValue
-import com.mmg.manahub.core.domain.model.CollectionStats
-import com.mmg.manahub.core.domain.model.MtgColor
-import com.mmg.manahub.core.domain.model.PreferredCurrency
-import com.mmg.manahub.core.domain.model.Rarity
+import com.mmg.manahub.core.model.CardType
+import com.mmg.manahub.core.model.CardValue
+import com.mmg.manahub.core.model.CollectionStats
+import com.mmg.manahub.core.model.MtgColor
+import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.model.Rarity
 import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.feature.auth.domain.model.SessionState
-import com.mmg.manahub.feature.auth.domain.repository.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class StatsRepositoryImpl @Inject constructor(
+class StatsRepositoryImpl(
     private val statsDao: StatsDao,
     private val deckDao: DeckDao,
     private val authRepository: AuthRepository,
