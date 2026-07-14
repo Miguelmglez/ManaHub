@@ -112,6 +112,10 @@ object DatabaseModule {
                 // reason). Additive: creates the community_aggregate_cache table
                 // (Deck Doctor Community/Archetype plan, Phase 3.3).
                 MIGRATION_43_44,
+                // v44 → v45 lives as a top-level `val` in Migration_44_45.kt (same
+                // reason). Additive: adds last_fetched_at/etag/last_modified to
+                // `content_sources` (News feature improvements, Phase 1).
+                MIGRATION_44_45,
             )
             .build()
 

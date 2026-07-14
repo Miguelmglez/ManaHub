@@ -48,11 +48,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.news.presentation.components.ArticleCard
@@ -73,15 +78,29 @@ fun NewsScreen(
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
     val context = LocalContext.current
+    val toastState = rememberMagicToastState()
 
     var showFilterSheet by remember { mutableStateOf(false) }
 
     val allSourceTypes = setOf(SourceType.ARTICLE, SourceType.VIDEO)
-    val allLanguages = setOf("en", "es")
+    val allLanguages = NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES.toSet()
     val hasActiveFilters = uiState.filterTypes != allSourceTypes
         || uiState.filterLanguages != allLanguages
         || uiState.filterSourceIds != null
 
+    // One-shot toast events (partial/total refresh failure) — never Snackbar (project rule).
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is NewsEvent.ShowPartialRefreshFailure -> {
+                    val msg = context.getString(R.string.news_refresh_partial_failure, event.failedCount)
+                    toastState.show(msg, MagicToastType.ERROR)
+                }
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -153,8 +172,9 @@ fun NewsScreen(
             InlineErrorState(
                 message = uiState.error ?: "",
                 retryLabel = stringResource(R.string.action_retry),
-                onRetry = viewModel::refresh,
+                onRetry = { viewModel.refresh() },
                 modifier = Modifier.padding(horizontal = 16.dp),
+                enabled = !uiState.isRefreshing,
             )
             Spacer(Modifier.height(8.dp))
         }
@@ -162,7 +182,7 @@ fun NewsScreen(
         // ── Content ───────────────────────────────────────────────────────────
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
-            onRefresh = viewModel::refresh,
+            onRefresh = { viewModel.refresh(force = true) },
             modifier = Modifier.fillMaxSize(),
         ) {
             when {
@@ -238,6 +258,9 @@ fun NewsScreen(
             },
             onDismiss = { showFilterSheet = false },
         )
+    }
+
+    MagicToastHost(state = toastState)
     }
 }
 

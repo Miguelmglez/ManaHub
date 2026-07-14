@@ -53,12 +53,26 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.model.news.ContentSource
 import kotlinx.coroutines.launch
+
+/**
+ * Resource id for a short language code's display label. [NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES]
+ * is the single source of truth for WHICH codes exist; this only maps a known code to its string
+ * resource (falls back to the raw uppercase code for anything unmapped, which should never happen
+ * in practice since every entry in [NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES] has a mapping here).
+ */
+internal fun languageLabelRes(code: String): Int = when (code) {
+    "en" -> R.string.news_language_en
+    "es" -> R.string.news_language_es
+    "de" -> R.string.news_language_de
+    else -> R.string.news_language_en
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -136,7 +150,7 @@ fun NewsFilterSheet(
                 )
                 TextButton(onClick = {
                     selectedTypes = setOf(SourceType.ARTICLE, SourceType.VIDEO)
-                    selectedLanguages = setOf("en", "es")
+                    selectedLanguages = NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES.toSet()
                     selectedSourceIds = allEnabledSourceIds
                 }) {
                     Text(
@@ -189,18 +203,14 @@ fun NewsFilterSheet(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            LanguageChip(
-                                label = stringResource(R.string.news_language_en),
-                                code = "en",
-                                selected = "en" in selectedLanguages,
-                                onToggle = { selectedLanguages = selectedLanguages.toggle("en") },
-                            )
-                            LanguageChip(
-                                label = stringResource(R.string.news_language_es),
-                                code = "es",
-                                selected = "es" in selectedLanguages,
-                                onToggle = { selectedLanguages = selectedLanguages.toggle("es") },
-                            )
+                            NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES.forEach { code ->
+                                LanguageChip(
+                                    label = stringResource(languageLabelRes(code)),
+                                    code = code,
+                                    selected = code in selectedLanguages,
+                                    onToggle = { selectedLanguages = selectedLanguages.toggle(code) },
+                                )
+                            }
                         }
                     }
                 }

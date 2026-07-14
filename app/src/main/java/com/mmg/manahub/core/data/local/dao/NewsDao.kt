@@ -22,9 +22,6 @@ interface NewsDao {
     @Query("SELECT * FROM news_articles ORDER BY published_at DESC")
     fun observeArticles(): Flow<List<NewsArticleEntity>>
 
-    @Query("SELECT MIN(fetched_at) FROM news_articles")
-    suspend fun oldestArticleFetchedAt(): Long?
-
     @Query("DELETE FROM news_articles WHERE fetched_at < :before")
     suspend fun evictArticlesBefore(before: Long)
 
@@ -35,9 +32,6 @@ interface NewsDao {
 
     @Query("SELECT * FROM news_videos ORDER BY published_at DESC")
     fun observeVideos(): Flow<List<NewsVideoEntity>>
-
-    @Query("SELECT MIN(fetched_at) FROM news_videos")
-    suspend fun oldestVideoFetchedAt(): Long?
 
     @Query("DELETE FROM news_videos WHERE fetched_at < :before")
     suspend fun evictVideosBefore(before: Long)
@@ -64,4 +58,19 @@ interface NewsDao {
 
     @Query("UPDATE content_sources SET is_enabled = :enabled WHERE id = :id")
     suspend fun setSourceEnabled(id: String, enabled: Boolean)
+
+    @Query("SELECT * FROM content_sources WHERE id = :id")
+    suspend fun getSourceById(id: String): ContentSourceEntity?
+
+    /**
+     * Bumps the per-source refresh watermark after a successful fetch (200 or 304). Called for
+     * BOTH a normal 200 (fresh `etag`/`lastModified`) and a 304 Not Modified (same `etag`/
+     * `lastModified` re-passed by the caller, only `fetchedAt` actually advances) — never on
+     * failure, so a failed source is retried on the next refresh.
+     */
+    @Query(
+        "UPDATE content_sources SET last_fetched_at = :fetchedAt, etag = :etag, last_modified = :lastModified " +
+            "WHERE id = :id"
+    )
+    suspend fun updateFetchWatermark(id: String, fetchedAt: Long, etag: String?, lastModified: String?)
 }
