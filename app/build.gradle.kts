@@ -188,9 +188,15 @@ android {
         }
     }
 
-    // Ensure assets are prepared before merging
+    // Ensure assets are prepared before merging or linting (Phase 3 CMP resource bridging).
+    // lintVitalAnalyzeRelease scans assets and needs an explicit dependency on the generator.
     tasks.configureEach {
-        if (name.startsWith("merge") && name.endsWith("Assets")) {
+        val taskName = name
+        if ((taskName.startsWith("merge") && taskName.endsWith("Assets")) ||
+            taskName.contains("lintVitalAnalyze", ignoreCase = true) ||
+            taskName.contains("lintAnalyze", ignoreCase = true) ||
+            (taskName.startsWith("generate") && taskName.contains("Lint") && taskName.contains("Model"))
+        ) {
             dependsOn(prepareCmpAssets)
         }
     }
