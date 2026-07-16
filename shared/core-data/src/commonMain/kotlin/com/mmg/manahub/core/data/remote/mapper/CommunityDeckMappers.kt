@@ -56,6 +56,7 @@ fun ArchidektDeckDetailDto.toDomain(): CommunityDeck {
         viewCount = viewCount,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        featuredImageUrl = customFeatured.takeIf { it.isNotBlank() } ?: featured.takeIf { it.isNotBlank() },
         cards = mappedCards,
         sourceUrl = "https://archidekt.com/decks/$id",
     )
@@ -73,7 +74,16 @@ fun ArchidektDeckSummaryDto.toDomain(): CommunityDeckSummary = CommunityDeckSumm
     viewCount = viewCount,
     createdAt = createdAt,
     updatedAt = updatedAt,
-    colorIdentity = colors.keys.toList(),
+    colorIdentity = colors.filterValues { it > 0 }.keys.map { colorKey ->
+        when (colorKey.lowercase()) {
+            "white" -> "W"
+            "blue" -> "U"
+            "black" -> "B"
+            "red" -> "R"
+            "green" -> "G"
+            else -> colorKey.uppercase() // Fallback to raw if already a letter
+        }
+    },
     // A user-picked `customFeatured` wins over the automatic `featured` crop when present.
     featuredImageUrl = customFeatured.takeIf { it.isNotBlank() } ?: featured.takeIf { it.isNotBlank() },
 )

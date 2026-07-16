@@ -2,9 +2,16 @@ package com.mmg.manahub.core.data.local.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "cards")
+@Entity(
+    tableName = "cards",
+    // Card Versions & Languages, Phase 1A: supports the oracle-wide lookups used to relate every
+    // printing/language of a card (CardDao is queried by oracle_id from UserCardCollectionDao,
+    // LocalWishlistDao and LocalOpenForTradeDao's observeVersionsByOracle joins).
+    indices = [Index("oracle_id")],
+)
 data class CardEntity(
 
     @PrimaryKey
@@ -127,4 +134,14 @@ data class CardEntity(
      */
     @ColumnInfo(name = "produced_mana", defaultValue = "")
     val producedMana: String = "",
+
+    /**
+     * Card Versions & Languages, Phase 1A. Scryfall's `oracle_id` — shared by every
+     * printing/language of this card. Empty string for rows cached before v46 (backfilled to ''
+     * by the additive migration); the real value arrives lazily on the row's next Scryfall
+     * refresh via [com.mmg.manahub.core.data.repository.CachePolicy] — never a mass re-fetch.
+     * See [com.mmg.manahub.core.model.Card.oracleId] for the exact-name fallback used while empty.
+     */
+    @ColumnInfo(name = "oracle_id", defaultValue = "")
+    val oracleId: String = "",
 )

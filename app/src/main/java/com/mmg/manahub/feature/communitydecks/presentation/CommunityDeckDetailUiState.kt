@@ -26,6 +26,9 @@ sealed interface CommunityDeckDetailUiState {
         val isImporting: Boolean = false,
         val importProgress: Pair<Int, Int>? = null,
         val isStale: Boolean = false,
+        val commanderExpanded: Boolean = true,
+        val mainboardExpanded: Boolean = true,
+        val sideboardExpanded: Boolean = true,
     ) : CommunityDeckDetailUiState
 
     /** The initial deck fetch failed; [message] is a user-facing reason. */

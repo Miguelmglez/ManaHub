@@ -177,6 +177,15 @@
     <string name="carddetail_other_prints">Other prints</string>
     <string name="carddetail_other_prints_title">Explore All Versions</string>
     <string name="carddetail_other_prints_desc">Alternate art, special frames &amp; prints</string>
+    <!-- Card Versions & Languages, Phase 1B -->
+    <string name="carddetail_language_sheet_title">Select language</string>
+    <string name="carddetail_language_button_description">Change language</string>
+    <string name="carddetail_variants_header">Variants</string>
+    <!-- Edge-case audit A5, 2026-07-15: collapse toggle for the Collection/Wishlist oracle-wide sections -->
+    <string name="carddetail_show_all">Show all (%1$d)</string>
+    <string name="carddetail_show_less">Show less</string>
+    <string name="carddetail_save_changes">Save changes</string>
+    <string name="carddetail_edit_entry_description">Edit entry</string>
     <string name="carddetail_delete_copy_title">Remove copy</string>
     <string name="carddetail_delete_copy_message">Remove this copy from your collection?</string>
     <string name="carddetail_remove_wishlist_title">Remove from wishlist</string>
@@ -3074,13 +3083,13 @@
     <string name="community_deck_views">%1$d views</string>
     <string name="community_deck_format">Format: %1$s</string>
 
-    <!-- Community Decks — Search (Phase 2) -->
-    <string name="community_deck_search_hint">Search by card name…</string>
+    <!-- Community Decks — Search (Phase 2; deck-NAME search since the Discover/Search overhaul 2026-07-15) -->
+    <string name="community_deck_search_hint">Search decks by name…</string>
     <string name="community_deck_search_button">Search</string>
     <string name="community_deck_search_empty">No decks found</string>
-    <string name="community_deck_search_empty_with_filter">No decks found with this filter. Try removing the format filter.</string>
+    <string name="community_deck_search_empty_with_filter">No decks found with these filters. Try removing one.</string>
     <string name="community_deck_search_timeout">Search timed out. Try a more specific query or remove the format filter.</string>
-    <string name="community_deck_search_initial">Search for a card to find community decks that include it</string>
+    <string name="community_deck_search_initial">Search decks by name, or use Advanced Search to filter by commander, card, and more</string>
     <string name="community_deck_load_more">Load More</string>
     <string name="community_deck_result_count">%1$d decks found</string>
     <string name="community_deck_cards_count">%1$d cards</string>
@@ -3093,13 +3102,44 @@
     <string name="community_deck_sort_label">Sort: %1$s</string>
     <string name="community_deck_sort_label_base">Sort by:</string>
     <string name="community_deck_format_label">Format:</string>
+    <string name="community_deck_tile_format_views">%1$s · %2$d views</string>
 
-    <!-- Community Hub — Discover (Deck Doctor Community/Archetype plan, Phase 5) -->
+    <!-- Community Hub — Discover (Deck Doctor Community/Archetype plan, Phase 5; overhauled into a
+         multi-section browse feed 2026-07-15) -->
     <string name="community_hub_tab_discover">Discover</string>
     <string name="community_hub_tab_search">Search</string>
     <string name="community_hub_discover_unavailable">Community data unavailable</string>
     <string name="community_hub_trending_commanders">Top commanders this week</string>
     <string name="community_hub_trending_cards">Most searched cards</string>
     <string name="community_hub_popular_decks">Popular decks</string>
+    <string name="community_hub_recent_decks">Recent decks</string>
+    <string name="community_hub_updated_decks">Recently updated</string>
+    <string name="community_hub_primer_decks">Decks with primers</string>
+    <string name="community_hub_featured_format">Featured format: %1$s</string>
+
+    <!-- Community Hub — Advanced Search sheet (Discover/Search overhaul, Phase 2, 2026-07-15) -->
+    <string name="community_advsearch_button">Advanced search</string>
+    <string name="community_advsearch_title">Advanced Search</string>
+    <string name="community_advsearch_close">Close</string>
+    <string name="community_advsearch_clear_all">Clear all</string>
+    <string name="community_advsearch_search_button">Search</string>
+    <string name="community_advsearch_section_colors">Colors</string>
+    <string name="community_advsearch_colors_caption">Matches decks with exactly these colors</string>
+    <string name="community_advsearch_section_format">Deck format</string>
+    <string name="community_advsearch_section_bracket">Commander bracket</string>
+    <string name="community_advsearch_bracket_any">Any</string>
+    <string name="community_advsearch_section_commander">Commander</string>
+    <string name="community_advsearch_section_card">Card</string>
+    <string name="community_advsearch_section_username">Owner username</string>
+    <string name="community_advsearch_username_hint">Username</string>
+    <string name="community_advsearch_section_size">Deck size</string>
+    <string name="community_advsearch_size_equals">Equals</string>
+    <string name="community_advsearch_size_hint">e.g. 100</string>
+    <string name="community_advsearch_primers_only">Only decks with primers</string>
+    <string name="community_advsearch_commander_hint">Search commander name…</string>
+    <string name="community_advsearch_card_hint">Search card name…</string>
+    <string name="community_advsearch_clear_selection">Clear selection</string>
+    <string name="community_advsearch_select">Select</string>
+    <string name="community_advsearch_cancel">Cancel</string>
 
 </resources>

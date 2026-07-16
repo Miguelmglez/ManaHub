@@ -5,6 +5,7 @@ import com.mmg.manahub.core.data.network.ArchidektRequestQueue
 import com.mmg.manahub.core.model.AggregateCardEntry
 import com.mmg.manahub.core.model.AggregateSource
 import com.mmg.manahub.core.model.CommunityAggregate
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import com.mmg.manahub.core.model.SixtyDeckSummary
 
 /** How many decks the degraded direct-Archidekt fallback samples (Phase 3.3: "reduced sample"). */
@@ -42,7 +43,13 @@ class ArchidektDirectFallbackSource(
     override suspend fun fetch(signatureCard: String, format: Int): CommunityAggregate.Sixty.Materialized? {
         return try {
             val search = archidektRequestQueue.execute {
-                archidektClient.searchDecks(cardName = signatureCard, deckFormat = format, pageSize = FALLBACK_SAMPLE_SIZE)
+                archidektClient.searchDecks(
+                    CommunityDeckSearchFilters(
+                        cardName = signatureCard,
+                        deckFormatId = format,
+                        pageSize = FALLBACK_SAMPLE_SIZE,
+                    ),
+                )
             }
             val sanitized = search.results.filter { !it.private && !it.theorycrafted }.take(FALLBACK_SAMPLE_SIZE)
             if (sanitized.isEmpty()) return null

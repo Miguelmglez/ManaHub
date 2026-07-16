@@ -13,6 +13,7 @@ import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
+import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
@@ -35,6 +36,7 @@ import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
 import com.mmg.manahub.feature.survey.domain.usecase.CompleteSurveyUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.UpdateWishlistEntryUseCase
 import kotlinx.coroutines.Dispatchers
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -158,6 +160,8 @@ fun sharedDomainKoinModule(
     //    ScannerViewModel via the reverse KoinToHiltBridgeModule — same singleton instance either way. ──
     single { AddToWishlistUseCase(repo = get(), authRepo = get()) }
     single { MigrateLocalTradeListsUseCase(wishlistRepo = get(), openForTradeRepo = get()) }
+    // Card Versions & Languages, Phase 1A.
+    single { UpdateWishlistEntryUseCase(repo = get(), cardRepository = get(), authRepo = get()) }
 
     // ── News use cases. ──
     single { GetNewsFeedUseCase(repository = get()) }
@@ -171,6 +175,13 @@ fun sharedDomainKoinModule(
             cardRepository = get(),
             userCardRepository = get(),
             progressionEventBus = get(),
+        )
+    }
+    // Card Versions & Languages, Phase 1A.
+    single {
+        UpdateCollectionEntryUseCase(
+            cardRepository = get(),
+            userCardRepository = get(),
         )
     }
     // Also consumed by the still-Hilt (excluded) ScannerViewModel via the reverse

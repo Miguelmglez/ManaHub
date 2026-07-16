@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.remote
 
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -14,18 +15,25 @@ class ArchidektClient(
     suspend fun getDeckById(id: Int): ArchidektDeckDetailDto =
         httpClient.get("${baseUrl}api/decks/${id}/").body()
 
-    suspend fun searchDecks(
-        cardName: String? = null,
-        deckFormat: Int? = null,
-        orderBy: String? = null,
-        page: Int? = null,
-        pageSize: Int? = null,
-    ): ArchidektSearchResultDto =
+    /**
+     * Searches `GET /api/decks/v3/` with every filter verified live 2026-07-15 (see
+     * `docs/adr/ADR-004-community-api-contracts.md` §1b). Only non-null/non-empty
+     * [CommunityDeckSearchFilters] fields are sent — `deckTags` is intentionally never exposed
+     * (confirmed to always statement-timeout).
+     */
+    suspend fun searchDecks(filters: CommunityDeckSearchFilters): ArchidektSearchResultDto =
         httpClient.get("${baseUrl}api/decks/v3/") {
-            cardName?.let { parameter("cardName", it) }
-            deckFormat?.let { parameter("deckFormat", it) }
-            orderBy?.let { parameter("orderBy", it) }
-            page?.let { parameter("page", it) }
-            pageSize?.let { parameter("pageSize", it) }
+            filters.deckName?.let { parameter("name", it) }
+            filters.cardName?.let { parameter("cardName", it) }
+            filters.commanderName?.let { parameter("commanderName", it) }
+            filters.ownerUsername?.let { parameter("ownerUsername", it) }
+            filters.deckFormatId?.let { parameter("deckFormat", it) }
+            filters.edhBracket?.let { parameter("edhBracket", it) }
+            if (filters.colors.isNotEmpty()) parameter("colors", filters.colors.joinToString(","))
+            filters.size?.let { parameter("size", it) }
+            if (filters.primersOnly) parameter("primers", true)
+            filters.orderBy?.let { parameter("orderBy", it) }
+            parameter("page", filters.page)
+            parameter("pageSize", filters.pageSize)
         }.body()
 }

@@ -42,6 +42,21 @@ interface LocalWishlistDao {
     @Query("SELECT * FROM local_wishlists WHERE scryfall_id = :scryfallId")
     suspend fun getByScryfallId(scryfallId: String): List<LocalWishlistEntity>
 
+    // Card Versions & Languages, Phase 1A. Every wishlist entry for ANY printing/language sharing
+    // the same oracle identity — see UserCardCollectionDao.observeVersionsByOracle for the exact
+    // matching semantics (oracle_id when known, exact `name` match as the pre-oracle_id fallback).
+    @Transaction
+    @Query("""
+        SELECT * FROM local_wishlists
+        WHERE scryfall_id IN (
+            SELECT scryfall_id FROM cards
+            WHERE (:oracleId != '' AND oracle_id = :oracleId)
+               OR (oracle_id = '' AND name = :name)
+        )
+        ORDER BY created_at DESC
+    """)
+    fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<LocalWishlistWithCard>>
+
     // Used to check `synced` before mutating a row, so local edits to an already-synced entry
     // can be paired with the matching remote call (trades audit §2.3, 2026-07-10).
     @Query("SELECT * FROM local_wishlists WHERE id = :id")

@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.remote.ArchidektClient
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import com.mmg.manahub.core.model.CommunityDeckSearchResult
 import com.mmg.manahub.core.model.DataResult
 import io.ktor.client.plugins.ResponseException
@@ -88,19 +89,17 @@ class CommunityDecksRepositoryImpl(
         }
 
     override suspend fun searchDecks(
-        cardName: String?,
-        deckFormat: Int?,
-        orderBy: String?,
-        page: Int,
-        pageSize: Int,
+        filters: CommunityDeckSearchFilters,
     ): DataResult<CommunityDeckSearchResult> = withContext(dispatcherProvider.io) {
+        // The most specific text signal driving this query, used only for length-only telemetry
+        // (never the raw text — see CLAUDE.md telemetry rules).
+        val querySignalLength = (filters.cardName ?: filters.commanderName ?: filters.deckName)?.length ?: 0
+
         try {
-            val dto = requestQueue.execute {
-                api.searchDecks(cardName, deckFormat, orderBy, page, pageSize)
-            }
+            val dto = requestQueue.execute { api.searchDecks(filters) }
 
             // Archidekt signals a server-side statement timeout with count = -1 and an
-            // empty result set (commonly on a popular cardName + deckFormat combination).
+            // empty result set (commonly on a popular card/commander + format combination).
             if (dto.count < 0) {
                 crashReporter.log("community_deck_search_server_timeout")
                 crashReporter.recordException(
@@ -108,11 +107,11 @@ class CommunityDecksRepositoryImpl(
                 )
                 crashReporter.setCustomKey(
                     "community_search_timeout_format",
-                    deckFormat?.toString() ?: "none",
+                    filters.deckFormatId?.toString() ?: "none",
                 )
                 crashReporter.setCustomKey(
                     "community_search_timeout_query_len",
-                    (cardName?.length ?: 0).toString(),
+                    querySignalLength.toString(),
                 )
                 return@withContext DataResult.Error(
                     "Search timed out. Try a more specific query or remove the format filter.",
@@ -139,7 +138,7 @@ class CommunityDecksRepositoryImpl(
             )
             crashReporter.setCustomKey(
                 "community_deck_search_query_len",
-                (cardName?.length ?: 0).toString(),
+                querySignalLength.toString(),
             )
             DataResult.Error(e.message ?: "Search failed")
         }

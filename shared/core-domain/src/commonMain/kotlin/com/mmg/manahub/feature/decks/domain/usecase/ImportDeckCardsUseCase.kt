@@ -194,6 +194,8 @@ class ImportDeckCardsUseCase(
             var resolvedCount = 0
             var failedCount = 0
             var commanderScryfallId: String? = null
+            val totalPhysicalCards = parsed.cards.sumOf { it.quantity }
+            var physicalProcessedCount = 0
 
             parsed.cards.forEachIndexed { index, card ->
                 val result = cardRepository.searchCardByName(card.name)
@@ -218,7 +220,8 @@ class ImportDeckCardsUseCase(
                     crashReporter.log("deck_import_card_unresolved: index=$index, name_length=${card.name.length}")
                     failedCount++
                 }
-                onProgress(resolvedCount + failedCount, parsed.cards.size)
+                physicalProcessedCount += card.quantity
+                onProgress(physicalProcessedCount, totalPhysicalCards)
             }
 
             if (parsed.cards.isNotEmpty() && failedCount > parsed.cards.size / 2) {

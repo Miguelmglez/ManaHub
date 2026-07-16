@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.MtgDatabase
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
@@ -45,6 +46,7 @@ class UserCardRepositoryImplTest {
     private val database                   = mockk<MtgDatabase>(relaxed = true)
     private val supabaseClient             = mockk<SupabaseClient>(relaxed = true)
     private val authRepository             = mockk<AuthRepository>(relaxed = true)
+    private val localOpenForTradeDao       = mockk<LocalOpenForTradeDao>(relaxed = true)
 
     private lateinit var repository: UserCardRepositoryImpl
 
@@ -85,6 +87,20 @@ class UserCardRepositoryImplTest {
         // userId is also null (guest-session behaviour) instead of a relaxed-mock proxy.
         coEvery { authRepository.getCurrentUser() } returns null
 
+        // MockK relaxed mocks do NOT return null for unstubbed calls to a function whose
+        // return type is a nullable data class — they auto-generate a non-null "child mock"
+        // instance instead (all String fields default to "", not null; all Long/Int/Boolean
+        // fields default to 0/false). Without this explicit stub, addOrIncrement's existing-row
+        // lookup never sees `existing == null`, so every test below silently falls into the
+        // "increment existing" branch instead of "create new" — corrupting id/userId/createdAt/
+        // isFoil assertions. Must return null explicitly to exercise the create-new path.
+        every {
+            userCardCollectionDao.getByCompositeKey(any(), any(), any(), any(), any())
+        } returns null
+        every {
+            userCardCollectionDao.getByCompositeKeyGuest(any(), any(), any(), any())
+        } returns null
+
         repository = UserCardRepositoryImpl(
             userCardCollectionDao      = userCardCollectionDao,
             collectionRemoteDataSource = collectionRemoteDataSource,
@@ -92,6 +108,7 @@ class UserCardRepositoryImplTest {
             database                   = database,
             supabaseClient             = supabaseClient,
             authRepository             = authRepository,
+            localOpenForTradeDao       = localOpenForTradeDao,
             ioDispatcher               = UnconfinedTestDispatcher(),
         )
     }

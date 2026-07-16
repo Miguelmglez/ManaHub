@@ -21,6 +21,8 @@ data class ArchidektDeckDetailDto(
     val viewCount: Int = 0,
     val createdAt: String = "",
     val updatedAt: String = "",
+    val featured: String = "",
+    val customFeatured: String = "",
     val cards: List<ArchidektCardEntryDto> = emptyList(),
     val categories: List<ArchidektCategoryDto> = emptyList(),
 )

@@ -254,9 +254,6 @@ private fun VariantCardItem(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (card.rarity.isNotBlank()) {
-                    VariantAttrTag(card.rarity.replaceFirstChar { it.uppercaseChar() })
-                }
                 Text(
                     text = PriceFormatter.formatFromScryfall(
                         card.priceUsd,

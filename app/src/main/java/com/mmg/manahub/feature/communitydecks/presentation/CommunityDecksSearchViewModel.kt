@@ -5,30 +5,52 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
+import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.temporal.IsoFields
+
+/** Card-name search debounce window shared by the Commander and Card advanced-search pickers. */
+private const val CARD_PICKER_DEBOUNCE_MS = 400L
+
+/** Minimum query length before a card-picker search fires. */
+private const val CARD_PICKER_MIN_LENGTH = 2
+
+/** Page size for every Discover section row (kept small — Archidekt caps a page at 60 anyway). */
+private const val DISCOVER_SECTION_SIZE = 10
+
+/** Page size for a Search-tab page. */
+private const val SEARCH_PAGE_SIZE = 20
 
 /**
- * ViewModel for the Community Decks search / browse screen.
+ * ViewModel for the Community Decks Hub (Discover + Search).
  *
- * Drives a paged Archidekt search ([SearchCommunityDecksUseCase]) with format /
- * sort filters. Both the landing ([com.mmg.manahub.app.navigation.Screen.CommunityDecks])
- * and the "decks containing a card" deep-link
- * ([com.mmg.manahub.app.navigation.Screen.CommunityDecksByCard]) routes share this
- * ViewModel; the latter pre-fills [initialCardName] from `SavedStateHandle` and
- * auto-triggers a search.
+ * Drives a paged Archidekt search ([SearchCommunityDecksUseCase]) by deck name + advanced filters
+ * (Discover/Search overhaul 2026-07-15), and a multi-section Discover feed. Both the landing
+ * ([com.mmg.manahub.app.navigation.Screen.CommunityDecks]) and the "decks containing a card"
+ * deep-link ([com.mmg.manahub.app.navigation.Screen.CommunityDecksByCard]) routes share this
+ * ViewModel; the latter resolves [initialCardName] into the CARD advanced filter and auto-runs.
  *
  * One-shot navigation / error effects are delivered through a buffered [Channel].
  */
@@ -37,6 +59,8 @@ class CommunityDecksSearchViewModel(
     private val searchCommunityDecks: SearchCommunityDecksUseCase,
     private val userPreferences: UserPreferencesDataStore,
     private val communityAggregateRepository: CommunityAggregateRepository,
+    private val cardRepository: CardRepository,
+    private val searchCards: SearchCardsUseCase,
 ) : ViewModel() {
 
     private val crashlytics = FirebaseCrashlytics.getInstance()
@@ -49,7 +73,6 @@ class CommunityDecksSearchViewModel(
 
     private val _uiState = MutableStateFlow(
         CommunityDecksSearchUiState(
-            query = initialCardName ?: "",
             hubTab = if (openedViaByCardDeepLink) CommunityHubTab.SEARCH else CommunityHubTab.DISCOVER,
         ),
     )
@@ -58,20 +81,22 @@ class CommunityDecksSearchViewModel(
     private val _events = Channel<CommunityDecksSearchEvent>(Channel.BUFFERED)
     val events: Flow<CommunityDecksSearchEvent> = _events.receiveAsFlow()
 
-    /** Feature flag — the screen renders a disabled state when this is false. */
-    val isFeatureEnabled: StateFlow<Boolean> = userPreferences.communityDecksEnabledFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
     private var currentPage = 1
     private var searchJob: Job? = null
     private var discoverLoaded = false
 
+    /** Debounced input flows for the two advanced-search card pickers (Commander / Card). */
+    private val commanderQueryFlow = MutableStateFlow("")
+    private val cardQueryFlow = MutableStateFlow("")
+
     init {
         crashlytics.log("screen_viewed: community_decks_search")
-        crashlytics.setCustomKey("community_search_prefilled", !initialCardName.isNullOrBlank())
+        crashlytics.setCustomKey("community_search_prefilled", openedViaByCardDeepLink)
+
         if (openedViaByCardDeepLink) {
-            search()
+            resolveDeepLinkCardAndSearch(initialCardName!!)
         }
+
         // Phase 5 Community Hub: mirror the D4 flag into state; a lazy Discover load fires only
         // once (guarded by `discoverLoaded`) the FIRST time it becomes true AND the landing tab is
         // actually Discover (the ByCard deep-link never needs it unless the user manually switches
@@ -82,6 +107,44 @@ class CommunityDecksSearchViewModel(
                 if (enabled && !openedViaByCardDeepLink && !discoverLoaded) loadDiscover()
             }
         }
+
+        viewModelScope.launch {
+            commanderQueryFlow
+                .debounce(CARD_PICKER_DEBOUNCE_MS)
+                .filter { it.length >= CARD_PICKER_MIN_LENGTH }
+                .distinctUntilChanged()
+                .collectLatest { query -> runCardPickerSearch(query, isCommander = true) }
+        }
+        viewModelScope.launch {
+            cardQueryFlow
+                .debounce(CARD_PICKER_DEBOUNCE_MS)
+                .filter { it.length >= CARD_PICKER_MIN_LENGTH }
+                .distinctUntilChanged()
+                .collectLatest { query -> runCardPickerSearch(query, isCommander = false) }
+        }
+    }
+
+    /**
+     * The ByCard deep-link now resolves [name] into the Search tab's CARD advanced filter (rather
+     * than the plain-text query bar) and auto-runs. If Scryfall resolution fails (unknown/renamed
+     * card), falls back to the old behaviour of searching the deck-NAME bar with the raw text so
+     * the deep-link never dead-ends.
+     */
+    private fun resolveDeepLinkCardAndSearch(name: String) {
+        viewModelScope.launch {
+            val resolved = runCatching { cardRepository.getCardByExactName(name) }
+                .getOrNull()
+                ?.getOrNull()
+
+            _uiState.update {
+                if (resolved != null) {
+                    it.copy(advancedFilters = it.advancedFilters.copy(card = resolved))
+                } else {
+                    it.copy(query = name)
+                }
+            }
+            search()
+        }
     }
 
     /** Switches the active [CommunityHubTab], lazily loading Discover data the first time it's shown. */
@@ -91,71 +154,236 @@ class CommunityDecksSearchViewModel(
     }
 
     /**
-     * Fetches "Top commanders this week" / "Most searched cards" ([TrendingSnapshot]) and "Popular
-     * decks" (the existing Archidekt search, `orderBy=-viewCount`, confirmed live in
-     * `docs/adr/ADR-004-community-api-contracts.md` §1). Runs at most once per ViewModel instance
-     * ([discoverLoaded]); ANY failure degrades to an empty section with [CommunityDecksSearchUiState
-     * .discoverUnavailable] — never blocks or affects the Search tab.
+     * Fetches every Discover section IN PARALLEL: trending commanders/cards (resolved to full
+     * [Card]s for image tiles), popular/recent/recently-updated/primer decks, and a weekly-rotating
+     * featured non-Commander format. Runs at most once per ViewModel instance ([discoverLoaded]).
+     * Each section fails INDEPENDENTLY (`runCatching`) and simply renders empty/hidden —
+     * [CommunityDecksSearchUiState.discoverUnavailable] is only set when literally EVERY section
+     * came back empty, never for a single degraded source.
      */
     private fun loadDiscover() {
         discoverLoaded = true
         viewModelScope.launch {
-            _uiState.update { it.copy(isTrendingLoading = true, isPopularDecksLoading = true) }
+            _uiState.update { it.copy(isDiscoverLoading = true) }
 
-            val trendingResult = runCatching { communityAggregateRepository.getTrending() }.getOrNull()
-            val trending = (trendingResult as? DataResult.Success)?.data
+            val featuredFormat = pickFeaturedFormat()
 
-            val popularResult = searchCommunityDecks(cardName = null, orderBy = CommunityDeckSort.POPULAR.apiValue, page = 1, pageSize = 10)
-            val popularDecks = (popularResult as? DataResult.Success)?.data?.decks.orEmpty()
+            val trendingDeferred = async { runCatching { communityAggregateRepository.getTrending() }.getOrNull() }
+            val popularDeferred = async { fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue) }
+            val recentDeferred = async { fetchDecks(orderBy = CommunityDeckSort.RECENT.apiValue) }
+            val updatedDeferred = async { fetchDecks(orderBy = CommunityDeckSort.UPDATED.apiValue) }
+            val primersDeferred = async {
+                fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue, primersOnly = true)
+            }
+            val featuredDeferred = async {
+                fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue, deckFormatId = featuredFormat.apiId)
+            }
 
-            val trendingFailed = trendingResult == null || trendingResult is DataResult.Error
-            val popularFailed = popularResult is DataResult.Error
-            if (trendingFailed) crashlytics.log("community_discover_trending_failed")
-            if (popularFailed) crashlytics.log("community_discover_popular_decks_failed")
+            val trendingSnapshot = (trendingDeferred.await() as? DataResult.Success)?.data
+            val commanderCards = resolveTrendingCards(trendingSnapshot?.topCommanders.orEmpty().map { it.name })
+            val cardCards = resolveTrendingCards(trendingSnapshot?.topCards.orEmpty().map { it.name })
+
+            val popularDecks = popularDeferred.await()
+            val recentDecks = recentDeferred.await()
+            val updatedDecks = updatedDeferred.await()
+            val primerDecks = primersDeferred.await()
+            val featuredDecks = featuredDeferred.await()
+
+            val allEmpty = commanderCards.isEmpty() && cardCards.isEmpty() && popularDecks.isEmpty() &&
+                recentDecks.isEmpty() && updatedDecks.isEmpty() && primerDecks.isEmpty() && featuredDecks.isEmpty()
+            if (allEmpty) crashlytics.log("community_discover_all_failed")
 
             _uiState.update {
                 it.copy(
-                    trending = trending,
+                    isDiscoverLoading = false,
+                    discoverUnavailable = allEmpty,
+                    trendingCommanderCards = commanderCards,
+                    trendingCardCards = cardCards,
                     popularDecks = popularDecks,
-                    isTrendingLoading = false,
-                    isPopularDecksLoading = false,
-                    discoverUnavailable = trendingFailed && popularDecks.isEmpty(),
+                    recentDecks = recentDecks,
+                    updatedDecks = updatedDecks,
+                    primerDecks = primerDecks,
+                    featuredFormat = featuredFormat,
+                    featuredFormatDecks = featuredDecks,
                 )
             }
         }
     }
 
-    /** A trending card/commander name tapped in Discover — switches to Search pre-filled + auto-run. */
-    fun onDiscoverTermClick(term: String) {
+    /** One Discover section's decks; any failure (exception or [DataResult.Error]) degrades to empty. */
+    private suspend fun fetchDecks(
+        orderBy: String,
+        deckFormatId: Int? = null,
+        primersOnly: Boolean = false,
+    ): List<CommunityDeckSummary> = runCatching {
+        val filters = CommunityAdvancedFilters(
+            format = CommunityDeckFormatFilter.entries.firstOrNull { it.apiId == deckFormatId }
+                ?: CommunityDeckFormatFilter.ALL,
+            primersOnly = primersOnly,
+        ).toSearchFilters(deckName = null, orderBy = orderBy, page = 1, pageSize = DISCOVER_SECTION_SIZE)
+        (searchCommunityDecks(filters) as? DataResult.Success)?.data?.decks.orEmpty()
+    }.getOrElse { emptyList() }
+
+    /** Resolves trending card/commander names to full [Card]s in parallel; unresolved names are dropped. */
+    private suspend fun resolveTrendingCards(names: List<String>): List<Card> = coroutineScope {
+        names.take(DISCOVER_SECTION_SIZE)
+            .map { name -> async { runCatching { cardRepository.getCardByExactName(name) }.getOrNull()?.getOrNull() } }
+            .awaitAll()
+            .filterNotNull()
+    }
+
+    /**
+     * Picks the weekly-rotating non-Commander featured format via the ISO week-based-year number
+     * (never `WeekFields.of(Locale)` — locale-dependent, see the project's established gamification
+     * convention) indexing deterministically into [CommunityDeckFormatFilter.FEATURED_ROTATION].
+     */
+    private fun pickFeaturedFormat(): CommunityDeckFormatFilter {
+        val rotation = CommunityDeckFormatFilter.FEATURED_ROTATION
+        val week = LocalDate.now().get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
+        return rotation[week % rotation.size]
+    }
+
+    /** A trending commander tile tapped in Discover — switches to Search with the COMMANDER filter set. */
+    fun onTrendingCommanderClick(card: Card) {
         crashlytics.log("community_discover_term_click")
-        _uiState.update { it.copy(query = term, hubTab = CommunityHubTab.SEARCH) }
+        _uiState.update {
+            it.copy(hubTab = CommunityHubTab.SEARCH, advancedFilters = it.advancedFilters.copy(commander = card))
+        }
+        search()
+    }
+
+    /** A trending card tile tapped in Discover — switches to Search with the CARD filter set. */
+    fun onTrendingCardClick(card: Card) {
+        crashlytics.log("community_discover_term_click")
+        _uiState.update {
+            it.copy(hubTab = CommunityHubTab.SEARCH, advancedFilters = it.advancedFilters.copy(card = card))
+        }
         search()
     }
 
     fun onQueryChange(query: String) {
+        // Only ever updates the raw text — never touches `results`/`hasSearched`, so editing the
+        // field can never blank an already-rendered result set (Discover/Search overhaul fix).
         _uiState.update { it.copy(query = query) }
-    }
-
-    /** Re-runs the search if one was already issued (so filters apply live). */
-    fun onFormatSelected(format: CommunityDeckFormatFilter) {
-        _uiState.update { it.copy(selectedFormat = format) }
-        if (_uiState.value.hasSearched) {
-            search()
-        }
     }
 
     /** Re-runs the search if one was already issued (so the new sort applies live). */
     fun onSortSelected(sort: CommunityDeckSort) {
         _uiState.update { it.copy(selectedSort = sort) }
-        if (_uiState.value.hasSearched) {
-            search()
+        if (_uiState.value.hasSearched) search()
+    }
+
+    // ── Advanced search filters (Phase 2) ───────────────────────────────────────────
+
+    fun onFormatFilterSelected(format: CommunityDeckFormatFilter) {
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(format = format)) }
+    }
+
+    fun onColorToggled(color: String) {
+        _uiState.update {
+            val current = it.advancedFilters.colors
+            val next = if (current.contains(color)) current - color else current + color
+            it.copy(advancedFilters = it.advancedFilters.copy(colors = next))
         }
     }
 
-    /** Runs a fresh search (page 1). No-ops on a blank query. */
+    fun onBracketSelected(bracket: Int?) {
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(edhBracket = bracket)) }
+    }
+
+    fun onUsernameChanged(username: String) {
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(ownerUsername = username)) }
+    }
+
+    fun onDeckSizeChanged(size: String) {
+        // Free-text only; parsed to Int? at request-build time (never build a partial filter here).
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(deckSize = size)) }
+    }
+
+    fun onPrimersOnlyToggled(primersOnly: Boolean) {
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(primersOnly = primersOnly)) }
+    }
+
+    fun onCommanderQueryChange(query: String) {
+        _uiState.update { it.copy(commanderQuery = query) }
+        commanderQueryFlow.value = query
+        if (query.isBlank()) _uiState.update { it.copy(commanderResults = emptyList()) }
+    }
+
+    fun onCardQueryChange(query: String) {
+        _uiState.update { it.copy(cardQuery = query) }
+        cardQueryFlow.value = query
+        if (query.isBlank()) _uiState.update { it.copy(cardResults = emptyList()) }
+    }
+
+    private suspend fun runCardPickerSearch(query: String, isCommander: Boolean) {
+        _uiState.update {
+            if (isCommander) it.copy(isCommanderSearching = true) else it.copy(isCardSearching = true)
+        }
+        val results = (searchCards(query, page = 1) as? DataResult.Success)?.data?.cards.orEmpty()
+        _uiState.update {
+            if (isCommander) it.copy(commanderResults = results, isCommanderSearching = false)
+            else it.copy(cardResults = results, isCardSearching = false)
+        }
+    }
+
+    fun onCommanderSelected(card: Card) {
+        _uiState.update {
+            it.copy(
+                advancedFilters = it.advancedFilters.copy(commander = card),
+                commanderQuery = "",
+                commanderResults = emptyList(),
+            )
+        }
+    }
+
+    fun onCommanderCleared() {
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(commander = null)) }
+    }
+
+    fun onCardFilterSelected(card: Card) {
+        _uiState.update {
+            it.copy(
+                advancedFilters = it.advancedFilters.copy(card = card),
+                cardQuery = "",
+                cardResults = emptyList(),
+            )
+        }
+    }
+
+    fun onCardFilterCleared() {
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(card = null)) }
+    }
+
+    fun onClearAdvancedFilters() {
+        _uiState.update {
+            it.copy(
+                advancedFilters = CommunityAdvancedFilters(),
+                commanderQuery = "",
+                commanderResults = emptyList(),
+                cardQuery = "",
+                cardResults = emptyList(),
+            )
+        }
+    }
+
+    /** Applies the advanced filters (called from the sheet's Search button) and runs a fresh search. */
+    fun onApplyAdvancedFilters() {
+        search()
+    }
+
+    // ── Search ───────────────────────────────────────────────────────────────────
+
+    /**
+     * Runs a fresh search (page 1) combining the deck-name query bar with the applied advanced
+     * filters. No-ops only when BOTH the query is blank AND no advanced filter is active — a blank
+     * query with active filters (e.g. "commander = Krenko, Mob Boss") still searches.
+     */
     fun search() {
-        val query = _uiState.value.query.trim()
-        if (query.isBlank()) return
+        val state = _uiState.value
+        val deckName = state.query.trim()
+        val filters = state.advancedFilters
+        if (deckName.isBlank() && filters.activeCount == 0) return
 
         searchJob?.cancel()
         currentPage = 1
@@ -163,19 +391,19 @@ class CommunityDecksSearchViewModel(
         searchJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true) }
 
-            val state = _uiState.value
-            crashlytics.setCustomKey("community_search_format", state.selectedFormat.name)
+            crashlytics.setCustomKey("community_search_format", filters.format.name)
             crashlytics.setCustomKey("community_search_sort", state.selectedSort.name)
-            crashlytics.setCustomKey("community_search_query_len", query.length)
+            crashlytics.setCustomKey("community_search_query_len", deckName.length)
+            crashlytics.setCustomKey("community_search_active_filters", filters.activeCount)
 
-            when (
-                val result = searchCommunityDecks(
-                    cardName = query,
-                    deckFormat = state.selectedFormat.apiId,
-                    orderBy = state.selectedSort.apiValue,
-                    page = 1,
-                )
-            ) {
+            val dataFilters = filters.toSearchFilters(
+                deckName = deckName,
+                orderBy = state.selectedSort.apiValue,
+                page = 1,
+                pageSize = SEARCH_PAGE_SIZE,
+            )
+
+            when (val result = searchCommunityDecks(dataFilters)) {
                 is DataResult.Success -> {
                     crashlytics.setCustomKey("community_search_result_count", result.data.totalCount)
                     crashlytics.log("community_search_success")
@@ -209,14 +437,14 @@ class CommunityDecksSearchViewModel(
             _uiState.update { it.copy(isLoadingMore = true) }
 
             val state = _uiState.value
-            when (
-                val result = searchCommunityDecks(
-                    cardName = state.query.trim(),
-                    deckFormat = state.selectedFormat.apiId,
-                    orderBy = state.selectedSort.apiValue,
-                    page = nextPage,
-                )
-            ) {
+            val dataFilters = state.advancedFilters.toSearchFilters(
+                deckName = state.query.trim(),
+                orderBy = state.selectedSort.apiValue,
+                page = nextPage,
+                pageSize = SEARCH_PAGE_SIZE,
+            )
+
+            when (val result = searchCommunityDecks(dataFilters)) {
                 is DataResult.Success -> {
                     currentPage = nextPage
                     crashlytics.log("community_search_load_more")

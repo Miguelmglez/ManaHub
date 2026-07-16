@@ -347,22 +347,6 @@ class DeckStudioViewModel(
                 initialValue = null,
             )
 
-    /**
-     * Whether the Community Decks feature (Archidekt browse/import) is exposed. Kept as an
-     * INDEPENDENT sibling `StateFlow` (mirrors [deckStatsFlow]/[playerNameFlow]) rather than
-     * threaded into a combine chain — this is a simple, standalone boolean gate with no
-     * dependency on the rest of [uiState]. Gates the "View decks" action on community add
-     * suggestions ([DeckStudioUiState.communityAdds]) independently of
-     * [DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED] — the two flags can be re-enabled on
-     * different timelines.
-     */
-    val communityDecksEnabledFlow: StateFlow<Boolean> = userPreferences.communityDecksEnabledFlow
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = false,
-        )
-
     /** The app user's player name, used to compute win/loss in [DeckStatsCard]. */
     val playerNameFlow: StateFlow<String> = userPreferences.playerNameFlow
         .stateIn(

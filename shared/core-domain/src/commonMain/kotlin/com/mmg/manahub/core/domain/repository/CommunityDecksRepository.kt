@@ -2,6 +2,7 @@ package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import com.mmg.manahub.core.model.CommunityDeckSearchResult
 
 /**
@@ -27,17 +28,11 @@ interface CommunityDecksRepository {
      *
      * Search results are intentionally NOT cached — pagination makes a coherent cache
      * complex, and individual decks are still cached on the detail view. Every
-     * parameter is optional and omitted from the request when null.
+     * [CommunityDeckSearchFilters] field is optional and omitted from the request when null/empty.
      *
      * Surfaces a [DataResult.Error] on a server timeout (Archidekt returns
-     * `count = -1` with empty results when a `cardName + deckFormat` query on a popular
-     * card exceeds its statement timeout) so the UI can suggest a narrower query.
+     * `count = -1` with empty results when a query on a popular card/commander exceeds its
+     * statement timeout) so the UI can suggest a narrower query.
      */
-    suspend fun searchDecks(
-        cardName: String? = null,
-        deckFormat: Int? = null,
-        orderBy: String? = null,
-        page: Int = 1,
-        pageSize: Int = 20,
-    ): DataResult<CommunityDeckSearchResult>
+    suspend fun searchDecks(filters: CommunityDeckSearchFilters): DataResult<CommunityDeckSearchResult>
 }

@@ -94,6 +94,10 @@ fun CardDto.toDomain(): Card {
             )
         },
         producedMana = producedMana.toCompactWubrg(),
+        // Card Versions & Languages, Phase 1A: root oracle_id first, falling back to the front
+        // face's (reversible cards sometimes carry it only per-face), else "" (pre-v46 fallback
+        // is an exact match on `name`, which is always the English oracle name — see Card.oracleId).
+        oracleId = oracleId ?: front?.oracleId ?: "",
     )
 }
 

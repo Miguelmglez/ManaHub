@@ -128,6 +128,28 @@ interface UserCardCollectionDao {
     @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId AND updated_at > :since")
     fun countPendingSync(userId: String, since: Long): Int
 
+    // Card Versions & Languages, Phase 1A. Every non-deleted collection row for ANY
+    // printing/language sharing the same oracle identity as the card being viewed — feeds
+    // CardDetail's "your other copies" section (Phase 1B). The subquery matches by oracle_id
+    // when it is known; rows whose cached CardEntity predates the oracle_id column (oracle_id =
+    // '') are related by an exact match on the English oracle `name` instead. When [oracleId]
+    // itself is blank (the viewed card's own cache row predates oracle_id), the first branch is
+    // never true, so matching correctly falls through to name-only — it does NOT widen to every
+    // other oracle_id='' card in the table.
+    @Transaction
+    @Query("""
+        SELECT * FROM user_card_collection
+        WHERE is_deleted = 0
+          AND (user_id = :userId OR user_id IS NULL)
+          AND scryfall_id IN (
+              SELECT scryfall_id FROM cards
+              WHERE (:oracleId != '' AND oracle_id = :oracleId)
+                 OR (oracle_id = '' AND name = :name)
+          )
+        ORDER BY created_at DESC
+    """)
+    fun observeVersionsByOracle(oracleId: String, name: String, userId: String?): Flow<List<UserCardWithCard>>
+
     // ── Paging 3 support ──────────────────────────────────────────────────────
 
     // Returns a PagingSource backed by Room. Requires room-paging dependency.

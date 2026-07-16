@@ -116,6 +116,10 @@ object DatabaseModule {
                 // reason). Additive: adds last_fetched_at/etag/last_modified to
                 // `content_sources` (News feature improvements, Phase 1).
                 MIGRATION_44_45,
+                // v45 → v46 lives as a top-level `val` in Migration_45_46.kt (same
+                // reason). Additive: adds oracle_id + a supporting index to `cards`
+                // (Card Versions & Languages plan, Phase 1A).
+                MIGRATION_45_46,
             )
             .build()
 

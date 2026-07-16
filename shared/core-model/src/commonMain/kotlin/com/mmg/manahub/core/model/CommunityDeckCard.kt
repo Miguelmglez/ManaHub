@@ -41,11 +41,15 @@ data class CommunityDeckCard(
 ) {
     /** True when this entry belongs to the Sideboard category. */
     val isSideboard: Boolean
-        get() = categories.any { it.equals("Sideboard", ignoreCase = true) }
+        get() = categories.any { 
+            it.equals("Sideboard", ignoreCase = true) || it.equals("Side", ignoreCase = true) 
+        }
 
     /** True when this entry is the deck's commander. */
     val isCommander: Boolean
-        get() = categories.any { it.equals("Commander", ignoreCase = true) }
+        get() = categories.any { 
+            it.equals("Commander", ignoreCase = true) || it.equals("Commanders", ignoreCase = true) 
+        }
 
     /**
      * The Scryfall image CDN URL for this exact printing, built directly from [scryfallId]

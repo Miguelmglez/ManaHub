@@ -380,7 +380,6 @@ fun BattlefieldContent(
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = mc.primaryAccent,
-                            contentColor = mc.surface,
                         ),
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                     ) {

@@ -89,4 +89,17 @@ data class Card(
      * is needed here.
      */
     val producedMana: String = "",
+    /**
+     * Card Versions & Languages, Phase 1A. Scryfall's `oracle_id` — shared by every
+     * printing/language of the same card (e.g. all copies of "Lightning Bolt" across every set
+     * and translation carry the same oracle_id). Used to relate versions/languages of a card
+     * without a network round-trip (see [com.mmg.manahub.core.data.remote.mapper.toDomain]).
+     *
+     * Empty for rows cached before this field was introduced (DB v46) — those rows have not yet
+     * been re-fetched from Scryfall. Callers that need to relate versions of such a row MUST fall
+     * back to an exact match on [name], which is ALWAYS the English oracle name regardless of
+     * [lang] (see `feedback_carddetail_variant_lookup_bugs` memory) and therefore works as a
+     * stable fallback identity key even when oracleId is unknown.
+     */
+    val oracleId: String = "",
 )
