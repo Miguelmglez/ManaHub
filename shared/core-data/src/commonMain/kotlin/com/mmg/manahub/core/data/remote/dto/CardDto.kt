@@ -6,6 +6,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CardDto(
     @SerialName("id")               val id:              String,
+    // Card Versions & Languages, Phase 1A: shared by every printing/language of this card.
+    // Absent (null) is possible on some reversible-card responses where Scryfall places it only
+    // on the individual card_faces objects instead of the root — see toDomain()'s fallback.
+    @SerialName("oracle_id")        val oracleId:        String?      = null,
     @SerialName("name")             val name:            String,
     @SerialName("printed_name")     val printedName:     String?      = null,
     @SerialName("lang")             val lang:            String,
@@ -57,6 +61,9 @@ data class ImageUrisDto(
 @Serializable
 data class CardFaceDto(
     @SerialName("name")        val name:       String,
+    // Card Versions & Languages, Phase 1A: reversible cards carry oracle_id per-face instead of
+    // on the root CardDto — used as a fallback in toDomain() when the root value is null.
+    @SerialName("oracle_id")   val oracleId:   String?  = null,
     @SerialName("mana_cost")   val manaCost:   String?  = null,
     @SerialName("type_line")   val typeLine:   String?  = null,
     @SerialName("oracle_text") val oracleText: String?  = null,

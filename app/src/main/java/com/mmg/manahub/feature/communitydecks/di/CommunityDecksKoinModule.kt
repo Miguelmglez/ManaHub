@@ -112,6 +112,11 @@ fun communityDecksKoinModule(
             // Community Hub Discover (Phase 5) — resolved from communityAggregateKoinModule
             // (loaded in the same ManaHubApp `modules(...)` call, see that module's own KDoc).
             communityAggregateRepository = get(),
+            // Discover/Search overhaul (2026-07-15): CardRepository (coreBridgeKoinModule) resolves
+            // trending names to full Cards + the ByCard deep-link's exact-name lookup; SearchCardsUseCase
+            // (a global `single` in SharedDomainKoinModule) backs the advanced-search Commander/Card pickers.
+            cardRepository = get(),
+            searchCards = get(),
         )
     }
     viewModel {
@@ -119,7 +124,6 @@ fun communityDecksKoinModule(
             savedStateHandle = get(),
             getCommunityDeck = get(),
             importCommunityDeck = get(),
-            userPreferences = get(),
         )
     }
 }

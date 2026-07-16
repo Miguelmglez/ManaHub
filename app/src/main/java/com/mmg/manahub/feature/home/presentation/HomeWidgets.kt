@@ -109,10 +109,14 @@ import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.ui.isReducedMotionEnabled
+import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.DraftSetCard
@@ -127,6 +131,7 @@ import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.TimeAgoFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -357,11 +362,8 @@ fun HomeWidgetHost(
     if (widget.type.isGamification && !uiState.gamificationEnabled) return
     // Phase 5: silently hidden (never an error state) while there's no trending data yet / the
     // community engine is off / the Worker is unreachable — see HomeWidgetType.TRENDING_COMMANDERS'
-    // KDoc. Also hidden while Community Decks browsing itself is flag-disabled (its onClick
-    // navigates into that screen) — the two flags can be re-enabled on different timelines.
-    if (widget.type == HomeWidgetType.TRENDING_COMMANDERS &&
-        (trending.isNullOrEmptyTrending() || !uiState.communityDecksEnabled)
-    ) return
+    // KDoc.
+    if (widget.type == HomeWidgetType.TRENDING_COMMANDERS && trending.isNullOrEmptyTrending()) return
 
     Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
         if (widget.type != HomeWidgetType.CONTEXT_HERO) {
@@ -375,12 +377,7 @@ fun HomeWidgetHost(
         when (widget.type) {
             HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
             HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
-                // A previously-pinned COMMUNITY_DECKS shortcut is filtered out (not force-removed
-                // from the persisted preference) while the feature is flag-disabled — reappears
-                // automatically if re-enabled, matching the gamification widgets' convention.
-                actions = uiState.quickStartActions.filter {
-                    it != QuickStartAction.COMMUNITY_DECKS || uiState.communityDecksEnabled
-                },
+                actions = uiState.quickStartActions,
                 onAction = onAction,
             )
             HomeWidgetType.PROGRESSION_HUB -> ProgressionHubWidget(uiState.gamification, onAction)
@@ -442,35 +439,31 @@ private fun TrendingCommandersWidget(
     trending: com.mmg.manahub.core.model.TrendingSnapshot?,
     onAction: (HomeAction) -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val topThree = trending?.topCommanders.orEmpty().take(3)
-    if (topThree.isEmpty()) return
+    val topCommanders = trending?.topCommanders.orEmpty()
+    if (topCommanders.isEmpty()) return
 
     WidgetShell(onClick = { onAction(HomeAction.OpenCommunityDecks) }, onClickLabel = stringResourceSafe(R.string.widget_title_trending_commanders)) {
-        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-            topThree.forEachIndexed { index, commander ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                ) {
-                    Text(
-                        text = "${index + 1}",
-                        style = ty.labelMedium,
-                        color = mc.primaryAccent,
-                        modifier = Modifier.width(20.dp),
-                    )
-                    Text(
-                        text = commander.name,
-                        style = ty.bodyMedium,
-                        color = mc.textPrimary,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            items(topCommanders.take(5)) { commander ->
+                DeckItem(
+                    deck = DeckSummary(
+                        id = commander.name,
+                        name = commander.name,
+                        description = null,
+                        format = "Commander",
+                        coverCardId = null,
+                        createdAt = 0L,
+                        updatedAt = 0L,
+                        cardCount = commander.count,
+                        colorIdentity = emptySet(),
+                        coverImageUrl = null
+                    ),
+                    onClick = { onAction(HomeAction.OpenCommunityDecks) },
+                    reduced = true,
+                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    modifier = Modifier.width(160.dp),
+                )
             }
         }
     }
@@ -881,7 +874,7 @@ internal fun FirstStepsCarousel(
                         // observeSkippedFirstSteps DataStore mechanism as before.
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
+                                .align(Alignment.TopStart)
                                 .minimumInteractiveComponentSize()
                                 .clip(CircleShape)
                                 .clickable(
@@ -2659,9 +2652,12 @@ private fun RulesTipWidget() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 private sealed interface SocialSlide {
-    /** Real friend count + optional newest pending-request headline (Home feature overhaul
-     * Phase 1.2.d — replaces the old permanent data-less tile). */
-    data class FriendsActivity(val friendCount: Int, val latestRequestName: String?) : SocialSlide
+    /** Real friend count + optional newest pending-request headline. */
+    data class FriendsActivity(
+        val friendCount: Int,
+        val latestRequestName: String?,
+        val friends: List<Friend>
+    ) : SocialSlide
     data class MostWishlisted(val entries: List<com.mmg.manahub.core.model.CommunityEntry>) : SocialSlide
     data class ActiveTournament(val summary: TournamentSummary) : SocialSlide
     data class Milestones(val milestones: List<com.mmg.manahub.core.model.CommunityMilestone>) : SocialSlide
@@ -2676,9 +2672,9 @@ private fun SocialHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
         return
     }
     val community = uiState.communityStats
-    val slides = remember(community, uiState.activeTournamentSummary, uiState.friendCount, uiState.latestFriendRequestName, uiState.archidektTrending) {
+    val slides = remember(community, uiState.activeTournamentSummary, uiState.friendCount, uiState.latestFriendRequestName, uiState.archidektTrending, uiState.friends) {
         buildList {
-            add(SocialSlide.FriendsActivity(uiState.friendCount, uiState.latestFriendRequestName))
+            add(SocialSlide.FriendsActivity(uiState.friendCount, uiState.latestFriendRequestName, uiState.friends))
             community?.mostWishlisted?.takeIf { it.isNotEmpty() }?.let { add(SocialSlide.MostWishlisted(it)) }
             uiState.activeTournamentSummary?.let { add(SocialSlide.ActiveTournament(it)) }
             community?.milestones?.takeIf { it.isNotEmpty() }?.let { add(SocialSlide.Milestones(it)) }
@@ -2704,7 +2700,7 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
             ClickableBox(onClick = { onAction(HomeAction.OpenFriends) }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
                     HubBadge(Icons.Default.Group, mc.primaryAccent)
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(stringResourceSafe(R.string.home_social_friends_title), style = ty.titleMedium, color = mc.textPrimary)
                         when {
                             slide.latestRequestName != null ->
@@ -2717,6 +2713,9 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
                             else ->
                                 Text(stringResourceSafe(R.string.home_friends_empty), style = ty.labelSmall, color = mc.textSecondary)
                         }
+                    }
+                    if (slide.friends.isNotEmpty()) {
+                        FriendAvatarRow(friends = slide.friends)
                     }
                 }
             }
@@ -2799,6 +2798,7 @@ private sealed interface TradesSlide {
     data class Inbox(val summary: TradeSummary?) : TradesSlide
     data class Suggestions(val count: Int) : TradesSlide
     data class OpenForTrade(val count: Int, val valueDisplay: String?) : TradesSlide
+    data class RecentActivity(val proposals: List<com.mmg.manahub.core.model.TradeProposal>) : TradesSlide
 }
 
 @Composable
@@ -2807,28 +2807,51 @@ private fun TradesHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
         AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_trades_hub)) { onAction(HomeAction.CreateAccount) }
         return
     }
-    val slides = remember(uiState.tradeSummary, uiState.tradeSuggestionsCount, uiState.openForTradeCount, uiState.openForTradeValueDisplay) {
-        listOf(
-            TradesSlide.Inbox(uiState.tradeSummary),
-            TradesSlide.Suggestions(uiState.tradeSuggestionsCount),
-            TradesSlide.OpenForTrade(uiState.openForTradeCount, uiState.openForTradeValueDisplay),
-        )
+    val slides = remember(uiState.tradeSummary, uiState.tradeSuggestionsCount, uiState.openForTradeCount, uiState.openForTradeValueDisplay, uiState.recentTrades) {
+        buildList {
+            if (uiState.recentTrades.isNotEmpty()) {
+                add(TradesSlide.RecentActivity(uiState.recentTrades))
+            }
+            add(TradesSlide.Inbox(uiState.tradeSummary))
+            add(TradesSlide.Suggestions(uiState.tradeSuggestionsCount))
+            add(TradesSlide.OpenForTrade(uiState.openForTradeCount, uiState.openForTradeValueDisplay))
+        }
     }
     WidgetShell {
         AutoSlideHub(
             slides = slides,
-            slideContent = { slide -> TradesSlideContent(slide, onAction) },
+            slideContent = { slide -> TradesSlideContent(slide, uiState.isAuthenticated, onAction) },
             showDots = false,
         )
     }
 }
 
 @Composable
-private fun TradesSlideContent(slide: TradesSlide, onAction: (HomeAction) -> Unit) {
+private fun TradesSlideContent(
+    slide: TradesSlide,
+    isAuthenticated: Boolean,
+    onAction: (HomeAction) -> Unit
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     when (slide) {
+        is TradesSlide.RecentActivity -> HubSlide {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Text(
+                    text = stringResourceSafe(R.string.trades_tab_history),
+                    style = ty.labelMedium,
+                    color = mc.textSecondary,
+                    modifier = Modifier.padding(horizontal = spacing.xs)
+                )
+                slide.proposals.forEach { proposal ->
+                    ReducedTradeProposalRow(
+                        proposal = proposal,
+                        onClick = { onAction(HomeAction.OpenTrades) }
+                    )
+                }
+            }
+        }
         is TradesSlide.Inbox -> HubSlide {
             ClickableBox(onClick = { onAction(HomeAction.OpenTrades) }) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
@@ -3000,6 +3023,111 @@ private fun ColorIdentityDots(colors: Set<String>) {
     }
 }
 
+
+@Composable
+private fun ReducedTradeProposalRow(
+    proposal: TradeProposal,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val statusTint = when (proposal.status) {
+        TradeStatus.COMPLETED -> mc.lifePositive
+        TradeStatus.ACCEPTED  -> mc.primaryAccent
+        TradeStatus.CANCELLED,
+        TradeStatus.REVOKED   -> mc.lifeNegative
+        TradeStatus.DECLINED  -> mc.goldMtg
+        TradeStatus.COUNTERED -> mc.secondaryAccent
+        else                  -> mc.textSecondary
+    }
+
+    Surface(
+        shape = CardShape,
+        color = mc.surfaceVariant.copy(alpha = 0.3f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+        ) {
+            Icon(
+                imageVector = Icons.Default.SwapHoriz,
+                contentDescription = null,
+                tint = statusTint,
+                modifier = Modifier.size(16.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = proposal.status.name.lowercase().replaceFirstChar { it.uppercase() },
+                    style = ty.labelSmall,
+                    color = statusTint
+                )
+                Text(
+                    text = stringResourceSafe(R.string.home_trade_inbox_preview, proposal.items.size),
+                    style = ty.bodySmall,
+                    color = mc.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = TimeAgoFormatter.format(proposal.updatedAt),
+                style = ty.labelSmall,
+                color = mc.textDisabled
+            )
+        }
+    }
+}
+
+@Composable
+private fun FriendAvatarRow(friends: List<Friend>) {
+    val spacing = MaterialTheme.spacing
+    val mc = MaterialTheme.magicColors
+    Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
+        friends.take(4).forEach { friend ->
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(mc.background)
+                    .padding(1.dp)
+            ) {
+                AvatarImage(
+                    avatarUrl = friend.avatarUrl,
+                    initials = friend.nickname.take(1).uppercase(),
+                    size = 30
+                )
+            }
+        }
+        if (friends.size > 4) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(mc.background)
+                    .padding(1.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(mc.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "+${friends.size - 4}",
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.textSecondary
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun PillButton(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {

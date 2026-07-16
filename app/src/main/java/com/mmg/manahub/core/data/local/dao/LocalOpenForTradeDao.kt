@@ -34,6 +34,21 @@ interface LocalOpenForTradeDao {
     @Query("SELECT * FROM local_open_for_trade WHERE scryfall_id = :scryfallId ORDER BY created_at DESC")
     fun observeByScryfallId(scryfallId: String): Flow<List<LocalOpenForTradeEntity>>
 
+    // Card Versions & Languages, Phase 1A. Every open-for-trade entry for ANY printing/language
+    // sharing the same oracle identity — see UserCardCollectionDao.observeVersionsByOracle for
+    // the exact matching semantics (oracle_id when known, exact `name` match as fallback).
+    @Transaction
+    @Query("""
+        SELECT * FROM local_open_for_trade
+        WHERE scryfall_id IN (
+            SELECT scryfall_id FROM cards
+            WHERE (:oracleId != '' AND oracle_id = :oracleId)
+               OR (oracle_id = '' AND name = :name)
+        )
+        ORDER BY created_at DESC
+    """)
+    fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<LocalOpenForTradeWithCard>>
+
     @Query("SELECT * FROM local_open_for_trade WHERE local_collection_id = :collectionId LIMIT 1")
     suspend fun getByCollectionId(collectionId: String): LocalOpenForTradeEntity?
 

@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.BottomSheetDefaults
@@ -82,6 +83,16 @@ fun AddCardSheet(
     setCode: String? = null,
     setName: String? = null,
     rarity: String? = null,
+    /**
+     * Card Versions & Languages, Phase 1B. When non-null, renders a "Set / Variant" field above the
+     * toggles that invokes this callback on tap. The caller owns the printing selection state: it
+     * swaps [setCode]/[setName]/[rarity]/[cardImage]/[manaCost] on the NEXT recomposition when the
+     * user picks a different printing (e.g. via [VariantSelectorSheet]) — this composable stays
+     * stateless with respect to WHICH printing is selected. [initialFoil]/[initialCondition]/
+     * [initialLanguage]/[initialQty] are captured in `remember { }` with no keys specifically so a
+     * printing swap does NOT reset the user's foil/condition/language/quantity choices.
+     */
+    onOpenVariantSelector: (() -> Unit)? = null,
     extraContent: (@Composable () -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
@@ -94,6 +105,11 @@ fun AddCardSheet(
     var condition by remember { mutableStateOf(initialCondition) }
     var language by remember { mutableStateOf(initialLanguage) }
     var qty by remember { mutableIntStateOf(initialQty) }
+    // Edge-case audit A8 (2026-07-15): guards the confirm button against a double-tap firing
+    // onConfirm twice (e.g. addOrIncrement being invoked twice for one user action). No reset is
+    // needed — every call site dismisses this sheet (showAddSheet/showWishlistSheet = false) as
+    // part of handling onConfirm, so the composable is torn down before it could matter.
+    var confirmed by remember { mutableStateOf(false) }
 
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
@@ -253,6 +269,54 @@ fun AddCardSheet(
                     }
                 }
 
+                // Set / Variant field — only rendered when the caller supports switching printings.
+                if (onOpenVariantSelector != null) {
+                    Surface(
+                        onClick = onOpenVariantSelector,
+                        color = mc.surface,
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, mc.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Set / Variant", style = ty.labelMedium, color = mc.textSecondary)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    if (setCode != null) {
+                                        SetSymbol(
+                                            setCode = setCode,
+                                            rarity = CardRarity.fromString(rarity ?: "common"),
+                                            size = 16.dp,
+                                        )
+                                    }
+                                    Text(
+                                        text = setName ?: "Select set",
+                                        style = ty.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = mc.textPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = mc.textDisabled,
+                            )
+                        }
+                    }
+                }
+
                 // Dropdowns
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -396,14 +460,16 @@ fun AddCardSheet(
                         )
 
                         IconButton(
-                            onClick = { qty++ },
+                            // Edge-case audit A4 (2026-07-15): caps quantity at 99 — mirrors the
+                            // existing qty > 1 guard on the minus button below.
+                            onClick = { if (qty < 99) qty++ },
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = "Add",
                                 modifier = Modifier.size(24.dp),
-                                tint = mc.primaryAccent
+                                tint = if (qty < 99) mc.primaryAccent else mc.textDisabled
                             )
                         }
                     }
@@ -431,13 +497,17 @@ fun AddCardSheet(
 
                 Button(
                     onClick = {
-                        onConfirm(
-                            isFoil,
-                            condition,
-                            language,
-                            qty
-                        )
+                        if (!confirmed) {
+                            confirmed = true
+                            onConfirm(
+                                isFoil,
+                                condition,
+                                language,
+                                qty
+                            )
+                        }
                     },
+                    enabled = !confirmed,
                     modifier = Modifier.weight(2f).height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(

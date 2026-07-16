@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.feature.communitydecks.domain.usecase.GetCommunityDeckUseCase
@@ -12,11 +11,9 @@ import com.mmg.manahub.feature.communitydecks.domain.usecase.ImportCommunityDeck
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -31,7 +28,6 @@ class CommunityDeckDetailViewModel(
     savedStateHandle: SavedStateHandle,
     private val getCommunityDeck: GetCommunityDeckUseCase,
     private val importCommunityDeck: ImportCommunityDeckUseCase,
-    userPreferences: UserPreferencesDataStore,
 ) : ViewModel() {
 
     private val crashlytics = FirebaseCrashlytics.getInstance()
@@ -43,10 +39,6 @@ class CommunityDeckDetailViewModel(
 
     private val _events = Channel<CommunityDeckDetailEvent>(Channel.BUFFERED)
     val events: Flow<CommunityDeckDetailEvent> = _events.receiveAsFlow()
-
-    /** Feature flag — the screen renders a disabled state when this is false. */
-    val isFeatureEnabled: StateFlow<Boolean> = userPreferences.communityDecksEnabledFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
         crashlytics.setCustomKey("community_deck_archidekt_id", archidektId)
@@ -67,6 +59,8 @@ class CommunityDeckDetailViewModel(
                     _uiState.value = CommunityDeckDetailUiState.Content(
                         deck = result.data,
                         isStale = result.isStale,
+                        // Sideboard is collapsed by default to keep the focus on the mainboard.
+                        sideboardExpanded = false,
                     )
                 }
                 is DataResult.Error -> {
@@ -74,6 +68,30 @@ class CommunityDeckDetailViewModel(
                     _uiState.value = CommunityDeckDetailUiState.Error(result.message)
                 }
             }
+        }
+    }
+
+    fun toggleCommander() {
+        _uiState.update { current ->
+            if (current is CommunityDeckDetailUiState.Content) {
+                current.copy(commanderExpanded = !current.commanderExpanded)
+            } else current
+        }
+    }
+
+    fun toggleMainboard() {
+        _uiState.update { current ->
+            if (current is CommunityDeckDetailUiState.Content) {
+                current.copy(mainboardExpanded = !current.mainboardExpanded)
+            } else current
+        }
+    }
+
+    fun toggleSideboard() {
+        _uiState.update { current ->
+            if (current is CommunityDeckDetailUiState.Content) {
+                current.copy(sideboardExpanded = !current.sideboardExpanded)
+            } else current
         }
     }
 
@@ -87,7 +105,7 @@ class CommunityDeckDetailViewModel(
 
         _uiState.update { current ->
             if (current is CommunityDeckDetailUiState.Content) {
-                current.copy(isImporting = true, importProgress = 0 to state.deck.cards.size)
+                current.copy(isImporting = true, importProgress = 0 to state.deck.cards.sumOf { it.quantity })
             } else {
                 current
             }

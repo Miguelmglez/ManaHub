@@ -707,11 +707,12 @@ class CollectionViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 8 — groupByCard: multiple copies collapse into one group
+    //  GROUP 8 — groupByCard: multiple copies collapse into one group PER SET
+    //  (Card Versions & Languages, Phase 1C)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given two copies of same card when collection loads then they are grouped into one entry`() = runTest {
+    fun `given two copies of same printing when collection loads then they are grouped into one entry`() = runTest {
         val entries = listOf(
             TestFixtures.buildUserCardWithCard(
                 userCard = TestFixtures.buildUserCard(id = "uc-001", scryfallId = "id-001", quantity = 1, isFoil = false),
@@ -731,6 +732,55 @@ class CollectionViewModelTest {
         assertEquals(3,    group.totalQuantity)   // 1 + 2
         assertTrue(group.hasFoil)
         assertEquals(2,    group.distinctCopies)
+    }
+
+    @Test
+    fun `given same identity and set but different printings when collection loads then they collapse into one set entry`() = runTest {
+        // ps11 (es) does not exist here — this simulates 10e (en) + 10e (fr): same
+        // identity (name fallback, oracleId blank), same set, different scryfallId/language.
+        val entries = listOf(
+            TestFixtures.buildUserCardWithCard(
+                userCard = TestFixtures.buildUserCard(id = "uc-001", scryfallId = "10e-en", quantity = 1, language = "en", createdAt = 1_000L),
+                card     = TestFixtures.buildCard("10e-en", name = "Venerable Monk", setCode = "10e"),
+            ),
+            TestFixtures.buildUserCardWithCard(
+                userCard = TestFixtures.buildUserCard(id = "uc-002", scryfallId = "10e-fr", quantity = 1, language = "fr", createdAt = 2_000L),
+                card     = TestFixtures.buildCard("10e-fr", name = "Venerable Monk", setCode = "10e"),
+            ),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        // One item for the "10e" set, aggregating both language variants
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        val group = viewModel.uiState.value.cards.first()
+        assertEquals(2, group.totalQuantity)
+        assertEquals(2, group.distinctCopies)
+        // Representative print is the FIRST-added copy in that set (edge-case audit A6,
+        // 2026-07-15) — a "most recent" representative churned the group's displayed
+        // image/price/nav-target on every additional copy added.
+        assertEquals("10e-en", group.card.scryfallId)
+    }
+
+    @Test
+    fun `given same identity but different sets when collection loads then each set gets its own entry`() = runTest {
+        val entries = listOf(
+            TestFixtures.buildUserCardWithCard(
+                userCard = TestFixtures.buildUserCard(id = "uc-001", scryfallId = "ps11-es", quantity = 1, language = "es"),
+                card     = TestFixtures.buildCard("ps11-es", name = "Venerable Monk", setCode = "ps11"),
+            ),
+            TestFixtures.buildUserCardWithCard(
+                userCard = TestFixtures.buildUserCard(id = "uc-002", scryfallId = "10e-en", quantity = 1, language = "en"),
+                card     = TestFixtures.buildCard("10e-en", name = "Venerable Monk", setCode = "10e"),
+            ),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        // Two entries — one per set — even though both share the same card identity
+        assertEquals(2, viewModel.uiState.value.cards.size)
+        val setCodes = viewModel.uiState.value.cards.map { it.card.setCode }.toSet()
+        assertEquals(setOf("ps11", "10e"), setCodes)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

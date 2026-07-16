@@ -1,6 +1,8 @@
 package com.mmg.manahub.feature.carddetail.di
 
+import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailViewModel
+import com.mmg.manahub.feature.trades.domain.usecase.UpdateWishlistEntryUseCase
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -47,6 +49,11 @@ import org.koin.dsl.module
  * (`AddToWishlistUseCase` is ALSO re-exposed to the still-Hilt, excluded `ScannerViewModel` via
  * `KoinToHiltBridgeModule's reverse bridge — same singleton instance either way.)
  *
+ * `UpdateCollectionEntryUseCase` and `UpdateWishlistEntryUseCase` (Card Versions & Languages, Phase
+ * 1A) are likewise natively Koin-built in `SharedDomainKoinModule` — resolved below via `get()`.
+ * They back the CardDetail edit flow added in Phase 1B (edit an existing collection/wishlist entry's
+ * printing/language/foil/condition/quantity in place).
+ *
  * As features migrate further in Phase 1, each `single { hiltInstance }` here is replaced by a real Koin
  * provider and the matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing
  * without ever leaving the app uncompilable between commits.
@@ -68,9 +75,10 @@ fun cardDetailKoinModule(): Module = module {
             wishlistRepo = get(),
             openForTradeRepo = get(),
             userPrefs = get(),
-            userPreferencesDataStore = get(),
             authRepository = get(),
             helper = get(),
+            updateCollectionEntry = get(),
+            updateWishlistEntry = get(),
         )
     }
 }

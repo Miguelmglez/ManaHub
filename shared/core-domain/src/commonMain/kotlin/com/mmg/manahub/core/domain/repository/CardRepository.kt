@@ -34,6 +34,26 @@ interface CardRepository {
     ): DataResult<com.mmg.manahub.core.model.PaginatedCards>
     suspend fun getCardById(scryfallId: String): DataResult<Card>
 
+    /**
+     * Edge-case audit A3 (2026-07-15). Force-refreshes [scryfallId] from Scryfall, bypassing the
+     * freshness cache check in [getCardById] — a cached row that predates the `oracleId` column
+     * (blank `oracle_id`) can otherwise look "fresh" by cache age and never get a chance to pick
+     * up its real oracle id, silently excluding it from the oracle-wide Collection/Wishlist/Trade
+     * observers (Card Versions & Languages, Phase 1B). Used both for a targeted one-shot refresh
+     * (CardDetailViewModel, when the loaded card's `oracleId` is blank) and by
+     * [backfillMissingOracleIds]'s opportunistic startup pass.
+     */
+    suspend fun refreshCardById(scryfallId: String): DataResult<Card>
+
+    /**
+     * Edge-case audit A3 (2026-07-15). Opportunistic startup maintenance: finds up to [limit]
+     * cards referenced by a LIVE collection or wishlist row whose cached row predates the
+     * `oracleId` column (blank `oracle_id`), and force-refreshes each sequentially via
+     * [refreshCardById] (itself funnelled through the Scryfall rate-limit queue). Best-effort and
+     * failure-silent — one bad fetch must never abort the batch or block app start.
+     */
+    suspend fun backfillMissingOracleIds(limit: Int = 20)
+
     /** Fetches a card by set code and collector number (returns English version by default). */
     suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card>
 
@@ -42,6 +62,14 @@ interface CardRepository {
 
     /** Fetches all paper-printed versions (prints) of a card by its exact English name. */
     suspend fun getCardArtVariants(name: String): DataResult<List<Card>>
+
+    /**
+     * Card Versions & Languages, Phase 1A. Fetches every language printed for the exact
+     * printing identified by [setCode] + [collectorNumber] (Scryfall `set:<code>
+     * cn:"<number>" lang:any unique:prints`). Feeds CardDetail's language selector (Phase 1B).
+     * All returned cards are upserted into the local Room cache.
+     */
+    suspend fun getLanguagePrints(setCode: String, collectorNumber: String): DataResult<List<Card>>
 
     /** Fetches a card by its exact English name (e.g. "Lightning Bolt"). */
     suspend fun getCardByExactName(name: String): Result<Card>

@@ -60,7 +60,6 @@ fun DeckListScreen(
     viewModel:         DeckViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isCommunityDecksEnabled by viewModel.isCommunityDecksEnabled.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
     Scaffold(
@@ -93,7 +92,6 @@ fun DeckListScreen(
                 uiState.decks.isEmpty() -> EmptyDecksState(
                     onCreateClick = onCreateDeck,
                     onBrowseCommunityDecks = onBrowseCommunityDecks,
-                    showBrowseCommunityDecks = isCommunityDecksEnabled,
                     modifier      = Modifier.align(Alignment.Center),
                 )
 
@@ -140,7 +138,6 @@ fun DeckListScreen(
 private fun EmptyDecksState(
     onCreateClick: () -> Unit,
     onBrowseCommunityDecks: () -> Unit,
-    showBrowseCommunityDecks: Boolean = true,
     modifier:      Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -198,17 +195,15 @@ private fun EmptyDecksState(
             )
         }
         
-        if (showBrowseCommunityDecks) {
-            TextButton(
-                onClick = onBrowseCommunityDecks,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    "Browse Community Decks",
-                    style = ty.labelLarge,
-                    color = mc.textSecondary
-                )
-            }
+        TextButton(
+            onClick = onBrowseCommunityDecks,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "Browse Community Decks",
+                style = ty.labelLarge,
+                color = mc.textSecondary
+            )
         }
     }
 }

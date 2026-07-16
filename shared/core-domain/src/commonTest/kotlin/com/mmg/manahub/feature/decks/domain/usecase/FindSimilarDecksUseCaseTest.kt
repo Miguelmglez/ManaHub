@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.core.model.CommunityDeckOwner
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import com.mmg.manahub.core.model.CommunityDeckSearchResult
 import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.core.model.DataResult
@@ -27,8 +28,8 @@ private class FakeCommunityDecksRepository(
 ) : CommunityDecksRepository {
     var lastQuery: String? = null
     override suspend fun getDeckById(archidektId: Int): DataResult<com.mmg.manahub.core.model.CommunityDeck> = error("unused")
-    override suspend fun searchDecks(cardName: String?, deckFormat: Int?, orderBy: String?, page: Int, pageSize: Int): DataResult<CommunityDeckSearchResult> {
-        lastQuery = cardName
+    override suspend fun searchDecks(filters: CommunityDeckSearchFilters): DataResult<CommunityDeckSearchResult> {
+        lastQuery = filters.cardName
         return result
     }
 }

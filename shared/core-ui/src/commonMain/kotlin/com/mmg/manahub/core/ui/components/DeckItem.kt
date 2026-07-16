@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -70,6 +69,7 @@ import kotlinx.datetime.toLocalDateTime
  * @param onDelete        Optional callback for deletion (shows a confirmation dialog).
  * @param onPlaytest      Optional callback to start a playtest session.
  * @param reduced         If true, renders a more compact version suitable for widgets/grids.
+ * @param ownerName       Optional owner name for community decks.
  */
 @Composable
 fun DeckItem(
@@ -80,6 +80,7 @@ fun DeckItem(
     onDelete: (() -> Unit)? = null,
     onPlaytest: (() -> Unit)? = null,
     reduced: Boolean = false,
+    ownerName: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -219,9 +220,20 @@ fun DeckItem(
                         overflow = TextOverflow.Ellipsis,
                     )
 
+                    if (ownerName != null) {
+                        Text(
+                            text = if (reduced) ownerName else "by $ownerName",
+                            style = ty.labelSmall,
+                            color = mc.textDisabled,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
                     if (!reduced) {
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
 
+                        // Card count + last-updated date
                         // Card count + last-updated date
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),

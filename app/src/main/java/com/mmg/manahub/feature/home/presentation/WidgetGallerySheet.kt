@@ -83,9 +83,6 @@ fun WidgetGallerySheet(
     currentLayout: List<WidgetInstance>,
     isAuthenticated: Boolean,
     gamificationEnabled: Boolean,
-    // Mirrors gamificationEnabled's "omit entirely from the gallery, don't show as a greyed row"
-    // convention — Trending Commanders navigates into Community Decks, which is currently disabled.
-    communityDecksEnabled: Boolean = false,
     onAddWidget: (HomeWidgetType) -> Unit,
     onRemoveWidget: (HomeWidgetType) -> Unit,
     onMoveWidget: (from: Int, to: Int) -> Unit,
@@ -209,13 +206,11 @@ fun WidgetGallerySheet(
                         .filter { it.type.category == category }
                         .map { it.type }
                         .filter { gamificationEnabled || !it.isGamification }
-                        .filter { communityDecksEnabled || it != HomeWidgetType.TRENDING_COMMANDERS }
                         .distinct()
 
                     val notAdded = HomeWidgetType.entries
                         .filter { it.category == category }
                         .filter { gamificationEnabled || !it.isGamification }
-                        .filter { communityDecksEnabled || it != HomeWidgetType.TRENDING_COMMANDERS }
                         .filter { it !in addedTypes }
 
                     val widgets = (addedInOrder + notAdded).distinctBy { it.persistedId }

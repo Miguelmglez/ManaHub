@@ -437,53 +437,59 @@ class SyncManager @Inject constructor(
      * upserts it into Room if it wins.
      *
      * Resolution order:
-     * 1. Look up the row by its Supabase UUID (exact match, includes tombstones).
-     * 2. If not found, look up by composite key — the same card variant may exist locally
-     *    under a different (guest-generated) UUID. When found:
-     *    a. If the remote row loses the LWW comparison, skip entirely.
-     *    b. Otherwise, hard-delete the stale local row so the Supabase-canonical UUID
-     *       can be inserted without violating the composite UNIQUE constraint.
-     * 3. Skip if the local row is strictly newer (LWW).
-     * 4. Upsert the remote row and invoke [onInserted].
-     *
-     * Note: the `local` variable after a UUID-mismatch resolution intentionally points
-     * to the entity that was just hard-deleted. At that point [dto].updatedAt is always
-     * strictly greater than [local].updatedAt (guaranteed by the check in step 2a), so
-     * step 3 never incorrectly skips the upsert.
+     * 1. Look up the row by its Supabase UUID (exact match, includes tombstones) — this is
+     *    [dto]'s own lineage on this device, if any.
+     * 2. Independently look up whichever row (ANY id, live or tombstoned) currently occupies the
+     *    TARGET tuple `(userId, scryfallId, isFoil, condition, language)`. This catches two
+     *    distinct scenarios with the SAME mechanism:
+     *    a. Step 1 found nothing (`byId == null`) — the same card variant may exist locally
+     *       under a different (guest-generated) UUID ("UUID mismatch").
+     *    b. Step 1 found a row (`byId != null`) but ITS tuple no longer matches [dto]'s tuple
+     *       (e.g. another device re-pointed [dto]'s row via
+     *       [com.mmg.manahub.core.data.repository.UserCardRepositoryImpl.updateEntryWithMerge],
+     *       and the target tuple happens to already be occupied by a DIFFERENT pre-existing
+     *       local row) — edge-case audit A1 (2026-07-15). Previously this composite-key lookup
+     *       only ran in case (a), so applying [dto]'s new tuple as-is in case (b) could throw a
+     *       `SQLiteConstraintException` (the composite unique index has NO partial/WHERE clause —
+     *       a soft-deleted row still occupies its tuple, see `UserCardCollectionEntity`'s `Index`
+     *       list — so a colliding row is a collision regardless of its `is_deleted` flag),
+     *       aborting the ENTIRE pull loop with the sync watermark never advancing: a permanent
+     *       "poison-pill" row that blocks every future sync cycle for this user.
+     * 3. LWW: skip [dto] entirely if the row tracked under its own id (or, absent that, the
+     *    tuple's current occupant) is strictly newer.
+     * 4. Resolution: [dto] is authoritative once it wins LWW — Supabase's own upsert conflict
+     *    resolution already ran during this cycle's PUSH phase (which always executes before
+     *    PULL, see [sync]), so the server-held quantity is already the merged one; we never
+     *    re-sum locally. When a DIFFERENT row occupies the target tuple, atomically delete it and
+     *    upsert [dto] under its own id via [collectionDao.reconcileAndUpsert] — a pure
+     *    soft-delete cannot free the tuple slot (see the Index note above), and a hard-delete is
+     *    safe here specifically because PUSH already ran this cycle: any not-yet-communicated
+     *    local state on that stale row was flushed to Supabase (and itself resolved server-side
+     *    if IT collided too) before this PULL began.
      */
     private fun pullCollectionRow(
         dto: UserCardCollectionDto,
         onInserted: () -> Unit,
     ) {
         val byId = collectionDao.getByIdIncludingDeleted(dto.id)
-        // When non-null, this is the stale guest-UUID row that must be removed atomically
-        // with the canonical-UUID upsert (see reconcileAndUpsert below).
-        var staleId: String? = null
+        val tupleOwner = collectionDao.getByCompositeKey(
+            dto.userId, dto.scryfallId, dto.isFoil,
+            dto.condition, dto.language,
+        )
+        // A different physical row (not the one tracked under dto's own id) already occupies the
+        // target tuple — null when there is no collision, or when the tuple owner IS byId itself
+        // (its current tuple already matches dto's, e.g. a quantity-only change).
+        val staleId: String? = tupleOwner?.id?.takeIf { it != dto.id }
 
-        val local = if (byId != null) {
-            byId
-        } else {
-            // UUID mismatch: the same card variant may exist locally under a
-            // different (guest-generated) UUID. Find it by composite key.
-            val byComposite = collectionDao.getByCompositeKey(
-                dto.userId, dto.scryfallId, dto.isFoil,
-                dto.condition, dto.language,
-            )
-            if (byComposite != null) {
-                // LWW: if the local row is strictly newer, skip this remote row entirely.
-                if (dto.updatedAt <= byComposite.updatedAt) return
-                // Remote row wins — mark the stale row for atomic deletion.
-                staleId = byComposite.id
-            }
-            byComposite
-        }
-        // LWW: skip if local row is strictly newer. When local came from the UUID-mismatch
-        // branch, dto.updatedAt > local.updatedAt is always true here (ensured above).
+        // LWW driver: prefer the row tracked under dto's own id (the most direct lineage); fall
+        // back to the tuple owner when this device has never seen dto.id before.
+        val local = byId ?: tupleOwner
         if (local != null && dto.updatedAt <= local.updatedAt) return
 
-        // Use the atomic reconcileAndUpsert when a stale-UUID row must be replaced so a
-        // process-kill between the delete and the insert never orphans the collection entry.
         if (staleId != null) {
+            crashReporter.log("collection_pull_tuple_collision_resolved")
+            // Use the atomic reconcileAndUpsert when a stale row must be replaced so a
+            // process-kill between the delete and the insert never orphans the collection entry.
             collectionDao.reconcileAndUpsert(staleId, dto.toEntity())
         } else {
             collectionDao.upsert(dto.toEntity())

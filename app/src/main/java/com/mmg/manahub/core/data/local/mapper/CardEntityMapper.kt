@@ -118,6 +118,7 @@ fun CardEntity.toDomainCard(): Card = Card(
             .getOrNull()
     },
     producedMana = producedMana,
+    oracleId = oracleId,
 )
 
 fun Card.toEntityCard(): CardEntity = CardEntity(
@@ -174,6 +175,7 @@ fun Card.toEntityCard(): CardEntity = CardEntity(
     pennyRank = pennyRank,
     cardFaces = cardFaces?.let { gson.toJson(it) },
     producedMana = producedMana,
+    oracleId = oracleId,
 )
 
 fun List<CardEntity>.toDomainCardList(): List<Card> = map { it.toDomainCard() }
