@@ -32,7 +32,13 @@ private class FakeCardRepository(private val byId: Map<String, Card>, private va
     override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<com.mmg.manahub.core.model.PaginatedCards> = error("unused")
     override suspend fun getCardById(scryfallId: String): DataResult<Card> =
         byId[scryfallId]?.let { DataResult.Success(it) } ?: DataResult.Error("not found")
+    override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
+    override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
     override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> = error("unused")
+    // Pre-existing gap fixed while touching this fake for the A3 backfill additions above
+    // (2026-07-15): getLanguagePrints was added to CardRepository for Card Versions & Languages
+    // Phase 1A but this hand-written fake was never updated, breaking wasmJs test compilation.
+    override suspend fun getLanguagePrints(setCode: String, collectorNumber: String): DataResult<List<Card>> = error("unused")
     override suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>> = error("unused")
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> = error("unused")

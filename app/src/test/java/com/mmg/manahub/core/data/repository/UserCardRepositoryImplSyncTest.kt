@@ -1,12 +1,14 @@
 package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.MtgDatabase
+import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import io.github.jan.supabase.SupabaseClient
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -42,6 +44,7 @@ class UserCardRepositoryImplSyncTest {
     private val database               = mockk<MtgDatabase>(relaxed = true)
     private val supabaseClient         = mockk<SupabaseClient>(relaxed = true)
     private val authRepository         = mockk<AuthRepository>(relaxed = true)
+    private val localOpenForTradeDao   = mockk<LocalOpenForTradeDao>(relaxed = true)
 
     private lateinit var repository: UserCardRepositoryImpl
 
@@ -77,6 +80,27 @@ class UserCardRepositoryImplSyncTest {
 
     @Before
     fun setUp() {
+        // When userId is explicitly passed as null, addOrIncrement falls back to
+        // authRepository.getCurrentUser()?.id. Relaxed mocks auto-generate a non-null child
+        // mock for an unstubbed nullable-object-returning call (see note below), so without
+        // this explicit stub resolvedUserId ends up "" (child mock's default String field)
+        // instead of null, and the guest-session assertion below fails on an empty-string id.
+        coEvery { authRepository.getCurrentUser() } returns null
+
+        // MockK relaxed mocks do NOT return null for unstubbed calls to a function whose
+        // return type is a nullable data class — they auto-generate a non-null "child mock"
+        // instance instead (all String fields default to "", not null; all Long/Int/Boolean
+        // fields default to 0/false). Without this explicit stub, addOrIncrement's existing-row
+        // lookup never sees `existing == null`, so every test below silently falls into the
+        // "increment existing" branch instead of "create new" — corrupting id/userId/createdAt/
+        // isFoil assertions. Must return null explicitly to exercise the create-new path.
+        every {
+            userCardCollectionDao.getByCompositeKey(any(), any(), any(), any(), any())
+        } returns null
+        every {
+            userCardCollectionDao.getByCompositeKeyGuest(any(), any(), any(), any())
+        } returns null
+
         repository = UserCardRepositoryImpl(
             userCardCollectionDao      = userCardCollectionDao,
             collectionRemoteDataSource = collectionRemoteDataSource,
@@ -84,6 +108,7 @@ class UserCardRepositoryImplSyncTest {
             database                   = database,
             supabaseClient             = supabaseClient,
             authRepository             = authRepository,
+            localOpenForTradeDao       = localOpenForTradeDao,
             ioDispatcher               = UnconfinedTestDispatcher(),
         )
     }

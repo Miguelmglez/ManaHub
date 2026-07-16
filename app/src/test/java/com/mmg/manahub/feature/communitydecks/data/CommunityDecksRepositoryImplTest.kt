@@ -14,6 +14,7 @@ import com.mmg.manahub.core.data.remote.dto.ArchidektOracleCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektOwnerDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
 import com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import com.mmg.manahub.core.model.DataResult
 import io.ktor.client.plugins.ResponseException
 import io.ktor.http.HttpStatusCode
@@ -382,10 +383,10 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given successful API response when searchDecks then returns mapped domain result`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } returns buildSearchResultDto()
+        coEvery { api.searchDecks(any()) } returns buildSearchResultDto()
 
         // Act
-        val result = repository.searchDecks("Sol Ring", null, null, 1, 20)
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Success)
@@ -407,12 +408,12 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given last page when searchDecks then hasMore is false`() = runTest {
         // Arrange — next is null → last page.
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } returns buildSearchResultDto(
+        coEvery { api.searchDecks(any()) } returns buildSearchResultDto(
             next = null,
         )
 
         // Act
-        val result = repository.searchDecks("Sol Ring", null, null, 1, 20) as DataResult.Success
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20)) as DataResult.Success
 
         // Assert
         assertFalse(result.data.hasMore)
@@ -423,14 +424,21 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given deckFormat filter when searchDecks then passes it to API`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } returns buildSearchResultDto()
+        coEvery { api.searchDecks(any()) } returns buildSearchResultDto()
+        val filters = CommunityDeckSearchFilters(
+            cardName = "Sol Ring",
+            deckFormatId = 3,
+            orderBy = "-viewCount",
+            page = 1,
+            pageSize = 20,
+        )
 
         // Act
-        repository.searchDecks("Sol Ring", 3, "-viewCount", 1, 20)
+        repository.searchDecks(filters)
 
-        // Assert — verify the exact arguments passed through to the API.
+        // Assert — verify the exact filters object passed through to the API.
         coVerify(exactly = 1) {
-            api.searchDecks("Sol Ring", 3, "-viewCount", 1, 20)
+            api.searchDecks(filters)
         }
     }
 
@@ -439,13 +447,13 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given count minus one when searchDecks then returns timeout error`() = runTest {
         // Arrange — Archidekt signals server-side statement timeout with count = -1.
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } returns buildSearchResultDto(
+        coEvery { api.searchDecks(any()) } returns buildSearchResultDto(
             count = -1,
             results = emptyList(),
         )
 
         // Act
-        val result = repository.searchDecks("Lightning Bolt", null, null, 1, 20)
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Lightning Bolt", page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -458,10 +466,10 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given HTTP 500 when searchDecks then returns search failed error`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws buildResponseException(500)
+        coEvery { api.searchDecks(any()) } throws buildResponseException(500)
 
         // Act
-        val result = repository.searchDecks("Sol Ring", null, null, 1, 20)
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -472,10 +480,10 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given HTTP 429 when searchDecks then returns rate limit error`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws buildResponseException(429)
+        coEvery { api.searchDecks(any()) } throws buildResponseException(429)
 
         // Act
-        val result = repository.searchDecks("Sol Ring", null, null, 1, 20)
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -487,10 +495,10 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given generic exception when searchDecks then returns error with message`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws RuntimeException("Parse failed")
+        coEvery { api.searchDecks(any()) } throws RuntimeException("Parse failed")
 
         // Act
-        val result = repository.searchDecks("Sol Ring", null, null, 1, 20)
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -500,10 +508,10 @@ class CommunityDecksRepositoryImplTest {
     @Test
     fun `given exception with null message when searchDecks then returns fallback error`() = runTest {
         // Arrange
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } throws RuntimeException()
+        coEvery { api.searchDecks(any()) } throws RuntimeException()
 
         // Act
-        val result = repository.searchDecks("Sol Ring", null, null, 1, 20)
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -526,14 +534,14 @@ class CommunityDecksRepositoryImplTest {
             updatedAt = "2024-01-01",
             colors = emptyMap(),
         )
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } returns ArchidektSearchResultDto(
+        coEvery { api.searchDecks(any()) } returns ArchidektSearchResultDto(
             count = 1,
             next = null,
             results = listOf(noOwnerSummary),
         )
 
         // Act
-        val result = repository.searchDecks("Test", null, null, 1, 20) as DataResult.Success
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Test", page = 1, pageSize = 20)) as DataResult.Success
 
         // Assert
         assertEquals("Unknown", result.data.decks.first().owner.username)
@@ -554,14 +562,14 @@ class CommunityDecksRepositoryImplTest {
             updatedAt = "2024-01-01",
             colors = emptyMap(),
         )
-        coEvery { api.searchDecks(any(), any(), any(), any(), any()) } returns ArchidektSearchResultDto(
+        coEvery { api.searchDecks(any()) } returns ArchidektSearchResultDto(
             count = 1,
             next = null,
             results = listOf(noColorSummary),
         )
 
         // Act
-        val result = repository.searchDecks("Test", null, null, 1, 20) as DataResult.Success
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Test", page = 1, pageSize = 20)) as DataResult.Success
 
         // Assert
         assertTrue(result.data.decks.first().colorIdentity.isEmpty())

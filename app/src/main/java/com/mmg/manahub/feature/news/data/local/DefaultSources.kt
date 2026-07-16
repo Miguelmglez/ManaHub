@@ -16,14 +16,6 @@ object DefaultSources {
             language = "en",
         ),
         ContentSourceEntity(
-            id = "default_article_edhrec",
-            name = "EDHREC",
-            feedUrl = "https://edhrec.com/articles/feed",
-            type = "ARTICLE",
-            isDefault = true,
-            language = "en",
-        ),
-        ContentSourceEntity(
             id = "default_article_scg",
             name = "Star City Games",
             feedUrl = "https://articles.starcitygames.com/feed",
@@ -59,22 +51,6 @@ object DefaultSources {
             id = "default_article_mtgrocks",
             name = "MTG Rocks",
             feedUrl = "https://mtgrocks.com/feed",
-            type = "ARTICLE",
-            isDefault = true,
-            language = "en",
-        ),
-        ContentSourceEntity(
-            id = "default_article_cranial",
-            name = "Cranial Insertion",
-            feedUrl = "https://cranial-insertion.com/feed",
-            type = "ARTICLE",
-            isDefault = true,
-            language = "en",
-        ),
-        ContentSourceEntity(
-            id = "default_article_gatheringmagic",
-            name = "GatheringMagic",
-            feedUrl = "https://www.gatheringmagic.com/feed/",
             type = "ARTICLE",
             isDefault = true,
             language = "en",
@@ -123,6 +99,21 @@ object DefaultSources {
         //   MTGStocks news       — no RSS; every candidate path returns 202 (challenge/queue
         //                          response, not a feed).
         //   TCGplayer Infinite   — no public RSS; `/feed` returns the SPA HTML shell.
+        //
+        // Retired 2026-07-16 (dead-source cleanup, confirmed via direct curl checks — see
+        // NewsRepositoryImpl.reconcileDefaultSources, which deletes these ids from installs that
+        // already seeded them under the old catalog):
+        //   EDHREC (default_article_edhrec)             — https://edhrec.com/articles/feed TCP
+        //                                                  connects but hangs/times out (15s+, 0
+        //                                                  bytes); Cloudflare bot-protection
+        //                                                  black-holing non-browser clients, not a
+        //                                                  transient blip.
+        //   GatheringMagic (default_article_gatheringmagic) — https://www.gatheringmagic.com/feed/
+        //                                                  connection refused on 443; the host's
+        //                                                  server is down.
+        //   Cranial Insertion (default_article_cranial) — https://cranial-insertion.com/feed
+        //                                                  redirects (301→http, 302→https) then
+        //                                                  404s; feed removed.
     )
 
     // ── Spanish article sources ───────────────────────────────────────────────
@@ -160,12 +151,18 @@ object DefaultSources {
     val articlesDe = emptyList<ContentSourceEntity>()
 
     // ── English video sources ─────────────────────────────────────────────────
+    // channel_id corrections 2026-07-16 (dead-source cleanup, confirmed via direct curl checks —
+    // the OLD ids below returned a genuine Google-served 404 "requested URL not found on this
+    // server"; the corrected ids return HTTP 200 with the right <title> and 15 <entry> items).
+    // See NewsRepositoryImpl.reconcileDefaultSources, which rewrites feedUrl + resets the
+    // etag/lastModified/lastFetchedAt watermark for installs that already seeded the old id.
 
     val videos = listOf(
         ContentSourceEntity(
             id = "default_video_mtg_official",
             name = "Magic: The Gathering",
-            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCpwK0zGsMU0C9V_gPMNngSw",
+            // OLD (dead): channel_id=UCpwK0zGsMU0C9V_gPMNngSw
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UC8ZGymAvfP97qJabgqUkz4A",
             type = "VIDEO",
             isDefault = true,
             language = "en",
@@ -204,8 +201,11 @@ object DefaultSources {
         ),
         ContentSourceEntity(
             id = "default_video_nitpicking",
+            // Feed title is now "Nitpicking Nerd" (singular) — same channel, just a display-name
+            // change upstream; keep our own `name` field as-is.
             name = "Nitpicking Nerds",
-            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCiIYx9sFBPjq1P8VGkHDALQ",
+            // OLD (dead): channel_id=UCiIYx9sFBPjq1P8VGkHDALQ
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCrLsxBysUHnpSKRpXMbMVzg",
             type = "VIDEO",
             isDefault = true,
             language = "en",
@@ -213,7 +213,9 @@ object DefaultSources {
         ContentSourceEntity(
             id = "default_video_good_morning",
             name = "Good Morning Magic",
-            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCvE8Mza7uRuIIqmMLGsz01g",
+            // OLD (dead): channel_id=UCvE8Mza7uRuIIqmMLGsz01g — note this is only a casing/
+            // character difference from the corrected id below, easy to mistype.
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCvE8Mza7uRuiYlwiSDyJi9A",
             type = "VIDEO",
             isDefault = true,
             language = "en",
@@ -221,7 +223,8 @@ object DefaultSources {
         ContentSourceEntity(
             id = "default_video_pleasant_kenobi",
             name = "Pleasant Kenobi",
-            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCkUELeIMduQbsv8MhmMEPpg",
+            // OLD (dead): channel_id=UCkUELeIMduQbsv8MhmMEPpg
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UC_b074DeDtbHukufPf2O1kw",
             type = "VIDEO",
             isDefault = true,
             language = "en",
@@ -229,7 +232,8 @@ object DefaultSources {
         ContentSourceEntity(
             id = "default_video_legenvd",
             name = "LegenVD",
-            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCd0kth9C1hqSiaqoQ9TINaA",
+            // OLD (dead): channel_id=UCd0kth9C1hqSiaqoQ9TINaA
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCd0kth9C1hqJiaoedeBZ0cQ",
             type = "VIDEO",
             isDefault = true,
             language = "en",
@@ -237,7 +241,8 @@ object DefaultSources {
         ContentSourceEntity(
             id = "default_video_loadingreadyrun",
             name = "LoadingReadyRun",
-            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCLBNH4hp-NaMcqc5M9MYqzA",
+            // OLD (dead): channel_id=UCLBNH4hp-NaMcqc5M9MYqzA
+            feedUrl = "https://www.youtube.com/feeds/videos.xml?channel_id=UCwjN2uVdL9A0i3gaIHKFzuA",
             type = "VIDEO",
             isDefault = true,
             language = "en",

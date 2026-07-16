@@ -3,40 +3,47 @@ package com.mmg.manahub.feature.carddetail.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
+import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
+import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.UpdateWishlistEntryUseCase
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -53,22 +60,34 @@ class CardDetailViewModel(
     private val wishlistRepo: WishlistRepository,
     private val openForTradeRepo: OpenForTradeRepository,
     private val userPrefs: UserPreferencesRepository,
-    private val userPreferencesDataStore: UserPreferencesDataStore,
     private val authRepository: AuthRepository,
     private val helper: AnalyticsHelper,
+    private val updateCollectionEntry: UpdateCollectionEntryUseCase,
+    private val updateWishlistEntry: UpdateWishlistEntryUseCase,
 ) : ViewModel() {
 
     private val initialScryfallId: String = checkNotNull(savedStateHandle["scryfallId"])
     private val scryfallIdFlow = MutableStateFlow(initialScryfallId)
     private val scryfallId: String get() = scryfallIdFlow.value
 
+    // The currently-loaded [Card], mirrored from every point [_uiState.card] is written. Used to
+    // derive the oracle-wide identity (oracleId, name) that the Collection/Wishlist/Trade sections
+    // now key off (Card Versions & Languages, Phase 1B) — distinct from [scryfallIdFlow], which is
+    // the exact printing being displayed.
+    private val loadedCardFlow = MutableStateFlow<Card?>(null)
+
+    /**
+     * Emits (oracleId, name) whenever the loaded card's ORACLE IDENTITY changes — deliberately
+     * `distinctUntilChanged` so a same-oracle field update (price refresh, tag edit) that re-emits
+     * [loadedCardFlow] does not tear down and rebuild the downstream Room observers below.
+     */
+    private val cardIdentityFlow = loadedCardFlow
+        .filterNotNull()
+        .map { it.oracleId to it.name }
+        .distinctUntilChanged()
+
     private val _uiState = MutableStateFlow(CardDetailUiState())
     val uiState: StateFlow<CardDetailUiState> = _uiState.asStateFlow()
-
-    /** Community Decks feature flag — gates the "Find Community Decks" entry point. */
-    val isCommunityDecksEnabled: StateFlow<Boolean> =
-        userPreferencesDataStore.communityDecksEnabledFlow
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     // One-shot UI events (toasts, navigation, etc.)
     private val _events = MutableSharedFlow<CardDetailEvent>(extraBufferCapacity = 8)
@@ -76,6 +95,9 @@ class CardDetailViewModel(
 
     // Tracks the in-flight variant-load coroutine so it can be cancelled on dismiss.
     private var variantJob: Job? = null
+
+    // Tracks the in-flight language-prints-load coroutine so it can be cancelled on dismiss.
+    private var languageJob: Job? = null
 
     init {
         loadCard()
@@ -107,37 +129,22 @@ class CardDetailViewModel(
                 when (val result = cardRepo.getCardById(id)) {
                     is DataResult.Success -> {
                         val card = result.data
-                        if (card.lang != "en") {
-                            // If it's not English, try to load the English version (F-13).
-                            // Fast path: same set + collector number, just lang=en. This works
-                            // whenever the set itself has an English printing.
-                            val sameSetEnglish = cardRepo.getCardBySetAndNumber(card.setCode, card.collectorNumber)
-                            if (sameSetEnglish is DataResult.Success && sameSetEnglish.data.lang == "en") {
-                                scryfallIdFlow.value = sameSetEnglish.data.scryfallId
-                                return@collectLatest
+                        // The opened print displays as-is, in its own language — no forced
+                        // redirect to an English printing (F-13 removed). printedName/printedText
+                        // (with an oracle-English fallback when null) already handle localized
+                        // display for foreign prints in CardDetailScreen.
+                        _uiState.update { it.copy(card = card, isLoading = false, isStale = result.isStale) }
+                        loadedCardFlow.value = card
+                        if (card.oracleId.isBlank()) {
+                            // Edge-case audit A3 (2026-07-15): this printing's cached row predates
+                            // the oracle_id column — trigger a one-shot background refresh so it
+                            // (and the oracle-wide Collection/Wishlist/Trade sections that key off
+                            // oracleId, Phase 1B) stop silently excluding it. Fire-and-forget: the
+                            // observeCard Room collector below picks up the refreshed row
+                            // automatically once it lands, no manual _uiState write needed here.
+                            viewModelScope.launch {
+                                runCatching { cardRepo.refreshCardById(id) }
                             }
-                            // Fallback: some sets (e.g. Salvat 2011, a Spanish-exclusive promo
-                            // set) were NEVER printed in English, so set+number never resolves to
-                            // an English print. Note that `/cards/:set/:number` is a COORDINATE
-                            // lookup, not a language filter: it returns Success with whatever
-                            // single printing exists at that set+number, which for a
-                            // foreign-exclusive set is the same non-English card we started with.
-                            // Checking `.data.lang == "en"` above (not just Success) is required,
-                            // or this falls through to a no-op self-assignment below.
-                            // Scryfall's `name` field is always the English oracle name
-                            // regardless of `lang` (only `printedName` is localized), so look up
-                            // the English print by exact oracle name across all sets instead.
-                            val exactNameResult = cardRepo.getCardByExactName(card.name)
-                            val exactNameCard = exactNameResult.getOrNull()
-                            if (exactNameCard != null) {
-                                scryfallIdFlow.value = exactNameCard.scryfallId
-                                return@collectLatest
-                            }
-                            // Both lookups failed: fall back to displaying the original
-                            // foreign-language card (should not really happen for real cards).
-                            _uiState.update { it.copy(card = card, isLoading = false, isStale = result.isStale) }
-                        } else {
-                            _uiState.update { it.copy(card = card, isLoading = false, isStale = result.isStale) }
                         }
                     }
 
@@ -158,6 +165,7 @@ class CardDetailViewModel(
                             isStale = card.isStale
                         )
                     }
+                    loadedCardFlow.value = card
                 }
         }
     }
@@ -166,22 +174,32 @@ class CardDetailViewModel(
         viewModelScope.launch {
             combine(
                 authRepository.sessionState,
-                scryfallIdFlow
-            ) { state, id ->
+                cardIdentityFlow
+            ) { state, identity ->
                 val userId = (state as? SessionState.Authenticated)?.user?.id
-                Pair(id, userId)
-            }.flatMapLatest { (id, userId) ->
-                userCardRepo.observeByScryfallId(id, userId)
-            }.collect { cards ->
-                _uiState.update { it.copy(userCards = cards) }
+                Triple(identity.first, identity.second, userId)
+            }.flatMapLatest { (oracleId, name, userId) ->
+                userCardRepo.observeVersionsByOracle(oracleId, name, userId)
+            }.catch { e ->
+                // Edge-case audit B/11 (2026-07-15): this oracle-wide observer (Phase 1B) had NO
+                // .catch{} — unlike the pre-existing observeDecks — so a Room exception here would
+                // propagate uncaught out of viewModelScope.launch. Capture the source key BEFORE
+                // reporting (mirrors the established home_flow_error_source pattern).
+                FirebaseCrashlytics.getInstance().setCustomKey("carddetail_flow_error_source", "user_cards")
+                recordSafeNonFatal("carddetail_flow_error", e)
+            }.collect { rows ->
+                _uiState.update { it.copy(userCards = rows) }
             }
         }
     }
 
     private fun observeWishlistEntries() {
         viewModelScope.launch {
-            scryfallIdFlow.flatMapLatest { id ->
-                wishlistRepo.observeByScryfallId(id)
+            cardIdentityFlow.flatMapLatest { (oracleId, name) ->
+                wishlistRepo.observeVersionsByOracle(oracleId, name)
+            }.catch { e ->
+                FirebaseCrashlytics.getInstance().setCustomKey("carddetail_flow_error_source", "wishlist_entries")
+                recordSafeNonFatal("carddetail_flow_error", e)
             }.collect { entries ->
                 _uiState.update { it.copy(wishlistEntries = entries) }
             }
@@ -190,8 +208,11 @@ class CardDetailViewModel(
 
     private fun observeTradeEntries() {
         viewModelScope.launch {
-            scryfallIdFlow.flatMapLatest { id ->
-                openForTradeRepo.observeByScryfallId(id)
+            cardIdentityFlow.flatMapLatest { (oracleId, name) ->
+                openForTradeRepo.observeVersionsByOracle(oracleId, name)
+            }.catch { e ->
+                FirebaseCrashlytics.getInstance().setCustomKey("carddetail_flow_error_source", "trade_entries")
+                recordSafeNonFatal("carddetail_flow_error", e)
             }.collect { entries ->
                 val qtyMap = entries.associate { it.userCardId to it.quantity }
                 _uiState.update { it.copy(tradeQuantities = qtyMap) }
@@ -201,10 +222,47 @@ class CardDetailViewModel(
 
     // ── Sheet visibility ──────────────────────────────────────────────────────
 
-    fun onShowAddSheet() = _uiState.update { it.copy(showAddSheet = true) }
-    fun onDismissAddSheet() = _uiState.update { it.copy(showAddSheet = false) }
-    fun onShowWishlistSheet() = _uiState.update { it.copy(showWishlistSheet = true) }
-    fun onDismissWishlistSheet() = _uiState.update { it.copy(showWishlistSheet = false) }
+    /** Opens the add-to-collection sheet defaulted to the currently displayed printing (ADD mode). */
+    fun onShowAddSheet() {
+        val card = _uiState.value.card
+        _uiState.update { it.copy(showAddSheet = true, sheetPrinting = card, entryBeingEdited = null) }
+    }
+
+    fun onDismissAddSheet() =
+        _uiState.update { it.copy(showAddSheet = false, sheetPrinting = null, entryBeingEdited = null) }
+
+    /** Opens the add-to-collection sheet in EDIT mode for an existing collection entry. */
+    fun onEditCollectionEntry(entry: UserCardWithCard) {
+        FirebaseCrashlytics.getInstance().log("card_detail_edit_collection_entry_opened")
+        _uiState.update {
+            it.copy(showAddSheet = true, sheetPrinting = entry.card, entryBeingEdited = entry)
+        }
+    }
+
+    /** Opens the add-to-wishlist sheet defaulted to the currently displayed printing (ADD mode). */
+    fun onShowWishlistSheet() {
+        val card = _uiState.value.card
+        _uiState.update { it.copy(showWishlistSheet = true, sheetPrinting = card, wishlistEntryBeingEdited = null) }
+    }
+
+    fun onDismissWishlistSheet() =
+        _uiState.update { it.copy(showWishlistSheet = false, sheetPrinting = null, wishlistEntryBeingEdited = null) }
+
+    /** Opens the add-to-wishlist sheet in EDIT mode for an existing wishlist entry. */
+    fun onEditWishlistEntry(entry: WishlistEntry) {
+        val printingCard = entry.card
+        if (printingCard == null) {
+            viewModelScope.launch {
+                _events.emit(CardDetailEvent.ShowToast("Could not load this entry's card", ToastSeverity.ERROR))
+            }
+            return
+        }
+        FirebaseCrashlytics.getInstance().log("card_detail_edit_wishlist_entry_opened")
+        _uiState.update {
+            it.copy(showWishlistSheet = true, sheetPrinting = printingCard, wishlistEntryBeingEdited = entry)
+        }
+    }
+
     fun onShowTradeSheet() = _uiState.update { it.copy(showTradeSheet = true) }
     fun onDismissTradeSheet() = _uiState.update { it.copy(showTradeSheet = false) }
     fun onShowTagPicker() = _uiState.update { it.copy(showTagPicker = true) }
@@ -215,19 +273,137 @@ class CardDetailViewModel(
     fun onDismissWishlistDeleteConfirm() = _uiState.update { it.copy(wishlistEntryToDelete = null) }
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 
+    // ── Language selector (Card Versions & Languages, Phase 1B) ─────────────────
+
+    /**
+     * Opens the topbar language selector for the currently DISPLAYED printing and loads every
+     * language printed for its exact set + collector number.
+     */
+    fun onOpenLanguageSelector() {
+        val card = _uiState.value.card ?: return
+        languageJob?.cancel()
+        _uiState.update { it.copy(showLanguageSelector = true, isLoadingLanguages = true, languagePrints = emptyList()) }
+        helper.logEvent("open_language_selector", mapOf("card_id" to card.scryfallId))
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("language_prints_set_code", card.setCode)
+            setCustomKey("language_prints_collector_number", card.collectorNumber)
+            log("card_detail_language_selector_opened")
+        }
+        languageJob = viewModelScope.launch {
+            FirebaseCrashlytics.getInstance().log("card_detail_language_prints_fetch_started")
+            try {
+                when (val result = cardRepo.getLanguagePrints(card.setCode, card.collectorNumber)) {
+                    is DataResult.Success -> {
+                        _uiState.update {
+                            it.copy(languagePrints = result.data, isLoadingLanguages = false)
+                        }
+                        FirebaseCrashlytics.getInstance().log("card_detail_language_prints_fetch_success")
+                    }
+                    // Empty/error both fall back to the full language list in the UI layer — the
+                    // user can still pick a language, they just won't navigate anywhere real.
+                    is DataResult.Error -> {
+                        _uiState.update {
+                            it.copy(languagePrints = emptyList(), isLoadingLanguages = false)
+                        }
+                        FirebaseCrashlytics.getInstance().apply {
+                            // Enum-id classification only — never the raw error message (no PII
+                            // leak risk either way here, but keeps this consistent with the
+                            // project's "enum ids only" telemetry rule).
+                            setCustomKey(
+                                "language_prints_error_type",
+                                if (result.message == "SCRYFALL_404") "not_found" else "network_error",
+                            )
+                            log("card_detail_language_prints_fetch_failed")
+                        }
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(isLoadingLanguages = false) }
+            }
+        }
+    }
+
+    fun onCloseLanguageSelector() {
+        languageJob?.cancel()
+        _uiState.update { it.copy(showLanguageSelector = false, languagePrints = emptyList(), isLoadingLanguages = false) }
+    }
+
+    /** Picks a REAL print returned by [onOpenLanguageSelector]; re-keys the displayed printing. */
+    fun onSelectLanguagePrint(print: Card) {
+        _uiState.update { it.copy(showLanguageSelector = false) }
+        // Guard against the StateFlow self-assignment no-op trap (see
+        // feedback_carddetail_variant_lookup_bugs memory): assigning the same value is a silent
+        // no-op that would otherwise leave the sheet's dismissal as the only visible effect, which
+        // is fine here — but skip the write entirely to make the intent explicit.
+        if (print.scryfallId == scryfallId) return
+        helper.logEvent("select_language_print", mapOf("card_id" to print.scryfallId))
+        FirebaseCrashlytics.getInstance().log("card_detail_language_print_selected")
+        scryfallIdFlow.value = print.scryfallId
+    }
+
+    /**
+     * Picks a language from the FALLBACK list (no real print exists for it at this set/number).
+     * Per product decision, only real prints navigate — this just informs the user.
+     */
+    fun onSelectFallbackLanguage(langCode: String) {
+        _uiState.update { it.copy(showLanguageSelector = false) }
+        val current = _uiState.value.card?.lang
+        if (langCode == current) return
+        // Previously zero telemetry for this outcome (toast only) — high product value: measures
+        // how often users hit a "print not available in this language" dead end.
+        FirebaseCrashlytics.getInstance().log("card_detail_language_fallback_selected")
+        viewModelScope.launch {
+            _events.emit(
+                CardDetailEvent.ShowToast(
+                    "This print is not available in ${CardConstants.getLanguageName(langCode)}",
+                    ToastSeverity.INFO,
+                )
+            )
+        }
+    }
+
     // ── Variant (other prints) selector ─────────────────────────────────────────
 
-    /** Opens the variant selector and loads all art variants for the current card. */
+    /** Opens the variant selector from the main screen's "Explore All Versions" row. */
     fun onOpenVariantSelector() {
         val cardName = _uiState.value.card?.name ?: return
+        openVariantSelector(VariantSelectorSource.SCREEN, cardName)
+    }
+
+    /**
+     * Opens the variant selector from WITHIN the add/edit sheet's "Set / Variant" field. Selecting
+     * a variant here swaps [CardDetailUiState.sheetPrinting] in place instead of navigating away —
+     * see [onSelectVariant].
+     */
+    fun onOpenVariantSelectorForSheet() {
+        val cardName = (_uiState.value.sheetPrinting ?: _uiState.value.card)?.name ?: return
+        openVariantSelector(VariantSelectorSource.SHEET, cardName)
+    }
+
+    private fun openVariantSelector(source: VariantSelectorSource, cardName: String) {
         variantJob?.cancel()
-        _uiState.update { it.copy(showVariantSelector = true, isLoadingVariants = true, cardVariants = emptyList()) }
+        _uiState.update {
+            it.copy(
+                showVariantSelector = true,
+                isLoadingVariants = true,
+                cardVariants = emptyList(),
+                variantSelectorSource = source,
+            )
+        }
+        FirebaseCrashlytics.getInstance().apply {
+            setCustomKey("variant_selector_source", source.name)
+            log("card_detail_variant_selector_opened")
+        }
         variantJob = viewModelScope.launch {
             try {
                 when (val result = cardRepo.getCardArtVariants(cardName)) {
                     is DataResult.Success -> _uiState.update { it.copy(cardVariants = result.data, isLoadingVariants = false) }
                     is DataResult.Error -> {
                         _uiState.update { it.copy(isLoadingVariants = false) }
+                        FirebaseCrashlytics.getInstance().apply {
+                            setCustomKey("variant_selector_error_type", "network_error")
+                            log("card_detail_variant_fetch_failed")
+                        }
                         _events.emit(CardDetailEvent.ShowToast("Could not load other prints", ToastSeverity.ERROR))
                     }
                 }
@@ -237,15 +413,32 @@ class CardDetailViewModel(
         }
     }
 
+    /**
+     * Dismisses the variant selector. Deliberately does NOT touch [CardDetailUiState.showAddSheet] /
+     * [CardDetailUiState.showWishlistSheet] — when [CardDetailUiState.variantSelectorSource] is
+     * [VariantSelectorSource.SHEET] the underlying sheet was never closed, so the user is returned
+     * to it automatically.
+     */
     fun onCloseVariantSelector() {
         variantJob?.cancel()
         _uiState.update { it.copy(showVariantSelector = false, cardVariants = emptyList(), isLoadingVariants = false, expandedVariantImageUrl = null) }
     }
 
-    /** Picks a variant; emits a [CardDetailEvent.NavigateToCard] one-shot event. */
+    /**
+     * Picks a variant. [VariantSelectorSource.SCREEN] emits a one-shot navigation event (unchanged
+     * behavior); [VariantSelectorSource.SHEET] instead swaps [CardDetailUiState.sheetPrinting] so the
+     * still-open add/edit sheet reflects the newly chosen printing.
+     */
     fun onSelectVariant(card: Card) {
-        _uiState.update { it.copy(showVariantSelector = false) }
-        viewModelScope.launch { _events.emit(CardDetailEvent.NavigateToCard(card.scryfallId)) }
+        when (_uiState.value.variantSelectorSource) {
+            VariantSelectorSource.SCREEN -> {
+                _uiState.update { it.copy(showVariantSelector = false) }
+                viewModelScope.launch { _events.emit(CardDetailEvent.NavigateToCard(card.scryfallId)) }
+            }
+            VariantSelectorSource.SHEET -> {
+                _uiState.update { it.copy(showVariantSelector = false, sheetPrinting = card) }
+            }
+        }
     }
 
     fun onExpandVariantImage(url: String) = _uiState.update { it.copy(expandedVariantImageUrl = url) }
@@ -257,9 +450,11 @@ class CardDetailViewModel(
         isFoil: Boolean,
         condition: String, language: String, quantity: Int,
     ) {
+        // The chosen printing may differ from the displayed one (Set / Variant field).
+        val targetScryfallId = _uiState.value.sheetPrinting?.scryfallId ?: scryfallId
         viewModelScope.launch {
             val result = addToCollection(
-                scryfallId = scryfallId,
+                scryfallId = targetScryfallId,
                 isFoil = isFoil,
                 condition = condition,
                 language = language,
@@ -267,17 +462,62 @@ class CardDetailViewModel(
             )
             if (result is DataResult.Error) {
                 _uiState.update { it.copy(error = result.message) }
-                helper.logEvent("error_add_card_collection", mapOf("card_id" to scryfallId))
+                helper.logEvent("error_add_card_collection", mapOf("card_id" to targetScryfallId))
                 _events.emit(
                     CardDetailEvent.ShowToast(
                         "Failed to add card", ToastSeverity.ERROR,
                     )
                 )
             } else {
-                helper.logEvent("add_card_collection", mapOf("card_id" to scryfallId))
+                helper.logEvent("add_card_collection", mapOf("card_id" to targetScryfallId))
                 _events.emit(CardDetailEvent.ShowToast("Card added to your collection"))
             }
-            _uiState.update { it.copy(showAddSheet = false) }
+            _uiState.update { it.copy(showAddSheet = false, sheetPrinting = null) }
+        }
+    }
+
+    /**
+     * Card Versions & Languages, Phase 1B. Edits [CardDetailUiState.entryBeingEdited] in place via
+     * [UpdateCollectionEntryUseCase] — the atomic re-point/merge is fully owned by that use case /
+     * [UserCardRepository.updateEntryWithMerge]; the oracle-wide observer picks up the change
+     * automatically (no manual reload).
+     */
+    fun onUpdateCollectionEntry(
+        isFoil: Boolean,
+        condition: String, language: String, quantity: Int,
+    ) {
+        val entry = _uiState.value.entryBeingEdited ?: return
+        val targetScryfallId = _uiState.value.sheetPrinting?.scryfallId ?: entry.card.scryfallId
+        val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
+        viewModelScope.launch {
+            val result = updateCollectionEntry(
+                entryId = entry.userCard.id,
+                newScryfallId = targetScryfallId,
+                isFoil = isFoil,
+                condition = condition,
+                language = language,
+                quantity = quantity,
+                userId = userId,
+            )
+            when {
+                result is DataResult.Error -> {
+                    helper.logEvent("error_update_collection_entry", mapOf("entry_id" to entry.userCard.id))
+                    _uiState.update { it.copy(error = result.message) }
+                    _events.emit(CardDetailEvent.ShowToast("Failed to update entry", ToastSeverity.ERROR))
+                }
+                result is DataResult.Success && result.data == UpdateEntryOutcome.ENTRY_NOT_FOUND -> {
+                    // A2 (edge-case audit, 2026-07-15): the entry was deleted concurrently
+                    // (another device / sync) between opening the edit sheet and confirming — tell
+                    // the user honestly instead of the misleading "Entry updated".
+                    helper.logEvent("error_update_collection_entry_not_found", mapOf("entry_id" to entry.userCard.id))
+                    _events.emit(CardDetailEvent.ShowToast("This entry no longer exists", ToastSeverity.ERROR))
+                }
+                else -> {
+                    helper.logEvent("update_collection_entry", mapOf("entry_id" to entry.userCard.id))
+                    _events.emit(CardDetailEvent.ShowToast("Entry updated"))
+                }
+            }
+            _uiState.update { it.copy(showAddSheet = false, sheetPrinting = null, entryBeingEdited = null) }
         }
     }
 
@@ -285,11 +525,12 @@ class CardDetailViewModel(
         isFoil: Boolean,
         condition: String, language: String, quantity: Int,
     ) {
+        val targetScryfallId = _uiState.value.sheetPrinting?.scryfallId ?: scryfallId
         viewModelScope.launch {
             val entry = WishlistEntry(
                 id              = UUID.randomUUID().toString(),
                 userId          = "",
-                cardId          = scryfallId,
+                cardId          = targetScryfallId,
                 quantity        = quantity,
                 matchAnyVariant = false,
                 isFoil          = isFoil,
@@ -299,11 +540,11 @@ class CardDetailViewModel(
             )
             addToWishlistUseCase(entry)
                 .onSuccess {
-                    helper.logEvent("add_card_wishlist", mapOf("card_id" to scryfallId))
+                    helper.logEvent("add_card_wishlist", mapOf("card_id" to targetScryfallId))
                     _events.emit(CardDetailEvent.ShowToast("Added to wishlist"))
                 }
                 .onFailure { e ->
-                    helper.logEvent("error_add_card_wishlist", mapOf("card_id" to scryfallId))
+                    helper.logEvent("error_add_card_wishlist", mapOf("card_id" to targetScryfallId))
                     _uiState.update { it.copy(error = e.message) }
                     _events.emit(
                         CardDetailEvent.ShowToast(
@@ -312,27 +553,53 @@ class CardDetailViewModel(
                         )
                     )
                 }
-            _uiState.update { it.copy(showWishlistSheet = false) }
+            _uiState.update { it.copy(showWishlistSheet = false, sheetPrinting = null) }
         }
     }
 
-    fun onUpdateQuantity(userCardId: String, quantity: Int) {
+    /**
+     * Card Versions & Languages, Phase 1B. Edits [CardDetailUiState.wishlistEntryBeingEdited] in
+     * place via [UpdateWishlistEntryUseCase] — see that use case's KDoc for the remote-first merge
+     * semantics. The oracle-wide observer picks up the change automatically (no manual reload).
+     */
+    fun onUpdateWishlistEntry(
+        isFoil: Boolean,
+        condition: String, language: String, quantity: Int,
+    ) {
+        val entry = _uiState.value.wishlistEntryBeingEdited ?: return
+        val targetCardId = _uiState.value.sheetPrinting?.scryfallId ?: entry.cardId
         viewModelScope.launch {
-            val card = _uiState.value.userCards.find { it.id == userCardId } ?: return@launch
-            runCatching {
-                userCardRepo.updateAttributes(
-                    id = userCardId,
-                    isForTrade = card.isForTrade,
-                    quantity = quantity,
-                )
-            }.onFailure { e -> _uiState.update { it.copy(error = e.message) } }
-        }
-    }
-
-    fun onUpdateWishlistQuantity(id: String, quantity: Int) {
-        viewModelScope.launch {
-            wishlistRepo.updateQuantityLocal(id, quantity)
-                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+            updateWishlistEntry(
+                entryId = entry.id,
+                newCardId = targetCardId,
+                isFoil = isFoil,
+                condition = condition.uppercase().trim(),
+                language = language.lowercase().trim(),
+                quantity = quantity,
+            )
+                .onSuccess { outcome ->
+                    if (outcome == UpdateEntryOutcome.ENTRY_NOT_FOUND) {
+                        // A2 (edge-case audit, 2026-07-15): the entry was deleted concurrently
+                        // (another device / sync) between opening the edit sheet and confirming —
+                        // tell the user honestly instead of the misleading "Entry updated".
+                        helper.logEvent("error_update_wishlist_entry_not_found", mapOf("entry_id" to entry.id))
+                        _events.emit(CardDetailEvent.ShowToast("This entry no longer exists", ToastSeverity.ERROR))
+                    } else {
+                        helper.logEvent("update_wishlist_entry", mapOf("entry_id" to entry.id))
+                        _events.emit(CardDetailEvent.ShowToast("Entry updated"))
+                    }
+                }
+                .onFailure { e ->
+                    helper.logEvent("error_update_wishlist_entry", mapOf("entry_id" to entry.id))
+                    _uiState.update { it.copy(error = e.message) }
+                    _events.emit(
+                        CardDetailEvent.ShowToast(
+                            "Failed to update entry: ${e.message}",
+                            ToastSeverity.ERROR
+                        )
+                    )
+                }
+            _uiState.update { it.copy(showWishlistSheet = false, sheetPrinting = null, wishlistEntryBeingEdited = null) }
         }
     }
 
@@ -343,7 +610,7 @@ class CardDetailViewModel(
             var anyError = false
             var totalOffered = 0
             selections.forEach { (id, desiredQty) ->
-                val uc = userCards.find { it.id == id } ?: return@forEach
+                val uc = userCards.find { it.userCard.id == id }?.userCard ?: return@forEach
                 val prevQty = currentQty[id] ?: 0
                 if (desiredQty == prevQty) {
                     totalOffered += desiredQty

@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.core.model.DataResult
 import kotlinx.coroutines.CoroutineDispatcher
@@ -68,11 +69,13 @@ class FindSimilarDecksUseCase(
         if (seedQuery.isBlank()) return@withContext DataResult.Success(emptyList())
         when (
             val result = communityDecksRepository.searchDecks(
-                cardName = seedQuery,
-                deckFormat = deckFormat,
-                orderBy = "-viewCount",
-                page = 1,
-                pageSize = SEARCH_POOL_SIZE,
+                CommunityDeckSearchFilters(
+                    cardName = seedQuery,
+                    deckFormatId = deckFormat,
+                    orderBy = "-viewCount",
+                    page = 1,
+                    pageSize = SEARCH_POOL_SIZE,
+                ),
             )
         ) {
             is DataResult.Error -> result

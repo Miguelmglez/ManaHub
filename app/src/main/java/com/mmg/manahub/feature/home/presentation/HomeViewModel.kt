@@ -495,50 +495,54 @@ class HomeViewModel(
             emit(OpenForTradeSummary(0, null))
         }
 
-    /**
-     * Bundles the three Trades Hub data sources into one typed combine (non-vararg, per the
-     * project's combine-arity convention) so [socialSnapshotFlow]'s outer combine stays a typed
-     * 5-arg overload.
-     */
+    /** Bundles the three Trades Hub data sources into one typed combine. */
     private data class TradesSnapshot(
         val summary: TradeSummary?,
         val suggestionsCount: Int,
         val openForTrade: OpenForTradeSummary,
+        val recentTrades: List<TradeProposal>,
     )
 
     private fun tradesSnapshotFlow(authed: Boolean): Flow<TradesSnapshot> = combine(
         tradeSummaryFlow(authed),
         suggestionsCountFlow,
         openForTradeSummaryFlow(authed),
-    ) { summary, suggestionsCount, openForTrade ->
-        TradesSnapshot(summary, suggestionsCount, openForTrade)
+        recentTradesFlow(authed),
+    ) { summary, suggestionsCount, openForTrade, recentTrades ->
+        TradesSnapshot(summary, suggestionsCount, openForTrade, recentTrades)
     }
 
+    private fun recentTradesFlow(authed: Boolean): Flow<List<TradeProposal>> =
+        if (!authed) flowOf(emptyList())
+        else tradesRepository.observeActiveProposals()
+            .map { it.sortedByDescending { p -> p.updatedAt }.take(3) }
+            .catch { emit(emptyList()) }
+
     /**
-     * Bundles the friend count + latest pending friend request + Archidekt trending decks —
-     * everything else [socialSnapshotFlow]'s outer combine needs beyond community stats / trades
-     * / tournament / wishlist — so that combine stays a typed 5-arg overload (Home feature
-     * overhaul Phase 1.2.c/1.2.d).
+     * Bundles the friend count + latest pending friend request + Archidekt trending decks + friends list.
      */
     private data class SocialExtras(
         val friendCount: Int,
         val latestFriendRequestName: String?,
         val archidektTrending: List<ArchidektTrendingDeck>,
+        val friends: List<com.mmg.manahub.core.model.Friend>,
     )
 
     private fun socialExtrasFlow(authed: Boolean): Flow<SocialExtras> =
         if (!authed) {
-            flowOf(SocialExtras(friendCount = 0, latestFriendRequestName = null, archidektTrending = emptyList()))
+            flowOf(SocialExtras(friendCount = 0, latestFriendRequestName = null, archidektTrending = emptyList(), friends = emptyList()))
         } else {
             combine(
                 friendRepository.observeFriendCount().catch { emit(0) },
                 friendRepository.observePendingRequests().catch { emit(emptyList()) },
                 archidektTrendingRepository.observeTrendingDecks().catch { emit(emptyList()) },
-            ) { friendCount, pendingRequests, trending ->
+                friendRepository.observeFriends().catch { emit(emptyList()) },
+            ) { friendCount, pendingRequests, trending, friends ->
                 SocialExtras(
                     friendCount = friendCount,
                     latestFriendRequestName = pendingRequests.firstOrNull()?.fromNickname,
                     archidektTrending = trending,
+                    friends = friends.take(5),
                 )
             }
         }
@@ -782,10 +786,7 @@ class HomeViewModel(
             NewsBundle(items = news, filtersActive = filtersActive)
         }
 
-        // A plain boolean gate (mirrors gamificationEnabledFlow) — appended as a 4th argument to
-        // the FINAL typed combine (still ≤5, no vararg/cast needed) rather than threaded into the
-        // already-fragile coreFlow/dataFlow vararg bundles above.
-        combine(coreFlow, newsFlow, dataFlow, userPrefsDataStore.communityDecksEnabledFlow) { core, news, data, communityDecksEnabled ->
+        combine(coreFlow, newsFlow, dataFlow) { core, news, data ->
             buildUiState(
                 core = core,
                 news = news.items,
@@ -796,7 +797,6 @@ class HomeViewModel(
                 social = data.social,
                 gamification = data.gamification,
                 recentlyAdded = data.recentlyAdded,
-                communityDecksEnabled = communityDecksEnabled,
             )
         }.stateIn(
             scope = viewModelScope,
@@ -1183,7 +1183,6 @@ class HomeViewModel(
         social: SocialSnapshot,
         gamification: GamificationSnapshot,
         recentlyAdded: List<RecentlyAddedCard>,
-        communityDecksEnabled: Boolean,
     ): HomeUiState {
         val collectionStats = core.library.stats
         val deckCount = core.library.decks.size
@@ -1273,10 +1272,11 @@ class HomeViewModel(
             friendCount = friendCount,
             latestFriendRequestName = social.extras.latestFriendRequestName,
             archidektTrending = social.extras.archidektTrending,
+            friends = social.extras.friends,
+            recentTrades = social.trades.recentTrades,
             // Gamification (Phase 2)
             gamificationEnabled = gamification.enabled,
             gamification = gamification.data,
-            communityDecksEnabled = communityDecksEnabled,
         )
     }
 

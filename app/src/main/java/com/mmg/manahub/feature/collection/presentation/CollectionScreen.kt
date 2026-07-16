@@ -597,9 +597,9 @@ private fun CardGrid(
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(cards, key = { _, item -> item.card.scryfallId }) { index, item ->
-            var visible by rememberSaveable(key = item.card.scryfallId) { mutableStateOf(false) }
-            LaunchedEffect(item.card.scryfallId) { visible = true }
+        itemsIndexed(cards, key = { _, item -> item.groupKey }) { index, item ->
+            var visible by rememberSaveable(key = item.groupKey) { mutableStateOf(false) }
+            LaunchedEffect(item.groupKey) { visible = true }
             val delay = (index % 12) * 30
 
             // Stable container to prevent LazyVerticalGrid from collapsing when returning from
@@ -643,7 +643,7 @@ private fun CardList(
     ) {
         items(
             items = cards,
-            key   = { it.card.scryfallId },
+            key   = { it.groupKey },
         ) { item ->
             CardListItem(
                 item    = item,

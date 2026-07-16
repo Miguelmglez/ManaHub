@@ -47,6 +47,19 @@ interface NewsDao {
     @Delete
     suspend fun deleteSource(source: ContentSourceEntity)
 
+    /**
+     * Targeted delete by primary key, used ONLY by
+     * [com.mmg.manahub.feature.news.data.NewsRepositoryImpl.reconcileDefaultSources] to clean up
+     * a fixed, code-controlled allowlist of retired default source ids
+     * (`RETIRED_DEFAULT_SOURCE_IDS`). Deliberately unguarded by `is_default` — the caller already
+     * restricts [ids] to that allowlist, which can never contain a user-added (`custom_*`) id.
+     * This must NEVER be exposed as a general-purpose delete path for user-facing source removal
+     * — [deleteSource] (single-entity, `isDefault` guarded at the repository layer) remains the
+     * only sanctioned path for that.
+     */
+    @Query("DELETE FROM content_sources WHERE id IN (:ids)")
+    suspend fun deleteSourcesByIds(ids: List<String>)
+
     @Query("SELECT * FROM content_sources ORDER BY type, name")
     fun observeSources(): Flow<List<ContentSourceEntity>>
 

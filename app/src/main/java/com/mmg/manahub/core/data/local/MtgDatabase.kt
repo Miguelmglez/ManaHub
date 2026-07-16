@@ -103,7 +103,7 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         // Community aggregate cache — Deck Doctor Community/Archetype plan, Phase 3.3 (v44)
         CommunityAggregateEntity::class,
     ],
-    version = 45,
+    version = 46,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)

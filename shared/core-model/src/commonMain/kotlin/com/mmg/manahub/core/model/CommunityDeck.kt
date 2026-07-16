@@ -20,6 +20,7 @@ data class CommunityDeck(
     val viewCount: Int,
     val createdAt: String,
     val updatedAt: String,
+    val featuredImageUrl: String? = null,
     val cards: List<CommunityDeckCard>,
     val sourceUrl: String,
 )

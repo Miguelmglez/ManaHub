@@ -5,6 +5,7 @@ import com.mmg.manahub.core.data.local.SyncPreferencesStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
+import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
@@ -124,6 +125,16 @@ class CollectionSyncTest {
         coEvery { collectionRemote.batchUpsert(any()) } returns Result.success(Unit)
         coEvery { deckRemote.batchUpsertDecks(any()) } returns Result.success(Unit)
         coEvery { deckRemote.upsertDeckCards(any(), any()) } returns Result.success(Unit)
+        // ensureCardsExist() pre-fetches any card missing from Room before a collection pull can
+        // upsert (RESTRICT FK). Without this stub, cardDao.getByIds(any()) is an unstubbed relaxed
+        // call returning an EMPTY list (MockK's relaxed default for a List return type), so every
+        // scryfallId is treated as "missing" and the Scryfall batch fetch (also unstubbed/relaxed)
+        // never populates it either — cachedIds ends up empty and pullCollectionRow is silently
+        // skipped for every row, regardless of any LWW stubbing below. Pretend every requested id
+        // is already cached.
+        coEvery { cardDao.getByIds(any()) } answers {
+            firstArg<List<String>>().map { id -> mockk<CardEntity>(relaxed = true) { every { scryfallId } returns id } }
+        }
 
         syncManager = SyncManager(
             collectionDao    = collectionDao,
@@ -226,7 +237,13 @@ class CollectionSyncTest {
         // Arrange: server sends a soft-delete tombstone that is newer than the local row
         val localEntity  = buildEntity(updatedAt = 2_000L, isDeleted = false)
         val remoteDeleted = buildDto(updatedAt = 5_000L, isDeleted = true)
-        every { collectionDao.getById(remoteDeleted.id) } returns localEntity
+        // pullCollectionRow resolves the local row via getByIdIncludingDeleted (own lineage)
+        // AND getByCompositeKey (tuple occupant) — both must point at the same local row
+        // (same id as remoteDeleted) so the tuple-collision path is not spuriously triggered.
+        every { collectionDao.getByIdIncludingDeleted(remoteDeleted.id) } returns localEntity
+        every {
+            collectionDao.getByCompositeKey(remoteDeleted.userId, remoteDeleted.scryfallId, remoteDeleted.isFoil, remoteDeleted.condition, remoteDeleted.language)
+        } returns localEntity
         coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDeleted))
         val capturedEntity = slot<UserCardCollectionEntity>()
         every { collectionDao.upsert(capture(capturedEntity)) } returns 1L
@@ -245,7 +262,10 @@ class CollectionSyncTest {
         // Arrange: local row is newer → LWW says local wins
         val localEntity   = buildEntity(updatedAt = 9_000L, isDeleted = false)
         val remoteDeleted = buildDto(updatedAt = 1_000L, isDeleted = true)
-        every { collectionDao.getById(remoteDeleted.id) } returns localEntity
+        every { collectionDao.getByIdIncludingDeleted(remoteDeleted.id) } returns localEntity
+        every {
+            collectionDao.getByCompositeKey(remoteDeleted.userId, remoteDeleted.scryfallId, remoteDeleted.isFoil, remoteDeleted.condition, remoteDeleted.language)
+        } returns localEntity
         coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDeleted))
 
         // Act
@@ -261,7 +281,10 @@ class CollectionSyncTest {
     fun `given new remote card not present locally when sync then it is inserted into Room`() = runTest(testDispatcher) {
         // Arrange: server sends a card that does not exist locally yet (first pull)
         val remoteNew = buildDto(id = "brand-new-id", scryfallId = CARD_ID_C)
-        every { collectionDao.getById("brand-new-id") } returns null    // not in Room
+        every { collectionDao.getByIdIncludingDeleted("brand-new-id") } returns null    // not in Room
+        every {
+            collectionDao.getByCompositeKey(remoteNew.userId, remoteNew.scryfallId, remoteNew.isFoil, remoteNew.condition, remoteNew.language)
+        } returns null
         coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteNew))
 
         // Act
@@ -283,9 +306,20 @@ class CollectionSyncTest {
         val dtoB = buildDto(id = "id-b", scryfallId = CARD_ID_B, updatedAt = 1_000L)
         val dtoC = buildDto(id = "id-c", scryfallId = CARD_ID_C, updatedAt = 4_000L)
 
-        every { collectionDao.getById("id-a") } returns buildEntity(id = "id-a", updatedAt = 2_000L)   // remote newer
-        every { collectionDao.getById("id-b") } returns buildEntity(id = "id-b", updatedAt = 8_000L)   // local newer
-        every { collectionDao.getById("id-c") } returns null                                             // new
+        val entityA = buildEntity(id = "id-a", scryfallId = CARD_ID_A, updatedAt = 2_000L)   // remote newer
+        val entityB = buildEntity(id = "id-b", scryfallId = CARD_ID_B, updatedAt = 8_000L)   // local newer
+        every { collectionDao.getByIdIncludingDeleted("id-a") } returns entityA
+        every {
+            collectionDao.getByCompositeKey(dtoA.userId, dtoA.scryfallId, dtoA.isFoil, dtoA.condition, dtoA.language)
+        } returns entityA
+        every { collectionDao.getByIdIncludingDeleted("id-b") } returns entityB
+        every {
+            collectionDao.getByCompositeKey(dtoB.userId, dtoB.scryfallId, dtoB.isFoil, dtoB.condition, dtoB.language)
+        } returns entityB
+        every { collectionDao.getByIdIncludingDeleted("id-c") } returns null                                             // new
+        every {
+            collectionDao.getByCompositeKey(dtoC.userId, dtoC.scryfallId, dtoC.isFoil, dtoC.condition, dtoC.language)
+        } returns null
 
         coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(dtoA, dtoB, dtoC))
 
@@ -354,7 +388,10 @@ class CollectionSyncTest {
     fun `given remote has newer card when sync then remote card is merged into Room via LWW`() = runTest(testDispatcher) {
         // assignUserIdAndSync only pushes; pull behaviour is tested via sync()
         val remoteDto = buildDto(id = "server-id", scryfallId = CARD_ID_C, updatedAt = 99_999L)
-        every { collectionDao.getById("server-id") } returns null   // not present locally
+        every { collectionDao.getByIdIncludingDeleted("server-id") } returns null   // not present locally
+        every {
+            collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
+        } returns null
         coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
 
         // Act
@@ -374,7 +411,10 @@ class CollectionSyncTest {
         val remoteDto    = buildDto(id = "conflict-id", scryfallId = CARD_ID_A, updatedAt = 7_000L)
 
         every { collectionDao.getAllSince(USER_ID, LAST_SYNC) } returns listOf(localEntity)
-        every { collectionDao.getById("conflict-id") } returns localEntity
+        every { collectionDao.getByIdIncludingDeleted("conflict-id") } returns localEntity
+        every {
+            collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
+        } returns localEntity
         coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
         val capturedEntity = slot<UserCardCollectionEntity>()
         every { collectionDao.upsert(capture(capturedEntity)) } returns 1L
@@ -429,7 +469,10 @@ class CollectionSyncTest {
         )
         val remoteNew = buildDto(id = "remote-new", scryfallId = CARD_ID_C)
         every { collectionDao.getAllSince(USER_ID, LAST_SYNC) } returns localRows
-        every { collectionDao.getById("remote-new") } returns null
+        every { collectionDao.getByIdIncludingDeleted("remote-new") } returns null
+        every {
+            collectionDao.getByCompositeKey(remoteNew.userId, remoteNew.scryfallId, remoteNew.isFoil, remoteNew.condition, remoteNew.language)
+        } returns null
         coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteNew))
 
         // Act

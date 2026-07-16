@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
 import com.mmg.manahub.core.domain.repository.ArchidektTrendingRepository
 import com.mmg.manahub.core.model.ArchidektFormat
 import com.mmg.manahub.core.model.ArchidektTrendingDeck
+import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -80,9 +81,11 @@ class ArchidektTrendingRepositoryImpl(
     private suspend fun fetchFresh(): ArchidektSearchResultDto? = withContext(dispatcherProvider.io) {
         runCatching {
             val dto = client.searchDecks(
-                deckFormat = ArchidektFormat.COMMANDER.apiId,
-                orderBy = "-viewCount",
-                pageSize = 20,
+                CommunityDeckSearchFilters(
+                    deckFormatId = ArchidektFormat.COMMANDER.apiId,
+                    orderBy = "-viewCount",
+                    pageSize = 20,
+                ),
             )
             runCatching {
                 cache.insert(

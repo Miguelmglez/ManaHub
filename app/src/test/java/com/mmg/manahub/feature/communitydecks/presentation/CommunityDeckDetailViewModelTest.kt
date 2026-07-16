@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.communitydecks.presentation
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.core.model.CommunityDeckCard
@@ -19,7 +18,6 @@ import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -47,10 +45,7 @@ class CommunityDeckDetailViewModelTest {
 
     private val getCommunityDeck: GetCommunityDeckUseCase = mockk()
     private val importCommunityDeck: ImportCommunityDeckUseCase = mockk()
-    private val userPreferences: UserPreferencesDataStore = mockk()
     private val crashlytics: FirebaseCrashlytics = mockk(relaxed = true)
-
-    private val featureFlagFlow = MutableStateFlow(true)
 
     // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -85,8 +80,6 @@ class CommunityDeckDetailViewModelTest {
 
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns crashlytics
-
-        every { userPreferences.communityDecksEnabledFlow } returns featureFlagFlow
     }
 
     @After
@@ -104,7 +97,6 @@ class CommunityDeckDetailViewModelTest {
             savedStateHandle = savedStateHandle,
             getCommunityDeck = getCommunityDeck,
             importCommunityDeck = importCommunityDeck,
-            userPreferences = userPreferences,
         )
 
     // ── Group 1: Loading state ──────────────────────────────────────────────
@@ -378,64 +370,6 @@ class CommunityDeckDetailViewModelTest {
 
         // Assert
         coVerify(exactly = 0) { importCommunityDeck(any(), any()) }
-    }
-
-    // ── Group 9: Feature flag ───────────────────────────────────────────────
-
-    @Test
-    fun `given feature enabled flow emits true then isFeatureEnabled is true`() = runTest {
-        // Arrange
-        featureFlagFlow.value = true
-        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(buildCommunityDeck())
-
-        val vm = createViewModel()
-
-        // Must subscribe to stateIn(WhileSubscribed) before reading.
-        val job = backgroundScope.launch { vm.isFeatureEnabled.collect {} }
-        advanceUntilIdle()
-
-        // Assert
-        assertTrue(vm.isFeatureEnabled.value)
-
-        job.cancel()
-    }
-
-    @Test
-    fun `given feature enabled flow emits false then isFeatureEnabled is false`() = runTest {
-        // Arrange
-        featureFlagFlow.value = false
-        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(buildCommunityDeck())
-
-        val vm = createViewModel()
-
-        // Must subscribe for WhileSubscribed to start.
-        val job = backgroundScope.launch { vm.isFeatureEnabled.collect {} }
-        advanceUntilIdle()
-
-        // Assert
-        assertFalse(vm.isFeatureEnabled.value)
-
-        job.cancel()
-    }
-
-    @Test
-    fun `given feature flag changes when subscribed then isFeatureEnabled updates`() = runTest {
-        // Arrange
-        featureFlagFlow.value = true
-        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(buildCommunityDeck())
-
-        val vm = createViewModel()
-        val job = backgroundScope.launch { vm.isFeatureEnabled.collect {} }
-        advanceUntilIdle()
-
-        // Act
-        featureFlagFlow.value = false
-        advanceUntilIdle()
-
-        // Assert
-        assertFalse(vm.isFeatureEnabled.value)
-
-        job.cancel()
     }
 
     // ── Group 10: Retry / loadDeck ──────────────────────────────────────────

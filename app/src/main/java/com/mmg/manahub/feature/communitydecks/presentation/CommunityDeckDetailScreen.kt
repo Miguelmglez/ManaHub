@@ -1,23 +1,41 @@
 package com.mmg.manahub.feature.communitydecks.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -33,12 +52,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
@@ -49,6 +77,7 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -65,10 +94,9 @@ import com.mmg.manahub.feature.communitydecks.presentation.components.communityD
  *
  * @param onBack pops the back stack.
  * @param onNavigateToDeck opens the freshly-imported local deck (in Deck Studio).
- * @param onCardClick opens a single card's detail screen by its resolved Scryfall id
- *   (lazy lookup — nothing is prefetched; see [CommunityDeckDetailContent]).
+ * @param onCardClick opens a single card's detail screen by its resolved Scryfall id.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun CommunityDeckDetailScreen(
     onBack: () -> Unit,
@@ -76,9 +104,10 @@ fun CommunityDeckDetailScreen(
     onCardClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CommunityDeckDetailViewModel = koinViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isEnabled by viewModel.isFeatureEnabled.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -124,17 +153,36 @@ fun CommunityDeckDetailScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
-                            text = stringResource(R.string.community_deck_detail_title),
-                            style = ty.titleLarge,
-                            color = mc.textPrimary,
-                        )
+                        Column {
+                            Text(
+                                text = (uiState as? CommunityDeckDetailUiState.Content)?.deck?.name
+                                    ?: stringResource(R.string.community_deck_detail_title),
+                                style = ty.titleMedium,
+                                color = mc.textPrimary,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            (uiState as? CommunityDeckDetailUiState.Content)?.deck?.format?.let { fmt ->
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = mc.goldMtg.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = fmt.uppercase(),
+                                        style = ty.labelSmall,
+                                        color = mc.goldMtg,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                    )
+                                }
+                            }
+                        }
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.community_deck_detail_title),
+                                contentDescription = stringResource(R.string.action_back),
                                 tint = mc.textSecondary,
                             )
                         }
@@ -143,47 +191,46 @@ fun CommunityDeckDetailScreen(
                 )
             },
         ) { padding ->
-            if (!isEnabled) {
-                EmptyState(
-                    title = stringResource(R.string.community_deck_feature_disabled),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                )
-            } else {
-                when (val state = uiState) {
-                    is CommunityDeckDetailUiState.Loading -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(padding),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(color = mc.primaryAccent)
-                        }
+            when (val state = uiState) {
+                is CommunityDeckDetailUiState.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = mc.primaryAccent)
                     }
+                }
 
-                    is CommunityDeckDetailUiState.Error -> {
-                        FullErrorState(
-                            message = state.message,
-                            retryLabel = stringResource(R.string.retry),
-                            onRetry = viewModel::loadDeck,
-                            modifier = Modifier.padding(padding),
-                        )
-                    }
+                is CommunityDeckDetailUiState.Error -> {
+                    FullErrorState(
+                        message = state.message,
+                        retryLabel = stringResource(R.string.retry),
+                        onRetry = viewModel::loadDeck,
+                        modifier = Modifier.padding(padding),
+                    )
+                }
 
-                    is CommunityDeckDetailUiState.Content -> {
-                        CommunityDeckDetailContent(
-                            deck = state.deck,
-                            isImporting = state.isImporting,
-                            importProgress = state.importProgress,
-                            isStale = state.isStale,
-                            onImport = viewModel::importDeck,
-                            onOpenSource = uriHandler::openUri,
-                            onCardClick = onCardClick,
-                            contentPadding = padding,
-                        )
-                    }
+                is CommunityDeckDetailUiState.Content -> {
+                    CommunityDeckDetailContent(
+                        deck = state.deck,
+                        isImporting = state.isImporting,
+                        importProgress = state.importProgress,
+                        isStale = state.isStale,
+                        commanderExpanded = state.commanderExpanded,
+                        mainboardExpanded = state.mainboardExpanded,
+                        sideboardExpanded = state.sideboardExpanded,
+                        onToggleCommander = viewModel::toggleCommander,
+                        onToggleMainboard = viewModel::toggleMainboard,
+                        onToggleSideboard = viewModel::toggleSideboard,
+                        onImport = viewModel::importDeck,
+                        onOpenSource = uriHandler::openUri,
+                        onCardClick = onCardClick,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        contentPadding = padding,
+                    )
                 }
             }
         }
@@ -195,20 +242,28 @@ fun CommunityDeckDetailScreen(
  * Stateless content for a loaded community deck: header, attribution, disclaimer,
  * card list, and a sticky import action.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CommunityDeckDetailContent(
     deck: CommunityDeck,
     isImporting: Boolean,
     importProgress: Pair<Int, Int>?,
     isStale: Boolean,
+    commanderExpanded: Boolean,
+    mainboardExpanded: Boolean,
+    sideboardExpanded: Boolean,
+    onToggleCommander: () -> Unit,
+    onToggleMainboard: () -> Unit,
+    onToggleSideboard: () -> Unit,
     onImport: () -> Unit,
     onOpenSource: (String) -> Unit,
     onCardClick: (String) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
     Column(
@@ -219,48 +274,10 @@ private fun CommunityDeckDetailContent(
         // Card list takes the available space; import bar pinned at the bottom.
         LazyColumn(modifier = Modifier.weight(1f)) {
             item(key = "header") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = spacing.lg, vertical = spacing.md),
-                ) {
-                    if (isStale) {
-                        StaleBanner()
-                        Spacer(Modifier.height(spacing.sm))
-                    }
-
-                    Text(
-                        text = deck.name,
-                        style = ty.titleLarge,
-                        color = mc.textPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(spacing.xs))
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = stringResource(R.string.community_deck_format, deck.format),
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                        )
-                        Spacer(Modifier.width(spacing.md))
-                        Text(
-                            text = stringResource(R.string.community_deck_views, deck.viewCount),
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                        )
-                    }
-
-                    deck.createdAt.toEpochMillisOrNull()?.let { millis ->
-                        Spacer(Modifier.height(spacing.xxs))
-                        Text(
-                            text = TimeAgoFormatter.format(millis),
-                            style = ty.bodySmall,
-                            color = mc.textDisabled,
-                        )
-                    }
-                }
+                DeckHeaderArea(
+                    deck = deck,
+                    isStale = isStale,
+                )
             }
 
             item(key = "attribution") {
@@ -274,7 +291,7 @@ private fun CommunityDeckDetailContent(
             item(key = "disclaimer") {
                 Text(
                     text = stringResource(R.string.community_decks_disclaimer),
-                    style = ty.bodySmall,
+                    style = MaterialTheme.magicTypography.bodySmall,
                     color = mc.textDisabled,
                     modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
                 )
@@ -291,7 +308,18 @@ private fun CommunityDeckDetailContent(
                 }
             } else {
                 // Grouped card sections composed into THIS single lazy list (no nesting).
-                communityDeckCardItems(deck.cards, onCardClick = onCardClick)
+                communityDeckCardItems(
+                    cards = deck.cards,
+                    commanderExpanded = commanderExpanded,
+                    mainboardExpanded = mainboardExpanded,
+                    sideboardExpanded = sideboardExpanded,
+                    onToggleCommander = onToggleCommander,
+                    onToggleMainboard = onToggleMainboard,
+                    onToggleSideboard = onToggleSideboard,
+                    onCardClick = onCardClick,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
             }
         }
 
@@ -304,20 +332,95 @@ private fun CommunityDeckDetailContent(
     }
 }
 
+@Composable
+private fun DeckHeaderArea(
+    deck: CommunityDeck,
+    isStale: Boolean,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.lg, vertical = spacing.md),
+    ) {
+        if (isStale) {
+            StaleBanner()
+            Spacer(Modifier.height(spacing.sm))
+        }
+
+        // Image "Card" representation
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f),
+            shape = CardShape,
+            border = BorderStroke(0.5.dp, mc.surfaceVariant),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (deck.featuredImageUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(deck.featuredImageUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(R.drawable.mtg_card_back),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(spacing.md))
+
+        // Attributes row below the image
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.Visibility,
+                contentDescription = null,
+                tint = mc.textDisabled,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(spacing.xs))
+            Text(
+                text = deck.viewCount.toString(),
+                style = ty.bodyMedium,
+                color = mc.textSecondary,
+            )
+            Spacer(Modifier.width(spacing.lg))
+            deck.createdAt.toEpochMillisOrNull()?.let { millis ->
+                Text(
+                    text = TimeAgoFormatter.format(millis),
+                    style = ty.bodyMedium,
+                    color = mc.textDisabled,
+                )
+            }
+        }
+    }
+}
+
 /** Small "cached data" banner shown when the deck was served from a stale cache. */
 @Composable
 private fun StaleBanner() {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
 
     Text(
         text = stringResource(R.string.community_deck_error_network),
         style = ty.labelSmall,
         color = mc.goldMtg,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = spacing.xxs),
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
@@ -333,51 +436,83 @@ private fun ImportBar(
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
-    Column(
+    Surface(
+        color = mc.background,
+        tonalElevation = 8.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(spacing.lg),
+            .navigationBarsPadding()
     ) {
-        if (isImporting) {
-            val processed = importProgress?.first ?: 0
-            val total = importProgress?.second ?: 0
-            Text(
-                text = stringResource(R.string.community_deck_import_progress, processed, total),
-                style = ty.bodyMedium,
-                color = mc.textSecondary,
-            )
-            Spacer(Modifier.height(spacing.sm))
-            if (total > 0) {
-                LinearProgressIndicator(
-                    progress = { processed.toFloat() / total.toFloat() },
-                    color = mc.primaryAccent,
-                    trackColor = mc.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                LinearProgressIndicator(
-                    color = mc.primaryAccent,
-                    trackColor = mc.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        } else {
-            Button(
-                onClick = onImport,
-                enabled = enabled,
-                shape = ButtonShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.onAccent,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.lg),
+        ) {
+            AnimatedVisibility(
+                visible = isImporting,
+                enter = fadeIn(tween(300)),
+                exit = fadeOut(tween(300)),
             ) {
-                Text(
-                    text = stringResource(R.string.community_deck_import),
-                    style = ty.labelLarge,
-                )
+                Column {
+                    val processed = importProgress?.first ?: 0
+                    val total = importProgress?.second ?: 0
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.community_deck_import_progress, processed, total),
+                            style = ty.labelLarge,
+                            color = mc.primaryAccent,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        if (total > 0) {
+                            Text(
+                                text = "${(processed.toFloat() / total * 100).toInt()}%",
+                                style = ty.labelLarge,
+                                color = mc.textSecondary,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(spacing.sm))
+                    if (total > 0) {
+                        LinearProgressIndicator(
+                            progress = { processed.toFloat() / total.toFloat() },
+                            color = mc.primaryAccent,
+                            trackColor = mc.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            color = mc.primaryAccent,
+                            trackColor = mc.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                        )
+                    }
+                }
+            }
+
+            if (!isImporting) {
+                Button(
+                    onClick = onImport,
+                    enabled = enabled,
+                    shape = ButtonShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = mc.primaryAccent,
+                        contentColor = mc.onAccent,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.community_deck_import).uppercase(),
+                        style = ty.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                }
             }
         }
     }
