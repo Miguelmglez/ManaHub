@@ -1,15 +1,32 @@
 package com.mmg.manahub.feature.communitydecks.presentation.components
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.CommunityDeckCard
 import com.mmg.manahub.core.ui.components.CardListItem
@@ -66,48 +83,98 @@ private fun typeGroupOf(card: CommunityDeckCard): String {
  *   is tapped. Rows whose `scryfallId` is blank (Archidekt didn't resolve a printing) render
  *   without an image and are not clickable.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 fun LazyListScope.communityDeckCardItems(
     cards: List<CommunityDeckCard>,
+    commanderExpanded: Boolean = true,
+    mainboardExpanded: Boolean = true,
+    sideboardExpanded: Boolean = true,
+    onToggleCommander: () -> Unit = {},
+    onToggleMainboard: () -> Unit = {},
+    onToggleSideboard: () -> Unit = {},
     onCardClick: (String) -> Unit = {},
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
+    // Archidekt cards can be in multiple categories. Sideboard is usually explicit.
+    // We also explicitly exclude "Maybeboard" from the main zones to avoid duplicates
+    // or cluttering the Mainboard if Archidekt marks them with a generic type category.
     val commanders = cards.filter { it.isCommander }
-    val mainboard = cards.filter { !it.isSideboard && !it.isCommander }
-    val sideboard = cards.filter { it.isSideboard }
+    val sideboard = cards.filter { it.isSideboard && !it.isCommander }
+    val mainboard = cards.filter { card ->
+        !card.isCommander && !card.isSideboard && !card.categories.any { it.contains("maybe", ignoreCase = true) }
+    }
     val mainboardCount = mainboard.sumOf { it.quantity }
     val sideboardCount = sideboard.sumOf { it.quantity }
 
     if (commanders.isNotEmpty()) {
         item(key = "header_commander") {
-            SectionHeader(stringResource(R.string.community_deck_cards_commander))
+            SectionHeader(
+                title = stringResource(R.string.community_deck_cards_commander),
+                expanded = commanderExpanded,
+                onToggle = onToggleCommander,
+            )
         }
-        cardRows(commanders, prefix = "commander", onCardClick = onCardClick)
+        if (commanderExpanded) {
+            cardRows(
+                items = commanders,
+                prefix = "commander",
+                onCardClick = onCardClick,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+        }
     }
 
     if (mainboard.isNotEmpty()) {
         item(key = "header_mainboard") {
-            SectionHeader(stringResource(R.string.community_deck_cards_mainboard, mainboardCount))
+            SectionHeader(
+                title = stringResource(R.string.community_deck_cards_mainboard, mainboardCount),
+                expanded = mainboardExpanded,
+                onToggle = onToggleMainboard,
+            )
         }
-        val groupedMainboard = MAINBOARD_TYPE_ORDER.mapNotNull { label ->
-            val group = mainboard.filter { typeGroupOf(it) == label }
-            if (group.isEmpty()) null else label to group
-        }
-        groupedMainboard.forEach { (label, group) ->
-            item(key = "header_mainboard_$label") {
-                GroupHeader(
-                    label = label,
-                    count = group.sumOf { it.quantity },
-                    modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
+        if (mainboardExpanded) {
+            val groupedMainboard = MAINBOARD_TYPE_ORDER.mapNotNull { label ->
+                val group = mainboard.filter { typeGroupOf(it) == label }
+                if (group.isEmpty()) null else label to group
+            }
+            groupedMainboard.forEach { (label, group) ->
+                item(key = "header_mainboard_$label") {
+                    GroupHeader(
+                        label = label,
+                        count = group.sumOf { it.quantity },
+                        modifier = Modifier.padding(horizontal = MaterialTheme.spacing.lg),
+                    )
+                }
+                cardRows(
+                    items = group,
+                    prefix = "main_$label",
+                    onCardClick = onCardClick,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
                 )
             }
-            cardRows(group, prefix = "main_$label", onCardClick = onCardClick)
         }
     }
 
     if (sideboard.isNotEmpty()) {
         item(key = "header_sideboard") {
-            SectionHeader(stringResource(R.string.community_deck_cards_sideboard, sideboardCount))
+            SectionHeader(
+                title = stringResource(R.string.community_deck_cards_sideboard, sideboardCount),
+                expanded = sideboardExpanded,
+                onToggle = onToggleSideboard,
+            )
         }
-        cardRows(sideboard, prefix = "side", onCardClick = onCardClick)
+        if (sideboardExpanded) {
+            cardRows(
+                items = sideboard,
+                prefix = "side",
+                onCardClick = onCardClick,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+        }
     }
 }
 
@@ -120,14 +187,28 @@ fun LazyListScope.communityDeckCardItems(
  * @param cards all card entries of the deck.
  * @param onCardClick see [communityDeckCardItems].
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CommunityDeckCardList(
     cards: List<CommunityDeckCard>,
     modifier: Modifier = Modifier,
     onCardClick: (String) -> Unit = {},
 ) {
+    var commanderExpanded by remember { mutableStateOf(true) }
+    var mainboardExpanded by remember { mutableStateOf(true) }
+    var sideboardExpanded by remember { mutableStateOf(false) }
+
     LazyColumn(modifier = modifier) {
-        communityDeckCardItems(cards, onCardClick)
+        communityDeckCardItems(
+            cards = cards,
+            commanderExpanded = commanderExpanded,
+            mainboardExpanded = mainboardExpanded,
+            sideboardExpanded = sideboardExpanded,
+            onToggleCommander = { commanderExpanded = !commanderExpanded },
+            onToggleMainboard = { mainboardExpanded = !mainboardExpanded },
+            onToggleSideboard = { sideboardExpanded = !sideboardExpanded },
+            onCardClick = onCardClick,
+        )
     }
 }
 
@@ -135,10 +216,13 @@ fun CommunityDeckCardList(
  * Emits [items] as rich [CardListItem] rows, with a stable, collision-free key derived
  * from the zone/group [prefix] + the item index.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 private fun LazyListScope.cardRows(
     items: List<CommunityDeckCard>,
     prefix: String,
     onCardClick: (String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     items(
         count = items.size,
@@ -157,23 +241,49 @@ private fun LazyListScope.cardRows(
             rarity = card.rarity.takeIf { it.isNotBlank() },
             typeLine = card.typeLine.takeIf { it.isNotBlank() },
             containerColor = Color.Transparent,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
+            scryfallId = card.scryfallId,
         )
     }
 }
 
-/** Section title (e.g. "Mainboard (60)"). */
+/** Collapsible section title (e.g. "Mainboard (60)"). */
 @Composable
-private fun SectionHeader(title: String) {
+private fun SectionHeader(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
-    Text(
-        text = title,
-        style = ty.titleMedium,
-        color = mc.textPrimary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = spacing.lg, vertical = spacing.sm),
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "HeaderRotation"
     )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = spacing.lg, vertical = spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = ty.titleMedium,
+            color = mc.primaryAccent,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.weight(1f))
+        Icon(
+            imageVector = Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = mc.primaryAccent,
+            modifier = Modifier.graphicsLayer { rotationZ = rotation }
+        )
+    }
 }

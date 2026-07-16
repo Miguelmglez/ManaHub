@@ -75,6 +75,23 @@ abstract class CardDao {
     @Query("SELECT * FROM cards WHERE is_stale = 1")
     abstract fun observeStaleCards(): Flow<List<CardEntity>>
 
+    // Edge-case audit A3 (2026-07-15). Feeds CardRepositoryImpl.backfillMissingOracleIds: finds
+    // cards referenced by a LIVE collection row OR any wishlist row whose cached row predates the
+    // oracle_id column (oracle_id = ''), capped at [limit]. A single cross-table query (rather
+    // than fetching separate scryfall_id lists in Kotlin and filtering) — Room queries operate at
+    // the DB level regardless of which Dao interface declares them, so this needs no new
+    // cross-feature DAO dependency in CardRepositoryImpl.
+    @Query("""
+        SELECT scryfall_id FROM cards
+        WHERE oracle_id = ''
+          AND (
+              scryfall_id IN (SELECT scryfall_id FROM user_card_collection WHERE is_deleted = 0)
+              OR scryfall_id IN (SELECT scryfall_id FROM local_wishlists)
+          )
+        LIMIT :limit
+    """)
+    abstract suspend fun getScryfallIdsWithBlankOracleId(limit: Int): List<String>
+
     @Query("UPDATE cards SET tags = :tagsJson WHERE scryfall_id = :scryfallId")
     abstract suspend fun updateTags(scryfallId: String, tagsJson: String)
 

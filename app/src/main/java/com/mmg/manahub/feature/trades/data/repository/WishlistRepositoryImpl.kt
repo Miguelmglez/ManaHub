@@ -7,8 +7,10 @@ import com.mmg.manahub.core.data.local.entity.LocalWishlistEntity
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.remote.dto.WishlistEntryDto
 import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.util.recordSafeNonFatal
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -43,6 +45,9 @@ class WishlistRepositoryImpl(
 
     override fun observeByScryfallId(scryfallId: String): Flow<List<WishlistEntry>> =
         dao.observeByScryfallIdWithCard(scryfallId).map { list -> list.map { it.toDomain() } }
+
+    override fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<WishlistEntry>> =
+        dao.observeVersionsByOracle(oracleId, name).map { list -> list.map { it.toDomain() } }
 
     override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
 
@@ -237,6 +242,143 @@ class WishlistRepositoryImpl(
             .onFailure { e -> recordSafeNonFatal("wishlist_add_and_sync_remote_failed", e) }
 
         return Result.success(Unit)
+    }
+
+    override suspend fun updateEntryWithMerge(
+        entryId: String,
+        newCardId: String,
+        isFoil: Boolean?,
+        condition: String?,
+        language: String?,
+        quantity: Int,
+        userId: String?,
+    ): Result<UpdateEntryOutcome> = addMutex.withLock {
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("wishlist_edit_entry_id", entryId)
+                setCustomKey("wishlist_edit_new_card_id", newCardId)
+            }
+            val edited = dao.getById(entryId)
+            if (edited == null) {
+                // A2 (edge-case audit, 2026-07-15): the entry no longer exists (concurrent delete
+                // from another device/sync, or a stale UI reference). Previously this branch
+                // silently `return@runCatching`'d Unit and the ViewModel showed "Entry updated"
+                // even though nothing changed — now the caller can distinguish this and show an
+                // honest error.
+                FirebaseCrashlytics.getInstance().setCustomKey("wishlist_edit_merge_outcome", "entry_not_found")
+                recordSafeNonFatal(
+                    "wishlist_update_merge_entry_not_found",
+                    IllegalStateException("updateEntryWithMerge: entryId no longer exists"),
+                )
+                return@runCatching UpdateEntryOutcome.ENTRY_NOT_FOUND
+            }
+            val existing = dao.getByAttributes(
+                scryfallId = newCardId,
+                matchAnyVariant = edited.matchAnyVariant,
+                isFoil = isFoil,
+                condition = condition,
+                language = language,
+            )
+
+            if (existing != null && existing.id != entryId) {
+                // MERGE: another entry already occupies the target attribute tuple — combine
+                // quantities into the survivor and drop the edited entry. Remote-first for both
+                // legs (mirrors removeLocal/updateQuantityLocal above).
+                val mergedQuantity = existing.quantity + quantity
+                if (existing.synced) {
+                    remote.updateWishlistQuantity(existing.id, mergedQuantity).getOrThrow()
+                }
+                dao.update(existing.copy(quantity = mergedQuantity))
+
+                if (edited.synced) {
+                    try {
+                        remote.removeWishlistEntry(edited.id).getOrThrow()
+                    } catch (e: Throwable) {
+                        // TOP finding (crashlytics-ux-auditor audit, 2026-07-15): the survivor's
+                        // remote quantity update above already succeeded — if THIS second remote
+                        // call now fails, the server and this device diverge (existing bumped,
+                        // edited never removed there). A generic catch-all wouldn't distinguish
+                        // this from "nothing happened yet", so it gets a dedicated non-fatal.
+                        // Rethrown unchanged — instrumentation only, behavior stays identical.
+                        FirebaseCrashlytics.getInstance().setCustomKey("wishlist_edit_remote_step_failed", "remove")
+                        recordSafeNonFatal("wishlist_update_merge_partial_failure", e)
+                        throw e
+                    }
+                }
+                dao.deleteById(edited.id)
+                FirebaseCrashlytics.getInstance().apply {
+                    setCustomKey("wishlist_edit_merge_outcome", "merged")
+                    log("wishlist_entry_update_merge_outcome")
+                }
+                return@runCatching UpdateEntryOutcome.UPDATED
+            }
+
+            // No collision (or the target tuple IS the edited entry's own tuple) — update in place.
+            val attributesChanged = edited.scryfallId != newCardId || edited.isFoil != isFoil ||
+                edited.condition != condition || edited.language != language
+            val updated = edited.copy(
+                scryfallId = newCardId,
+                isFoil = isFoil,
+                condition = condition,
+                language = language,
+                quantity = quantity,
+            )
+
+            val mergeOutcome: String
+            if (edited.synced) {
+                when {
+                    !attributesChanged -> {
+                        remote.updateWishlistQuantity(edited.id, quantity).getOrThrow()
+                        mergeOutcome = "in_place_quantity_only"
+                    }
+                    !userId.isNullOrBlank() -> {
+                        // No partial-attribute-update RPC exists remotely (only quantity) —
+                        // remove and re-insert under the same id (remote-first, mirrors
+                        // removeLocal/updateQuantityLocal above).
+                        remote.removeWishlistEntry(edited.id).getOrThrow()
+                        try {
+                            remote.addWishlistEntry(updated.toDto(userId)).getOrThrow()
+                        } catch (e: Throwable) {
+                            // TOP finding: the remove above already succeeded — if the re-add now
+                            // fails, the remote row is GONE entirely (neither the old nor the new
+                            // attribute state survives server-side), while the local row below is
+                            // about to be updated and left `synced = true` — no future sync push
+                            // would ever recreate it remotely. Rethrown unchanged — instrumentation
+                            // only, behavior stays identical.
+                            FirebaseCrashlytics.getInstance().setCustomKey("wishlist_edit_remote_step_failed", "add")
+                            recordSafeNonFatal("wishlist_update_merge_partial_failure", e)
+                            throw e
+                        }
+                        mergeOutcome = "in_place_reinsert"
+                    }
+                    else -> {
+                        // No userId available to rebuild the remote DTO for a full attribute
+                        // change — defer: mark unsynced so the next migrateLocalToRemote/
+                        // addAndSync corrects the server row via its upsert-by-id. Reported so a
+                        // genuine gap (a caller that should always pass userId here but doesn't)
+                        // is caught rather than silently leaving the server row stale.
+                        recordSafeNonFatal(
+                            "wishlist_update_merge_missing_userid",
+                            IllegalStateException("Synced wishlist entry attribute edit without a userId"),
+                        )
+                        dao.update(updated.copy(synced = false))
+                        FirebaseCrashlytics.getInstance().apply {
+                            setCustomKey("wishlist_edit_merge_outcome", "in_place_deferred_unsynced")
+                            log("wishlist_entry_update_merge_outcome")
+                        }
+                        return@runCatching UpdateEntryOutcome.UPDATED
+                    }
+                }
+            } else {
+                mergeOutcome = if (attributesChanged) "in_place_local_only" else "in_place_quantity_only"
+            }
+            dao.update(updated)
+            FirebaseCrashlytics.getInstance().apply {
+                setCustomKey("wishlist_edit_merge_outcome", mergeOutcome)
+                log("wishlist_entry_update_merge_outcome")
+            }
+            UpdateEntryOutcome.UPDATED
+        }
     }
 
     private fun LocalWishlistEntity.toDomain() = WishlistEntry(

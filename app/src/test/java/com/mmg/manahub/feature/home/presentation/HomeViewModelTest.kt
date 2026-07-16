@@ -225,10 +225,6 @@ class HomeViewModelTest {
         every { gamificationRepository.observeActiveQuests() } returns questBoardFlow
         every { gamificationRepository.observeDailyActivityStreak() } returns streakFlow
 
-        // Community Decks feature flag — hidden for release (2026-07-14), default OFF. Collected
-        // unconditionally in the final uiState combine (mirrors the other flag stubs above).
-        every { userPrefsDataStore.communityDecksEnabledFlow } returns flowOf(false)
-
         // Layout round-trip: homeLayoutFlow decodes the saved tokens (or the supplied
         // default when none are saved); saveHomeLayout writes the tokens.
         every { userPrefsDataStore.homeLayoutFlow(any()) } answers {

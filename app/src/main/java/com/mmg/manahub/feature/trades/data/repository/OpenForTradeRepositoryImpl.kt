@@ -75,6 +75,17 @@ class OpenForTradeRepositoryImpl(
     override fun observeByScryfallId(scryfallId: String): Flow<List<OpenForTradeEntry>> =
         dao.observeByScryfallId(scryfallId).map { list -> list.map { it.toDomain() } }
 
+    // A9 (edge-case audit, 2026-07-15): unlike observeLocal() above, this does NOT de-duplicate
+    // rows that share the same (scryfallId, isFoil, condition, language) tuple across different
+    // localCollectionIds — it returns the raw per-row DAO output, one row per underlying
+    // local_open_for_trade entry. Safe today because CardDetailViewModel.observeTradeEntries (the
+    // only call site) only reads `.userCardId -> .quantity` into a Map keyed by the OWNING
+    // collection row's id, so duplicate physical tuples across different collection rows are
+    // expected and correct here. A future caller that renders these entries as a flat list should
+    // first apply observeLocal()'s GroupKey dedup/sum convention (see [GroupKey] above).
+    override fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<OpenForTradeEntry>> =
+        dao.observeVersionsByOracle(oracleId, name).map { list -> list.map { it.toDomain() } }
+
     override fun observeUnsyncedCount(): Flow<Int> = dao.observeUnsyncedCount()
 
     override suspend fun addLocal(

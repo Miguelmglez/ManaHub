@@ -58,6 +58,25 @@ issue **one search per signature card** (not one combined multi-`cardName` query
 returned deck-id sets client-side (in the Worker) exactly as originally planned — just skip ever
 trying the combined-param request, since it is confirmed to timeout rather than degrade gracefully.
 
+### 1b. Addendum (verified live 2026-07-15, Community Hub Discover/Search overhaul)
+
+Additional `api/decks/v3/` query params probed with the nonsense-value technique (nonsense value →
+`count: 0` = real filter; `count: 1000` = silently ignored; `count: -1` = filter runs but times out)
+plus response-field cross-checks:
+
+| Param | Verdict |
+|---|---|
+| `name=<text>` | **WORKS** — deck-name substring filter (`count: 0` on nonsense). |
+| `commanderName=<exact card name>` | **WORKS** — verified `Krenko, Mob Boss` returns mono-R decks only. Nonsense/very popular names can hit the statement timeout (`count: -1`). |
+| `ownerUsername=<username>` | **WORKS** — all results owned by that user. `owner=`, `ownerName=`, `username=` are all **ignored**. |
+| `edhBracket=<1..5>` | **WORKS** — response `edhBracket` matches. |
+| `colors=W,U` (comma-joined) | **WORKS as EXACT color-set match** (results contain exactly those colors). Repeated `colors=W&colors=U` = last-one-wins (mono-U). No working "includes"/"at most" mode param was found (`andcolors`, `colorsMatch` ignored). |
+| `size=<n>` | **WORKS as exact equality only** — `sizeComp` (`eq/gt/lte/...`) is **ignored**; results always equal `size`. |
+| `primers=true` | **WORKS** — all results `hasPrimer: true`. NOTE: `hasPrimer=<anything>` as a request param is **ignored**; only `primers` filters. |
+| `deckTags=<tag>` | **ALWAYS times out** (`count: -1`, consistent across tags/casing/orderings) — DO NOT expose deck-tag filtering. |
+| `orderBy` | `-viewCount`, `-createdAt`, `-updatedAt` verified. `-viewsThisWeek`/`-trending`/`-points` return *something* but the ordering is not credible (non-monotonic viewCounts) — do not use. |
+| `pageSize` | Unreliable at BOTH ends: values ≤3 returned MORE rows than requested (4–5), values >60 are capped at 60. Always slice client-side (`.take(n)`). |
+
 ## 2. Archidekt `GET https://archidekt.com/api/decks/{id}/` (deck detail)
 
 Confirmed present at the top level: `deckFormat`, `edhBracket`, `private`, `theorycrafted`,

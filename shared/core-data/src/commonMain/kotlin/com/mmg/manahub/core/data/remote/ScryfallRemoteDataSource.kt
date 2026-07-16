@@ -258,6 +258,35 @@ class ScryfallRemoteDataSource(
             }
         }
 
+    /**
+     * Card Versions & Languages, Phase 1A. Fetches every language printed for the exact printing
+     * identified by [setCode] + [collectorNumber], via Scryfall's `set:<code> cn:"<number>"
+     * lang:any unique:prints` search (feeds CardDetail's language selector, Phase 1B).
+     *
+     * Sanitisation mirrors [getCardArtVariants]/[searchCards]: [setCode] is lower-cased and
+     * restricted to `[a-z0-9]` (mirrors the set-code allowlist already applied to Draft Sim's
+     * `extraPoolSets` query-building — set codes are always short lowercase alphanumerics), and
+     * [collectorNumber] has quotes/backslashes stripped before being embedded in the `cn:"..."`
+     * clause. Not memoised in [ScryfallCache] (results are set/collector-number specific and used
+     * once per language-selector open, unlike the by-name caches above) — the call still goes
+     * through [requestQueue] for rate-limiting.
+     */
+    suspend fun getLanguagePrints(setCode: String, collectorNumber: String): Result<List<Card>> =
+        safeCall {
+            val safeSet = setCode.lowercase().filter { it.isLetterOrDigit() }
+            val safeNumber = collectorNumber.replace("\"", "").replace("\\", "").trim()
+            if (safeSet.isBlank() || safeNumber.isBlank()) return@safeCall emptyList()
+            val cards = requestQueue.execute {
+                api.searchCards(
+                    query = "set:$safeSet cn:\"$safeNumber\" lang:any",
+                    unique = "prints",
+                    order = "released",
+                )
+            }.data.toDomain()
+            cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
+            cards
+        }
+
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> =
         withContext(dispatcherProvider.io) { runCatching { block() } }
 }

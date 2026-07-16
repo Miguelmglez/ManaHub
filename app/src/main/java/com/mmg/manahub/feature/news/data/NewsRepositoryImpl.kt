@@ -54,6 +54,11 @@ class NewsRepositoryImpl(
         // Ensure default sources are seeded
         newsDao.insertSourcesIfAbsent(DefaultSources.all)
 
+        // Reconcile previously-seeded default sources against the current DefaultSources catalog
+        // (see KDoc on reconcileDefaultSources for why insertSourcesIfAbsent's IGNORE conflict
+        // strategy alone is not enough to propagate a feedUrl fix/removal to existing installs).
+        reconcileDefaultSources()
+
         // Evict old cache (>7 days) — unconditional, independent of per-source staleness.
         val evictBefore = System.currentTimeMillis() - EVICT_MS
         newsDao.evictArticlesBefore(evictBefore)
@@ -163,6 +168,58 @@ class NewsRepositoryImpl(
         SourceFetchOutcome.FAILED
     }
 
+    /**
+     * Reconciles previously-seeded DEFAULT sources against the current [DefaultSources] catalog.
+     *
+     * [NewsDao.insertSourcesIfAbsent] uses `OnConflictStrategy.IGNORE`: it seeds a default source
+     * exactly once, the first time it's ever inserted for that `id`. Editing a default source's
+     * `feedUrl` in [DefaultSources] — or removing the entry entirely — has ZERO effect on an
+     * install that already seeded the OLD row, because the id is unchanged and the conflicting
+     * INSERT is silently ignored forever. This method is the reconciliation step that makes those
+     * catalog edits actually reach installs that seeded the old version:
+     *  - a persisted default source whose `feedUrl` differs from the CURRENT catalog value for
+     *    that same id gets its `feedUrl` rewritten, and its conditional-GET/staleness state reset
+     *    (`etag`/`lastModified` → null, `lastFetchedAt` → 0) — the old caching headers and
+     *    watermark are meaningless against a different URL/server, and leaving them in place
+     *    would make the corrected source read as "fresh" and skip its first real fetch. The
+     *    user's `isEnabled` preference is left untouched.
+     *  - a persisted default source whose id is in [RETIRED_DEFAULT_SOURCE_IDS] (permanently
+     *    dead, removed from [DefaultSources] — see the "Retired" comment block there) is deleted
+     *    outright via [NewsDao.deleteSourcesByIds], a targeted-by-id delete that bypasses the
+     *    `isDefault` guard in [deleteSource]. That guard exists to protect USER-facing deletes
+     *    (a user must never be able to delete a default source from the UI) and must never be
+     *    weakened generally — this path only ever acts on a fixed, code-controlled id allowlist,
+     *    never a caller-supplied id, so it cannot be used to delete an arbitrary default source.
+     *
+     * Idempotent and cheap on the common case: once a source is reconciled it never drifts again,
+     * so a later call is one local Room read (`getAllSources`) and zero writes. Only ever touches
+     * rows where `isDefault == true`; a user-added custom source (`isDefault == false`) is never
+     * read, updated, or deleted here.
+     */
+    private suspend fun reconcileDefaultSources() {
+        val currentDefaultsById = DefaultSources.all.associateBy { it.id }
+        val persistedDefaults = newsDao.getAllSources().filter { it.isDefault }
+
+        for (source in persistedDefaults) {
+            val catalogEntry = currentDefaultsById[source.id] ?: continue
+            if (source.feedUrl != catalogEntry.feedUrl) {
+                newsDao.updateSource(
+                    source.copy(
+                        feedUrl = catalogEntry.feedUrl,
+                        etag = null,
+                        lastModified = null,
+                        lastFetchedAt = 0L,
+                    )
+                )
+            }
+        }
+
+        val idsToDelete = persistedDefaults.map { it.id }.filter { it in RETIRED_DEFAULT_SOURCE_IDS }
+        if (idsToDelete.isNotEmpty()) {
+            newsDao.deleteSourcesByIds(idsToDelete)
+        }
+    }
+
     override suspend fun toggleSource(sourceId: String, enabled: Boolean) {
         newsDao.setSourceEnabled(sourceId, enabled)
     }
@@ -248,6 +305,22 @@ class NewsRepositoryImpl(
         private const val FRESH_MS = 60 * 60 * 1000L          // 1 hour per-source watermark TTL
         private const val EVICT_MS = 7 * 24 * 60 * 60 * 1000L // 7 days
         private const val MAX_CONCURRENT_FETCHES = 6
+
+        /**
+         * Fixed, code-controlled allowlist of default source ids retired because their feed is
+         * permanently unfetchable (verified via direct HTTP checks, 2026-07-16 — see the
+         * "Retired" comment block in [DefaultSources]). Consumed only by
+         * [reconcileDefaultSources], which deletes these ids from any install that seeded them
+         * under an older catalog. Deliberately a fixed set, not "any id no longer present in
+         * [DefaultSources.all]" — that dynamic check would delete every default source on any
+         * install if the catalog were ever empty due to a future bug, which a hardcoded allowlist
+         * cannot do. Only extend this set when retiring a SPECIFIC known-dead default source.
+         */
+        private val RETIRED_DEFAULT_SOURCE_IDS = setOf(
+            "default_article_edhrec",
+            "default_article_gatheringmagic",
+            "default_article_cranial",
+        )
     }
 }
 

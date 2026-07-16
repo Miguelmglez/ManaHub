@@ -3,8 +3,10 @@ package com.mmg.manahub.feature.home.presentation
 import androidx.annotation.StringRes
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.NudgeTrigger
 import com.mmg.manahub.core.model.QuickStartAction
+import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.news.NewsItem
 // FirstStepItem is defined in the same package — no explicit import needed.
 
@@ -85,19 +87,16 @@ data class HomeUiState(
     /** Up to 3 popular Commander decks fetched from Archidekt (Home feature overhaul Phase 1.2.c). */
     val archidektTrending: List<com.mmg.manahub.core.model.ArchidektTrendingDeck> = emptyList(),
 
+    /** Up to 5 recent friends for the Social Hub slide. */
+    val friends: List<Friend> = emptyList(),
+    /** Up to 3 most recent trade proposals for the Trades Hub slide. */
+    val recentTrades: List<TradeProposal> = emptyList(),
+
     // ── Gamification (Phase 2) ──────────────────────────────────────────────────
     /** Master toggle. When false every gamification surface (widgets + hero suggestion) is hidden. */
     val gamificationEnabled: Boolean = true,
     /** Level / XP / streak / quest summary for the Home gamification widgets; null until loaded. */
     val gamification: HomeGamification? = null,
-
-    /**
-     * Whether the Community Decks feature (Archidekt browse/import) is exposed. When false, hides
-     * the Trending Commanders widget, the Community Decks Quick Start action (both the rendered
-     * shortcut and the customize-sheet option), and its entry in the widget gallery — mirrors
-     * [gamificationEnabled]'s "stays in persisted layout, just not shown" convention.
-     */
-    val communityDecksEnabled: Boolean = false,
 )
 
 /**

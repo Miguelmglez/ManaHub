@@ -9,6 +9,7 @@ import com.mmg.manahub.core.data.local.entity.NewsArticleEntity
 import com.mmg.manahub.core.data.local.entity.NewsVideoEntity
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
+import com.mmg.manahub.feature.news.data.local.DefaultSources
 import com.mmg.manahub.feature.news.data.parser.RssFeedParser
 import com.mmg.manahub.feature.news.data.parser.YouTubeRssFeedParser
 import com.mmg.manahub.feature.news.data.remote.FeedFetchResult
@@ -53,6 +54,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * GROUP 12 — detectFeedLanguage
  * GROUP 13 — validateFeed
  * GROUP 14 — observeNews / observeSources / toggleSource
+ * GROUP 15 — reconcileDefaultSources (dead-source cleanup fix, 2026-07-16): feedUrl drift
+ *            rewrite + watermark reset, retired-id cleanup, idempotency, custom sources untouched
  */
 class NewsRepositoryImplTest {
 
@@ -683,5 +686,169 @@ class NewsRepositoryImplTest {
         repository.toggleSource("s1", false)
 
         coVerify(exactly = 1) { newsDao.setSourceEnabled("s1", false) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 15 — reconcileDefaultSources (dead-source cleanup fix, 2026-07-16)
+    //
+    //  insertSourcesIfAbsent's OnConflictStrategy.IGNORE means editing/removing a row in
+    //  DefaultSources.kt has no effect on an install that already seeded the old row under the
+    //  same id — reconcileDefaultSources (called from refreshAll, right after
+    //  insertSourcesIfAbsent) is the reconciliation step that fixes that for existing installs.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a persisted default source whose feedUrl differs from the catalog when refreshAll then it is rewritten and its watermark is reset`() = runTest {
+        val stalePersisted = ContentSourceEntity(
+            id = "default_article_mtggoldfish",
+            name = "MTGGoldfish",
+            feedUrl = "https://old.example.com/feed",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+            lastFetchedAt = 123_456L,
+            etag = "old-etag",
+            lastModified = "old-lm",
+        )
+        coEvery { newsDao.getAllSources() } returns listOf(stalePersisted)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 1) {
+            newsDao.updateSource(
+                match {
+                    it.id == "default_article_mtggoldfish" &&
+                        it.feedUrl == "https://www.mtggoldfish.com/feed" &&
+                        it.etag == null &&
+                        it.lastModified == null &&
+                        it.lastFetchedAt == 0L
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `given a feedUrl-drift reconciliation when refreshAll then the user's isEnabled preference is preserved`() = runTest {
+        val stalePersisted = ContentSourceEntity(
+            id = "default_article_mtggoldfish",
+            name = "MTGGoldfish",
+            feedUrl = "https://old.example.com/feed",
+            type = "ARTICLE",
+            isEnabled = false,
+            isDefault = true,
+            language = "en",
+        )
+        coEvery { newsDao.getAllSources() } returns listOf(stalePersisted)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 1) { newsDao.updateSource(match { it.isEnabled == false }) }
+    }
+
+    @Test
+    fun `given a persisted default source with a retired id when refreshAll then it is deleted via deleteSourcesByIds`() = runTest {
+        val retired = ContentSourceEntity(
+            id = "default_article_edhrec",
+            name = "EDHREC",
+            feedUrl = "https://edhrec.com/articles/feed",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+        )
+        coEvery { newsDao.getAllSources() } returns listOf(retired)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 1) { newsDao.deleteSourcesByIds(listOf("default_article_edhrec")) }
+        coVerify(exactly = 0) { newsDao.updateSource(any()) }
+    }
+
+    @Test
+    fun `given multiple retired ids among healthy sources when refreshAll then only the retired ones are deleted`() = runTest {
+        val healthy = DefaultSources.all.first { it.id == "default_article_mtggoldfish" }
+        val retired1 = healthy.copy(id = "default_article_edhrec", feedUrl = "https://edhrec.com/articles/feed")
+        val retired2 = healthy.copy(id = "default_article_cranial", feedUrl = "https://cranial-insertion.com/feed")
+        coEvery { newsDao.getAllSources() } returns listOf(healthy, retired1, retired2)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 1) {
+            newsDao.deleteSourcesByIds(
+                match { it.toSet() == setOf("default_article_edhrec", "default_article_cranial") }
+            )
+        }
+    }
+
+    @Test
+    fun `given persisted default sources that exactly match the catalog when refreshAll then nothing is updated or deleted`() = runTest {
+        val upToDate = DefaultSources.all.first().copy(lastFetchedAt = 111L)
+        coEvery { newsDao.getAllSources() } returns listOf(upToDate)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 0) { newsDao.updateSource(any()) }
+        coVerify(exactly = 0) { newsDao.deleteSourcesByIds(any()) }
+    }
+
+    @Test
+    fun `given reconciliation already applied when refreshAll runs a second time then it is a no-op (idempotent)`() = runTest {
+        // Simulates the state AFTER a prior reconciliation: the corrected feedUrl is already
+        // persisted, and the retired source is already gone from the DB.
+        val alreadyReconciled = DefaultSources.all.first { it.id == "default_video_nitpicking" }
+        coEvery { newsDao.getAllSources() } returns listOf(alreadyReconciled)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 0) { newsDao.updateSource(any()) }
+        coVerify(exactly = 0) { newsDao.deleteSourcesByIds(any()) }
+    }
+
+    @Test
+    fun `given a custom source with a stale-looking feedUrl when refreshAll then reconciliation never touches it`() = runTest {
+        val custom = articleSource(id = "custom_abc123")
+            .copy(isDefault = false, feedUrl = "https://custom.example.com/feed")
+        coEvery { newsDao.getAllSources() } returns listOf(custom)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 0) { newsDao.updateSource(any()) }
+        coVerify(exactly = 0) { newsDao.deleteSourcesByIds(any()) }
+    }
+
+    @Test
+    fun `given a mix of drifted retired and untouched sources when refreshAll then each is handled independently`() = runTest {
+        val drifted = ContentSourceEntity(
+            id = "default_article_mtggoldfish",
+            name = "MTGGoldfish",
+            feedUrl = "https://old.example.com/feed",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+        )
+        val retired = ContentSourceEntity(
+            id = "default_article_gatheringmagic",
+            name = "GatheringMagic",
+            feedUrl = "https://www.gatheringmagic.com/feed/",
+            type = "ARTICLE",
+            isDefault = true,
+            language = "en",
+        )
+        val untouched = DefaultSources.all.first { it.id == "default_article_scg" }
+        val custom = articleSource(id = "custom_xyz").copy(isDefault = false)
+        coEvery { newsDao.getAllSources() } returns listOf(drifted, retired, untouched, custom)
+        coEvery { newsDao.getEnabledSources() } returns emptyList()
+
+        repository.refreshAll(force = false)
+
+        coVerify(exactly = 1) { newsDao.updateSource(match { it.id == "default_article_mtggoldfish" }) }
+        coVerify(exactly = 1) { newsDao.deleteSourcesByIds(listOf("default_article_gatheringmagic")) }
     }
 }

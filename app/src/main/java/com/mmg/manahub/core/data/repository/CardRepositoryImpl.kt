@@ -18,6 +18,7 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineDispatcher
@@ -123,6 +124,33 @@ class CardRepositoryImpl @Inject constructor(
             else DataResult.Error(result.exceptionOrNull()?.message ?: "Unknown error")
         }
 
+    override suspend fun getLanguagePrints(setCode: String, collectorNumber: String): DataResult<List<Card>> =
+        withContext(ioDispatcher) {
+            val result = remote.getLanguagePrints(setCode, collectorNumber)
+            if (result.isSuccess) {
+                val cards = result.getOrThrow()
+                // Upsert every language/printing into Room so CardDetail's language selector
+                // (Phase 1B) and the oracle-wide collection/wishlist/open-for-trade observers can
+                // resolve them without a further network round-trip.
+                val cachedMap = cardDao.getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
+                val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
+                cardDao.upsertAll(entities)
+                DataResult.Success(cards)
+            } else {
+                val exception = result.exceptionOrNull()
+                if (exception is ClientRequestException && exception.response.status == HttpStatusCode.NotFound) {
+                    DataResult.Error("SCRYFALL_404")
+                } else {
+                    // A genuine fetch failure (network/parse) blocks the language selector
+                    // entirely — a real product friction point, worth a non-fatal. Skip the
+                    // expected SCRYFALL_404 case above (a printing that genuinely has no other
+                    // language prints is not an error).
+                    exception?.let { recordSafeNonFatal("language_prints_fetch_failed", it) }
+                    DataResult.Error(exception?.message ?: "Unknown error")
+                }
+            }
+        }
+
     /**
      * Builds a [CardEntity] with auto-computed tags for a single card.
      *
@@ -218,8 +246,38 @@ class CardRepositoryImpl @Inject constructor(
         if (cached != null && CachePolicy.isFresh(cached.cachedAt) && cached.relatedUris != "{}")
             return@withContext DataResult.Success(cached.toDomainCard())
 
+        fetchAndCacheFromRemote(scryfallId, cached)
+    }
+
+    // Edge-case audit A3 (2026-07-15). Unlike getCardById, always hits the network — used to
+    // force-refresh a cached row that predates the oracle_id column, which would otherwise pass
+    // getCardById's freshness check (isFresh/relatedUris) and never get a chance to re-fetch.
+    override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = withContext(ioDispatcher) {
+        fetchAndCacheFromRemote(scryfallId, cardDao.getById(scryfallId))
+    }
+
+    override suspend fun backfillMissingOracleIds(limit: Int) = withContext(ioDispatcher) {
+        val staleIds = runCatching { cardDao.getScryfallIdsWithBlankOracleId(limit) }.getOrElse { emptyList() }
+        // Sequential, not parallel: ScryfallRequestQueue already rate-limits every network call
+        // globally (≤10 req/s via a single Mutex) — firing these concurrently would just queue up
+        // behind the same lock with no benefit, and sequential execution avoids this best-effort
+        // background backfill starving other in-flight Scryfall calls at app start. Failure-silent
+        // per card so one bad fetch never aborts the rest of the batch.
+        staleIds.forEach { id -> runCatching { refreshCardById(id) } }
+    }
+
+    /**
+     * Shared network-fetch-and-cache path for [getCardById] (which short-circuits on a fresh
+     * cache hit before calling this) and [refreshCardById] (which always calls this directly).
+     * Extracted so the two force-refresh callers can't drift from getCardById's original
+     * success/stale/error handling.
+     */
+    private suspend fun fetchAndCacheFromRemote(
+        scryfallId: String,
+        cached: com.mmg.manahub.core.data.local.entity.CardEntity?,
+    ): DataResult<Card> {
         val result = remote.getCardById(scryfallId)
-        return@withContext when {
+        return when {
             result.isSuccess -> {
                 val card = result.getOrThrow()
 

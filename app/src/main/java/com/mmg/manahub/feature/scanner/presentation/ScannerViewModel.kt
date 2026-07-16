@@ -256,7 +256,7 @@ class ScannerViewModel @Inject constructor(
             if (com.mmg.manahub.BuildConfig.DEBUG) {
                 val now = System.currentTimeMillis()
                 frameTimestamps.addLast(now)
-                if (frameTimestamps.size > 10) frameTimestamps.removeFirst()
+                if (frameTimestamps.size > 10) frameTimestamps.removeAt(0)
                 val fps = if (frameTimestamps.size >= 2) {
                     val span = frameTimestamps.last() - frameTimestamps.first()
                     if (span > 0) ((frameTimestamps.size - 1) * 1000L / span).toInt() else 0
@@ -318,7 +318,7 @@ class ScannerViewModel @Inject constructor(
                 // ── Adaptive stability buffer ────────────────────────────────
                 val requiredFrames = HIGH_CONFIDENCE_FRAMES
 
-                if (recentMatches.size >= requiredFrames) recentMatches.removeFirst()
+                if (recentMatches.size >= requiredFrames) recentMatches.removeAt(0)
                 recentMatches.addLast(id)
 
                 if (recentMatches.size < requiredFrames || recentMatches.any { it != id }) {

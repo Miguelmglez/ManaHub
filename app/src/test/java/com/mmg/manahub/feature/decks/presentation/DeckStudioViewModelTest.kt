@@ -153,10 +153,6 @@ class DeckStudioViewModelTest {
         // in init (mirrors playerNameFlow's own construction-time collection) — default OFF so
         // these pre-existing tests keep exercising the byte-identical pre-Phase-4 Motor-A-only path.
         every { userPreferences.communityEngineEnabledFlow } returns flowOf(false)
-        // communityDecksEnabledFlow is ALSO collected at construction time (sibling stateIn
-        // property, mirrors playerNameFlow/communityEngineEnabledFlow above) — hidden-for-release
-        // default OFF, unrelated to these pre-existing tests.
-        every { userPreferences.communityDecksEnabledFlow } returns flowOf(false)
         // getDeckGameStatsUseCase is relaxed → returns an empty Flow<Result> by default; the
         // deckStatsFlow (WhileSubscribed) is lazy and unsubscribed in these tests, so no explicit stub.
         // deckRepository.createDeck returns a stable id by default (overridden per test as needed).

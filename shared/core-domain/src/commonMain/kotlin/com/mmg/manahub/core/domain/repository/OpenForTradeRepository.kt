@@ -6,6 +6,13 @@ import kotlinx.coroutines.flow.Flow
 interface OpenForTradeRepository {
     fun observeLocal(): Flow<List<OpenForTradeEntry>>
     fun observeByScryfallId(scryfallId: String): Flow<List<OpenForTradeEntry>>
+
+    /**
+     * Card Versions & Languages, Phase 1A. Emits every open-for-trade entry for ANY
+     * printing/language that shares the same oracle identity as [oracleId] (falling back to an
+     * exact [name] match when [oracleId] is blank — see [com.mmg.manahub.core.model.Card.oracleId]).
+     */
+    fun observeVersionsByOracle(oracleId: String, name: String): Flow<List<OpenForTradeEntry>>
     fun observeUnsyncedCount(): Flow<Int>
     suspend fun addLocal(
         scryfallId: String,

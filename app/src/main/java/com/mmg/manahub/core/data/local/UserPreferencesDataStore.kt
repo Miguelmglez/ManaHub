@@ -87,13 +87,12 @@ private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hour
 
 // ── Feature flags ─────────────────────────────────────────────────────────
 private val KEY_PUSH_NOTIFICATIONS_ENABLED = booleanPreferencesKey("push_notifications_enabled")
-/** Master Community Decks switch (Archidekt import/browse). Default: DISABLED until rollout. */
-private val KEY_COMMUNITY_DECKS_ENABLED = booleanPreferencesKey("community_decks_enabled")
 /**
  * Master Community Engine switch (D4, Deck Doctor Community/Archetype plan, Phase 3.3) — gates
  * Motor B (EDHREC/Archidekt-backed suggestion aggregates from the `manahub-community` Worker).
- * DISTINCT from [KEY_COMMUNITY_DECKS_ENABLED] (which gates the unrelated Archidekt deck
- * browse/import feature). Default: ENABLED as of 2026-07-12 — the Worker is now deployed at a
+ * DISTINCT from the (removed 2026-07-16) Community Decks feature flag, which used to gate the
+ * unrelated Archidekt deck browse/import feature — that feature is now always visible. Default:
+ * ENABLED as of 2026-07-12 — the Worker is now deployed at a
  * real URL and the feature has consumer UI (Deck Studio Suggestions tab, Home trending widget);
  * `CommunityAggregateRepositoryImpl` short-circuits every method to a
  * [com.mmg.manahub.core.model.DataResult.Error] only while this is explicitly turned off.
@@ -566,28 +565,12 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     /**
-     * Controls whether the Community Decks feature (Archidekt browse/import) is exposed.
-     * Default: false (hidden for release, 2026-07-14 — the feature is still being polished). The
-     * screens themselves ([com.mmg.manahub.feature.communitydecks.presentation
-     * .CommunityDecksSearchViewModel]/`CommunityDeckDetailViewModel`) render a graceful
-     * `EmptyState` when this is false; entry points into them are additionally hidden so users
-     * never tap a live-looking button into a disabled screen. [SettingsViewModel] still exposes a
-     * toggle for QA to re-enable locally.
-     */
-    val communityDecksEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
-        .map { prefs -> prefs[KEY_COMMUNITY_DECKS_ENABLED] ?: false }
-        .catch { emit(false) }
-
-    suspend fun setCommunityDecksEnabled(enabled: Boolean) {
-        context.userPrefsDataStore.edit { it[KEY_COMMUNITY_DECKS_ENABLED] = enabled }
-    }
-
-    /**
      * Controls whether the Community Engine (Motor B: EDHREC/Archidekt suggestion aggregates) is
      * active. Default: true (ENABLED) as of 2026-07-12 — the `manahub-community` Worker is now
      * deployed at a real URL (see `COMMUNITY_WORKER_URL` in `app/build.gradle.kts`) and the user
-     * explicitly requested the feature be visible. See [KEY_COMMUNITY_ENGINE_ENABLED]. Distinct
-     * from [communityDecksEnabledFlow].
+     * explicitly requested the feature be visible. See [KEY_COMMUNITY_ENGINE_ENABLED]. The
+     * unrelated Community Decks (Archidekt browse/import) feature has no flag of its own anymore
+     * (removed 2026-07-16) — it is always enabled.
      */
     val communityEngineEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
         .map { prefs -> prefs[KEY_COMMUNITY_ENGINE_ENABLED] ?: true }

@@ -125,10 +125,6 @@ class SettingsViewModel(
             .catch { /* ignore */ }
             .launchIn(viewModelScope)
 
-        userPrefsDataStore.communityDecksEnabledFlow
-            .onEach { value -> _uiState.update { it.copy(communityDecksEnabled = value) } }
-            .catch { /* ignore */ }
-            .launchIn(viewModelScope)
     }
 
     fun selectTheme(theme: AppTheme) {
@@ -263,15 +259,6 @@ class SettingsViewModel(
      */
     fun setGamificationEnabled(enabled: Boolean) {
         viewModelScope.launch { userPrefsDataStore.setGamificationEnabled(enabled) }
-    }
-
-    /**
-     * Toggles the master Community Decks preference.
-     *
-     * @param enabled `true` to show Community Decks entry points, `false` to hide them.
-     */
-    fun setCommunityDecksEnabled(enabled: Boolean) {
-        viewModelScope.launch { userPrefsDataStore.setCommunityDecksEnabled(enabled) }
     }
 
     /**

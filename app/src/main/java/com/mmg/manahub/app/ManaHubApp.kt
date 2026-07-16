@@ -521,6 +521,11 @@ class ManaHubApp : Application(), KoinComponent {
         appScope.launch {
             runCatching { syncManaSymbols() }
             runCatching { tagDictionaryRepo.loadAndApply() }
+            // Edge-case audit A3 (2026-07-15): opportunistic startup backfill for cached cards
+            // referenced by a live collection/wishlist row whose oracle_id predates that column
+            // (oracle_id = ''). Small batch (20), sequential, failure-silent — never blocks app
+            // start.
+            runCatching { cardRepository.backfillMissingOracleIds(20) }
         }
 
         // Start the gamification engine collecting the progression bus (idempotent), then

@@ -63,7 +63,6 @@ import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -104,12 +103,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.crossfade
@@ -122,6 +125,7 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCard
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
@@ -145,6 +149,7 @@ import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.model.WishlistEntry
 
@@ -161,8 +166,21 @@ fun CardDetailScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isCommunityDecksEnabled by viewModel.isCommunityDecksEnabled.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
+
+    // Screen-entry breadcrumb (no PII) — CardDetail had ZERO Crashlytics breadcrumbs before the
+    // edge-case/telemetry audit (2026-07-15).
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: card_detail")
+    }
+    // The displayed printing can change without leaving this screen (language/variant switches),
+    // so the scryfall-id custom key is kept fresh in its own effect, separate from the one-shot
+    // screen_viewed breadcrumb above.
+    LaunchedEffect(uiState.card?.scryfallId) {
+        uiState.card?.scryfallId?.let {
+            FirebaseCrashlytics.getInstance().setCustomKey("card_detail_scryfall_id", it)
+        }
+    }
 
     // Collect one-shot events from the ViewModel
     LaunchedEffect(Unit) {
@@ -213,6 +231,18 @@ fun CardDetailScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        // Language selector — shows the displayed print's language flag; tap opens
+                        // the language picker sheet (Card Versions & Languages, Phase 1B).
+                        val langButtonDescription = stringResource(R.string.carddetail_language_button_description)
+                        IconButton(
+                            onClick = viewModel::onOpenLanguageSelector,
+                            modifier = Modifier.semantics { contentDescription = langButtonDescription },
+                        ) {
+                            Text(
+                                text = CardConstants.getFlag(uiState.card?.lang ?: "en"),
+                                style = MaterialTheme.magicTypography.titleLarge,
+                            )
+                        }
                     }
                 }
             }
@@ -243,12 +273,11 @@ fun CardDetailScreen(
                     onShowWishlistSheet = viewModel::onShowWishlistSheet,
                     onShowTradeSheet = viewModel::onShowTradeSheet,
                     onShowVariantSelector = viewModel::onOpenVariantSelector,
-                    onUpdateQuantity = viewModel::onUpdateQuantity,
-                    onUpdateWishlistQuantity = viewModel::onUpdateWishlistQuantity,
+                    onEditCollectionEntry = viewModel::onEditCollectionEntry,
+                    onEditWishlistEntry = viewModel::onEditWishlistEntry,
                     onRequestDelete = viewModel::onRequestDelete,
                     onRequestDeleteWishlist = viewModel::onRequestDeleteWishlist,
                     onNavigateToDeck = onNavigateToDeck,
-                    isCommunityDecksEnabled = isCommunityDecksEnabled,
                     onFindCommunityDecks = onNavigateToCommunityDecks,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
@@ -277,9 +306,12 @@ fun CardDetailScreen(
         )
     }
 
-    // Add to collection sheet
+    // Add-to-collection sheet — also serves as the EDIT sheet for an existing collection entry
+    // (Card Versions & Languages, Phase 1B) when uiState.entryBeingEdited is non-null.
     if (uiState.showAddSheet) {
-        uiState.card?.let { card ->
+        val printing = uiState.sheetPrinting ?: uiState.card
+        val editingEntry = uiState.entryBeingEdited
+        printing?.let { card ->
             AddCardSheet(
                 cardName = card.name,
                 cardImage = card.imageNormal,
@@ -287,18 +319,34 @@ fun CardDetailScreen(
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
-                confirmButtonText = stringResource(R.string.carddetail_add_copy),
+                initialFoil = editingEntry?.userCard?.isFoil ?: false,
+                initialCondition = editingEntry?.userCard?.condition ?: "NM",
+                initialLanguage = editingEntry?.userCard?.language ?: card.lang,
+                initialQty = editingEntry?.userCard?.quantity ?: 1,
+                confirmButtonText = if (editingEntry != null) {
+                    stringResource(R.string.carddetail_save_changes)
+                } else {
+                    stringResource(R.string.carddetail_add_copy)
+                },
+                onOpenVariantSelector = viewModel::onOpenVariantSelectorForSheet,
                 onConfirm = { isFoil: Boolean, condition: String, language: String, qty: Int ->
-                    viewModel.onAddToCollection(isFoil, condition, language, qty)
+                    if (editingEntry != null) {
+                        viewModel.onUpdateCollectionEntry(isFoil, condition, language, qty)
+                    } else {
+                        viewModel.onAddToCollection(isFoil, condition, language, qty)
+                    }
                 },
                 onDismiss = viewModel::onDismissAddSheet,
             )
         }
     }
 
-    // Add to wishlist sheet
+    // Add-to-wishlist sheet — also serves as the EDIT sheet for an existing wishlist entry
+    // (Card Versions & Languages, Phase 1B) when uiState.wishlistEntryBeingEdited is non-null.
     if (uiState.showWishlistSheet) {
-        uiState.card?.let { card ->
+        val printing = uiState.sheetPrinting ?: uiState.card
+        val editingWishlistEntry = uiState.wishlistEntryBeingEdited
+        printing?.let { card ->
             AddCardSheet(
                 cardName = card.name,
                 cardImage = card.imageNormal,
@@ -306,9 +354,22 @@ fun CardDetailScreen(
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
-                confirmButtonText = stringResource(R.string.carddetail_wishlist_sheet_title),
+                initialFoil = editingWishlistEntry?.isFoil ?: false,
+                initialCondition = editingWishlistEntry?.condition ?: "NM",
+                initialLanguage = editingWishlistEntry?.language ?: card.lang,
+                initialQty = editingWishlistEntry?.quantity ?: 1,
+                confirmButtonText = if (editingWishlistEntry != null) {
+                    stringResource(R.string.carddetail_save_changes)
+                } else {
+                    stringResource(R.string.carddetail_wishlist_sheet_title)
+                },
+                onOpenVariantSelector = viewModel::onOpenVariantSelectorForSheet,
                 onConfirm = { isFoil: Boolean, condition: String, language: String, qty: Int ->
-                    viewModel.onAddToWishlist(isFoil, condition, language, qty)
+                    if (editingWishlistEntry != null) {
+                        viewModel.onUpdateWishlistEntry(isFoil, condition, language, qty)
+                    } else {
+                        viewModel.onAddToWishlist(isFoil, condition, language, qty)
+                    }
                 },
                 onDismiss = viewModel::onDismissWishlistSheet,
             )
@@ -318,7 +379,7 @@ fun CardDetailScreen(
     // Mark as tradeable sheet
     if (uiState.showTradeSheet) {
         TradeSelectionSheet(
-            userCards = uiState.userCards,
+            userCards = uiState.userCards.map { it.userCard },
             currentTradeQty = uiState.tradeQuantities,
             onConfirm = viewModel::onConfirmTradeSelection,
             onDismiss = viewModel::onDismissTradeSheet,
@@ -368,10 +429,13 @@ fun CardDetailScreen(
         )
     }
 
-    // Variant (other prints) selector
+    // Variant (other prints) selector — opened either from the main screen ("Explore All
+    // Versions") or from within the add/edit sheet's "Set / Variant" field, see
+    // VariantSelectorSource. currentCardId highlights whichever printing is relevant to the
+    // currently-open surface.
     if (uiState.showVariantSelector) {
         VariantSelectorSheet(
-            currentCardId = uiState.card?.scryfallId ?: "",
+            currentCardId = (uiState.sheetPrinting ?: uiState.card)?.scryfallId ?: "",
             variants = uiState.cardVariants,
             isLoading = uiState.isLoadingVariants,
             onDismiss = viewModel::onCloseVariantSelector,
@@ -384,6 +448,138 @@ fun CardDetailScreen(
             imageUrl = uiState.expandedVariantImageUrl!!,
             onDismiss = viewModel::onCloseExpandedImage,
         )
+    }
+
+    // Language (print) selector — Card Versions & Languages, Phase 1B.
+    if (uiState.showLanguageSelector) {
+        CardDetailLanguageSheet(
+            currentLangCode = uiState.card?.lang ?: "en",
+            prints = uiState.languagePrints,
+            isLoading = uiState.isLoadingLanguages,
+            onDismiss = viewModel::onCloseLanguageSelector,
+            onSelectPrint = viewModel::onSelectLanguagePrint,
+            onSelectFallbackLanguage = viewModel::onSelectFallbackLanguage,
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Language (print) selector sheet — Card Versions & Languages, Phase 1B.
+//  Visual style mirrors AddCardScreen's LanguageSelectorSheet. Lists the REAL prints returned by
+//  CardRepository.getLanguagePrints when available; falls back to the full CardConstants.languages
+//  list (informational only — no navigation) when the load failed or returned no results.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CardDetailLanguageSheet(
+    currentLangCode: String,
+    prints: List<Card>,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onSelectPrint: (Card) -> Unit,
+    onSelectFallbackLanguage: (String) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.background,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.carddetail_language_sheet_title),
+                style = ty.titleMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(160.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = mc.primaryAccent)
+                    }
+                }
+
+                prints.isNotEmpty() -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).navigationBarsPadding()
+                    ) {
+                        items(prints, key = { it.scryfallId }) { print ->
+                            LanguageSheetRow(
+                                flag = CardConstants.getFlag(print.lang),
+                                name = CardConstants.getLanguageName(print.lang),
+                                isSelected = print.lang == currentLangCode,
+                                onClick = { onSelectPrint(print) },
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    // No real prints resolved (load failed or genuinely no other languages) —
+                    // fall back to the full language list; only real prints navigate.
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).navigationBarsPadding()
+                    ) {
+                        items(CardConstants.languages, key = { it.first }) { (code, flag) ->
+                            LanguageSheetRow(
+                                flag = flag,
+                                name = CardConstants.getLanguageName(code),
+                                isSelected = code == currentLangCode,
+                                onClick = { onSelectFallbackLanguage(code) },
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun LanguageSheetRow(
+    flag: String,
+    name: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(onClick = onClick)
+            .then(
+                if (isSelected) Modifier.background(mc.primaryAccent.copy(alpha = 0.08f))
+                else Modifier
+            )
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(text = flag, style = ty.titleLarge)
+        Text(
+            text = name,
+            style = ty.bodyMedium,
+            color = if (isSelected) mc.primaryAccent else mc.textPrimary,
+            modifier = Modifier.weight(1f),
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 
@@ -413,7 +609,7 @@ private fun FaceFlippable(
 @Composable
 private fun CardDetailContent(
     card: Card,
-    userCards: List<UserCard>,
+    userCards: List<UserCardWithCard>,
     wishlistEntries: List<WishlistEntry>,
     tradeQuantities: Map<String, Int>,
     decksContainingCard: List<Deck>,
@@ -428,12 +624,11 @@ private fun CardDetailContent(
     onShowWishlistSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
     onShowVariantSelector: () -> Unit,
-    onUpdateQuantity: (String, Int) -> Unit,
-    onUpdateWishlistQuantity: (String, Int) -> Unit,
+    onEditCollectionEntry: (UserCardWithCard) -> Unit,
+    onEditWishlistEntry: (WishlistEntry) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
     onRequestDeleteWishlist: (WishlistEntry) -> Unit,
     onNavigateToDeck: (String) -> Unit,
-    isCommunityDecksEnabled: Boolean,
     onFindCommunityDecks: (String) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
@@ -775,10 +970,11 @@ private fun CardDetailContent(
 
                         CollectionSection(
                             userCards = userCards,
+                            displayedSetCode = card.setCode,
                             tradeQuantities = tradeQuantities,
                             onShowAddSheet = onShowAddSheet,
                             onShowTradeSheet = onShowTradeSheet,
-                            onUpdateQuantity = onUpdateQuantity,
+                            onEditEntry = onEditCollectionEntry,
                             onRequestDelete = onRequestDelete,
                         )
                     }
@@ -862,10 +1058,11 @@ private fun CardDetailContent(
                 HorizontalDivider()
                 CollectionSection(
                     userCards = userCards,
+                    displayedSetCode = card.setCode,
                     tradeQuantities = tradeQuantities,
                     onShowAddSheet = onShowAddSheet,
                     onShowTradeSheet = onShowTradeSheet,
-                    onUpdateQuantity = onUpdateQuantity,
+                    onEditEntry = onEditCollectionEntry,
                     onRequestDelete = onRequestDelete,
                 )
             }
@@ -881,8 +1078,9 @@ private fun CardDetailContent(
             // Wishlist section
             WishlistSection(
                 entries = wishlistEntries,
+                displayedSetCode = card.setCode,
                 onShowWishlistSheet = onShowWishlistSheet,
-                onUpdateQuantity = onUpdateWishlistQuantity,
+                onEditEntry = onEditWishlistEntry,
                 onRequestDelete = onRequestDeleteWishlist,
             )
 
@@ -921,9 +1119,9 @@ private fun CardDetailContent(
                 )
             }
 
-            // Community Decks entry point (feature-flag gated)
-            if (isCommunityDecksEnabled) {
-                HorizontalDivider()
+            // Community Decks entry point
+            HorizontalDivider()
+            run {
                 val mc = MaterialTheme.magicColors
                 OutlinedButton(
                     onClick = { onFindCommunityDecks(card.name) },
@@ -1058,16 +1256,25 @@ private fun DeckChip(deck: Deck, onClick: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Collection section: add button + list of existing copies
+//  Collection section: add button + list of existing copies. Card Versions & Languages, Phase 1B —
+//  now ORACLE-WIDE (every printing/language the user owns), grouped displayed-set-first with a
+//  "Variants" subheader for copies from other sets.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Edge-case audit A5 (2026-07-15): the oracle-wide Collection/Wishlist sections below render
+// inside this screen's SINGLE verticalScroll Column (see CardDetailContent), not a LazyColumn —
+// a card with many owned printings/languages otherwise renders every row unbounded. Both sections
+// share this collapsed-row count.
+private const val ORACLE_SECTION_COLLAPSED_COUNT = 5
 
 @Composable
 private fun CollectionSection(
-    userCards: List<UserCard>,
+    userCards: List<UserCardWithCard>,
+    displayedSetCode: String,
     tradeQuantities: Map<String, Int>,
     onShowAddSheet: () -> Unit,
     onShowTradeSheet: () -> Unit,
-    onUpdateQuantity: (String, Int) -> Unit,
+    onEditEntry: (UserCardWithCard) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
 ) {
     Column(
@@ -1114,13 +1321,42 @@ private fun CollectionSection(
             color = MaterialTheme.magicColors.textSecondary,
         )
     } else {
-        userCards.forEach { uc ->
+        val (sameSet, otherSet) = userCards.partition { it.card.setCode == displayedSetCode }
+        // A5: same-set entries first, then cross-set — capped at ORACLE_SECTION_COLLAPSED_COUNT
+        // rows by default, with a "Show all (N)" / "Show less" toggle.
+        var expanded by remember { mutableStateOf(false) }
+        val combined = sameSet.map { it to false } + otherSet.map { it to true }
+        val visible = if (expanded) combined else combined.take(ORACLE_SECTION_COLLAPSED_COUNT)
+        var otherSetHeaderShown = false
+        visible.forEach { (entry, isOtherSet) ->
+            if (isOtherSet && !otherSetHeaderShown) {
+                Text(
+                    text = stringResource(R.string.carddetail_variants_header),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = MaterialTheme.magicColors.textSecondary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                otherSetHeaderShown = true
+            }
             CollectionCopyRow(
-                userCard = uc,
-                tradeQuantity = tradeQuantities[uc.id] ?: 0,
-                onUpdateQuantity = onUpdateQuantity,
+                entry = entry,
+                tradeQuantity = tradeQuantities[entry.userCard.id] ?: 0,
+                onEdit = onEditEntry,
                 onRequestDelete = onRequestDelete,
             )
+        }
+        if (combined.size > ORACLE_SECTION_COLLAPSED_COUNT) {
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) {
+                        stringResource(R.string.carddetail_show_less)
+                    } else {
+                        stringResource(R.string.carddetail_show_all, combined.size)
+                    },
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = MaterialTheme.magicColors.primaryAccent,
+                )
+            }
         }
 
         // "Offer for trade" button — only shown when there are collection copies
@@ -1148,97 +1384,133 @@ private fun CollectionSection(
 
 @Composable
 private fun CollectionCopyRow(
-    userCard: UserCard,
+    entry: UserCardWithCard,
     tradeQuantity: Int,
-    onUpdateQuantity: (String, Int) -> Unit,
+    onEdit: (UserCardWithCard) -> Unit,
     onRequestDelete: (UserCard) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val userCard = entry.userCard
+    val printing = entry.card
+    val preferredCurrency = LocalPreferredCurrency.current
+    val priceText = PriceFormatter.formatFromScryfall(
+        priceUsd = if (userCard.isFoil) printing.priceUsdFoil else printing.priceUsd,
+        priceEur = if (userCard.isFoil) printing.priceEurFoil else printing.priceEur,
+        preferredCurrency = preferredCurrency,
+    )
+
     Surface(
         color = mc.surface,
         shape = CardShape,
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Badges row
-            Row(
-                modifier = Modifier.heightIn(min = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            AsyncImage(
+                model = printing.imageNormal,
+                contentDescription = printing.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(44.dp)
+                    .height(60.dp)
+                    .clip(CardShape),
+            )
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                LanguageBadge(langCode = userCard.language)
-                CopyBadge(label = userCard.condition)
-                if (userCard.isFoil) FoilBadge()
-                if (tradeQuantity > 0) {
-                    Surface(
-                        color = mc.secondaryAccent.copy(alpha = 0.15f),
-                        shape = ChipShape,
-                    ) {
+                // Set icon + set name for this specific printing
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    SetSymbol(
+                        setCode = printing.setCode,
+                        rarity = CardRarity.fromString(printing.rarity),
+                        size = 14.dp,
+                    )
+                    Text(
+                        text = printing.setName,
+                        style = ty.labelSmall,
+                        color = mc.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                // Badges row
+                Row(
+                    modifier = Modifier.heightIn(min = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LanguageBadge(langCode = userCard.language)
+                    CopyBadge(label = userCard.condition)
+                    if (userCard.isFoil) FoilBadge()
+                    if (tradeQuantity > 0) {
+                        Surface(
+                            color = mc.secondaryAccent.copy(alpha = 0.15f),
+                            shape = ChipShape,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.carddetail_for_trade_badge),
+                                style = ty.labelSmall,
+                                color = mc.secondaryAccent,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
+
+                // Static quantity + per-printing price (steppers removed — edit via the Edit button)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "x${userCard.quantity}",
+                        style = ty.titleMedium,
+                        color = mc.textPrimary,
+                    )
+                    if (priceText != "—") {
                         Text(
-                            text = stringResource(R.string.carddetail_for_trade_badge),
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.secondaryAccent,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            text = priceText,
+                            style = ty.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = mc.goldMtg,
                         )
                     }
                 }
             }
 
-            // Quantity stepper + delete
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            IconButton(
+                onClick = { onEdit(entry) },
+                // 40dp keeps the row compact while staying above the minimum touch target.
+                modifier = Modifier.size(40.dp),
             ) {
-                Text(
-                    stringResource(R.string.carddetail_quantity_label),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textSecondary,
-                    modifier = Modifier.weight(1f),
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.carddetail_edit_entry_description),
+                    tint = mc.textSecondary,
+                    modifier = Modifier.size(18.dp),
                 )
-                IconButton(
-                    onClick = { onUpdateQuantity(userCard.id, userCard.quantity - 1) },
-                    // 40dp keeps the row compact while staying above the minimum touch target.
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Remove,
-                        contentDescription = stringResource(R.string.action_remove),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                Text(
-                    text = "${userCard.quantity}",
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp),
+            }
+            IconButton(
+                onClick = { onRequestDelete(userCard) },
+                // 40dp keeps the row compact while staying above the minimum touch target.
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.action_delete),
+                    tint = mc.lifeNegative,
+                    modifier = Modifier.size(18.dp),
                 )
-                IconButton(
-                    onClick = { onUpdateQuantity(userCard.id, userCard.quantity + 1) },
-                    // 40dp keeps the row compact while staying above the minimum touch target.
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                IconButton(
-                    onClick = { onRequestDelete(userCard) },
-                    // 40dp keeps the row compact while staying above the minimum touch target.
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.action_delete),
-                        tint = mc.lifeNegative,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
             }
         }
     }
@@ -1246,14 +1518,16 @@ private fun CollectionCopyRow(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Wishlist section: add button + list of existing entries
+//  Wishlist section: add button + list of existing entries. Card Versions & Languages, Phase 1B —
+//  same oracle-wide / displayed-set-first grouping as the collection section above.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun WishlistSection(
     entries: List<WishlistEntry>,
+    displayedSetCode: String,
     onShowWishlistSheet: () -> Unit,
-    onUpdateQuantity: (String, Int) -> Unit,
+    onEditEntry: (WishlistEntry) -> Unit,
     onRequestDelete: (WishlistEntry) -> Unit,
 ) {
     Column(
@@ -1295,12 +1569,41 @@ private fun WishlistSection(
             color = MaterialTheme.magicColors.textSecondary,
         )
     } else {
-        entries.forEach { entry ->
+        val (sameSet, otherSet) = entries.partition { it.card?.setCode == displayedSetCode }
+        // A5: same as CollectionSection above — capped at ORACLE_SECTION_COLLAPSED_COUNT rows
+        // with a "Show all (N)" / "Show less" toggle.
+        var expanded by remember { mutableStateOf(false) }
+        val combined = sameSet.map { it to false } + otherSet.map { it to true }
+        val visible = if (expanded) combined else combined.take(ORACLE_SECTION_COLLAPSED_COUNT)
+        var otherSetHeaderShown = false
+        visible.forEach { (entry, isOtherSet) ->
+            if (isOtherSet && !otherSetHeaderShown) {
+                Text(
+                    text = stringResource(R.string.carddetail_variants_header),
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = MaterialTheme.magicColors.textSecondary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                otherSetHeaderShown = true
+            }
             WishlistEntryRow(
                 entry = entry,
-                onUpdateQuantity = onUpdateQuantity,
+                onEdit = onEditEntry,
                 onRequestDelete = onRequestDelete,
             )
+        }
+        if (combined.size > ORACLE_SECTION_COLLAPSED_COUNT) {
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(
+                    text = if (expanded) {
+                        stringResource(R.string.carddetail_show_less)
+                    } else {
+                        stringResource(R.string.carddetail_show_all, combined.size)
+                    },
+                    style = MaterialTheme.magicTypography.labelSmall,
+                    color = MaterialTheme.magicColors.primaryAccent,
+                )
+            }
         }
     }
 }
@@ -1308,82 +1611,120 @@ private fun WishlistSection(
 @Composable
 private fun WishlistEntryRow(
     entry: WishlistEntry,
-    onUpdateQuantity: (String, Int) -> Unit,
+    onEdit: (WishlistEntry) -> Unit,
     onRequestDelete: (WishlistEntry) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val printing = entry.card
+    val preferredCurrency = LocalPreferredCurrency.current
+    val priceText = printing?.let {
+        PriceFormatter.formatFromScryfall(
+            priceUsd = if (entry.isFoil) it.priceUsdFoil else it.priceUsd,
+            priceEur = if (entry.isFoil) it.priceEurFoil else it.priceEur,
+            preferredCurrency = preferredCurrency,
+        )
+    }
+
     Surface(
         color = mc.surface,
         shape = CardShape,
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Badges row
-            Row(
-                modifier = Modifier.heightIn(min = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            AsyncImage(
+                model = printing?.imageNormal,
+                contentDescription = printing?.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(44.dp)
+                    .height(60.dp)
+                    .clip(CardShape),
+            )
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                LanguageBadge(langCode = entry.language ?: "en")
-                CopyBadge(label = entry.condition ?: "")
-                if (entry.isFoil) FoilBadge()
+                if (printing != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        SetSymbol(
+                            setCode = printing.setCode,
+                            rarity = CardRarity.fromString(printing.rarity),
+                            size = 14.dp,
+                        )
+                        Text(
+                            text = printing.setName,
+                            style = ty.labelSmall,
+                            color = mc.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                // Badges row
+                Row(
+                    modifier = Modifier.heightIn(min = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LanguageBadge(langCode = entry.language ?: printing?.lang ?: "en")
+                    CopyBadge(label = entry.condition ?: "")
+                    if (entry.isFoil) FoilBadge()
+                }
+
+                // Static quantity + per-printing price (steppers removed — edit via the Edit button)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "x${entry.quantity}",
+                        style = ty.titleMedium,
+                        color = mc.textPrimary,
+                    )
+                    if (priceText != null && priceText != "—") {
+                        Text(
+                            text = priceText,
+                            style = ty.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = mc.goldMtg,
+                        )
+                    }
+                }
             }
 
-            // Quantity stepper + delete
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            IconButton(
+                onClick = { onEdit(entry) },
+                // 40dp keeps the row compact while staying above the minimum touch target.
+                modifier = Modifier.size(40.dp),
             ) {
-                Text(
-                    stringResource(R.string.carddetail_quantity_label),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textSecondary,
-                    modifier = Modifier.weight(1f),
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.carddetail_edit_entry_description),
+                    tint = mc.textSecondary,
+                    modifier = Modifier.size(18.dp),
                 )
-                IconButton(
-                    onClick = { onUpdateQuantity(entry.id, entry.quantity - 1) },
-                    // 40dp keeps the row compact while staying above the minimum touch target.
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Remove,
-                        contentDescription = stringResource(R.string.action_remove),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                Text(
-                    text = "${entry.quantity}",
-                    style = MaterialTheme.magicTypography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp),
+            }
+            IconButton(
+                onClick = { onRequestDelete(entry) },
+                // 40dp keeps the row compact while staying above the minimum touch target.
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = stringResource(R.string.action_delete),
+                    tint = mc.lifeNegative,
+                    modifier = Modifier.size(18.dp),
                 )
-                IconButton(
-                    onClick = { onUpdateQuantity(entry.id, entry.quantity + 1) },
-                    // 40dp keeps the row compact while staying above the minimum touch target.
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = stringResource(R.string.action_add),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                IconButton(
-                    onClick = { onRequestDelete(entry) },
-                    // 40dp keeps the row compact while staying above the minimum touch target.
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.action_delete),
-                        tint = mc.lifeNegative,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
             }
         }
     }

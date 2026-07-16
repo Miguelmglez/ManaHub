@@ -162,11 +162,7 @@ fun HomeScreen(
         // Breadcrumb: the quick-start customize sheet was opened (fires once per open).
         LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("home_quick_start_customize_opened") }
         QuickStartCustomizeSheet(
-            // Don't offer COMMUNITY_DECKS as a pickable shortcut while the feature is flag-disabled
-            // (mirrors the QuickActionsWidget filter in HomeWidgets.kt — the two must stay in sync).
-            allActions = QuickStartAction.entries.filter {
-                it != QuickStartAction.COMMUNITY_DECKS || uiState.communityDecksEnabled
-            },
+            allActions = QuickStartAction.entries,
             selectedActions = uiState.quickStartActions,
             onSave = { selected ->
                 viewModel.saveQuickStartActions(selected)
@@ -183,7 +179,6 @@ fun HomeScreen(
             currentLayout = uiState.layout,
             isAuthenticated = uiState.isAuthenticated,
             gamificationEnabled = uiState.gamificationEnabled,
-            communityDecksEnabled = uiState.communityDecksEnabled,
             onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
             onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
             onMoveWidget = { from, to -> viewModel.onAction(HomeAction.MoveWidget(from, to)) },

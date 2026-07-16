@@ -506,6 +506,8 @@ fun AppNavGraph(
                     onCardClick = { scryfallId ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                     },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable,
                 )
             }
 

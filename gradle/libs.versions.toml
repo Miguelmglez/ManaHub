@@ -52,7 +52,7 @@ compose-multiplatform = "1.11.0"
 
 # Koin — KMP-native DI, added in Phase 0 Spike D to run ALONGSIDE Hilt during the per-feature
 # Hilt→Koin cutover (coexistence). Hilt aliases are intentionally kept; Koin is additive.
-koin = "4.0.2"
+koin = "4.2.2"
 
 # kotlinx-datetime — KMP date/time library replacing java.time in shared code (Phase 4).
 kotlinx-datetime = "0.6.2"

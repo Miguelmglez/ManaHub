@@ -50,7 +50,7 @@ class TimedLruCache<K : Any, V : Any>(
     /** Evicts the least-recently-used entry if size exceeds [maxSize]. */
     private fun evictIfNeeded() {
         while (accessOrder.size > maxSize) {
-            val eldest = accessOrder.removeFirst()
+            val eldest = accessOrder.removeAt(0)
             map.remove(eldest)
         }
     }

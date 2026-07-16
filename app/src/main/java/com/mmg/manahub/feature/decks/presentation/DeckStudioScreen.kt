@@ -167,7 +167,6 @@ fun DeckStudioScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
     val playerName by viewModel.playerNameFlow.collectAsStateWithLifecycle()
-    val communityDecksEnabled by viewModel.communityDecksEnabledFlow.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val context = LocalContext.current
@@ -411,7 +410,6 @@ fun DeckStudioScreen(
                                 viewModel.onAddSuggestion(s.card.scryfallId, s.card.name)
                             },
                             onCommunityCardTap = { id -> selectedCardId = id },
-                            communityDecksEnabled = communityDecksEnabled,
                             onViewCommunityDecksForCard = onNavigateToCommunityDecksByCard,
                             onOpenSimilarDeck = onNavigateToCommunityDeckDetail,
                         )
@@ -1404,10 +1402,6 @@ private fun SuggestionsTab(
     // call site if a preview/test constructs it without these.
     onAddCommunity: (com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion) -> Unit = {},
     onCommunityCardTap: (String) -> Unit = {},
-    // Community Decks feature flag (independent of DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED,
-    // see DeckStudioViewModel.communityDecksEnabledFlow's KDoc) — hides the "View decks" action on
-    // community add suggestions when the browse/import feature itself is disabled.
-    communityDecksEnabled: Boolean = false,
     onViewCommunityDecksForCard: (String) -> Unit = {},
     onOpenSimilarDeck: (Int) -> Unit = {},
 ) {
@@ -1583,18 +1577,14 @@ private fun SuggestionsTab(
                         suggestion = suggestion,
                         sourceLabel = uiState.deck?.name.orEmpty().ifBlank { stringResource(R.string.deck_studio_suggestions_community_header) },
                         onAdd = { onAddCommunity(suggestion) },
-                        // Community Decks (browse/import) is a SEPARATE flag from Motor B — hide only
-                        // the "View decks" action when it's disabled, the add suggestion itself stays.
-                        showViewDecksAction = communityDecksEnabled,
                         onViewDecks = { onViewCommunityDecksForCard(suggestion.card.name) },
                         onCardTap = { onCommunityCardTap(suggestion.card.scryfallId) },
                     )
                 }
             }
 
-            // "Decks like yours" navigates straight into Screen.CommunityDeckDetail — hide the whole
-            // carousel (not just the row action) when Community Decks browsing is disabled.
-            if (communityDecksEnabled && uiState.similarDecks.isNotEmpty()) {
+            // "Decks like yours" navigates straight into Screen.CommunityDeckDetail.
+            if (uiState.similarDecks.isNotEmpty()) {
                 item(key = "similar_decks_header") {
                     SuggestionsSectionHeader(
                         stringResource(R.string.deck_studio_suggestions_similar_decks_header),
