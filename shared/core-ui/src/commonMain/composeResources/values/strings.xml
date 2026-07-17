@@ -8,4 +8,6 @@
 -->
 <resources>
     <string name="deckbuilder_ideal_curve">Ideal curve</string>
+    <string name="addcard_language_sheet_title">Select Language</string>
+    <string name="addcard_condition_sheet_title">Select Condition</string>
 </resources>

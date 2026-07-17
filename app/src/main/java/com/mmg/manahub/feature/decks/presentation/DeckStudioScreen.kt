@@ -162,6 +162,12 @@ fun DeckStudioScreen(
     // but this keeps the signature source-compatible for tests/previews) keeps compiling.
     onNavigateToCommunityDecksByCard: (String) -> Unit = {},
     onNavigateToCommunityDeckDetail: (Int) -> Unit = {},
+    // Deck Builder v2 (plan §3.4/§3.5): navigates to Screen.DeckWizard, optionally pre-filled from
+    // a Discoveries v2 "Build this" tap (strategyHint = a raw SeedStrategy enum name, themeHint = a
+    // free-form label, colors = concatenated ManaColor symbols) -- all null for the plain "Build
+    // from seed" entry point. Route construction stays in AppNavGraph (this screen never imports
+    // Screen directly, mirroring onNavigateToCommunityDecksByCard's own convention).
+    onNavigateToWizard: (strategyHint: String?, themeHint: String?, colors: String?) -> Unit = { _, _, _ -> },
     viewModel: DeckStudioViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -251,6 +257,17 @@ fun DeckStudioScreen(
     }
     BackHandler(onBack = handleBack)
 
+    // Deck Builder v2 (plan D10/§3.7): a single "Build from seed" entry point routes to the v2
+    // wizard when DECK_BUILDER_V2_ENABLED, else opens the legacy seed sheet -- shared by BOTH the
+    // top-bar overflow item and the empty-state primary button so the two never drift.
+    val handleBuildFromSeed: () -> Unit = {
+        if (DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) {
+            onNavigateToWizard(null, null, null)
+        } else {
+            viewModel.openSeedSheet()
+        }
+    }
+
     val isCommanderFormat = uiState.deck?.format
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } } == DeckFormat.COMMANDER
 
@@ -266,7 +283,7 @@ fun DeckStudioScreen(
                     // Playtest is available only for a non-empty, persisted deck.
                     playtestEnabled = !uiState.isEmptyDeck && uiState.deck?.id != null,
                     onPlaytest = { uiState.deck?.id?.let(onPlaytest) },
-                    onBuildFromSeed = { viewModel.openSeedSheet() },
+                    onBuildFromSeed = handleBuildFromSeed,
                     onBrowseInspirations = { viewModel.openInspirations() },
                     onEdit = { showEditDeckSheet = true },
                     onShare = {
@@ -380,10 +397,7 @@ fun DeckStudioScreen(
                                 viewModel.showCollectionCards()
                                 showCommanderSearchSheet = true
                             },
-                            onBuildFromSeed = {
-                                // Phase 3 (P3-T1/P3-T2): opens the seed-build sheet (VM state-driven).
-                                viewModel.openSeedSheet()
-                            },
+                            onBuildFromSeed = handleBuildFromSeed,
                             onBrowseInspirations = { viewModel.openInspirations() },
                             onImportDeck = { showImportSheet = true },
                             onFormatChange = viewModel::changeFormat,
@@ -557,15 +571,37 @@ fun DeckStudioScreen(
             shape = BottomSheetShape,
             containerColor = mc.background,
         ) {
-            InspirationsSheetContent(
-                discoveries = uiState.discoveries,
-                isLoading = uiState.isLoadingDiscoveries,
-                onCardClick = { id ->
-                    focusManager.clearFocus()
-                    onCardClick(id)
-                },
-                onSeedStudio = { discovery -> viewModel.startFromDiscovery(discovery) },
-            )
+            // Deck Builder v2 Phase 5 (plan D10/§3.7): the SAME entry point, content swaps on the
+            // flag -- Discoveries v2 clusters (identity-only, color-coherent) hand off to the v2
+            // wizard pre-filled (D11); the legacy content still seeds the old seed sheet.
+            if (DeckFeatureFlags.DISCOVERIES_V2_ENABLED) {
+                InspirationsSheetContentV2(
+                    discoveries = uiState.discoveriesV2,
+                    isLoading = uiState.isLoadingDiscoveries,
+                    onCardClick = { id ->
+                        focusManager.clearFocus()
+                        onCardClick(id)
+                    },
+                    onBuildThis = { discovery ->
+                        viewModel.closeInspirations()
+                        onNavigateToWizard(
+                            discovery.strategyHint?.name,
+                            discovery.themeHint,
+                            discovery.dominantColors.joinToString("") { it.symbol },
+                        )
+                    },
+                )
+            } else {
+                InspirationsSheetContent(
+                    discoveries = uiState.discoveries,
+                    isLoading = uiState.isLoadingDiscoveries,
+                    onCardClick = { id ->
+                        focusManager.clearFocus()
+                        onCardClick(id)
+                    },
+                    onSeedStudio = { discovery -> viewModel.startFromDiscovery(discovery) },
+                )
+            }
         }
     }
 
@@ -771,9 +807,9 @@ private fun DeckStudioTopBar(
                             onEdit()
                         },
                     )
-                    // HIDDEN for release behind DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED
-                    // (UI-only; openSeedSheet/seed-sheet stay compiled).
-                    if (DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED) {
+                    // Deck Builder v2 (plan D10/§3.7): visible whenever EITHER the legacy seed
+                    // sheet OR the v2 wizard is enabled -- handleBuildFromSeed picks the destination.
+                    if (DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED || DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -795,9 +831,10 @@ private fun DeckStudioTopBar(
                             },
                         )
                     }
-                    // HIDDEN for release behind DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED
-                    // (UI-only; openInspirations/inspirations-sheet stay compiled).
-                    if (DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED) {
+                    // Deck Builder v2 (plan D10/§3.7): visible whenever EITHER the legacy
+                    // discoverSynergies content OR Discoveries v2 is enabled -- the sheet content
+                    // itself branches on DISCOVERIES_V2_ENABLED (see the ModalBottomSheet below).
+                    if (DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED || DeckFeatureFlags.DISCOVERIES_V2_ENABLED) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -1206,8 +1243,8 @@ private fun EmptyDeckState(
                 // DeckFeatureFlags. When BOTH are disabled, "Import deck" is promoted from the
                 // secondary OutlinedButton to the PRIMARY filled Button so the empty state still has
                 // a clear primary action (the + FAB remains the main add-cards affordance).
-                val seedEnabled = DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED
-                val inspirationsEnabled = DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED
+                val seedEnabled = DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED || DeckFeatureFlags.DECK_BUILDER_V2_ENABLED
+                val inspirationsEnabled = DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED || DeckFeatureFlags.DISCOVERIES_V2_ENABLED
                 val importIsPrimary = !seedEnabled && !inspirationsEnabled
 
                 // Primary action.
@@ -1375,6 +1412,75 @@ private fun InspirationsSheetContent(
 }
 
 /**
+ * Deck Builder v2 Phase 5 (plan §3.5) sheet content -- the [DeckDiscoveryV2] sibling of
+ * [InspirationsSheetContent], rendered instead of it when `DeckFeatureFlags
+ * .DISCOVERIES_V2_ENABLED` is on (same entry point, D10/§3.7). "Build this" hands off to the v2
+ * wizard pre-filled (D11) instead of the old seed-sheet handoff.
+ */
+@Composable
+private fun InspirationsSheetContentV2(
+    discoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
+    isLoading: Boolean,
+    onCardClick: (String) -> Unit,
+    onBuildThis: (com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Column(
+        modifier = Modifier
+            .fillMaxHeight(0.92f)
+            .padding(horizontal = spacing.lg),
+    ) {
+        Text(
+            text = stringResource(R.string.deck_studio_inspirations_title),
+            style = ty.titleLarge,
+            color = mc.textPrimary,
+            modifier = Modifier.padding(top = spacing.md),
+        )
+        Text(
+            text = stringResource(R.string.deck_studio_inspirations_subtitle),
+            style = ty.bodySmall,
+            color = mc.textSecondary,
+            modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
+        )
+
+        when {
+            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            }
+            discoveries.isEmpty() -> EmptyState(
+                title = stringResource(R.string.deck_studio_inspirations_empty_title),
+                subtitle = stringResource(R.string.deck_studio_inspirations_empty_subtitle),
+                icon = Icons.Default.AutoAwesome,
+            )
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = rememberLazyListState(),
+                contentPadding = PaddingValues(vertical = spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
+            ) {
+                // Keyed by the cluster's own stable identity (tag key or tribe key) -- distinct
+                // from the legacy MagicDiscovery key shape (no primaryTag on this model).
+                items(discoveries.take(20), key = { it.key.stableKey() }) { discovery ->
+                    com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
+                        discovery = discovery,
+                        onCardClick = onCardClick,
+                        onBuildThis = { onBuildThis(discovery) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.stableKey(): String = when (this) {
+    is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Strategy -> "strategy_${tag.key}"
+    is com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.Tribe -> "tribe_$tribeKey"
+}
+
+/**
  * The Suggestions surface (Deck Doctor inline, Phase 1/2): a Health summary, the Cut list, and
  * the "From your collection" Add list (Motor A, Phase 2 — offline, always available), all driven
  * by the live deck via [DeckStudioViewModel]. [BudgetInputBar] is NOT shown here (D5 — Motor A
@@ -1428,6 +1534,11 @@ private fun SuggestionsTab(
     val evaluation = health.evaluation
     val spacing = MaterialTheme.spacing
     var showArchetypeSheet by remember { mutableStateOf(false) }
+    // Hoisted OUT of the LazyColumn content lambda: LazyListScope's content is a plain (non-
+    // @Composable) lambda, so stringResource() may only be called inside an item{}/items{} block,
+    // never directly in a `when { }`/`val` sitting between them (feedback_lazylistscope_content_not_composable).
+    val communitySourceLabel = uiState.deck?.name.orEmpty()
+        .ifBlank { stringResource(R.string.deck_studio_suggestions_community_header) }
 
     if (showArchetypeSheet) {
         val archetypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1513,6 +1624,9 @@ private fun SuggestionsTab(
         // ── Adds — Motor A (Deck Doctor Community/Archetype plan Phase 2): collection-only,
         //    offline, always available. `BudgetInputBar` stays in the codebase (D5) but is not
         //    surfaced here — every Motor A suggestion is already owned, so budget is moot for it.
+        //    Deck Builder v2 (plan §3.8): grouped by SuggestionCategoryResolver with a header chip
+        //    per category (Removal/Ramp/Tokens/...) — presentation-side only, DeckDoctorOrchestrator's
+        //    state shape is unchanged.
         item(key = "adds_header") {
             SuggestionsSectionHeader(
                 stringResource(R.string.deck_studio_suggestions_from_collection),
@@ -1535,8 +1649,17 @@ private fun SuggestionsTab(
                     icon = Icons.Default.AutoAwesome,
                 )
             }
-            else -> items(uiState.adds, key = { "add_${it.fit.card.scryfallId}" }) { suggestion ->
-                AddSuggestionRow(suggestion = suggestion, onAdd = { onAdd(suggestion) })
+            else -> {
+                val groupedAdds = com.mmg.manahub.feature.decks.presentation.components.SuggestionGrouping
+                    .groupAddSuggestions(uiState.adds, uiState.health?.profile)
+                groupedAdds.forEach { (category, suggestions) ->
+                    item(key = "adds_cat_${category.id}") {
+                        SuggestionCategoryHeaderChip(label = category.displayLabel, count = suggestions.size, tint = mc.lifePositive)
+                    }
+                    items(suggestions, key = { "add_${it.fit.card.scryfallId}" }) { suggestion ->
+                        AddSuggestionRow(suggestion = suggestion, onAdd = { onAdd(suggestion) })
+                    }
+                }
             }
         }
 
@@ -1545,7 +1668,9 @@ private fun SuggestionsTab(
         //    `communityAdds`/`similarDecks` are simply empty and NOTHING below renders (no header,
         //    no empty state — the plan's "flag off = nothing community-related" requirement). A
         //    Worker/aggregate failure (`communityUnavailable`) shows ONE InlineErrorState for this
-        //    section only; Motor A above is never affected.
+        //    section only; Motor A above is never affected. Deck Builder v2 (plan §3.8): grouped
+        //    the SAME way as Motor A, but ALWAYS its own separate section — never merged with Motor
+        //    A even within a shared category (D3).
         if (uiState.communityEngineEnabled) {
             item(key = "community_adds_header") {
                 SuggestionsSectionHeader(
@@ -1572,14 +1697,23 @@ private fun SuggestionsTab(
                         color = mc.textSecondary,
                     )
                 }
-                else -> items(uiState.communityAdds, key = { "community_add_${it.card.scryfallId}" }) { suggestion ->
-                    CommunityAddSuggestionRow(
-                        suggestion = suggestion,
-                        sourceLabel = uiState.deck?.name.orEmpty().ifBlank { stringResource(R.string.deck_studio_suggestions_community_header) },
-                        onAdd = { onAddCommunity(suggestion) },
-                        onViewDecks = { onViewCommunityDecksForCard(suggestion.card.name) },
-                        onCardTap = { onCommunityCardTap(suggestion.card.scryfallId) },
-                    )
+                else -> {
+                    val groupedCommunityAdds = com.mmg.manahub.feature.decks.presentation.components.SuggestionGrouping
+                        .groupCommunityAddSuggestions(uiState.communityAdds, uiState.health?.profile)
+                    groupedCommunityAdds.forEach { (category, suggestions) ->
+                        item(key = "community_cat_${category.id}") {
+                            SuggestionCategoryHeaderChip(label = category.displayLabel, count = suggestions.size, tint = mc.secondaryAccent)
+                        }
+                        items(suggestions, key = { "community_add_${it.card.scryfallId}" }) { suggestion ->
+                            CommunityAddSuggestionRow(
+                                suggestion = suggestion,
+                                sourceLabel = communitySourceLabel,
+                                onAdd = { onAddCommunity(suggestion) },
+                                onViewDecks = { onViewCommunityDecksForCard(suggestion.card.name) },
+                                onCardTap = { onCommunityCardTap(suggestion.card.scryfallId) },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1605,6 +1739,23 @@ private fun SuggestionsTab(
                 }
             }
         }
+    }
+}
+
+/**
+ * Deck Builder v2 (plan §3.8) category sub-header for a grouped suggestions list ("Removal (5)") —
+ * a lighter-weight chip than [SuggestionsSectionHeader], since it sits ONE level below it (section
+ * = Motor A/Motor B, category = Removal/Ramp/... within that section).
+ */
+@Composable
+private fun SuggestionCategoryHeaderChip(label: String, count: Int, tint: androidx.compose.ui.graphics.Color) {
+    Surface(shape = ChipShape, color = tint.copy(alpha = 0.14f)) {
+        Text(
+            text = stringResource(R.string.deck_studio_suggestion_category_chip, label, count),
+            style = MaterialTheme.magicTypography.labelMedium,
+            color = tint,
+            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xs),
+        )
     }
 }
 

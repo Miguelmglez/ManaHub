@@ -432,8 +432,26 @@ class CardDetailViewModel(
     fun onSelectVariant(card: Card) {
         when (_uiState.value.variantSelectorSource) {
             VariantSelectorSource.SCREEN -> {
+                // getCardArtVariants has no lang: filter (Scryfall returns English objects for
+                // every variant), so navigating straight to `card.scryfallId` would silently
+                // force English even when the user was viewing a localized print. Try to resolve
+                // the SAME printing (set + collector number) in the language that was already
+                // being displayed before this navigation, falling back to the tapped English
+                // printing when no such localized object exists or the lookup fails.
+                val previousLang = _uiState.value.card?.lang
                 _uiState.update { it.copy(showVariantSelector = false) }
-                viewModelScope.launch { _events.emit(CardDetailEvent.NavigateToCard(card.scryfallId)) }
+                viewModelScope.launch {
+                    val targetScryfallId = if (previousLang != null) {
+                        val result = cardRepo.getLanguagePrints(card.setCode, card.collectorNumber)
+                        (result as? DataResult.Success)?.data
+                            ?.firstOrNull { it.lang == previousLang }
+                            ?.scryfallId
+                            ?: card.scryfallId
+                    } else {
+                        card.scryfallId
+                    }
+                    _events.emit(CardDetailEvent.NavigateToCard(targetScryfallId))
+                }
             }
             VariantSelectorSource.SHEET -> {
                 _uiState.update { it.copy(showVariantSelector = false, sheetPrinting = card) }
@@ -446,13 +464,42 @@ class CardDetailViewModel(
 
     // ── Collection mutations ──────────────────────────────────────────────────
 
+    /**
+     * Resolves the exact Scryfall printing id for [basePrinting]'s set + collector number in
+     * [language] — so the CardEntity ultimately FK'd from the collection/wishlist entry (and thus
+     * its price fields) matches what the user actually selected, not whichever printing happened to
+     * be cached as [basePrinting] (see feedback memory on the AddCardSheet price bug).
+     */
+    private suspend fun resolvePricedScryfallId(basePrinting: Card, language: String): String {
+        if (basePrinting.lang == language) return basePrinting.scryfallId
+        val result = cardRepo.getLanguagePrints(basePrinting.setCode, basePrinting.collectorNumber)
+        if (result is DataResult.Success) {
+            result.data.firstOrNull { it.lang == language }?.let { return it.scryfallId }
+        }
+        // No Scryfall object exists for this exact (set, collector number, language) — see if the
+        // user already owns an identical copy (same set/number/language) whose linked card has real
+        // price data, and reuse it; otherwise fall back to the originally-targeted printing (its
+        // price may be for the wrong language, but there is nothing better to link to — this mirrors
+        // every other case where Scryfall simply has no price for a card).
+        _uiState.value.userCards.firstOrNull { row ->
+            row.card.setCode == basePrinting.setCode &&
+                row.card.collectorNumber == basePrinting.collectorNumber &&
+                row.userCard.language == language &&
+                (row.card.priceUsd != null || row.card.priceEur != null)
+        }?.let { return it.card.scryfallId }
+        return basePrinting.scryfallId
+    }
+
     fun onAddToCollection(
         isFoil: Boolean,
         condition: String, language: String, quantity: Int,
     ) {
-        // The chosen printing may differ from the displayed one (Set / Variant field).
-        val targetScryfallId = _uiState.value.sheetPrinting?.scryfallId ?: scryfallId
         viewModelScope.launch {
+            // The chosen printing may differ from the displayed one (Set / Variant field); resolve
+            // the printing matching the SELECTED language so price fields line up (see
+            // resolvePricedScryfallId).
+            val basePrinting = _uiState.value.sheetPrinting ?: _uiState.value.card
+            val targetScryfallId = basePrinting?.let { resolvePricedScryfallId(it, language) } ?: scryfallId
             val result = addToCollection(
                 scryfallId = targetScryfallId,
                 isFoil = isFoil,
@@ -487,9 +534,10 @@ class CardDetailViewModel(
         condition: String, language: String, quantity: Int,
     ) {
         val entry = _uiState.value.entryBeingEdited ?: return
-        val targetScryfallId = _uiState.value.sheetPrinting?.scryfallId ?: entry.card.scryfallId
         val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
         viewModelScope.launch {
+            val basePrinting = _uiState.value.sheetPrinting ?: entry.card
+            val targetScryfallId = resolvePricedScryfallId(basePrinting, language)
             val result = updateCollectionEntry(
                 entryId = entry.userCard.id,
                 newScryfallId = targetScryfallId,
@@ -525,8 +573,9 @@ class CardDetailViewModel(
         isFoil: Boolean,
         condition: String, language: String, quantity: Int,
     ) {
-        val targetScryfallId = _uiState.value.sheetPrinting?.scryfallId ?: scryfallId
         viewModelScope.launch {
+            val basePrinting = _uiState.value.sheetPrinting ?: _uiState.value.card
+            val targetScryfallId = basePrinting?.let { resolvePricedScryfallId(it, language) } ?: scryfallId
             val entry = WishlistEntry(
                 id              = UUID.randomUUID().toString(),
                 userId          = "",
@@ -567,8 +616,9 @@ class CardDetailViewModel(
         condition: String, language: String, quantity: Int,
     ) {
         val entry = _uiState.value.wishlistEntryBeingEdited ?: return
-        val targetCardId = _uiState.value.sheetPrinting?.scryfallId ?: entry.cardId
         viewModelScope.launch {
+            val basePrinting = _uiState.value.sheetPrinting ?: entry.card
+            val targetCardId = basePrinting?.let { resolvePricedScryfallId(it, language) } ?: entry.cardId
             updateWishlistEntry(
                 entryId = entry.id,
                 newCardId = targetCardId,

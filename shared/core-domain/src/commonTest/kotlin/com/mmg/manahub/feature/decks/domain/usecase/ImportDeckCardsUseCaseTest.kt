@@ -36,6 +36,7 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
     override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
     override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> = error("unused")
+    override suspend fun getCachedEnglishSiblings(pairs: Set<Pair<String, String>>): Map<Pair<String, String>, Card> = error("unused")
     // Pre-existing gap fixed while touching this fake for the A3 backfill additions above
     // (2026-07-15): getLanguagePrints was added to CardRepository for Card Versions & Languages
     // Phase 1A but this hand-written fake was never updated, breaking wasmJs test compilation.
@@ -44,7 +45,7 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardByExactName(name: String): Result<Card> = error("unused")
-    override suspend fun searchWithRawQuery(query: String): List<Card> = error("unused")
+    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> = error("unused")
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = error("unused")
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
     override suspend fun refreshCollectionPrices() = error("unused")

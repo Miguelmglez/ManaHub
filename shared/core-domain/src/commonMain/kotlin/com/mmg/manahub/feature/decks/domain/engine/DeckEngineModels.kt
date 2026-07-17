@@ -100,7 +100,25 @@ enum class SeedStrategy(
     TRIBAL(
         "Tribal", "Synergistic creature tribe", "🐉",
         listOf(CardTag.TRIBAL, CardTag.AGGRO),
-    ),
+    );
+
+    companion object {
+        /**
+         * Reverse lookup from a [CardTag] to the [SeedStrategy] it best represents (Deck Builder v2
+         * — Discoveries v2 §3.5 and the wizard Direction step §3.4 both tap a collection-lean
+         * [CardTag] chip and need a [SeedStrategy] hint back). Prefers an EXACT name match
+         * (`tag.key.equals(strategy.name, ignoreCase = true)`) first — several tags are declared as
+         * a signal INSIDE more than one strategy's `primaryTags` (e.g. [CardTag.AGGRO] appears in
+         * AGGRO, TOKENS and TRIBAL), so a plain `firstOrNull { tag in primaryTags }` would always
+         * resolve to the first-declared entry (AGGRO) regardless of which tag was tapped. Falls back
+         * to the `primaryTags`-contains check only for a tag with no identically-named strategy
+         * (e.g. [CardTag.BURN] -> AGGRO). Returns null for a tag with no reasonable representative
+         * (e.g. [CardTag.ENCHANTRESS]) — never a guess.
+         */
+        fun forTag(tag: CardTag): SeedStrategy? =
+            entries.firstOrNull { it.name.equals(tag.key, ignoreCase = true) }
+                ?: entries.firstOrNull { tag in it.primaryTags }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

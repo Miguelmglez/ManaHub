@@ -104,6 +104,21 @@ abstract class CardDao {
     @Query("UPDATE cards SET tags = :tagsJson, suggested_tags = :suggestedJson WHERE scryfall_id = :scryfallId")
     abstract suspend fun updateTagsAndSuggestions(scryfallId: String, tagsJson: String, suggestedJson: String)
 
+    // Broken-image fix (2026-07-17). Batch lookup of cached ENGLISH printings for a set of
+    // (set_code, collector_number) pairs — feeds CardRepositoryImpl.getCachedEnglishSiblings,
+    // which overrides a non-English collection group's image with its English sibling's (many
+    // non-English Scryfall printings have no native image; same set + collector number always
+    // shares the same illustration). Room has no tuple-IN support, so this over-fetches on the
+    // cross product of the two IN lists and the caller filters down to exact pairs in Kotlin —
+    // cheap for the small batches involved (distinct non-English printings in one collection load).
+    @Query("""
+        SELECT * FROM cards
+        WHERE lang = 'en'
+          AND set_code IN (:setCodes)
+          AND collector_number IN (:collectorNumbers)
+    """)
+    abstract suspend fun getEnglishSiblings(setCodes: List<String>, collectorNumbers: List<String>): List<CardEntity>
+
     @Query("""
         UPDATE cards SET
             price_usd      = :priceUsd,

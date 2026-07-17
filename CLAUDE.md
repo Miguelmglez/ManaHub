@@ -185,6 +185,17 @@ launch, for a start-destination ViewModel's dependency chain). Bare `single { }`
 every consumer's param type is the exact concrete return type. → memory:
 `feedback_koin_single_concrete_type_mismatch`
 
+**`koinViewModel { parametersOf(x) }` needs an explicit `key` when the call site is a fixed-position
+overlay (sheet-scoped conditional content), not a real nav destination.** Compose's
+`ViewModelProvider` caches by key on the enclosing `ViewModelStoreOwner`; a real nav route gets a
+fresh `NavBackStackEntry`/`ViewModelStore` per call so this never surfaces there, but an overlay
+composable mounted at a fixed call site (e.g. `CardDetailScreen` opened from inside another screen's
+`AnimatedVisibility`, not `navController.navigate(...)`) keeps the same owner across recompositions —
+so `parametersOf(...)` is honored only on the FIRST construction and silently ignored on every
+later re-open with a different id. Always pass `koinViewModel(key = idString) { parametersOf(idString) }`
+in that pattern (precedent: `SetPickerViewModel`/`SetPickerSheet.kt`). → memory:
+`feedback_koin_viewmodel_overlay_key_trap`
+
 ### Utilities
 `core/util/TimeAgoFormatter` for relative dates (English only) — don't write inline `SimpleDateFormat`.
 
@@ -419,10 +430,22 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
 - → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
-**Suggestions tab + seed-build hidden for release (2026-07-14)**: `DeckFeatureFlags
-.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` and `.DECK_STUDIO_BUILD_FROM_SEED_ENABLED` flipped back to
-`false` (had been `true` since 2026-07-12 for the Community/Archetype plan launch) — code intact,
-flip back to `true` to re-enable. Manual editing, Import, and Discoveries are unaffected.
+**Suggestions tab hidden for release (2026-07-14)**: `DeckFeatureFlags
+.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flipped back to `false` (had been `true` since 2026-07-12 for
+the Community/Archetype plan launch) — code intact, flip back to `true` to re-enable. Manual editing
+and Import are unaffected.
+
+**Deck Builder v2 landed (2026-07-17, `docs/plans/deck-builder-v2-plan.md` Phases 3-5):** a new
+full-screen wizard (`Screen.DeckWizard` / `feature/decks/presentation/wizard/`) REPLACED
+`.DECK_STUDIO_BUILD_FROM_SEED_ENABLED` (now `false`) as the "Build from seed" entry point's
+destination, and a new `DiscoverSynergiesV2UseCase` (identity-only clustering) REPLACED
+`.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED` (now `false`) as the "Browse inspirations" sheet's
+content — both legacy paths stay compiled, and BOTH entry points stay visible whenever EITHER the
+legacy flag or its v2 sibling (`DECK_BUILDER_V2_ENABLED`/`DISCOVERIES_V2_ENABLED`, both `true`) is
+on. See `docs/hidden-features/deck-studio-build-from-seed.md` and `-inspirations.md` for the
+re-enable/retire procedure. → memory: `project_deck_builder_v2` (consolidated; per-run detail in
+`.claude/agent-memory/android-kotlin-architect/`)
+
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
 `Screen.DeckStudio.createRoute(deckId?)` (null ⇒ fresh draft). The old `CreateDeckBottomSheet` + the
@@ -803,6 +826,17 @@ offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/AD
 
 ## Testing conventions
 
+- **Targeted testing — NEVER run the full test suite by default.** Run ONLY the test classes/packages
+  affected by the change: the suites mirroring the files you touched + direct consumers of changed
+  public APIs. Use `--tests "com.mmg.manahub.<package>.*"` / specific class patterns. The full
+  `./gradlew test` run is reserved for: pre-PR final gate, changes to cross-cutting core code
+  (`core/data`, DB migrations, DI graph roots), or when the affected surface is genuinely unclear.
+  Same for builds: `assembleDebug` once per implementation batch, not after every file. Rationale:
+  full runs waste most of their time on untouched code. → memory: `feedback_targeted_testing`
+- **Batch implementation runs.** When executing a multi-phase plan, group phases into larger
+  implementation runs and defer the test-write + build + verify gate to the END of each run — do not
+  stop to write tests and do a full build after every small phase unless a phase is explicitly risky
+  (schema migration, data-loss surface).
 - Unit tests: MockK (`io.mockk`) + Turbine (`app.cash.turbine`). Instrumented Room tests: in-memory DB
   on device/emulator. Test classes mirror source package paths.
 - **`testDebugUnitTest --tests "<pattern>"` compiles the ENTIRE `src/test` source set first** — a compile

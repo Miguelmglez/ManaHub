@@ -51,6 +51,32 @@ sealed class Screen(val route: String) {
     object DeckAddCards : Screen("collection/decks/{deckId}/add") {
         fun createRoute(deckId: String) = "collection/decks/$deckId/add"
     }
+
+    /**
+     * Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.4) — the 4-step wizard + generation +
+     * result flow. A single destination with INTERNAL phase state (mirrors the Playtest
+     * mulligan/battle-phase-in-one-screen precedent), never a second nav destination per step.
+     * Always creates a FRESH draft (no `deckId` arg, unlike [DeckStudio]) — the wizard owns its own
+     * deck-creation lifecycle and hands off to [DeckStudio] only on the Result screen's "Open in
+     * Deck Studio" CTA.
+     *
+     * Optional query args pre-fill the wizard from a Discoveries v2 "Build this" tap (D11):
+     * [strategyHint] is a raw [com.mmg.manahub.feature.decks.domain.engine.SeedStrategy] enum name,
+     * [themeHint] a free-form label (e.g. a tribe display name), [colors] a concatenated
+     * [com.mmg.manahub.feature.decks.domain.engine.ManaColor] symbol string (e.g. "WU"). All blank
+     * by default (a plain "Build from seed" entry point passes none).
+     */
+    object DeckWizard : Screen("deck/wizard?strategyHint={strategyHint}&themeHint={themeHint}&colors={colors}") {
+        const val baseRoute = "deck/wizard"
+
+        fun createRoute(strategyHint: String? = null, themeHint: String? = null, colors: String? = null): String {
+            val params = mutableListOf<String>()
+            if (!strategyHint.isNullOrEmpty()) params += "strategyHint=${Uri.encode(strategyHint)}"
+            if (!themeHint.isNullOrEmpty()) params += "themeHint=${Uri.encode(themeHint)}"
+            if (!colors.isNullOrEmpty()) params += "colors=${Uri.encode(colors)}"
+            return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
+        }
+    }
     // Screen.DeckImprovement (the standalone Deck Doctor screen) was RETIRED in Phase 0.5 of
     // docs/claude-code-prompt-deck-doctor-community.md (D10) — Deck Studio's Suggestions tab
     // is now the sole Deck Doctor UI surface. DeckMagicDetailScreen.onImproveDeck navigates to

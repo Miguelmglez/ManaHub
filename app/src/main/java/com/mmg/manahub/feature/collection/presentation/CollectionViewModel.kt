@@ -8,8 +8,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CollectionCardGroup
+import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.groupByCard
+import com.mmg.manahub.core.model.groupCollection
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.UserCardWithCard
@@ -69,6 +73,13 @@ class CollectionViewModel(
     // Raw unfiltered collection from Room (non-deleted entries)
     private val _allCards = MutableStateFlow<List<UserCardWithCard>>(emptyList())
 
+    // Broken-image fix (2026-07-17). Cached ENGLISH sibling (same setCode + collectorNumber) for
+    // every distinct non-English printing currently in the raw collection, keyed by
+    // (setCode, collectorNumber). Refreshed ONCE per raw collection emission (see
+    // refreshEnglishSiblingCache), never per filter/sort pass — applyFilters() only does a pure
+    // in-memory lookup against this map so re-filtering/re-sorting never triggers a Room query.
+    private var englishSiblingCache: Map<Pair<String, String>, Card> = emptyMap()
+
     // Live set of scryfall IDs present in the local wishlist table.
     // Used by the "In Wishlist" advanced-search filter.
     private val _wishlistCardIds = MutableStateFlow<Set<String>>(emptySet())
@@ -108,6 +119,12 @@ class CollectionViewModel(
         viewModelScope.launch {
             userPreferencesRepository.collectionViewModeFlow.collect { mode ->
                 _uiState.update { it.copy(viewMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            userPreferencesRepository.collectionGroupingModeFlow.collect { mode ->
+                _uiState.update { it.copy(groupingMode = mode) }
+                applyFilters()
             }
         }
     }
@@ -163,6 +180,7 @@ class CollectionViewModel(
                 }
                 .collect { cards ->
                     _allCards.value = cards
+                    refreshEnglishSiblingCache(cards)
                     applyFilters()
                     // Re-check pending changes on every collection emit, but skip the check
                     // while a sync is actively running to avoid a false-positive during the
@@ -189,6 +207,48 @@ class CollectionViewModel(
                 }
         }
     }
+
+    /**
+     * Broken-image fix (2026-07-17). Batch-reads (Room only, no network) the English sibling
+     * printing for every distinct non-English (setCode, collectorNumber) pair present in [cards],
+     * and replaces [englishSiblingCache] wholesale. Called once per raw collection emission — the
+     * O(1)-per-load Room read that keeps [applyFilters]'s per-pass lookup pure in-memory.
+     * Best-effort: a lookup failure just leaves the cache empty for this load (groups fall back to
+     * their own representative's image, never a crash or blocked render).
+     */
+    private suspend fun refreshEnglishSiblingCache(cards: List<UserCardWithCard>) {
+        val pairs = cards.asSequence()
+            .filter { it.card.lang != "en" }
+            .map { it.card.setCode to it.card.collectorNumber }
+            .toSet()
+        englishSiblingCache = if (pairs.isEmpty()) {
+            emptyMap()
+        } else {
+            runCatching { cardRepository.getCachedEnglishSiblings(pairs) }.getOrDefault(emptyMap())
+        }
+    }
+
+    /**
+     * Broken-image fix (2026-07-17). For every non-English group, overrides ONLY the image fields
+     * with its cached English sibling's (many non-English Scryfall printings have no native image;
+     * the English printing of the same set + collector number always shares the same illustration
+     * and is guaranteed to have one). Every other field (name, price, set, rarity...) keeps coming
+     * from the actual representative printing. A group with no cached sibling yet (e.g. added
+     * before this fix, or the save-time warm-cache fetch hasn't landed) keeps its own image — no
+     * regression, no network call from this list-rendering path. Pure in-memory, O(groups).
+     */
+    private fun overrideForeignImages(groups: List<CollectionCardGroup>): List<CollectionCardGroup> =
+        groups.map { group ->
+            val card = group.card
+            if (card.lang == "en") return@map group
+            val englishSibling = englishSiblingCache[card.setCode to card.collectorNumber] ?: return@map group
+            group.copy(
+                card = card.copy(
+                    imageNormal = englishSibling.imageNormal,
+                    imageArtCrop = englishSibling.imageArtCrop,
+                )
+            )
+        }
 
     private fun refreshPrices() {
         viewModelScope.launch {
@@ -323,6 +383,20 @@ class CollectionViewModel(
         applyFilters()
     }
 
+    /**
+     * Changes the Cards tab "Group by" selection. Updates local state immediately (so the
+     * selector and sectioned list reflect the choice without waiting on the DataStore
+     * round-trip — mirrors [onSortChange], unlike [onViewModeToggle]'s launch-only shape, since
+     * grouping needs [CollectionUiState.sections] recomputed right away), persists the choice,
+     * then re-runs [applyFilters] to rebuild [CollectionUiState.sections].
+     */
+    fun onGroupingChange(mode: CollectionGroupingMode) {
+        _uiState.update { it.copy(groupingMode = mode) }
+        analyticsHelper.logEvent("collection_grouping_changed", mapOf("grouping_mode" to mode.name))
+        viewModelScope.launch { userPreferencesRepository.saveCollectionGroupingMode(mode) }
+        applyFilters()
+    }
+
     fun onViewModeToggle() {
         viewModelScope.launch {
             val newMode = if (_uiState.value.viewMode == CollectionViewMode.GRID) {
@@ -407,8 +481,9 @@ class CollectionViewModel(
             }
         }
 
-        // Group copies of the same card into one entry
-        val grouped = result.groupByCard()
+        // Group copies of the same card into one entry, then override each non-English group's
+        // image with its cached English sibling's (broken-image fix, 2026-07-17).
+        val grouped = overrideForeignImages(result.groupByCard())
 
         // Sort
         val sorted = when (state.sortOrder) {
@@ -419,7 +494,13 @@ class CollectionViewModel(
             SortOrder.DATE_ADDED -> grouped.sortedByDescending { it.latestAddedAt }
         }
 
-        _uiState.update { it.copy(cards = sorted) }
+        val sections = if (state.groupingMode == CollectionGroupingMode.NONE) {
+            emptyList()
+        } else {
+            groupCollection(sorted, state.groupingMode)
+        }
+
+        _uiState.update { it.copy(cards = sorted, sections = sections) }
     }
 
     private fun matchesCriterion(card: UserCardWithCard, criterion: SearchCriterion): Boolean {

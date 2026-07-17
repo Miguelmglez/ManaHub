@@ -55,7 +55,7 @@ class CandidatePoolGeneratorTest {
     fun `E2 - role queries lead with otag oracle tags`() = runTest(dispatcher) {
         val queries = mutableListOf<String>()
         // Non-empty result → no fallback fires; we see only the primary otag queries.
-        coEvery { repository.searchWithRawQuery(capture(queries)) } returns
+        coEvery { repository.searchWithRawQuery(capture(queries), any()) } returns
             listOf(card(id = "x", colorIdentity = listOf("U")))
 
         generator(
@@ -84,7 +84,7 @@ class CandidatePoolGeneratorTest {
     fun `E2 - empty otag result falls back to the legacy substring fragment`() = runTest(dispatcher) {
         val queries = mutableListOf<String>()
         // Every query (primary + fallback) returns empty → fallback always fires.
-        coEvery { repository.searchWithRawQuery(capture(queries)) } returns emptyList()
+        coEvery { repository.searchWithRawQuery(capture(queries), any()) } returns emptyList()
 
         generator(
             profile = minimalProfile(colorIdentity = setOf(ManaColor.U)),
@@ -94,15 +94,15 @@ class CandidatePoolGeneratorTest {
         // Primary otag + substring fallback for the single role.
         assertTrue("primary otag issued", queries.any { it.contains("otag:board-wipe") })
         assertTrue("fallback substring issued", queries.any { it.contains("destroy all") })
-        coVerify(exactly = 2) { repository.searchWithRawQuery(any()) }
+        coVerify(exactly = 2) { repository.searchWithRawQuery(any(), any()) }
     }
 
     @Test
     fun `E2 - erroring otag query falls back to the substring and recovers cards`() = runTest(dispatcher) {
-        coEvery { repository.searchWithRawQuery(match { it.contains("otag:board-wipe") }) } throws
+        coEvery { repository.searchWithRawQuery(match { it.contains("otag:board-wipe") }, any()) } throws
             RuntimeException("otag not supported")
         val survivor = card(id = "wrath", colorIdentity = listOf("U"))
-        coEvery { repository.searchWithRawQuery(match { it.contains("destroy all") }) } returns
+        coEvery { repository.searchWithRawQuery(match { it.contains("destroy all") }, any()) } returns
             listOf(survivor)
 
         val result = generator(
@@ -116,7 +116,7 @@ class CandidatePoolGeneratorTest {
     @Test
     fun `E2 - successful otag query does NOT issue the fallback`() = runTest(dispatcher) {
         val queries = mutableListOf<String>()
-        coEvery { repository.searchWithRawQuery(capture(queries)) } returns
+        coEvery { repository.searchWithRawQuery(capture(queries), any()) } returns
             listOf(card(id = "ok", colorIdentity = listOf("U")))
 
         generator(
@@ -125,9 +125,27 @@ class CandidatePoolGeneratorTest {
         )
 
         // Only the primary otag query — no fallback substring.
-        coVerify(exactly = 1) { repository.searchWithRawQuery(any()) }
+        coVerify(exactly = 1) { repository.searchWithRawQuery(any(), any()) }
         assertTrue(queries.single().contains("otag:removal"))
         assertFalse(queries.single().contains("destroy target"))
+    }
+
+    // ── Deck Builder v2 Phase 0 (root cause 1.2.1): kill the alphabetical pool ─────
+
+    @Test
+    fun `every searchWithRawQuery call passes order = edhrec, primary and fallback alike`() = runTest(dispatcher) {
+        val orders = mutableListOf<String>()
+        coEvery { repository.searchWithRawQuery(any(), capture(orders)) } returns emptyList()
+
+        generator(
+            profile = minimalProfile(colorIdentity = setOf(ManaColor.U)),
+            evaluation = evaluation(DeckRole.BOARD_WIPE to 2, DeckRole.SPOT_REMOVAL to 3),
+        )
+
+        // BOARD_WIPE fires primary + fallback (both empty), SPOT_REMOVAL fires primary only —
+        // every one of those calls must request EDHREC order, never the Scryfall default (name-ASC).
+        assertTrue("at least one query was issued", orders.isNotEmpty())
+        assertTrue("every call requests order=edhrec", orders.all { it == "edhrec" })
     }
 
     // ── Query composition (controlled allowlist only) ─────────────────────────────
@@ -135,7 +153,7 @@ class CandidatePoolGeneratorTest {
     @Test
     fun `query contains color identity, legality, budget cap and excludes basics`() = runTest(dispatcher) {
         val query = slot<String>()
-        coEvery { repository.searchWithRawQuery(capture(query)) } returns
+        coEvery { repository.searchWithRawQuery(capture(query), any()) } returns
             listOf(card(id = "x", colorIdentity = listOf("W")))
 
         val profile = minimalProfile(colorIdentity = setOf(ManaColor.W, ManaColor.U))
@@ -156,7 +174,7 @@ class CandidatePoolGeneratorTest {
     @Test
     fun `empty color identity omits the id filter`() = runTest(dispatcher) {
         val query = slot<String>()
-        coEvery { repository.searchWithRawQuery(capture(query)) } returns
+        coEvery { repository.searchWithRawQuery(capture(query), any()) } returns
             listOf(card(id = "x", colorIdentity = emptyList()))
 
         val profile = minimalProfile(colorIdentity = emptySet())
@@ -168,7 +186,7 @@ class CandidatePoolGeneratorTest {
     @Test
     fun `no usd cap omits the usd filter`() = runTest(dispatcher) {
         val query = slot<String>()
-        coEvery { repository.searchWithRawQuery(capture(query)) } returns
+        coEvery { repository.searchWithRawQuery(capture(query), any()) } returns
             listOf(card(id = "x", colorIdentity = listOf("G")))
 
         generator(
@@ -185,7 +203,7 @@ class CandidatePoolGeneratorTest {
     @Test
     fun `E3 - elf tribe fingerprint adds a t-elf query`() = runTest(dispatcher) {
         val queries = mutableListOf<String>()
-        coEvery { repository.searchWithRawQuery(capture(queries)) } returns
+        coEvery { repository.searchWithRawQuery(capture(queries), any()) } returns
             listOf(card(id = "elf", colorIdentity = listOf("G")))
 
         // PAYOFF gap has no role query, but the derived `tribe:elf` fingerprint key drives a t:elf query.
@@ -203,7 +221,7 @@ class CandidatePoolGeneratorTest {
     @Test
     fun `E3 - dominant strategy fingerprint adds an otag strategy query`() = runTest(dispatcher) {
         val queries = mutableListOf<String>()
-        coEvery { repository.searchWithRawQuery(capture(queries)) } returns
+        coEvery { repository.searchWithRawQuery(capture(queries), any()) } returns
             listOf(card(id = "lg", colorIdentity = listOf("W")))
 
         generator(
@@ -219,7 +237,7 @@ class CandidatePoolGeneratorTest {
 
     @Test
     fun `E3 - a strategy key NOT in the allowlist adds no extra query`() = runTest(dispatcher) {
-        coEvery { repository.searchWithRawQuery(any()) } returns emptyList()
+        coEvery { repository.searchWithRawQuery(any(), any()) } returns emptyList()
 
         // `control` is an ARCHETYPE key with no allowlisted otag → no strategy query, and PAYOFF has
         // no role query → zero queries overall.
@@ -231,7 +249,7 @@ class CandidatePoolGeneratorTest {
             evaluation = evaluation(DeckRole.PAYOFF to 5),
         )
 
-        coVerify(exactly = 0) { repository.searchWithRawQuery(any()) }
+        coVerify(exactly = 0) { repository.searchWithRawQuery(any(), any()) }
         assertTrue(result.isEmpty())
     }
 
@@ -245,9 +263,9 @@ class CandidatePoolGeneratorTest {
         val duplicate = card(id = "a", colorIdentity = listOf("U")).copy(edhrecRank = 100)
 
         // First role's otag returns a + c, second role's otag returns b + duplicate-of-a.
-        coEvery { repository.searchWithRawQuery(match { it.contains("otag:board-wipe") }) } returns
+        coEvery { repository.searchWithRawQuery(match { it.contains("otag:board-wipe") }, any()) } returns
             listOf(highRank, noRank)
-        coEvery { repository.searchWithRawQuery(match { it.contains("otag:card-advantage") }) } returns
+        coEvery { repository.searchWithRawQuery(match { it.contains("otag:card-advantage") }, any()) } returns
             listOf(lowRank, duplicate)
 
         val result = generator(
@@ -261,7 +279,7 @@ class CandidatePoolGeneratorTest {
 
     @Test
     fun `roles without a query fragment and no strategy or tribe produce zero queries`() = runTest(dispatcher) {
-        coEvery { repository.searchWithRawQuery(any()) } returns emptyList()
+        coEvery { repository.searchWithRawQuery(any(), any()) } returns emptyList()
 
         // PAYOFF / THREAT have no role fragment and the profile has no strategy/tribe fingerprint.
         val result = generator(
@@ -269,19 +287,19 @@ class CandidatePoolGeneratorTest {
             evaluation = evaluation(DeckRole.PAYOFF to 5, DeckRole.THREAT to 5),
         )
 
-        coVerify(exactly = 0) { repository.searchWithRawQuery(any()) }
+        coVerify(exactly = 0) { repository.searchWithRawQuery(any(), any()) }
         assertTrue(result.isEmpty())
     }
 
     @Test
     fun `a failing role query does not abort the others`() = runTest(dispatcher) {
         // Both the otag AND its fallback fail for board-wipe; card-advantage's otag succeeds.
-        coEvery { repository.searchWithRawQuery(match { it.contains("otag:board-wipe") }) } throws
+        coEvery { repository.searchWithRawQuery(match { it.contains("otag:board-wipe") }, any()) } throws
             RuntimeException("Scryfall down")
-        coEvery { repository.searchWithRawQuery(match { it.contains("destroy all") }) } throws
+        coEvery { repository.searchWithRawQuery(match { it.contains("destroy all") }, any()) } throws
             RuntimeException("Scryfall down")
         val survivor = card(id = "ok", colorIdentity = listOf("U"))
-        coEvery { repository.searchWithRawQuery(match { it.contains("otag:card-advantage") }) } returns
+        coEvery { repository.searchWithRawQuery(match { it.contains("otag:card-advantage") }, any()) } returns
             listOf(survivor)
 
         val result = generator(

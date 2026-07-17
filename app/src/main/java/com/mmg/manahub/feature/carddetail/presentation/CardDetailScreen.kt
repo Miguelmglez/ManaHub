@@ -224,7 +224,7 @@ fun CardDetailScreen(
                             )
                         }
                         CardName(
-                            name = uiState.card?.name ?: "",
+                            name = uiState.card?.printedName ?: uiState.card?.name ?: "",
                             style = MaterialTheme.magicTypography.titleLarge,
                             modifier = Modifier
                                 .weight(1f),
@@ -313,9 +313,8 @@ fun CardDetailScreen(
         val editingEntry = uiState.entryBeingEdited
         printing?.let { card ->
             AddCardSheet(
-                cardName = card.name,
+                cardName = card.printedName ?: card.name,
                 cardImage = card.imageNormal,
-                manaCost = card.manaCost,
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
@@ -348,9 +347,8 @@ fun CardDetailScreen(
         val editingWishlistEntry = uiState.wishlistEntryBeingEdited
         printing?.let { card ->
             AddCardSheet(
-                cardName = card.name,
+                cardName = card.printedName ?: card.name,
                 cardImage = card.imageNormal,
-                manaCost = card.manaCost,
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
@@ -766,7 +764,11 @@ private fun CardDetailContent(
                             exit = fadeOut()
                         )
                     ) { isBack ->
-                        val name = if (isBack) backFace?.name ?: card.name else frontFace?.name ?: card.name
+                        val name = if (isBack) {
+                            backFace?.printedName ?: card.printedName ?: card.name
+                        } else {
+                            frontFace?.printedName ?: card.printedName ?: card.name
+                        }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -988,7 +990,11 @@ private fun CardDetailContent(
             ) {
                 // Name + badges
                 FaceFlippable(rotation = rotation) { isBack ->
-                    val name = if (isBack) backFace?.name ?: card.name else frontFace?.name ?: card.name
+                    val name = if (isBack) {
+                        backFace?.printedName ?: card.printedName ?: card.name
+                    } else {
+                        frontFace?.printedName ?: card.printedName ?: card.name
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

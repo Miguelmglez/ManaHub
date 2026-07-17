@@ -47,10 +47,7 @@ data class ScanSession(
  * @property selectedCondition      Current condition code in the mode bar (e.g. "NM").
  * @property selectedQuantity       Current quantity in the mode bar (1–4).
  * @property lockedSetCode          When non-null, only cards of this set are auto-added.
- * @property isQuickMode            Auto-adds detected cards without any confirmation UI.
- * @property isLookupOnly           Cards are only shown in the bottom bar, never added.
  * @property showQueueSheet         Controls the scan-queue ModalBottomSheet.
- * @property showSettingsSheet      Controls the settings ModalBottomSheet.
  * @property toastMessage           One-shot toast text (cleared after display).
  * @property detectedCorners        Four corner points of the detected card in frame pixel
  *                                  coordinates, or null when no card is in the frame.
@@ -58,9 +55,6 @@ data class ScanSession(
  *                                  the Canvas overlay reads from a single source of truth.
  * @property multiSelectedIds       Set of scryfallId values selected in the queue sheet.
  * @property isSoundEnabled         Whether sound effects play on successful card add.
- * @property languageMismatch       True when the scanned card's language differs from
- *                                  [selectedLanguage] and [isQuickMode] is on; card is shown
- *                                  but not added automatically.
  * @property showAmbiguitySelector  True when a card was identified as ambiguous in normal mode;
  *                                  shows an inline [DropdownMenu] to confirm or skip.
  * @property showPriceDetailSheet   True when the price detail [ModalBottomSheet] is open
@@ -68,10 +62,21 @@ data class ScanSession(
  * @property hasFlash               True when the current camera hardware has a flash unit.
  *                                  Populated asynchronously after the camera binds; defaults to
  *                                  true so the flash button is visible until confirmed otherwise.
+ * @property isRecognitionPausedByUser  True when the user explicitly paused recognition via the
+ *                                  top-bar toggle, independent of any sheet-driven pause (queue,
+ *                                  settings, edit, variant selector, expanded image).
+ * @property isAutoDeleteOnAddEnabled  True when a per-entry "Add to collection"/"Add to wishlist"
+ *                                  action in [ScanQueueSheet] should also remove that entry from
+ *                                  the queue once the add succeeds.
+ * @property ownedCardIdentityKeys  Live set of identity keys (`oracleId.ifBlank { name }`) already
+ *                                  present in the user's collection — feeds the "already in
+ *                                  collection" badge in [QueueCardItem]. Kept up to date by a
+ *                                  [ScannerViewModel] collector on `UserCardRepository.observeCollection()`.
  */
 data class ScannerUiState(
     val isFlashOn: Boolean = false,
     val hasFlash: Boolean = true,
+    val isRecognitionPausedByUser: Boolean = false,
     val isSearching: Boolean = false,
     val lastDetectedCard: Card? = null,
     val error: String? = null,
@@ -82,12 +87,8 @@ data class ScannerUiState(
     val selectedCondition: String = "NM",
     val selectedQuantity: Int = 1,
     val lockedSetCode: String? = null,
-    // Behaviour modes
-    val isQuickMode: Boolean = true,
-    val isLookupOnly: Boolean = false,
     // Sheet visibility
     val showQueueSheet: Boolean = false,
-    val showSettingsSheet: Boolean = false,
     val showEditSheet: Boolean = false,
     val showPriceDetailSheet: Boolean = false,
     // Edit card
@@ -102,10 +103,17 @@ data class ScannerUiState(
     val detectedCorners: List<PointF>? = null,
     // Sound
     val isSoundEnabled: Boolean = true,
+    // Auto-delete a queue entry once it's individually added to collection/wishlist
+    val isAutoDeleteOnAddEnabled: Boolean = false,
+    // "Already in collection" badge — live identity-key set, see KDoc above
+    val ownedCardIdentityKeys: Set<String> = emptySet(),
     // Language mismatch indicator (Quick Mode only)
     val languageMismatch: Boolean = false,
     // Ambiguity resolution (normal mode only)
     val showAmbiguitySelector: Boolean = false,
+    // Card Detail overlay (Phase 2 scanner UX, 2026-07-17)
+    val selectedCardDetailId: String? = null,
+    val returnToQueueOnDetailClose: Boolean = false,
     // Rolling FPS counter — only populated in DEBUG builds, always 0 in release
     val fps: Int = 0,
 

@@ -94,6 +94,7 @@ import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -762,72 +763,6 @@ private fun SearchResultItem(
                         style = ty.bodySmall,
                         color = mc.goldMtg,
                     )
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Search language bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun LanguageSelectorSheet(
-    selectedLanguage: String,
-    onDismiss: () -> Unit,
-    onSelectLanguage: (String) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = mc.background,
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.addcard_language_sheet_title),
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
-            )
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                items(CardConstants.languages, key = { it.first }) { (code, flag) ->
-                    val isSelected = code == selectedLanguage
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .clickable { onSelectLanguage(code) }
-                            .then(
-                                if (isSelected) Modifier.background(mc.primaryAccent.copy(alpha = 0.08f))
-                                else Modifier
-                            )
-                            .padding(horizontal = spacing.lg, vertical = spacing.md),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.md),
-                    ) {
-                        Text(text = flag, style = ty.titleLarge)
-                        Text(
-                            text = CardConstants.getLanguageName(code),
-                            style = ty.bodyMedium,
-                            color = if (isSelected) mc.primaryAccent else mc.textPrimary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = mc.primaryAccent,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
                 }
             }
         }

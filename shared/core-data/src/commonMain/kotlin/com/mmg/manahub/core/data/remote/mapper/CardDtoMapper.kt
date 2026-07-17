@@ -81,6 +81,7 @@ fun CardDto.toDomain(): Card {
         cardFaces = cardFaces?.map { face ->
             CardFace(
                 name = face.name,
+                printedName = face.printedName,
                 manaCost = face.manaCost,
                 typeLine = face.typeLine,
                 oracleText = face.oracleText,

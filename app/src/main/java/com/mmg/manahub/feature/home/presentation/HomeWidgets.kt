@@ -64,8 +64,10 @@ import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -221,12 +223,18 @@ private fun stringResourceSafe(id: Int, vararg formatArgs: Any): String = string
 
 /**
  * Section header matching the Stats screen style: Icon + Uppercase Label.
+ *
+ * When [onClick] is non-null (Home widget board overhaul, TASK 6) the icon+label area (NOT
+ * [trailingContent]) becomes a ≥48dp tap target that opens the widget's logical destination —
+ * the same one its "See more"/internal taps already use.
  */
 @Composable
 private fun WidgetSectionHeader(
     title: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
@@ -237,21 +245,37 @@ private fun WidgetSectionHeader(
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         modifier = modifier.fillMaxWidth().padding(bottom = spacing.xs)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = mc.primaryAccent,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(
-            text = title.uppercase(),
-            style = ty.labelLarge,
-            color = mc.textPrimary,
-            letterSpacing = 2.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .then(
+                    if (onClick != null) {
+                        Modifier
+                            .clip(ChipShape)
+                            .clickable(onClickLabel = onClickLabel, role = Role.Button, onClick = onClick)
+                    } else {
+                        Modifier
+                    }
+                ),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = mc.primaryAccent,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = title.uppercase(),
+                style = ty.labelLarge,
+                color = mc.textPrimary,
+                letterSpacing = 2.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         trailingContent?.invoke()
     }
 }
@@ -355,6 +379,11 @@ fun HomeWidgetHost(
     // Deck Doctor Community/Archetype plan, Phase 5 — kept OUTSIDE HomeUiState on purpose, see
     // [com.mmg.manahub.feature.home.presentation.HomeViewModel.trendingFlow]'s KDoc.
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
+    // Home widget board overhaul, TASK 5b — kept OUTSIDE HomeUiState for the same reason as
+    // [trending]; see [com.mmg.manahub.feature.home.presentation.HomeViewModel.communityDecksFlow]'s
+    // KDoc.
+    communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
+    communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
 ) {
     val spacing = MaterialTheme.spacing
     // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
@@ -367,13 +396,22 @@ fun HomeWidgetHost(
 
     Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
         if (widget.type != HomeWidgetType.CONTEXT_HERO) {
+            val titleText = stringResourceSafe(widget.type.defaultTitleRes)
+            val titleClickAction = widgetHeaderTitleClickAction(widget.type)
             WidgetSectionHeader(
-                title = stringResourceSafe(widget.type.defaultTitleRes),
+                title = titleText,
                 icon = widget.type.icon,
-                trailingContent = widgetHeaderTrailingContent(widget.type, uiState, onAction),
+                onClick = titleClickAction?.let { action -> { onAction(action) } },
+                onClickLabel = titleText,
+                trailingContent = widgetHeaderTrailingContent(
+                    type = widget.type,
+                    uiState = uiState,
+                    onAction = onAction,
+                    communityDecksCategory = communityDecksCategory,
+                ),
             )
         }
-        
+
         when (widget.type) {
             HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
             HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
@@ -394,6 +432,7 @@ fun HomeWidgetHost(
             HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(
                 stats = uiState.wishlistStats,
                 isAuthenticated = uiState.isAuthenticated,
+                authResolved = uiState.authResolved,
                 onAction = onAction,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
@@ -415,11 +454,50 @@ fun HomeWidgetHost(
             HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
             HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
             HomeWidgetType.RULES_TIP -> RulesTipWidget()
-            HomeWidgetType.SOCIAL_HUB -> SocialHubWidget(uiState, onAction)
+            HomeWidgetType.FRIENDS -> FriendsWidget(
+                friends = uiState.friends,
+                friendCount = uiState.friendCount,
+                latestFriendRequestName = uiState.latestFriendRequestName,
+                isAuthenticated = uiState.isAuthenticated,
+                authResolved = uiState.authResolved,
+                onAction = onAction,
+            )
+            HomeWidgetType.COMMUNITY_DECKS -> CommunityDecksWidget(
+                decks = communityDecks,
+                onAction = onAction,
+            )
             HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
             HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
         }
     }
+}
+
+/**
+ * The logical destination for tapping a widget's TITLE (Home widget board overhaul, TASK 6) — the
+ * same action its "See more" tile / internal taps already navigate to. Null means the title is not
+ * clickable (its internal content already IS the whole tap target, e.g. CONTEXT_HERO/QUICK_ACTIONS,
+ * or there is no single destination, e.g. CARD_OF_THE_DAY/RULES_TIP).
+ */
+private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = when (type) {
+    HomeWidgetType.MTG_NEWS -> HomeAction.OpenNews
+    HomeWidgetType.YOUR_DECKS_SHELF -> HomeAction.OpenDecks
+    HomeWidgetType.RECENTLY_ADDED -> HomeAction.OpenLibrary
+    HomeWidgetType.WISHLIST_PROGRESS -> HomeAction.OpenWishlist
+    HomeWidgetType.DISCOVER_CARDS -> HomeAction.SearchCard
+    HomeWidgetType.LATEST_SETS -> HomeAction.OpenDraftGuide
+    HomeWidgetType.GAME_STATS_HUB -> HomeAction.OpenStats
+    HomeWidgetType.COLLECTION_STATS_HUB -> HomeAction.OpenStats
+    HomeWidgetType.TRADES_HUB -> HomeAction.OpenTrades
+    HomeWidgetType.FRIENDS -> HomeAction.OpenFriends
+    HomeWidgetType.COMMUNITY_DECKS -> HomeAction.OpenCommunityDecks
+    HomeWidgetType.TRENDING_COMMANDERS -> HomeAction.OpenCommunityDecks
+    HomeWidgetType.PROGRESSION_HUB -> HomeAction.OpenProfile
+    HomeWidgetType.QUESTS_HUB -> HomeAction.OpenProfileQuests
+    HomeWidgetType.QUICK_ACTIONS,
+    HomeWidgetType.CARD_OF_THE_DAY,
+    HomeWidgetType.RULES_TIP,
+    HomeWidgetType.CONTEXT_HERO,
+    -> null
 }
 
 /** `true` when there is no trending data to show (null snapshot or an empty commanders list) —
@@ -472,12 +550,14 @@ private fun TrendingCommandersWidget(
 /**
  * Resolves the trailing affordance shown in a widget's section header, or null when the widget
  * has none. Each branch is self-contained; the DISCOVER_CARDS branch hosts its own local
- * set-picker toggle state and the reusable [SetPickerSheet].
+ * set-picker toggle state and the reusable [SetPickerSheet]; COMMUNITY_DECKS hosts its own local
+ * category-picker sheet toggle state (Home widget board overhaul, TASK 5b).
  */
 private fun widgetHeaderTrailingContent(
     type: HomeWidgetType,
     uiState: HomeUiState,
     onAction: (HomeAction) -> Unit,
+    communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
 ): (@Composable () -> Unit)? = when (type) {
     HomeWidgetType.QUICK_ACTIONS -> {
         {
@@ -531,6 +611,26 @@ private fun widgetHeaderTrailingContent(
                     onDismiss = { showSetPicker = false },
                     availableSets = null,
                     singleSelection = true,
+                )
+            }
+        }
+    }
+    HomeWidgetType.COMMUNITY_DECKS -> {
+        {
+            var showCategoryPicker by remember { mutableStateOf(false) }
+            WidgetHeaderIconButton(
+                icon = Icons.Default.Style,
+                contentDescription = stringResource(R.string.home_community_decks_category_a11y),
+                onClick = { showCategoryPicker = true },
+            )
+            if (showCategoryPicker) {
+                CommunityDecksCategoryPickerSheet(
+                    selected = communityDecksCategory,
+                    onSelect = { category ->
+                        onAction(HomeAction.SelectCommunityDecksCategory(category))
+                        showCategoryPicker = false
+                    },
+                    onDismiss = { showCategoryPicker = false },
                 )
             }
         }
@@ -1498,11 +1598,17 @@ private sealed interface GameStatsSlide {
     data class Performance(val details: PerformanceDetails) : GameStatsSlide
     data class Streak(val streak: PlayStreak, val totalGames: Int) : GameStatsSlide
     data class LastGame(val recap: LastGameRecap) : GameStatsSlide
+    /** Relocated from the retired SOCIAL_HUB (Home widget board overhaul, TASK 5c) — real data,
+     * kept alive per the no-stub rule rather than dropped alongside the low-value slides. */
+    data class ActiveTournament(val summary: TournamentSummary) : GameStatsSlide
 }
 
 @Composable
 private fun GameStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit) {
-    val slides = remember(uiState.winRate, uiState.bestDeck, uiState.nemesis, uiState.performanceDetails, uiState.playStreak, uiState.lastGameRecap) {
+    val slides = remember(
+        uiState.winRate, uiState.bestDeck, uiState.nemesis, uiState.performanceDetails,
+        uiState.playStreak, uiState.lastGameRecap, uiState.activeTournamentSummary,
+    ) {
         buildList {
             uiState.winRate?.let { add(GameStatsSlide.WinRate(it)) }
             uiState.bestDeck?.let { add(GameStatsSlide.BestDeck(it)) }
@@ -1512,6 +1618,7 @@ private fun GameStatsHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> U
                 ?.let { add(GameStatsSlide.Performance(it)) }
             uiState.playStreak?.let { add(GameStatsSlide.Streak(it, uiState.winRate?.totalGames ?: 0)) }
             uiState.lastGameRecap?.let { add(GameStatsSlide.LastGame(it)) }
+            uiState.activeTournamentSummary?.let { add(GameStatsSlide.ActiveTournament(it)) }
         }
     }
     WidgetShell {
@@ -1530,6 +1637,23 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     when (slide) {
+        is GameStatsSlide.ActiveTournament -> HubSlide {
+            val summary = slide.summary
+            ClickableBox(onClick = { onAction(HomeAction.OpenTournaments) }) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+                    HubBadge(Icons.Default.EmojiEvents, mc.primaryAccent)
+                    Column {
+                        Text(summary.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                            Text(stringResourceSafe(R.string.home_tournament_round, summary.round), style = ty.labelSmall, color = mc.textSecondary)
+                            summary.standing?.let {
+                                Text(stringResourceSafe(R.string.home_tournament_standing, it), style = ty.labelSmall, color = mc.textSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
         is GameStatsSlide.WinRate -> {
             val stats = slide.stats
             val color = if (stats.percentage >= 50) mc.lifePositive else mc.lifeNegative
@@ -2051,9 +2175,14 @@ private fun StatBox(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun DecksShelfWidget(decks: List<DeckSummary>, onAction: (HomeAction) -> Unit) {
+private fun DecksShelfWidget(decks: List<DeckSummary>?, onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.OpenDecks) }) {
+        // TASK 7b: null = still loading; distinguishes from "the user genuinely has zero decks".
+        if (decks == null) {
+            WidgetLoading()
+            return@WidgetShell
+        }
         if (decks.isEmpty()) {
             WidgetEmptyBody(stringResourceSafe(R.string.home_decks_empty))
             return@WidgetShell
@@ -2079,13 +2208,18 @@ private fun DecksShelfWidget(decks: List<DeckSummary>, onAction: (HomeAction) ->
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun RecentlyAddedWidget(
-    entries: List<RecentlyAddedCard>,
+    entries: List<RecentlyAddedCard>?,
     onAction: (HomeAction) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.OpenLibrary) }) {
+        // TASK 7b: null = still loading; distinguishes from "the collection genuinely has nothing".
+        if (entries == null) {
+            WidgetLoading()
+            return@WidgetShell
+        }
         if (entries.isEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
                 WidgetEmptyBody(stringResourceSafe(R.string.home_recently_added_empty))
@@ -2146,10 +2280,16 @@ private fun QuantityBadge(quantity: Int, modifier: Modifier = Modifier) {
 private fun WishlistWidget(
     stats: WishlistStats?,
     isAuthenticated: Boolean,
+    authResolved: Boolean,
     onAction: (HomeAction) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
+    // TASK 7a: while the session is still resolving, show a spinner — never the gated placeholder.
+    if (!authResolved) {
+        WidgetShell { WidgetLoading() }
+        return
+    }
     if (!isAuthenticated) {
         AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_wishlist)) { onAction(HomeAction.CreateAccount) }
         return
@@ -2647,143 +2787,201 @@ private fun RulesTipWidget() {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  SOCIAL_HUB (account-gated)
-// ═══════════════════════════════════════════════════════════════════════════════
+// SOCIAL_HUB was split into FRIENDS + COMMUNITY_DECKS (Home widget board overhaul, TASK 5) —
+// see those widgets above. Its old MostWishlisted/Milestones slides were dropped as low-value
+// (TASK 5c); ActiveTournament moved into GAME_STATS_HUB (see GameStatsSlide.ActiveTournament).
 
-private sealed interface SocialSlide {
-    /** Real friend count + optional newest pending-request headline. */
-    data class FriendsActivity(
-        val friendCount: Int,
-        val latestRequestName: String?,
-        val friends: List<Friend>
-    ) : SocialSlide
-    data class MostWishlisted(val entries: List<com.mmg.manahub.core.model.CommunityEntry>) : SocialSlide
-    data class ActiveTournament(val summary: TournamentSummary) : SocialSlide
-    data class Milestones(val milestones: List<com.mmg.manahub.core.model.CommunityMilestone>) : SocialSlide
-    /** A popular Archidekt Commander deck (Phase 1.2.c) — mandatory "via Archidekt" attribution. */
-    data class TrendingDeck(val deck: com.mmg.manahub.core.model.ArchidektTrendingDeck) : SocialSlide
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+//  FRIENDS (Home widget board overhaul, TASK 5a — split off SOCIAL_HUB's friends slide)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun SocialHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit) {
-    if (!uiState.isAuthenticated) {
-        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_social_hub)) { onAction(HomeAction.CreateAccount) }
+private fun FriendsWidget(
+    friends: List<Friend>?,
+    friendCount: Int,
+    latestFriendRequestName: String?,
+    isAuthenticated: Boolean,
+    authResolved: Boolean,
+    onAction: (HomeAction) -> Unit,
+) {
+    // TASK 7a: while the session is still resolving, show a spinner — never the gated placeholder
+    // (which would otherwise flash before a real signed-in session lands).
+    if (!authResolved) {
+        WidgetShell { WidgetLoading() }
         return
     }
-    val community = uiState.communityStats
-    val slides = remember(community, uiState.activeTournamentSummary, uiState.friendCount, uiState.latestFriendRequestName, uiState.archidektTrending, uiState.friends) {
-        buildList {
-            add(SocialSlide.FriendsActivity(uiState.friendCount, uiState.latestFriendRequestName, uiState.friends))
-            community?.mostWishlisted?.takeIf { it.isNotEmpty() }?.let { add(SocialSlide.MostWishlisted(it)) }
-            uiState.activeTournamentSummary?.let { add(SocialSlide.ActiveTournament(it)) }
-            community?.milestones?.takeIf { it.isNotEmpty() }?.let { add(SocialSlide.Milestones(it)) }
-            uiState.archidektTrending.forEach { add(SocialSlide.TrendingDeck(it)) }
-        }
+    if (!isAuthenticated) {
+        AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_friends)) { onAction(HomeAction.CreateAccount) }
+        return
     }
-    WidgetShell {
-        AutoSlideHub(
-            slides = slides,
-            slideContent = { slide -> SocialSlideContent(slide, onAction) },
-            showDots = false,
-        )
+    // TASK 7b: null = still loading the friend list.
+    if (friends == null) {
+        WidgetShell { WidgetLoading() }
+        return
     }
-}
-
-@Composable
-private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    when (slide) {
-        is SocialSlide.FriendsActivity -> HubSlide {
-            ClickableBox(onClick = { onAction(HomeAction.OpenFriends) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.Default.Group, mc.primaryAccent)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResourceSafe(R.string.home_social_friends_title), style = ty.titleMedium, color = mc.textPrimary)
-                        when {
-                            slide.latestRequestName != null ->
-                                Text(
-                                    stringResourceSafe(R.string.home_friends_pending_request, slide.latestRequestName),
-                                    style = ty.labelSmall, color = mc.primaryAccent, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                )
-                            slide.friendCount > 0 ->
-                                Text(stringResourceSafe(R.string.home_friends_count, slide.friendCount), style = ty.labelSmall, color = mc.textSecondary)
-                            else ->
-                                Text(stringResourceSafe(R.string.home_friends_empty), style = ty.labelSmall, color = mc.textSecondary)
+    WidgetShell(onClick = { onAction(HomeAction.OpenFriends) }) {
+        if (latestFriendRequestName != null) {
+            Surface(
+                color = mc.primaryAccent.copy(alpha = 0.12f),
+                shape = ChipShape,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    Icon(Icons.Default.Group, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = stringResourceSafe(R.string.home_friends_pending_request, latestFriendRequestName),
+                        style = ty.labelMedium,
+                        color = mc.primaryAccent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+        if (friends.isEmpty()) {
+            WidgetEmptyBody(stringResourceSafe(R.string.home_friends_empty))
+            return@WidgetShell
+        }
+        Text(
+            text = stringResourceSafe(R.string.home_friends_count, friendCount),
+            style = ty.labelSmall,
+            color = mc.textSecondary,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            items(friends, key = { it.id }) { friend ->
+                Column(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .clip(CardShape)
+                        .clickable(onClick = { onAction(HomeAction.OpenFriends) }),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+                ) {
+                    AvatarImage(avatarUrl = friend.avatarUrl, initials = friend.nickname.take(1).uppercase(), size = 56)
+                    Text(
+                        text = friend.nickname,
+                        style = ty.labelSmall,
+                        color = mc.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  COMMUNITY_DECKS (Home widget board overhaul, TASK 5b — split off SOCIAL_HUB's Archidekt
+//  trending-deck slide; richer real DeckItem cards + native tap-through)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun CommunityDecksWidget(
+    decks: List<com.mmg.manahub.core.model.CommunityDeckSummary>?,
+    onAction: (HomeAction) -> Unit,
+) {
+    val spacing = MaterialTheme.spacing
+    WidgetShell {
+        // TASK 7b: null = still loading this category's decks.
+        if (decks == null) {
+            WidgetLoading()
+            return@WidgetShell
+        }
+        if (decks.isEmpty()) {
+            WidgetEmptyBody(stringResourceSafe(R.string.home_community_decks_empty))
+            return@WidgetShell
+        }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            items(decks, key = { it.archidektId }) { deck ->
+                DeckItem(
+                    deck = deck.toDeckSummary(),
+                    onClick = { onAction(HomeAction.OpenCommunityDeck(deck.archidektId)) },
+                    reduced = true,
+                    ownerName = deck.owner.username,
+                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    modifier = Modifier.width(160.dp),
+                )
+            }
+            item(key = "see_more") {
+                SeeAllTile(onClick = { onAction(HomeAction.OpenCommunityDecks) }, modifier = Modifier.width(96.dp))
+            }
+        }
+    }
+}
+
+/** Projects a lightweight Archidekt search result onto the shared [DeckItem]'s [DeckSummary] shape. */
+private fun com.mmg.manahub.core.model.CommunityDeckSummary.toDeckSummary(): DeckSummary = DeckSummary(
+    id = archidektId.toString(),
+    name = name,
+    description = null,
+    format = format,
+    coverCardId = null,
+    createdAt = 0L,
+    updatedAt = 0L,
+    cardCount = size,
+    colorIdentity = colorIdentity.toSet(),
+    coverImageUrl = featuredImageUrl,
+)
+
+/** Category picker for the COMMUNITY_DECKS widget (TASK 5b), mirroring [SetPickerSheet]'s pattern. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommunityDecksCategoryPickerSheet(
+    selected: HomeCommunityDeckCategory,
+    onSelect: (HomeCommunityDeckCategory) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = mc.backgroundSecondary) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.lg)
+                .padding(bottom = spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
+            Text(
+                text = stringResourceSafe(R.string.home_community_decks_category_sheet_title),
+                style = ty.titleLarge,
+                color = mc.textPrimary,
+                modifier = Modifier.padding(bottom = spacing.sm),
+            )
+            HomeCommunityDeckCategory.entries.forEach { category ->
+                val isSelected = category == selected
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(ChipShape)
+                        .clickable(onClickLabel = stringResourceSafe(category.titleRes), role = Role.Button) {
+                            onSelect(category)
                         }
+                        .padding(horizontal = spacing.sm, vertical = spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    if (isSelected) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
+                    } else {
+                        Spacer(Modifier.size(20.dp))
                     }
-                    if (slide.friends.isNotEmpty()) {
-                        FriendAvatarRow(friends = slide.friends)
-                    }
-                }
-            }
-        }
-        is SocialSlide.MostWishlisted -> HubSlide {
-            ClickableBox(onClick = { onAction(HomeAction.OpenStats) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.AutoMirrored.Filled.TrendingUp, mc.primaryAccent)
-                    Column {
-                        Text(stringResourceSafe(R.string.widget_title_most_wishlisted), style = ty.titleMedium, color = mc.textPrimary)
-                        slide.entries.take(1).forEach { entry ->
-                            // The card name resolves ONLY from the local cache (HomeViewModel.withResolvedCardNames);
-                            // an entry the user never cached locally has an empty name — render a count-only
-                            // fallback instead of an empty/blank name (Home dashboard audit, HIGH).
-                            val row = if (entry.name.isNotBlank()) {
-                                stringResourceSafe(R.string.home_most_wishlisted_row, entry.name, entry.count)
-                            } else {
-                                stringResourceSafe(R.string.home_most_wishlisted_row_unnamed, entry.count)
-                            }
-                            Text(
-                                row,
-                                style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        is SocialSlide.ActiveTournament -> HubSlide {
-            val summary = slide.summary
-            ClickableBox(onClick = { onAction(HomeAction.OpenTournaments) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.Default.EmojiEvents, mc.primaryAccent)
-                    Column {
-                        Text(summary.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                            Text(stringResourceSafe(R.string.home_tournament_round, summary.round), style = ty.labelSmall, color = mc.textSecondary)
-                            summary.standing?.let {
-                                Text(stringResourceSafe(R.string.home_tournament_standing, it), style = ty.labelSmall, color = mc.textSecondary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        is SocialSlide.Milestones -> HubSlide {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                HubBadge(Icons.Default.AutoAwesome, mc.primaryAccent)
-                Column {
-                    Text(stringResourceSafe(R.string.widget_title_community_milestones), style = ty.titleMedium, color = mc.textPrimary)
-                    slide.milestones.take(1).forEach { m ->
-                        Text("${m.value} · ${m.label}", style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-        }
-        is SocialSlide.TrendingDeck -> HubSlide {
-            val deck = slide.deck
-            ClickableBox(onClick = { onAction(HomeAction.OpenNewsUrl(deck.deckUrl)) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.Default.Style, mc.primaryAccent)
-                    Column {
-                        Text(deck.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            stringResourceSafe(R.string.home_archidekt_deck_subtitle, deck.viewCount),
-                            style = ty.labelSmall, color = mc.textSecondary,
-                        )
-                    }
+                    Text(
+                        text = stringResourceSafe(category.titleRes),
+                        style = ty.bodyMedium,
+                        color = if (isSelected) mc.primaryAccent else mc.textPrimary,
+                    )
                 }
             }
         }
@@ -2794,33 +2992,50 @@ private fun SocialSlideContent(slide: SocialSlide, onAction: (HomeAction) -> Uni
 //  TRADES_HUB (account-gated)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** Home widget board overhaul, TASK 4b — real card-based content replaces the old count-only slides. */
 private sealed interface TradesSlide {
     data class Inbox(val summary: TradeSummary?) : TradesSlide
-    data class Suggestions(val count: Int) : TradesSlide
-    data class OpenForTrade(val count: Int, val valueDisplay: String?) : TradesSlide
-    data class RecentActivity(val proposals: List<com.mmg.manahub.core.model.TradeProposal>) : TradesSlide
+    data class Suggestions(val previews: List<TradeSuggestionPreview>) : TradesSlide
+    data class OpenForTrade(val preview: OpenForTradePreview) : TradesSlide
+    data class RecentActivity(val proposals: List<TradeProposal>) : TradesSlide
 }
 
 @Composable
 private fun TradesHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit) {
+    // TASK 7a: while the session is still resolving, show a spinner — never the gated placeholder.
+    if (!uiState.authResolved) {
+        WidgetShell { WidgetLoading() }
+        return
+    }
     if (!uiState.isAuthenticated) {
         AccountGatedPlaceholder(stringResourceSafe(R.string.widget_title_trades_hub)) { onAction(HomeAction.CreateAccount) }
         return
     }
-    val slides = remember(uiState.tradeSummary, uiState.tradeSuggestionsCount, uiState.openForTradeCount, uiState.openForTradeValueDisplay, uiState.recentTrades) {
+    val suggestionPreviews = uiState.tradeSuggestionPreviews
+    val openForTrade = uiState.openForTradePreview
+    val recentTrades = uiState.recentTrades
+    // TASK 7b: never render a section whose backing slice hasn't finished loading yet — wait for
+    // every slice once so the widget flips straight to its final content, with no partial swaps.
+    if (suggestionPreviews == null || openForTrade == null || recentTrades == null) {
+        WidgetShell { WidgetLoading() }
+        return
+    }
+    val slides = remember(uiState.tradeSummary, suggestionPreviews, openForTrade, recentTrades) {
         buildList {
-            if (uiState.recentTrades.isNotEmpty()) {
-                add(TradesSlide.RecentActivity(uiState.recentTrades))
+            if (recentTrades.isNotEmpty()) {
+                add(TradesSlide.RecentActivity(recentTrades))
             }
             add(TradesSlide.Inbox(uiState.tradeSummary))
-            add(TradesSlide.Suggestions(uiState.tradeSuggestionsCount))
-            add(TradesSlide.OpenForTrade(uiState.openForTradeCount, uiState.openForTradeValueDisplay))
+            if (suggestionPreviews.isNotEmpty()) {
+                add(TradesSlide.Suggestions(suggestionPreviews))
+            }
+            add(TradesSlide.OpenForTrade(openForTrade))
         }
     }
     WidgetShell {
         AutoSlideHub(
             slides = slides,
-            slideContent = { slide -> TradesSlideContent(slide, uiState.isAuthenticated, onAction) },
+            slideContent = { slide -> TradesSlideContent(slide, onAction) },
             showDots = false,
         )
     }
@@ -2829,7 +3044,6 @@ private fun TradesHubWidget(uiState: HomeUiState, onAction: (HomeAction) -> Unit
 @Composable
 private fun TradesSlideContent(
     slide: TradesSlide,
-    isAuthenticated: Boolean,
     onAction: (HomeAction) -> Unit
 ) {
     val mc = MaterialTheme.magicColors
@@ -2875,36 +3089,64 @@ private fun TradesSlideContent(
             }
         }
         is TradesSlide.Suggestions -> HubSlide {
-            ClickableBox(onClick = { onAction(HomeAction.OpenTrades) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.Default.AutoAwesome, mc.primaryAccent)
-                    Column {
-                        Text(stringResourceSafe(R.string.widget_title_trade_suggestions), style = ty.titleMedium, color = mc.textPrimary)
-                        if (slide.count == 0) {
-                            Text(stringResourceSafe(R.string.home_trade_suggestions_empty), style = ty.labelSmall, color = mc.textSecondary)
-                        } else {
-                            Text(stringResourceSafe(R.string.home_trade_suggestions_count, slide.count), style = ty.titleMedium, color = mc.primaryAccent)
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Text(
+                    text = stringResourceSafe(R.string.widget_title_trade_suggestions),
+                    style = ty.labelMedium,
+                    color = mc.textSecondary,
+                    modifier = Modifier.padding(horizontal = spacing.xs),
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                    items(slide.previews, key = { it.card.id }) { preview ->
+                        Column(
+                            modifier = Modifier.width(72.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+                        ) {
+                            DiscoverCardThumb(card = preview.card, onClick = { onAction(HomeAction.OpenTrades) })
+                            // Never log the friend's name — this is UI-only, no telemetry key here.
+                            preview.counterpartyName?.let { name ->
+                                Text(
+                                    text = name,
+                                    style = ty.labelSmall,
+                                    color = mc.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
                         }
                     }
                 }
             }
         }
         is TradesSlide.OpenForTrade -> HubSlide {
-            ClickableBox(onClick = { onAction(HomeAction.OpenTrades) }) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
-                    HubBadge(Icons.Default.Style, mc.primaryAccent)
-                    Column {
-                        Text(stringResourceSafe(R.string.widget_title_open_for_trade), style = ty.titleMedium, color = mc.textPrimary)
-                        if (slide.count == 0) {
+            val preview = slide.preview
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.xs),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResourceSafe(R.string.widget_title_open_for_trade), style = ty.labelMedium, color = mc.textSecondary)
+                    preview.valueDisplay?.let {
+                        Text(
+                            stringResourceSafe(R.string.home_open_for_trade_value, it),
+                            style = ty.labelMedium, color = mc.goldMtg,
+                        )
+                    }
+                }
+                if (preview.cards.isEmpty()) {
+                    ClickableBox(onClick = { onAction(HomeAction.OpenTrades) }) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+                            HubBadge(Icons.Default.Style, mc.primaryAccent)
                             Text(stringResourceSafe(R.string.home_open_for_trade_empty), style = ty.labelSmall, color = mc.textSecondary)
-                        } else {
-                            Text(stringResourceSafe(R.string.home_open_for_trade_count, slide.count), style = ty.titleMedium, color = mc.primaryAccent)
-                            slide.valueDisplay?.let {
-                                Text(
-                                    stringResourceSafe(R.string.home_open_for_trade_value, it),
-                                    style = ty.labelSmall, color = mc.goldMtg,
-                                )
-                            }
+                        }
+                    }
+                } else {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                        items(preview.cards, key = { it.id }) { card ->
+                            DiscoverCardThumb(card = card, onClick = { onAction(HomeAction.OpenTrades) })
                         }
                     }
                 }
@@ -3293,6 +3535,9 @@ fun HomeWidgetContainer(
     modifier: Modifier = Modifier,
     // Deck Doctor Community/Archetype plan, Phase 5.
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
+    // Home widget board overhaul, TASK 5b.
+    communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
+    communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
 ) {
     Box(modifier = modifier) {
         HomeWidgetHost(
@@ -3302,6 +3547,8 @@ fun HomeWidgetContainer(
             sharedTransitionScope = sharedTransitionScope,
             animatedVisibilityScope = animatedVisibilityScope,
             trending = trending,
+            communityDecks = communityDecks,
+            communityDecksCategory = communityDecksCategory,
         )
     }
 }

@@ -78,9 +78,10 @@ enum class ThemeId(val displayName: String) {
 
 /**
  * The two skeleton shapes Appendix A defines. [COMMANDER] = 99-card singleton (+ the commander,
- * 100 total). [SIXTY] = any 60-card constructed shell — in THIS build only [com.mmg.manahub
- * .core.model.DeckFormat.CASUAL] is a live 60-card format (Standard/Pioneer/Modern/Legacy/
- * Vintage/Pauper are commented out for the current release scope; see [ArchetypeFormat.of]).
+ * 100 total). [SIXTY] = any 60-card constructed shell — every 60-card [com.mmg.manahub
+ * .core.model.DeckFormat] (Standard/Pioneer/Modern/Legacy/Vintage/Pauper/Casual, restored Deck
+ * Builder v2 Phase 0) maps onto it; they share the same Appendix-A skeleton shape and differ only
+ * by legality, not by archetype layout (see [ArchetypeFormat.of]).
  * [DeckFormat.DRAFT] has no archetype skeleton (Appendix A defines no Draft data) and always
  * resolves to `null` — the archetype layer is a no-op for Draft decks.
  */
@@ -92,6 +93,12 @@ enum class ArchetypeFormat {
          * `null` when the format has no archetype skeleton (Draft). */
         fun of(format: com.mmg.manahub.core.model.DeckFormat): ArchetypeFormat? = when (format) {
             com.mmg.manahub.core.model.DeckFormat.COMMANDER -> COMMANDER
+            com.mmg.manahub.core.model.DeckFormat.STANDARD,
+            com.mmg.manahub.core.model.DeckFormat.PIONEER,
+            com.mmg.manahub.core.model.DeckFormat.MODERN,
+            com.mmg.manahub.core.model.DeckFormat.LEGACY,
+            com.mmg.manahub.core.model.DeckFormat.VINTAGE,
+            com.mmg.manahub.core.model.DeckFormat.PAUPER,
             com.mmg.manahub.core.model.DeckFormat.CASUAL -> SIXTY
             com.mmg.manahub.core.model.DeckFormat.DRAFT -> null
         }
