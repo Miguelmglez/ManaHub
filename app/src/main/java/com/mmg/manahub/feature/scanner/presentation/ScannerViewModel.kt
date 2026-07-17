@@ -8,6 +8,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.ScannedCardCommit
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -66,6 +67,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ScannerViewModel @Inject constructor(
     private val cardRepository: CardRepository,
+    private val userCardRepository: UserCardRepository,
     private val commitScannedCards: CommitScannedCardsUseCase,
     private val addToWishlist: AddToWishlistUseCase,
     private val analyticsHelper: AnalyticsHelper,
@@ -126,6 +128,24 @@ class ScannerViewModel @Inject constructor(
 
     init {
         loadPersistedQueue()
+        observeOwnedCardIdentityKeys()
+    }
+
+    /**
+     * Continuously tracks the set of "already owned" card identity keys — the same convention
+     * used across Card Versions & Languages: [com.mmg.manahub.core.model.Card.oracleId] falling
+     * back to the exact English [com.mmg.manahub.core.model.Card.name] when [oracleId] is blank
+     * (some cached rows predate the oracleId backfill). Feeds the "already in collection" badge
+     * in [QueueCardItem]. This is a LIVE collector (not a one-shot fetch) so the badge appears
+     * immediately after the user adds a card from the queue while the sheet is still open.
+     */
+    private fun observeOwnedCardIdentityKeys() {
+        viewModelScope.launch {
+            userCardRepository.observeCollection().collect { rows ->
+                val keys = rows.mapTo(mutableSetOf()) { it.card.oracleId.ifBlank { it.card.name } }
+                _uiState.update { it.copy(ownedCardIdentityKeys = keys) }
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -345,37 +365,27 @@ class ScannerViewModel @Inject constructor(
                     return
                 }
 
-                when {
-                    confirmedState.isLookupOnly -> {
-                        _uiState.update { it.copy(languageMismatch = false) }
-                    }
+                if (confirmedState.selectedLanguage != DEFAULT_LANGUAGE &&
+                    result.card.lang != confirmedState.selectedLanguage
+                ) {
+                    _uiState.update { it.copy(languageMismatch = true) }
+                    return
+                }
 
-                    confirmedState.isQuickMode -> {
-                        if (confirmedState.selectedLanguage != DEFAULT_LANGUAGE &&
-                            result.card.lang != confirmedState.selectedLanguage
-                        ) {
-                            _uiState.update { it.copy(languageMismatch = true) }
-                            return
-                        }
-                        _uiState.update { it.copy(languageMismatch = false) }
-                        analyticsHelper.logEvent("scanner_card_added_quick_mode", mapOf(
-                            "set_code" to result.card.setCode,
-                        ))
-                        quickAddCard(result.card)
-                    }
+                _uiState.update { it.copy(languageMismatch = false) }
 
-                    result.ambiguous -> {
-                        _uiState.update {
-                            it.copy(
-                                showAmbiguitySelector = true,
-                                languageMismatch = false,
-                            )
-                        }
+                if (result.ambiguous) {
+                    _uiState.update {
+                        it.copy(
+                            showAmbiguitySelector = true,
+                        )
                     }
-
-                    else -> {
-                        _uiState.update { it.copy(languageMismatch = false) }
-                    }
+                } else {
+                    analyticsHelper.logEvent(
+                        "scanner_card_added_auto",
+                        mapOf("set_code" to result.card.setCode)
+                    )
+                    quickAddCard(result.card)
                 }
             }
         }
@@ -482,6 +492,9 @@ class ScannerViewModel @Inject constructor(
             _uiState.update {
                 it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name))
             }
+            if (_uiState.value.isAutoDeleteOnAddEnabled) {
+                onRemoveSessionCard(entry)
+            }
         }
     }
 
@@ -509,6 +522,9 @@ class ScannerViewModel @Inject constructor(
             )
             _uiState.update {
                 it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name))
+            }
+            if (_uiState.value.isAutoDeleteOnAddEnabled) {
+                onRemoveSessionCard(entry)
             }
         }
     }
@@ -587,6 +603,15 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(isSoundEnabled = !it.isSoundEnabled) }
     }
 
+    /**
+     * Toggles whether a per-entry "Add to collection" / "Add to wishlist" action in
+     * [ScanQueueSheet] also removes that entry from the queue once the add succeeds. Sticky for
+     * the session (survives sheet close/reopen); does NOT affect the bulk "Add all" actions.
+     */
+    fun onToggleAutoDeleteOnAdd() {
+        _uiState.update { it.copy(isAutoDeleteOnAddEnabled = !it.isAutoDeleteOnAddEnabled) }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Mode bar actions
     // ─────────────────────────────────────────────────────────────────────────
@@ -614,16 +639,6 @@ class ScannerViewModel @Inject constructor(
     /** Sets or clears the locked set filter. */
     fun onSetLockSelected(setCode: String?) {
         _uiState.update { it.copy(lockedSetCode = setCode) }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Queue actions & filtering
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /** Updates the search query for filtering the scan queue. */
-    fun onQueueSearchQueryChanged(query: String) {
-        // Filtering is handled in the UI layer (ScanQueueSheet) for performance;
-        // the query is stored here for future ViewModel-side filtering if needed.
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -701,27 +716,16 @@ class ScannerViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Settings bottom sheet
+    //  Recognition pause toggle (top bar) — independent of sheet-driven pauses
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** Opens the settings bottom sheet. */
-    fun onOpenSettings() {
-        _uiState.update { it.copy(showSettingsSheet = true) }
-    }
-
-    /** Closes the settings bottom sheet. */
-    fun onCloseSettings() {
-        _uiState.update { it.copy(showSettingsSheet = false) }
-    }
-
-    /** Toggles Quick Mode (auto-add on detect). */
-    fun onToggleQuickMode() {
-        _uiState.update { it.copy(isQuickMode = !it.isQuickMode, languageMismatch = false) }
-    }
-
-    /** Toggles Lookup Only mode (show price, never add). */
-    fun onToggleLookupOnly() {
-        _uiState.update { it.copy(isLookupOnly = !it.isLookupOnly) }
+    /**
+     * Toggles recognition pause via the top-bar play/pause control. This is independent of the
+     * sheet-driven pauses (queue/settings/edit/variant-selector/expanded-image) — both conditions
+     * are OR'd together at the [CameraPreview] call site.
+     */
+    fun onToggleRecognitionPaused() {
+        _uiState.update { it.copy(isRecognitionPausedByUser = !it.isRecognitionPausedByUser) }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -833,6 +837,37 @@ class ScannerViewModel @Inject constructor(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  Card Detail overlay
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Opens the detail overlay for [id].
+     * @param fromQueue If true, closes the queue sheet first and flags it for restoration on close.
+     */
+    fun onOpenCardDetail(id: String, fromQueue: Boolean = false) {
+        _uiState.update {
+            it.copy(
+                selectedCardDetailId = id,
+                showQueueSheet = if (fromQueue) false else it.showQueueSheet,
+                returnToQueueOnDetailClose = fromQueue
+            )
+        }
+    }
+
+    /**
+     * Closes the detail overlay. If it was opened from the queue, re-opens the queue sheet.
+     */
+    fun onCloseCardDetail() {
+        _uiState.update {
+            it.copy(
+                selectedCardDetailId = null,
+                showQueueSheet = if (it.returnToQueueOnDetailClose) true else it.showQueueSheet,
+                returnToQueueOnDetailClose = false
+            )
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  Variant selector
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -898,16 +933,24 @@ class ScannerViewModel @Inject constructor(
     //  Duplicate scanned card
     // ─────────────────────────────────────────────────────────────────────────
 
-    fun onAddDuplicateScannedCard(original: ScannedCard) {
+    /**
+     * Duplicates [original] and inserts the copy immediately after it in the scan queue (in
+     * place, NOT appended at the end), so quickly stamping several physical copies of the same
+     * card keeps them visually grouped. Backs the "Duplicate" action in [QueueCardItem] (replaced
+     * the old per-copy "Variants" button — item 6 of the 2026-07-17 scanner UX pass). Unlike the
+     * old `onAddDuplicateScannedCard` this never touches the edit sheet's visibility, since it is
+     * no longer reachable from inside [EditScannedCardSheet].
+     */
+    fun onDuplicateSessionCard(original: ScannedCard) {
         val duplicate = original.copy(timestamp = System.currentTimeMillis())
         _uiState.update { state ->
-            state.copy(
-                scanSession = state.scanSession.copy(
-                    cards = state.scanSession.cards + duplicate,
-                ),
-                showEditSheet = false,
-                editingCard = null,
-            )
+            val index = state.scanSession.cards.indexOfFirst { it.timestamp == original.timestamp }
+            val updatedCards = if (index >= 0) {
+                state.scanSession.cards.toMutableList().apply { add(index + 1, duplicate) }
+            } else {
+                state.scanSession.cards + duplicate
+            }
+            state.copy(scanSession = state.scanSession.copy(cards = updatedCards))
         }
         persistQueue()
     }

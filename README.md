@@ -58,6 +58,12 @@ Build and manage decks backed by your collection and real-time Scryfall data.
 - Import / export in Moxfield / MTGO text format
 - Format validation (Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Commander, Casual)
 - Card detail with double-faced support; quick add/remove from search or your collection
+- **Deck creation wizard**: guided multi-step builder (Commander & Casual) that matches your
+  collection against community deck templates (EDHREC/Archidekt data), with staged generation
+  progress, per-category fill report, and community picks grouped by role (Removal, Ramp, …)
+  clearly separated from cards you own
+- **Collection discoveries**: synergy clusters detected in your own collection (strategies and
+  tribes), each with a one-tap "Build this" handoff into the wizard
 
 ### 👥 Friends
 Friend requests (incoming/outgoing), invite by link or QR, search by Game Tag, browse a friend's collection, head-to-head stats and match history.

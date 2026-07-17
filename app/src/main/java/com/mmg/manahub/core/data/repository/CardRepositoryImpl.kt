@@ -223,8 +223,22 @@ class CardRepositoryImpl @Inject constructor(
             }
         }
 
-    override suspend fun searchWithRawQuery(query: String): List<Card> =
-        withContext(ioDispatcher) { remote.searchWithRawQuery(query) }
+    override suspend fun getCachedEnglishSiblings(pairs: Set<Pair<String, String>>): Map<Pair<String, String>, Card> =
+        withContext(ioDispatcher) {
+            if (pairs.isEmpty()) return@withContext emptyMap()
+            val setCodes = pairs.map { it.first }.distinct()
+            val collectorNumbers = pairs.map { it.second }.distinct()
+            cardDao.getEnglishSiblings(setCodes, collectorNumbers)
+                .asSequence()
+                .map { it.toDomainCard() }
+                // The DAO query is a cross product of the two IN lists — keep only the exact
+                // (setCode, collectorNumber) pairs actually requested.
+                .filter { (it.setCode to it.collectorNumber) in pairs }
+                .associateBy { it.setCode to it.collectorNumber }
+        }
+
+    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> =
+        withContext(ioDispatcher) { remote.searchWithRawQuery(query, order) }
 
     override suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>> =
         withContext(ioDispatcher) {

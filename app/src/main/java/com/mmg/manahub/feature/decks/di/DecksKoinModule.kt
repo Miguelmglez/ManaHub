@@ -24,6 +24,11 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseC
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
+import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
+import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
+import com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver
+import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
+import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckViewModel
@@ -152,6 +157,27 @@ fun decksKoinModule(
     single { ImportDeckCardsUseCase(deckRepository = get(), cardRepository = get(), crashReporter = get(), deckstatsFetcher = get()) }
     single { ImportDeckUseCase(importDeckCardsUseCase = get()) }
 
+    // Deck Builder v2 (docs/plans/deck-builder-v2-plan.md), Phase 1/2. Flag-gated OFF
+    // (DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) -- registered natively in Koin now so the wizard
+    // (Phase 3, not yet built) can resolve them with no further DI work. `CommunityAggregateRepository`
+    // is resolved via `get()` from `communityAggregateKoinModule` (same cross-module pattern as
+    // SuggestAddsFromCommunityUseCase above).
+    single { DeckTemplateResolver(communityAggregateRepository = get(), crashReporter = get()) }
+    single { CollectionProfileUseCase() }
+    single {
+        BuildDeckFromTemplateUseCase(
+            deckTemplateResolver = get(),
+            deckScorer = get(),
+            cardRepository = get(),
+            manaBaseAnalyzer = get(),
+            crashReporter = get(),
+        )
+    }
+    // Deck Builder v2, Phase 5 (docs/plans/deck-builder-v2-plan.md §3.5) -- Discoveries v2. Flag
+    // -gated OFF by default until DeckFeatureFlags.DISCOVERIES_V2_ENABLED flips (this batch flips
+    // it to true -- see that flag's KDoc).
+    single { DiscoverSynergiesV2UseCase(deckScorer = get()) }
+
     // ── ViewModels (the Decks island) ──────────────────────────────────────────────
     // DeckViewModel: backs the deck list.
     viewModel { DeckViewModel(deckRepo = get(), cardRepo = get()) }
@@ -182,6 +208,24 @@ fun decksKoinModule(
             findSimilarDecksUseCase = get(),
             communityAggregateRepository = get(),
             importDeckCardsUseCase = get(),
+            discoverSynergiesV2UseCase = get(),
+        )
+    }
+
+    // DeckWizardViewModel: Deck Builder v2 wizard (docs/plans/deck-builder-v2-plan.md §3.4). Always
+    // creates its own fresh draft (no `deckId` nav arg, unlike DeckStudioViewModel) -- the optional
+    // strategyHint/themeHint/colors args are the Discoveries v2 "Build this" hand-off (D11).
+    viewModel {
+        DeckWizardViewModel(
+            deckRepository = get(),
+            userCardRepository = get(),
+            collectionProfileUseCase = get(),
+            buildDeckFromTemplateUseCase = get(),
+            searchCardsUseCase = get(),
+            communityAggregateRepository = get(),
+            crashReporter = get(),
+            appContext = get(),
+            savedStateHandle = get(),
         )
     }
 

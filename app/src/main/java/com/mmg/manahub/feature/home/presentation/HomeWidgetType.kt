@@ -165,14 +165,9 @@ enum class HomeWidgetType(
     ),
 
     // ── Social ────────────────────────────────────────────────────────────────────
-    SOCIAL_HUB(
-        persistedId = "social_hub",
-        defaultTitleRes = R.string.widget_title_social_hub,
-        supportedSizes = setOf(WidgetSize.MEDIUM),
-        category = WidgetCategory.SOCIAL,
-        audience = WidgetAudience.ACCOUNT_GATED,
-        icon = Icons.Default.Group,
-    ),
+    // SOCIAL_HUB was split (Home widget board overhaul, TASK 5) into FRIENDS + COMMUNITY_DECKS —
+    // see the companion LEGACY_SOCIAL_HUB_PERSISTED_ID migration below (its persisted layout
+    // token is expanded into both new widgets at decode time so no existing board goes empty).
     TRADES_HUB(
         persistedId = "trades_hub",
         defaultTitleRes = R.string.widget_title_trades_hub,
@@ -181,8 +176,18 @@ enum class HomeWidgetType(
         audience = WidgetAudience.ACCOUNT_GATED,
         icon = Icons.Default.SwapHoriz,
     ),
+    /** Friend list + pending-request headline (Home widget board overhaul, TASK 5a — split off
+     * SOCIAL_HUB's friends slide). */
+    FRIENDS(
+        persistedId = "friends",
+        defaultTitleRes = R.string.widget_title_friends,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.SOCIAL,
+        audience = WidgetAudience.ACCOUNT_GATED,
+        icon = Icons.Default.Group,
+    ),
 
-    // ── Community (Deck Doctor Community/Archetype plan, Phase 5) ─────────────────
+    // ── Community (Deck Doctor Community/Archetype plan, Phase 5 + widget board overhaul TASK 5b) ─
     /** Top-3 trending commanders of the week; tap navigates into the Community Hub's Discover
      * section (reuses [HomeAction.OpenCommunityDecks] — the Hub lands on Discover by default when
      * `communityEngineEnabledFlow` is on). Silently hidden — never an error state — on Worker
@@ -194,6 +199,19 @@ enum class HomeWidgetType(
         category = WidgetCategory.COMMUNITY,
         audience = WidgetAudience.ALL,
         icon = Icons.Default.Group,
+    ),
+    /** Browsable community decks (Archidekt), category-selectable — Home widget board overhaul,
+     * TASK 5b. Works without an account (browsing is public); replaces SOCIAL_HUB's Archidekt
+     * trending-deck slide with richer [com.mmg.manahub.core.ui.components.DeckItem] cards that
+     * navigate NATIVELY into [com.mmg.manahub.app.navigation.Screen.CommunityDeckDetail] instead
+     * of opening an external URL. */
+    COMMUNITY_DECKS(
+        persistedId = "community_decks_browse",
+        defaultTitleRes = R.string.widget_title_community_decks,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.COMMUNITY,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.Style,
     );
 
     /** True for widgets that belong to the gamification system (hidden when the toggle is off). */
@@ -204,5 +222,13 @@ enum class HomeWidgetType(
         /** Resolves a persisted id back to its type, or null if unknown/removed. */
         fun fromPersistedId(id: String): HomeWidgetType? =
             entries.firstOrNull { it.persistedId == id }
+
+        /**
+         * The retired SOCIAL_HUB widget's old persisted id (Home widget board overhaul, TASK 5c).
+         * A layout token with this id is expanded into [FRIENDS] + [COMMUNITY_DECKS] at decode
+         * time — see `WidgetInstance.toInstancesWithMigration` — so an existing user's board never
+         * silently loses the whole slot the way an unknown-id token would.
+         */
+        const val LEGACY_SOCIAL_HUB_PERSISTED_ID: String = "social_hub"
     }
 }

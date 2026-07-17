@@ -385,4 +385,50 @@ class CardRepositoryImplTest {
             )
         }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Broken-image fix (2026-07-17): getCachedEnglishSiblings (Room-only, no network)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given cached English row matching set and collector number when getCachedEnglishSiblings then it is returned keyed by the pair`() = runTest {
+        val englishEntity = TestFixtures.buildCardEntity(scryfallId = "en-001")
+            .copy(setCode = "lea", collectorNumber = "5", lang = "en")
+        coEvery { cardDao.getEnglishSiblings(listOf("lea"), listOf("5")) } returns listOf(englishEntity)
+
+        val result = repository.getCachedEnglishSiblings(setOf("lea" to "5"))
+
+        assertEquals(1, result.size)
+        assertEquals("en-001", result["lea" to "5"]?.scryfallId)
+    }
+
+    @Test
+    fun `given DAO cross-product returns a non-matching pair when getCachedEnglishSiblings then it is filtered out`() = runTest {
+        // Room has no tuple-IN support: the DAO query is a cross product of the two IN lists.
+        // A row that matches set OR number but not the exact pair must not leak into the result.
+        val wrongPairEntity = TestFixtures.buildCardEntity(scryfallId = "en-wrong")
+            .copy(setCode = "lea", collectorNumber = "999", lang = "en")
+        coEvery { cardDao.getEnglishSiblings(listOf("lea"), listOf("5")) } returns listOf(wrongPairEntity)
+
+        val result = repository.getCachedEnglishSiblings(setOf("lea" to "5"))
+
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `given empty pairs when getCachedEnglishSiblings then DAO is never queried and result is empty`() = runTest {
+        val result = repository.getCachedEnglishSiblings(emptySet())
+
+        assertTrue(result.isEmpty())
+        coVerify(exactly = 0) { cardDao.getEnglishSiblings(any(), any()) }
+    }
+
+    @Test
+    fun `given no cached English row for a pair when getCachedEnglishSiblings then that pair is simply absent`() = runTest {
+        coEvery { cardDao.getEnglishSiblings(listOf("lea"), listOf("5")) } returns emptyList()
+
+        val result = repository.getCachedEnglishSiblings(setOf("lea" to "5"))
+
+        assertTrue(result.isEmpty())
+    }
 }

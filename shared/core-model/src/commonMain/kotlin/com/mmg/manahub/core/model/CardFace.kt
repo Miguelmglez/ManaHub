@@ -11,6 +11,11 @@ package com.mmg.manahub.core.model
 data class CardFace(
     /** Display name of this face (e.g. "Delver of Secrets"). */
     val name: String,
+    /**
+     * Localized name of this face for non-English prints (mirrors [Card.printedName]). Null when
+     * the print is English or Scryfall has no localized name for this face.
+     */
+    val printedName: String?,
     /** Mana cost string in Scryfall notation, e.g. "{1}{U}". Null for back faces. */
     val manaCost: String?,
     /** Full type line for this face, e.g. "Creature — Human Wizard". */

@@ -10,8 +10,19 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +34,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -36,21 +48,38 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddCircleOutline
-import androidx.compose.material.icons.filled.AddToPhotos
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FlashOff
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.CollectionsBookmark
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.FlashOff
+import androidx.compose.material.icons.rounded.FlashOn
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -73,15 +102,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,6 +122,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -102,6 +135,7 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
+import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
@@ -109,7 +143,9 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer
 import com.mmg.manahub.feature.scanner.data.CardRecognizer
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
@@ -126,6 +162,9 @@ import java.util.concurrent.Executors
 fun ScannerScreen(
     onBack: () -> Unit,
     onNavigateToCardDetail: (scryfallId: String) -> Unit = {},
+    onNavigateToAddCard: () -> Unit = {},
+    onNavigateToDeck: (String) -> Unit = {},
+    onNavigateToCommunityDecks: (cardName: String) -> Unit = {},
     viewModel: ScannerViewModel = hiltViewModel(),
 ) {
     val mc = MaterialTheme.magicColors
@@ -141,13 +180,21 @@ fun ScannerScreen(
         }
     }
 
+    // Back handler for the sheet-scoped CardDetail overlay
+    BackHandler(enabled = uiState.selectedCardDetailId != null) {
+        viewModel.onCloseCardDetail()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             cameraPermission.status.isGranted -> {
+                val isRecognitionPaused = uiState.isRecognitionPausedByUser || uiState.showQueueSheet
+                        || uiState.showEditSheet || uiState.showVariantSelector || uiState.expandedVariantImageUrl != null
+                        || uiState.selectedCardDetailId != null || uiState.showPriceDetailSheet
+
                 CameraPreview(
                     isFlashOn = uiState.isFlashOn,
-                    isPaused = uiState.showQueueSheet || uiState.showSettingsSheet || uiState.showEditSheet
-                        || uiState.showVariantSelector || uiState.expandedVariantImageUrl != null,
+                    isPaused = isRecognitionPaused,
                     selectedLanguage = uiState.selectedLanguage,
                     onRecognitionResult = viewModel::onRecognitionResult,
                     onFlashAvailability = viewModel::onFlashAvailabilityChanged,
@@ -160,10 +207,13 @@ fun ScannerScreen(
                     queueCount = uiState.scanSession.cards.sumOf { it.quantity },
                     isFlashOn = uiState.isFlashOn,
                     hasFlash = uiState.hasFlash,
+                    isSoundEnabled = uiState.isSoundEnabled,
+                    isRecognitionPausedByUser = uiState.isRecognitionPausedByUser,
                     selectedLanguage = uiState.selectedLanguage,
                     onOpenQueue = viewModel::onOpenQueue,
                     onToggleFlash = viewModel::onToggleFlash,
-                    onOpenSettings = viewModel::onOpenSettings,
+                    onToggleSound = viewModel::onToggleSound,
+                    onToggleRecognitionPaused = viewModel::onToggleRecognitionPaused,
                     onLanguageSelected = viewModel::onLanguageSelected,
                 )
 
@@ -176,14 +226,10 @@ fun ScannerScreen(
                         card = uiState.lastDetectedCard,
                         isSearching = uiState.isSearching,
                         error = uiState.error,
-                        isQuickMode = uiState.isQuickMode,
-                        isLookupOnly = uiState.isLookupOnly,
                         languageMismatch = uiState.languageMismatch,
                         isFoil = uiState.selectedIsFoil,
                         preferredCurrency = preferredCurrency,
-                        onManualAdd = viewModel::onManualAddCurrentCard,
-                        onOpenPriceDetail = viewModel::onOpenPriceDetail,
-                        onClick = { uiState.lastDetectedCard?.scryfallId?.let(onNavigateToCardDetail) },
+                        onClick = { uiState.lastDetectedCard?.scryfallId?.let { viewModel.onOpenCardDetail(it, fromQueue = false) } },
                     )
                 }
 
@@ -223,6 +269,8 @@ fun ScannerScreen(
             session = uiState.scanSession,
             multiSelectedIds = uiState.multiSelectedIds,
             preferredCurrency = preferredCurrency,
+            ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
+            isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
             onDismiss = viewModel::onCloseQueue,
             onRemoveCard = viewModel::onRemoveSessionCard,
             onEditCard = viewModel::onEditScannedCard,
@@ -233,21 +281,9 @@ fun ScannerScreen(
             onAddAllToWishlist = viewModel::onAddAllToWishlist,
             onAddEntryToCollection = viewModel::onAddEntryToCollection,
             onAddEntryToWishlist = viewModel::onAddEntryToWishlist,
-            onNavigateToCardDetail = onNavigateToCardDetail,
-            onSelectVariant = viewModel::onOpenVariantSelector,
-        )
-    }
-
-    // Settings bottom sheet
-    if (uiState.showSettingsSheet) {
-        ScannerSettingsSheet(
-            isQuickMode = uiState.isQuickMode,
-            isLookupOnly = uiState.isLookupOnly,
-            isSoundEnabled = uiState.isSoundEnabled,
-            onDismiss = viewModel::onCloseSettings,
-            onToggleQuickMode = viewModel::onToggleQuickMode,
-            onToggleLookupOnly = viewModel::onToggleLookupOnly,
-            onToggleSound = viewModel::onToggleSound,
+            onNavigateToCardDetail = viewModel::onOpenCardDetail,
+            onDuplicateCard = viewModel::onDuplicateSessionCard,
+            onToggleAutoDeleteOnAdd = viewModel::onToggleAutoDeleteOnAdd,
         )
     }
 
@@ -260,7 +296,7 @@ fun ScannerScreen(
             isLoadingPrints = uiState.isLoadingPrints,
             onDismiss = viewModel::onCloseEditSheet,
             onConfirm = viewModel::onUpdateScannedCard,
-            onAddAnotherCopy = { viewModel.onAddDuplicateScannedCard(editingCard) },
+            onOpenVariantSelector = { viewModel.onOpenVariantSelector(editingCard) },
         )
     }
 
@@ -282,6 +318,51 @@ fun ScannerScreen(
             imageUrl = uiState.expandedVariantImageUrl!!,
             onDismiss = viewModel::onCloseExpandedImage,
         )
+    }
+
+    // Sheet-scoped CardDetail overlay (same stacking pattern as variant selector).
+    // Enter/exit matches the app-wide CardDetail transition (see AppNavGraph's
+    // Screen.CollectionCardDetail composable) — a scale+fade, NOT a bottom-sheet slide, since this
+    // overlay represents a full "screen", not a sheet.
+    AnimatedVisibility(
+        visible = uiState.selectedCardDetailId != null,
+        enter = fadeIn(tween(400)) + scaleIn(initialScale = 0.92f, animationSpec = tween(450)),
+        exit = fadeOut(tween(300)),
+    ) {
+        if (uiState.selectedCardDetailId != null) {
+            CardDetailScreen(
+                onBack = viewModel::onCloseCardDetail,
+                onNavigateToAddCard = {
+                    viewModel.onCloseCardDetail()
+                    onNavigateToAddCard()
+                },
+                onNavigateToCard = { id ->
+                    // Cross-navigation within the overlay: just update the ID
+                    viewModel.onOpenCardDetail(id)
+                },
+                // Pass existing navigation callbacks to ensure features like "Find Community Decks"
+                // or "Open in Deck" still work from within the scanner-scoped overlay.
+                onNavigateToDeck = { id ->
+                    viewModel.onCloseCardDetail()
+                    onNavigateToDeck(id)
+                },
+                onNavigateToCommunityDecks = { name ->
+                    viewModel.onCloseCardDetail()
+                    onNavigateToCommunityDecks(name)
+                },
+                // Use Koin's parameter-based injection (updated in CardDetailKoinModule). An explicit
+                // `key` tied to the card id is REQUIRED here: this call site's ViewModelStoreOwner never
+                // changes (this overlay is not a real nav destination, unlike every other place
+                // CardDetailScreen is opened via navController.navigate(...), which gets a fresh
+                // NavBackStackEntry/ViewModelStore per route). Without a distinct key, Compose's
+                // ViewModelProvider returns the SAME cached CardDetailViewModel on every recomposition
+                // and silently ignores the new parametersOf(...) after the first construction — i.e. the
+                // "always shows the same card" bug. selectedCardDetailId is non-null here (guarded above).
+                viewModel = koinViewModel(
+                    key = uiState.selectedCardDetailId,
+                ) { org.koin.core.parameter.parametersOf(uiState.selectedCardDetailId) }
+            )
+        }
     }
 }
 
@@ -351,10 +432,14 @@ private fun CameraPreview(
         }
     }
 
+    // Wrap the isPaused state in a remembered updated state to ensure the analyzer
+    // lambda always reads the fresh value without triggering a re-allocation of
+    // the analyzer or re-binding of the camera use case.
+    val currentIsPaused by rememberUpdatedState(isPaused)
     val frameMetadataAnalyzer = remember {
         FrameMetadataAnalyzer(
             delegate = recognizer,
-            isPaused = { isPaused },
+            isPaused = { currentIsPaused },
         )
     }
 
@@ -566,20 +651,27 @@ interface ScannerEntryPoint {
 //  Top Scanner Controls
 // ─────────────────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TopScannerControls(
     onBack: () -> Unit,
     queueCount: Int,
     isFlashOn: Boolean,
     hasFlash: Boolean,
+    isSoundEnabled: Boolean,
+    isRecognitionPausedByUser: Boolean,
     selectedLanguage: String,
     onOpenQueue: () -> Unit,
     onToggleFlash: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onToggleSound: () -> Unit,
+    onToggleRecognitionPaused: () -> Unit,
     onLanguageSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    var showLanguageSelector by remember { mutableStateOf(false) }
+    var isSettingsExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -587,78 +679,36 @@ private fun TopScannerControls(
             .statusBarsPadding()
             .padding(top = 16.dp, start = 16.dp, end = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         IconButton(
             onClick = onBack,
             modifier = Modifier
                 .size(40.dp)
                 .background(mc.background.copy(0.6f), CircleShape)
+                .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
         ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = mc.textPrimary)
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = mc.textPrimary)
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            /*// Language Selector — shows 2-letter code on button, full name in dropdown
-            var showLanguageMenu by remember { mutableStateOf(false) }
-            Box {
-                IconButton(
-                    onClick = { showLanguageMenu = true },
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color.Black.copy(0.4f), CircleShape)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Language,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(2.dp))
-                        Text(
-                            text = selectedLanguage.uppercase(),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.sp,
-                        )
-                    }
-                }
-                DropdownMenu(
-                    expanded = showLanguageMenu,
-                    onDismissRequest = { showLanguageMenu = false },
-                    modifier = Modifier.background(Color(0xFF1C1C1E))
-                ) {
-                    CardConstants.languages.forEach { (code, _) ->
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = code.uppercase(),
-                                        color = Color(0xFFFFC107),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.width(28.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        text = CardConstants.getLanguageName(code),
-                                        color = Color.White,
-                                    )
-                                }
-                            },
-                            onClick = {
-                                onLanguageSelected(code)
-                                showLanguageMenu = false
-                            }
-                        )
-                    }
-                }
-            }*/
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            // Recognition pause/resume toggle — independent of sheet-driven pauses
+            IconButton(
+                onClick = onToggleRecognitionPaused,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        if (isRecognitionPausedByUser) mc.goldMtg.copy(0.9f) else mc.background.copy(0.6f),
+                        CircleShape
+                    )
+                    .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (isRecognitionPausedByUser) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                    contentDescription = null,
+                    tint = if (isRecognitionPausedByUser) mc.background else mc.textPrimary,
+                )
+            }
 
             // Queue button with badge
             Box {
@@ -667,8 +717,9 @@ private fun TopScannerControls(
                     modifier = Modifier
                         .size(40.dp)
                         .background(mc.background.copy(0.6f), CircleShape)
+                        .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
                 ) {
-                    Icon(Icons.Default.AddToPhotos, contentDescription = null, tint = mc.textPrimary)
+                    Icon(Icons.Rounded.Style, contentDescription = null, tint = mc.textPrimary)
                 }
                 if (queueCount > 0) {
                     Surface(
@@ -678,6 +729,7 @@ private fun TopScannerControls(
                             .size(18.dp)
                             .align(Alignment.TopEnd)
                             .offset(x = 2.dp, y = (-2).dp)
+                            .border(1.5.dp, mc.background, CircleShape)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
@@ -694,30 +746,169 @@ private fun TopScannerControls(
                 }
             }
 
-            // Flash button
-            if (hasFlash) {
-                IconButton(
-                    onClick = onToggleFlash,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(mc.background.copy(0.6f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = if (isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                        contentDescription = null,
-                        tint = if (isFlashOn) mc.goldMtg else mc.textPrimary
-                    )
-                }
-            }
-
-            // Settings button
+            // Language selector — flag icon opens LanguageSelectorSheet (item 2, 2026-07-17 UX pass)
             IconButton(
-                onClick = onOpenSettings,
+                onClick = { showLanguageSelector = true },
                 modifier = Modifier
                     .size(40.dp)
                     .background(mc.background.copy(0.6f), CircleShape)
+                    .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
             ) {
-                Icon(Icons.Default.Settings, contentDescription = null, tint = mc.textPrimary)
+                Text(text = CardConstants.getFlag(selectedLanguage), style = ty.titleLarge)
+            }
+
+            // Settings group (Vertical downward expansion)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Gear button - toggles expansion (Must be the top element to expand "downwards")
+                IconButton(
+                    onClick = { isSettingsExpanded = !isSettingsExpanded },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            if (isSettingsExpanded) mc.primaryAccent.copy(0.9f) else mc.background.copy(0.6f),
+                            CircleShape
+                        )
+                        .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                        .zIndex(1f) // Keep gear on top during animation
+                ) {
+                    Icon(
+                        Icons.Rounded.Settings,
+                        contentDescription = null,
+                        tint = if (isSettingsExpanded) mc.background else mc.textPrimary
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = isSettingsExpanded,
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
+                    exit = fadeOut() + slideOutVertically(targetOffsetY = { -it })
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // Sound toggle
+                        IconButton(
+                            onClick = onToggleSound,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(
+                                    if (isSoundEnabled) mc.goldMtg.copy(0.9f) else mc.background.copy(0.6f),
+                                    CircleShape
+                                )
+                                .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = if (isSoundEnabled) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
+                                contentDescription = null,
+                                tint = if (isSoundEnabled) mc.background else mc.textPrimary,
+                            )
+                        }
+
+                        // Flash button
+                        if (hasFlash) {
+                            IconButton(
+                                onClick = onToggleFlash,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        if (isFlashOn) mc.goldMtg.copy(0.9f) else mc.background.copy(0.6f),
+                                        CircleShape
+                                    )
+                                    .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = if (isFlashOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff,
+                                    contentDescription = null,
+                                    tint = if (isFlashOn) mc.background else mc.textPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showLanguageSelector) {
+        LanguageSelectorSheet(
+            selectedLanguage = selectedLanguage,
+            onDismiss = { showLanguageSelector = false },
+            onSelectLanguage = { code ->
+                onLanguageSelected(code)
+                showLanguageSelector = false
+            },
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Scanner language selector sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Language selector bottom sheet — visual/behavioral twin of `AddCardScreen`'s private
+ * `LanguageSelectorSheet` (same flag + name + checkmark [LazyColumn] row pattern). Duplicated
+ * here rather than extracted into a shared composable: both screens' sheets are `private` inside
+ * their own file/package and this scanner UX pass is scoped to files that don't include
+ * `AddCardScreen.kt` (see the 2026-07-17 scanner UX pass memory note).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguageSelectorSheet(
+    selectedLanguage: String,
+    onDismiss: () -> Unit,
+    onSelectLanguage: (String) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.background,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.scanner_language_sheet_title),
+                style = ty.titleMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                items(CardConstants.languages, key = { it.first }) { (code, flag) ->
+                    val isSelected = code == selectedLanguage
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clickable { onSelectLanguage(code) }
+                            .then(
+                                if (isSelected) Modifier.background(mc.primaryAccent.copy(alpha = 0.08f))
+                                else Modifier
+                            )
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(text = flag, style = ty.titleLarge)
+                        Text(
+                            text = CardConstants.getLanguageName(code),
+                            style = ty.bodyMedium,
+                            color = if (isSelected) mc.primaryAccent else mc.textPrimary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = mc.primaryAccent,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -732,13 +923,9 @@ private fun DetectedCardOverlay(
     card: Card?,
     isSearching: Boolean,
     error: String?,
-    isQuickMode: Boolean,
-    isLookupOnly: Boolean,
     languageMismatch: Boolean,
     isFoil: Boolean,
     preferredCurrency: PreferredCurrency,
-    onManualAdd: () -> Unit,
-    onOpenPriceDetail: () -> Unit,
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -880,6 +1067,8 @@ private fun ScanQueueSheet(
     session: ScanSession,
     multiSelectedIds: Set<String>,
     preferredCurrency: PreferredCurrency,
+    ownedCardIdentityKeys: Set<String>,
+    isAutoDeleteOnAddEnabled: Boolean,
     onDismiss: () -> Unit,
     onRemoveCard: (ScannedCard) -> Unit,
     onEditCard: (ScannedCard) -> Unit,
@@ -890,8 +1079,9 @@ private fun ScanQueueSheet(
     onAddAllToWishlist: () -> Unit,
     onAddEntryToCollection: (ScannedCard) -> Unit,
     onAddEntryToWishlist: (ScannedCard) -> Unit,
-    onNavigateToCardDetail: (scryfallId: String) -> Unit,
-    onSelectVariant: (ScannedCard) -> Unit,
+    onNavigateToCardDetail: (scryfallId: String, fromQueue: Boolean) -> Unit,
+    onDuplicateCard: (ScannedCard) -> Unit,
+    onToggleAutoDeleteOnAdd: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -951,8 +1141,18 @@ private fun ScanQueueSheet(
                         color = mc.textPrimary
                     )
                     IconButton(onClick = onClearSession) {
-                        Icon(Icons.Default.Delete, null, tint = mc.textSecondary)
+                        Icon(Icons.Rounded.Delete, null, tint = mc.textSecondary)
                     }
+                }
+
+                // Sticky "Auto-delete on add" switch — stays visible above the scrollable list
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    SettingsToggleRow(
+                        title = stringResource(R.string.scanner_queue_auto_delete_title),
+                        subtitle = stringResource(R.string.scanner_queue_auto_delete_desc),
+                        checked = isAutoDeleteOnAddEnabled,
+                        onCheckedChange = { onToggleAutoDeleteOnAdd() },
+                    )
                 }
 
                 // Search Bar
@@ -961,7 +1161,7 @@ private fun ScanQueueSheet(
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     placeholder = { Text(stringResource(R.string.scanner_queue_search_placeholder), style = ty.bodyMedium, color = mc.textDisabled) },
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = mc.textDisabled) },
+                    leadingIcon = { Icon(Icons.Rounded.Search, null, tint = mc.textDisabled) },
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedContainerColor = mc.textPrimary.copy(0.05f),
@@ -981,12 +1181,13 @@ private fun ScanQueueSheet(
                         QueueCardItem(
                             entry = entry,
                             preferredCurrency = preferredCurrency,
+                            isInCollection = entry.card.oracleId.ifBlank { entry.card.name } in ownedCardIdentityKeys,
                             onEdit = { onEditCard(entry) },
                             onDelete = { onRemoveCard(entry) },
                             onAddToCollection = { onAddEntryToCollection(entry) },
                             onAddToWishlist = { onAddEntryToWishlist(entry) },
-                            onClick = { onNavigateToCardDetail(entry.card.scryfallId) },
-                            onSelectVariant = { onSelectVariant(entry) },
+                            onClick = { onNavigateToCardDetail(entry.card.scryfallId, true) },
+                            onDuplicate = { onDuplicateCard(entry) },
                         )
                     }
                 }
@@ -1005,7 +1206,7 @@ private fun ScanQueueSheet(
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent, contentColor = mc.background)
                     ) {
-                        Icon(Icons.Default.PlaylistAdd, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.scanner_queue_add_all), style = ty.bodyLarge)
                     }
@@ -1017,7 +1218,7 @@ private fun ScanQueueSheet(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.textPrimary),
                         border = androidx.compose.foundation.BorderStroke(1.dp, mc.textPrimary.copy(0.2f))
                     ) {
-                        Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.scanner_queue_add_all_wishlist), style = ty.bodyLarge)
                     }
@@ -1039,12 +1240,13 @@ private fun ScanQueueSheet(
 private fun QueueCardItem(
     entry: ScannedCard,
     preferredCurrency: PreferredCurrency,
+    isInCollection: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onAddToCollection: () -> Unit,
     onAddToWishlist: () -> Unit,
     onClick: () -> Unit,
-    onSelectVariant: () -> Unit,
+    onDuplicate: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -1103,11 +1305,22 @@ private fun QueueCardItem(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AttrTag(entry.language.uppercase())
+                    LanguageBadge(langCode = entry.language)
                     AttrTag(entry.condition)
-                    
+
                     if (entry.isFoil) {
                         AttrTag(stringResource(R.string.scanner_foil))
+                    }
+
+                    // "Already in collection" badge — any printing/language of the same oracle
+                    // identity (Card Versions & Languages convention: oracleId.ifBlank { name })
+                    if (isInCollection) {
+                        Icon(
+                            imageVector = Icons.Rounded.CollectionsBookmark,
+                            contentDescription = stringResource(R.string.scanner_already_in_collection),
+                            tint = mc.primaryAccent,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                 }
 
@@ -1139,7 +1352,7 @@ private fun QueueCardItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Add, null, tint = mc.primaryAccent, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.Style, null, tint = mc.primaryAccent, modifier = Modifier.size(24.dp))
                     Text(stringResource(R.string.action_add), style = ty.labelSmall, color = mc.textSecondary)
                 }
             }
@@ -1148,7 +1361,7 @@ private fun QueueCardItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.FavoriteBorder, null, tint = mc.secondaryAccent, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.FavoriteBorder, null, tint = mc.secondaryAccent, modifier = Modifier.size(24.dp))
                     Text(stringResource(R.string.carddetail_add_to_wishlist), style = ty.labelSmall, color = mc.textSecondary)
                 }
             }
@@ -1157,17 +1370,17 @@ private fun QueueCardItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Edit, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.Edit, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
                     Text(stringResource(R.string.action_edit), style = ty.labelSmall, color = mc.textSecondary)
                 }
             }
             IconButton(
-                onClick = onSelectVariant,
+                onClick = onDuplicate,
                 modifier = Modifier.weight(1f)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Collections, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
-                    Text(stringResource(R.string.scanner_select_variant), style = ty.labelSmall, color = mc.textSecondary)
+                    Icon(Icons.Rounded.ContentCopy, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
+                    Text(stringResource(R.string.scanner_duplicate_entry), style = ty.labelSmall, color = mc.textSecondary)
                 }
             }
             IconButton(
@@ -1175,7 +1388,7 @@ private fun QueueCardItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Clear, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.Clear, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
                     Text(stringResource(R.string.action_remove), style = ty.labelSmall, color = mc.textSecondary)
                 }
             }
@@ -1216,10 +1429,8 @@ private fun EditScannedCardSheet(
     isLoadingPrints: Boolean,
     onDismiss: () -> Unit,
     onConfirm: (ScannedCard) -> Unit,
-    onAddAnotherCopy: () -> Unit,
+    onOpenVariantSelector: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     AddCardSheet(
         cardName = scannedCard.card.name,
         onConfirm = { foil: Boolean, cond: String, lang: String, q: Int ->
@@ -1231,7 +1442,6 @@ private fun EditScannedCardSheet(
             ))
         },
         onDismiss = onDismiss,
-        manaCost = scannedCard.card.manaCost,
         cardImage = scannedCard.card.imageNormal,
         initialFoil = scannedCard.isFoil,
         initialCondition = scannedCard.condition,
@@ -1241,89 +1451,14 @@ private fun EditScannedCardSheet(
         setCode = scannedCard.card.setCode,
         setName = scannedCard.card.setName,
         rarity = scannedCard.card.rarity,
-        extraContent = {
-            OutlinedButton(
-                onClick = onAddAnotherCopy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.AddCircleOutline, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.scanner_add_another_copy), style = ty.bodyMedium)
-            }
-        },
+        // Variant selection moved into the Edit sheet (item 7, 2026-07-17 UX pass) — replaces the
+        // old standalone "Variants" queue action. VariantSelectorSheet renders on top of this
+        // still-open sheet (same stacking pattern as CardDetailScreen's sheet-scoped variant flow).
+        onOpenVariantSelector = onOpenVariantSelector,
+        // Reserves the card-art footprint immediately with the card-back art so switching between
+        // scanned entries never causes a visible layout jump while Coil loads the real image.
+        cardImagePlaceholder = painterResource(R.drawable.mtg_card_back),
     )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Price detail / Settings / Permission — reused or simplified
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ScannerSettingsSheet(
-    isQuickMode: Boolean,
-    isLookupOnly: Boolean,
-    isSoundEnabled: Boolean,
-    // COMMENTED OUT — embedding DB params replaced by ML Kit OCR (no DB required)
-    // embeddingDbVersion: Int,
-    // embeddingDbCardCount: Int,
-    // isEmbeddingDbUpdating: Boolean,
-    onDismiss: () -> Unit,
-    onToggleQuickMode: () -> Unit,
-    onToggleLookupOnly: () -> Unit,
-    onToggleSound: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { it != SheetValue.Hidden }
-    )
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = mc.backgroundSecondary,
-        dragHandle = null,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .navigationBarsPadding(),
-        ) {
-            // Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.offset(x = (-12).dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_cancel),
-                        tint = mc.textSecondary
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text(text = stringResource(R.string.scanner_settings_title), style = ty.titleMedium, color = mc.textPrimary)
-                SettingsToggleRow(stringResource(R.string.scanner_sound_effects), stringResource(R.string.scanner_sound_effects_desc), isSoundEnabled, { onToggleSound() })
-
-                // COMMENTED OUT — embedding DB status row replaced by ML Kit OCR (always ready)
-                // HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                // Row(...) { /* embeddingDbVersion, embeddingDbCardCount, isEmbeddingDbUpdating UI */ }
-
-                Spacer(Modifier.height(24.dp))
-            }
-        }
-    }
 }
 
 @Composable

@@ -441,6 +441,11 @@ fun AppNavGraph(
                             onNavigateToCardDetail = { scryfallId ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
                             },
+                            onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
+                            onNavigateToDeck = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
+                            onNavigateToCommunityDecks = { cardName ->
+                                navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
+                            }
                         )
                     }
 
@@ -569,6 +574,31 @@ fun AppNavGraph(
                     onNavigateToCommunityDeckDetail = { archidektId ->
                         navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
                     },
+                    onNavigateToWizard = { strategyHint, themeHint, colors ->
+                        navController.navigate(Screen.DeckWizard.createRoute(strategyHint, themeHint, colors))
+                    },
+                )
+            }
+
+            // ── Deck Builder v2 wizard (docs/plans/deck-builder-v2-plan.md §3.4) ─────
+            composable(
+                route = Screen.DeckWizard.route,
+                arguments = listOf(
+                    navArgument("strategyHint") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("themeHint") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("colors") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                ),
+            ) {
+                com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenDeckStudio = { deckId ->
+                        // Replace the wizard on the back stack with Deck Studio so system back from
+                        // Studio returns to whatever screen opened the wizard, not back to Result.
+                        navController.navigate(Screen.DeckStudio.createRoute(deckId)) {
+                            popUpTo(Screen.DeckWizard.route) { inclusive = true }
+                        }
+                    },
+                    onCardClick = { id -> navController.navigate(Screen.CollectionCardDetail.createRoute(id)) },
                 )
             }
 

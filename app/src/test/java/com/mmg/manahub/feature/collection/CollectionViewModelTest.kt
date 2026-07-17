@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.AdvancedSearchQuery
+import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchCriterion
@@ -30,6 +31,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -843,6 +845,155 @@ class CollectionViewModelTest {
 
         // null power → toIntOrNull returns null → criterion returns false
         assertTrue(viewModel.uiState.value.cards.isEmpty())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Broken-image fix (2026-07-17): non-English groups show the cached
+    //  English sibling's image; English groups and uncached foreign groups are untouched.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun buildEntryWithCard(
+        card: com.mmg.manahub.core.model.Card,
+        id: String = card.scryfallId,
+        createdAt: Long = 1_000L,
+    ) = TestFixtures.buildUserCardWithCard(
+        userCard = TestFixtures.buildUserCard(id = id, scryfallId = card.scryfallId, createdAt = createdAt),
+        card = card,
+    )
+
+    @Test
+    fun `given non-English group when cached English sibling exists then group image is overridden but other fields keep the representative printing`() = runTest {
+        val foreignCard = TestFixtures.buildCard(scryfallId = "es-001", name = "Rayo").copy(
+            lang = "es",
+            setCode = "lea",
+            collectorNumber = "5",
+            imageNormal = null,
+            imageArtCrop = null,
+        )
+        val englishSibling = TestFixtures.buildCard(scryfallId = "en-001", name = "Lightning Bolt").copy(
+            lang = "en",
+            setCode = "lea",
+            collectorNumber = "5",
+            imageNormal = "https://example.com/english-normal.jpg",
+            imageArtCrop = "https://example.com/english-art.jpg",
+        )
+        coEvery { cardRepository.getCachedEnglishSiblings(setOf("lea" to "5")) } returns
+            mapOf(("lea" to "5") to englishSibling)
+
+        viewModel = buildViewModel(listOf(buildEntryWithCard(foreignCard)))
+        advanceUntilIdle()
+
+        val group = viewModel.uiState.value.cards.single()
+        // Image fields come from the English sibling.
+        assertEquals("https://example.com/english-normal.jpg", group.card.imageNormal)
+        assertEquals("https://example.com/english-art.jpg", group.card.imageArtCrop)
+        // Every other field still comes from the actual (foreign) representative printing.
+        assertEquals("Rayo", group.card.name)
+        assertEquals("es", group.card.lang)
+        assertEquals("lea", group.card.setCode)
+    }
+
+    @Test
+    fun `given non-English group when no cached English sibling exists then group keeps its own image`() = runTest {
+        val foreignCard = TestFixtures.buildCard(scryfallId = "es-002", name = "Contrahechizo").copy(
+            lang = "es",
+            setCode = "lea",
+            collectorNumber = "9",
+            imageNormal = "https://example.com/spanish-fallback.jpg",
+            imageArtCrop = null,
+        )
+        coEvery { cardRepository.getCachedEnglishSiblings(any()) } returns emptyMap()
+
+        viewModel = buildViewModel(listOf(buildEntryWithCard(foreignCard)))
+        advanceUntilIdle()
+
+        val group = viewModel.uiState.value.cards.single()
+        assertEquals("https://example.com/spanish-fallback.jpg", group.card.imageNormal)
+        assertNull(group.card.imageArtCrop)
+    }
+
+    @Test
+    fun `given only English-language groups when loaded then the sibling repository is never queried`() = runTest {
+        val englishCard = TestFixtures.buildCard(scryfallId = "en-005", name = "Lightning Bolt").copy(
+            lang = "en",
+            setCode = "lea",
+            collectorNumber = "1",
+            imageNormal = "https://example.com/original.jpg",
+        )
+
+        viewModel = buildViewModel(listOf(buildEntryWithCard(englishCard)))
+        advanceUntilIdle()
+
+        val group = viewModel.uiState.value.cards.single()
+        assertEquals("https://example.com/original.jpg", group.card.imageNormal)
+        // No non-English pairs in the raw collection → the batch lookup is skipped entirely,
+        // not just called with an empty set (avoids a pointless Room round-trip).
+        coVerify(exactly = 0) { cardRepository.getCachedEnglishSiblings(any()) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Dynamic grouping (onGroupingChange)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given default state when onGroupingChange to TYPE then groupingMode updates immediately`() = runTest {
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        assertEquals(CollectionGroupingMode.NONE, viewModel.uiState.value.groupingMode)
+
+        viewModel.onGroupingChange(CollectionGroupingMode.TYPE)
+        advanceUntilIdle()
+
+        assertEquals(CollectionGroupingMode.TYPE, viewModel.uiState.value.groupingMode)
+    }
+
+    @Test
+    fun `given onGroupingChange then the selection is persisted and logged`() = runTest {
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.onGroupingChange(CollectionGroupingMode.COLOR)
+        advanceUntilIdle()
+
+        coVerify { userPreferencesRepository.saveCollectionGroupingMode(CollectionGroupingMode.COLOR) }
+        verify {
+            analyticsHelper.logEvent("collection_grouping_changed", mapOf("grouping_mode" to "COLOR"))
+        }
+    }
+
+    @Test
+    fun `given cards in collection when onGroupingChange to TYPE then sections are populated`() = runTest {
+        val entries = listOf(
+            buildEntry(scryfallId = "id-001", name = "Lightning Bolt", typeLine = "Instant"),
+            buildEntry(scryfallId = "id-002", name = "Grizzly Bears", typeLine = "Creature — Bear"),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.sections.isEmpty())
+
+        viewModel.onGroupingChange(CollectionGroupingMode.TYPE)
+        advanceUntilIdle()
+
+        val sections = viewModel.uiState.value.sections
+        assertEquals(2, sections.size)
+        val tokens = sections.map { it.labelToken }.toSet()
+        assertTrue(tokens.contains("Instants"))
+        assertTrue(tokens.contains("Creatures"))
+    }
+
+    @Test
+    fun `given TYPE grouping when onGroupingChange back to NONE then sections are cleared`() = runTest {
+        val entries = listOf(buildEntry(scryfallId = "id-001", name = "Lightning Bolt", typeLine = "Instant"))
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        viewModel.onGroupingChange(CollectionGroupingMode.TYPE)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.sections.isNotEmpty())
+
+        viewModel.onGroupingChange(CollectionGroupingMode.NONE)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.sections.isEmpty())
     }
 }
 

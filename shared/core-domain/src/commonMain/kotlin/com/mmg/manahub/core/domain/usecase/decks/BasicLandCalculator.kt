@@ -21,9 +21,24 @@ object BasicLandCalculator {
         nonBasicLands: List<DeckCard>,
         format: DeckFormat,
         commanderIdentity: Set<String>? = null,
+    ): BasicLandDistribution = calculate(mainboard, nonBasicLands, format.targetLandCount, commanderIdentity)
+
+    /**
+     * Overload taking an explicit [totalLandTarget] instead of deriving it from [DeckFormat
+     * .targetLandCount] -- Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.3
+     * FILLING_LANDS) needs a VARIABLE target (a community aggregate's `avgTypeDistribution.land`,
+     * or a resolved archetype skeleton's land ideal), never the fixed per-format default. The
+     * existing [format]-based overload above just forwards here so every current caller stays
+     * byte-identical.
+     */
+    fun calculate(
+        mainboard: List<DeckCard>,
+        nonBasicLands: List<DeckCard>,
+        totalLandTarget: Int,
+        commanderIdentity: Set<String>? = null,
     ): BasicLandDistribution {
         val nonBasicCount = nonBasicLands.sumOf { it.quantity }
-        val basicSlotsAvailable = (format.targetLandCount - nonBasicCount).coerceAtLeast(0)
+        val basicSlotsAvailable = (totalLandTarget - nonBasicCount).coerceAtLeast(0)
 
         if (basicSlotsAvailable == 0) return BasicLandDistribution()
 

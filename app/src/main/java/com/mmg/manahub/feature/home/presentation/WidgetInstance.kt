@@ -30,3 +30,25 @@ fun PersistedWidget.toInstanceOrNull(): WidgetInstance? {
     val type = HomeWidgetType.fromPersistedId(persistedId) ?: return null
     return WidgetInstance(type = type, size = size)
 }
+
+/**
+ * Maps a persisted layout to UI [WidgetInstance]s, migrating any legacy `social_hub` token
+ * (Home widget board overhaul, TASK 5c — SOCIAL_HUB was split into FRIENDS + COMMUNITY_DECKS) into
+ * both of its replacement widgets in place, then drops any other still-unrecognised id and
+ * de-duplicates by [HomeWidgetType.persistedId].
+ *
+ * The expansion is idempotent and cheap to re-run on every decode: it only rewrites the
+ * DataStore-persisted token once the user next mutates the layout (add/remove/move), since every
+ * mutation path re-persists from the already-expanded in-memory list.
+ */
+fun List<PersistedWidget>.toInstancesWithMigration(): List<WidgetInstance> =
+    flatMap { persisted ->
+        if (persisted.persistedId == HomeWidgetType.LEGACY_SOCIAL_HUB_PERSISTED_ID) {
+            listOf(
+                WidgetInstance(HomeWidgetType.FRIENDS, persisted.size),
+                WidgetInstance(HomeWidgetType.COMMUNITY_DECKS, persisted.size),
+            )
+        } else {
+            listOfNotNull(persisted.toInstanceOrNull())
+        }
+    }.distinctBy { it.type.persistedId }

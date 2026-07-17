@@ -101,7 +101,7 @@
     <!-- ══════════════════════════════════════════
          ADD CARD SCREEN
     ═══════════════════════════════════════════ -->
-    <string name="addcard_title">Add Card</string>
+    <string name="addcard_title">Search Card</string>
     <string name="addcard_search_hint">Card name…</string>
     <string name="addcard_search_min_chars">Type at least 2 characters to search</string>
     <string name="addcard_no_results">No cards found</string>
@@ -339,6 +339,11 @@
     <string name="scanner_edit_sheet_title">Edit scanned card</string>
     <string name="scanner_permission_camera_required">Camera permission required</string>
     <string name="scanner_permission_grant">Grant permission</string>
+    <string name="scanner_language_sheet_title">Scan language</string>
+    <string name="scanner_duplicate_entry">Duplicate</string>
+    <string name="scanner_queue_auto_delete_title">Auto-delete on add</string>
+    <string name="scanner_queue_auto_delete_desc">Remove entry from the queue when added to collection or wishlist</string>
+    <string name="scanner_already_in_collection">Already in your collection</string>
 
     <!-- ══════════════════════════════════════════
          STATS SCREEN
@@ -728,6 +733,7 @@
 
     <!-- Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) -->
     <string name="deck_studio_suggestions_community_header">Popular in similar decks</string>
+    <string name="deck_studio_suggestion_category_chip">%1$s (%2$d)</string>
     <string name="deck_studio_suggestions_similar_decks_header">Decks like yours</string>
     <string name="deck_doctor_community_inclusion">%1$d%% of %2$s decks</string>
     <string name="deck_doctor_community_fills_gap">Fills a gap</string>
@@ -837,6 +843,71 @@
     <string name="deck_studio_inspiration_seed_studio">Seed Studio</string>
     <string name="deck_studio_inspiration_fit">%1$d cards</string>
     <string name="deck_studio_inspiration_card_art">View card</string>
+
+    <!-- Deck Builder v2 — wizard (docs/plans/deck-builder-v2-plan.md §3.4) -->
+    <string name="deck_wizard_title">Build a Deck</string>
+    <string name="deck_wizard_step_of">Step %1$d of %2$d</string>
+    <string name="deck_wizard_next">Next</string>
+    <string name="deck_wizard_coming_soon">Coming soon</string>
+    <string name="deck_wizard_build_this">Build this</string>
+    <!-- Step 1 — Format -->
+    <string name="deck_wizard_format_title">Choose a format</string>
+    <string name="deck_wizard_format_subtitle">Commander and Casual have the deepest deck templates today.</string>
+    <!-- Step 2 — Direction -->
+    <string name="deck_wizard_direction_title">Pick a direction</string>
+    <string name="deck_wizard_direction_subtitle">Start from your commander, your collection\'s strengths, or a few seed cards.</string>
+    <string name="deck_wizard_commander_section_title">Commander</string>
+    <string name="deck_wizard_commander_search_hint">Search for a commander…</string>
+    <string name="deck_wizard_commander_required">Pick a commander to continue.</string>
+    <string name="deck_wizard_change_commander">Change commander</string>
+    <string name="deck_wizard_direction_leans_title">Your collection leans…</string>
+    <string name="deck_wizard_direction_leans_empty">Add more cards to your collection to see suggested directions.</string>
+    <string name="deck_wizard_direction_chip_strategy">%1$s · %2$d</string>
+    <string name="deck_wizard_direction_chip_tribe">%1$d %2$s</string>
+    <string name="deck_wizard_direction_color_lean">%1$s %2$d%%</string>
+    <string name="deck_wizard_seed_picker_toggle">Add seed cards (optional)</string>
+    <!-- Step 3 — Identity -->
+    <string name="deck_wizard_identity_title">Set your identity</string>
+    <string name="deck_wizard_identity_subtitle_commander">Colors are set by your commander.</string>
+    <string name="deck_wizard_identity_subtitle_casual">Pick the colors this deck should play.</string>
+    <string name="deck_wizard_color_discipline_hint">3+ colors can hurt consistency unless your collection has strong fixing. Consider narrowing to 2.</string>
+    <string name="deck_wizard_theme_picker_title">Theme (optional)</string>
+    <string name="deck_wizard_color_fixed_by_commander">%1$s, fixed by commander</string>
+    <!-- Step 4 — Review -->
+    <string name="deck_wizard_review_title">Review &amp; generate</string>
+    <string name="deck_wizard_review_format">Format</string>
+    <string name="deck_wizard_review_direction">Direction</string>
+    <string name="deck_wizard_review_direction_none">Not set</string>
+    <string name="deck_wizard_review_colors">Colors</string>
+    <string name="deck_wizard_review_seeds">Seed cards</string>
+    <string name="deck_wizard_fill_lands_title">Fill basic lands automatically</string>
+    <string name="deck_wizard_fill_lands_subtitle">Color-weighted from the final mana curve</string>
+    <string name="deck_wizard_expectation_copy">This is a deeper build — we compare community-known decks against your collection, so it can take a little longer than the old builder.</string>
+    <string name="deck_wizard_generate_cta">Generate deck</string>
+    <!-- Generating -->
+    <string name="deck_wizard_stage_validating">Checking your setup…</string>
+    <string name="deck_wizard_stage_analyzing_collection">Analyzing your collection…</string>
+    <string name="deck_wizard_stage_fetching_community">Comparing community data…</string>
+    <string name="deck_wizard_stage_mapping_categories">Mapping categories…</string>
+    <string name="deck_wizard_stage_filling_from_collection">Filling from your collection…</string>
+    <string name="deck_wizard_stage_resolving_gaps">Finding community picks for the gaps…</string>
+    <string name="deck_wizard_stage_filling_lands">Adding basic lands…</string>
+    <string name="deck_wizard_stage_done">Finishing up…</string>
+    <string name="deck_wizard_build_error_title">Something went wrong</string>
+    <string name="deck_wizard_build_error">We couldn\'t build the deck. Please try again.</string>
+    <string name="deck_wizard_retry">Try again</string>
+    <!-- Result -->
+    <string name="deck_wizard_result_report_title">Category fill</string>
+    <string name="deck_wizard_report_chip">%1$s %2$d/%3$d</string>
+    <string name="deck_wizard_result_from_collection">From your collection</string>
+    <string name="deck_wizard_result_community_picks">Community picks to look for</string>
+    <string name="deck_wizard_suggested_copies">Suggested: %1$d copies</string>
+    <string name="deck_wizard_source_community">Built from community data</string>
+    <string name="deck_wizard_source_synthetic">Built from your deck archetype</string>
+    <string name="deck_wizard_open_studio">Open in Deck Studio</string>
+    <string name="deck_wizard_suggestion_added">%1$s added</string>
+    <string name="deck_wizard_name_suffix_deck">%1$s Deck</string>
+    <string name="deck_wizard_name_default">New %1$s Deck</string>
 
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
@@ -2395,11 +2466,9 @@
     <string name="scanner_language_portuguese">Portuguese</string>
     <string name="scanner_language_japanese">Japanese</string>
     <string name="scanner_language_korean">Korean</string>
-    <string name="scanner_select_variant">Variants</string>
     <string name="scanner_variant_selector_title">Select variant</string>
     <string name="scanner_variant_no_results">No variants found</string>
     <string name="variant_tap_to_expand">Tap to expand %s</string>
-    <string name="scanner_add_another_copy">Add another copy with different options</string>
 
     <!-- ══════════════════════════════════════════
          ONLINE LOBBY
@@ -3141,5 +3210,17 @@
     <string name="community_advsearch_clear_selection">Clear selection</string>
     <string name="community_advsearch_select">Select</string>
     <string name="community_advsearch_cancel">Cancel</string>
+
+    <!-- ══════════════════════════════════════════
+         COLLECTION — dynamic grouping (Cards tab, "Group by")
+    ═══════════════════════════════════════════ -->
+    <string name="collection_grouping_label">Group by:</string>
+    <string name="collection_grouping_none">None</string>
+    <string name="collection_grouping_type">Type</string>
+    <string name="collection_grouping_color">Color</string>
+    <string name="collection_grouping_set">Set</string>
+    <string name="collection_grouping_tag">Tag</string>
+    <!-- "12 unique · 34 copies" -->
+    <string name="collection_group_count">%1$d unique · %2$d copies</string>
 
 </resources>

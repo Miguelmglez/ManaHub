@@ -53,6 +53,8 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUse
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.WeightedCardName
+import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
+import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.model.CommunityAggregate
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.Companion.MAX_SEED_CARDS
@@ -221,8 +223,13 @@ data class DeckStudioUiState(
     val useCommunityDataForSeed: Boolean = false,
 
     // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
-    /** Collection-synergy discoveries (Inspirations surface, Phase 4). Empty until loaded. */
+    /** Collection-synergy discoveries (Inspirations surface, Phase 4). Empty until loaded. Used
+     * when [DeckFeatureFlags.DISCOVERIES_V2_ENABLED] is off. */
     val discoveries: List<MagicDiscovery> = emptyList(),
+    /** Deck Builder v2 Phase 5 discoveries (identity-only clustering, plan §3.5). Used when
+     * [DeckFeatureFlags.DISCOVERIES_V2_ENABLED] is on -- populated INSTEAD of [discoveries], never
+     * both (see [loadDiscoveries]). */
+    val discoveriesV2: List<DeckDiscoveryV2> = emptyList(),
     /** Whether the Inspirations (Discoveries) bottom sheet is visible. */
     val showInspirations: Boolean = false,
     /** True while discoveries are being computed off the collection. */
@@ -281,6 +288,10 @@ class DeckStudioViewModel(
     // SAME paste-a-deck-list text field the Studio already has — a pasted deckstats.net URL is
     // detected and routed through the unified pipeline instead of the plain-text parser.
     private val importDeckCardsUseCase: ImportDeckCardsUseCase? = null,
+    // Deck Builder v2, Phase 5 (docs/plans/deck-builder-v2-plan.md §3.5) -- appended last,
+    // nullable-defaulted so no existing test call site needs to change; null behaves exactly as
+    // before Phase 5 (discoveriesV2 never populates, loadDiscoveries falls back to the legacy path).
+    private val discoverSynergiesV2UseCase: DiscoverSynergiesV2UseCase? = null,
 ) : ViewModel() {
 
     /**
@@ -462,14 +473,35 @@ class DeckStudioViewModel(
     }
 
     /**
-     * Computes collection-synergy discoveries off the user's collection for the
-     * Inspirations surface (Phase 4). Mirrors `DeckMagicViewModel.loadDiscoveries()`:
-     * feeds the RAW `observeCollection()` items (List<UserCardWithCard>) to the engine.
-     * A failure logs + records and leaves the discovery list empty — never fatal.
+     * Computes collection-synergy discoveries off the user's collection for the Inspirations
+     * surface. Mirrors `DeckMagicViewModel.loadDiscoveries()`: feeds the RAW `observeCollection()`
+     * items (List<UserCardWithCard>) to the engine. A failure logs + records and leaves the
+     * discovery list empty — never fatal.
+     *
+     * Deck Builder v2 Phase 5: when [DeckFeatureFlags.DISCOVERIES_V2_ENABLED] is on AND
+     * [discoverSynergiesV2UseCase] was actually wired (Koin), [DeckStudioUiState.discoveriesV2] is
+     * populated INSTEAD of the legacy [DeckStudioUiState.discoveries] — never both, so the sheet
+     * content branch (see `DeckStudioScreen.kt`) always has exactly one list to render.
      */
     private fun loadDiscoveries() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingDiscoveries = true) }
+            val v2UseCase = discoverSynergiesV2UseCase
+            if (DeckFeatureFlags.DISCOVERIES_V2_ENABLED && v2UseCase != null) {
+                runCatching {
+                    val collection = userCardRepository.observeCollection().first()
+                    v2UseCase(collection)
+                }.onSuccess { discoveries ->
+                    _uiState.update { it.copy(discoveriesV2 = discoveries, isLoadingDiscoveries = false) }
+                }.onFailure { t ->
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("deck_studio_discovery_v2_seeding_failed")
+                        recordException(RuntimeException("[DeckStudio] deck_studio_discovery_v2_seeding_failed", t))
+                    }
+                    _uiState.update { it.copy(isLoadingDiscoveries = false) }
+                }
+                return@launch
+            }
             runCatching {
                 val collection = userCardRepository.observeCollection().first()
                 deckMagicEngine.discoverSynergies(collection)

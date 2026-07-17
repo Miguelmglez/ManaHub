@@ -13,6 +13,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
+import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
@@ -66,6 +67,8 @@ private val KEY_TAG_SUGGEST_THRESHOLD = floatPreferencesKey("tag_suggest_thresho
 private val KEY_TAG_OVERRIDES_JSON    = stringPreferencesKey("tag_dictionary_overrides")
 private val KEY_USER_DEFINED_TAGS     = stringPreferencesKey("user_defined_tags")
 private val KEY_COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
+/** Persisted "Group by" selection for the Collection "Cards" tab. */
+private val KEY_COLLECTION_GROUPING_MODE = stringPreferencesKey("collection_grouping_mode")
 
 // ── Home dashboard ──────────────────────────────────────────────────────────
 /** Comma-separated list of QuickStartAction.persistedId values; order matters. */
@@ -81,6 +84,14 @@ private val KEY_HOME_COACHMARK_SEEN = booleanPreferencesKey("home_coachmark_seen
  * First Steps carousel. Order is not significant; duplicates are not produced.
  */
 private val KEY_FIRST_STEPS_SKIPPED = stringPreferencesKey("home_first_steps_skipped")
+/**
+ * Whether the "You're all set!" First Steps completion card has already been shown once
+ * (Home widget board overhaul, TASK 3). Lets the CONTEXT_HERO stop occupying the top slot with
+ * this card forever once the user has seen it a single time.
+ */
+private val KEY_FIRST_STEPS_COMPLETION_SEEN = booleanPreferencesKey("home_first_steps_completion_seen")
+/** Persisted category selection for the Home COMMUNITY_DECKS widget (Home widget board overhaul, TASK 5b). */
+private val KEY_HOME_COMMUNITY_DECKS_CATEGORY = stringPreferencesKey("home_community_decks_category")
 
 /** How long the account nudge stays suppressed after a dismissal. */
 private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hours
@@ -443,6 +454,10 @@ class UserPreferencesDataStore @Inject constructor(
         .map { prefs -> CollectionViewMode.fromName(prefs[KEY_COLLECTION_VIEW_MODE]) }
         .catch { emit(CollectionViewMode.GRID) }
 
+    override val collectionGroupingModeFlow: Flow<CollectionGroupingMode> = context.userPrefsDataStore.data
+        .map { prefs -> CollectionGroupingMode.fromName(prefs[KEY_COLLECTION_GROUPING_MODE]) }
+        .catch { emit(CollectionGroupingMode.NONE) }
+
     override suspend fun saveUserDefinedTag(tag: UserDefinedTag) {
         context.userPrefsDataStore.edit { prefs ->
             val json = prefs[KEY_USER_DEFINED_TAGS] ?: "[]"
@@ -468,6 +483,10 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun saveCollectionViewMode(mode: CollectionViewMode) {
         context.userPrefsDataStore.edit { it[KEY_COLLECTION_VIEW_MODE] = mode.name }
+    }
+
+    override suspend fun saveCollectionGroupingMode(mode: CollectionGroupingMode) {
+        context.userPrefsDataStore.edit { it[KEY_COLLECTION_GROUPING_MODE] = mode.name }
     }
 
     // ── Embedding database version ────────────────────────────────────────────
@@ -907,6 +926,33 @@ class UserPreferencesDataStore @Inject constructor(
     /** Marks the customization coach-mark as seen so it never shows again. */
     suspend fun markHomeCoachmarkSeen() {
         context.userPrefsDataStore.edit { it[KEY_HOME_COACHMARK_SEEN] = true }
+    }
+
+    /**
+     * Emits whether the First Steps "You're all set!" completion card has already been shown
+     * once (Home widget board overhaul, TASK 3).
+     */
+    val firstStepsCompletionSeenFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { it[KEY_FIRST_STEPS_COMPLETION_SEEN] ?: false }
+        .catch { emit(false) }
+
+    /** Marks the First Steps completion card as seen so it stops occupying the hero slot. */
+    suspend fun markFirstStepsCompletionSeen() {
+        context.userPrefsDataStore.edit { it[KEY_FIRST_STEPS_COMPLETION_SEEN] = true }
+    }
+
+    /**
+     * Emits the persisted category selection for the Home COMMUNITY_DECKS widget, or null when
+     * never chosen (the caller defaults to [com.mmg.manahub.feature.home.presentation
+     * .HomeCommunityDeckCategory.POPULAR]).
+     */
+    val homeCommunityDecksCategoryFlow: Flow<String?> = context.userPrefsDataStore.data
+        .map { it[KEY_HOME_COMMUNITY_DECKS_CATEGORY] }
+        .catch { emit(null) }
+
+    /** Persists [categoryId] (a [com.mmg.manahub.feature.home.presentation.HomeCommunityDeckCategory.persistedId]). */
+    suspend fun saveHomeCommunityDecksCategory(categoryId: String) {
+        context.userPrefsDataStore.edit { it[KEY_HOME_COMMUNITY_DECKS_CATEGORY] = categoryId }
     }
 
     /**

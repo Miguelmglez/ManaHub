@@ -3,6 +3,7 @@ package com.mmg.manahub.core.domain.usecase.collection
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 
 /**
@@ -30,6 +31,7 @@ class UpdateCollectionEntryUseCase(
     ): DataResult<UpdateEntryOutcome> {
         val cardResult = cardRepository.getCardById(newScryfallId)
         if (cardResult is DataResult.Error) return DataResult.Error(cardResult.message)
+        warmEnglishSiblingIfForeign((cardResult as DataResult.Success).data)
 
         val outcome = userCardRepository.updateEntryWithMerge(
             entryId = entryId,
@@ -41,5 +43,16 @@ class UpdateCollectionEntryUseCase(
             userId = userId,
         )
         return DataResult.Success(outcome)
+    }
+
+    /**
+     * Broken-image fix (2026-07-17). Mirrors [AddCardToCollectionUseCase]'s enrichment: best-effort
+     * warm the English sibling printing (same set + collector number) into Room so collection-list
+     * rendering can fall back to its image when the newly-selected non-English printing has none.
+     * Failure-silent — never blocks or fails the surrounding edit.
+     */
+    private suspend fun warmEnglishSiblingIfForeign(card: Card) {
+        if (card.lang == "en") return
+        runCatching { cardRepository.getCardBySetAndNumber(card.setCode, card.collectorNumber) }
     }
 }
