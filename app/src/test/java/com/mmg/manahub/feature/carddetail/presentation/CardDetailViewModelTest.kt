@@ -12,8 +12,10 @@ import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.usecase.card.RefreshCardStrategyTagsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
@@ -67,6 +69,7 @@ class CardDetailViewModelTest {
     private val helper                    = mockk<AnalyticsHelper>(relaxed = true)
     private val updateCollectionEntry     = mockk<UpdateCollectionEntryUseCase>()
     private val updateWishlistEntry       = mockk<UpdateWishlistEntryUseCase>()
+    private val refreshCardStrategyTags   = mockk<RefreshCardStrategyTagsUseCase>(relaxed = true)
 
     private lateinit var viewModel: CardDetailViewModel
 
@@ -74,8 +77,7 @@ class CardDetailViewModelTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun buildViewModel(): CardDetailViewModel {
-        val card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")
+    private fun buildViewModel(card: com.mmg.manahub.core.model.Card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")): CardDetailViewModel {
         coEvery { cardRepo.getCardById(initialScryfallId) } returns DataResult.Success(card)
         every { cardRepo.observeCard(any()) } returns flowOf(null)
         every { deckRepo.observeDecksContainingCard(any()) } returns flowOf(emptyList())
@@ -99,6 +101,7 @@ class CardDetailViewModelTest {
             helper                    = helper,
             updateCollectionEntry     = updateCollectionEntry,
             updateWishlistEntry       = updateWishlistEntry,
+            refreshCardStrategyTags   = refreshCardStrategyTags,
         )
     }
 
@@ -299,5 +302,67 @@ class CardDetailViewModelTest {
             assertEquals("Entry updated", toast.message)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Deck Engine Unification plan, D8, §5 Phase 5c: precomputed strategy tags
+    //  (auto-generated tags must surface for ANY viewed card, owned or not)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a card with a non-blank oracleId when loadCard then refreshCardStrategyTags is invoked`() = runTest {
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")
+            .copy(oracleId = "oracle-123")
+        viewModel = buildViewModel(card = card)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            refreshCardStrategyTags(initialScryfallId, "oracle-123", card.tags)
+        }
+    }
+
+    @Test
+    fun `given an unowned card with precomputed tags available when loadCard then observeCard reflects the merged tags`() = runTest {
+        // Unowned in the sense that the card was never previously cached with confirmed tags —
+        // loadCard() still calls getCardById/observeCard for ANY viewed card regardless of
+        // collection ownership, so the merged tags surface here exactly the same way they would
+        // for an owned card.
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")
+            .copy(oracleId = "oracle-123", tags = emptyList())
+        val enriched = card.copy(tags = listOf(CardTag.REMOVAL))
+
+        viewModel = buildViewModel(card = card)
+        // Override AFTER buildViewModel() so this specific-id stub isn't shadowed by its blanket
+        // `observeCard(any()) -> flowOf(null)` default — nothing collects yet under
+        // StandardTestDispatcher until advanceUntilIdle() below.
+        every { cardRepo.observeCard(initialScryfallId) } returns flowOf(enriched)
+        advanceUntilIdle()
+
+        assertEquals(listOf(CardTag.REMOVAL), viewModel.uiState.value.card?.tags)
+    }
+
+    @Test
+    fun `given refreshCardStrategyTags throws when loadCard then the card still loads successfully`() = runTest {
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")
+            .copy(oracleId = "oracle-123")
+        coEvery { refreshCardStrategyTags(any(), any(), any()) } throws RuntimeException("offline")
+
+        viewModel = buildViewModel(card = card)
+        advanceUntilIdle()
+
+        assertEquals(card.scryfallId, viewModel.uiState.value.card?.scryfallId)
+        assertTrue(viewModel.uiState.value.error == null)
+    }
+
+    @Test
+    fun `given a card with a blank oracleId when loadCard then refreshCardStrategyTags is never invoked`() = runTest {
+        // Blank-oracleId cards route through the pre-existing refreshCardById backfill instead
+        // (edge-case audit A3) — the two background refreshes are mutually exclusive.
+        val card = TestFixtures.buildCard(scryfallId = initialScryfallId, setCode = "lea")
+        viewModel = buildViewModel(card = card)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { refreshCardStrategyTags(any(), any(), any()) }
+        coVerify(exactly = 1) { cardRepo.refreshCardById(initialScryfallId) }
     }
 }

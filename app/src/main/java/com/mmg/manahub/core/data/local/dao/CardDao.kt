@@ -7,6 +7,9 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.mmg.manahub.core.data.local.entity.CardEntity
+import com.mmg.manahub.core.data.local.mapper.toTagList
+import com.mmg.manahub.core.data.local.mapper.toTagsJson
+import com.mmg.manahub.core.model.CardTag
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -103,6 +106,26 @@ abstract class CardDao {
 
     @Query("UPDATE cards SET tags = :tagsJson, suggested_tags = :suggestedJson WHERE scryfall_id = :scryfallId")
     abstract suspend fun updateTagsAndSuggestions(scryfallId: String, tagsJson: String, suggestedJson: String)
+
+    // Deck Engine Unification plan RUN 7b (BUG 2 fix). Closes a TOCTOU lost-update race between
+    // CardRepositoryImpl.scheduleTagResolution (on-device analyzer, fired in the background on
+    // every cache miss) and RefreshCardStrategyTagsUseCase (precomputed-table lookup, fired from
+    // CardDetailViewModel.loadCard on the SAME cache miss): both used to compute a union from a
+    // `tags` snapshot read BEFORE either had written, then plain-overwrite the column -- whichever
+    // wrote last silently discarded the other's contribution. Reading the CURRENT row and writing
+    // back INSIDE the same @Transaction (not a use-case-level read-then-write) makes the merge
+    // race-free regardless of write ordering. Still a plain `UPDATE ... SET tags = ...` on the
+    // existing row -- never an insert/replace, so this cannot trigger the CardEntity CASCADE-delete
+    // hazard (see the class-level upsert comment).
+    @Transaction
+    open suspend fun unionTags(scryfallId: String, additionalTags: List<CardTag>) {
+        if (additionalTags.isEmpty()) return
+        val current = getById(scryfallId)?.tags?.toTagList() ?: return
+        val merged = (current + additionalTags).distinct()
+        if (merged.size != current.size) {
+            updateTags(scryfallId, merged.toTagsJson())
+        }
+    }
 
     // Broken-image fix (2026-07-17). Batch lookup of cached ENGLISH printings for a set of
     // (set_code, collector_number) pairs — feeds CardRepositoryImpl.getCachedEnglishSiblings,

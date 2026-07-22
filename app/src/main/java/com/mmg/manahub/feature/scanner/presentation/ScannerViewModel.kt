@@ -542,7 +542,7 @@ class ScannerViewModel @Inject constructor(
         if (cards.isEmpty()) return
 
         viewModelScope.launch {
-            cards.forEach { entry ->
+            for (entry in cards) {
                 val wishlistEntry = WishlistEntry(
                     id             = UUID.randomUUID().toString(),
                     userId         = "",  // local-only; no auth required
@@ -555,6 +555,10 @@ class ScannerViewModel @Inject constructor(
                     card           = entry.card,
                 )
                 addToWishlist(wishlistEntry)
+                _uiState.update {
+                    it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name))
+                }
+                kotlinx.coroutines.delay(100)
             }
             analyticsHelper.logEvent(
                 "scanner_add_all_wishlist",
@@ -814,8 +818,13 @@ class ScannerViewModel @Inject constructor(
         if (cards.isEmpty()) return
 
         viewModelScope.launch {
-            // One batched commit → one CardScanned event (no per-card manual XP).
-            commitScannedCards(cards.map { it.toCommit() })
+            for (entry in cards) {
+                commitScannedCards(listOf(entry.toCommit()))
+                _uiState.update {
+                    it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name))
+                }
+                kotlinx.coroutines.delay(100)
+            }
             analyticsHelper.logEvent(
                 "scanner_add_all",
                 mapOf("count" to cards.size.toString()),
@@ -915,6 +924,9 @@ class ScannerViewModel @Inject constructor(
                 scanSession = state.scanSession.copy(cards = updatedCards),
                 showVariantSelector = false,
                 variantSelectorEntry = null,
+                editingCard = if (state.editingCard?.timestamp == original.timestamp) {
+                    state.editingCard.copy(card = variant, setCode = variant.setCode)
+                } else state.editingCard
             )
         }
         persistQueue()

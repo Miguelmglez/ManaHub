@@ -4,10 +4,10 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.NeutralPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.card
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -34,18 +34,20 @@ class DiscoverSynergiesV2UseCaseTest {
 
     @Test
     fun `a strategy cluster surfaces once it reaches the copy threshold`() = runTest(dispatcher) {
-        val collection = (1..6).map { i ->
+        // Deck Engine Unification plan D7 (4.1): threshold raised 6 -> 8 -- "small high-impact
+        // clusters, not broad type-based ones."
+        val collection = (1..8).map { i ->
             owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
         }
         val discoveries = useCase(collection)
         val rampDiscovery = discoveries.single { it.key is DiscoveryClusterKey.Strategy }
-        assertEquals(6, rampDiscovery.memberCount)
-        assertEquals(SeedStrategy.RAMP, rampDiscovery.strategyHint)
+        assertEquals(8, rampDiscovery.memberCount)
+        assertEquals(ArchetypeId.RAMP, rampDiscovery.archetype)
     }
 
     @Test
     fun `a strategy cluster below the copy threshold never surfaces`() = runTest(dispatcher) {
-        val collection = (1..5).map { i ->
+        val collection = (1..7).map { i ->
             owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
         }
         val discoveries = useCase(collection)
@@ -53,21 +55,24 @@ class DiscoverSynergiesV2UseCaseTest {
     }
 
     @Test
-    fun `a tribe cluster surfaces at the TRIBE_ABS_THRESHOLD copy count`() = runTest(dispatcher) {
-        val collection = (1..8).map { i ->
+    fun `a tribe cluster surfaces at its (raised) copy threshold`() = runTest(dispatcher) {
+        // Deck Engine Unification plan D7 (4.1): threshold raised 8 -> 10, deliberately past the
+        // engine's own TRIBE_ABS_THRESHOLD floor (see MIN_TRIBE_CLUSTER_COPIES's KDoc).
+        val collection = (1..10).map { i ->
             owned("elf$i") { card(id = "elf$i", name = "Elf $i", typeLine = "Creature — Elf", colorIdentity = listOf("G")) }
         }
         val discoveries = useCase(collection)
         val tribeDiscovery = discoveries.single { it.key is DiscoveryClusterKey.Tribe }
         assertEquals("Elves", tribeDiscovery.label)
-        assertEquals(SeedStrategy.TRIBAL, tribeDiscovery.strategyHint)
-        assertEquals("Elves", tribeDiscovery.themeHint)
-        assertEquals(8, tribeDiscovery.memberCount)
+        assertEquals(null, tribeDiscovery.archetype)
+        assertEquals(null, tribeDiscovery.theme)
+        assertEquals("tribe:elf", tribeDiscovery.tribe)
+        assertEquals(10, tribeDiscovery.memberCount)
     }
 
     @Test
-    fun `a tribe cluster below 8 copies never surfaces`() = runTest(dispatcher) {
-        val collection = (1..7).map { i ->
+    fun `a tribe cluster below its copy threshold never surfaces`() = runTest(dispatcher) {
+        val collection = (1..9).map { i ->
             owned("elf$i") { card(id = "elf$i", name = "Elf $i", typeLine = "Creature — Elf", colorIdentity = listOf("G")) }
         }
         val discoveries = useCase(collection)
@@ -102,13 +107,16 @@ class DiscoverSynergiesV2UseCaseTest {
 
     @Test
     fun `a color-coherent cluster with a genuine minority color still filters at least one member`() = runTest(dispatcher) {
-        val collection = listOf("G", "G", "G", "G", "G", "U", "B", "R").mapIndexed { i, color ->
+        // 7 green (majority) + one each of blue/black/red/white (4 distinct minority colors) --
+        // MAX_DOMINANT_COLORS caps at 3, so exactly 1 of the 4 minorities must be excluded, leaving
+        // 7 + 3 = 10 survivors, comfortably above the (raised, plan D7 4.1) 8-copy strategy floor.
+        val collection = (listOf("G", "G", "G", "G", "G", "G", "G", "U", "B", "R", "W")).mapIndexed { i, color ->
             owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf(color)) }
         }
         val discoveries = useCase(collection)
         val rampDiscovery = discoveries.single { it.key is DiscoveryClusterKey.Strategy }
-        // 8 inputs, 1 of the 3 minority colors must be excluded (MAX_DOMINANT_COLORS caps at 3).
-        assertTrue(rampDiscovery.memberCount < 8)
+        // 11 inputs, 1 of the 4 minority colors must be excluded (MAX_DOMINANT_COLORS caps at 3).
+        assertTrue(rampDiscovery.memberCount < 11)
         assertTrue(rampDiscovery.dominantColors.size <= 3)
     }
 
@@ -135,7 +143,9 @@ class DiscoverSynergiesV2UseCaseTest {
 
     @Test
     fun `duplicate printings never produce two entries of the same card name in cluster members`() = runTest(dispatcher) {
-        val others = (1..5).map { i ->
+        // 6 others (qty 1 each) + Ramp Twin (2 printings, deduped to qty 2) = 8 copies, clearing
+        // the (raised, plan D7 4.1) 8-copy strategy floor.
+        val others = (1..6).map { i ->
             owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
         }
         val twinPrintingA = owned("twin-a") { card(id = "twin-a", name = "Ramp Twin", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
@@ -169,12 +179,62 @@ class DiscoverSynergiesV2UseCaseTest {
     @Test
     fun `discoveries are capped at the requested limit`() = runTest(dispatcher) {
         val strategyTags = listOf(CardTag.RAMP, CardTag.TOKENS, CardTag.LIFEGAIN, CardTag.SACRIFICE)
+        // 8 copies per tag -- each cluster genuinely clears the (raised, plan D7 4.1) 8-copy floor,
+        // so this test still exercises real capping (4 viable clusters -> limit 2) rather than
+        // trivially passing on zero surfaced clusters.
         val collection = strategyTags.flatMap { tag ->
-            (1..6).map { i ->
+            (1..8).map { i ->
                 owned("${tag.key}$i") { card(id = "${tag.key}$i", name = "${tag.key} Card $i", tags = listOf(tag), colorIdentity = listOf("G")) }
             }
         }
         val discoveries = useCase(collection, limit = 2)
-        assertTrue(discoveries.size <= 2)
+        assertEquals(2, discoveries.size)
+    }
+
+    @Test
+    fun `rarity is a tiebreak only -- higher fit still wins over rarity`() = runTest(dispatcher) {
+        // Deck Engine Unification plan D7 (4.1): a common card with equal-or-better fit must NOT
+        // be pushed below a mythic by the rarity tiebreak -- it only breaks TIES.
+        val collection = (1..8).map { i ->
+            owned("ramp$i") {
+                card(
+                    id = "ramp$i",
+                    name = "Ramp Card $i",
+                    tags = listOf(CardTag.RAMP),
+                    colorIdentity = listOf("G"),
+                    rarity = if (i == 1) "mythic" else "common",
+                )
+            }
+        }
+        val discoveries = useCase(collection)
+        val rampDiscovery = discoveries.single { it.key is DiscoveryClusterKey.Strategy }
+        // Every fixture card is otherwise identical (same tags/color/CMC via the shared `card()`
+        // builder default) -- fit ties, so the tiebreak decides: the mythic must rank first.
+        assertEquals("Ramp Card 1", rampDiscovery.members.first().name)
+    }
+
+    @Test
+    fun `search filter narrows by label and by member card name`() = runTest(dispatcher) {
+        val collection = (1..8).map { i ->
+            owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
+        } + (1..10).map { i ->
+            owned("elf$i") { card(id = "elf$i", name = "Elf $i", typeLine = "Creature — Elf", colorIdentity = listOf("G")) }
+        }
+        val discoveries = useCase(collection)
+        assertEquals(2, discoveries.size)
+
+        val byLabel = DiscoverySearchFilter.apply(discoveries, query = "Elves", selectedCardNames = emptySet())
+        assertEquals(1, byLabel.size)
+        assertEquals("Elves", byLabel.single().label)
+
+        val byCard = DiscoverySearchFilter.apply(discoveries, query = "", selectedCardNames = setOf("Ramp Card 1"))
+        assertEquals(1, byCard.size)
+        assertTrue(byCard.single().key is DiscoveryClusterKey.Strategy)
+
+        val noMatch = DiscoverySearchFilter.apply(discoveries, query = "nonexistent strategy", selectedCardNames = emptySet())
+        assertTrue(noMatch.isEmpty())
+
+        val unfiltered = DiscoverySearchFilter.apply(discoveries, query = "", selectedCardNames = emptySet())
+        assertEquals(discoveries, unfiltered)
     }
 }

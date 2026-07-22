@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
 import kotlinx.coroutines.flow.Flow
@@ -49,8 +50,20 @@ interface DeckRepository {
      */
     suspend fun deleteDeck(deckId: String)
 
-    /** Adds or updates a card slot in the deck's mainboard or sideboard. */
-    suspend fun addCardToDeck(deckId: String, scryfallId: String, quantity: Int = 1, isSideboard: Boolean = false)
+    /**
+     * Adds or updates a card slot in the deck's mainboard or sideboard.
+     *
+     * @param source Deck Engine Unification plan (D4): per-card provenance, defaults to
+     *        [DeckCardSource.USER] so every existing caller keeps compiling unchanged. Callers that
+     *        know the card's origin (the wizard build, a Suggestions-tab accept) pass it explicitly.
+     */
+    suspend fun addCardToDeck(
+        deckId: String,
+        scryfallId: String,
+        quantity: Int = 1,
+        isSideboard: Boolean = false,
+        source: DeckCardSource = DeckCardSource.USER,
+    )
 
     /** Removes a card slot from the deck. */
     suspend fun removeCardFromDeck(deckId: String, scryfallId: String, isSideboard: Boolean)
@@ -104,4 +117,18 @@ interface DeckRepository {
         archetypeOverride: String?,
         themesOverride: List<String>,
     )
+
+    /**
+     * Pins (or, when null, clears) the deck's tribe override (Deck Engine Unification plan, D2/D4)
+     * -- a raw `tribe:<subtype>` key. Kept as its OWN write path, separate from
+     * [updateArchetypeOverride], so a manual archetype/theme edit (which has no tribe UI) never
+     * silently clobbers a wizard-set tribe pin by omission. Bumps [Deck.updatedAt].
+     */
+    suspend fun updateTribeOverride(deckId: String, tribeOverride: String?)
+
+    /**
+     * Sets (or clears) the deck's [Deck.strategyLocked] flag (D4 hard no-cut guarantee). Bumps
+     * [Deck.updatedAt].
+     */
+    suspend fun updateStrategyLocked(deckId: String, locked: Boolean)
 }

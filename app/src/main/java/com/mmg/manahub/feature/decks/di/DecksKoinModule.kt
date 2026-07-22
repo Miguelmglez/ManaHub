@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.decks.di
 
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.DeckstatsClient
 import com.mmg.manahub.core.data.remote.DeckstatsFetcherImpl
 import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
@@ -19,15 +20,18 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
 import com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver
 import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
+import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
@@ -37,6 +41,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -164,13 +169,31 @@ fun decksKoinModule(
     // SuggestAddsFromCommunityUseCase above).
     single { DeckTemplateResolver(communityAggregateRepository = get(), crashReporter = get()) }
     single { CollectionProfileUseCase() }
+    // Deck Engine Unification plan (§5 Phase 3) — the wizard's own use cases for the two NEW entry
+    // flows: Flow A's "suggested strategies from seeds" ranking and Flow B/C's "suggested seeds from
+    // a picked profile" ranking. Both pure/dependency-free (no defaults needed here since Koin
+    // always supplies a real instance; see each class's own KDoc).
+    single { SuggestStrategiesForSeedsUseCase() }
+    single { RankOwnedCardsForProfileUseCase() }
+    // Deck Engine Unification plan (D1, live-wired in §5 Phase 3.5): build = the Doctor's own Motor A
+    // loop, so BuildDeckFromTemplateUseCase shares the SAME SuggestAddsFromCollectionUseCase
+    // singleton DeckDoctorOrchestrator uses. Motor B (community) is NOW wired live -- the wizard's
+    // Review step gained a per-build "also use community trends" toggle
+    // (DeckWizardSpec.useCommunityData) that ANDs with this global flag at build time
+    // (BuildDeckFromTemplateUseCase.fetchCommunityOwnedCandidates checks BOTH), mirroring
+    // DeckStudioViewModel's own `isCommunityEngineEnabled = { userPreferences
+    // .communityEngineEnabledFlow.first() }` pattern exactly.
     single {
         BuildDeckFromTemplateUseCase(
             deckTemplateResolver = get(),
             deckScorer = get(),
             cardRepository = get(),
+            suggestAddsFromCollectionUseCase = get(),
             manaBaseAnalyzer = get(),
             crashReporter = get(),
+            communityAggregateRepository = get(),
+            suggestAddsFromCommunityUseCase = get(),
+            isCommunityEngineEnabled = { get<UserPreferencesDataStore>().communityEngineEnabledFlow.first() },
         )
     }
     // Deck Builder v2, Phase 5 (docs/plans/deck-builder-v2-plan.md §3.5) -- Discoveries v2. Flag
@@ -209,6 +232,7 @@ fun decksKoinModule(
             communityAggregateRepository = get(),
             importDeckCardsUseCase = get(),
             discoverSynergiesV2UseCase = get(),
+            findCombosUseCase = get(),
         )
     }
 
@@ -226,6 +250,9 @@ fun decksKoinModule(
             crashReporter = get(),
             appContext = get(),
             savedStateHandle = get(),
+            suggestStrategiesForSeedsUseCase = get(),
+            rankOwnedCardsForProfileUseCase = get(),
+            userPreferences = get(),
         )
     }
 

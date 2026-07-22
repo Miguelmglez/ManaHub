@@ -8,6 +8,7 @@ import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.toStrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.card
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -88,7 +89,7 @@ class DeckTemplateResolverTest {
         val resolver = DeckTemplateResolver(repo, ioDispatcher = dispatcher)
 
         val template = resolver.resolve(
-            DeckWizardSpec(format = DeckFormat.CASUAL, colorIdentity = setOf(ManaColor.R), strategyHint = SeedStrategy.AGGRO),
+            DeckWizardSpec(format = DeckFormat.CASUAL, colorIdentity = setOf(ManaColor.R), strategyProfile = SeedStrategy.AGGRO.toStrategyProfile()),
         )
 
         assertEquals(TemplateSource.SYNTHETIC, template.source)

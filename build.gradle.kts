@@ -13,4 +13,10 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.android.kmp.library) apply false
     alias(libs.plugins.compose.multiplatform) apply false
+    // Deck Engine Unification plan, RUN 5 / D5: :tools:tag-pipeline is a plain Kotlin/JVM module
+    // (not KMP). Declared here (apply false) for the same reason as kotlin-multiplatform above —
+    // AGP 9's built-in Kotlin support already puts org.jetbrains.kotlin.jvm on the root classpath
+    // with an unknown version, so the submodule's own `alias(libs.plugins.kotlin.jvm)` fails
+    // version-compatibility checking unless the version is pinned here first.
+    alias(libs.plugins.kotlin.jvm) apply false
 }

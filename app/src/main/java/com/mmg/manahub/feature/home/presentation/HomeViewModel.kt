@@ -455,7 +455,10 @@ class HomeViewModel(
         myUserId: String?,
     ): List<TradeSuggestionPreview> {
         if (suggestions.isEmpty()) return emptyList()
-        val capped = suggestions.take(HOME_TRADE_SUGGESTION_PREVIEW_LIMIT)
+        val distinctSuggestions = suggestions.distinctBy {
+            "${it.offeringUserId}|${it.wishingUserId}|${it.cardId}|${it.userCardId}"
+        }
+        val capped = distinctSuggestions.take(HOME_TRADE_SUGGESTION_PREVIEW_LIMIT)
         val cardIds = capped.map { it.cardId }.distinct()
         val cardsById = runCatching { cardRepository.getCardsByIds(cardIds) }
             .getOrElse { emptyList() }
@@ -468,9 +471,12 @@ class HomeViewModel(
             } else {
                 suggestion.wishingUserId
             }
+            // Generate a unique ID for the suggestion match (TASK 4b crash fix).
+            val uniqueId = "${suggestion.offeringUserId}|${suggestion.wishingUserId}|${suggestion.cardId}|${suggestion.userCardId}"
             TradeSuggestionPreview(
+                id = uniqueId,
                 card = DiscoverCard(
-                    id = card.scryfallId,
+                    id = uniqueId,
                     scryfallId = card.scryfallId,
                     name = card.name,
                     imageUrl = card.imageNormal ?: card.imageArtCrop,
@@ -1423,6 +1429,7 @@ class HomeViewModel(
             !core.firstStepsCompletionSeen && !firstStepsCompletionMarkSeenDispatched
         ) {
             firstStepsCompletionMarkSeenDispatched = true
+            crashlytics.log("home_first_steps_completion_seen")
             viewModelScope.launch { userPrefsDataStore.markFirstStepsCompletionSeen() }
         }
 
@@ -1640,26 +1647,9 @@ class HomeViewModel(
         gamification: GamificationSnapshot,
         firstStepsCompletionSeen: Boolean,
     ): HomeHeroState {
-        // Highest priority (when gamification is enabled): completed quests waiting to be claimed.
-        val claimable = gamification.data?.claimableCount ?: 0
-        if (gamification.enabled && claimable > 0) {
-            return HomeHeroState.QuestsReady(count = claimable)
-        }
-        val draft = activity.activeDraft
-        if (draft != null && draft.status == DraftStatus.DRAFTING) {
-            return HomeHeroState.ActiveDraft(setName = draft.config.setCode.uppercase())
-        }
-        // Show the First Steps carousel whenever the user still has things to discover.
-        if (visibleSteps.isNotEmpty()) {
-            return HomeHeroState.Welcome(steps = visibleSteps)
-        }
-        // All steps done/dismissed. Show the completion card once, the very first time this
-        // state is reached; every subsequent load skips straight to the Summary hero.
-        if (!firstStepsCompletionSeen) {
-            return HomeHeroState.Welcome(steps = emptyList())
-        }
-        val name = if (playerName.isNotBlank()) playerName else "Wizard"
-        return HomeHeroState.Summary(playerName = name, totalGames = activity.totalGames)
+        // Force Welcome state for now (user request: only show Welcome and Loading).
+        // visibleSteps.isNotEmpty() shows the carousel; empty shows the "You're all set!" card.
+        return HomeHeroState.Welcome(steps = visibleSteps)
     }
 
     private fun resolveNudge(

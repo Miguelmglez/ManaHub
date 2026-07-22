@@ -44,7 +44,11 @@ import com.mmg.manahub.core.data.local.paging.RemoteKeyEntity
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
+import com.mmg.manahub.core.data.local.dao.ComboCacheDao
+import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
 import com.mmg.manahub.core.data.local.entity.CommunityAggregateEntity
+import com.mmg.manahub.core.data.local.entity.ComboCacheEntity
+import com.mmg.manahub.core.data.local.entity.CardStrategyTagsCacheEntity
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.local.dao.FriendDao
@@ -102,8 +106,13 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         CommunityDeckCacheEntity::class,
         // Community aggregate cache — Deck Doctor Community/Archetype plan, Phase 3.3 (v44)
         CommunityAggregateEntity::class,
+        // Combo cache (Commander Spellbook find-my-combos) — Deck Engine Unification plan D7 (v48)
+        ComboCacheEntity::class,
+        // Card strategy tags cache (offline tag pipeline precomputed tags) — Deck Engine
+        // Unification plan D8, Phase 5c (v49)
+        CardStrategyTagsCacheEntity::class,
     ],
-    version = 46,
+    version = 49,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -142,4 +151,16 @@ abstract class MtgDatabase : RoomDatabase() {
      * Community/Archetype plan, Phase 3.3 (v44).
      */
     abstract fun communityAggregateDao(): CommunityAggregateDao
+
+    /**
+     * Cache of fetched Commander Spellbook `find-my-combos` responses — Deck Engine Unification
+     * plan D7, Phase 4.3 (v48).
+     */
+    abstract fun comboCacheDao(): ComboCacheDao
+
+    /**
+     * Cache of fetched Supabase `card_strategy_tags` rows (offline tag pipeline precomputed
+     * strategy tags) — Deck Engine Unification plan D8, Phase 5c (v49).
+     */
+    abstract fun cardStrategyTagsCacheDao(): CardStrategyTagsCacheDao
 }

@@ -38,11 +38,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.PriceFormatter
+import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.model.CollectionCardGroup
 
 /**
@@ -56,6 +60,7 @@ fun CardListItem(
     modifier: Modifier = Modifier,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    sharedTransitionKey: Any? = null,
 ) {
     CardListItem(
         name = item.card.name,
@@ -74,24 +79,14 @@ fun CardListItem(
         sharedTransitionScope = sharedTransitionScope,
         animatedVisibilityScope = animatedVisibilityScope,
         scryfallId = item.card.scryfallId,
+        sharedTransitionKey = sharedTransitionKey,
         extraSupportingContent = {
             if (item.distinctCopies > 1) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = StackedCardsIcon,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.magicColors.primaryAccent
-                    )
-                    Text(
-                        text  = item.distinctCopies.toString(),
-                        style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 12.sp),
-                        color = MaterialTheme.magicColors.primaryAccent,
-                    )
-                }
+                Text(
+                    text  = "${item.distinctCopies} variants",
+                    style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 12.sp),
+                    color = MaterialTheme.magicColors.primaryAccent,
+                )
             }
         }
     )
@@ -123,6 +118,7 @@ fun CardListItem(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     scryfallId: String? = null,
+    sharedTransitionKey: Any? = null,
     extraSupportingContent: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
@@ -147,7 +143,9 @@ fun CardListItem(
                 val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null && scryfallId != null) {
                     with(sharedTransitionScope) {
                         imageModifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "card-image-$scryfallId"),
+                            sharedContentState = rememberSharedContentState(
+                                key = sharedTransitionKey ?: "card-image-$scryfallId"
+                            ),
                             animatedVisibilityScope = animatedVisibilityScope,
                             clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
                             boundsTransform = { _, _ ->
@@ -164,6 +162,8 @@ fun CardListItem(
                     AsyncImage(
                         model = imageUrl,
                         contentDescription = name,
+                        placeholder = painterResource(Res.drawable.mtg_card_back),
+                        error = painterResource(Res.drawable.mtg_card_back),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -224,7 +224,12 @@ fun CardListItem(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                language?.let { CopyBadge(label = it.uppercase()) }
+                                language?.let { 
+                                    Text(
+                                        text = CardConstants.getFlag(it),
+                                        style = MaterialTheme.magicTypography.labelLarge.copy(fontSize = 14.sp)
+                                    )
+                                }
                                 condition?.let { CopyBadge(label = it) }
                                 if (hasFoil) FoilBadge()
                                 extraSupportingContent?.invoke(this@Row)

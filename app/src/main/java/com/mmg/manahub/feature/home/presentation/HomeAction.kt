@@ -111,7 +111,7 @@ sealed interface HomeAction {
 
     /** Opens the Profile screen on the Quests tab (gamification Phase 2). */
     object OpenProfileQuests : HomeAction
-    data class OpenCardDetail(val scryfallId: String) : HomeAction
+    data class OpenCardDetail(val scryfallId: String, val sharedTransitionKey: String? = null) : HomeAction
     data class OpenDeck(val deckId: String) : HomeAction
 
     /** Open a specific news article or video URL in the system browser. */

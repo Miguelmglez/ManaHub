@@ -298,6 +298,10 @@ scripts/draftsim_py/.cache/
 scripts/draftsim_py/__pycache__/
 scripts/draftsim_py/**/__pycache__/
 
+# Tag pipeline (tools/tag-pipeline, Deck Engine Unification plan D5): downloaded Scryfall bulk files
+# (~180MB) + cached EDHREC theme pages must never be committed — same rationale as draftsim_py above.
+tools/tag-pipeline/.cache/
+
 
 # =============================================================================
 # SECTION 9 — MISCELLANEOUS GENERATED FILES
@@ -402,3 +406,6 @@ graphify-out/
 /scripts/draftsim_py/draftsim_pipeline/config.py
 /scripts/draftsim_py/draftsim_pipeline/__init__.py
 /scripts/draftsim_py/draftsim_pipeline/worker.py
+
+# User-collection test fixtures for the wizard quality harness (real user data - never commit)
+/testdata/

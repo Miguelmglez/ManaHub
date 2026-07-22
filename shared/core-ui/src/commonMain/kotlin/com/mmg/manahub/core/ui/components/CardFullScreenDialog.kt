@@ -36,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -89,6 +92,8 @@ fun CardFullScreenDialog(
                 AsyncImage(
                     model             = displayImage,
                     contentDescription = card.name,
+                    placeholder        = painterResource(Res.drawable.mtg_card_back),
+                    error              = painterResource(Res.drawable.mtg_card_back),
                     contentScale      = ContentScale.Fit,
                     modifier          = Modifier
                         .fillMaxWidth()

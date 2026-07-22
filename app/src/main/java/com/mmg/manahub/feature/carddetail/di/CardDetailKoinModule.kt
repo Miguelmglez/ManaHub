@@ -84,6 +84,7 @@ fun cardDetailKoinModule(): Module = module {
             helper = get(),
             updateCollectionEntry = get(),
             updateWishlistEntry = get(),
+            refreshCardStrategyTags = get(),
         )
     }
 }

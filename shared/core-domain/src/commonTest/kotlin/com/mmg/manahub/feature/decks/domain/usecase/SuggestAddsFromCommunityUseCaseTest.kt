@@ -51,6 +51,7 @@ private class FakeCardRepository(private val byId: Map<String, Card>, private va
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
     override suspend fun evictStaleCache() = error("unused")
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
+    override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
     override suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>) = error("unused")
     override suspend fun updateSuggestedTags(scryfallId: String, suggestions: List<SuggestedTag>) = error("unused")
     override suspend fun confirmSuggestedTag(scryfallId: String, tag: CardTag) = error("unused")

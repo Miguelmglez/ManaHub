@@ -128,7 +128,7 @@ Coming soon.
 | Voice | Vosk (offline, on-device, grammar-restricted) |
 | Card data | Scryfall API |
 
-SDK: `minSdk = 29` (Android 10) · `targetSdk = 35` · `compileSdk = 36`. JDK 17.
+SDK: `minSdk = 29` (Android 10) · `targetSdk = 36` (Android 16) · `compileSdk = 37`. JDK 17.
 
 Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`, `COMMUNITY_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
 

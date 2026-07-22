@@ -38,11 +38,49 @@ data class Deck(
     // entries; empty means "no theme pin" (inference decides, or the macro pin runs theme-less).
     val archetypeOverride: String? = null,
     val themesOverride: List<String> = emptyList(),
+    // ── Deck Engine Unification (v46->v47, D2/D4) ───────────────────────────
+    // Raw `tribe:<subtype>` key (TribeDeriver.TRIBE_PREFIX-prefixed), or null = no tribe pin.
+    // A SEPARATE pin slot from archetypeOverride/themesOverride -- never folded into
+    // themesOverride's ThemeId-name-only list, so DeckDoctorOrchestrator.pinSeedTags' stale-pin
+    // detection (which maps every themesOverride entry through ThemeId.entries) is never confused
+    // by a tribe key. Written ONLY by the wizard (DeckWizardViewModel.writeResultIntoNewDeck) via
+    // DeckRepository.updateTribeOverride -- Deck Studio's "Deck plan" editor
+    // (DeckDoctorOrchestrator.setArchetypeOverride) has no tribe UI yet and never touches this
+    // field, so a manual archetype/theme edit can never silently clear a wizard-set tribe pin.
+    val tribeOverride: String? = null,
+    /**
+     * True for a deck built by the wizard (D4 hard no-cut guarantee). While true, the Deck Doctor
+     * (i) never lists a `DeckCardSource.WIZARD` card in cuts and (ii) the Suggestions tab hides the
+     * "Deck plan" editor -- both gates are consumed in Phase 2 (RUN 2), this field only PERSISTS the
+     * flag in RUN 1. Unlock = explicit user action in Studio, flips this back to false.
+     */
+    val strategyLocked: Boolean = false,
 )
+
+/**
+ * Per-card provenance (Deck Engine Unification plan, D4 hard no-cut guarantee). Persisted as a raw
+ * TEXT column (`deck_cards.source`) -- [fromRaw] parses defensively (CLAUDE.md: never `.valueOf()`),
+ * an unknown/stale string falls back to [USER] rather than crashing or guessing.
+ */
+enum class DeckCardSource {
+    /** Placed manually by the user in Deck Studio (the default -- also every pre-migration row). */
+    USER,
+    /** Placed by the wizard's build (seeds, commander, category fill, lands). */
+    WIZARD,
+    /** Added by accepting a Deck Doctor Suggestions-tab add. */
+    SUGGESTION;
+
+    companion object {
+        fun fromRaw(raw: String?): DeckCardSource = entries.firstOrNull { it.name == raw } ?: USER
+    }
+}
 
 data class DeckSlot(
     val scryfallId: String,
     val quantity:   Int,
+    /** Deck Engine Unification plan, D4 -- defaults to [DeckCardSource.USER] so every existing
+     * 2-arg call site (tests, legacy construction) keeps compiling unchanged. */
+    val source: DeckCardSource = DeckCardSource.USER,
 )
 
 data class DeckWithCards(

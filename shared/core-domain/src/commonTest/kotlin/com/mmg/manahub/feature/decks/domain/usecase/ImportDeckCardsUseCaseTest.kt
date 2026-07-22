@@ -7,6 +7,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.model.SuggestedTag
@@ -52,6 +53,7 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
     override suspend fun evictStaleCache() = error("unused")
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
+    override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
     override suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>) = error("unused")
     override suspend fun updateSuggestedTags(scryfallId: String, suggestions: List<SuggestedTag>) = error("unused")
     override suspend fun confirmSuggestedTag(scryfallId: String, tag: CardTag) = error("unused")
@@ -87,7 +89,7 @@ private class FakeDeckRepository(private var nextDeckId: String = "created-deck-
     fun seedExistingDeck(deck: Deck) { deckFlow.value = deck }
     override suspend fun updateDeck(deck: Deck) { updateDeckCallCount++; deckFlow.value = deck }
     override suspend fun deleteDeck(deckId: String) = Unit
-    override suspend fun addCardToDeck(deckId: String, scryfallId: String, quantity: Int, isSideboard: Boolean) {
+    override suspend fun addCardToDeck(deckId: String, scryfallId: String, quantity: Int, isSideboard: Boolean, source: DeckCardSource) {
         addedCards.add(AddCall(deckId, scryfallId, quantity, isSideboard))
     }
     override suspend fun removeCardFromDeck(deckId: String, scryfallId: String, isSideboard: Boolean) = Unit
@@ -98,6 +100,8 @@ private class FakeDeckRepository(private var nextDeckId: String = "created-deck-
     }
     override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) = Unit
     override suspend fun updateArchetypeOverride(deckId: String, archetypeOverride: String?, themesOverride: List<String>) = Unit
+    override suspend fun updateTribeOverride(deckId: String, tribeOverride: String?) = Unit
+    override suspend fun updateStrategyLocked(deckId: String, locked: Boolean) = Unit
 }
 
 /**

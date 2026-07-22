@@ -5,12 +5,19 @@ package com.mmg.manahub.core.model
  *
  * Named [DeckSlotEntry] to avoid collision with the domain-level
  * `DeckCard` used by the deck builder.
+ *
+ * @param source Deck Engine Unification plan, D4 (RUN 7b fix) -- mirrors [DeckSlot.source].
+ *        Defaults to [DeckCardSource.USER] so every pre-existing 4-arg call site keeps compiling
+ *        unchanged. Threading this through from [DeckSlot] is what lets
+ *        `DeckStudioViewModel`'s quantity-adjustment call sites preserve a slot's WIZARD/SUGGESTION
+ *        provenance instead of silently defaulting the repository write back to USER.
  */
 data class DeckSlotEntry(
     val scryfallId: String,
     val quantity: Int,
     val isSideboard: Boolean,
     val card: Card?,
+    val source: DeckCardSource = DeckCardSource.USER,
 )
 
 /**

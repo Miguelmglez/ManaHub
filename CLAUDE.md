@@ -430,21 +430,28 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
 - → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
-**Suggestions tab hidden for release (2026-07-14)**: `DeckFeatureFlags
-.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flipped back to `false` (had been `true` since 2026-07-12 for
-the Community/Archetype plan launch) — code intact, flip back to `true` to re-enable. Manual editing
-and Import are unaffected.
+**Suggestions tab hidden again (2026-07-21, temporary)**: `DeckFeatureFlags
+.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` is `false` — it had actually been flipped back to `true` at
+some point after the original 2026-07-14 hide (for the Community/Archetype plan Suggestions-tab
+launch, 2026-07-12 onward) and stayed `true` through the Deck Builder v2 work below; this pass
+flips it off again alongside the two v2 flags (see next paragraph). Code intact, flip back to
+`true` to re-enable. Manual editing and Import are unaffected.
 
-**Deck Builder v2 landed (2026-07-17, `docs/plans/deck-builder-v2-plan.md` Phases 3-5):** a new
+**Deck Builder v2 landed 2026-07-17 (`docs/plans/deck-builder-v2-plan.md` Phases 3-5), then hidden
+again 2026-07-21 (temporary — distinct from the 2026-07-14 permanent-release hide batch):** a new
 full-screen wizard (`Screen.DeckWizard` / `feature/decks/presentation/wizard/`) REPLACED
-`.DECK_STUDIO_BUILD_FROM_SEED_ENABLED` (now `false`) as the "Build from seed" entry point's
+`.DECK_STUDIO_BUILD_FROM_SEED_ENABLED` (already `false`) as the "Build from seed" entry point's
 destination, and a new `DiscoverSynergiesV2UseCase` (identity-only clustering) REPLACED
-`.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED` (now `false`) as the "Browse inspirations" sheet's
-content — both legacy paths stay compiled, and BOTH entry points stay visible whenever EITHER the
-legacy flag or its v2 sibling (`DECK_BUILDER_V2_ENABLED`/`DISCOVERIES_V2_ENABLED`, both `true`) is
-on. See `docs/hidden-features/deck-studio-build-from-seed.md` and `-inspirations.md` for the
-re-enable/retire procedure. → memory: `project_deck_builder_v2` (consolidated; per-run detail in
-`.claude/agent-memory/android-kotlin-architect/`)
+`.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED` (already `false`) as the "Browse inspirations" sheet's
+content — both legacy paths stay compiled. Both entry points stayed visible from 2026-07-17 through
+2026-07-21 whenever EITHER the legacy flag or its v2 sibling was `true`; as of 2026-07-21
+`DECK_BUILDER_V2_ENABLED`/`DISCOVERIES_V2_ENABLED` are ALSO flipped to `false`, so with all four
+flags now off, **both entry points are fully hidden end-to-end** (no destination reachable from
+either). This is a compile-time-flag-flip-only change — no logic/composables/ViewModels were
+touched or deleted. See `docs/hidden-features/deck-studio-build-from-seed.md` and `-inspirations.md`
+and `-suggestions.md` for the re-enable/retire procedure. → memory: `project_deck_builder_v2`
+(consolidated; per-run detail in `.claude/agent-memory/android-kotlin-architect/`),
+`project_deck_studio_temporary_hide_2026-07-21`
 
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
@@ -561,7 +568,12 @@ Key invariants:
 - **Phase 7 inference + flow (B4/E4/E5/E6/E7):** the Deck Doctor seeds the profile — `EvaluateDeckUseCase`
   takes a `seedTags` param fed by `InferDeckIdentityUseCase` over the commander + the deck's top-8
   highest-identity-tag mainboard cards (the fingerprint is no longer self-referential; do NOT reintroduce
-  `seedTags = emptyList()`). **Reasons are structured everywhere**: `MagicSuggestion.reasons` /
+  `seedTags = emptyList()`). **A deck's persisted `archetypeOverride`/`themesOverride` pin is ALSO folded
+  into `seedTags`** (`DeckDoctorOrchestrator.pinSeedTags`, via the single shared `DeckIdentitySeedTags`
+  table in `feature/decks/domain/engine/` — Wizard Quality Campaign Wave 4) — every wizard-built deck is
+  pinned from creation, so this is the common case, not an edge case; any future re-evaluation pass over a
+  deck's identity must fold in the SAME pin the SAME way, never inference-only. → memory:
+  `feedback_deck_doctor_honors_pinned_identity`. **Reasons are structured everywhere**: `MagicSuggestion.reasons` /
   `CardSuggestion.reasons` are `List<ScoreReason>` (NOT `List<String>`); engines emit `fit.reasons` and the
   UI renders `ScoreReason.label()` — never `fit.roles.map { it.name }` (raw-enum-name leak). Unresolvable
   mainboard slots surface `DeckWarning.UnresolvedCards(n)` from the **ViewModel** (the engine never sees
@@ -692,33 +704,58 @@ content). Must-know:
   `SocialExtras`) stay on the typed non-vararg overloads. `performanceFlow` MUST be declared before
   `statsSnapshotFlow` (property init order). Every data flow is `.catch{emit(empty/null)}`-isolated
   so one source failing never collapses the board.
-- **Every data source is real** (2026-07-13 overhaul, Phase 1): `CommunityStatsRepositoryImpl`
-  (Supabase RPC `get_community_stats()`, cache-first via `CommunityAggregateCache`, replaces the
-  deleted `CommunityStatsRepositoryStub`); `ArchidektTrendingRepository` (reuses the existing
-  `ArchidektClient`); Trades Hub wired to `TradesRepository`/`OpenForTradeRepository`/
-  `TradeSuggestionsRepository`; `friendCount` wired to `FriendRepository.observeFriendCount()`;
-  tournament round wired to a new read-only `TournamentRepository.observeCurrentRound()`. Account-gated
-  widgets render `AccountGatedPlaceholder` (→ `CreateAccount`) when `!isAuthenticated`.
+- **Every data source is real** (2026-07-13 overhaul, Phase 1); Trades Hub wired to
+  `TradesRepository`/`OpenForTradeRepository`/`TradeSuggestionsRepository`; `friendCount` wired to
+  `FriendRepository.observeFriendCount()`; tournament round wired to a read-only
+  `TournamentRepository.observeCurrentRound()`. Account-gated widgets gate on
+  `HomeUiState.authResolved` FIRST (never flash the placeholder while the session is still
+  `SessionState.Loading`), then `AccountGatedPlaceholder` (→ `CreateAccount`) when `!isAuthenticated`.
+  `CommunityStatsRepositoryImpl`/`ArchidektTrendingRepository` are DORMANT Koin registrations since the
+  2026-07-18 widget board overhaul (see below) — Home no longer consumes either.
 - `HomeWidgetHost` dispatches type→composable; `HomeWidgetContainer` just wraps it (no bounds
   registry, see above); all widgets share `WidgetShell` (flat Column, no card surface). No
-  `success`/`error` tokens exist — win=`lifePositive`, loss=`lifeNegative`.
+  `success`/`error` tokens exist — win=`lifePositive`, loss=`lifeNegative`. `WidgetSectionHeader`'s
+  icon+label area is an optional ≥48dp tap target (`onClick`/`onClickLabel`) resolved per widget type
+  by `widgetHeaderTitleClickAction` — same destination as that widget's internal "See more" tile.
 - **`RECENTLY_ADDED`** (new 2026-07-13): newest local collection additions,
   `UserCardRepository.observeRecentlyAdded(10)` — no Room migration (`created_at`/`updated_at`
   already existed on `UserCardCollectionEntity`). Keyed by the `user_card_collection` row id (NOT
-  scryfallId — duplicate copies of the same card would collide on scryfallId).
-- **`TRENDING_COMMANDERS` (Deck Doctor Community/Archetype plan Phase 5)**: its `TrendingSnapshot?`
-  data is kept OUTSIDE the `HomeUiState` combine chain (a separate `HomeViewModel.trendingFlow`
-  `stateIn`, threaded as its own param through `HomeScreen`→`HomeWidgetContainer`→`HomeWidgetHost`) —
-  see `project_community_hub_seedbuild_trending` memory for why. Silently hidden (never an error
-  state) on any failure/flag-off. Distinct from the new SOCIAL_HUB "Popular on Archidekt" slides —
-  different backend (Cloudflare Worker vs. direct Archidekt API), never conflate the two.
+  scryfallId — duplicate copies of the same card would collide on scryfallId). Nullable
+  (`List<RecentlyAddedCard>?`, null = loading) since the 2026-07-18 overhaul, same as `decks`,
+  `friends`, `recentTrades`, `tradeSuggestionPreviews`, `openForTradePreview`.
+- **`TRENDING_COMMANDERS` (Deck Doctor Community/Archetype plan Phase 5)** and **`COMMUNITY_DECKS`**
+  (2026-07-18 overhaul, TASK 5b — a category-selectable Archidekt deck browser, `WidgetAudience.ALL`):
+  both keep their data OUTSIDE the `HomeUiState` combine chain (independent `HomeViewModel.trendingFlow`
+  / `communityDecksFlow`+`communityDecksCategoryFlow` `stateIn`s, threaded as extra params through
+  `HomeScreen`→`HomeWidgetContainer`→`HomeWidgetHost`) — see `project_community_hub_seedbuild_trending`
+  memory for why. `TRENDING_COMMANDERS` is silently hidden (never an error state) on any
+  failure/flag-off. Distinct backends: Cloudflare Worker (`TRENDING_COMMANDERS`) vs. Archidekt search API
+  directly via `SearchCommunityDecksUseCase` (`COMMUNITY_DECKS`) — never conflate the two.
+- **`SOCIAL_HUB` was retired 2026-07-18**, split into `FRIENDS` (friend list + pending-request
+  headline) + `COMMUNITY_DECKS`; its MostWishlisted/Milestones slides were dropped (low value), its
+  ActiveTournament slide moved into `GAME_STATS_HUB`. A legacy persisted `"social_hub"` layout token
+  is migrated to `[FRIENDS, COMMUNITY_DECKS]` at decode time
+  (`WidgetInstance.toInstancesWithMigration()`), never silently dropped.
+- **Trades Hub** (2026-07-18 redesign): real card thumbnails, not counts — Suggestions/Open-for-Trade
+  render matched/owned cards via `DiscoverCardThumb`. `TradesRepository.refreshProposals()` only ever
+  fetches proposal METADATA (never items) — `HomeViewModel.hydrateTradeItemCounts()` fans
+  `refreshProposalThread()` out over the newest ≤5 distinct threads after the metadata refresh
+  succeeds, or `TradeSummary.latestItemCount` silently reads 0. See
+  `feedback_trades_refresh_proposals_metadata_only` memory.
 - **First Steps carousel**: tap = CTA only (2026-07-13 — no longer also dismisses); a dedicated
   top-right dismiss affordance (`Icons.Default.Close`, ≥48dp) calls the same `SkipFirstStep`/
   `observeSkippedFirstSteps` DataStore mechanism as before. Most step conditions are data-driven
-  (see `ALL_FIRST_STEPS` in `FirstStepItem.kt` for the per-step DATA-DRIVEN/DISMISS-ONLY doc).
-- Top bar = time-of-day greeting (`Calendar.HOUR_OF_DAY`) + avatar (→ `OpenProfile`).
+  (see `ALL_FIRST_STEPS` in `FirstStepItem.kt` for the per-step DATA-DRIVEN/DISMISS-ONLY doc). The
+  "You're all set!" completion card (empty-`Welcome` hero) shows ONCE — gated by
+  `UserPreferencesDataStore.firstStepsCompletionSeenFlow`/`markFirstStepsCompletionSeen()` — then the
+  hero falls through to `Summary` permanently (2026-07-18).
+- Top bar = deterministic, MTG-flavored greeting pool (4 time bands × 3-4 variants, seeded by epoch
+  day — `HomeScreen.resolveGreetingVariant`, 2026-07-18) + avatar (→ `OpenProfile`). A board-level
+  loading skeleton (`HomeBoardSkeleton`) renders while `HomeUiState.isLoading`, replacing the old
+  empty/partial-grid flash.
 - → memory: `project_home_widget_board`, `project_home_feature_overhaul_2026-07-13`,
-  `feedback_home_dashboard_audit_fixes_2026-07-13`, `feedback_archidekt_trending_stale_cache_bug`
+  `feedback_home_dashboard_audit_fixes_2026-07-13`, `feedback_archidekt_trending_stale_cache_bug`,
+  `project_home_widget_board_overhaul_2026-07`, `feedback_trades_refresh_proposals_metadata_only`
 
 ### Gamification (`core/gamification/`, multi-phase — Phase 0 + Phase 1 complete)
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine. **Local-first** (works 100%

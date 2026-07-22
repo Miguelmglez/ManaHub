@@ -15,6 +15,7 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckCard
+import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
@@ -55,6 +56,9 @@ import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.WeightedCardName
 import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
 import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
+import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
+import com.mmg.manahub.feature.decks.domain.model.ComboResult
+import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.model.CommunityAggregate
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.Companion.MAX_SEED_CARDS
@@ -113,6 +117,9 @@ sealed interface DeckStudioEvent {
  * BUILD is the manual editor (Phase 1). SUGGESTIONS is a Phase-2 stub.
  */
 enum class DeckStudioTab { BUILD, SUGGESTIONS }
+
+/** Tabs of the v2 synergy browser (Deck Engine Unification plan D7, Phase 4). */
+enum class InspirationsTab { STRATEGIES, COMBOS }
 
 /**
  * UI state for the unified Deck Studio editor surface (Phase 1).
@@ -234,6 +241,27 @@ data class DeckStudioUiState(
     val showInspirations: Boolean = false,
     /** True while discoveries are being computed off the collection. */
     val isLoadingDiscoveries: Boolean = false,
+    /** Which tab of the v2 synergy browser is active (Deck Engine Unification plan D7, Phase 4). */
+    val inspirationsTab: InspirationsTab = InspirationsTab.STRATEGIES,
+    /** Free-text label search (4.2) — filters [discoveriesV2] client-side, no recomputation. */
+    val discoverySearchQuery: String = "",
+    /** Search-by-card picks (4.2) — a cluster survives only if it contains at least one of these
+     * (by name). Populated from [DiscoverySearchFilter.pickableCardNames]. */
+    val discoverySelectedCardNames: Set<String> = emptySet(),
+    /** [discoveriesV2] narrowed by [discoverySearchQuery]/[discoverySelectedCardNames] — the list
+     * the Strategies tab actually renders. Recomputed by [recomputeFilteredDiscoveries] whenever
+     * any of the three inputs change (kept in state, not computed in the Composable, so the pure
+     * [DiscoverySearchFilter] stays the single source of truth and is unit-testable via the VM). */
+    val filteredDiscoveriesV2: List<DeckDiscoveryV2> = emptyList(),
+    /** Commander Spellbook combo results (Deck Engine Unification plan D7, Phase 4.3). Null until
+     * [loadCombos] has run at least once (lazy: only fetched on first Combos-tab selection, never
+     * on sheet open, so opening Inspirations never fires a network call by itself). */
+    val comboResult: ComboResult? = null,
+    /** True while [loadCombos] is in flight. */
+    val isLoadingCombos: Boolean = false,
+    /** True once [loadCombos] has completed at least once (success OR degraded-empty) — guards
+     * against re-fetching on every tab re-selection within the same sheet session. */
+    val combosLoaded: Boolean = false,
 
     // ── Import (Group B) ──────────────────────────────────────────────────────
     /** True while a pasted deck list is being resolved + written into the live draft. */
@@ -292,6 +320,10 @@ class DeckStudioViewModel(
     // nullable-defaulted so no existing test call site needs to change; null behaves exactly as
     // before Phase 5 (discoveriesV2 never populates, loadDiscoveries falls back to the legacy path).
     private val discoverSynergiesV2UseCase: DiscoverSynergiesV2UseCase? = null,
+    // Deck Engine Unification plan D7 (Phase 4.3) -- appended last, nullable-defaulted so no
+    // existing test call site needs to change; null means the Combos tab always degrades to an
+    // empty result (never a crash -- mirrors every other optional community-data dependency here).
+    private val findCombosUseCase: FindCombosUseCase? = null,
 ) : ViewModel() {
 
     /**
@@ -492,7 +524,10 @@ class DeckStudioViewModel(
                     val collection = userCardRepository.observeCollection().first()
                     v2UseCase(collection)
                 }.onSuccess { discoveries ->
-                    _uiState.update { it.copy(discoveriesV2 = discoveries, isLoadingDiscoveries = false) }
+                    // 4.2: filteredDiscoveriesV2 starts equal to the full list (no search active
+                    // yet) -- recomputeFilteredDiscoveries() re-derives it from state whenever the
+                    // user actually searches, so this is just the correct initial value.
+                    _uiState.update { it.copy(discoveriesV2 = discoveries, filteredDiscoveriesV2 = discoveries, isLoadingDiscoveries = false) }
                 }.onFailure { t ->
                     FirebaseCrashlytics.getInstance().apply {
                         log("deck_studio_discovery_v2_seeding_failed")
@@ -528,10 +563,13 @@ class DeckStudioViewModel(
                 }
 
                 val mainEntries = deckWithCards.mainboard.map { slot ->
-                    DeckSlotEntry(slot.scryfallId, slot.quantity, false, resolveCard(slot.scryfallId))
+                    // RUN 7b fix (BUG 1): thread the slot's provenance through -- DeckSlotEntry used
+                    // to drop it entirely, which is what let the quantity-adjustment call sites below
+                    // silently rewrite a WIZARD/SUGGESTION slot's source back to USER.
+                    DeckSlotEntry(slot.scryfallId, slot.quantity, false, resolveCard(slot.scryfallId), slot.source)
                 }
                 val sideEntries = deckWithCards.sideboard.map { slot ->
-                    DeckSlotEntry(slot.scryfallId, slot.quantity, true, resolveCard(slot.scryfallId))
+                    DeckSlotEntry(slot.scryfallId, slot.quantity, true, resolveCard(slot.scryfallId), slot.source)
                 }
                 val allEntries = mainEntries + sideEntries
                 cardCache = cardCache + allEntries.mapNotNull { it.card }.associateBy { it.scryfallId }
@@ -701,12 +739,21 @@ class DeckStudioViewModel(
                                     ?.scryfallId
                                 ?: continue
                             val currentQty = currentQuantity(scryfallId, false)
-                            deckRepository.addCardToDeck(deckId, scryfallId, currentQty + delta.delta, false)
+                            // RUN 7b fix (BUG 1): preserve a WIZARD-placed basic land's provenance
+                            // across a land-count bump. `existing` is null for a brand-new land slot
+                            // (nothing to preserve), so that path correctly defaults to USER.
+                            deckRepository.addCardToDeck(
+                                deckId, scryfallId, currentQty + delta.delta, false,
+                                source = existing?.source ?: DeckCardSource.USER,
+                            )
                         }
                         delta.delta < 0 && existing != null -> {
                             val newQty = currentQuantity(existing.scryfallId, false) + delta.delta
                             if (newQty <= 0) deckRepository.removeCardFromDeck(deckId, existing.scryfallId, false)
-                            else deckRepository.addCardToDeck(deckId, existing.scryfallId, newQty, false)
+                            else deckRepository.addCardToDeck(
+                                deckId, existing.scryfallId, newQty, false,
+                                source = existing.source,
+                            )
                         }
                     }
                 }
@@ -761,7 +808,15 @@ class DeckStudioViewModel(
                 if (card != null) cardCache = cardCache + (scryfallId to card)
 
                 val currentQty = currentQuantity(scryfallId, isSideboard)
-                deckRepository.addCardToDeck(deckId, scryfallId, currentQty + 1, isSideboard)
+                // RUN 7b fix (BUG 1): preserve the existing slot's provenance across a quantity
+                // bump -- omitting `source` would fall back to the repository's USER default,
+                // silently stripping WIZARD/SUGGESTION provenance and defeating D4's hard no-cut
+                // guarantee. A genuinely NEW slot (no existing match) has nothing to preserve and
+                // correctly falls back to USER.
+                deckRepository.addCardToDeck(
+                    deckId, scryfallId, currentQty + 1, isSideboard,
+                    source = existingSource(scryfallId, isSideboard) ?: DeckCardSource.USER,
+                )
             }.onFailure {
                 logFailure("deck_studio_add_failed", it)
                 _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_add_failed)))
@@ -778,8 +833,14 @@ class DeckStudioViewModel(
                 runCatching { deckRepository.removeCardFromDeck(deckId, scryfallId, isSideboard) }
                     .onFailure { logFailure("deck_studio_remove_failed", it) }
             } else {
-                runCatching { deckRepository.addCardToDeck(deckId, scryfallId, currentQty - 1, isSideboard) }
-                    .onFailure { logFailure("deck_studio_decrement_failed", it) }
+                // RUN 7b fix (BUG 1): same provenance-preservation as addCardToDeck above -- this
+                // decrement-but-stays-above-0 branch is still an upsert of an EXISTING slot.
+                runCatching {
+                    deckRepository.addCardToDeck(
+                        deckId, scryfallId, currentQty - 1, isSideboard,
+                        source = existingSource(scryfallId, isSideboard) ?: DeckCardSource.USER,
+                    )
+                }.onFailure { logFailure("deck_studio_decrement_failed", it) }
             }
         }
     }
@@ -821,6 +882,21 @@ class DeckStudioViewModel(
         val commander = s.commanderCard
         if (commander != null && commander.scryfallId == scryfallId && !isSideboard) return commander.quantity
         return s.cards.find { it.scryfallId == scryfallId && it.isSideboard == isSideboard }?.quantity ?: 0
+    }
+
+    /**
+     * Looks up the [DeckCardSource] of an EXISTING slot, mirroring [currentQuantity]'s
+     * commander-then-cards lookup order. RUN 7b fix (BUG 1): every quantity-adjustment call site
+     * that upserts an existing slot must pass this back into [DeckRepository.addCardToDeck]'s
+     * `source` param instead of omitting it (which silently defaults to USER and strips a
+     * WIZARD/SUGGESTION card's provenance). Returns null only when there is truly no existing
+     * slot to preserve (a genuinely new add), in which case callers fall back to USER themselves.
+     */
+    private fun existingSource(scryfallId: String, isSideboard: Boolean): DeckCardSource? {
+        val s = _uiState.value
+        val commander = s.commanderCard
+        if (commander != null && commander.scryfallId == scryfallId && !isSideboard) return commander.source
+        return s.cards.find { it.scryfallId == scryfallId && it.isSideboard == isSideboard }?.source
     }
 
     // ── Basic lands ─────────────────────────────────────────────────────────────
@@ -1265,7 +1341,12 @@ class DeckStudioViewModel(
     fun onAddSuggestion(scryfallId: String, cardName: String) {
         viewModelScope.launch {
             val currentQty = currentQuantity(scryfallId, false)
-            runCatching { deckRepository.addCardToDeck(deckId, scryfallId, currentQty + 1, false) }
+            // Deck Engine Unification (D4/RUN 1 follow-up): a Suggestions-tab accept persists
+            // DeckCardSource.SUGGESTION (never the default USER) so a future strategyLocked cut-gate
+            // change can distinguish "the Doctor suggested this" from "the user typed it in manually"
+            // if that distinction is ever needed -- today both stay equally cuttable, this is
+            // provenance-correctness only.
+            runCatching { deckRepository.addCardToDeck(deckId, scryfallId, currentQty + 1, false, DeckCardSource.SUGGESTION) }
                 .onFailure { logFailure("deck_studio_suggestion_add_failed", it); return@launch }
             _events.send(DeckStudioEvent.CardAdded(cardName))
 
@@ -1315,6 +1396,18 @@ class DeckStudioViewModel(
     fun onClearArchetypeOverride() {
         if (!::deckId.isInitialized) return
         deckDoctorOrchestrator.clearArchetypeOverride(deckId, _uiState.value.budgetConstraints)
+    }
+
+    /**
+     * Deck Engine Unification plan (D4): the deck's own explicit "Unlock strategy" action (Studio
+     * shows a confirmation dialog before calling this — see [DeckStudioScreen]). Delegates straight
+     * to [DeckDoctorOrchestrator.unlockStrategy], which flips `Deck.strategyLocked` off and re-runs a
+     * full analysis so [DeckDoctorState.cuts] immediately reflects the unlocked candidate pool.
+     */
+    fun onUnlockStrategy() {
+        if (!::deckId.isInitialized) return
+        crashReporter.log("deck_studio_unlock_strategy_confirmed")
+        deckDoctorOrchestrator.unlockStrategy(deckId, _uiState.value.budgetConstraints)
     }
 
     /**
@@ -1563,6 +1656,88 @@ class DeckStudioViewModel(
     /** Closes the Inspirations (Discoveries) bottom sheet. */
     fun closeInspirations() {
         _uiState.update { it.copy(showInspirations = false) }
+    }
+
+    // ── Synergy browser: tabs + search (Deck Engine Unification plan D7, 4.1-4.2) ──────────────
+
+    /** Switches the v2 synergy browser's active tab. Lazily kicks off [loadCombos] the FIRST
+     * time [InspirationsTab.COMBOS] is selected — opening Inspirations never fires a network call
+     * by itself; only actually looking at the Combos tab does. */
+    fun onSelectInspirationsTab(tab: InspirationsTab) {
+        _uiState.update { it.copy(inspirationsTab = tab) }
+        if (tab == InspirationsTab.COMBOS && !_uiState.value.combosLoaded && !_uiState.value.isLoadingCombos) {
+            loadCombos()
+        }
+    }
+
+    /** Updates the free-text label search (4.2) and re-derives [DeckStudioUiState.filteredDiscoveriesV2]. */
+    fun onDiscoverySearchQueryChange(query: String) {
+        _uiState.update { it.copy(discoverySearchQuery = query) }
+        recomputeFilteredDiscoveries()
+    }
+
+    /** Toggles one card in/out of the search-by-card pick set (4.2). */
+    fun onToggleDiscoverySearchCard(cardName: String) {
+        _uiState.update {
+            val selected = it.discoverySelectedCardNames
+            it.copy(discoverySelectedCardNames = if (cardName in selected) selected - cardName else selected + cardName)
+        }
+        recomputeFilteredDiscoveries()
+    }
+
+    /** Clears both search inputs (4.2) back to the unfiltered [DeckStudioUiState.discoveriesV2] list. */
+    fun onClearDiscoverySearch() {
+        _uiState.update { it.copy(discoverySearchQuery = "", discoverySelectedCardNames = emptySet()) }
+        recomputeFilteredDiscoveries()
+    }
+
+    /** Pure re-derivation via [DiscoverySearchFilter] -- the single source of truth for what the
+     * Strategies tab renders, kept in state (not computed in the Composable) so it stays unit
+     * testable from the VM and Compose stays a dumb `uiState.filteredDiscoveriesV2` reader. */
+    private fun recomputeFilteredDiscoveries() {
+        _uiState.update { state ->
+            state.copy(
+                filteredDiscoveriesV2 = DiscoverySearchFilter.apply(
+                    discoveries = state.discoveriesV2,
+                    query = state.discoverySearchQuery,
+                    selectedCardNames = state.discoverySelectedCardNames,
+                ),
+            )
+        }
+    }
+
+    // ── Combos tab (Deck Engine Unification plan D7, 4.3) ──────────────────────────────────────
+
+    /**
+     * Finds Commander Spellbook combos over the user's OWNED collection (the SAME
+     * `observeCollection()` snapshot [loadDiscoveries] uses -- this tab answers "what combos
+     * could I already build with what I own," not "what combos exist in this deck"). Never
+     * throws: [findCombosUseCase] is null-safe (degrades to [ComboResult.EMPTY]) and every
+     * failure inside it already degrades per [com.mmg.manahub.core.data.repository
+     * .CommanderSpellbookRepositoryImpl]'s own cache-then-empty contract -- this function's
+     * `runCatching` is defense-in-depth only (e.g. a Room read failure before the network call).
+     */
+    fun loadCombos() {
+        val useCase = findCombosUseCase
+        if (useCase == null) {
+            _uiState.update { it.copy(comboResult = ComboResult.EMPTY, combosLoaded = true, isLoadingCombos = false) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingCombos = true) }
+            runCatching {
+                val collection = userCardRepository.observeCollection().first()
+                val cardNames = collection.map { it.card.name }.distinct()
+                useCase(cardNames = cardNames)
+            }.onSuccess { result ->
+                val combos = (result as? DataResult.Success)?.data ?: ComboResult.EMPTY
+                _uiState.update { it.copy(comboResult = combos, isLoadingCombos = false, combosLoaded = true) }
+            }.onFailure { t ->
+                crashReporter.log("deck_studio_combos_load_failed")
+                crashReporter.recordException(RuntimeException("[DeckStudio] deck_studio_combos_load_failed", t))
+                _uiState.update { it.copy(comboResult = ComboResult.EMPTY, isLoadingCombos = false, combosLoaded = true) }
+            }
+        }
     }
 
     /**

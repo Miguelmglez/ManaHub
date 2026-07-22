@@ -27,11 +27,11 @@ plugins {
 
 android {
     namespace = "com.mmg.manahub.baselineprofile"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

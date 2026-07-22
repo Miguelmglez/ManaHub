@@ -74,6 +74,26 @@ enum class ThemeId(val displayName: String) {
     VEHICLES("Vehicles"),
     TOOLBOX("Toolbox"),
     CLONES_THEFT("Clones & Theft"),
+    ;
+
+    companion object {
+        /**
+         * Deck Engine Unification plan (D2): best-effort fuzzy match of a free-form display string
+         * (e.g. an EDHREC theme tag from the wizard's Identity-step picker,
+         * [com.mmg.manahub.core.model.CommunityAggregate.Commander.themeTags]) onto a [ThemeId] --
+         * case-insensitive, matches either direction (substring of / superstring of). Returns `null`
+         * on no match, never a guess -- mirrors
+         * [com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver]'s own
+         * `matchThemeTags` allowlist convention.
+         */
+        fun fromDisplayName(raw: String?): ThemeId? {
+            val needle = raw?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return null
+            return entries.firstOrNull { theme ->
+                val hay = theme.displayName.lowercase()
+                hay == needle || needle.contains(hay) || hay.contains(needle)
+            }
+        }
+    }
 }
 
 /**

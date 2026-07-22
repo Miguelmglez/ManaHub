@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckWithCards
 import com.mmg.manahub.core.data.local.dao.DeckWithCards as DeckWithCardsEntity
@@ -41,12 +42,16 @@ fun DeckEntity.toDomainDeck(): Deck = Deck(
     importedAt = importedAt,
     archetypeOverride = archetypeOverride,
     themesOverride = decodeThemesOverride(themesOverride),
+    tribeOverride = tribeOverride,
+    strategyLocked = strategyLocked,
 )
 
 fun DeckWithCardsEntity.toDomainDeckWithCards(): DeckWithCards = DeckWithCards(
     deck = deck.toDomainDeck(),
-    mainboard = cards.filter { !it.isSideboard }.map { DeckSlot(it.scryfallId, it.quantity) },
-    sideboard = cards.filter { it.isSideboard }.map { DeckSlot(it.scryfallId, it.quantity) },
+    mainboard = cards.filter { !it.isSideboard }
+        .map { DeckSlot(it.scryfallId, it.quantity, DeckCardSource.fromRaw(it.source)) },
+    sideboard = cards.filter { it.isSideboard }
+        .map { DeckSlot(it.scryfallId, it.quantity, DeckCardSource.fromRaw(it.source)) },
 )
 
 fun Deck.toEntity(): DeckEntity = DeckEntity(
@@ -66,4 +71,6 @@ fun Deck.toEntity(): DeckEntity = DeckEntity(
     importedAt = importedAt,
     archetypeOverride = archetypeOverride,
     themesOverride = encodeThemesOverride(themesOverride),
+    tribeOverride = tribeOverride,
+    strategyLocked = strategyLocked,
 )

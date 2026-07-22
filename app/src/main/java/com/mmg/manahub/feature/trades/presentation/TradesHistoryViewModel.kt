@@ -10,8 +10,6 @@ import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.toUserFacingMessage
-import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
@@ -20,7 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -69,8 +67,6 @@ class TradesHistoryViewModel(
     private val authRepository: AuthRepository,
     private val friendRepository: FriendRepository,
     private val tradesRepository: TradesRepository,
-    private val getActive: GetActiveTradesUseCase,
-    private val getHistory: GetTradeHistoryUseCase,
     private val refreshTrades: RefreshTradesUseCase,
     private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -108,11 +104,13 @@ class TradesHistoryViewModel(
                 }
             }
         }
-        // Combine active + historical proposals into one list sorted by most recent first.
+        // Observe all proposals sorted by most recent first. Using observeAllProposals()
+        // instead of combining getActive() and getHistory() prevents a race condition
+        // where a proposal transitioning between active/terminal states could briefly
+        // appear in both lists and crash the LazyColumn on a duplicate key.
         viewModelScope.launch {
-            combine(getActive(), getHistory()) { active, history ->
-                (active + history).sortedByDescending { it.updatedAt }
-            }
+            tradesRepository.observeAllProposals()
+                .map { list -> list.sortedByDescending { it.updatedAt } }
                 .catch { _uiState.update { s -> s.copy(isLoading = false) } }
                 .collect { allProposals ->
                     _uiState.update { s -> s.copy(proposals = allProposals, isLoading = false) }

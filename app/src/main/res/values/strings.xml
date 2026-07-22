@@ -815,6 +815,13 @@
     <string name="deck_studio_archetype_auto_detect">Auto-detect</string>
     <string name="deck_studio_archetype_apply">Apply</string>
     <string name="deck_studio_archetype_plan_updated">Deck plan updated</string>
+    <string name="deck_studio_strategy_unlocked">Strategy unlocked</string>
+    <string name="deck_studio_strategy_locked_title">Built by the wizard</string>
+    <string name="deck_studio_strategy_locked_body">This deck\'s strategy is locked, so the Doctor won\'t suggest cutting any card the wizard placed. Unlock it to edit the deck plan and allow those cards to be suggested as cuts again.</string>
+    <string name="deck_studio_strategy_locked_unlock_action">Unlock strategy</string>
+    <string name="deck_studio_unlock_strategy_confirm_title">Unlock this deck\'s strategy?</string>
+    <string name="deck_studio_unlock_strategy_confirm_body">The Deck Doctor will be able to suggest cutting cards the wizard placed, and you\'ll be able to change the deck plan again. This can\'t be undone automatically.</string>
+    <string name="deck_studio_unlock_strategy_confirm_action">Unlock</string>
     <string name="deck_studio_empty_title">Your deck is empty</string>
     <string name="deck_studio_empty_subtitle">Add cards with the + button, or import an existing list.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
@@ -844,6 +851,19 @@
     <string name="deck_studio_inspiration_fit">%1$d cards</string>
     <string name="deck_studio_inspiration_card_art">View card</string>
 
+    <!-- Synergy browser — Strategies/Combos tabs, search (Deck Engine Unification plan D7, Phase 4) -->
+    <string name="deck_studio_inspirations_tab_strategies">Strategies</string>
+    <string name="deck_studio_inspirations_tab_combos">Combos</string>
+    <string name="deck_studio_inspirations_search_hint">Search strategies or pick a card…</string>
+    <string name="deck_studio_inspirations_search_clear">Clear search</string>
+    <string name="deck_studio_inspirations_search_empty_title">No matches</string>
+    <string name="deck_studio_inspirations_search_empty_subtitle">Try a different search term or card.</string>
+    <string name="deck_studio_combos_empty_title">No combos found</string>
+    <string name="deck_studio_combos_empty_subtitle">We didn\'t find any known combos in your collection yet.</string>
+    <string name="deck_studio_combos_complete_header">Ready to build (%1$d)</string>
+    <string name="deck_studio_combos_almost_header">One card away (%1$d)</string>
+    <string name="deck_studio_combos_missing_card">Missing: %1$s</string>
+
     <!-- Deck Builder v2 — wizard (docs/plans/deck-builder-v2-plan.md §3.4) -->
     <string name="deck_wizard_title">Build a Deck</string>
     <string name="deck_wizard_step_of">Step %1$d of %2$d</string>
@@ -853,6 +873,15 @@
     <!-- Step 1 — Format -->
     <string name="deck_wizard_format_title">Choose a format</string>
     <string name="deck_wizard_format_subtitle">Commander and Casual have the deepest deck templates today.</string>
+    <!-- Entry chooser (Deck Engine Unification plan §5 Phase 3.1) -->
+    <string name="deck_wizard_entry_title">How do you want to start?</string>
+    <string name="deck_wizard_entry_subtitle">Pick the way that fits how you\'re thinking about this deck.</string>
+    <string name="deck_wizard_entry_cards_title">Start from cards</string>
+    <string name="deck_wizard_entry_cards_subtitle">Pick specific cards to build around — we\'ll suggest a strategy that fits them.</string>
+    <string name="deck_wizard_entry_colors_title">Start from colors</string>
+    <string name="deck_wizard_entry_colors_subtitle">Pick colors first, then choose from the strategies that fit them best.</string>
+    <string name="deck_wizard_entry_strategy_title">Start from strategy</string>
+    <string name="deck_wizard_entry_strategy_subtitle">Browse every archetype and theme, then pick the colors that fit it.</string>
     <!-- Step 2 — Direction -->
     <string name="deck_wizard_direction_title">Pick a direction</string>
     <string name="deck_wizard_direction_subtitle">Start from your commander, your collection\'s strengths, or a few seed cards.</string>
@@ -866,6 +895,29 @@
     <string name="deck_wizard_direction_chip_tribe">%1$d %2$s</string>
     <string name="deck_wizard_direction_color_lean">%1$s %2$d%%</string>
     <string name="deck_wizard_seed_picker_toggle">Add seed cards (optional)</string>
+    <string name="deck_wizard_suggested_strategies_title">Suggested strategies</string>
+    <string name="deck_wizard_suggested_strategies_empty">None of your seeds line up with a known strategy yet — you can still continue without one.</string>
+    <string name="deck_wizard_seed_coherence_warning">These seed cards don\'t share much in common — the build may end up unfocused. Consider trimming to cards with a clearer shared theme.</string>
+    <!-- Flow B — colors-first (Deck Engine Unification plan §5 Phase 3.3) -->
+    <string name="deck_wizard_colors_flow_title">Pick your colors</string>
+    <string name="deck_wizard_colors_flow_subtitle">We\'ll show the strategies that work best in these colors.</string>
+    <string name="deck_wizard_colors_flow_pick_hint">Pick at least one color to see viable strategies.</string>
+    <string name="deck_wizard_colors_flow_no_matches">No known strategies fit this color combination yet — you can still continue without one.</string>
+    <string name="deck_wizard_colors_required">Pick at least one color to continue.</string>
+    <string name="deck_wizard_viable_strategies_title">Viable strategies</string>
+    <!-- Flow C — strategy-first (Deck Engine Unification plan §5 Phase 3.4) -->
+    <string name="deck_wizard_strategy_required">Pick an archetype or theme to continue.</string>
+    <string name="deck_wizard_strategy_flow_title">Pick a strategy</string>
+    <string name="deck_wizard_strategy_flow_subtitle">Browse every archetype and theme, then we\'ll rank the colors that fit it best.</string>
+    <string name="deck_wizard_strategy_search_hint">Search archetypes and themes…</string>
+    <string name="deck_wizard_strategy_search_empty">No archetype or theme matches that search.</string>
+    <string name="deck_wizard_archetypes_title">Archetypes</string>
+    <string name="deck_wizard_themes_title">Themes</string>
+    <string name="deck_wizard_color_combos_title">Best color combos for this strategy</string>
+    <string name="deck_wizard_color_combos_empty">No curated color combo for this pick yet — you can still set colors on the next step.</string>
+    <!-- Flow B/C shared — suggested seeds -->
+    <string name="deck_wizard_suggested_seeds_title">Suggested seeds from your collection</string>
+    <string name="deck_wizard_suggested_seeds_subtitle">Tap to include a card as a starting seed (optional).</string>
     <!-- Step 3 — Identity -->
     <string name="deck_wizard_identity_title">Set your identity</string>
     <string name="deck_wizard_identity_subtitle_commander">Colors are set by your commander.</string>
@@ -882,6 +934,8 @@
     <string name="deck_wizard_review_seeds">Seed cards</string>
     <string name="deck_wizard_fill_lands_title">Fill basic lands automatically</string>
     <string name="deck_wizard_fill_lands_subtitle">Color-weighted from the final mana curve</string>
+    <string name="deck_wizard_use_community_data_title">Also use community trends</string>
+    <string name="deck_wizard_use_community_data_subtitle">Prioritize your owned cards that are popular in similar decks</string>
     <string name="deck_wizard_expectation_copy">This is a deeper build — we compare community-known decks against your collection, so it can take a little longer than the old builder.</string>
     <string name="deck_wizard_generate_cta">Generate deck</string>
     <!-- Generating -->
@@ -891,12 +945,16 @@
     <string name="deck_wizard_stage_mapping_categories">Mapping categories…</string>
     <string name="deck_wizard_stage_filling_from_collection">Filling from your collection…</string>
     <string name="deck_wizard_stage_resolving_gaps">Finding community picks for the gaps…</string>
+    <string name="deck_wizard_stage_top_up_from_collection">Topping up from your collection…</string>
     <string name="deck_wizard_stage_filling_lands">Adding basic lands…</string>
     <string name="deck_wizard_stage_done">Finishing up…</string>
     <string name="deck_wizard_build_error_title">Something went wrong</string>
     <string name="deck_wizard_build_error">We couldn\'t build the deck. Please try again.</string>
     <string name="deck_wizard_retry">Try again</string>
     <!-- Result -->
+    <string name="deck_wizard_gaps_title">Couldn\'t fill from your collection</string>
+    <string name="deck_wizard_gap_row_with_colors">Missing %1$d %2$s in %3$s</string>
+    <string name="deck_wizard_gap_row_no_colors">Missing %1$d %2$s</string>
     <string name="deck_wizard_result_report_title">Category fill</string>
     <string name="deck_wizard_report_chip">%1$s %2$d/%3$d</string>
     <string name="deck_wizard_result_from_collection">From your collection</string>
@@ -2529,10 +2587,26 @@
     <string name="lobby_action_leave_room">Leave room</string>
 
     <!-- Home widget board -->
-    <string name="home_greeting_morning">Good morning, %s</string>
-    <string name="home_greeting_afternoon">Good afternoon, %s</string>
-    <string name="home_greeting_evening">Good evening, %s</string>
-    <string name="home_greeting_signed_out">Welcome to ManaHub</string>
+    <!-- Home widget board overhaul, TASK 2 — creative, MTG-flavored greeting pool, one variant
+         picked deterministically per day (see HomeScreen.kt's greetingText()). -->
+    <string name="home_greeting_morning_1">Good morning, %1$s</string>
+    <string name="home_greeting_morning_2">Rise and shine, %1$s</string>
+    <string name="home_greeting_morning_3">Untap, upkeep, draw — morning, %1$s</string>
+    <string name="home_greeting_morning_4">A new day, a fresh hand, %1$s</string>
+    <string name="home_greeting_afternoon_1">Good afternoon, %1$s</string>
+    <string name="home_greeting_afternoon_2">The battlefield awaits, %1$s</string>
+    <string name="home_greeting_afternoon_3">Ready for a match, %1$s?</string>
+    <string name="home_greeting_afternoon_4">Midday magic, %1$s?</string>
+    <string name="home_greeting_evening_1">Good evening, %1$s</string>
+    <string name="home_greeting_evening_2">Time to brew, %1$s?</string>
+    <string name="home_greeting_evening_3">Twilight falls, %1$s</string>
+    <string name="home_greeting_night_1">Up late brewing, %1$s?</string>
+    <string name="home_greeting_night_2">Night owl mode, %1$s</string>
+    <string name="home_greeting_night_3">Still stacking triggers, %1$s?</string>
+    <string name="home_greeting_night_4">The midnight oil burns, %1$s</string>
+    <string name="home_greeting_signed_out_1">Welcome to ManaHub</string>
+    <string name="home_greeting_signed_out_2">Your next great deck starts here</string>
+    <string name="home_greeting_signed_out_3">Tap in, adventurer</string>
     <string name="home_greeting_subtitle_auth">Your journey continues</string>
     <string name="home_edit_start">Customize dashboard</string>
     <string name="home_customize_actions">Customize</string>
@@ -2576,7 +2650,6 @@
     <string name="home_win_rate_percent">%1$d%%</string>
     <string name="home_win_rate_record">%1$d wins / %2$d games</string>
     <string name="home_collection_decks_label">Decks</string>
-    <string name="home_social_friends_title">Friends activity</string>
     <string name="home_best_deck_record">%1$d–%2$d</string>
     <string name="home_best_deck_empty">No deck results yet.</string>
     <string name="home_nemesis_empty">No losses tracked yet.</string>
@@ -2647,18 +2720,25 @@
 
     <!-- Home feature overhaul (2026-07-13) — Trades Hub real data -->
     <string name="home_trade_inbox_preview">New offer · %1$d cards</string>
-    <string name="home_trade_suggestions_count">%1$d matches</string>
-    <string name="home_open_for_trade_count">%1$d cards</string>
     <string name="home_open_for_trade_value">Est. value: %1$s</string>
 
-    <!-- Home feature overhaul — Social Hub real data -->
+    <!-- Home feature overhaul — Friends widget real data -->
     <string name="home_friends_pending_request">New request from %1$s</string>
     <string name="home_friends_count">%1$d friends</string>
-    <string name="home_most_wishlisted_row">%1$s · %2$d wishlists</string>
-    <!-- Degraded MostWishlisted row when the card's name could not be resolved from the local cache. -->
-    <string name="home_most_wishlisted_row_unnamed">%1$d wishlists</string>
-    <string name="home_archidekt_deck_subtitle">%1$d views · via Archidekt</string>
     <string name="home_wishlist_value">Value: %1$s</string>
+
+    <!-- Home widget board overhaul, TASK 5b — Community Decks widget -->
+    <string name="home_community_decks_empty">No community decks available right now.</string>
+    <string name="home_community_decks_category_a11y">Choose category</string>
+    <string name="home_community_decks_category_sheet_title">Browse by</string>
+    <string name="home_community_decks_category_popular">Popular</string>
+    <string name="home_community_decks_category_popular_desc">Trending decks the community is brewing.</string>
+    <string name="home_community_decks_category_recent">Newest</string>
+    <string name="home_community_decks_category_recent_desc">The very latest decks shared by users.</string>
+    <string name="home_community_decks_category_updated">Updated</string>
+    <string name="home_community_decks_category_updated_desc">Recently updated lists with fresh tech.</string>
+    <string name="home_community_decks_category_primers">Primers</string>
+    <string name="home_community_decks_category_primers_desc">Detailed guides for mastering an archetype.</string>
 
     <!-- Home feature overhaul — Recently Added widget -->
     <string name="widget_title_recently_added">Recently added</string>
@@ -2719,9 +2799,10 @@
     <string name="home_widget_desc_latest_sets">Newest sets to draft</string>
     <string name="home_widget_desc_news">Latest MTG headlines</string>
     <string name="home_widget_desc_rules_tip">A rules tip each day</string>
-    <string name="home_widget_desc_social_hub">Friends, community and popular decks</string>
     <string name="home_widget_desc_trades_hub">Trade inbox and suggestions</string>
     <string name="home_widget_desc_trending_commanders">This week\'s most popular commanders</string>
+    <string name="home_widget_desc_friends">Your friends and pending requests</string>
+    <string name="home_widget_desc_community_decks">Browse popular community decks</string>
 
     <!-- Home feature overhaul — Quick Start labels (widget tiles) -->
     <string name="quick_start_scan_card">Scan Card</string>
@@ -2798,9 +2879,11 @@
     <string name="widget_title_decks_shelf">Your decks</string>
     <string name="widget_title_game_stats_hub">Game Stats</string>
     <string name="widget_title_collection_stats_hub">My Collection</string>
-    <string name="widget_title_social_hub">Community</string>
     <string name="widget_title_trades_hub">Trades</string>
     <string name="widget_title_trending_commanders">Trending Commanders</string>
+    <!-- Home widget board overhaul, TASK 5a/5b: SOCIAL_HUB was split into FRIENDS + COMMUNITY_DECKS. -->
+    <string name="widget_title_friends">Friends</string>
+    <string name="widget_title_community_decks">Community Decks</string>
     <string name="home_edit_widgets">Edit Widgets</string>
     <string name="widget_title_wishlist">Wishlist</string>
     <string name="widget_title_discover">Discover cards</string>
@@ -2810,7 +2893,6 @@
     <string name="widget_title_video">Video spotlight</string>
     <string name="widget_title_news">MTG news</string>
     <string name="widget_title_rules_tip">Rules tip</string>
-    <string name="widget_title_friends_activity">Friends activity</string>
     <string name="widget_title_trade_inbox">Trade inbox</string>
     <string name="widget_title_trade_suggestions">Trade suggestions</string>
     <string name="widget_title_open_for_trade">Open for trade</string>
@@ -2818,8 +2900,6 @@
     <string name="widget_title_tournament">Active tournament</string>
     <string name="widget_title_community_commanders">Top commanders</string>
     <string name="widget_title_community_meta">Community meta</string>
-    <string name="widget_title_most_wishlisted">Most wishlisted</string>
-    <string name="widget_title_community_milestones">Community milestones</string>
     <string name="widget_title_improve_game">Improve your game</string>
 
     <!-- Home: account nudge messages -->

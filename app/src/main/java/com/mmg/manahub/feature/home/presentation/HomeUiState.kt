@@ -286,6 +286,7 @@ data class TradeSummary(
  *   could not be resolved locally (never omit the row for this reason — degrade the name instead).
  */
 data class TradeSuggestionPreview(
+    val id: String,
     val card: DiscoverCard,
     val counterpartyName: String?,
 )
@@ -381,6 +382,7 @@ data class AccountNudge(
  *
  * @param persistedId Stable DataStore persistence key — never rename.
  * @param titleRes Label shown in the category picker sheet.
+ * @param descriptionRes Brief summary of what this category surfaces.
  * @param orderBy Archidekt `orderBy` query param value (see [com.mmg.manahub.core.model
  *   .CommunityDeckSearchFilters.orderBy]).
  * @param primersOnly When true, scopes to decks that have a written primer.
@@ -388,15 +390,32 @@ data class AccountNudge(
 enum class HomeCommunityDeckCategory(
     val persistedId: String,
     @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
     val orderBy: String,
     val primersOnly: Boolean = false,
 ) {
-    POPULAR(persistedId = "popular", titleRes = R.string.home_community_decks_category_popular, orderBy = "-viewCount"),
-    RECENT(persistedId = "recent", titleRes = R.string.home_community_decks_category_recent, orderBy = "-createdAt"),
-    UPDATED(persistedId = "updated", titleRes = R.string.home_community_decks_category_updated, orderBy = "-updatedAt"),
+    POPULAR(
+        persistedId = "popular",
+        titleRes = R.string.home_community_decks_category_popular,
+        descriptionRes = R.string.home_community_decks_category_popular_desc,
+        orderBy = "-viewCount"
+    ),
+    RECENT(
+        persistedId = "recent",
+        titleRes = R.string.home_community_decks_category_recent,
+        descriptionRes = R.string.home_community_decks_category_recent_desc,
+        orderBy = "-createdAt"
+    ),
+    UPDATED(
+        persistedId = "updated",
+        titleRes = R.string.home_community_decks_category_updated,
+        descriptionRes = R.string.home_community_decks_category_updated_desc,
+        orderBy = "-updatedAt"
+    ),
     PRIMERS(
         persistedId = "primers",
         titleRes = R.string.home_community_decks_category_primers,
+        descriptionRes = R.string.home_community_decks_category_primers_desc,
         orderBy = "-viewCount",
         primersOnly = true,
     );

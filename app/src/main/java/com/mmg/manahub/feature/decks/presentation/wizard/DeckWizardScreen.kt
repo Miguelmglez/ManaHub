@@ -49,6 +49,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,8 +70,21 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.androidx.compose.koinViewModel
 
-/** Steps 1-4 shown by [WizardStepIndicator]; GENERATING/RESULT replace the whole body instead. */
-private val STEP_PHASES = listOf(WizardPhase.FORMAT, WizardPhase.DIRECTION, WizardPhase.IDENTITY, WizardPhase.REVIEW)
+/**
+ * Steps 1-4 shown by [WizardStepIndicator]; GENERATING/RESULT replace the whole body instead.
+ * Deck Engine Unification plan (§5 Phase 3.1) — this is now COMPUTED, not a fixed list: Commander
+ * skips [WizardPhase.ENTRY] entirely (always [WizardEntryFlow.CARDS], see that enum's KDoc), and
+ * Flow B/C skip [WizardPhase.IDENTITY] ([DeckWizardViewModel.onNextFromDirection] routes straight to
+ * REVIEW for them) — a fixed list would show a wrong/skipped step number for either case.
+ */
+private fun stepPhasesFor(uiState: DeckWizardUiState): List<WizardPhase> {
+    val steps = mutableListOf(WizardPhase.FORMAT)
+    if (uiState.selectedFormat != DeckFormat.COMMANDER) steps += WizardPhase.ENTRY
+    steps += WizardPhase.DIRECTION
+    if (uiState.entryFlow == WizardEntryFlow.CARDS) steps += WizardPhase.IDENTITY
+    steps += WizardPhase.REVIEW
+    return steps
+}
 
 /**
  * Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.4) — the 4-step wizard + generation +
@@ -119,7 +133,7 @@ fun DeckWizardScreen(
             contentWindowInsets = WindowInsets(0),
             topBar = {
                 DeckWizardTopBar(
-                    phase = uiState.phase,
+                    uiState = uiState,
                     onBack = handleBack,
                 )
             },
@@ -128,7 +142,8 @@ fun DeckWizardScreen(
                 AnimatedContent(
                     targetState = uiState.phase,
                     transitionSpec = {
-                        val forward = STEP_PHASES.indexOf(targetState) >= STEP_PHASES.indexOf(initialState)
+                        val stepPhases = stepPhasesFor(uiState)
+                        val forward = stepPhases.indexOf(targetState) >= stepPhases.indexOf(initialState)
                         if (forward) {
                             (slideInHorizontally(tween(250)) { it / 4 } + fadeIn(tween(250))) togetherWith
                                 (slideOutHorizontally(tween(250)) { -it / 4 } + fadeOut(tween(150)))
@@ -145,9 +160,12 @@ fun DeckWizardScreen(
                             onSelectFormat = viewModel::onSelectFormat,
                             onNext = viewModel::onNextFromFormat,
                         )
+                        WizardPhase.ENTRY -> EntryStepContent(
+                            onSelect = viewModel::onSelectEntryFlow,
+                        )
                         WizardPhase.DIRECTION -> DirectionStepContent(
                             uiState = uiState,
-                            onSelectStrategy = viewModel::onSelectStrategyDirection,
+                            onSelectDirectionTag = viewModel::onSelectDirectionTag,
                             onSelectTribe = viewModel::onSelectTribeDirection,
                             onCommanderQueryChange = viewModel::onCommanderQueryChange,
                             onSelectCommander = viewModel::onSelectCommander,
@@ -156,6 +174,14 @@ fun DeckWizardScreen(
                             onSeedQueryChange = viewModel::onSeedQueryChange,
                             onAddSeed = viewModel::onAddSeed,
                             onRemoveSeed = viewModel::onRemoveSeed,
+                            onSelectSeedStrategyCandidate = viewModel::onSelectSeedStrategyCandidate,
+                            onToggleColorFlowColor = viewModel::onToggleColorFlowColor,
+                            onSelectColorAffinityEntry = viewModel::onSelectColorAffinityEntry,
+                            onTaxonomyQueryChange = viewModel::onTaxonomyQueryChange,
+                            onSelectTaxonomyArchetype = viewModel::onSelectTaxonomyArchetype,
+                            onSelectTaxonomyTheme = viewModel::onSelectTaxonomyTheme,
+                            onSelectColorCombo = viewModel::onSelectColorCombo,
+                            onToggleSuggestedSeed = viewModel::onToggleSuggestedSeed,
                             onNext = viewModel::onNextFromDirection,
                         )
                         WizardPhase.IDENTITY -> IdentityStepContent(
@@ -167,6 +193,7 @@ fun DeckWizardScreen(
                         WizardPhase.REVIEW -> ReviewStepContent(
                             uiState = uiState,
                             onToggleFillLands = viewModel::onToggleFillLands,
+                            onToggleUseCommunityData = viewModel::onToggleUseCommunityData,
                             onGenerate = viewModel::onGenerate,
                         )
                         WizardPhase.GENERATING -> GeneratingContent(
@@ -191,7 +218,7 @@ fun DeckWizardScreen(
 }
 
 @Composable
-private fun DeckWizardTopBar(phase: WizardPhase, onBack: () -> Unit) {
+private fun DeckWizardTopBar(uiState: DeckWizardUiState, onBack: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
@@ -211,11 +238,12 @@ private fun DeckWizardTopBar(phase: WizardPhase, onBack: () -> Unit) {
                     modifier = Modifier.padding(start = spacing.sm),
                 )
             }
-            val stepIndex = STEP_PHASES.indexOf(phase)
+            val stepPhases = remember(uiState.selectedFormat, uiState.entryFlow) { stepPhasesFor(uiState) }
+            val stepIndex = stepPhases.indexOf(uiState.phase)
             if (stepIndex >= 0) {
                 WizardStepIndicator(
                     stepIndex = stepIndex,
-                    stepCount = STEP_PHASES.size,
+                    stepCount = stepPhases.size,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.sm),
                 )
             }
@@ -406,6 +434,7 @@ private fun FormatCard(format: DeckFormat, selected: Boolean, comingSoon: Boolea
 private fun ReviewStepContent(
     uiState: DeckWizardUiState,
     onToggleFillLands: () -> Unit,
+    onToggleUseCommunityData: () -> Unit,
     onGenerate: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -432,7 +461,8 @@ private fun ReviewStepContent(
                     ReviewRow(
                         stringResource(R.string.deck_wizard_review_direction),
                         uiState.selectedCommander?.name
-                            ?: uiState.selectedStrategyHint?.displayName
+                            ?: uiState.selectedArchetype?.takeIf { it != com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.GENERIC }?.displayName
+                            ?: uiState.selectedDirectionTheme?.displayName
                             ?: uiState.selectedTribeLabel
                             ?: stringResource(R.string.deck_wizard_review_direction_none),
                     )
@@ -471,6 +501,39 @@ private fun ReviewStepContent(
                             uncheckedTrackColor = mc.surfaceVariant,
                         ),
                     )
+                }
+            }
+
+            // Deck Engine Unification plan (§5 Phase 3.5) — the shared source step. Hidden entirely
+            // when the global community-engine flag is off (never a disabled-but-visible toggle for
+            // a capability the user can't actually use — mirrors the Coming Soon format cards'
+            // "never advertise something inert" convention).
+            if (uiState.communityEngineAvailable) {
+                Surface(
+                    onClick = onToggleUseCommunityData,
+                    shape = CardShape,
+                    color = mc.surface,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(spacing.md).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.deck_wizard_use_community_data_title), style = ty.bodyMedium, color = mc.textPrimary)
+                            Text(stringResource(R.string.deck_wizard_use_community_data_subtitle), style = ty.labelSmall, color = mc.textSecondary)
+                        }
+                        Switch(
+                            checked = uiState.useCommunityData,
+                            onCheckedChange = { onToggleUseCommunityData() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = mc.onAccent,
+                                checkedTrackColor = mc.primaryAccent,
+                                uncheckedThumbColor = mc.textDisabled,
+                                uncheckedTrackColor = mc.surfaceVariant,
+                            ),
+                        )
+                    }
                 }
             }
 

@@ -61,7 +61,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -69,6 +68,9 @@ import coil3.compose.AsyncImage
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.core.model.DeckSummary
@@ -453,7 +455,7 @@ private fun CommunityDeckResultsGrid(
                 deck = deck.toDeckSummary(),
                 onClick = { onDeckClick(deck.archidektId) },
                 ownerName = deck.owner.username,
-                cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                cardBackPainter = painterResource(Res.drawable.mtg_card_back),
             )
         }
 
@@ -651,7 +653,7 @@ private fun LazyListScope.discoverDeckSection(
                     onClick = { onDeckClick(deck.archidektId) },
                     reduced = true,
                     ownerName = deck.owner.username,
-                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    cardBackPainter = painterResource(Res.drawable.mtg_card_back),
                     modifier = Modifier.width(160.dp),
                 )
             }
@@ -682,14 +684,14 @@ private fun CommunityTrendingCardTile(card: Card, onClick: () -> Unit) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (card.imageNormal != null) {
-            AsyncImage(
-                model = card.imageNormal,
-                contentDescription = card.name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        AsyncImage(
+            model = card.imageNormal,
+            contentDescription = card.name,
+            placeholder = painterResource(Res.drawable.mtg_card_back),
+            error = painterResource(Res.drawable.mtg_card_back),
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 

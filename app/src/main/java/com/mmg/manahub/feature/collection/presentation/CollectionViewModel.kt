@@ -381,6 +381,10 @@ class CollectionViewModel(
         _uiState.update { it.copy(sortOrder = sort) }
         analyticsHelper.logEvent("collection_sort_changed", mapOf("sort_order" to sort.name))
         applyFilters()
+        viewModelScope.launch {
+            gridState.scrollToItem(0)
+            listState.scrollToItem(0)
+        }
     }
 
     /**
@@ -395,6 +399,10 @@ class CollectionViewModel(
         analyticsHelper.logEvent("collection_grouping_changed", mapOf("grouping_mode" to mode.name))
         viewModelScope.launch { userPreferencesRepository.saveCollectionGroupingMode(mode) }
         applyFilters()
+        viewModelScope.launch {
+            gridState.scrollToItem(0)
+            listState.scrollToItem(0)
+        }
     }
 
     fun onViewModeToggle() {
@@ -488,10 +496,10 @@ class CollectionViewModel(
         // Sort
         val sorted = when (state.sortOrder) {
             SortOrder.NAME       -> grouped.sortedBy { it.card.name }
-            SortOrder.PRICE_DESC -> grouped.sortedByDescending { it.card.priceUsd ?: 0.0 }
-            SortOrder.PRICE_ASC  -> grouped.sortedBy { it.card.priceUsd ?: 0.0 }
-            SortOrder.RARITY     -> grouped.sortedByDescending { rarityWeight(it.card.rarity) }
-            SortOrder.DATE_ADDED -> grouped.sortedByDescending { it.latestAddedAt }
+            SortOrder.PRICE_DESC -> grouped.sortedWith(compareByDescending<CollectionCardGroup> { it.card.priceUsd ?: 0.0 }.thenBy { it.card.name })
+            SortOrder.PRICE_ASC  -> grouped.sortedWith(compareBy<CollectionCardGroup> { it.card.priceUsd ?: 0.0 }.thenBy { it.card.name })
+            SortOrder.RARITY     -> grouped.sortedWith(compareByDescending<CollectionCardGroup> { rarityWeight(it.card.rarity) }.thenBy { it.card.name })
+            SortOrder.DATE_ADDED -> grouped.sortedWith(compareByDescending<CollectionCardGroup> { it.latestAddedAt }.thenBy { it.card.name })
         }
 
         val sections = if (state.groupingMode == CollectionGroupingMode.NONE) {
