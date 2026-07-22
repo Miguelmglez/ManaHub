@@ -14,6 +14,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -86,15 +87,21 @@ class DeckTemplateResolver(
         val categories = groupCardsByCategory(aggregate.cards)
         val manaCurveTarget = normalizeCurve(aggregate.manaCurve)
         val colorIdentity = spec.commander?.colorIdentity?.toManaColorSet() ?: spec.colorIdentity
-        val themes = matchThemeTags(aggregate.themeTags.map { it.name }, spec.themeHint)
+        val themes = matchThemeTags(aggregate.themeTags.map { it.name }, spec.strategyProfile.themes.firstOrNull()?.displayName)
         return DeckTemplate(
             source = TemplateSource.COMMUNITY,
             categories = categories,
             landTarget = aggregate.avgTypeDistribution.land.coerceAtLeast(0),
             manaCurveTarget = manaCurveTarget,
             colorIdentity = colorIdentity,
-            archetypeInfo = DeckTemplateArchetypeInfo(archetype = ArchetypeId.GENERIC, themes = themes),
-            gamePlan = spec.strategyHint?.description,
+            // Deck Engine Unification (D2): the user's own archetype pin now flows into a
+            // COMMUNITY-sourced Commander template too (previously hardcoded GENERIC — the
+            // aggregate's category structure IS the skeleton either way, but the pin still seeds
+            // recomputeProfile's identity fingerprint and is what gets persisted as the deck's
+            // archetypeOverride, so silently dropping it here left a Direction-step pick with no
+            // effect on a community-sourced build).
+            archetypeInfo = DeckTemplateArchetypeInfo(archetype = spec.strategyProfile.archetype ?: ArchetypeId.GENERIC, themes = themes),
+            gamePlan = gamePlan(spec.strategyProfile),
         )
     }
 
@@ -199,7 +206,8 @@ class DeckTemplateResolver(
 
     private fun syntheticTemplate(spec: DeckWizardSpec): DeckTemplate {
         val archetypeFormat = if (spec.format == DeckFormat.COMMANDER) ArchetypeFormat.COMMANDER else ArchetypeFormat.SIXTY
-        val (archetypeId, themeId) = mapStrategyToArchetype(spec.strategyHint)
+        val archetypeId = spec.strategyProfile.archetype ?: ArchetypeId.GENERIC
+        val themes = spec.strategyProfile.themes
         val colorIdentity = if (spec.format == DeckFormat.COMMANDER) {
             spec.commander?.colorIdentity?.toManaColorSet() ?: spec.colorIdentity
         } else {
@@ -208,7 +216,7 @@ class DeckTemplateResolver(
         val resolved = ArchetypeSkeletonResolver.resolveWithColor(
             format = archetypeFormat,
             archetype = archetypeId,
-            themes = listOfNotNull(themeId),
+            themes = themes,
             colorCount = colorIdentity.count { it != ManaColor.C },
         )
         val categories = resolved.roleTargets
@@ -229,30 +237,21 @@ class DeckTemplateResolver(
             landTarget = resolved.lands.ideal,
             manaCurveTarget = DeckSkeletons.forFormat(deckFormat).targetCurve,
             colorIdentity = colorIdentity,
-            archetypeInfo = DeckTemplateArchetypeInfo(archetype = archetypeId, themes = listOfNotNull(themeId)),
-            gamePlan = spec.strategyHint?.description,
+            archetypeInfo = DeckTemplateArchetypeInfo(archetype = archetypeId, themes = themes),
+            gamePlan = gamePlan(spec.strategyProfile),
         )
     }
 
-    /**
-     * Fixed allowlist mapping a wizard [com.mmg.manahub.feature.decks.domain.engine.SeedStrategy]
-     * hint onto the archetype layer's own [ArchetypeId]/[ThemeId] vocabulary -- both enumerate a
-     * FIXED, closed set of macro-strategies/themes (mirrors [ArchetypeFormat.of]'s "never guess"
-     * convention: an unmapped/null hint resolves to GENERIC with no theme, never an invented one).
-     */
-    private fun mapStrategyToArchetype(hint: com.mmg.manahub.feature.decks.domain.engine.SeedStrategy?): Pair<ArchetypeId, ThemeId?> =
-        when (hint) {
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.AGGRO -> ArchetypeId.AGGRO to null
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.CONTROL -> ArchetypeId.CONTROL to null
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.COMBO -> ArchetypeId.COMBO to null
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.MIDRANGE -> ArchetypeId.MIDRANGE to null
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.RAMP -> ArchetypeId.RAMP to null
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.TOKENS -> ArchetypeId.GENERIC to ThemeId.TOKENS
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.GRAVEYARD -> ArchetypeId.GENERIC to ThemeId.REANIMATOR
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.LIFEGAIN -> ArchetypeId.GENERIC to ThemeId.LIFEGAIN
-            com.mmg.manahub.feature.decks.domain.engine.SeedStrategy.TRIBAL -> ArchetypeId.GENERIC to ThemeId.TRIBAL
-            null -> ArchetypeId.GENERIC to null
-        }
+    /** Deck Engine Unification (D2): a one-sentence "game plan" line for the Result screen, built
+     * from the resolved [StrategyProfile] — [ArchetypeId.GENERIC] contributes nothing (it is the
+     * neutral default, not a game plan of its own). Blank only when the profile is entirely unpinned. */
+    private fun gamePlan(profile: StrategyProfile): String? {
+        val parts = listOfNotNull(
+            profile.archetype?.takeIf { it != ArchetypeId.GENERIC }?.displayName,
+            profile.themes.firstOrNull()?.displayName,
+        )
+        return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+    }
 
     // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -300,11 +299,11 @@ class DeckTemplateResolver(
      * free-form EDHREC theme names) -- an unmapped theme tag simply contributes no [ThemeId], never
      * a guess. At most 2 themes are kept (mirrors [ArchetypeSkeletonResolver]'s own 2-theme cap).
      *
-     * @param preferredThemeHint [DeckWizardSpec.themeHint] (Phase 3 wizard Identity-step theme
-     *   picker, or a Discoveries v2 tribe "Build this" hand-off) — when it matches one of the
-     *   aggregate-derived [ThemeId]s, that theme is moved to the FRONT so the user's explicit pick
-     *   actually wins the 2-theme cap instead of being silently dropped by aggregate ordering.
-     *   A hint that matches nothing is a no-op, never an invented theme.
+     * @param preferredThemeHint the display name of [DeckWizardSpec.strategyProfile]'s first theme
+     *   (wizard Identity-step theme picker, or a Discoveries v2 tribe "Build this" hand-off) — when
+     *   it matches one of the aggregate-derived [ThemeId]s, that theme is moved to the FRONT so the
+     *   user's explicit pick actually wins the 2-theme cap instead of being silently dropped by
+     *   aggregate ordering. A hint that matches nothing is a no-op, never an invented theme.
      */
     private fun matchThemeTags(rawTags: List<String>, preferredThemeHint: String? = null): List<ThemeId> {
         val normalized = rawTags.map { it.trim().lowercase() }

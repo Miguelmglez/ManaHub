@@ -1,0 +1,150 @@
+package com.mmg.manahub.core.data.repository
+
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.common.DispatcherProvider
+import com.mmg.manahub.core.data.cache.CachedCardStrategyTagsEntry
+import com.mmg.manahub.core.data.cache.CardStrategyTagsCache
+import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
+import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsPayloadDto
+import com.mmg.manahub.core.data.tagging.TagDictionary
+import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
+import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
+import com.mmg.manahub.core.domain.repository.CardStrategyTagsSubmission
+import com.mmg.manahub.core.model.CardTag
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+
+private val strategyTagsJson = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+
+/** 14-day freshness window: precomputed tags change rarely (only on a pipeline re-run, roughly
+ *  per new-set release) — a longer TTL than [CommunityAggregateRepositoryImpl]'s 7-day window is
+ *  deliberate and safe here. */
+private const val CARD_STRATEGY_TAGS_FRESH_MS = 14L * 24 * 60 * 60 * 1000
+
+/**
+ * Cache-first implementation of [CardStrategyTagsRepository] (Deck Engine Unification plan, D8,
+ * §5 Phase 5c) — mirrors [CommunityAggregateRepositoryImpl]'s layering: Room cache (14-day
+ * freshness) -> [remote] (the Supabase `card_strategy_tags` table) -> stale cache as a last resort
+ * -> [CardStrategyTagsResult.NotFound]/[CardStrategyTagsResult.Error]. This repository NEVER falls
+ * back to on-device analysis itself — that fallback is the CALLER's responsibility (see
+ * [com.mmg.manahub.core.domain.usecase.card.RefreshCardStrategyTagsUseCase] and
+ * `ResolveCardStrategyTagsUseCase` in `:app`), keeping this class a pure "ask the precomputed
+ * source" concern.
+ */
+class CardStrategyTagsRepositoryImpl(
+    private val remote: CardStrategyTagsRemoteDataSourceContract,
+    private val cache: CardStrategyTagsCache,
+    private val crashReporter: CrashReporter,
+    private val dispatcherProvider: DispatcherProvider,
+    private val now: () -> Long,
+) : CardStrategyTagsRepository {
+
+    override suspend fun getStrategyTags(oracleId: String): CardStrategyTagsResult =
+        withContext(dispatcherProvider.io) {
+            if (oracleId.isBlank()) return@withContext CardStrategyTagsResult.NotFound
+
+            val cached = cache.get(oracleId)
+            if (cached != null && isFresh(cached.fetchedAt)) {
+                markSource("cache_fresh")
+                return@withContext decode(cached, isStale = false) ?: CardStrategyTagsResult.NotFound
+            }
+
+            try {
+                val row = remote.getByOracleId(oracleId)
+                if (row == null) {
+                    // No pipeline row yet for this card (never processed, or genuinely brand new).
+                    // A stale cache entry (however old) is still preferable to nothing — the
+                    // underlying tags rarely change between pipeline runs.
+                    markSource("remote_not_found")
+                    return@withContext cached?.let { decode(it, isStale = true) } ?: CardStrategyTagsResult.NotFound
+                }
+                val entry = CachedCardStrategyTagsEntry(
+                    oracleId        = oracleId,
+                    payloadJson     = strategyTagsJson.encodeToString(CardStrategyTagsPayloadDto.serializer(), row.payload),
+                    pipelineVersion = row.pipelineVersion,
+                    generatedAt     = row.generatedAt,
+                    fetchedAt       = now(),
+                )
+                cache.insert(entry)
+                markSource("remote_found")
+                toFound(row.payload, isStale = false)
+            } catch (e: Exception) {
+                recordFailure(oracleId, e)
+                markSource("error_fallback")
+                cached?.let { decode(it, isStale = true) } ?: CardStrategyTagsResult.Error("Strategy tags unavailable")
+            }
+        }
+
+    /**
+     * Plan §8a addendum — pushes a device-computed [submission] to `submit_card_strategy_tags`
+     * and, on success, ALSO populates the local cache with the just-submitted payload (a real
+     * Room-cache-population point, exactly like a fresh remote *read* hit would have done —
+     * avoids immediately re-hitting the network for the SAME card again this TTL window). NEVER
+     * throws: any failure (offline, unauthenticated, rate-limited, validation-rejected) is an
+     * EXPECTED degraded path for a best-effort background contribution, logged at LOG level only
+     * (never [CrashReporter.recordException]/a Non-Fatal — this is not a bug, see CLAUDE.md's
+     * telemetry conventions).
+     */
+    override suspend fun submitStrategyTags(oracleId: String, submission: CardStrategyTagsSubmission) {
+        if (oracleId.isBlank()) return
+        withContext(dispatcherProvider.io) {
+            val payload = CardStrategyTagsPayloadDto(
+                tags = submission.tags,
+                tribes = submission.tribes,
+                themes = submission.themes,
+                archetypes = submission.archetypes,
+                sources = listOf("device"),
+            )
+            try {
+                remote.submit(oracleId, payload)
+                cache.insert(
+                    CachedCardStrategyTagsEntry(
+                        oracleId = oracleId,
+                        payloadJson = strategyTagsJson.encodeToString(CardStrategyTagsPayloadDto.serializer(), payload),
+                        pipelineVersion = "device",
+                        // Not a formatted ISO-8601 instant (no kotlinx-datetime dependency here) —
+                        // this field is carried through as opaque provenance metadata only; freshness
+                        // is decided by [fetchedAt]/[isFresh], never by parsing this string.
+                        generatedAt = now().toString(),
+                        fetchedAt = now(),
+                    )
+                )
+            } catch (e: Exception) {
+                crashReporter.log("card_strategy_tags_submit_failed")
+            }
+        }
+    }
+
+    private fun isFresh(fetchedAt: Long): Boolean = now() - fetchedAt < CARD_STRATEGY_TAGS_FRESH_MS
+
+    /** Crash-time context / coarse precomputed-vs-fallback signal (RUN 7c telemetry) — O(1) custom-key
+     *  overwrite, deliberately not a [crashReporter] log (this resolves on nearly every card
+     *  add/search/detail-view cache-miss, so a log breadcrumb here would be excessive volume). */
+    private fun markSource(source: String) {
+        crashReporter.setCustomKey("card_strategy_tags_source", source)
+    }
+
+    private fun decode(entry: CachedCardStrategyTagsEntry, isStale: Boolean): CardStrategyTagsResult? =
+        try {
+            val payload = strategyTagsJson.decodeFromString(CardStrategyTagsPayloadDto.serializer(), entry.payloadJson)
+            toFound(payload, isStale)
+        } catch (e: Exception) {
+            null
+        }
+
+    /** Resolves raw string tag keys to [CardTag]s via [TagDictionary] — an unresolvable key (a
+     *  taxonomy drift between the offline pipeline and this build's dictionary) is silently
+     *  dropped rather than guessed at a category. */
+    private fun toFound(payload: CardStrategyTagsPayloadDto, isStale: Boolean): CardStrategyTagsResult.Found =
+        CardStrategyTagsResult.Found(
+            tags    = payload.tags.mapNotNull { key -> TagDictionary.get(key)?.let { CardTag(key, it.category) } },
+            tribes  = payload.tribes,
+            isStale = isStale,
+        )
+
+    private fun recordFailure(oracleId: String, e: Exception) {
+        crashReporter.log("card_strategy_tags_fetch_failed")
+        crashReporter.recordException(e)
+        crashReporter.setCustomKey("card_strategy_tags_oracle_id_len", oracleId.length.toString())
+    }
+}

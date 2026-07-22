@@ -39,12 +39,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -107,7 +109,7 @@ fun DeckListScreen(
                                 onClick          = { onDeckClick(deck.id) },
                                 onDelete         = { viewModel.deleteDeck(deck.id) },
                                 onPlaytest       = if (DeckFeatureFlags.PLAYTEST_ENABLED) ({ onPlaytestClick(deck.id) }) else null,
-                                cardBackPainter  = painterResource(R.drawable.mtg_card_back),
+                                cardBackPainter  = painterResource(Res.drawable.mtg_card_back),
                             )
                         }
                     }

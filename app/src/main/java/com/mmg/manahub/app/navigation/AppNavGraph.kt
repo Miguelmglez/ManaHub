@@ -291,6 +291,10 @@ fun AppNavGraph(
                                     HomeAction.OpenFriends -> navController.navigate(Screen.FriendsList.route)
                                     HomeAction.OpenTrades -> navController.navigate(Screen.Collection.routeWithTab("trades"))
                         HomeAction.OpenCommunityDecks -> navController.navigate(Screen.CommunityDecks.route)
+                        // Home widget board overhaul, TASK 5b/5c — opens the deck detail NATIVELY
+                        // instead of the old SOCIAL_HUB slide's external-browser redirect.
+                        is HomeAction.OpenCommunityDeck ->
+                            navController.navigate(Screen.CommunityDeckDetail.createRoute(action.archidektId))
                         HomeAction.OpenTournaments -> navController.navigate(Screen.TournamentList.route)
                                     HomeAction.OpenSettings -> navController.navigate(Screen.Settings.route)
                                     HomeAction.OpenProfile -> navController.navigate(Screen.Profile.baseRoute)
@@ -338,7 +342,7 @@ fun AppNavGraph(
                                     HomeAction.OpenProfileQuests ->
                                         navController.navigate(Screen.Profile.routeWithTab("quests"))
                                     is HomeAction.OpenCardDetail -> navController.navigate(
-                                        Screen.CollectionCardDetail.createRoute(action.scryfallId)
+                                        Screen.CollectionCardDetail.createRoute(action.scryfallId, action.sharedTransitionKey)
                                     )
                                     is HomeAction.OpenDeck ->
                                         navController.navigate(Screen.DeckStudio.createRoute(action.deckId))
@@ -377,6 +381,7 @@ fun AppNavGraph(
                                     is HomeAction.RemoveWidget,
                                     is HomeAction.UpdateLayout,
                                     is HomeAction.SkipFirstStep,
+                                    is HomeAction.SelectCommunityDecksCategory,
                                     -> Unit
                                 }
                             },
@@ -397,8 +402,8 @@ fun AppNavGraph(
                         ),
                     ) { backStackEntry ->
                         CollectionScreen(
-                            onCardClick = { id ->
-                                navController.navigate(Screen.CollectionCardDetail.createRoute(id))
+                            onCardClick = { id, key ->
+                                navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
                             },
                             onAddCardClick = { navController.navigate(Screen.CollectionAddCard.route) },
                             onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
@@ -451,12 +456,20 @@ fun AppNavGraph(
 
                     composable(
                         route = Screen.CollectionCardDetail.route,
-                        arguments = listOf(navArgument("scryfallId") { type = NavType.StringType }),
+                        arguments = listOf(
+                            navArgument("scryfallId") { type = NavType.StringType },
+                            navArgument("sharedTransitionKey") {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            }
+                        ),
                         enterTransition = { 
                             fadeIn(tween(400)) + scaleIn(initialScale = 0.92f, animationSpec = tween(450))
                         },
                         exitTransition = { fadeOut(tween(300)) }
-                    ) {
+                    ) { backStackEntry ->
+                        val sharedTransitionKey = backStackEntry.arguments?.getString("sharedTransitionKey")
                         CardDetailScreen(
                             onBack              = { navController.popBackStack() },
                             onNavigateToAddCard = { navController.navigate(Screen.CollectionAddCard.route) },
@@ -470,7 +483,8 @@ fun AppNavGraph(
                                 navController.navigate(Screen.CommunityDecksByCard.createRoute(cardName))
                             },
                             sharedTransitionScope = this@SharedTransitionLayout,
-                            animatedVisibilityScope = this@composable
+                            animatedVisibilityScope = this@composable,
+                            sharedTransitionKey = sharedTransitionKey
                         )
                     }
 
@@ -574,8 +588,8 @@ fun AppNavGraph(
                     onNavigateToCommunityDeckDetail = { archidektId ->
                         navController.navigate(Screen.CommunityDeckDetail.createRoute(archidektId))
                     },
-                    onNavigateToWizard = { strategyHint, themeHint, colors ->
-                        navController.navigate(Screen.DeckWizard.createRoute(strategyHint, themeHint, colors))
+                    onNavigateToWizard = { archetype, theme, tribe, colors, seeds ->
+                        navController.navigate(Screen.DeckWizard.createRoute(archetype, theme, tribe, colors, seeds))
                     },
                 )
             }
@@ -584,9 +598,11 @@ fun AppNavGraph(
             composable(
                 route = Screen.DeckWizard.route,
                 arguments = listOf(
-                    navArgument("strategyHint") { type = NavType.StringType; defaultValue = ""; nullable = false },
-                    navArgument("themeHint") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("archetype") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("theme") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("tribe") { type = NavType.StringType; defaultValue = ""; nullable = false },
                     navArgument("colors") { type = NavType.StringType; defaultValue = ""; nullable = false },
+                    navArgument("seeds") { type = NavType.StringType; defaultValue = ""; nullable = false },
                 ),
             ) {
                 com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen(

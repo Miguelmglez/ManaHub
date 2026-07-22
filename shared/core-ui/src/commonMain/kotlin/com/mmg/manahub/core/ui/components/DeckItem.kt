@@ -175,6 +175,7 @@ fun DeckItem(
                     "draft"     -> mc.secondaryAccent.copy(alpha = 0.9f)
                     "standard"  -> mc.lifePositive.copy(alpha = 0.9f)
                     "modern"    -> mc.lifeNegative.copy(alpha = 0.9f)
+                    "pioneer"   -> mc.manaU.copy(alpha = 0.9f)
                     else        -> mc.surfaceVariant.copy(alpha = 0.9f)
                 }
 
@@ -186,7 +187,11 @@ fun DeckItem(
                     Text(
                         text = formatLower.replaceFirstChar { it.uppercase() },
                         style = if (reduced) ty.labelSmall else ty.labelLarge,
-                        color = if (formatLower == "draft" || formatLower == "casual") mc.onAccent else mc.background,
+                        color = when (formatLower) {
+                            "casual", "draft" -> mc.onAccent
+                            "commander", "standard", "modern", "pioneer" -> mc.background
+                            else -> mc.textPrimary
+                        },
                         modifier = Modifier.padding(
                             horizontal = if (reduced) MaterialTheme.spacing.sm else MaterialTheme.spacing.md,
                             vertical = if (reduced) MaterialTheme.spacing.xxs else MaterialTheme.spacing.xs

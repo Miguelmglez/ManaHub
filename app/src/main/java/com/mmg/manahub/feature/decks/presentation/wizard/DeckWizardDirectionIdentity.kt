@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
@@ -65,21 +67,34 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
-import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
 import com.mmg.manahub.feature.decks.domain.template.OwnedCommanderCandidate
+import com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate
 import kotlin.math.roundToInt
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Step 2 — Direction
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Deck Engine Unification plan (§5 Phase 3.1) — dispatches Step 2's content by
+ * [DeckWizardUiState.entryFlow]. [WizardEntryFlow.CARDS] is the ORIGINAL wizard content
+ * ([CardsFlowDirectionContent], unchanged in shape, now also showing a ranked "Suggested
+ * strategies" section once seeds exist); [WizardEntryFlow.COLORS]/[WizardEntryFlow.STRATEGY] are the
+ * two NEW flows, both defined in `DeckWizardEntryFlows.kt`. All three converge on the SAME
+ * one-slot archetype/theme/tribe pick and the SAME [onAddSeed]/[onRemoveSeed] seed list — see each
+ * flow's own KDoc for its specific UX.
+ */
 @Composable
 internal fun DirectionStepContent(
     uiState: DeckWizardUiState,
-    onSelectStrategy: (SeedStrategy) -> Unit,
-    onSelectTribe: (String) -> Unit,
+    onSelectDirectionTag: (CardTag) -> Unit,
+    onSelectTribe: (CollectionTribeSignal) -> Unit,
     onCommanderQueryChange: (String) -> Unit,
     onSelectCommander: (Card) -> Unit,
     onClearCommander: () -> Unit,
@@ -87,6 +102,63 @@ internal fun DirectionStepContent(
     onSeedQueryChange: (String) -> Unit,
     onAddSeed: (Card) -> Unit,
     onRemoveSeed: (Card) -> Unit,
+    onSelectSeedStrategyCandidate: (SeedStrategyCandidate) -> Unit,
+    onToggleColorFlowColor: (ManaColor) -> Unit,
+    onSelectColorAffinityEntry: (ColorStrategyEntry) -> Unit,
+    onTaxonomyQueryChange: (String) -> Unit,
+    onSelectTaxonomyArchetype: (ArchetypeId) -> Unit,
+    onSelectTaxonomyTheme: (ThemeId) -> Unit,
+    onSelectColorCombo: (ColorComboSuggestion) -> Unit,
+    onToggleSuggestedSeed: (Card) -> Unit,
+    onNext: () -> Unit,
+) {
+    when (uiState.entryFlow) {
+        WizardEntryFlow.CARDS -> CardsFlowDirectionContent(
+            uiState = uiState,
+            onSelectDirectionTag = onSelectDirectionTag,
+            onSelectTribe = onSelectTribe,
+            onCommanderQueryChange = onCommanderQueryChange,
+            onSelectCommander = onSelectCommander,
+            onClearCommander = onClearCommander,
+            onToggleSeedPicker = onToggleSeedPicker,
+            onSeedQueryChange = onSeedQueryChange,
+            onAddSeed = onAddSeed,
+            onRemoveSeed = onRemoveSeed,
+            onSelectSeedStrategyCandidate = onSelectSeedStrategyCandidate,
+            onNext = onNext,
+        )
+        WizardEntryFlow.COLORS -> ColorsFlowDirectionContent(
+            uiState = uiState,
+            onToggleColor = onToggleColorFlowColor,
+            onSelectAffinityEntry = onSelectColorAffinityEntry,
+            onToggleSuggestedSeed = onToggleSuggestedSeed,
+            onNext = onNext,
+        )
+        WizardEntryFlow.STRATEGY -> StrategyFlowDirectionContent(
+            uiState = uiState,
+            onQueryChange = onTaxonomyQueryChange,
+            onSelectArchetype = onSelectTaxonomyArchetype,
+            onSelectTheme = onSelectTaxonomyTheme,
+            onSelectCombo = onSelectColorCombo,
+            onToggleSuggestedSeed = onToggleSuggestedSeed,
+            onNext = onNext,
+        )
+    }
+}
+
+@Composable
+private fun CardsFlowDirectionContent(
+    uiState: DeckWizardUiState,
+    onSelectDirectionTag: (CardTag) -> Unit,
+    onSelectTribe: (CollectionTribeSignal) -> Unit,
+    onCommanderQueryChange: (String) -> Unit,
+    onSelectCommander: (Card) -> Unit,
+    onClearCommander: () -> Unit,
+    onToggleSeedPicker: () -> Unit,
+    onSeedQueryChange: (String) -> Unit,
+    onAddSeed: (Card) -> Unit,
+    onRemoveSeed: (Card) -> Unit,
+    onSelectSeedStrategyCandidate: (SeedStrategyCandidate) -> Unit,
     onNext: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
@@ -129,7 +201,7 @@ internal fun DirectionStepContent(
             item(key = "collection_leans") {
                 CollectionLeanSection(
                     uiState = uiState,
-                    onSelectStrategy = onSelectStrategy,
+                    onSelectDirectionTag = onSelectDirectionTag,
                     onSelectTribe = onSelectTribe,
                 )
             }
@@ -160,11 +232,76 @@ internal fun DirectionStepContent(
                     }
                 }
             }
+
+            // Deck Engine Unification plan (§5 Phase 3.2, RC5) — once at least one seed (or the
+            // commander) is picked, rank viable strategies FROM the seeds themselves instead of
+            // leaving the user to guess a Direction chip that may not even fit what they just picked.
+            val suggestion = uiState.seedStrategySuggestion
+            if (suggestion != null) {
+                item(key = "seed_strategy_header") {
+                    Text(
+                        stringResource(R.string.deck_wizard_suggested_strategies_title),
+                        style = ty.labelLarge,
+                        color = mc.primaryAccent,
+                        modifier = Modifier.padding(top = spacing.xs),
+                    )
+                }
+                if (!suggestion.isCoherent) {
+                    item(key = "seed_coherence_warning") {
+                        SeedCoherenceWarning()
+                    }
+                }
+                if (suggestion.candidates.isEmpty()) {
+                    item(key = "seed_strategy_empty") {
+                        Text(
+                            stringResource(R.string.deck_wizard_suggested_strategies_empty),
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                        )
+                    }
+                } else {
+                    item(key = "seed_strategy_chips") {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                        ) {
+                            suggestion.candidates.forEach { candidate ->
+                                val selected = candidate.profile.archetype == uiState.selectedArchetype &&
+                                    candidate.profile.themes.firstOrNull() == uiState.selectedDirectionTheme &&
+                                    candidate.profile.tribe == uiState.selectedTribeKey
+                                DirectionChip(
+                                    label = candidate.label,
+                                    selected = selected,
+                                    onClick = { onSelectSeedStrategyCandidate(candidate) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
         WizardStickyButton(
             label = stringResource(R.string.deck_wizard_next),
             enabled = canProceed,
             onClick = onNext,
+        )
+    }
+}
+
+/** Shown when [com.mmg.manahub.feature.decks.domain.usecase.SeedStrategySuggestion.isCoherent] is
+ * false — the seeds' own identity-tag/tribe fingerprints barely overlap each other (plan §5 3.2:
+ * "incoherent seed set -> inline explanation, never a silent bad build"). The ranked candidates below
+ * this banner still render — the user can pick one anyway, or go back and trim their seed picks. */
+@Composable
+private fun SeedCoherenceWarning() {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.deck_wizard_seed_coherence_warning),
+            style = ty.bodySmall,
+            color = mc.textSecondary,
+            modifier = Modifier.padding(MaterialTheme.spacing.md),
         )
     }
 }
@@ -256,11 +393,25 @@ private fun CommanderCandidateCard(candidate: OwnedCommanderCandidate, onClick: 
     }
 }
 
+/**
+ * Deck Engine Unification plan (D2): renders one Direction chip per STRATEGY tag the collection
+ * leans into ([signal.tag][com.mmg.manahub.feature.decks.domain.template.CollectionStrategySignal
+ * .tag]) that resolves onto the unified taxonomy via [DeckIdentitySeedTags.archetypeForTag] or
+ * `.themeForTag`. A tag with STILL no [com.mmg.manahub.feature.decks.domain.engine.ArchetypeId]/
+ * [ThemeId] home under the new taxonomy is filtered out of the rendered list entirely (never a
+ * "dead" -- selectable-but-inert -- chip); this is the taxonomy-era continuation of the Wizard
+ * Quality Campaign B1 "every rendered chip must do something when tapped" fix, NOT a regression of
+ * it -- the pre-unification fix kept a chip alive via a raw-[CardTag] pin fallback, but D2
+ * deliberately closed that fallback slot (the taxonomy is now `StrategyProfile`-only, with no
+ * "arbitrary tag" pin anywhere left to carry it). See [DeckIdentitySeedTags]'s `THEME_TAGS` KDoc
+ * for how the 4 originally-called-out dead tags (`plus_counters`/`death_triggers`/`spellslinger`/
+ * `etb`) all resolve under the new mapping.
+ */
 @Composable
 private fun CollectionLeanSection(
     uiState: DeckWizardUiState,
-    onSelectStrategy: (SeedStrategy) -> Unit,
-    onSelectTribe: (String) -> Unit,
+    onSelectDirectionTag: (CardTag) -> Unit,
+    onSelectTribe: (CollectionTribeSignal) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -296,21 +447,33 @@ private fun CollectionLeanSection(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(spacing.xs),
             ) {
+                // D2: only render chips whose tag resolves onto the unified taxonomy -- see this
+                // composable's class KDoc.
+                val archetypeByTag = profile.dominantStrategies.associate { it.tag to DeckIdentitySeedTags.archetypeForTag(it.tag) }
+                val themeByTag = profile.dominantStrategies.associate { it.tag to DeckIdentitySeedTags.themeForTag(it.tag) }
                 profile.dominantStrategies.forEach { signal ->
-                    val strategy = SeedStrategy.forTag(signal.tag)
-                    val selected = strategy != null && strategy == uiState.selectedStrategyHint
+                    val archetype = archetypeByTag[signal.tag]
+                    val theme = themeByTag[signal.tag]
+                    if (archetype == null && theme == null) return@forEach
+                    val selected = when {
+                        archetype != null -> archetype == uiState.selectedArchetype
+                        else -> theme == uiState.selectedDirectionTheme
+                    }
                     DirectionChip(
                         label = stringResource(R.string.deck_wizard_direction_chip_strategy, signal.tag.displayLabel, signal.copies),
                         selected = selected,
-                        onClick = { strategy?.let(onSelectStrategy) },
+                        onClick = { onSelectDirectionTag(signal.tag) },
                     )
                 }
                 profile.dominantTribes.forEach { tribe: CollectionTribeSignal ->
-                    val selected = tribe.displayLabel == uiState.selectedTribeLabel
+                    // Edge-case audit (Wizard Quality Campaign final gate, 2026-07-19): compare by
+                    // the stable tribeKey, not the pluralized displayLabel -- the label is
+                    // display-only, the key is what actually threads into StrategyProfile.tribe.
+                    val selected = tribe.tribeKey == uiState.selectedTribeKey
                     DirectionChip(
                         label = stringResource(R.string.deck_wizard_direction_chip_tribe, tribe.copies, tribe.displayLabel),
                         selected = selected,
-                        onClick = { onSelectTribe(tribe.displayLabel) },
+                        onClick = { onSelectTribe(tribe) },
                     )
                 }
             }
@@ -333,7 +496,7 @@ private fun ColorLeanRow(color: ManaColor, sharePercent: Int) {
 }
 
 @Composable
-private fun DirectionChip(label: String, selected: Boolean, onClick: () -> Unit) {
+internal fun DirectionChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     Surface(
@@ -545,7 +708,7 @@ internal fun IdentityStepContent(
                     Text(
                         text = stringResource(R.string.deck_wizard_color_discipline_hint),
                         style = ty.bodySmall,
-                        color = mc.goldMtg,
+                        color = mc.textSecondary,
                         modifier = Modifier.padding(spacing.md),
                     )
                 }
@@ -555,15 +718,23 @@ internal fun IdentityStepContent(
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(20.dp))
                 }
-            } else if (uiState.availableThemeTags.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    Text(stringResource(R.string.deck_wizard_theme_picker_title), style = ty.labelLarge, color = mc.primaryAccent)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                    ) {
-                        uiState.availableThemeTags.forEach { theme ->
-                            DirectionChip(label = theme, selected = theme == uiState.selectedThemeHint, onClick = { onSelectTheme(theme) })
+            } else {
+                // D2: only offer EDHREC theme strings that resolve onto a real ThemeId -- an
+                // unresolvable free-form aggregate tag has nowhere to bind under the unified
+                // taxonomy (mirrors CollectionLeanSection's own dead-chip filter).
+                val resolvableThemeTags = remember(uiState.availableThemeTags) {
+                    uiState.availableThemeTags.filter { ThemeId.fromDisplayName(it) != null }
+                }
+                if (resolvableThemeTags.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                        Text(stringResource(R.string.deck_wizard_theme_picker_title), style = ty.labelLarge, color = mc.primaryAccent)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                        ) {
+                            resolvableThemeTags.forEach { theme ->
+                                DirectionChip(label = theme, selected = theme == uiState.selectedThemeHint, onClick = { onSelectTheme(theme) })
+                            }
                         }
                     }
                 }
@@ -578,7 +749,7 @@ internal fun IdentityStepContent(
 }
 
 @Composable
-private fun ColorToggleChip(color: ManaColor, selected: Boolean, readOnly: Boolean, onClick: () -> Unit) {
+internal fun ColorToggleChip(color: ManaColor, selected: Boolean, readOnly: Boolean, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val border = if (selected) BorderStroke(1.5.dp, mc.primaryAccent) else BorderStroke(0.5.dp, mc.surfaceVariant)
     val background = if (selected) mc.primaryAccent.copy(alpha = 0.18f) else mc.surface

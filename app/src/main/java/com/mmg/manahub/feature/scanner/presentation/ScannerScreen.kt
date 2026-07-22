@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -115,6 +116,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -172,6 +176,7 @@ fun ScannerScreen(
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
     val toastState = rememberMagicToastState()
     val preferredCurrency = LocalPreferredCurrency.current
+    val queueListState = androidx.compose.foundation.lazy.rememberLazyListState()
 
     // Auto-launch permission dialog on first composition
     LaunchedEffect(Unit) {
@@ -271,6 +276,7 @@ fun ScannerScreen(
             preferredCurrency = preferredCurrency,
             ownedCardIdentityKeys = uiState.ownedCardIdentityKeys,
             isAutoDeleteOnAddEnabled = uiState.isAutoDeleteOnAddEnabled,
+            listState = queueListState,
             onDismiss = viewModel::onCloseQueue,
             onRemoveCard = viewModel::onRemoveSessionCard,
             onEditCard = viewModel::onEditScannedCard,
@@ -726,14 +732,15 @@ private fun TopScannerControls(
                         color = mc.secondaryAccent,
                         shape = CircleShape,
                         modifier = Modifier
-                            .size(18.dp)
+                            .height(18.dp)
+                            .widthIn(min = 18.dp)
                             .align(Alignment.TopEnd)
                             .offset(x = 2.dp, y = (-2).dp)
                             .border(1.5.dp, mc.background, CircleShape)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 4.dp)) {
                             Text(
-                                text = queueCount.toString(),
+                                text = if (queueCount > 99) "+99" else queueCount.toString(),
                                 style = MaterialTheme.magicTypography.labelSmall.copy(
                                     fontSize = 10.sp,
                                     letterSpacing = 0.sp
@@ -847,6 +854,18 @@ private fun TopScannerControls(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Language codes for which on-device OCR recognition is available. Scanner-only restriction —
+ * [CardConstants.languages] itself stays untouched (AddCard's Scryfall search-by-language must
+ * keep offering every language Scryfall indexes, ja/ko included; that's independent of what
+ * [com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer] can recognize on a physical card).
+ *
+ * ja/ko excluded 2026-07-22 (Android 16 / API 36 migration): the ML Kit `-japanese`/`-korean`
+ * text-recognition artefacts were removed end-to-end (native libs not 16KB-page-size aligned,
+ * no fixed release upstream) — see [com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer].
+ */
+private val OCR_SUPPORTED_LANGUAGES = CardConstants.languages.filterNot { (code, _) -> code == "ja" || code == "ko" }
+
+/**
  * Language selector bottom sheet — visual/behavioral twin of `AddCardScreen`'s private
  * `LanguageSelectorSheet` (same flag + name + checkmark [LazyColumn] row pattern). Duplicated
  * here rather than extracted into a shared composable: both screens' sheets are `private` inside
@@ -877,7 +896,7 @@ private fun LanguageSelectorSheet(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                items(CardConstants.languages, key = { it.first }) { (code, flag) ->
+                items(OCR_SUPPORTED_LANGUAGES, key = { it.first }) { (code, flag) ->
                     val isSelected = code == selectedLanguage
                     Row(
                         modifier = Modifier
@@ -1069,6 +1088,7 @@ private fun ScanQueueSheet(
     preferredCurrency: PreferredCurrency,
     ownedCardIdentityKeys: Set<String>,
     isAutoDeleteOnAddEnabled: Boolean,
+    listState: androidx.compose.foundation.lazy.LazyListState,
     onDismiss: () -> Unit,
     onRemoveCard: (ScannedCard) -> Unit,
     onEditCard: (ScannedCard) -> Unit,
@@ -1141,7 +1161,7 @@ private fun ScanQueueSheet(
                         color = mc.textPrimary
                     )
                     IconButton(onClick = onClearSession) {
-                        Icon(Icons.Rounded.Delete, null, tint = mc.textSecondary)
+                        Icon(Icons.Rounded.Delete, null, tint = mc.lifeNegative)
                     }
                 }
 
@@ -1176,7 +1196,7 @@ private fun ScanQueueSheet(
                 Spacer(Modifier.height(16.dp))
 
                 // Card List
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(modifier = Modifier.weight(1f), state = listState) {
                     items(filtered, key = { "${it.card.scryfallId}_${it.timestamp}" }) { entry ->
                         QueueCardItem(
                             entry = entry,
@@ -1388,8 +1408,8 @@ private fun QueueCardItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.Clear, null, tint = mc.textSecondary, modifier = Modifier.size(24.dp))
-                    Text(stringResource(R.string.action_remove), style = ty.labelSmall, color = mc.textSecondary)
+                    Icon(Icons.Rounded.Clear, null, tint = mc.lifeNegative, modifier = Modifier.size(24.dp))
+                    Text(stringResource(R.string.action_remove), style = ty.labelSmall, color = mc.lifeNegative)
                 }
             }
         }
@@ -1457,7 +1477,7 @@ private fun EditScannedCardSheet(
         onOpenVariantSelector = onOpenVariantSelector,
         // Reserves the card-art footprint immediately with the card-back art so switching between
         // scanned entries never causes a visible layout jump while Coil loads the real image.
-        cardImagePlaceholder = painterResource(R.drawable.mtg_card_back),
+        cardImagePlaceholder = painterResource(Res.drawable.mtg_card_back),
     )
 }
 

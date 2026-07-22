@@ -7,9 +7,12 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -96,6 +99,9 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
@@ -364,6 +370,50 @@ fun AccountGatedPlaceholder(
     }
 }
 
+/**
+ * Board-level loading skeleton (Home widget board overhaul, TASK 1), shown by [HomeScreen] while
+ * the FIRST combine emission of [HomeUiState] is still pending — replaces an empty/partial grid
+ * with a few placeholder blocks so real widgets don't all pop in at once once the board resolves.
+ */
+@Composable
+fun HomeBoardSkeleton(modifier: Modifier = Modifier) {
+    val spacing = MaterialTheme.spacing
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.lg),
+    ) {
+        repeat(HOME_BOARD_SKELETON_BLOCK_COUNT) {
+            HomeBoardSkeletonBlock()
+        }
+    }
+}
+
+/** Number of placeholder blocks shown by [HomeBoardSkeleton] — matches a typical first screenful. */
+private const val HOME_BOARD_SKELETON_BLOCK_COUNT = 4
+
+/** A single pulsing placeholder block, sized like a typical MEDIUM widget. */
+@Composable
+private fun HomeBoardSkeletonBlock() {
+    val mc = MaterialTheme.magicColors
+    val infiniteTransition = rememberInfiniteTransition(label = "home-board-skeleton")
+    val animatedAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+        label = "skeleton-pulse",
+    )
+    // Reduced-motion users see a static mid-tone block, not a pulsing one (mirrors the hero pulse
+    // at ContextHeroWidget's isReducedMotionEnabled() guard).
+    val alpha = if (isReducedMotionEnabled()) 0.5f else animatedAlpha
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MediumMinHeight)
+            .clip(CardShape)
+            .background(mc.surfaceVariant.copy(alpha = alpha)),
+    )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Host — dispatch on widget type (exhaustive over all HomeWidgetType entries)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -539,7 +589,7 @@ private fun TrendingCommandersWidget(
                     ),
                     onClick = { onAction(HomeAction.OpenCommunityDecks) },
                     reduced = true,
-                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    cardBackPainter = painterResource(Res.drawable.mtg_card_back),
                     modifier = Modifier.width(160.dp),
                 )
             }
@@ -618,9 +668,8 @@ private fun widgetHeaderTrailingContent(
     HomeWidgetType.COMMUNITY_DECKS -> {
         {
             var showCategoryPicker by remember { mutableStateOf(false) }
-            WidgetHeaderIconButton(
-                icon = Icons.Default.Style,
-                contentDescription = stringResource(R.string.home_community_decks_category_a11y),
+            CommunityDecksCategoryAffordance(
+                category = communityDecksCategory,
                 onClick = { showCategoryPicker = true },
             )
             if (showCategoryPicker) {
@@ -723,18 +772,42 @@ private fun DiscoverSetAffordance(
 
 @Composable
 private fun ContextHeroWidget(hero: HomeHeroState, onAction: (HomeAction) -> Unit) {
+    // User request: only show Welcome and Loading states.
+    if (hero !is HomeHeroState.Welcome && hero !is HomeHeroState.Loading) return
+
     // Delegate to the carousel / completion card when the hero is the Welcome state.
     if (hero is HomeHeroState.Welcome) {
-        if (hero.steps.isEmpty()) {
-            // All first steps are done or explicitly dismissed (F-8: this state IS reachable —
-            // give it real UI rather than a render-nothing branch).
-            FirstStepsCompletedCard()
-        } else {
-            FirstStepsCarousel(
-                steps = hero.steps,
-                onAction = onAction,
-                onDismiss = { stepId -> onAction(HomeAction.SkipFirstStep(stepId)) },
-            )
+        val initialTime = remember { System.currentTimeMillis() }
+        val wasInitiallyNotEmpty = remember { hero.steps.isNotEmpty() }
+        var isVisible by remember { mutableStateOf(hero.steps.isNotEmpty()) }
+
+        LaunchedEffect(hero.steps.isEmpty()) {
+            if (hero.steps.isEmpty()) {
+                val isRealAction = wasInitiallyNotEmpty && (System.currentTimeMillis() - initialTime > 500L)
+                if (isRealAction && isVisible) {
+                    delay(1500)
+                    isVisible = false
+                } else {
+                    isVisible = false
+                }
+            } else {
+                isVisible = true
+            }
+        }
+
+        AnimatedVisibility(
+            visible = isVisible,
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            if (hero.steps.isEmpty()) {
+                FirstStepsCompletedCard()
+            } else {
+                FirstStepsCarousel(
+                    steps = hero.steps,
+                    onAction = onAction,
+                    onDismiss = { stepId -> onAction(HomeAction.SkipFirstStep(stepId)) },
+                )
+            }
         }
         return
     }
@@ -2193,7 +2266,7 @@ private fun DecksShelfWidget(decks: List<DeckSummary>?, onAction: (HomeAction) -
                     deck            = deck,
                     onClick         = { onAction(HomeAction.OpenDeck(deck.id)) },
                     reduced         = true,
-                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    cardBackPainter = painterResource(Res.drawable.mtg_card_back),
                     modifier        = Modifier.width(160.dp),
                 )
             }
@@ -2232,13 +2305,15 @@ private fun RecentlyAddedWidget(
             return@WidgetShell
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-            items(entries, key = { it.rowId }) { entry ->
+            items(entries, key = { "recent|${it.rowId}" }) { entry ->
                 Box {
+                    val uniqueKey = "recent|${entry.rowId}"
                     DiscoverCardThumb(
                         card = entry.card,
-                        onClick = { onAction(HomeAction.OpenCardDetail(entry.card.scryfallId)) },
+                        onClick = { onAction(HomeAction.OpenCardDetail(entry.card.scryfallId, uniqueKey)) },
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
+                        sharedTransitionKey = uniqueKey
                     )
                     if (entry.quantity > 1) {
                         QuantityBadge(
@@ -2314,12 +2389,14 @@ private fun WishlistWidget(
                     )
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    items(stats.cards.toList(), key = { it.id }) { card ->
+                    items(stats.cards.toList(), key = { "wishlist|${it.id}" }) { card ->
+                        val uniqueKey = "wishlist|${card.id}"
                         DiscoverCardThumb(
                             card = card,
-                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) },
+                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
+                            sharedTransitionKey = uniqueKey
                         )
                     }
                 }
@@ -2385,12 +2462,14 @@ private fun DiscoverCardsWidget(
                     }
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    items(cards, key = { it.id }) { card ->
+                    items(cards, key = { "discover|${it.id}" }) { card ->
+                        val uniqueKey = "discover|${card.id}"
                         DiscoverCardThumb(
                             card = card,
-                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId)) },
+                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
+                            sharedTransitionKey = uniqueKey
                         )
                     }
                 }
@@ -2406,6 +2485,7 @@ private fun DiscoverCardThumb(
     onClick: () -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    sharedTransitionKey: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     Box(
@@ -2418,7 +2498,9 @@ private fun DiscoverCardThumb(
                 if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {
                         Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                            sharedContentState = rememberSharedContentState(
+                                key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
+                            ),
                             animatedVisibilityScope = animatedVisibilityScope,
                             clipInOverlayDuringTransition = OverlayClip(CardShape),
                             renderInOverlayDuringTransition = true,
@@ -2434,6 +2516,8 @@ private fun DiscoverCardThumb(
             AsyncImage(
                 model = card.imageUrl,
                 contentDescription = card.name,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -2457,7 +2541,7 @@ private fun RandomCardWidget(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val mc = MaterialTheme.magicColors
-    WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId)) } }) {
+    WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId, "random_card|${it.scryfallId}")) } }) {
         // Priority: LOADING → spinner (even over a previously-shown card, so refresh gives visible
         // feedback); LOADED + card → full image; otherwise → retry affordance.
         if (loadState == DiscoverLoadState.LOADING) {
@@ -2483,7 +2567,9 @@ private fun RandomCardWidget(
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                             with(sharedTransitionScope) {
                                 Modifier.sharedBounds(
-                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                                    sharedContentState = rememberSharedContentState(
+                                        key = "random_card|${card.scryfallId}"
+                                    ),
                                     animatedVisibilityScope = animatedVisibilityScope,
                                     clipInOverlayDuringTransition = OverlayClip(CardShape),
                                     renderInOverlayDuringTransition = true,
@@ -2498,6 +2584,8 @@ private fun RandomCardWidget(
                     AsyncImage(
                         model = card.imageUrl,
                         contentDescription = card.name,
+                        placeholder = painterResource(Res.drawable.mtg_card_back),
+                        error = painterResource(Res.drawable.mtg_card_back),
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -2525,11 +2613,17 @@ private fun SeeAllTile(
     val spacing = MaterialTheme.spacing
     Column(
         modifier = modifier
-            .widthIn(min = 72.dp)
-            .heightIn(min = 88.dp)
-            .clip(ChipShape)
-            .background(mc.primaryAccent.copy(alpha = 0.10f))
-            .border(BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.25f)), ChipShape)
+            .width(96.dp)
+            .heightIn(min = 100.dp)
+            .clip(CardShape)
+            .background(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        mc.primaryAccent.copy(alpha = 0.15f),
+                        mc.primaryAccent.copy(alpha = 0.0f)
+                    )
+                )
+            )
             .clickable(onClickLabel = stringResourceSafe(R.string.home_news_see_all), role = Role.Button, onClick = onClick)
             .padding(horizontal = spacing.md, vertical = spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2537,22 +2631,29 @@ private fun SeeAllTile(
     ) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(40.dp)
                 .clip(CircleShape)
-                .background(mc.primaryAccent.copy(alpha = 0.15f)),
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            mc.primaryAccent.copy(alpha = 0.2f),
+                            Color.Transparent
+                        )
+                    )
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
                 tint = mc.primaryAccent,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
-        Spacer(Modifier.height(spacing.xs))
+        Spacer(Modifier.height(spacing.sm))
         Text(
             text = stringResourceSafe(R.string.home_news_see_all),
-            style = ty.labelSmall,
+            style = ty.labelMedium,
             color = mc.primaryAccent,
             maxLines = 1,
         )
@@ -2613,7 +2714,7 @@ private fun NewsWidget(
                     NewsItemCard(
                         item = item,
                         orientation = NewsItemOrientation.VERTICAL,
-                        placeholderPainter = painterResource(R.drawable.mtg_card_back),
+                        placeholderPainter = painterResource(Res.drawable.mtg_card_back),
                         modifier = Modifier.width(220.dp),
                         onClick = { onAction(HomeAction.OpenNewsUrl(item.url)) },
                     )
@@ -2901,19 +3002,22 @@ private fun CommunityDecksWidget(
             WidgetEmptyBody(stringResourceSafe(R.string.home_community_decks_empty))
             return@WidgetShell
         }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             items(decks, key = { it.archidektId }) { deck ->
                 DeckItem(
                     deck = deck.toDeckSummary(),
                     onClick = { onAction(HomeAction.OpenCommunityDeck(deck.archidektId)) },
                     reduced = true,
                     ownerName = deck.owner.username,
-                    cardBackPainter = painterResource(R.drawable.mtg_card_back),
+                    cardBackPainter = painterResource(Res.drawable.mtg_card_back),
                     modifier = Modifier.width(160.dp),
                 )
             }
             item(key = "see_more") {
-                SeeAllTile(onClick = { onAction(HomeAction.OpenCommunityDecks) }, modifier = Modifier.width(96.dp))
+                SeeAllTile(onClick = { onAction(HomeAction.OpenCommunityDecks) })
             }
         }
     }
@@ -2933,6 +3037,49 @@ private fun com.mmg.manahub.core.model.CommunityDeckSummary.toDeckSummary(): Dec
     coverImageUrl = featuredImageUrl,
 )
 
+/**
+ * Community-decks widget category selector affordance. Shows the active category's title
+ * + a chevron. The whole row is a ≥48dp tap target that re-opens the category picker.
+ */
+@Composable
+private fun CommunityDecksCategoryAffordance(
+    category: HomeCommunityDeckCategory,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    val label = stringResource(category.titleRes)
+
+    Row(
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .clip(ChipShape)
+            .clickable(
+                onClickLabel = stringResource(R.string.home_community_decks_category_a11y),
+                role = Role.Button,
+                onClick = onClick
+            )
+            .padding(horizontal = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+    ) {
+        Text(
+            text = label.uppercase(),
+            style = ty.labelMedium,
+            color = mc.primaryAccent,
+            maxLines = 1,
+            letterSpacing = 1.sp
+        )
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = mc.primaryAccent,
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
+
 /** Category picker for the COMMUNITY_DECKS widget (TASK 5b), mirroring [SetPickerSheet]'s pattern. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2944,46 +3091,105 @@ private fun CommunityDecksCategoryPickerSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = mc.backgroundSecondary) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = mc.backgroundSecondary,
+        dragHandle = null
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = spacing.lg)
-                .padding(bottom = spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                .padding(top = spacing.xl, bottom = spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
             Text(
                 text = stringResourceSafe(R.string.home_community_decks_category_sheet_title),
                 style = ty.titleLarge,
                 color = mc.textPrimary,
-                modifier = Modifier.padding(bottom = spacing.sm),
+                modifier = Modifier.padding(bottom = spacing.xs),
             )
-            HomeCommunityDeckCategory.entries.forEach { category ->
-                val isSelected = category == selected
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .clip(ChipShape)
-                        .clickable(onClickLabel = stringResourceSafe(category.titleRes), role = Role.Button) {
-                            onSelect(category)
+
+            // 2x2 Grid of category cards.
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                HomeCommunityDeckCategory.entries.chunked(2).forEach { rowCategories ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                    ) {
+                        rowCategories.forEach { category ->
+                            CategorySelectionCard(
+                                category = category,
+                                isSelected = category == selected,
+                                onClick = { onSelect(category) },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
-                        .padding(horizontal = spacing.sm, vertical = spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                ) {
-                    if (isSelected) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
-                    } else {
-                        Spacer(Modifier.size(20.dp))
                     }
-                    Text(
-                        text = stringResourceSafe(category.titleRes),
-                        style = ty.bodyMedium,
-                        color = if (isSelected) mc.primaryAccent else mc.textPrimary,
-                    )
                 }
             }
+
+            Spacer(Modifier.height(spacing.sm))
+        }
+    }
+}
+
+@Composable
+private fun CategorySelectionCard(
+    category: HomeCommunityDeckCategory,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val icon = when (category) {
+        HomeCommunityDeckCategory.POPULAR -> Icons.Default.Whatshot
+        HomeCommunityDeckCategory.RECENT -> Icons.Default.History
+        HomeCommunityDeckCategory.UPDATED -> Icons.Default.Refresh
+        HomeCommunityDeckCategory.PRIMERS -> Icons.AutoMirrored.Filled.MenuBook
+    }
+
+    Surface(
+        color = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface.copy(alpha = 0.4f),
+        shape = CardShape,
+        border = if (isSelected) BorderStroke(1.5.dp, mc.primaryAccent.copy(alpha = 0.5f)) else null,
+        modifier = modifier
+            .heightIn(min = 120.dp)
+            .clip(CardShape)
+            .clickable(
+                onClickLabel = stringResource(category.titleRes),
+                role = Role.Button,
+                onClick = onClick
+            ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSelected) mc.primaryAccent else mc.textSecondary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = stringResource(category.titleRes),
+                style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = if (isSelected) mc.primaryAccent else mc.textPrimary,
+                maxLines = 1,
+            )
+            Text(
+                text = stringResource(category.descriptionRes),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -3097,13 +3303,18 @@ private fun TradesSlideContent(
                     modifier = Modifier.padding(horizontal = spacing.xs),
                 )
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    items(slide.previews, key = { it.card.id }) { preview ->
+                    items(slide.previews, key = { "trade_sug|${it.id}" }) { preview ->
                         Column(
                             modifier = Modifier.width(72.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(spacing.xxs),
                         ) {
-                            DiscoverCardThumb(card = preview.card, onClick = { onAction(HomeAction.OpenTrades) })
+                            val uniqueKey = "trade_sug|${preview.id}"
+                            DiscoverCardThumb(
+                                card = preview.card,
+                                onClick = { onAction(HomeAction.OpenCardDetail(preview.card.scryfallId, uniqueKey)) },
+                                sharedTransitionKey = uniqueKey
+                            )
                             // Never log the friend's name — this is UI-only, no telemetry key here.
                             preview.counterpartyName?.let { name ->
                                 Text(
@@ -3145,8 +3356,13 @@ private fun TradesSlideContent(
                     }
                 } else {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                        items(preview.cards, key = { it.id }) { card ->
-                            DiscoverCardThumb(card = card, onClick = { onAction(HomeAction.OpenTrades) })
+                        items(preview.cards, key = { "open_trade|${it.id}" }) { card ->
+                            val uniqueKey = "open_trade|${card.id}"
+                            DiscoverCardThumb(
+                                card = card,
+                                onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
+                                sharedTransitionKey = uniqueKey
+                            )
                         }
                     }
                 }

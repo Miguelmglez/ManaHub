@@ -16,15 +16,18 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.SuggestedTag
+import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
+import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.util.recordSafeNonFatal
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -37,10 +40,11 @@ class CardRepositoryImpl @Inject constructor(
     private val cardDao:               CardDao,
     private val userCardCollectionDao: UserCardCollectionDao,
     private val remote:                ScryfallRemoteDataSource,
-    private val computeCardTags:       ComputeCardTagsUseCase,
+    private val resolveCardStrategyTags: ResolveCardStrategyTagsUseCase,
     private val userPrefs:             UserPreferencesDataStore,
     @IoDispatcher    private val ioDispatcher:      CoroutineDispatcher,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) : CardRepository {
 
     override suspend fun searchCardByName(query: String): DataResult<Card> =
@@ -48,7 +52,9 @@ class CardRepositoryImpl @Inject constructor(
             val result = remote.searchCardByName(query)
             if (result.isSuccess) {
                 val card = result.getOrThrow()
-                cardDao.upsert(entityWithComputedTags(card))
+                val (entity, existingTagsJson) = entityPreservingTags(card)
+                cardDao.upsert(entity)
+                scheduleTagResolution(card, existingTagsJson)
                 DataResult.Success(card)
             } else {
                 val exception = result.exceptionOrNull()
@@ -65,10 +71,13 @@ class CardRepositoryImpl @Inject constructor(
             val result = remote.searchCards(query, page, bypassCache)
             if (result.isSuccess) {
                 val cards = result.getOrThrow()
-                // Single batch DB read for existing cache entries; tag computation on defaultDispatcher.
+                // Single batch DB read for existing cache entries; tag resolution is deferred to a
+                // background job (see scheduleTagResolutionBatch) so search results return without
+                // waiting on it.
                 val cachedMap = cardDao.getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
-                val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
+                val entities = entitiesPreservingTagsBatch(cards, cachedMap)
                 cardDao.upsertAll(entities)
+                scheduleTagResolutionBatch(cards, cachedMap)
                 DataResult.Success(cards)
             } else {
                 val exception = result.exceptionOrNull()
@@ -85,10 +94,11 @@ class CardRepositoryImpl @Inject constructor(
             val result = remote.searchCardsPaginated(query, page, bypassCache)
             if (result.isSuccess) {
                 val paginated = result.getOrThrow()
-                // Single batch DB read for existing cache entries; tag computation on defaultDispatcher.
+                // Single batch DB read for existing cache entries; tag resolution deferred (see above).
                 val cachedMap = cardDao.getByIds(paginated.cards.map { it.scryfallId }).associateBy { it.scryfallId }
-                val entities = entitiesWithComputedTagsBatch(paginated.cards, cachedMap)
+                val entities = entitiesPreservingTagsBatch(paginated.cards, cachedMap)
                 cardDao.upsertAll(entities)
+                scheduleTagResolutionBatch(paginated.cards, cachedMap)
                 DataResult.Success(paginated)
             } else {
                 val exception = result.exceptionOrNull()
@@ -131,10 +141,12 @@ class CardRepositoryImpl @Inject constructor(
                 val cards = result.getOrThrow()
                 // Upsert every language/printing into Room so CardDetail's language selector
                 // (Phase 1B) and the oracle-wide collection/wishlist/open-for-trade observers can
-                // resolve them without a further network round-trip.
+                // resolve them without a further network round-trip. Tag resolution deferred (see
+                // scheduleTagResolutionBatch).
                 val cachedMap = cardDao.getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
-                val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
+                val entities = entitiesPreservingTagsBatch(cards, cachedMap)
                 cardDao.upsertAll(entities)
+                scheduleTagResolutionBatch(cards, cachedMap)
                 DataResult.Success(cards)
             } else {
                 val exception = result.exceptionOrNull()
@@ -152,49 +164,97 @@ class CardRepositoryImpl @Inject constructor(
         }
 
     /**
-     * Builds a [CardEntity] with auto-computed tags for a single card.
+     * Builds a [CardEntity] PRESERVING whatever tags already exist in cache (empty for a brand new
+     * card). Deck Engine Unification plan, D8, §5 Phase 5c: tag computation/resolution itself is
+     * deferred to a background job (see [scheduleTagResolution]) so this stays a pure, fast Room
+     * read + copy — no CPU-bound regex work and no network call on the caller's critical path
+     * (a card add to the collection must not wait on tag analysis).
      *
-     * Reads the cached entity once (for existing user tags), then offloads
-     * tag computation to [defaultDispatcher] (CPU-bound regex work in [StrategyAnalyzer]).
+     * Returns the entity alongside the existing `tags` JSON (or null for a brand-new card) so the
+     * caller can hand it straight to [scheduleTagResolution] without a second DB read.
      */
-    private suspend fun entityWithComputedTags(card: Card) = run {
+    private suspend fun entityPreservingTags(card: Card): Pair<com.mmg.manahub.core.data.local.entity.CardEntity, String?> {
         val existing = cardDao.getById(card.scryfallId)
-        val (tagsJson, suggestedJson) = computeTagsForCacheOnDefault(card, existing?.tags)
-        card.toEntityCard().copy(
-            tags = tagsJson,
+        val entity = card.toEntityCard().copy(
+            tags = existing?.tags ?: "[]",
             userTags = existing?.userTags ?: "[]",
-            suggestedTags = suggestedJson,
+            suggestedTags = existing?.suggestedTags ?: "[]",
         )
+        return entity to existing?.tags
     }
 
     /**
-     * Builds a batch of [CardEntity] objects with computed tags, using a single [cardDao.getByIds]
-     * call for all cache lookups instead of N individual [cardDao.getById] calls.
-     *
-     * Tag computation is offloaded to [defaultDispatcher].
+     * Builds a batch of [CardEntity] objects PRESERVING each card's existing tags, using a single
+     * [cardDao.getByIds]-sourced [cachedMap] instead of N individual [cardDao.getById] calls. Tag
+     * resolution for the whole batch is deferred to [scheduleTagResolutionBatch] — see
+     * [entityPreservingTags]'s KDoc for why.
      */
-    private suspend fun entitiesWithComputedTagsBatch(
+    private fun entitiesPreservingTagsBatch(
         cards: List<Card>,
         cachedMap: Map<String, com.mmg.manahub.core.data.local.entity.CardEntity>,
     ): List<com.mmg.manahub.core.data.local.entity.CardEntity> =
-        withContext(defaultDispatcher) {
+        cards.map { card ->
+            val existing = cachedMap[card.scryfallId]
+            card.toEntityCard().copy(
+                tags          = existing?.tags ?: "[]",
+                userTags      = existing?.userTags ?: "[]",
+                suggestedTags = existing?.suggestedTags ?: "[]",
+            )
+        }
+
+    /**
+     * Fire-and-forget background tag resolution for a single freshly-cached [card] — the
+     * non-blocking half of Deck Engine Unification plan D8/§5 Phase 5c. Runs on [appScope] (NOT
+     * the caller's coroutine) so it survives the caller returning. [ResolveCardStrategyTagsUseCase]
+     * is STRICT FALLBACK as of the plan §8a addendum: the offline pipeline's precomputed Supabase
+     * source is used EXCLUSIVELY when present (zero on-device CPU work — this is also the fix for
+     * "adding many cards freezes the app"); the on-device analyzer only runs on a genuine miss, and
+     * that miss result is pushed back to Supabase so the table converges over time. Any failure is
+     * swallowed — this is best-effort enrichment, never a source of add/search failures.
+     */
+    private fun scheduleTagResolution(card: Card, existingTagsJson: String?) {
+        appScope.launch(defaultDispatcher) {
+            runCatching {
+                val auto    = userPrefs.tagAutoThresholdFlow.first()
+                val suggest = userPrefs.tagSuggestThresholdFlow.first()
+                val result  = resolveCardStrategyTags(card, existingTagsJson, auto, suggest)
+                cardDao.updateTagsAndSuggestions(
+                    scryfallId    = card.scryfallId,
+                    tagsJson      = result.confirmedTags.toTagsJson(),
+                    suggestedJson = result.suggestedTags.toSuggestedTagsJson(),
+                )
+            }.onFailure { e -> recordSafeNonFatal("card_strategy_tags_background_resolve_failed", e) }
+        }
+    }
+
+    /**
+     * Batch sibling of [scheduleTagResolution] — processes [cards] SEQUENTIALLY within one
+     * background job (not N concurrent launches) to avoid bursting the Supabase table with
+     * simultaneous per-card lookups when a whole search page / collection refresh lands at once,
+     * mirroring [backfillMissingOracleIds]'s identical "sequential, not parallel" rationale. A
+     * single card's failure never aborts the rest of the batch.
+     */
+    private fun scheduleTagResolutionBatch(
+        cards: List<Card>,
+        cachedMap: Map<String, com.mmg.manahub.core.data.local.entity.CardEntity>,
+    ) {
+        if (cards.isEmpty()) return
+        appScope.launch(defaultDispatcher) {
             val auto    = userPrefs.tagAutoThresholdFlow.first()
             val suggest = userPrefs.tagSuggestThresholdFlow.first()
-            cards.map { card ->
-                val existing = cachedMap[card.scryfallId]
-                val result = computeCardTags(
-                    card             = card,
-                    existingTagsJson = existing?.tags,
-                    autoThreshold    = auto,
-                    suggestThreshold = suggest,
-                )
-                card.toEntityCard().copy(
-                    tags          = result.confirmedTags.toTagsJson(),
-                    userTags      = existing?.userTags ?: "[]",
-                    suggestedTags = result.suggestedTags.toSuggestedTagsJson(),
-                )
+            cards.forEach { card ->
+                runCatching {
+                    val existingTagsJson = cachedMap[card.scryfallId]?.tags
+                    val result = resolveCardStrategyTags(card, existingTagsJson, auto, suggest)
+                    cardDao.updateTagsAndSuggestions(
+                        scryfallId    = card.scryfallId,
+                        tagsJson      = result.confirmedTags.toTagsJson(),
+                        suggestedJson = result.suggestedTags.toSuggestedTagsJson(),
+                    )
+                }.onFailure { e -> recordSafeNonFatal("card_strategy_tags_background_resolve_failed", e) }
             }
         }
+    }
 
     override suspend fun getCardByExactName(name: String): Result<Card> =
         withContext(ioDispatcher) {
@@ -202,7 +262,11 @@ class CardRepositoryImpl @Inject constructor(
                 // Persist to Room so callers that re-key an observeCard()-style flow off the
                 // returned scryfallId (e.g. CardDetailViewModel's foreign->English fallback)
                 // find a row waiting for them instead of blocking forever on an empty flow.
-                result.getOrNull()?.let { card -> cardDao.upsert(entityWithComputedTags(card)) }
+                result.getOrNull()?.let { card ->
+                    val (entity, existingTagsJson) = entityPreservingTags(card)
+                    cardDao.upsert(entity)
+                    scheduleTagResolution(card, existingTagsJson)
+                }
             }
         }
 
@@ -211,7 +275,9 @@ class CardRepositoryImpl @Inject constructor(
             val result = remote.getCardBySetAndNumber(set, number)
             if (result.isSuccess) {
                 val card = result.getOrThrow()
-                cardDao.upsert(entityWithComputedTags(card))
+                val (entity, existingTagsJson) = entityPreservingTags(card)
+                cardDao.upsert(entity)
+                scheduleTagResolution(card, existingTagsJson)
                 DataResult.Success(card)
             } else {
                 val exception = result.exceptionOrNull()
@@ -295,18 +361,18 @@ class CardRepositoryImpl @Inject constructor(
             result.isSuccess -> {
                 val card = result.getOrThrow()
 
-                // Preserve any user edits to confirmed tags; otherwise auto-tag.
-                // Offloaded to defaultDispatcher inside computeTagsForCacheOnDefault.
-                val (tagsJson, suggestedJson) = computeTagsForCacheOnDefault(card, cached?.tags)
-
+                // Preserve whatever tags already exist (a brand-new card gets none yet); tag
+                // resolution/computation is deferred to a background job (D8/§5 Phase 5c) so this
+                // fetch-and-cache path never blocks on it.
                 cardDao.upsert(
                     card.toEntityCard().copy(
-                        tags = tagsJson,
+                        tags = cached?.tags ?: "[]",
                         userTags = cached?.userTags ?: "[]",
-                        suggestedTags = suggestedJson,
+                        suggestedTags = cached?.suggestedTags ?: "[]",
                     )
                 )
                 cardDao.clearStale(scryfallId)
+                scheduleTagResolution(card, cached?.tags)
                 DataResult.Success(cardDao.getById(scryfallId)!!.toDomainCard())
             }
             cached != null -> {
@@ -343,10 +409,11 @@ class CardRepositoryImpl @Inject constructor(
             val cards = result.getOrThrow()
 
             // Build all entities first (reads only), then write in a single upsertAll
-            // transaction instead of N individual upsert() calls.
-            // Tag computation is offloaded to defaultDispatcher inside the batch helper.
-            val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
+            // transaction instead of N individual upsert() calls. Tag resolution is deferred to a
+            // background job (see scheduleTagResolutionBatch).
+            val entities = entitiesPreservingTagsBatch(cards, cachedMap)
             cardDao.upsertAll(entities)
+            scheduleTagResolutionBatch(cards, cachedMap)
 
             // Clear stale flag for every card we successfully refreshed.
             val refreshed = cards.map { it.scryfallId }.toSet()
@@ -397,12 +464,14 @@ class CardRepositoryImpl @Inject constructor(
             remote.getCardsBatch(chunk)
                 .onSuccess { cards ->
                     // Build a lookup map from the chunk's cached entities (may be empty for
-                    // brand-new cards) to preserve any existing userTags.
+                    // brand-new cards) to preserve any existing userTags. Tag resolution deferred
+                    // (see scheduleTagResolutionBatch).
                     val cachedMap = cardDao.getByIds(chunk).associateBy { it.scryfallId }
                     runCatching {
-                        val entities = entitiesWithComputedTagsBatch(cards, cachedMap)
+                        val entities = entitiesPreservingTagsBatch(cards, cachedMap)
                         cardDao.upsertAll(entities)
                     }
+                    scheduleTagResolutionBatch(cards, cachedMap)
                 }
             // Failures are intentionally swallowed — callers fall back to individual getCardById
         }
@@ -413,6 +482,10 @@ class CardRepositoryImpl @Inject constructor(
 
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) {
         cardDao.updateTags(scryfallId, tags.distinct().toTagsJson())
+    }
+
+    override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) {
+        cardDao.unionTags(scryfallId, tags)
     }
 
     override suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>) {
@@ -445,27 +518,6 @@ class CardRepositoryImpl @Inject constructor(
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-
-    /**
-     * Computes the JSON pair (tagsJson, suggestedTagsJson) for a single card.
-     *
-     * Delegates to [ComputeCardTagsUseCase] and offloads the CPU-bound regex work
-     * in [StrategyAnalyzer] to [defaultDispatcher].
-     */
-    private suspend fun computeTagsForCacheOnDefault(
-        card: Card,
-        existingTagsJson: String?,
-    ): Pair<String, String> = withContext(defaultDispatcher) {
-        val auto    = userPrefs.tagAutoThresholdFlow.first()
-        val suggest = userPrefs.tagSuggestThresholdFlow.first()
-        val result  = computeCardTags(
-            card             = card,
-            existingTagsJson = existingTagsJson,
-            autoThreshold    = auto,
-            suggestThreshold = suggest,
-        )
-        result.confirmedTags.toTagsJson() to result.suggestedTags.toSuggestedTagsJson()
-    }
 
     private fun buildStaleReason(e: Throwable?): String {
         val date = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())

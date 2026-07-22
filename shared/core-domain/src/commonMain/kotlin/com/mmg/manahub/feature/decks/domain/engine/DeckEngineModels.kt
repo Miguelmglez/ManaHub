@@ -121,6 +121,27 @@ enum class SeedStrategy(
     }
 }
 
+/**
+ * Deck Engine Unification plan (D2): [SeedStrategy] is DORMANT on the wizard path (no new
+ * consumer -- see [DeckIdentitySeedTags]'s class KDoc) but stays a convenient shorthand for test
+ * fixtures (the harness's 9-strategy coverage matrix) that want "one of the 9 classic strategies"
+ * without hand-building a [StrategyProfile]. Fixed allowlist mirroring the (now-deleted)
+ * `DeckTemplateResolver.mapStrategyToArchetype` 1:1 exactly -- AGGRO/CONTROL/COMBO/MIDRANGE/RAMP map
+ * onto their identically-named [ArchetypeId]; TOKENS/GRAVEYARD/LIFEGAIN/TRIBAL map onto
+ * [ArchetypeId.GENERIC] + a theme (never guess an unmapped combination).
+ */
+fun SeedStrategy.toStrategyProfile(): StrategyProfile = when (this) {
+    SeedStrategy.AGGRO -> StrategyProfile(archetype = ArchetypeId.AGGRO)
+    SeedStrategy.CONTROL -> StrategyProfile(archetype = ArchetypeId.CONTROL)
+    SeedStrategy.COMBO -> StrategyProfile(archetype = ArchetypeId.COMBO)
+    SeedStrategy.MIDRANGE -> StrategyProfile(archetype = ArchetypeId.MIDRANGE)
+    SeedStrategy.RAMP -> StrategyProfile(archetype = ArchetypeId.RAMP)
+    SeedStrategy.TOKENS -> StrategyProfile(archetype = ArchetypeId.GENERIC, themes = listOf(ThemeId.TOKENS))
+    SeedStrategy.GRAVEYARD -> StrategyProfile(archetype = ArchetypeId.GENERIC, themes = listOf(ThemeId.REANIMATOR))
+    SeedStrategy.LIFEGAIN -> StrategyProfile(archetype = ArchetypeId.GENERIC, themes = listOf(ThemeId.LIFEGAIN))
+    SeedStrategy.TRIBAL -> StrategyProfile(archetype = ArchetypeId.GENERIC, themes = listOf(ThemeId.TRIBAL))
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Suggestion + deck entries
 // ═══════════════════════════════════════════════════════════════════════════════

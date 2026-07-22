@@ -47,8 +47,10 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.template.BuildStage
 import com.mmg.manahub.feature.decks.domain.template.CategoryFill
+import com.mmg.manahub.feature.decks.domain.template.DeckGap
 import com.mmg.manahub.feature.decks.domain.template.TemplateBuildResult
 import com.mmg.manahub.feature.decks.domain.template.TemplateCardSuggestion
 import com.mmg.manahub.feature.decks.domain.template.TemplateSource
@@ -142,6 +144,7 @@ private fun BuildStage.label(): String = stringResource(
         BuildStage.MAPPING_CATEGORIES -> R.string.deck_wizard_stage_mapping_categories
         BuildStage.FILLING_FROM_COLLECTION -> R.string.deck_wizard_stage_filling_from_collection
         BuildStage.RESOLVING_GAPS -> R.string.deck_wizard_stage_resolving_gaps
+        BuildStage.TOP_UP_FROM_COLLECTION -> R.string.deck_wizard_stage_top_up_from_collection
         BuildStage.FILLING_LANDS -> R.string.deck_wizard_stage_filling_lands
         BuildStage.DONE -> R.string.deck_wizard_stage_done
     }
@@ -222,6 +225,19 @@ internal fun ResultContent(
                 }
             }
 
+            // Deck Engine Unification (D3): a structured, honest gap declaration -- the owned
+            // collection had nothing left clearing the fit floor for these slots, so the build
+            // reports the gap instead of placing a weak filler card. One line per gap ("missing 3
+            // Ramp in {G}").
+            if (result.gaps.isNotEmpty()) {
+                item(key = "gaps_header") {
+                    Text(stringResource(R.string.deck_wizard_gaps_title), style = ty.labelLarge, color = mc.goldMtg)
+                }
+                items(result.gaps, key = { "gap_${it.categoryId}" }) { gap ->
+                    GapWarningRow(gap)
+                }
+            }
+
             if (result.report.isNotEmpty()) {
                 item(key = "report_header") {
                     Text(stringResource(R.string.deck_wizard_result_report_title), style = ty.labelLarge, color = mc.primaryAccent)
@@ -296,6 +312,23 @@ private fun ResultSourceBadge(source: TemplateSource, gamePlan: String?) {
                 Text(gamePlan, style = ty.bodyMedium, color = mc.textPrimary, modifier = Modifier.padding(top = spacing.xs))
             }
         }
+    }
+}
+
+/** Deck Engine Unification (D3): one structured gap declaration -- "Missing N {label} in {colors}"
+ * (colorless decks drop the "in {colors}" clause entirely; there is nothing to name). */
+@Composable
+private fun GapWarningRow(gap: DeckGap) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val colorLabel = gap.colors.joinToString("") { it.symbol }
+    val text = if (colorLabel.isEmpty()) {
+        stringResource(R.string.deck_wizard_gap_row_no_colors, gap.missingCount, gap.categoryLabel)
+    } else {
+        stringResource(R.string.deck_wizard_gap_row_with_colors, gap.missingCount, gap.categoryLabel, colorLabel)
+    }
+    Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
+        Text(text = text, style = ty.bodySmall, color = mc.goldMtg, modifier = Modifier.padding(MaterialTheme.spacing.md))
     }
 }
 

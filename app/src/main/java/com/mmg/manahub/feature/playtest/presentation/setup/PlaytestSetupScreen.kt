@@ -67,6 +67,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -229,7 +232,7 @@ private fun SetupContent(
             // Background Image with Gradient Overlay
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(uiState.deckImageUrl ?: R.drawable.mtg_card_back)
+                    .data(uiState.deckImageUrl ?: Res.drawable.mtg_card_back)
                     .crossfade(true)
                     .build(),
                 contentDescription = null,

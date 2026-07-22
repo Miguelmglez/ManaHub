@@ -16,6 +16,7 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UpdateEntryOutcome
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.usecase.card.RefreshCardStrategyTagsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.AddCardToCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
 import com.mmg.manahub.core.util.CardConstants
@@ -64,6 +65,7 @@ class CardDetailViewModel(
     private val helper: AnalyticsHelper,
     private val updateCollectionEntry: UpdateCollectionEntryUseCase,
     private val updateWishlistEntry: UpdateWishlistEntryUseCase,
+    private val refreshCardStrategyTags: RefreshCardStrategyTagsUseCase,
 ) : ViewModel() {
 
     private val initialScryfallId: String = checkNotNull(savedStateHandle["scryfallId"])
@@ -144,6 +146,18 @@ class CardDetailViewModel(
                             // automatically once it lands, no manual _uiState write needed here.
                             viewModelScope.launch {
                                 runCatching { cardRepo.refreshCardById(id) }
+                            }
+                        } else {
+                            // Deck Engine Unification plan, D8, §5 Phase 5c ("card detail view" read
+                            // point). Every viewed card — owned or not — gets one chance to catch up
+                            // with the offline pipeline's precomputed strategy tags, even if it was
+                            // cached long before this table existed (a fresh-cache short-circuit in
+                            // getCardById would otherwise never re-trigger tag resolution for it).
+                            // Fire-and-forget, additive-only, never blocks card display: the
+                            // observeCard Room collector below picks up the merged tags
+                            // automatically if any new ones are found.
+                            viewModelScope.launch {
+                                runCatching { refreshCardStrategyTags(id, card.oracleId, card.tags) }
                             }
                         }
                     }

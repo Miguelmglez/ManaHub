@@ -101,8 +101,12 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -164,6 +168,7 @@ fun CardDetailScreen(
     viewModel: CardDetailViewModel = koinViewModel(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    sharedTransitionKey: Any? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val toastState = rememberMagicToastState()
@@ -281,6 +286,7 @@ fun CardDetailScreen(
                     onFindCommunityDecks = onNavigateToCommunityDecks,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
+                    sharedTransitionKey = sharedTransitionKey,
                     modifier = Modifier.padding(padding),
                 )
             }
@@ -630,6 +636,7 @@ private fun CardDetailContent(
     onFindCommunityDecks: (String) -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    sharedTransitionKey: Any? = null,
     modifier: Modifier = Modifier,
 ) {
     var showBackFace by remember { mutableStateOf(false) }
@@ -683,7 +690,9 @@ private fun CardDetailContent(
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                             with(sharedTransitionScope) {
                                 Modifier.sharedBounds(
-                                    sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                                    sharedContentState = rememberSharedContentState(
+                                        key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
+                                    ),
                                     animatedVisibilityScope = animatedVisibilityScope,
                                     clipInOverlayDuringTransition = OverlayClip(CardShape),
                                     boundsTransform = sharedBoundsTransform,
@@ -708,6 +717,8 @@ private fun CardDetailContent(
                         .diskCachePolicy(CachePolicy.ENABLED)
                         .build(),
                     contentDescription = card.name,
+                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                    error = painterResource(Res.drawable.mtg_card_back),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
@@ -726,6 +737,8 @@ private fun CardDetailContent(
                             .diskCachePolicy(CachePolicy.ENABLED)
                             .build(),
                         contentDescription = card.name,
+                        placeholder = painterResource(Res.drawable.mtg_card_back),
+                        error = painterResource(Res.drawable.mtg_card_back),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
@@ -1423,8 +1436,7 @@ private fun CollectionCopyRow(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .width(44.dp)
-                    .height(60.dp)
-                    .clip(CardShape),
+                    .height(60.dp),
             )
 
             Column(

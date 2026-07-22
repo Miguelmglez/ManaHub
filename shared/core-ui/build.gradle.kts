@@ -32,7 +32,7 @@ kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {
         namespace = "com.mmg.manahub.core.ui"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 29
 
         // Enable a JVM host unit-test component so commonTest runs as an Android host test

@@ -12,10 +12,10 @@ import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.UserCardCollectionDto
 import com.mmg.manahub.core.data.remote.collection.toDto
 import com.mmg.manahub.core.data.remote.collection.toEntity
-import com.mmg.manahub.core.data.remote.decks.DeckCardSyncDto
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.toDto
 import com.mmg.manahub.core.data.remote.decks.toEntity
+import com.mmg.manahub.core.data.remote.decks.toSyncDto
 import com.mmg.manahub.core.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -146,13 +146,9 @@ class SyncManager @Inject constructor(
                 if (localDecks.isNotEmpty()) {
                     deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }).getOrThrow()
                     for (deck in localDecks) {
-                        val cards = deckDao.getDeckCards(deck.id).map { card ->
-                            DeckCardSyncDto(
-                                scryfallId = card.scryfallId,
-                                quantity = card.quantity,
-                                isSideboard = card.isSideboard,
-                            )
-                        }
+                        // Deck Engine Unification (D4): .toSyncDto() carries provenance (source)
+                        // through the push -- see DeckSyncDto.kt.
+                        val cards = deckDao.getDeckCards(deck.id).map { card -> card.toSyncDto() }
                         deckRemote.upsertDeckCards(deck.id, cards).getOrThrow()
                     }
                     decksPushed = localDecks.size
@@ -206,6 +202,10 @@ class SyncManager @Inject constructor(
                                         scryfallId = it.scryfallId,
                                         quantity = it.quantity,
                                         isSideboard = it.isSideboard,
+                                        // Deck Engine Unification (D4): carry provenance through
+                                        // the pull too -- tolerant default "USER" on the DTO side
+                                        // already covers a server not yet returning this column.
+                                        source = it.source,
                                     )
                                 }
                         )
@@ -313,13 +313,9 @@ class SyncManager @Inject constructor(
                 if (localDecks.isNotEmpty()) {
                     deckRemote.batchUpsertDecks(localDecks.map { it.toDto() }).getOrThrow()
                     for (deck in localDecks) {
-                        val cards = deckDao.getDeckCards(deck.id).map { card ->
-                            DeckCardSyncDto(
-                                scryfallId = card.scryfallId,
-                                quantity = card.quantity,
-                                isSideboard = card.isSideboard,
-                            )
-                        }
+                        // Deck Engine Unification (D4): .toSyncDto() carries provenance (source)
+                        // through the push -- see DeckSyncDto.kt.
+                        val cards = deckDao.getDeckCards(deck.id).map { card -> card.toSyncDto() }
                         deckRemote.upsertDeckCards(deck.id, cards).getOrThrow()
                     }
                     decksPushed = localDecks.size
@@ -361,6 +357,10 @@ class SyncManager @Inject constructor(
                                         scryfallId = it.scryfallId,
                                         quantity = it.quantity,
                                         isSideboard = it.isSideboard,
+                                        // Deck Engine Unification (D4): carry provenance through
+                                        // the pull too -- tolerant default "USER" on the DTO side
+                                        // already covers a server not yet returning this column.
+                                        source = it.source,
                                     )
                                 }
                         )

@@ -36,20 +36,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -98,6 +103,10 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
+import com.mmg.manahub.feature.decks.domain.model.AlmostCombo
+import com.mmg.manahub.feature.decks.domain.model.Combo
+import com.mmg.manahub.feature.decks.domain.model.ComboResult
+import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanChip
@@ -163,11 +172,14 @@ fun DeckStudioScreen(
     onNavigateToCommunityDecksByCard: (String) -> Unit = {},
     onNavigateToCommunityDeckDetail: (Int) -> Unit = {},
     // Deck Builder v2 (plan §3.4/§3.5): navigates to Screen.DeckWizard, optionally pre-filled from
-    // a Discoveries v2 "Build this" tap (strategyHint = a raw SeedStrategy enum name, themeHint = a
-    // free-form label, colors = concatenated ManaColor symbols) -- all null for the plain "Build
-    // from seed" entry point. Route construction stays in AppNavGraph (this screen never imports
-    // Screen directly, mirroring onNavigateToCommunityDecksByCard's own convention).
-    onNavigateToWizard: (strategyHint: String?, themeHint: String?, colors: String?) -> Unit = { _, _, _ -> },
+    // a Discoveries v2 "Build this" tap. Deck Engine Unification (D2): args carry the unified
+    // taxonomy directly (archetype = a raw ArchetypeId enum name, theme = a raw ThemeId enum name,
+    // tribe = a raw tribe:<subtype> key, colors = concatenated ManaColor symbols) -- all null for
+    // the plain "Build from seed" entry point. Route construction stays in AppNavGraph (this screen
+    // never imports Screen directly, mirroring onNavigateToCommunityDecksByCard's own convention).
+    // [seeds] (plan D7, 4.3): a combo's component card names, hands off to the wizard's Flow A --
+    // null/empty for every other entry point (Discoveries v2's "Build this" passes null here too).
+    onNavigateToWizard: (archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?) -> Unit = { _, _, _, _, _ -> },
     viewModel: DeckStudioViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -217,6 +229,7 @@ fun DeckStudioScreen(
     val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
     val seedBuiltMsg = stringResource(R.string.deck_studio_seed_built)
     val archetypePlanUpdatedMsg = stringResource(R.string.deck_studio_archetype_plan_updated)
+    val strategyUnlockedMsg = stringResource(R.string.deck_studio_strategy_unlocked)
 
     // Screen-entry breadcrumb (no PII).
     LaunchedEffect(Unit) {
@@ -262,7 +275,7 @@ fun DeckStudioScreen(
     // top-bar overflow item and the empty-state primary button so the two never drift.
     val handleBuildFromSeed: () -> Unit = {
         if (DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) {
-            onNavigateToWizard(null, null, null)
+            onNavigateToWizard(null, null, null, null, null)
         } else {
             viewModel.openSeedSheet()
         }
@@ -419,6 +432,10 @@ fun DeckStudioScreen(
                             onAutoDetectArchetypePlan = {
                                 viewModel.onClearArchetypeOverride()
                                 toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
+                            },
+                            onUnlockStrategy = {
+                                viewModel.onUnlockStrategy()
+                                toastState.show(strategyUnlockedMsg, MagicToastType.SUCCESS)
                             },
                             onAddCommunity = { s ->
                                 viewModel.onAddSuggestion(s.card.scryfallId, s.card.name)
@@ -577,6 +594,7 @@ fun DeckStudioScreen(
             if (DeckFeatureFlags.DISCOVERIES_V2_ENABLED) {
                 InspirationsSheetContentV2(
                     discoveries = uiState.discoveriesV2,
+                    filteredDiscoveries = uiState.filteredDiscoveriesV2,
                     isLoading = uiState.isLoadingDiscoveries,
                     onCardClick = { id ->
                         focusManager.clearFocus()
@@ -585,10 +603,25 @@ fun DeckStudioScreen(
                     onBuildThis = { discovery ->
                         viewModel.closeInspirations()
                         onNavigateToWizard(
-                            discovery.strategyHint?.name,
-                            discovery.themeHint,
+                            discovery.archetype?.name,
+                            discovery.theme?.name,
+                            discovery.tribe,
                             discovery.dominantColors.joinToString("") { it.symbol },
+                            null,
                         )
+                    },
+                    inspirationsTab = uiState.inspirationsTab,
+                    onSelectTab = viewModel::onSelectInspirationsTab,
+                    searchQuery = uiState.discoverySearchQuery,
+                    onSearchQueryChange = viewModel::onDiscoverySearchQueryChange,
+                    selectedCardNames = uiState.discoverySelectedCardNames,
+                    onToggleSearchCard = viewModel::onToggleDiscoverySearchCard,
+                    onClearSearch = viewModel::onClearDiscoverySearch,
+                    comboResult = uiState.comboResult,
+                    isLoadingCombos = uiState.isLoadingCombos,
+                    onUseComboAsSeed = { cardNames ->
+                        viewModel.closeInspirations()
+                        onNavigateToWizard(null, null, null, null, cardNames)
                     },
                 )
             } else {
@@ -1416,13 +1449,36 @@ private fun InspirationsSheetContent(
  * [InspirationsSheetContent], rendered instead of it when `DeckFeatureFlags
  * .DISCOVERIES_V2_ENABLED` is on (same entry point, D10/§3.7). "Build this" hands off to the v2
  * wizard pre-filled (D11) instead of the old seed-sheet handoff.
+ *
+ * Deck Engine Unification plan D7 (Phase 4) redesign: this is now a two-tab synergy browser
+ * (Strategies / Combos) with free-text + search-by-card filtering on the Strategies tab (4.1/4.2)
+ * and a Commander Spellbook combos tab (4.3). Stateless per the file's own convention -- every
+ * input is a param, every mutation a callback to [DeckStudioViewModel].
+ *
+ * @param discoveries the FULL unfiltered cluster list -- only used to derive the search-by-card
+ *   pickable pool ([DiscoverySearchFilter.pickableCardNames]); the Strategies tab itself renders
+ *   [filteredDiscoveries].
+ * @param filteredDiscoveries [discoveries] narrowed by [searchQuery]/[selectedCardNames]
+ *   ([DeckStudioViewModel.filteredDiscoveriesV2] -- the VM is the single source of truth for the
+ *   filter, this Composable stays a dumb reader).
  */
 @Composable
 private fun InspirationsSheetContentV2(
     discoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
+    filteredDiscoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
     isLoading: Boolean,
     onCardClick: (String) -> Unit,
     onBuildThis: (com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2) -> Unit,
+    inspirationsTab: InspirationsTab,
+    onSelectTab: (InspirationsTab) -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    selectedCardNames: Set<String>,
+    onToggleSearchCard: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    comboResult: ComboResult?,
+    isLoadingCombos: Boolean,
+    onUseComboAsSeed: (List<String>) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -1446,6 +1502,128 @@ private fun InspirationsSheetContentV2(
             modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
         )
 
+        TabRow(
+            selectedTabIndex = inspirationsTab.ordinal,
+            containerColor = mc.backgroundSecondary,
+            contentColor = mc.primaryAccent,
+        ) {
+            Tab(
+                selected = inspirationsTab == InspirationsTab.STRATEGIES,
+                onClick = { onSelectTab(InspirationsTab.STRATEGIES) },
+                text = {
+                    Text(
+                        stringResource(R.string.deck_studio_inspirations_tab_strategies),
+                        style = ty.labelLarge,
+                    )
+                },
+            )
+            Tab(
+                selected = inspirationsTab == InspirationsTab.COMBOS,
+                onClick = { onSelectTab(InspirationsTab.COMBOS) },
+                text = {
+                    Text(
+                        stringResource(R.string.deck_studio_inspirations_tab_combos),
+                        style = ty.labelLarge,
+                    )
+                },
+            )
+        }
+        Spacer(Modifier.height(spacing.sm))
+
+        when (inspirationsTab) {
+            InspirationsTab.STRATEGIES -> StrategiesTabContent(
+                discoveries = discoveries,
+                filteredDiscoveries = filteredDiscoveries,
+                isLoading = isLoading,
+                onCardClick = onCardClick,
+                onBuildThis = onBuildThis,
+                searchQuery = searchQuery,
+                onSearchQueryChange = onSearchQueryChange,
+                selectedCardNames = selectedCardNames,
+                onToggleSearchCard = onToggleSearchCard,
+                onClearSearch = onClearSearch,
+            )
+            InspirationsTab.COMBOS -> CombosTabContent(
+                comboResult = comboResult,
+                isLoading = isLoadingCombos,
+                onCardClick = onCardClick,
+                onUseComboAsSeed = onUseComboAsSeed,
+            )
+        }
+    }
+}
+
+/**
+ * The Strategies tab (4.1 strictness lives entirely in [com.mmg.manahub.feature.decks.domain
+ * .template.DiscoverSynergiesV2UseCase]; this composable is 4.2's search UI only).
+ */
+@Composable
+private fun StrategiesTabContent(
+    discoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
+    filteredDiscoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
+    isLoading: Boolean,
+    onCardClick: (String) -> Unit,
+    onBuildThis: (com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2) -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    selectedCardNames: Set<String>,
+    onToggleSearchCard: (String) -> Unit,
+    onClearSearch: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    // Pure derivation of the pickable pool from the (small, already-loaded) cluster list -- not
+    // worth VM state, mirrors this screen's own `tabs = buildList { ... }` local-derivation
+    // precedent above.
+    val pickableCardNames = remember(discoveries) { DiscoverySearchFilter.pickableCardNames(discoveries) }
+
+    Column(Modifier.fillMaxSize()) {
+        if (!isLoading && discoveries.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = spacing.xs),
+                placeholder = { Text(stringResource(R.string.deck_studio_inspirations_search_hint), style = ty.bodyMedium) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary) },
+                trailingIcon = if (searchQuery.isNotEmpty() || selectedCardNames.isNotEmpty()) {
+                    {
+                        IconButton(onClick = onClearSearch, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.deck_studio_inspirations_search_clear),
+                                tint = mc.textSecondary,
+                            )
+                        }
+                    }
+                } else null,
+                singleLine = true,
+                shape = ChipShape,
+            )
+
+            if (pickableCardNames.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = spacing.sm),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                ) {
+                    items(pickableCardNames, key = { it }) { name ->
+                        FilterChip(
+                            selected = name in selectedCardNames,
+                            onClick = { onToggleSearchCard(name) },
+                            label = { Text(name, style = ty.labelMedium) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
+                                selectedLabelColor = mc.primaryAccent,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
         when {
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
@@ -1455,6 +1633,11 @@ private fun InspirationsSheetContentV2(
                 subtitle = stringResource(R.string.deck_studio_inspirations_empty_subtitle),
                 icon = Icons.Default.AutoAwesome,
             )
+            filteredDiscoveries.isEmpty() -> EmptyState(
+                title = stringResource(R.string.deck_studio_inspirations_search_empty_title),
+                subtitle = stringResource(R.string.deck_studio_inspirations_search_empty_subtitle),
+                icon = Icons.Default.Search,
+            )
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 state = rememberLazyListState(),
@@ -1463,11 +1646,77 @@ private fun InspirationsSheetContentV2(
             ) {
                 // Keyed by the cluster's own stable identity (tag key or tribe key) -- distinct
                 // from the legacy MagicDiscovery key shape (no primaryTag on this model).
-                items(discoveries.take(20), key = { it.key.stableKey() }) { discovery ->
+                items(filteredDiscoveries.take(20), key = { it.key.stableKey() }) { discovery ->
                     com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
                         discovery = discovery,
                         onCardClick = onCardClick,
                         onBuildThis = { onBuildThis(discovery) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The Combos tab (Deck Engine Unification plan D7, 4.3). */
+@Composable
+private fun CombosTabContent(
+    comboResult: ComboResult?,
+    isLoading: Boolean,
+    onCardClick: (String) -> Unit,
+    onUseComboAsSeed: (List<String>) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val spacing = MaterialTheme.spacing
+
+    when {
+        isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+        }
+        comboResult == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+        }
+        comboResult.complete.isEmpty() && comboResult.almostThere.isEmpty() -> EmptyState(
+            title = stringResource(R.string.deck_studio_combos_empty_title),
+            subtitle = stringResource(R.string.deck_studio_combos_empty_subtitle),
+            icon = Icons.Default.AutoAwesome,
+        )
+        else -> LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = rememberLazyListState(),
+            contentPadding = PaddingValues(vertical = spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.md),
+        ) {
+            if (comboResult.complete.isNotEmpty()) {
+                item(key = "combos_complete_header") {
+                    Text(
+                        text = stringResource(R.string.deck_studio_combos_complete_header, comboResult.complete.size),
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.textSecondary,
+                    )
+                }
+                items(comboResult.complete, key = { "combo_${it.id}" }) { combo ->
+                    com.mmg.manahub.feature.decks.presentation.components.ComboRow(
+                        combo = combo,
+                        onCardClick = onCardClick,
+                        onUseAsSeed = { onUseComboAsSeed(combo.cardNames) },
+                    )
+                }
+            }
+            if (comboResult.almostThere.isNotEmpty()) {
+                item(key = "combos_almost_header") {
+                    Text(
+                        text = stringResource(R.string.deck_studio_combos_almost_header, comboResult.almostThere.size),
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(top = spacing.sm),
+                    )
+                }
+                items(comboResult.almostThere, key = { "almost_${it.id}" }) { almost ->
+                    com.mmg.manahub.feature.decks.presentation.components.AlmostComboRow(
+                        almostCombo = almost,
+                        onCardClick = onCardClick,
+                        onUseAsSeed = { onUseComboAsSeed(almost.ownedCardNames + almost.missingCardName) },
                     )
                 }
             }
@@ -1504,6 +1753,9 @@ private fun SuggestionsTab(
     onCut: (CardFit) -> Unit,
     onApplyArchetypePlan: (ArchetypeId, List<ThemeId>) -> Unit,
     onAutoDetectArchetypePlan: () -> Unit,
+    // Deck Engine Unification (D4) — explicit "Unlock strategy" action, gated behind a confirmation
+    // dialog owned by this composable (see the `strategyLocked` banner below).
+    onUnlockStrategy: () -> Unit = {},
     // Motor B (Phase 4) — no-op defaults so this composable never has to be re-plumbed in every
     // call site if a preview/test constructs it without these.
     onAddCommunity: (com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion) -> Unit = {},
@@ -1534,13 +1786,22 @@ private fun SuggestionsTab(
     val evaluation = health.evaluation
     val spacing = MaterialTheme.spacing
     var showArchetypeSheet by remember { mutableStateOf(false) }
+    var showUnlockConfirmDialog by remember { mutableStateOf(false) }
+    // Deck Engine Unification (D4): the deck's own persisted flag (Deck.strategyLocked), not the
+    // orchestrator's own async-loaded DeckDoctorState.strategyLocked -- uiState.deck is always
+    // current (observed live), so the "Deck plan" editor gate can never lag one analysis cycle
+    // behind a fresh wizard build or a just-completed unlock.
+    val strategyLocked = uiState.deck?.strategyLocked == true
     // Hoisted OUT of the LazyColumn content lambda: LazyListScope's content is a plain (non-
     // @Composable) lambda, so stringResource() may only be called inside an item{}/items{} block,
     // never directly in a `when { }`/`val` sitting between them (feedback_lazylistscope_content_not_composable).
     val communitySourceLabel = uiState.deck?.name.orEmpty()
         .ifBlank { stringResource(R.string.deck_studio_suggestions_community_header) }
 
-    if (showArchetypeSheet) {
+    // Deck Engine Unification (D4): the "Deck plan" editor sheet is only reachable while unlocked
+    // -- showArchetypeSheet can only ever flip true from the (now-hidden) chip's onClick below, but
+    // this guard is defensive against a stray state carried across a locked->unlocked transition.
+    if (showArchetypeSheet && !strategyLocked) {
         val archetypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { showArchetypeSheet = false },
@@ -1558,13 +1819,67 @@ private fun SuggestionsTab(
         }
     }
 
+    if (showUnlockConfirmDialog) {
+        val ty = MaterialTheme.magicTypography
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showUnlockConfirmDialog = false },
+            title = {
+                Text(
+                    text = stringResource(R.string.deck_studio_unlock_strategy_confirm_title),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.deck_studio_unlock_strategy_confirm_body),
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showUnlockConfirmDialog = false
+                        onUnlockStrategy()
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.deck_studio_unlock_strategy_confirm_action),
+                        style = ty.labelMedium,
+                        color = mc.lifeNegative,
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    FirebaseCrashlytics.getInstance().log("deck_studio_unlock_strategy_declined")
+                    showUnlockConfirmDialog = false
+                }) {
+                    Text(text = stringResource(R.string.action_cancel), style = ty.labelMedium, color = mc.textSecondary)
+                }
+            },
+            containerColor = mc.background,
+        )
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = rememberLazyListState(),
         contentPadding = PaddingValues(spacing.lg),
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        // ── Archetype plan chip (Phase 1.7) ─────────────────────────────────────
+        // ── Archetype plan chip (Phase 1.7) — hidden while strategyLocked (D4): editing the deck
+        // plan on a wizard-built deck would contradict the strategy it was built for. A dedicated
+        // banner (below) explains why and offers the explicit unlock action instead. ───────────
+        if (strategyLocked) {
+            item(key = "strategy_locked_banner") {
+                StrategyLockedBanner(onUnlockClick = {
+                    FirebaseCrashlytics.getInstance().log("deck_studio_unlock_strategy_dialog_shown")
+                    showUnlockConfirmDialog = true
+                })
+            }
+        } else {
         item(key = "archetype_plan_chip") {
             ArchetypePlanChip(
                 macro = health.archetypeResolution.macro,
@@ -1580,6 +1895,7 @@ private fun SuggestionsTab(
             item(key = "archetype_plan_hint") {
                 ArchetypePlanHint(onClick = { showArchetypeSheet = true })
             }
+        }
         }
 
         // ── Health summary ────────────────────────────────────────────────────
@@ -1756,6 +2072,40 @@ private fun SuggestionCategoryHeaderChip(label: String, count: Int, tint: androi
             color = tint,
             modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm, vertical = MaterialTheme.spacing.xs),
         )
+    }
+}
+
+/**
+ * Deck Engine Unification (D4): shown INSTEAD of the "Deck plan" chip while `Deck.strategyLocked`
+ * -- explains why editing is unavailable and offers the explicit unlock action (behind a
+ * confirmation dialog, owned by the caller). Never a silent hide with no explanation.
+ */
+@Composable
+private fun StrategyLockedBanner(onUnlockClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            Text(
+                text = stringResource(R.string.deck_studio_strategy_locked_title),
+                style = ty.titleMedium,
+                color = mc.textPrimary,
+            )
+            Text(
+                text = stringResource(R.string.deck_studio_strategy_locked_body),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+            )
+            OutlinedButton(
+                onClick = onUnlockClick,
+                shape = ChipShape,
+                border = BorderStroke(1.dp, mc.textSecondary),
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(R.string.deck_studio_strategy_locked_unlock_action), color = mc.textPrimary)
+            }
+        }
     }
 }
 

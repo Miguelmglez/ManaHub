@@ -21,6 +21,8 @@ import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.paging.RemoteKeyDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
+import com.mmg.manahub.core.data.local.dao.ComboCacheDao
+import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.NewsDao
@@ -120,6 +122,18 @@ object DatabaseModule {
                 // reason). Additive: adds oracle_id + a supporting index to `cards`
                 // (Card Versions & Languages plan, Phase 1A).
                 MIGRATION_45_46,
+                // v46 → v47 lives as a top-level `val` in Migration_46_47.kt (same
+                // reason). Additive: adds strategy_locked/tribe_override to `decks`
+                // and source to `deck_cards` (Deck Engine Unification plan, Phase 0.2).
+                MIGRATION_46_47,
+                // v47 → v48 lives as a top-level `val` in Migration_47_48.kt (same
+                // reason). Additive: creates the combo_cache table (Deck Engine
+                // Unification plan, Phase 4.3, D7).
+                MIGRATION_47_48,
+                // v48 → v49 lives as a top-level `val` in Migration_48_49.kt (same
+                // reason). Additive: creates the card_strategy_tags_cache table (Deck
+                // Engine Unification plan, Phase 5c, D8).
+                MIGRATION_48_49,
             )
             .build()
 
@@ -745,4 +759,6 @@ object DatabaseModule {
     @Provides fun provideGamificationStatsDao(db: MtgDatabase): GamificationStatsDao = db.gamificationStatsDao()
     @Provides fun provideCommunityDeckCacheDao(db: MtgDatabase): CommunityDeckCacheDao = db.communityDeckCacheDao()
     @Provides fun provideCommunityAggregateDao(db: MtgDatabase): CommunityAggregateDao = db.communityAggregateDao()
+    @Provides fun provideComboCacheDao(db: MtgDatabase): ComboCacheDao = db.comboCacheDao()
+    @Provides fun provideCardStrategyTagsCacheDao(db: MtgDatabase): CardStrategyTagsCacheDao = db.cardStrategyTagsCacheDao()
 }

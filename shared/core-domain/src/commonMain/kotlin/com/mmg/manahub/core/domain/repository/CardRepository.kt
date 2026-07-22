@@ -112,8 +112,26 @@ interface CardRepository {
     )
     suspend fun evictStaleCache()
 
-    /** Replace the confirmed tag list for a card already in the local cache. */
+    /**
+     * Replace the confirmed tag list for a card already in the local cache.
+     *
+     * This is a PLAIN OVERWRITE -- only safe when the caller already holds the full authoritative
+     * tag list (e.g. [confirmSuggestedTag]). A caller that only knows a PARTIAL set of tags to add
+     * (merged with whatever is already persisted) must use [unionCardTags] instead, which merges
+     * atomically and closes the TOCTOU race two concurrent partial-merge callers would otherwise hit.
+     */
     suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>)
+
+    /**
+     * Atomically merges [tags] into a card's existing confirmed-tag list (union, never a plain
+     * overwrite) -- Deck Engine Unification plan RUN 7b (BUG 2 fix). Reads the CURRENT persisted
+     * tags and writes back the union inside a single Room transaction, so two concurrent partial
+     * enrichment jobs targeting the same card (e.g. the on-device analyzer's background resolution
+     * and [com.mmg.manahub.core.domain.usecase.card.RefreshCardStrategyTagsUseCase]'s precomputed-
+     * table lookup, both fired on the same cache-miss card-detail view) can never lose one
+     * contribution to the other, regardless of write ordering.
+     */
+    suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>)
 
     /** Replace the user-added tag list for a card. */
     suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>)

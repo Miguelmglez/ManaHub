@@ -71,6 +71,11 @@ interface DeckDao {
         fromSideboard: Boolean,
         newSourceQty: Int,
         newTargetQty: Int,
+        // Deck Engine Unification (v47, D4): preserves the slot's existing provenance across a
+        // mainboard<->sideboard move -- without this, every move silently reset a WIZARD/SUGGESTION
+        // -sourced card back to the DeckCardEntity default ("USER"), which would have broken the D4
+        // no-cut guarantee for a wizard-built card the user simply sideboarded and moved back.
+        source: String = "USER",
     ) {
         if (newSourceQty <= 0) {
             removeDeckCard(deckId, scryfallId, fromSideboard)
@@ -81,6 +86,7 @@ interface DeckDao {
                     scryfallId = scryfallId,
                     quantity = newSourceQty,
                     isSideboard = fromSideboard,
+                    source = source,
                 )
             )
         }
@@ -90,6 +96,7 @@ interface DeckDao {
                 scryfallId = scryfallId,
                 quantity = newTargetQty,
                 isSideboard = !fromSideboard,
+                source = source,
             )
         )
     }
@@ -136,6 +143,39 @@ interface DeckDao {
         deckId: String,
         archetypeOverride: String?,
         themesOverrideJson: String?,
+        updatedAt: Long = System.currentTimeMillis(),
+    )
+
+    /**
+     * Pins (or clears, null) the deck's tribe override (Deck Engine Unification plan, D2/D4) — a
+     * SEPARATE write path from [updateArchetypeOverride], see [com.mmg.manahub.core.model.Deck
+     * .tribeOverride]'s KDoc. Bumps `updated_at`.
+     */
+    @Query("""
+        UPDATE decks SET
+            tribe_override = :tribeOverride,
+            updated_at = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun updateTribeOverride(
+        deckId: String,
+        tribeOverride: String?,
+        updatedAt: Long = System.currentTimeMillis(),
+    )
+
+    /**
+     * Sets (or clears) the deck's `strategy_locked` flag (D4 hard no-cut guarantee). Bumps
+     * `updated_at`.
+     */
+    @Query("""
+        UPDATE decks SET
+            strategy_locked = :locked,
+            updated_at = :updatedAt
+        WHERE id = :deckId
+    """)
+    suspend fun updateStrategyLocked(
+        deckId: String,
+        locked: Boolean,
         updatedAt: Long = System.currentTimeMillis(),
     )
 

@@ -5,10 +5,12 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
-import com.mmg.manahub.feature.decks.domain.engine.SeedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -38,14 +40,16 @@ sealed class DiscoveryClusterKey {
  *   [com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec.seeds] from this list, capped
  *   by the wizard the same way [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
  *   .startFromDiscovery] already caps the old handoff.
- * @param strategyHint the [SeedStrategy] to pre-fill the wizard with — resolved for a
- *   [DiscoveryClusterKey.Strategy] cluster via [SeedStrategy.forTag] or [SeedStrategy.TRIBAL] for a
- *   [DiscoveryClusterKey.Tribe] cluster (the archetype layer
- *   has no per-tribe skeleton — see `DeckTemplateResolver.mapStrategyToArchetype`'s KDoc — so the
- *   SEEDS are what make a tribal "Build this" concretely tribe-specific, not this hint alone).
- * @param themeHint free-form label, set ONLY for a tribe cluster (e.g. "Vampires") — forward
- *   -compatible plumbing carried on [DeckWizardSpec.themeHint], not yet consumed by the synthetic
- *   template path (see that field's own KDoc).
+ * @param archetype the [ArchetypeId] to pre-fill the wizard with (Deck Engine Unification plan D2)
+ *   — resolved for a [DiscoveryClusterKey.Strategy] cluster via
+ *   [DeckIdentitySeedTags.archetypeForTag]; always `null` for a [DiscoveryClusterKey.Tribe] cluster
+ *   (the archetype layer has no per-tribe skeleton — the SEEDS are what make a tribal "Build this"
+ *   concretely tribe-specific, not this hint alone).
+ * @param theme the [ThemeId] to pre-fill the wizard with — resolved for a
+ *   [DiscoveryClusterKey.Strategy] cluster via [DeckIdentitySeedTags.themeForTag]; always `null` for
+ *   a tribe cluster (the tribe itself carries the identity, see [tribe]).
+ * @param tribe the raw `tribe:<subtype>` key, set ONLY for a [DiscoveryClusterKey.Tribe] cluster —
+ *   carried straight onto [DeckWizardSpec.strategyProfile]'s `tribe` field.
  */
 data class DeckDiscoveryV2(
     val key: DiscoveryClusterKey,
@@ -53,8 +57,9 @@ data class DeckDiscoveryV2(
     val memberCount: Int,
     val dominantColors: Set<ManaColor>,
     val members: List<Card>,
-    val strategyHint: SeedStrategy?,
-    val themeHint: String?,
+    val archetype: ArchetypeId?,
+    val theme: ThemeId?,
+    val tribe: String?,
 )
 
 /**
@@ -120,8 +125,9 @@ class DiscoverSynergiesV2UseCase(
                 key = DiscoveryClusterKey.Strategy(tag),
                 label = tag.displayLabel,
                 minCopies = MIN_STRATEGY_CLUSTER_COPIES,
-                strategyHint = SeedStrategy.forTag(tag),
-                themeHint = null,
+                archetype = DeckIdentitySeedTags.archetypeForTag(tag),
+                theme = DeckIdentitySeedTags.themeForTag(tag),
+                tribe = null,
             )?.let { discoveries += it }
         }
 
@@ -135,8 +141,9 @@ class DiscoverSynergiesV2UseCase(
                 key = DiscoveryClusterKey.Tribe(tribeKey, label),
                 label = label,
                 minCopies = MIN_TRIBE_CLUSTER_COPIES,
-                strategyHint = SeedStrategy.TRIBAL,
-                themeHint = label,
+                archetype = null,
+                theme = null,
+                tribe = tribeKey,
             )?.let { discoveries += it }
         }
 
@@ -156,8 +163,9 @@ class DiscoverSynergiesV2UseCase(
         key: DiscoveryClusterKey,
         label: String,
         minCopies: Int,
-        strategyHint: SeedStrategy?,
-        themeHint: String?,
+        archetype: ArchetypeId?,
+        theme: ThemeId?,
+        tribe: String?,
     ): DeckDiscoveryV2? {
         val dominantColors = dominantColors(members)
         val coherent = members.filter { isColorCoherent(it, dominantColors) }
@@ -180,9 +188,17 @@ class DiscoverSynergiesV2UseCase(
             colorIdentity = dominantColors,
             seedTags = if (key is DiscoveryClusterKey.Strategy) listOf(key.tag) else emptyList(),
         )
+        // Deck Engine Unification plan D7 (4.1): rarity is a TIEBREAK ONLY, never a primary sort
+        // key -- a common card that fits better than a mythic still ranks first. This favours
+        // rare/mythic/game-changer cards among near-equal-fit candidates, matching the user's own
+        // "seeds should be few, rare/mythic-weighted, not every card of a type" framing.
         val ranked = coherent
             .map { card -> card to deckScorer.fit(card, profile, isOwned = true).score }
-            .sortedWith(compareByDescending<Pair<Card, Float>> { it.second }.thenBy { it.first.name })
+            .sortedWith(
+                compareByDescending<Pair<Card, Float>> { it.second }
+                    .thenByDescending { rarityRank(it.first.rarity) }
+                    .thenBy { it.first.name }
+            )
             .map { it.first }
             .take(MEMBER_CAP)
 
@@ -192,8 +208,9 @@ class DiscoverSynergiesV2UseCase(
             memberCount = coherent.size,
             dominantColors = dominantColors,
             members = ranked,
-            strategyHint = strategyHint,
-            themeHint = themeHint,
+            archetype = archetype,
+            theme = theme,
+            tribe = tribe,
         )
     }
 
@@ -223,6 +240,22 @@ class DiscoverSynergiesV2UseCase(
         return cardColors.isEmpty() || cardColors.all { it in dominantColors }
     }
 
+    /**
+     * Mythic > rare > uncommon > everything else -- a THIRD documented duplicate of
+     * `CollectionViewModel`'s private `rarityWeight` table (`:app` cannot be depended on from
+     * `:shared:core-domain`, and this module cannot depend on `:shared:core-model`'s OWN private
+     * copy either -- see `CollectionGrouping.kt`'s KDoc for the first duplicate). Keep all three
+     * in sync by hand if the ordering ever changes; mirrors [MIN_TRIBE_CLUSTER_COPIES]'s own
+     * "deliberate, documented local duplicate rather than a cross-module visibility change"
+     * precedent in this same class.
+     */
+    private fun rarityRank(rarity: String): Int = when (rarity.lowercase()) {
+        "mythic" -> 4
+        "rare" -> 3
+        "uncommon" -> 2
+        else -> 1
+    }
+
     /** Best-effort English pluralization -- duplicated per the existing [SuggestionCategoryResolver]/
      * [CollectionProfileUseCase] precedent (display-only, not worth a shared public API surface). */
     private fun pluralizeTribeWord(word: String): String = when {
@@ -237,14 +270,23 @@ class DiscoverSynergiesV2UseCase(
 
     private companion object {
         const val DEFAULT_LIMIT = 8
-        const val MEMBER_CAP = 12
+        /** Deck Engine Unification plan D7 (4.1): lowered from 12 -- "small high-impact clusters,
+         * not broad type-based ones." A "Build this" seed handoff of 8 top-fit, rarity-weighted
+         * cards stays a tight, potent starting point rather than a whole shelf of the type. */
+        const val MEMBER_CAP = 8
         const val MAX_DOMINANT_COLORS = 3
-        const val MIN_STRATEGY_CLUSTER_COPIES = 6
-        /** Mirrors [DeckScorer]'s own PRIVATE `TRIBE_ABS_THRESHOLD` (8) -- that companion object is
-         * `private`, so this is a deliberate, documented local duplicate of the same value rather
-         * than a cross-module visibility change to a pre-existing engine constant (see class KDoc
-         * "TRIBE_ABS_THRESHOLD alignment"). Keep in sync if the engine's threshold ever changes. */
-        const val MIN_TRIBE_CLUSTER_COPIES = 8
+        /** Deck Engine Unification plan D7 (4.1): raised from 6 -- a cluster of exactly-6 copies
+         * read as noise as often as signal; 8 owned copies is a genuinely committed strategy. */
+        const val MIN_STRATEGY_CLUSTER_COPIES = 8
+        /** Deck Engine Unification plan D7 (4.1): raised from 8 (which merely mirrored
+         * [DeckScorer]'s own PRIVATE `TRIBE_ABS_THRESHOLD` -- that companion object is `private`,
+         * so this remains a deliberate, documented local duplicate rather than a cross-module
+         * visibility change, see class KDoc "TRIBE_ABS_THRESHOLD alignment"). Raised further past
+         * the engine's own floor for the SAME "small high-impact clusters" reason as
+         * [MIN_STRATEGY_CLUSTER_COPIES] -- a tribal cluster only just past the engine's own
+         * minimum-viable bar isn't yet a strong "Build this" candidate. Keep the engine-alignment
+         * NOTE (not the value) in sync if [DeckScorer]'s threshold ever changes. */
+        const val MIN_TRIBE_CLUSTER_COPIES = 10
         const val MAX_SEED_COPIES_PER_CARD = 4
     }
 }

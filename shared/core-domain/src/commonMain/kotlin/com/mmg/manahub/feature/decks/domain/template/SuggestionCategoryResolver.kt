@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.decks.domain.template
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeData
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
@@ -24,6 +26,14 @@ import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
  *  2. a [DeckRole] -> category mapping for the roles that have one clean category name
  *     (SPOT_REMOVAL->Removal, RAMP->Ramp, ...). PAYOFF/SYNERGY/THREAT/FILLER have no single clean
  *     category name and fall through to the next steps.
+ *  2.5. Wizard Quality Campaign B2a fallback: when step 2 finds no legacy [DeckRole] match, try the
+ *     Appendix A [ArchetypeRoleClassifier] vocabulary (`finisher`, `threat_early`, `sac_outlet`,
+ *     `recursion`, ...) — the RoleKeys [DeckTemplateResolver.roleKeyToSuggestionCategory] falls back
+ *     to as a raw category id for a synthetic template category with no [DeckRole] bridge. Without
+ *     this step those categories NEVER matched a candidate bucket (documented KNOWN LIMITATION on
+ *     that function) — a 2026-07-18 wizard-quality bug (B2, "Casual build returned 35 cards instead
+ *     of 60"). Produces the SAME id [DeckTemplateResolver] already emits for that RoleKey, so a
+ *     synthetic category and its candidate bucket now agree.
  *  3. the dominant derived `tribe:<x>` key on the CARD itself (via [TribeDeriver]), preferring
  *     whichever of the card's own tribes also has the highest weight in the deck's own
  *     [DeckProfile.tagFingerprint] when a profile is supplied (so grouping aligns with what the
@@ -64,6 +74,7 @@ object SuggestionCategoryResolver {
     ): SuggestionCategory {
         aggregateCategory?.trim()?.takeIf { it.isNotEmpty() }?.let { return fromAggregateLabel(it) }
         roleCategory(card)?.let { return it }
+        archetypeRoleCategory(card)?.let { return it }
         tribeCategory(card, profile)?.let { return it }
         strategyCategory(card)?.let { return it }
         typeLineHeuristicCategory(card)?.let { return it }
@@ -89,6 +100,28 @@ object SuggestionCategoryResolver {
         val roles = roleClassifier.classify(card)
         val topRole = roles.entries.maxByOrNull { it.value }?.key ?: return null
         return ROLE_CATEGORIES[topRole]
+    }
+
+    /**
+     * Step 2.5 (see class KDoc) — the Appendix A [ArchetypeRoleClassifier.ROLE_SPECS] fallback.
+     * Deliberately uses [ArchetypeRoleClassifier.ROLE_SPECS] directly rather than
+     * [ArchetypeRoleClassifier.classify] (which ALSO mixes in the 5 legacy-backed roles under
+     * different RoleKey spellings, e.g. `removal_spot`/`tutor` vs. this resolver's own
+     * `removal`/`tutors` ids from step 2) — those 5 are already handled, and agree, in [roleCategory].
+     * [ArchetypeData.MANA_FIX_KEY] is excluded: it is never a standalone template category (see
+     * [DeckTemplateResolver.syntheticTemplate]'s own filter), so it must never win a candidate bucket
+     * here either.
+     */
+    private fun archetypeRoleCategory(card: Card): SuggestionCategory? {
+        val best = ArchetypeRoleClassifier.ROLE_SPECS
+            .asSequence()
+            .filter { it.key != ArchetypeData.MANA_FIX_KEY }
+            .map { spec -> spec to spec.matcher(card) }
+            .filter { it.second > 0f }
+            .maxByOrNull { it.second }
+            ?.first
+            ?: return null
+        return SuggestionCategory(best.key, best.label)
     }
 
     private fun tribeCategory(card: Card, profile: DeckProfile?): SuggestionCategory? {

@@ -84,6 +84,9 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
@@ -579,6 +582,8 @@ private fun SpotlightCardTile(
         AsyncImage(
             model = card.imageNormal,
             contentDescription = card.name,
+            placeholder = painterResource(Res.drawable.mtg_card_back),
+            error = painterResource(Res.drawable.mtg_card_back),
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
@@ -682,6 +687,8 @@ private fun SearchResultItem(
             AsyncImage(
                 model = card.imageNormal,
                 contentDescription = card.name,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(width = 44.dp, height = 60.dp)
