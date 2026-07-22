@@ -37,9 +37,15 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 @Composable
 fun LanguageBadge(langCode: String, modifier: Modifier = Modifier) {
     val flag = com.mmg.manahub.core.util.CardConstants.getFlag(langCode)
-    val isFlag = flag.isNotEmpty()
-    val displayLabel = flag.ifEmpty { langCode.uppercase() }
-    CopyBadge(label = displayLabel, modifier = modifier, showBackground = !isFlag)
+    if (flag.isNotEmpty()) {
+        Text(
+            text = flag,
+            style = MaterialTheme.magicTypography.labelLarge.copy(fontSize = 14.sp),
+            modifier = modifier
+        )
+    } else {
+        CopyBadge(label = langCode.uppercase(), modifier = modifier)
+    }
 }
 
 @Composable

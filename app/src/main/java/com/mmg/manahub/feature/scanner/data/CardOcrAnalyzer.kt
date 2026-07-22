@@ -24,12 +24,15 @@ import kotlinx.coroutines.tasks.await
  * Smart filters (card-type-line keywords, rules-text phrases, OCR artefact cleanup)
  * further reduce false positives from artwork text or bottom card body.
  *
- * Recognizer clients are cached by script group and released on [close].
+ * The recognizer client is created lazily and released on [close].
  *
- * Supported scripts:
+ * Supported script:
  * - Latin (EN/ES/DE/FR/IT/PT): [TextRecognizerOptions.DEFAULT_OPTIONS]
- * - Japanese (JA): `JapaneseTextRecognizerOptions`
- * - Korean  (KO): `KoreanTextRecognizerOptions`
+ *
+ * Japanese/Korean OCR support was removed (2026-07-22, Android 16 / API 36 migration): the
+ * `-japanese`/`-korean` ML Kit artefacts ship native libraries that are not 16KB-page-size
+ * aligned, with no fixed release available upstream. Scryfall search by language (`AddCard`,
+ * unrelated to on-device OCR) still supports ja/ko — only recognition of physical cards does not.
  */
 class CardOcrAnalyzer {
 
@@ -41,31 +44,10 @@ class CardOcrAnalyzer {
          */
         const val NAME_ZONE_TOP_FRACTION    = 0.30f
         const val NAME_ZONE_BOTTOM_FRACTION = 0.60f
-
-        private val LATIN_LANGUAGES = setOf("en", "es", "de", "fr", "it", "pt")
     }
 
-    private val recognizerCache = mutableMapOf<String, TextRecognizer>()
-
-    private fun getRecognizer(language: String): TextRecognizer {
-        val key = when {
-            language in LATIN_LANGUAGES -> "latin"
-            language == "ja"            -> "ja"
-            language == "ko"            -> "ko"
-            else                        -> "latin"
-        }
-        return recognizerCache.getOrPut(key) {
-            when (key) {
-                "ja" -> TextRecognition.getClient(
-                    com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions.Builder().build()
-                )
-                "ko" -> TextRecognition.getClient(
-                    com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions.Builder().build()
-                )
-                else -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            }
-        }
-    }
+    private val recognizerLazy = lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    private val recognizer: TextRecognizer by recognizerLazy
 
     /**
      * Runs OCR on [mediaImage] and returns the most likely card name within the name zone,
@@ -76,16 +58,14 @@ class CardOcrAnalyzer {
      *
      * @param mediaImage      Raw YUV_420_888 image from [ImageProxy.image].
      * @param rotationDegrees Degrees to rotate for upright display (from [ImageProxy.imageInfo]).
-     * @param language        Language code used to select the OCR script.
      */
     suspend fun extractCardName(
         mediaImage: Image,
         rotationDegrees: Int,
-        language: String = "en",
     ): String? {
         return try {
             val image = InputImage.fromMediaImage(mediaImage, rotationDegrees)
-            val result = getRecognizer(language).process(image).await()
+            val result = recognizer.process(image).await()
             extractFromResult(result)
         } catch (e: Exception) {
             if (com.mmg.manahub.BuildConfig.DEBUG) {
@@ -262,7 +242,6 @@ class CardOcrAnalyzer {
     }
 
     fun close() {
-        recognizerCache.values.forEach { it.close() }
-        recognizerCache.clear()
+        if (recognizerLazy.isInitialized()) recognizer.close()
     }
 }

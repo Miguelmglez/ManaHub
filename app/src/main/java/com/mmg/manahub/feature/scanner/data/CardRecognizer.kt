@@ -79,9 +79,8 @@ class CardRecognizer(
             try {
                 // imageProxy must remain open until ML Kit finishes consuming mediaImage.
                 val cardName = cardOcrAnalyzer.extractCardName(
-                    mediaImage     = mediaImage,
+                    mediaImage      = mediaImage,
                     rotationDegrees = rotationDegrees,
-                    language       = selectedLanguage,
                 )
                 imageProxy.close()
                 isProcessing.set(false)

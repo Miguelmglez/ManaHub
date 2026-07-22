@@ -11,6 +11,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.CommunityAggregate
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.model.TagCategory
@@ -19,6 +20,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
+import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
@@ -71,6 +73,13 @@ data class DeckDoctorState(
     val isAddsLoading: Boolean = false,
     /** True once at least one full [DeckDoctorOrchestrator.loadAnalysis] has completed. */
     val isLoaded: Boolean = false,
+    /**
+     * Deck Engine Unification plan (D4): mirrors `Deck.strategyLocked`. While true, [cuts] never
+     * includes a [DeckCardSource.WIZARD]-sourced card (see [loadAnalysis]/[recomputeIncremental]'s
+     * `protectedIds` extension) and the host UI hides the "Deck plan" archetype/theme editor. Flip
+     * off via [unlockStrategy] (an explicit, confirmed user action).
+     */
+    val strategyLocked: Boolean = false,
 
     // ── Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) ────────
     // Entirely additive to Motor A above and gated behind `communityEngineEnabledFlow` (D4):
@@ -221,6 +230,13 @@ class DeckDoctorOrchestrator(
         var archetypeOverride: String?,
         var themesOverride: List<String>,
         val commanderTags: List<CardTag>,
+        // ── Deck Engine Unification (D4) ────────────────────────────────────────
+        /** Mirrors `Deck.strategyLocked` -- re-read on every full [loadAnalysis] (an unlock is
+         * always followed by a full reload, see [unlockStrategy]). */
+        val strategyLocked: Boolean,
+        /** Scryfall ids of every mainboard slot whose persisted `source == WIZARD` -- folded into
+         * [suggestCutsUseCase]'s `protectedIds` while [strategyLocked] (D4 hard no-cut guarantee). */
+        val wizardSourcedIds: Set<String>,
     )
 
     /**
@@ -263,11 +279,22 @@ class DeckDoctorOrchestrator(
             val commanderIdentity = commanderCard?.colorIdentity?.toSet().orEmpty()
             val commanderTags = commanderCard?.let { it.tags + it.userTags }.orEmpty()
 
-            val seedCards = inferenceSeeds(commanderCard, mainboardEntries)
-            val seedTags = inferDeckIdentityUseCase(seedCards).seedTags
-            val weights = weightsProvider().toScoreWeights()
             val archetypeOverride = deckWithCards.deck.archetypeOverride
             val themesOverride = deckWithCards.deck.themesOverride
+            val tribeOverride = deckWithCards.deck.tribeOverride
+            val strategyLocked = deckWithCards.deck.strategyLocked
+            // Deck Engine Unification (D4): every mainboard slot the wizard placed persists
+            // source == WIZARD (DeckWizardViewModel.writeResultIntoNewDeck) -- while the deck is
+            // strategyLocked, NONE of them may ever appear in `cuts` (a hard guarantee, not a
+            // ranking nudge, since rankCuts fully filters `protectedIds` out of its candidate pool).
+            val wizardSourcedIds = deckWithCards.mainboard
+                .filter { it.source == DeckCardSource.WIZARD }
+                .mapTo(mutableSetOf()) { it.scryfallId }
+
+            val seedCards = inferenceSeeds(commanderCard, mainboardEntries)
+            val inferredSeedTags = inferDeckIdentityUseCase(seedCards).seedTags
+            val seedTags = (inferredSeedTags + pinSeedTags(archetypeOverride, themesOverride, tribeOverride)).distinct()
+            val weights = weightsProvider().toScoreWeights()
 
             val health = evaluateDeckUseCase(
                 mainboard = mainboardEntries,
@@ -282,7 +309,7 @@ class DeckDoctorOrchestrator(
             val cuts = suggestCutsUseCase(
                 mainboard = mainboardEntries,
                 profile = health.profile,
-                protectedIds = setOfNotNull(commanderId),
+                protectedIds = cutProtectedIds(commanderId, strategyLocked, wizardSourcedIds),
                 weights = weights,
             )
 
@@ -311,6 +338,8 @@ class DeckDoctorOrchestrator(
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
                 commanderTags = commanderTags,
+                strategyLocked = strategyLocked,
+                wizardSourcedIds = wizardSourcedIds,
             )
 
             if (unresolvedCount > 0) {
@@ -326,6 +355,7 @@ class DeckDoctorOrchestrator(
                     health = withUnresolvedWarning(health, unresolvedCount),
                     cuts = cuts,
                     isSuggestionsLoading = false,
+                    strategyLocked = strategyLocked,
                 )
             }
             recomputeAddsInternal(constraints)
@@ -531,6 +561,13 @@ class DeckDoctorOrchestrator(
     /**
      * Re-evaluates the deck IN MEMORY from [AnalysisCache.workingMainboard] after a single-card
      * suggestion add/cut: rebuild profile/evaluation/cuts (pure), then recompute ADD suggestions.
+     *
+     * [AnalysisCache.seedTags] is reused UNCHANGED (never re-derived here) -- it was already computed
+     * once in [loadAnalysis] as `inference + `[pinSeedTags]` (Wave 4, Task 1), so every incremental
+     * add/cut in this session ranks against the EXACT SAME basis the full analysis started from. An
+     * archetype/theme override change goes through [setArchetypeOverride], which re-runs a FULL
+     * [loadAnalysis] rather than an incremental step (see its own KDoc) -- so there is no path where
+     * this method's basis can drift from the pin.
      */
     private fun recomputeIncremental(constraints: BudgetConstraints) {
         val context = analysisCache ?: return
@@ -550,7 +587,7 @@ class DeckDoctorOrchestrator(
             val cuts = suggestCutsUseCase(
                 mainboard = mainboard,
                 profile = health.profile,
-                protectedIds = setOfNotNull(context.commanderId),
+                protectedIds = cutProtectedIds(context.commanderId, context.strategyLocked, context.wizardSourcedIds),
                 weights = weights,
             )
             _state.update {
@@ -658,6 +695,55 @@ class DeckDoctorOrchestrator(
         (card.tags + card.userTags).count { it.category in IDENTITY_CATEGORIES }
 
     /**
+     * Wizard Quality Campaign Wave 4 (Task 1): folds a deck's PERSISTED `archetypeOverride`/
+     * `themesOverride` pin into the seed-tag basis via the SAME [DeckIdentitySeedTags] table
+     * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase.recomputeProfile]
+     * uses at build time -- without this, a deck built with an explicit Direction hint (e.g. the
+     * wizard's GRAVEYARD strategy) scored its own placed cards against a richer basis DURING the
+     * build than the Doctor scores them against AFTERWARD (inference-only), so a card that legitimately
+     * cleared the wizard's category-fill floor could fall below the Doctor's cut floor purely from
+     * the missing explicit signal -- see `project_wizard_quality_campaign_wave3` memory's bucket-(ii)
+     * root cause and [DeckIdentitySeedTags]'s class KDoc.
+     *
+     * [archetypeOverride]/[themesOverride] are persisted as raw enum-name STRINGS
+     * ([com.mmg.manahub.core.model.Deck.archetypeOverride]/`themesOverride`) -- mapped back
+     * defensively via `entries.firstOrNull`; an unknown/stale name (e.g. a renamed enum entry)
+     * resolves to "no pin contribution" for that piece, never a guess or a crash. A deck with no
+     * override (both null/empty -- the common case) contributes an empty list here, so
+     * [loadAnalysis]'s `seedTags` is BYTE-IDENTICAL to before this change for every unpinned/GENERIC
+     * deck.
+     *
+     * A stale/unresolvable override string is now ALSO reported as a non-fatal (never silently
+     * swallowed): the persisted string was written by this same app and should always resolve, so a
+     * miss means enum drift (a renamed/removed [ArchetypeId]/[ThemeId] entry without a data
+     * migration) -- an actionable bug, not an expected runtime state, and exactly the class of
+     * silent-degradation this campaign exists to catch early.
+     */
+    private fun pinSeedTags(archetypeOverride: String?, themesOverride: List<String>, tribeOverride: String? = null): List<CardTag> {
+        val archetype = archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
+        val themes = themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
+        val archetypeStale = archetypeOverride != null && archetype == null
+        val themesLostCount = themesOverride.size - themes.size
+        if (archetypeStale || themesLostCount > 0) {
+            crashReporter.log("deck_doctor_pin_seed_tags_unresolved")
+            crashReporter.setCustomKey("deck_doctor_pin_archetype_stale", archetypeStale.toString())
+            crashReporter.setCustomKey("deck_doctor_pin_themes_lost_count", themesLostCount.toString())
+            crashReporter.recordException(
+                RuntimeException(
+                    "[DeckDoctorOrchestrator] deck_doctor_pin_seed_tags_unresolved: " +
+                        "archetypeOverride=$archetypeOverride themesOverride=$themesOverride"
+                )
+            )
+        }
+        // Deck Engine Unification (D2): tribeOverride is a SEPARATE pin column (never folded into
+        // themesOverride's JSON list -- see Deck.tribeOverride's KDoc), so it never participates in
+        // the stale-pin detection above (a blank/absent tribe is simply "no tribe pin", not a data
+        // hazard the way an unresolvable ArchetypeId/ThemeId name is).
+        if (archetype == null && themes.isEmpty() && tribeOverride.isNullOrBlank()) return emptyList()
+        return DeckIdentitySeedTags.forArchetype(archetype ?: ArchetypeId.GENERIC, themes, tribeOverride)
+    }
+
+    /**
      * Resolves the archetype/theme skeleton Motor A's theme-role bonus scores against, mirroring
      * [EvaluateDeckUseCase]'s own resolution EXACTLY (same inputs: format, resolved macro/themes,
      * color count) — a cheap, pure, side-effect-free re-derivation (no card iteration), never a
@@ -711,6 +797,36 @@ class DeckDoctorOrchestrator(
     fun clearArchetypeOverride(deckId: String, constraints: BudgetConstraints) {
         setArchetypeOverride(deckId, constraints, archetypeId = null, themes = emptyList())
     }
+
+    /**
+     * Deck Engine Unification plan (D4): the deck's own explicit "Unlock strategy" action —
+     * flips `Deck.strategyLocked` off (releasing BOTH gates: [DeckDoctorState.cuts] may include a
+     * WIZARD-sourced card again, and the host UI may show the "Deck plan" editor again) then re-runs
+     * a full [loadAnalysis] (mirrors [setArchetypeOverride]'s "cheap enough to just reload"
+     * precedent — the cut candidate pool itself changed, not just a display flag).
+     */
+    fun unlockStrategy(deckId: String, constraints: BudgetConstraints) {
+        scope.launch {
+            runCatching {
+                deckRepository.updateStrategyLocked(deckId, false)
+            }.onFailure {
+                crashReporter.log("deck_studio_unlock_strategy_failed")
+                crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_unlock_strategy_failed", it))
+                return@launch
+            }
+            loadAnalysis(deckId, constraints)
+        }
+    }
+
+    /**
+     * Deck Engine Unification plan (D4): the commander is ALWAYS protected from cuts (pre-existing
+     * behavior, unchanged); every [wizardSourcedIds] id joins it ONLY while [strategyLocked] — an
+     * unlocked deck's wizard-placed cards become ordinary cut candidates again, same as any manual
+     * addition. [suggestCutsUseCase]/[DeckScorer.rankCuts] fully EXCLUDES `protectedIds` from its
+     * candidate pool (not a ranking nudge), so this is a hard, structural guarantee.
+     */
+    private fun cutProtectedIds(commanderId: String?, strategyLocked: Boolean, wizardSourcedIds: Set<String>): Set<String> =
+        setOfNotNull(commanderId) + (if (strategyLocked) wizardSourcedIds else emptySet())
 
     /** Appends a [DeckWarning.UnresolvedCards] when one or more mainboard slots failed to resolve. */
     private fun withUnresolvedWarning(health: DeckHealth, unresolvedCount: Int): DeckHealth {

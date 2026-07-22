@@ -36,6 +36,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -54,6 +57,7 @@ fun CardGridItem(
     modifier: Modifier = Modifier,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    sharedTransitionKey: Any? = null,
 ) {
     val card = item.card
     val mc = MaterialTheme.magicColors
@@ -78,7 +82,9 @@ fun CardGridItem(
                 val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {
                         imageModifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
+                            sharedContentState = rememberSharedContentState(
+                                key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
+                            ),
                             animatedVisibilityScope = animatedVisibilityScope,
                             clipInOverlayDuringTransition = OverlayClip(CardShape),
                             boundsTransform = { _, _ ->
@@ -94,6 +100,8 @@ fun CardGridItem(
                 AsyncImage(
                     model = card.imageArtCrop ?: card.imageNormal,
                     contentDescription = card.name,
+                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                    error = painterResource(Res.drawable.mtg_card_back),
                     contentScale = ContentScale.Crop,
                     modifier = finalImageModifier,
                 )

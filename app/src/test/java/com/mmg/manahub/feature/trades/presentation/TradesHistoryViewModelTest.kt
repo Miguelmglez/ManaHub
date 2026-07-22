@@ -8,8 +8,6 @@ import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
-import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -53,16 +51,13 @@ class TradesHistoryViewModelTest {
     private val authRepository = mockk<AuthRepository>()
     private val friendRepository = mockk<FriendRepository>()
     private val tradesRepository = mockk<TradesRepository>(relaxed = true)
-    private val getActive = mockk<GetActiveTradesUseCase>()
-    private val getHistory = mockk<GetTradeHistoryUseCase>()
     private val refreshTrades = mockk<RefreshTradesUseCase>()
 
     // ── Shared flows ──────────────────────────────────────────────────────────
 
     private val sessionFlow = MutableStateFlow<SessionState>(SessionState.Loading)
     private val friendsFlow = MutableStateFlow<List<Friend>>(emptyList())
-    private val activeFlow = MutableStateFlow<List<TradeProposal>>(emptyList())
-    private val historyFlow = MutableStateFlow<List<TradeProposal>>(emptyList())
+    private val allProposalsFlow = MutableStateFlow<List<TradeProposal>>(emptyList())
 
     private companion object {
         const val USER_A = "user-a"
@@ -104,8 +99,7 @@ class TradesHistoryViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { authRepository.sessionState } returns sessionFlow
         every { friendRepository.observeFriends() } returns friendsFlow
-        every { getActive() } returns activeFlow
-        every { getHistory() } returns historyFlow
+        every { tradesRepository.observeAllProposals() } returns allProposalsFlow
     }
 
     @After
@@ -117,8 +111,6 @@ class TradesHistoryViewModelTest {
         authRepository = authRepository,
         friendRepository = friendRepository,
         tradesRepository = tradesRepository,
-        getActive = getActive,
-        getHistory = getHistory,
         refreshTrades = refreshTrades,
         ioDispatcher = testDispatcher,
     )
@@ -203,11 +195,9 @@ class TradesHistoryViewModelTest {
 
     @Test
     fun `given proposals of every status when filter is ACTIVE then only active-status proposals are returned`() = runTest {
-        activeFlow.value = listOf(
+        allProposalsFlow.value = listOf(
             buildProposal("p1", TradeStatus.PROPOSED),
             buildProposal("p2", TradeStatus.ACCEPTED),
-        )
-        historyFlow.value = listOf(
             buildProposal("p3", TradeStatus.COMPLETED),
             buildProposal("p4", TradeStatus.DECLINED),
         )
@@ -223,8 +213,8 @@ class TradesHistoryViewModelTest {
 
     @Test
     fun `given proposals of every status when filter is COMPLETED then only COMPLETED proposals are returned`() = runTest {
-        activeFlow.value = listOf(buildProposal("p1", TradeStatus.PROPOSED))
-        historyFlow.value = listOf(
+        allProposalsFlow.value = listOf(
+            buildProposal("p1", TradeStatus.PROPOSED),
             buildProposal("p2", TradeStatus.COMPLETED),
             buildProposal("p3", TradeStatus.DECLINED),
         )
@@ -240,7 +230,7 @@ class TradesHistoryViewModelTest {
 
     @Test
     fun `given proposals of every status when filter is DECLINED then DECLINED CANCELLED REVOKED and COUNTERED are all returned`() = runTest {
-        historyFlow.value = listOf(
+        allProposalsFlow.value = listOf(
             buildProposal("p1", TradeStatus.DECLINED),
             buildProposal("p2", TradeStatus.CANCELLED),
             buildProposal("p3", TradeStatus.REVOKED),
@@ -259,8 +249,10 @@ class TradesHistoryViewModelTest {
 
     @Test
     fun `given proposals across active and history when filter is ALL then every proposal is returned sorted by most recent first`() = runTest {
-        activeFlow.value = listOf(buildProposal("p1", TradeStatus.PROPOSED, updatedAt = 2_000L))
-        historyFlow.value = listOf(buildProposal("p2", TradeStatus.COMPLETED, updatedAt = 3_000L))
+        allProposalsFlow.value = listOf(
+            buildProposal("p1", TradeStatus.PROPOSED, updatedAt = 2_000L),
+            buildProposal("p2", TradeStatus.COMPLETED, updatedAt = 3_000L),
+        )
         sessionFlow.value = authenticated(USER_A)
         coEvery { refreshTrades(any()) } returns Result.success(Unit)
 

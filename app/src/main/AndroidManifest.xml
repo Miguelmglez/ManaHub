@@ -128,7 +128,7 @@
         <!-- Download ML Kit OCR models at install time via Play Services (unbundled) -->
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="ocr_latin,ocr_japanese,ocr_korean" />
+            android:value="ocr_latin" />
 
     </application>
 

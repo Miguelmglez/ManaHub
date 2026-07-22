@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.carddetail.di
 import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailViewModel
 import com.mmg.manahub.feature.trades.domain.usecase.UpdateWishlistEntryUseCase
+import androidx.lifecycle.SavedStateHandle
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -62,11 +63,15 @@ import org.koin.dsl.module
  */
 fun cardDetailKoinModule(): Module = module {
     // ── The Koin island: CardDetailViewModel is now resolved by Koin, not Hilt. ──
-    // Koin injects the SavedStateHandle (carrying the `scryfallId` nav arg) into the factory, so the
-    // nav-arg behaviour is identical to the previous Hilt resolution.
-    viewModel {
+    // Koin injects the SavedStateHandle (carrying the `scryfallId` nav arg) into the factory.
+    // We also support passing `scryfallId` as a parameter for overlay usage (Scanner, 2026-07-17).
+    viewModel { params ->
+        val savedStateHandle: SavedStateHandle = get()
+        params.getOrNull<String>()?.let { overrideId ->
+            savedStateHandle["scryfallId"] = overrideId
+        }
         CardDetailViewModel(
-            savedStateHandle = get(),
+            savedStateHandle = savedStateHandle,
             cardRepo = get(),
             userCardRepo = get(),
             deckRepo = get(),
@@ -79,6 +84,7 @@ fun cardDetailKoinModule(): Module = module {
             helper = get(),
             updateCollectionEntry = get(),
             updateWishlistEntry = get(),
+            refreshCardStrategyTags = get(),
         )
     }
 }

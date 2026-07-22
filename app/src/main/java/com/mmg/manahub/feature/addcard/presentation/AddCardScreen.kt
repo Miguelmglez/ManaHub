@@ -84,6 +84,9 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
@@ -94,6 +97,7 @@ import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -578,6 +582,8 @@ private fun SpotlightCardTile(
         AsyncImage(
             model = card.imageNormal,
             contentDescription = card.name,
+            placeholder = painterResource(Res.drawable.mtg_card_back),
+            error = painterResource(Res.drawable.mtg_card_back),
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
@@ -681,6 +687,8 @@ private fun SearchResultItem(
             AsyncImage(
                 model = card.imageNormal,
                 contentDescription = card.name,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(width = 44.dp, height = 60.dp)
@@ -762,72 +770,6 @@ private fun SearchResultItem(
                         style = ty.bodySmall,
                         color = mc.goldMtg,
                     )
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Search language bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun LanguageSelectorSheet(
-    selectedLanguage: String,
-    onDismiss: () -> Unit,
-    onSelectLanguage: (String) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = mc.background,
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.addcard_language_sheet_title),
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-                modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
-            )
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                items(CardConstants.languages, key = { it.first }) { (code, flag) ->
-                    val isSelected = code == selectedLanguage
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .clickable { onSelectLanguage(code) }
-                            .then(
-                                if (isSelected) Modifier.background(mc.primaryAccent.copy(alpha = 0.08f))
-                                else Modifier
-                            )
-                            .padding(horizontal = spacing.lg, vertical = spacing.md),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.md),
-                    ) {
-                        Text(text = flag, style = ty.titleLarge)
-                        Text(
-                            text = CardConstants.getLanguageName(code),
-                            style = ty.bodyMedium,
-                            color = if (isSelected) mc.primaryAccent else mc.textPrimary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = mc.primaryAccent,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
                 }
             }
         }

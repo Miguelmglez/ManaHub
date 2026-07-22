@@ -42,6 +42,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.collectLatest
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Types
@@ -90,12 +91,7 @@ fun MagicToastHost(
     var visible  by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
-        state.events.collect { msg ->
-            // If a toast is already visible, briefly hide it before showing the next one
-            if (visible) {
-                visible = false
-                delay(220)
-            }
+        state.events.collectLatest { msg ->
             current = msg
             visible = true
             delay(msg.durationMs)

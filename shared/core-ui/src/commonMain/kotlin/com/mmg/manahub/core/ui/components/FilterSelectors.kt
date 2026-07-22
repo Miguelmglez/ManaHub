@@ -14,11 +14,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -130,6 +133,134 @@ fun <T> ManaHubSelector(
                 )
                 if (index < items.size - 1) {
                     HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.3f))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A bottom sheet selector component following the ManaHub design system.
+ * Replaces DropdownMenu with a ModalBottomSheet for better mobile UX.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> ManaHubBottomSheetSelector(
+    icon: ImageVector,
+    label: String,
+    valueText: String,
+    items: List<T>,
+    selectedItem: T,
+    onSelect: (T) -> Unit,
+    itemLabel: @Composable (T) -> String,
+    modifier: Modifier = Modifier
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    var expanded by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        Surface(
+            onClick = { expanded = true },
+            color = mc.backgroundSecondary,
+            shape = MaterialTheme.shapes.medium,
+            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.md, vertical = spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = mc.primaryAccent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = label,
+                    style = ty.labelLarge,
+                    color = mc.textSecondary
+                )
+                
+                Spacer(modifier = Modifier.weight(1f))
+
+                Text(
+                    text = valueText,
+                    style = ty.labelLarge,
+                    color = mc.primaryAccent
+                )
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+
+    if (expanded) {
+        ModalBottomSheet(
+            onDismissRequest = { expanded = false },
+            sheetState = sheetState,
+            containerColor = mc.backgroundSecondary,
+            contentColor = mc.textPrimary
+        ) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = spacing.xl)
+            ) {
+                items(
+                    count = items.size,
+                    key = { index -> items[index].hashCode() }
+                ) { index ->
+                    val item = items[index]
+                    val isSelected = item == selectedItem
+                    
+                    Surface(
+                        onClick = {
+                            onSelect(item)
+                            expanded = false
+                        },
+                        color = androidx.compose.ui.graphics.Color.Transparent,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = spacing.lg, vertical = spacing.md),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = itemLabel(item),
+                                style = ty.titleMedium,
+                                color = if (isSelected) mc.primaryAccent else mc.textPrimary
+                            )
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = mc.primaryAccent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+                    
+                    if (index < items.size - 1) {
+                        HorizontalDivider(
+                            color = mc.surfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(horizontal = spacing.lg)
+                        )
+                    }
                 }
             }
         }

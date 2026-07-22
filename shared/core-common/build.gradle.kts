@@ -22,7 +22,7 @@ kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {
         namespace = "com.mmg.manahub.core.common"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 29
 
         // Enable a JVM host unit-test component so commonTest runs as an Android host test
@@ -35,6 +35,13 @@ kotlin {
     wasmJs {
         browser()
     }
+
+    // ── Plain JVM target (Deck Engine Unification plan, RUN 5 / D5) ──────────────────────────
+    // See :shared:core-model's build.gradle.kts for the full rationale. core-domain/core-data
+    // (which :tools:tag-pipeline actually needs) depend on this module via `implementation`, so
+    // the jvm() target must exist here too for Gradle's KMP dependency resolution to find a
+    // matching target across the whole project-dependency chain.
+    jvm()
 
     // JVM toolchain — match :app (JVM 17).
     jvmToolchain(17)
@@ -59,6 +66,14 @@ kotlin {
             }
         }
         wasmJsMain {
+            dependencies {}
+        }
+        // jvmMain intentionally has no code — no jvm-specific actual is needed by the pipeline
+        // (it only consumes pure commonMain types: Card, CardTag, TagDictionaryEntry, etc.).
+        // If a jvm actual for DispatcherProvider/KeyValueStore/CrashReporter is ever needed, add
+        // it here (java.util.concurrent-backed dispatcher, file-backed KeyValueStore, no-op
+        // CrashReporter) — the CLI does not need any of these today.
+        jvmMain {
             dependencies {}
         }
     }

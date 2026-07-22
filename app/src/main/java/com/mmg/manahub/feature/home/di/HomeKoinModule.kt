@@ -1,13 +1,10 @@
 package com.mmg.manahub.feature.home.di
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.data.remote.ArchidektClient
 import com.mmg.manahub.core.data.remote.CommunityStatsRemoteDataSource
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.data.repository.ArchidektTrendingRepositoryImpl
 import com.mmg.manahub.core.data.repository.CommunityStatsRepositoryImpl
 import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.domain.repository.ArchidektTrendingRepository
 import com.mmg.manahub.core.domain.repository.CommunityStatsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
@@ -19,6 +16,7 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.home.presentation.HomeViewModel
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -85,27 +83,17 @@ fun homeKoinModule(): Module = module {
     single { GetAccountNudgeUseCase() }
 
     // ── CommunityStatsRepository (Home feature overhaul Phase 1.2.b): real Supabase-RPC-backed
-    //    impl, replacing the old always-null CommunityStatsRepositoryStub. Single consumer (this
-    //    island) — no promotion to coreBridgeKoinModule needed. ──
+    //    impl. DORMANT since the Home widget board overhaul (TASK 5c) — Home no longer consumes
+    //    it (the old SOCIAL_HUB MostWishlisted/Milestones slides were dropped as low-value when
+    //    SOCIAL_HUB was split into FRIENDS + COMMUNITY_DECKS). Left registered rather than deleted
+    //    per this codebase's dormant-registration convention (see `project_dormant_budget_pool`
+    //    memory) in case a future surface wants the same community-stats backend. ──
     single { CommunityStatsRemoteDataSource(supabaseClient = get()) }
     single<CommunityStatsRepository> {
         CommunityStatsRepositoryImpl(
             remote = get(),
             cache = get(),
             crashReporter = get(),
-            now = { System.currentTimeMillis() },
-        )
-    }
-
-    // ── ArchidektTrendingRepository (Home feature overhaul Phase 1.2.c): reuses the existing
-    //    ArchidektClient (communityDecksKoinModule) and CommunityAggregateCache
-    //    (communityAggregateKoinModule) — no parallel network stack. ──
-    single<ArchidektTrendingRepository> {
-        ArchidektTrendingRepositoryImpl(
-            client = get<ArchidektClient>(),
-            cache = get(),
-            crashReporter = get(),
-            dispatcherProvider = get(),
             now = { System.currentTimeMillis() },
         )
     }
@@ -125,7 +113,6 @@ fun homeKoinModule(): Module = module {
             getNewsFeedUseCase = get(),
             refreshNewsFeedUseCase = get(),
             manageSourcesUseCase = get(),
-            communityStatsRepository = get(),
             draftRepository = get(),
             wishlistRepository = get(),
             getAccountNudgeUseCase = get(),
@@ -135,8 +122,10 @@ fun homeKoinModule(): Module = module {
             openForTradeRepository = get(),
             tradeSuggestionsRepository = get(),
             friendRepository = get(),
-            archidektTrendingRepository = get(),
             playtestRepository = get(),
+            // Home widget board overhaul, TASK 5b — from communityDecksKoinModule (loaded in the
+            // same ManaHubApp `modules(...)` call), no parallel data path.
+            searchCommunityDecksUseCase = get(),
             // Deck Doctor Community/Archetype plan, Phase 5 — from communityAggregateKoinModule
             // (loaded in the same ManaHubApp `modules(...)` call).
             communityAggregateRepository = get(),

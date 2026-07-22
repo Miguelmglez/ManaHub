@@ -2,6 +2,7 @@ package com.mmg.manahub.core.domain.repository
 
 import com.mmg.manahub.core.model.AppLanguage
 import com.mmg.manahub.core.model.CardLanguage
+import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.NewsLanguage
 import com.mmg.manahub.core.model.PreferredCurrency
@@ -21,6 +22,8 @@ interface UserPreferencesRepository {
     val lastPriceRefreshFlow: Flow<Long?>
     val userDefinedTagsFlow: Flow<List<UserDefinedTag>>
     val collectionViewModeFlow: Flow<CollectionViewMode>
+    /** Persisted "Group by" selection for the Collection "Cards" tab. Default: [CollectionGroupingMode.NONE]. */
+    val collectionGroupingModeFlow: Flow<CollectionGroupingMode>
 
     suspend fun setAppLanguage(language: AppLanguage)
     suspend fun setCardLanguage(language: CardLanguage)
@@ -30,4 +33,5 @@ interface UserPreferencesRepository {
     suspend fun saveUserDefinedTag(tag: UserDefinedTag)
     suspend fun deleteUserDefinedTag(key: String)
     suspend fun saveCollectionViewMode(mode: CollectionViewMode)
+    suspend fun saveCollectionGroupingMode(mode: CollectionGroupingMode)
 }

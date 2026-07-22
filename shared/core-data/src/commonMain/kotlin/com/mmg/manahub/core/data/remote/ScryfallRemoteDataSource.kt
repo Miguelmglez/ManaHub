@@ -160,11 +160,16 @@ class ScryfallRemoteDataSource(
         }
     }
 
-    suspend fun searchWithRawQuery(query: String): List<Card> =
+    /**
+     * @param order optional Scryfall `order` param. Null preserves the historic default (name-ASC).
+     *   MUST be part of the cache key (see below) -- otherwise a cached alphabetical result for a
+     *   query would silently be served back for a later `order = "edhrec"` request on the same query.
+     */
+    suspend fun searchWithRawQuery(query: String, order: String? = null): List<Card> =
         safeCall {
-            val cacheKey = "raw:${query.lowercase().trim()}"
+            val cacheKey = "raw:${query.lowercase().trim()}:${order ?: "name"}"
             cache.searches.getOrFetch(cacheKey) {
-                val cards = requestQueue.execute { api.searchCards(query, page = 1) }
+                val cards = requestQueue.execute { api.searchCards(query, order = order ?: "name", page = 1) }
                     .data.toDomain()
                 cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
                 cards

@@ -34,6 +34,13 @@ data class DeckEntity(
     // JSON array of theme enum-name strings (ThemeId.name), e.g. `["TRIBAL","ARISTOCRATS"]`.
     // Null/blank = no theme pin. At most 2 entries (enforced at the UI/use-case layer, not here).
     @ColumnInfo(name = "themes_override") val themesOverride: String? = null,
+    // ── Deck Engine Unification (v47) ────────────────────────────────────────
+    // Raw `tribe:<subtype>` key, nullable (no default pin). A SEPARATE column from
+    // archetype_override/themes_override -- see Deck.tribeOverride's KDoc for why.
+    @ColumnInfo(name = "tribe_override") val tribeOverride: String? = null,
+    // True for a wizard-built deck (D4 hard no-cut guarantee). Additive, defaults false so every
+    // pre-migration/manually-created deck is unaffected.
+    @ColumnInfo(name = "strategy_locked") val strategyLocked: Boolean = false,
 )
 
 /** Cross-reference: which cards belong to which deck (mainboard + sideboard). */
@@ -55,4 +62,8 @@ data class DeckCardEntity(
     @ColumnInfo(name = "scryfall_id") val scryfallId: String,
     @ColumnInfo(name = "quantity") val quantity: Int = 1,
     @ColumnInfo(name = "is_sideboard") val isSideboard: Boolean = false,
+    // Deck Engine Unification (v47, D4): raw DeckCardSource.name, default "USER" so every existing
+    // 3/4-arg construction (tests, sync pull, manual DAO calls not yet source-aware) keeps
+    // compiling and behaves exactly as before this column existed.
+    @ColumnInfo(name = "source") val source: String = "USER",
 )

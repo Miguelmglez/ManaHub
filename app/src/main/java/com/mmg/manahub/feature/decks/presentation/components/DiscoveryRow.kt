@@ -37,7 +37,9 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
+import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
 
 /** Height of the cluster-strength indicator bar track. */
 private val FitBarHeight = 6.dp
@@ -162,6 +164,87 @@ internal fun DiscoveryRow(
                     style = ty.labelLarge,
                     color = mc.primaryAccent,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Deck Builder v2 Phase 5 (plan §3.5) discovery row -- the [DeckDiscoveryV2] sibling of
+ * [DiscoveryRow], rendered instead of it when `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` is on.
+ * Adds a dominant-colors mana-pip row (D11's "Build this" hands the SAME colors to the wizard) and
+ * a real member count (never a bare cluster-size proxy — [DeckDiscoveryV2.memberCount] is the
+ * ALREADY color-coherent count, computed by [com.mmg.manahub.feature.decks.domain.template
+ * .DiscoverSynergiesV2UseCase]).
+ *
+ * @param onBuildThis hands off to the v2 wizard, pre-filled with this discovery's strategy/tribe
+ *   hint + dominant colors (D11) -- replaces [DiscoveryRow]'s seed-sheet handoff.
+ */
+@Composable
+internal fun DiscoveryRowV2(
+    discovery: DeckDiscoveryV2,
+    onCardClick: (String) -> Unit,
+    onBuildThis: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = mc.backgroundSecondary,
+        shape = CardShape,
+    ) {
+        Column(modifier = Modifier.padding(spacing.md)) {
+            CardName(name = discovery.label, style = ty.titleMedium, color = mc.textPrimary)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Text(
+                    text = stringResource(R.string.deck_studio_inspiration_fit, discovery.memberCount),
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
+                )
+                if (discovery.dominantColors.isNotEmpty()) {
+                    Spacer(Modifier.width(spacing.xs))
+                    // L1 (design review): xxs is exactly 2dp -- use the token, not the literal.
+                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.xxs)) {
+                        discovery.dominantColors.sortedBy { it.name }.forEach { color ->
+                            ManaSymbolImage(token = color.symbol, size = 14.dp)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(spacing.sm))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                items(discovery.members.take(6), key = { it.scryfallId }) { card ->
+                    Box(
+                        modifier = Modifier
+                            .heightIn(min = ArtTouchTarget)
+                            .clip(ChipShape)
+                            .clickable { onCardClick(card.scryfallId) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AsyncImage(
+                            model = card.imageArtCrop,
+                            contentDescription = stringResource(R.string.deck_studio_inspiration_card_art),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(width = ArtThumbWidth, height = ArtThumbHeight)
+                                .clip(ChipShape),
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(spacing.sm))
+            OutlinedButton(
+                onClick = onBuildThis,
+                modifier = Modifier.fillMaxWidth().heightIn(min = ArtTouchTarget),
+                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                shape = ButtonShape,
+            ) {
+                Text(text = stringResource(R.string.deck_wizard_build_this), style = ty.labelLarge, color = mc.primaryAccent)
             }
         }
     }

@@ -25,7 +25,7 @@ kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {
         namespace = "com.mmg.manahub.core.domain"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 29
 
         // Enable a JVM host unit-test component so commonTest runs as an Android host test
@@ -38,6 +38,11 @@ kotlin {
     wasmJs {
         browser()
     }
+
+    // ── Plain JVM target (Deck Engine Unification plan, RUN 5 / D5) ──────────────────────────
+    // See :shared:core-model's build.gradle.kts for the full rationale. This module hosts
+    // TribeDeriver/ArchetypeId/ThemeId — :tools:tag-pipeline needs them directly.
+    jvm()
 
     // JVM toolchain — match :app (JVM 17).
     jvmToolchain(17)
@@ -69,6 +74,11 @@ kotlin {
             dependencies {}
         }
         wasmJsMain {
+            dependencies {}
+        }
+        // jvmMain intentionally has no code — no jvm-specific actual is needed (see core-common's
+        // note; core-domain has zero expect/actual declarations of its own).
+        jvmMain {
             dependencies {}
         }
     }

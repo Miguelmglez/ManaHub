@@ -57,8 +57,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
+import com.mmg.manahub.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,7 +72,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.mmg.manahub.R
+
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -373,7 +376,7 @@ private fun DeckHeaderArea(
                     )
                 } else {
                     Image(
-                        painter = painterResource(R.drawable.mtg_card_back),
+                        painter = painterResource(Res.drawable.mtg_card_back),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

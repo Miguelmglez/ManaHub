@@ -29,7 +29,7 @@ kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {
         namespace = "com.mmg.manahub.core.data"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 29
 
         // Enable a JVM host unit-test component so commonTest runs as an Android host test
@@ -42,6 +42,11 @@ kotlin {
     wasmJs {
         browser()
     }
+
+    // ── Plain JVM target (Deck Engine Unification plan, RUN 5 / D5) ──────────────────────────
+    // See :shared:core-model's build.gradle.kts for the full rationale. This module hosts
+    // TagDictionary/StrategyAnalyzer/CardDto/CardDtoMapper — the pipeline's actual reuse target.
+    jvm()
 
     // JVM toolchain — match :app (JVM 17).
     jvmToolchain(17)
@@ -91,6 +96,13 @@ kotlin {
             dependencies {
                 // JS/Wasm engine for browser targets.
                 implementation(libs.ktor.client.js)
+            }
+        }
+        // Deck Engine Unification plan, RUN 5 / D5: CIO is a pure-Kotlin/JVM Ktor engine (no
+        // Android/OkHttp dependency), the right choice for a plain JVM CLI (:tools:tag-pipeline).
+        jvmMain {
+            dependencies {
+                implementation(libs.ktor.cio)
             }
         }
     }

@@ -18,10 +18,8 @@ import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.DeclineProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.EditProposalUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalOpenForTradeUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
-import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeThreadUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MarkCompletedUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradeThreadUseCase
@@ -134,8 +132,6 @@ fun tradesKoinModule(
     factory { MarkCompletedUseCase(get()) }
     factory { GetTradeThreadUseCase(get()) }
     factory { RefreshTradeThreadUseCase(get()) }
-    factory { GetActiveTradesUseCase(get()) }
-    factory { GetTradeHistoryUseCase(get()) }
     factory { RefreshTradesUseCase(get()) }
     factory {
         UpdateTradeCollectionUseCase(
@@ -202,8 +198,6 @@ fun tradesKoinModule(
             authRepository = get(),
             friendRepository = get(),
             tradesRepository = get(),
-            getActive = get(),
-            getHistory = get(),
             refreshTrades = get(),
             ioDispatcher = get(named("io")),
         )

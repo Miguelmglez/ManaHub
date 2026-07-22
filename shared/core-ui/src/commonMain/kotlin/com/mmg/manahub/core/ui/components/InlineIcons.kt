@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
  * Two overlapping rectangles representing stacked/multiple cards.
  * Replaces `Icons.Default.Style` which is unavailable on wasmJs.
  */
-internal val StackedCardsIcon: ImageVector by lazy {
+val StackedCardsIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "StackedCards",
         defaultWidth = 24.dp,
@@ -59,7 +59,7 @@ internal val StackedCardsIcon: ImageVector by lazy {
  * Hexagon shape representing the Alchemy card prefix icon.
  * Replaces `R.drawable.ic_alchemy` which is an Android resource.
  */
-internal val AlchemyIcon: ImageVector by lazy {
+val AlchemyIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Alchemy",
         defaultWidth = 24.dp,
@@ -83,7 +83,7 @@ internal val AlchemyIcon: ImageVector by lazy {
  * Shield shape with a slash through it, used for protection or counters.
  * Replaces `R.drawable.ic_counter` which is an Android resource.
  */
-internal val CounterIcon: ImageVector by lazy {
+val CounterIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Counter",
         defaultWidth = 54.dp,
@@ -126,7 +126,7 @@ val SetSymbolFallbackIcon: ImageVector get() = CounterIcon
  * Magnifying glass icon (Material "Search").
  * Replaces `Icons.Default.Search` which requires material-icons-core (no wasmJs artifact).
  */
-internal val SearchIcon: ImageVector by lazy {
+val SearchIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Search",
         defaultWidth = 24.dp,
@@ -166,7 +166,7 @@ internal val SearchIcon: ImageVector by lazy {
  * X mark icon (Material "Close" / "Clear").
  * Replaces `Icons.Default.Clear` which requires material-icons-core (no wasmJs artifact).
  */
-internal val ClearIcon: ImageVector by lazy {
+val ClearIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Clear",
         defaultWidth = 24.dp,
@@ -196,14 +196,14 @@ internal val ClearIcon: ImageVector by lazy {
  * Alias for [ClearIcon] — semantically "close a dialog/overlay".
  * Both [MagicToastCard] and [CardFullScreenDialog] reference this single vector.
  */
-internal val CloseIcon: ImageVector get() = ClearIcon
+val CloseIcon: ImageVector get() = ClearIcon
 
 /**
  * Right-pointing triangle (Material "PlayArrow").
  * Replaces `Icons.Default.PlayArrow` which requires material-icons-core (no wasmJs artifact).
  * Used as a video play overlay in [NewsItemCard].
  */
-internal val PlayArrowIcon: ImageVector by lazy {
+val PlayArrowIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "PlayArrow",
         defaultWidth = 24.dp,
@@ -224,7 +224,7 @@ internal val PlayArrowIcon: ImageVector by lazy {
  * Two curved arrows forming a cycle (Material "Sync" / "Loop").
  * Used as a card-flip icon. Replaces `Icons.Default.Flip` (no wasmJs artifact).
  */
-internal val FlipIcon: ImageVector by lazy {
+val FlipIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Flip",
         defaultWidth = 24.dp,

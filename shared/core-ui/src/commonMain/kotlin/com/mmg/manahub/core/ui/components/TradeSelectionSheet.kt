@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -284,10 +285,9 @@ private fun CopyRow(
                     )
 
                     // Language
-                    AttributeBadge(
-                        userCard.language.uppercase(),
-                        mc.textSecondary,
-                        mc.textSecondary.copy(alpha = 0.1f),
+                    Text(
+                        text = com.mmg.manahub.core.util.CardConstants.getFlag(userCard.language),
+                        style = ty.labelLarge.copy(fontSize = 14.sp)
                     )
 
                     // Condition

@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.home.presentation
 
 import androidx.annotation.StringRes
+import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.model.Friend
@@ -28,6 +29,14 @@ data class HomeUiState(
     val newsFiltersActive: Boolean = false,
     val accountNudge: AccountNudge? = null,
     val isAuthenticated: Boolean = false,
+    /**
+     * True once the FIRST real auth-session emission (Authenticated or Unauthenticated, never
+     * [com.mmg.manahub.core.domain.auth.SessionState.Loading]) has landed (Home widget board
+     * overhaul, TASK 7a). Account-gated widgets must render [isAuthenticated] as a definitive
+     * "signed out" state ONLY once this is true — otherwise a still-resolving session is
+     * mistaken for signed-out and the account-gated placeholder flashes before real content.
+     */
+    val authResolved: Boolean = false,
     /** User's display name from DataStore. */
     val playerName: String? = null,
     /** User avatar URL from DataStore; null while not set. */
@@ -62,35 +71,48 @@ data class HomeUiState(
     val discoverSet: com.mmg.manahub.core.model.MagicSet? = null,
     val latestSets: List<DraftSet> = emptyList(),
     val wishlistStats: WishlistStats? = null,
-    /** All of the user's decks, newest-first. Drives the Your Decks shelf widget. */
-    val decks: List<DeckSummary> = emptyList(),
+    /**
+     * All of the user's decks, newest-first. Drives the Your Decks shelf widget. Null until the
+     * first Room emission lands (Home widget board overhaul, TASK 7b) — distinguishes "still
+     * loading" from "the user genuinely has zero decks".
+     */
+    val decks: List<DeckSummary>? = null,
     /**
      * Newest-first collection additions for the RECENTLY_ADDED widget (Home feature overhaul
-     * Phase 2.1). Empty while loading or when the collection has no cards yet.
+     * Phase 2.1). Null until the first emission lands (TASK 7b); empty once loaded means the
+     * collection genuinely has no cards yet.
      */
-    val recentlyAdded: List<RecentlyAddedCard> = emptyList(),
+    val recentlyAdded: List<RecentlyAddedCard>? = null,
 
     // ── Phase 3 data slices ────────────────────────────────────────────────────
-    val communityStats: com.mmg.manahub.core.model.CommunityStats? = null,
     val tradeSummary: TradeSummary? = null,
-    /** Count of TradeSuggestionsRepository matches for the Trades Hub Suggestions slide. */
-    val tradeSuggestionsCount: Int = 0,
-    /** Count of the local Open-for-Trade list, for the Trades Hub Open-for-Trade slide. */
-    val openForTradeCount: Int = 0,
-    /** Estimated total value of the open-for-trade cards, currency-formatted, or null if 0/unknown. */
-    val openForTradeValueDisplay: String? = null,
+    /**
+     * Actual matched cards for the Trades Hub Suggestions section (Home widget board overhaul,
+     * TASK 4b — replaces the old count-only slide). Null while loading.
+     */
+    val tradeSuggestionPreviews: List<TradeSuggestionPreview>? = null,
+    /**
+     * Open-for-trade summary (count, estimated value, and a few card thumbnails) for the Trades
+     * Hub (TASK 4b). Null while loading.
+     */
+    val openForTradePreview: OpenForTradePreview? = null,
     val activeTournamentSummary: TournamentSummary? = null,
     /** Real accepted-friend count (Home feature overhaul Phase 1.2.d — replaces the old hardcoded 0). */
     val friendCount: Int = 0,
-    /** Newest pending friend request headline for the Social Hub friends slide, or null. */
+    /** Newest pending friend request headline for the Friends widget, or null. */
     val latestFriendRequestName: String? = null,
-    /** Up to 3 popular Commander decks fetched from Archidekt (Home feature overhaul Phase 1.2.c). */
-    val archidektTrending: List<com.mmg.manahub.core.model.ArchidektTrendingDeck> = emptyList(),
 
-    /** Up to 5 recent friends for the Social Hub slide. */
-    val friends: List<Friend> = emptyList(),
-    /** Up to 3 most recent trade proposals for the Trades Hub slide. */
-    val recentTrades: List<TradeProposal> = emptyList(),
+    /**
+     * Up to 5 recent friends for the FRIENDS widget (Home widget board overhaul, TASK 5a). Null
+     * until the first emission lands — distinguishes "still loading" from "the user genuinely has
+     * zero friends" (TASK 7b).
+     */
+    val friends: List<Friend>? = null,
+    /**
+     * Up to 3 most recent trade proposals for the Trades Hub. Null until the first emission
+     * lands (TASK 7b).
+     */
+    val recentTrades: List<TradeProposal>? = null,
 
     // ── Gamification (Phase 2) ──────────────────────────────────────────────────
     /** Master toggle. When false every gamification surface (widgets + hero suggestion) is hidden. */
@@ -245,11 +267,38 @@ data class WishlistStats(
  *
  * @param latestItemCount Item count of the newest pending proposal, rendered via
  *   `R.string.home_trade_inbox_preview` (a formatted template, not a VM-composed string) — null
- *   when there is no pending proposal.
+ *   when there is no pending proposal. [com.mmg.manahub.feature.home.presentation.HomeViewModel]
+ *   hydrates this via a bounded [com.mmg.manahub.core.data.repository.TradesRepository
+ *   .refreshProposalThread] fan-out (Home widget board overhaul, TASK 4a) — `refreshProposals`
+ *   alone only fetches proposal METADATA, never items, so this would otherwise always read 0.
  */
 data class TradeSummary(
     val pendingCount: Int,
     val latestItemCount: Int?,
+)
+
+/**
+ * A single matched-trade card preview for the Trades Hub Suggestions section (Home widget board
+ * overhaul, TASK 4b).
+ *
+ * @param card The matched card, resolved from the local cache for a thumbnail.
+ * @param counterpartyName The friend's nickname on the other side of the match, or null when it
+ *   could not be resolved locally (never omit the row for this reason — degrade the name instead).
+ */
+data class TradeSuggestionPreview(
+    val id: String,
+    val card: DiscoverCard,
+    val counterpartyName: String?,
+)
+
+/**
+ * Open-for-trade summary with real card thumbnails (Home widget board overhaul, TASK 4b —
+ * replaces the old count-only slide).
+ */
+data class OpenForTradePreview(
+    val count: Int,
+    val valueDisplay: String?,
+    val cards: List<DiscoverCard>,
 )
 
 /** Active-tournament summary for the tournament widget. */
@@ -323,3 +372,57 @@ data class AccountNudge(
 
 /** Simplified news wrapper removed in favor of rich NewsItem. */
 // data class NewsItem(val id: String, val title: String, val imageUrl: String?)
+
+/**
+ * Category filter for the Home COMMUNITY_DECKS widget (Home widget board overhaul, TASK 5b).
+ * Mirrors the Community Hub Discover tab's sort options
+ * ([com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksSearchViewModel.loadDiscover])
+ * with a scope narrow enough for a single [com.mmg.manahub.core.model.CommunityDeckSearchFilters]
+ * request per selection.
+ *
+ * @param persistedId Stable DataStore persistence key — never rename.
+ * @param titleRes Label shown in the category picker sheet.
+ * @param descriptionRes Brief summary of what this category surfaces.
+ * @param orderBy Archidekt `orderBy` query param value (see [com.mmg.manahub.core.model
+ *   .CommunityDeckSearchFilters.orderBy]).
+ * @param primersOnly When true, scopes to decks that have a written primer.
+ */
+enum class HomeCommunityDeckCategory(
+    val persistedId: String,
+    @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
+    val orderBy: String,
+    val primersOnly: Boolean = false,
+) {
+    POPULAR(
+        persistedId = "popular",
+        titleRes = R.string.home_community_decks_category_popular,
+        descriptionRes = R.string.home_community_decks_category_popular_desc,
+        orderBy = "-viewCount"
+    ),
+    RECENT(
+        persistedId = "recent",
+        titleRes = R.string.home_community_decks_category_recent,
+        descriptionRes = R.string.home_community_decks_category_recent_desc,
+        orderBy = "-createdAt"
+    ),
+    UPDATED(
+        persistedId = "updated",
+        titleRes = R.string.home_community_decks_category_updated,
+        descriptionRes = R.string.home_community_decks_category_updated_desc,
+        orderBy = "-updatedAt"
+    ),
+    PRIMERS(
+        persistedId = "primers",
+        titleRes = R.string.home_community_decks_category_primers,
+        descriptionRes = R.string.home_community_decks_category_primers_desc,
+        orderBy = "-viewCount",
+        primersOnly = true,
+    );
+
+    companion object {
+        /** Resolves a persisted id back to its category, defaulting to [POPULAR] when unset/unknown. */
+        fun fromPersistedId(id: String?): HomeCommunityDeckCategory =
+            entries.firstOrNull { it.persistedId == id } ?: POPULAR
+    }
+}

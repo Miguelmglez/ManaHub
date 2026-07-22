@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
@@ -11,9 +12,11 @@ import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
 import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -35,15 +38,12 @@ import org.junit.Test
  * Covers:
  * - Initial default state
  * - NoCard result: state unchanged
- * - Stability buffer — normal path: requires [STABILITY_FRAMES]=3 consecutive identical
- *   matches when similarity < [HIGH_CONFIDENCE_SIMILARITY] (0.90)
- * - Stability buffer — high-confidence path: a single frame with similarity ≥ 0.90
- *   immediately confirms the card ([HIGH_CONFIDENCE_FRAMES]=1)
+ * - Stability buffer — normal path: a single frame with similarity ≥ 1.0 (exact name OCR)
+ *   confirms the card ([HIGH_CONFIDENCE_FRAMES]=1)
  * - Anti-duplicate guard: same card within 800 ms is blocked
  * - Set lock filter: mismatched setCode is rejected before stability
- * - Language mismatch: Quick Mode + language != "en" sets languageMismatch flag
- * - Lookup Only mode: card shown in bar, never added to session
- * - Ambiguity selector: ambiguous + normal mode → showAmbiguitySelector=true
+ * - Language mismatch: language != "en" sets languageMismatch flag
+ * - Ambiguity selector: ambiguous → showAmbiguitySelector=true
  * - UI toggle actions: flash, queue sheet, sound
  *
  * NOTE: [SoundManager] and [AnalyticsHelper] are relaxed mocks — their side-effects
@@ -65,6 +65,7 @@ class ScannerViewModelTest {
     // ── Mocks ──────────────────────────────────────────────────────────────────
 
     private val cardRepository: CardRepository = mockk(relaxed = true)
+    private val userCardRepository: UserCardRepository = mockk(relaxed = true)
     private val commitScannedCards: CommitScannedCardsUseCase = mockk(relaxed = true)
     private val addToWishlist: AddToWishlistUseCase = mockk()
     private val analyticsHelper: AnalyticsHelper = mockk(relaxed = true)
@@ -111,8 +112,13 @@ class ScannerViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // Empty collection by default: the "already in collection" badge collector (init block)
+        // needs a real Flow — a relaxed mock alone would return Unit for `collect` without ever
+        // touching FlowCollector, which happens to be harmless here but this stub keeps intent explicit.
+        every { userCardRepository.observeCollection() } returns emptyFlow()
         viewModel = ScannerViewModel(
             cardRepository = cardRepository,
+            userCardRepository = userCardRepository,
             commitScannedCards = commitScannedCards,
             addToWishlist = addToWishlist,
             analyticsHelper = analyticsHelper,
@@ -153,10 +159,7 @@ class ScannerViewModelTest {
         assertFalse(state.showAmbiguitySelector)
         assertFalse(state.languageMismatch)
         assertNull(state.lockedSetCode)
-        assertTrue(state.isQuickMode)          // Quick Mode ON by default
-        assertFalse(state.isLookupOnly)
         assertFalse(state.showQueueSheet)
-        assertFalse(state.showSettingsSheet)
         assertNull(state.toastMessage)
         assertTrue(state.isSoundEnabled)
         assertTrue(state.hasFlash)             // defaults to true until hardware confirms
@@ -180,45 +183,19 @@ class ScannerViewModelTest {
         assertNull(stateAfter.detectedCorners)
         assertFalse(stateAfter.isSearching)
         assertFalse(stateAfter.languageMismatch)
-        // Session and mode flags must not change
+        // Session and flags must not change
         assertEquals(stateBefore.scanSession, stateAfter.scanSession)
-        assertEquals(stateBefore.isQuickMode, stateAfter.isQuickMode)
-        assertEquals(stateBefore.isLookupOnly, stateAfter.isLookupOnly)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 3 — Stability buffer (Quick Mode)
+    //  GROUP 3 — Stability buffer
     // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun onRecognitionResult_stabilityBuffer_requiresThreeConsecutive_forBorderlineMatch() = runTest {
-        // Arrange — Quick Mode ON, similarity=0.85 (below high-confidence 0.90) → needs 3 frames
-        // Act — only 2 frames at borderline similarity: should NOT confirm yet
-        repeatIdentified(2, identified(similarity = 0.85f))
-        advanceUntilIdle()
-
-        // Assert — card not yet added after 2 frames
-        assertTrue(
-            "Session should still be empty after only 2 frames at borderline similarity",
-            viewModel.uiState.value.scanSession.cards.isEmpty(),
-        )
-
-        // Act — 3rd frame: should confirm and add
-        viewModel.onRecognitionResult(identified(similarity = 0.85f))
-        advanceUntilIdle()
-
-        // Assert — card added after 3rd consecutive frame
-        assertFalse(
-            "Session should contain the card after 3 consecutive borderline frames",
-            viewModel.uiState.value.scanSession.cards.isEmpty(),
-        )
-    }
 
     @Test
     fun onRecognitionResult_stabilityBuffer_confirmsImmediately_forHighConfidenceMatch() = runTest {
-        // Arrange — Quick Mode ON, similarity=0.95 (above high-confidence 0.90) → needs 1 frame
+        // Arrange — similarity=1.0 (exact OCR match) → needs 1 frame
         // Act — single frame with high-confidence similarity
-        viewModel.onRecognitionResult(identified(similarity = 0.95f))
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
         // Assert — card confirmed and added after just 1 frame
@@ -230,10 +207,10 @@ class ScannerViewModelTest {
     }
 
     @Test
-    fun onRecognitionResult_identified_quickMode_addsToSession() = runTest {
+    fun onRecognitionResult_identified_addsToSession() = runTest {
         // Arrange
-        // Act — 3 consecutive borderline frames to satisfy the full stability buffer
-        repeatIdentified(3, identified(similarity = 0.85f))
+        // Act — satisfy the stability buffer (1 frame for exact name OCR)
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
         // Assert — card appears in session
@@ -249,16 +226,14 @@ class ScannerViewModelTest {
     @Test
     fun onRecognitionResult_antiDuplicate_blocksWithin800ms() = runTest {
         // Arrange
-        // Act — first successful add (3 frames)
-        repeatIdentified(3)
+        // Act — first successful add
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
         val countAfterFirst = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
 
         // Act — immediately try to add the same card again (within 800 ms window)
-        // The anti-duplicate guard clears recentMatches and returns early.
-        // We need 3 new frames but the guard fires on the first one.
-        viewModel.onRecognitionResult(identified())
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
         val countAfterSecond = viewModel.uiState.value.scanSession.cards.sumOf { it.quantity }
@@ -280,8 +255,8 @@ class ScannerViewModelTest {
         // Arrange — lock to a different set than the card's setCode ("lea")
         viewModel.onSetLockSelected("khm")
 
-        // Act — 3 frames with a card from set "lea" but lock is "khm"
-        repeatIdentified(3)
+        // Act — card from set "lea" but lock is "khm"
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
         // Assert — card rejected by set lock; session empty
@@ -297,7 +272,7 @@ class ScannerViewModelTest {
         viewModel.onSetLockSelected("lea")
 
         // Act
-        repeatIdentified(3)
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
         // Assert — card passes the lock filter and is added
@@ -308,80 +283,47 @@ class ScannerViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — Language mismatch (Quick Mode)
+    //  GROUP 6 — Language mismatch
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun onRecognitionResult_languageMismatch_quickMode_setsFlag() = runTest {
-        // Arrange — Quick Mode ON, selectedLanguage = "ja", card.lang = "en"
+    fun onRecognitionResult_languageMismatch_setsFlag() = runTest {
+        // Arrange — selectedLanguage = "ja", card.lang = "en"
         // The language filter only triggers when selectedLanguage != "en"
         viewModel.onLanguageSelected("ja")
 
-        // Act — 3 frames to satisfy stability buffer
-        repeatIdentified(3)
+        // Act
+        viewModel.onRecognitionResult(identified(similarity = 1.0f))
         advanceUntilIdle()
 
         // Assert — languageMismatch is true; card was NOT auto-added
         val state = viewModel.uiState.value
         assertTrue(
-            "Language mismatch flag should be set when card.lang != selectedLanguage in Quick Mode",
+            "Language mismatch flag should be set when card.lang != selectedLanguage",
             state.languageMismatch,
         )
         // Card is shown in bottom bar (lastDetectedCard set) but session is empty
         assertNotNull(state.lastDetectedCard)
         assertTrue(
-            "Session should be empty when language mismatch in Quick Mode",
+            "Session should be empty when language mismatch",
             state.scanSession.cards.isEmpty(),
         )
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 7 — Lookup Only mode
+    //  GROUP 7 — Ambiguity selector
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun onRecognitionResult_lookupOnly_setsLastDetectedCard() = runTest {
-        // Arrange — enable Lookup Only (disables both Quick Mode auto-add and manual add)
-        viewModel.onToggleLookupOnly()  // isLookupOnly = true
-        // Also turn off Quick Mode to isolate Lookup Only behaviour
-        viewModel.onToggleQuickMode()   // isQuickMode = false
-
-        // Act — 3 frames to confirm card
-        repeatIdentified(3)
-        advanceUntilIdle()
-
-        // Assert — card shown in bottom bar but NOT added to session
-        val state = viewModel.uiState.value
-        assertNotNull(
-            "Lookup Only: lastDetectedCard should be set",
-            state.lastDetectedCard,
-        )
-        assertTrue(
-            "Lookup Only: session must remain empty — card is never added",
-            state.scanSession.cards.isEmpty(),
-        )
-        assertFalse(
-            "Lookup Only: languageMismatch should be cleared in this mode",
-            state.languageMismatch,
-        )
-    }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 8 — Ambiguity selector (normal mode)
-    // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun onRecognitionResult_ambiguous_normalMode_showsSelector() = runTest {
-        // Arrange — disable Quick Mode and Lookup Only to enter normal mode
-        viewModel.onToggleQuickMode()   // isQuickMode = false; isLookupOnly already false
-
-        // Act — 3 frames with ambiguous=true
-        repeatIdentified(3, result = identified(ambiguous = true))
+    fun onRecognitionResult_ambiguous_showsSelector() = runTest {
+        // Arrange
+        // Act — ambiguous=true
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, ambiguous = true))
         advanceUntilIdle()
 
         // Assert — inline ambiguity selector is triggered
         assertTrue(
-            "Ambiguous card in normal mode should set showAmbiguitySelector=true",
+            "Ambiguous card should set showAmbiguitySelector=true",
             viewModel.uiState.value.showAmbiguitySelector,
         )
         // Card is set in bottom bar but session remains empty (user must confirm)
@@ -392,8 +334,7 @@ class ScannerViewModelTest {
     @Test
     fun onDismissAmbiguitySelector_clearsSelectorAndCard() = runTest {
         // Arrange — reach ambiguity state
-        viewModel.onToggleQuickMode()
-        repeatIdentified(3, result = identified(ambiguous = true))
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, ambiguous = true))
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.showAmbiguitySelector)
 

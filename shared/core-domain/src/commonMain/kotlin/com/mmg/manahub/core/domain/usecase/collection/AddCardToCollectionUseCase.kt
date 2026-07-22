@@ -6,6 +6,7 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import com.mmg.manahub.core.model.Card
 import kotlinx.datetime.Clock
 
 /**
@@ -49,6 +50,7 @@ class AddCardToCollectionUseCase(
     ): DataResult<Unit> {
         val cardResult = cardRepository.getCardById(scryfallId)
         if (cardResult is DataResult.Error) return DataResult.Error(cardResult.message)
+        warmEnglishSiblingIfForeign((cardResult as DataResult.Success).data)
         val outcome = userCardRepository.addOrIncrement(
             scryfallId       = scryfallId,
             isFoil           = isFoil,
@@ -88,6 +90,7 @@ class AddCardToCollectionUseCase(
     ): DataResult<AddOutcome> {
         val cardResult = cardRepository.getCardById(scryfallId)
         if (cardResult is DataResult.Error) return DataResult.Error(cardResult.message)
+        warmEnglishSiblingIfForeign((cardResult as DataResult.Success).data)
         val outcome = userCardRepository.addOrIncrement(
             scryfallId  = scryfallId,
             isFoil      = isFoil,
@@ -98,5 +101,19 @@ class AddCardToCollectionUseCase(
             quantity    = quantity,
         )
         return DataResult.Success(outcome)
+    }
+
+    /**
+     * Broken-image fix (2026-07-17). Non-English Scryfall printings frequently have no native
+     * image — the English printing of the SAME set + collector number always shares the same
+     * illustration and is guaranteed to have one. Best-effort warm the English sibling into Room
+     * so [com.mmg.manahub.core.domain.repository.CardRepository.getCachedEnglishSiblings] can
+     * resolve it later for collection-list image rendering (Room-only, no network there). Pure
+     * enrichment: any failure (network, 404, rate limit) is swallowed and must never fail the
+     * surrounding add.
+     */
+    private suspend fun warmEnglishSiblingIfForeign(card: Card) {
+        if (card.lang == "en") return
+        runCatching { cardRepository.getCardBySetAndNumber(card.setCode, card.collectorNumber) }
     }
 }
