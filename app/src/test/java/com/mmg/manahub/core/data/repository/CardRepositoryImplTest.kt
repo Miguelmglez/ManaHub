@@ -5,19 +5,25 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.usecase.card.ComputeCardTagsUseCase
+import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
-import com.mmg.manahub.core.tagging.createStrategyAnalyzer
 import com.mmg.manahub.util.TestFixtures
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -42,8 +48,13 @@ class CardRepositoryImplTest {
     private val remote    = mockk<ScryfallRemoteDataSource>()
     private val userPrefs = mockk<UserPreferencesDataStore>()
 
-    // Pure use-cases — construct real instances to avoid fragile mock setup.
-    private val computeCardTags = ComputeCardTagsUseCase(SuggestTagsUseCase(createStrategyAnalyzer()))
+    // Deck Engine Unification plan, D8, §5 Phase 5c: tag resolution moved to a background job
+    // (see scheduleTagResolution/scheduleTagResolutionBatch) that this repository no longer builds
+    // itself — relaxed so every existing test (none of which asserts on tag CONTENT) keeps working
+    // without stubbing this on every call; a relaxed suspend call returns an empty-list Result and
+    // never throws, so the background job's `.onFailure { recordSafeNonFatal(...) }` path (which
+    // would hit the real, unmocked FirebaseCrashlytics in a JVM unit test) is never exercised here.
+    private val resolveCardStrategyTags = mockk<ResolveCardStrategyTagsUseCase>(relaxed = true)
 
     private lateinit var repository: CardRepositoryImpl
 
@@ -51,6 +62,13 @@ class CardRepositoryImplTest {
 
     @Before
     fun setUp() {
+        // The background tag-resolution job's .onFailure branch (scheduleTagResolution/
+        // scheduleTagResolutionBatch) calls recordSafeNonFatal, which hits the real
+        // FirebaseCrashlytics.getInstance() outside a runCatching the test can't otherwise reach —
+        // per feedback_crashlytics_helper_top_level_functions, mock it statically for every test.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+
         val testDispatcher = UnconfinedTestDispatcher()
 
         // DataStore flows used inside the repository's tag-computation path.
@@ -61,11 +79,19 @@ class CardRepositoryImplTest {
             cardDao               = cardDao,
             userCardCollectionDao = userCardCollectionDao,
             remote                = remote,
-            computeCardTags       = computeCardTags,
+            resolveCardStrategyTags = resolveCardStrategyTags,
             userPrefs             = userPrefs,
             ioDispatcher          = testDispatcher,
             defaultDispatcher     = testDispatcher,
+            // Unconfined so the background enrichment job runs deterministically within runTest,
+            // same rationale as ioDispatcher/defaultDispatcher above.
+            appScope              = CoroutineScope(testDispatcher),
         )
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -382,6 +408,117 @@ class CardRepositoryImplTest {
                 priceEur     = null,
                 priceEurFoil = null,
                 updatedAt    = 987654321L,
+            )
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Broken-image fix (2026-07-17): getCachedEnglishSiblings (Room-only, no network)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given cached English row matching set and collector number when getCachedEnglishSiblings then it is returned keyed by the pair`() = runTest {
+        val englishEntity = TestFixtures.buildCardEntity(scryfallId = "en-001")
+            .copy(setCode = "lea", collectorNumber = "5", lang = "en")
+        coEvery { cardDao.getEnglishSiblings(listOf("lea"), listOf("5")) } returns listOf(englishEntity)
+
+        val result = repository.getCachedEnglishSiblings(setOf("lea" to "5"))
+
+        assertEquals(1, result.size)
+        assertEquals("en-001", result["lea" to "5"]?.scryfallId)
+    }
+
+    @Test
+    fun `given DAO cross-product returns a non-matching pair when getCachedEnglishSiblings then it is filtered out`() = runTest {
+        // Room has no tuple-IN support: the DAO query is a cross product of the two IN lists.
+        // A row that matches set OR number but not the exact pair must not leak into the result.
+        val wrongPairEntity = TestFixtures.buildCardEntity(scryfallId = "en-wrong")
+            .copy(setCode = "lea", collectorNumber = "999", lang = "en")
+        coEvery { cardDao.getEnglishSiblings(listOf("lea"), listOf("5")) } returns listOf(wrongPairEntity)
+
+        val result = repository.getCachedEnglishSiblings(setOf("lea" to "5"))
+
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `given empty pairs when getCachedEnglishSiblings then DAO is never queried and result is empty`() = runTest {
+        val result = repository.getCachedEnglishSiblings(emptySet())
+
+        assertTrue(result.isEmpty())
+        coVerify(exactly = 0) { cardDao.getEnglishSiblings(any(), any()) }
+    }
+
+    @Test
+    fun `given no cached English row for a pair when getCachedEnglishSiblings then that pair is simply absent`() = runTest {
+        coEvery { cardDao.getEnglishSiblings(listOf("lea"), listOf("5")) } returns emptyList()
+
+        val result = repository.getCachedEnglishSiblings(setOf("lea" to "5"))
+
+        assertTrue(result.isEmpty())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Deck Engine Unification plan, D8, §5 Phase 5c: non-blocking tag resolution
+    //  (card add / search / detail hot paths must not wait on Supabase/on-device tag analysis)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a failing resolveCardStrategyTags when getCardById caches a new card then the fetch still succeeds`() = runTest {
+        // The background enrichment job's own failure must never surface as a fetch failure —
+        // this is the "add must not fail if tag analysis fails" half of the D8 requirement.
+        // fetchAndCacheFromRemote reads cardDao.getById TWICE (the initial cache check, then a
+        // final re-read of the just-upserted row) — returnsMany mirrors the pre-existing
+        // "given expired cache..." test's precedent for this exact two-call shape.
+        coEvery { cardDao.getById("id-001") } returnsMany listOf(null, TestFixtures.buildFreshCardEntity("id-001"))
+        coEvery { remote.getCardById("id-001") } returns Result.success(TestFixtures.buildCard("id-001"))
+        coEvery { cardDao.upsert(any()) } returns Unit
+        coEvery { cardDao.clearStale(any()) } returns Unit
+        coEvery {
+            resolveCardStrategyTags(any(), any(), any(), any())
+        } throws RuntimeException("strategy tags unavailable")
+
+        val result = repository.getCardById("id-001")
+
+        assertTrue(result is DataResult.Success)
+    }
+
+    @Test
+    fun `given getCardById caches a new card then upsert happens WITHOUT waiting on resolveCardStrategyTags`() = runTest {
+        // A card add resolves via getCardById immediately on the cache write — tag resolution is
+        // scheduled afterward on a separate background job, not awaited inline.
+        coEvery { cardDao.getById("id-001") } returnsMany listOf(null, TestFixtures.buildFreshCardEntity("id-001"))
+        coEvery { remote.getCardById("id-001") } returns Result.success(TestFixtures.buildCard("id-001"))
+        coEvery { cardDao.upsert(any()) } returns Unit
+        coEvery { cardDao.clearStale(any()) } returns Unit
+
+        repository.getCardById("id-001")
+
+        // The first upsert() writes preserved (pre-analysis) tags — never blocked by
+        // resolveCardStrategyTags — and the background job runs the resolution afterward.
+        coVerify(exactly = 1) { cardDao.upsert(any()) }
+        coVerify(exactly = 1) { resolveCardStrategyTags(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given resolveCardStrategyTags returns confirmed tags when getCardById caches a new card then the background job persists them`() = runTest {
+        coEvery { cardDao.getById("id-001") } returnsMany listOf(null, TestFixtures.buildFreshCardEntity("id-001"))
+        coEvery { remote.getCardById("id-001") } returns Result.success(TestFixtures.buildCard("id-001"))
+        coEvery { cardDao.upsert(any()) } returns Unit
+        coEvery { cardDao.clearStale(any()) } returns Unit
+        val resolvedResult = ComputeCardTagsUseCase.Result(
+            confirmedTags = listOf(CardTag.REMOVAL),
+            suggestedTags = emptyList(),
+        )
+        coEvery { resolveCardStrategyTags(any(), any(), any(), any()) } returns resolvedResult
+
+        repository.getCardById("id-001")
+
+        coVerify(exactly = 1) {
+            cardDao.updateTagsAndSuggestions(
+                scryfallId = "id-001",
+                tagsJson = any(),
+                suggestedJson = any(),
             )
         }
     }

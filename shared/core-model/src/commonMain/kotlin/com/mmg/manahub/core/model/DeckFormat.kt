@@ -15,7 +15,7 @@ enum class DeckFormat(
     val requiresCommander: Boolean,
     val uniqueCards: Boolean,
 ) {
-    /*STANDARD(
+    STANDARD(
         displayName       = "Standard",
         targetDeckSize    = 60,
         targetLandCount   = 24,
@@ -26,48 +26,48 @@ enum class DeckFormat(
     // 60-card non-rotating constructed formats (Deck Doctor Phase 4, D1). Same deck shape
     // as Standard but each filters against its OWN Scryfall legality (see DeckScorer.isLegal)
     // and uses a tighter skeleton/curve (DeckSkeletons.forFormat).
-      PIONEER(
-          displayName       = "Pioneer",
-          targetDeckSize    = 60,
-          targetLandCount   = 24,
-          maxCopies         = 4,
-          requiresCommander = false,
-          uniqueCards       = false,
-      ),
-      MODERN(
-          displayName       = "Modern",
-          targetDeckSize    = 60,
-          targetLandCount   = 24,
-          maxCopies         = 4,
-          requiresCommander = false,
-          uniqueCards       = false,
-      ),
-      LEGACY(
-          displayName       = "Legacy",
-          targetDeckSize    = 60,
-          targetLandCount   = 24,
-          maxCopies         = 4,
-          requiresCommander = false,
-          uniqueCards       = false,
-      ),
-      VINTAGE(
-          displayName       = "Vintage",
-          targetDeckSize    = 60,
-          targetLandCount   = 24,
-          maxCopies         = 4,
-          requiresCommander = false,
-          uniqueCards       = false,
-      ),
-      // Pauper: 60-card, commons-only. Slightly higher land count (the format runs leaner curves
-      // and wants consistent mana). Filtered by legal:pauper.
-      PAUPER(
-          displayName       = "Pauper",
-          targetDeckSize    = 60,
-          targetLandCount   = 23,
-          maxCopies         = 4,
-          requiresCommander = false,
-          uniqueCards       = false,
-      ),*/
+    PIONEER(
+        displayName       = "Pioneer",
+        targetDeckSize    = 60,
+        targetLandCount   = 24,
+        maxCopies         = 4,
+        requiresCommander = false,
+        uniqueCards       = false,
+    ),
+    MODERN(
+        displayName       = "Modern",
+        targetDeckSize    = 60,
+        targetLandCount   = 24,
+        maxCopies         = 4,
+        requiresCommander = false,
+        uniqueCards       = false,
+    ),
+    LEGACY(
+        displayName       = "Legacy",
+        targetDeckSize    = 60,
+        targetLandCount   = 24,
+        maxCopies         = 4,
+        requiresCommander = false,
+        uniqueCards       = false,
+    ),
+    VINTAGE(
+        displayName       = "Vintage",
+        targetDeckSize    = 60,
+        targetLandCount   = 24,
+        maxCopies         = 4,
+        requiresCommander = false,
+        uniqueCards       = false,
+    ),
+    // Pauper: 60-card, commons-only. Slightly higher land count (the format runs leaner curves
+    // and wants consistent mana). Filtered by legal:pauper.
+    PAUPER(
+        displayName       = "Pauper",
+        targetDeckSize    = 60,
+        targetLandCount   = 23,
+        maxCopies         = 4,
+        requiresCommander = false,
+        uniqueCards       = false,
+    ),
     COMMANDER(
         displayName       = "Commander",
         targetDeckSize    = 100,
@@ -102,5 +102,6 @@ enum class DeckFormat(
      * special-cased separately.
      */
     val isSixtyCardConstructed: Boolean
-        get() = this == CASUAL
+        get() = this == STANDARD || this == PIONEER || this == MODERN || this == LEGACY ||
+            this == VINTAGE || this == PAUPER || this == CASUAL
 }

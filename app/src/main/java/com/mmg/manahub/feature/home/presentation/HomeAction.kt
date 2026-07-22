@@ -23,6 +23,18 @@ sealed interface HomeAction {
     object OpenFriends : HomeAction
     object OpenTrades : HomeAction
     object OpenCommunityDecks : HomeAction
+
+    /**
+     * Opens a specific community deck's detail NATIVELY (Home widget board overhaul, TASK 5b/5c) —
+     * replaces the old behaviour of opening an Archidekt deck URL in the system browser.
+     */
+    data class OpenCommunityDeck(val archidektId: Int) : HomeAction
+
+    /**
+     * Switches the Home COMMUNITY_DECKS widget's category and persists the choice (Home widget
+     * board overhaul, TASK 5b). Handled in [HomeViewModel].
+     */
+    data class SelectCommunityDecksCategory(val category: HomeCommunityDeckCategory) : HomeAction
     object OpenTournaments : HomeAction
     object OpenSettings : HomeAction
     object OpenProfile : HomeAction
@@ -99,7 +111,7 @@ sealed interface HomeAction {
 
     /** Opens the Profile screen on the Quests tab (gamification Phase 2). */
     object OpenProfileQuests : HomeAction
-    data class OpenCardDetail(val scryfallId: String) : HomeAction
+    data class OpenCardDetail(val scryfallId: String, val sharedTransitionKey: String? = null) : HomeAction
     data class OpenDeck(val deckId: String) : HomeAction
 
     /** Open a specific news article or video URL in the system browser. */

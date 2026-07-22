@@ -22,6 +22,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -78,6 +81,8 @@ fun MagicCard(
         AsyncImage(
             model = card.imageNormal,
             contentDescription = card.name,
+            placeholder = painterResource(Res.drawable.mtg_card_back),
+            error = painterResource(Res.drawable.mtg_card_back),
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )

@@ -19,6 +19,9 @@ import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
+import com.mmg.manahub.core.data.local.dao.ComboCacheDao
+import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
+import com.mmg.manahub.core.di.cardStrategyTagsKoinModule
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
@@ -75,6 +78,7 @@ import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
 import com.mmg.manahub.feature.collection.di.collectionKoinModule
 import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
 import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
+import com.mmg.manahub.feature.decks.di.commanderSpellbookKoinModule
 import com.mmg.manahub.feature.decks.di.communityAggregateKoinModule
 import com.mmg.manahub.feature.decks.di.decksKoinModule
 import com.mmg.manahub.feature.draft.di.draftKoinModule
@@ -243,6 +247,16 @@ class ManaHubApp : Application(), KoinComponent {
     // Unrelated to communityDeckCacheDao above (that's the Archidekt browse/import cache; this is
     // the EDHREC/Archidekt suggestion-aggregate cache). No consumer UI yet — wired ahead of Motor B.
     @Inject lateinit var communityAggregateDao: CommunityAggregateDao
+
+    // Commander Spellbook combo cache (Deck Engine Unification plan D7, Phase 4.3 — synergy
+    // browser Combos tab) bridge dep. Unrelated to communityAggregateDao above.
+    @Inject lateinit var comboCacheDao: ComboCacheDao
+
+    // Card strategy tags cache (offline tag pipeline precomputed tags) — Deck Engine Unification
+    // plan D8, Phase 5c. Serves cardStrategyTagsKoinModule (CardDetailViewModel's read point); the
+    // eager-Hilt CardRepositoryImpl gets its OWN CardStrategyTagsRepository instance via a residual
+    // SharedDomainUseCaseModule provider (same DAO singleton, see that provider's KDoc for why).
+    @Inject lateinit var cardStrategyTagsCacheDao: CardStrategyTagsCacheDao
 
     // CardDetail island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
     //  - AnalyticsHelper is now bridged in coreBridgeKoinModule (promoted from Settings; shared with it).
@@ -439,6 +453,12 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 communityAggregateKoinModule(
                     cacheDao = communityAggregateDao,
+                ),
+                commanderSpellbookKoinModule(
+                    cacheDao = comboCacheDao,
+                ),
+                cardStrategyTagsKoinModule(
+                    cacheDao = cardStrategyTagsCacheDao,
                 ),
                 cardDetailKoinModule(),
                 friendsKoinModule(

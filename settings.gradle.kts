@@ -41,3 +41,7 @@ include(":shared:core-data")
 // Spacing, Shapes, Material 3 bridge). Uses CMP compose plugin. Typography stays in :app
 // until font loading is abstracted via the CMP resource system.
 include(":shared:core-ui")
+// Deck Engine Unification plan — RUN 5 / D5: plain Kotlin/JVM CLI that bulk-computes strategy
+// tags/tribes/theme+archetype affinities by reusing the shared modules' jvm() targets (never :app —
+// Gradle disallows depending on an Android application project).
+include(":tools:tag-pipeline")

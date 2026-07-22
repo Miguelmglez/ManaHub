@@ -57,7 +57,7 @@ class TradesRepositoryImpl(
         val proposalsResult = remote.fetchProposals(userId)
         if (proposalsResult.isFailure) return Result.failure(proposalsResult.exceptionOrNull()!!)
 
-        val dtos = proposalsResult.getOrThrow()
+        val dtos = proposalsResult.getOrThrow().distinctBy { it.id }
         // The existing-items merge is computed INSIDE the update lambda so a concurrent
         // refreshProposalThread() call can't interleave a read-then-write and silently drop
         // the other call's freshly-fetched items (trades audit §2.8, 2026-07-10).
@@ -74,7 +74,7 @@ class TradesRepositoryImpl(
         val proposalsResult = remote.fetchProposals(userId)
         if (proposalsResult.isFailure) return Result.failure(proposalsResult.exceptionOrNull()!!)
 
-        val dtos = proposalsResult.getOrThrow()
+        val dtos = proposalsResult.getOrThrow().distinctBy { it.id }
 
         // Fetch items for every proposal in this thread CONCURRENTLY. Network/DB calls stay
         // OUTSIDE the cache.update lambda below (its lambda must be pure/fast —

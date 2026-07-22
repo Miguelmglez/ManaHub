@@ -122,7 +122,7 @@ class CandidatePoolGenerator(
                 roleFragment = plan.primary,
                 budgetFragment = budgetFragment,
             )
-            val primaryResult = runCatching { cardRepository.searchWithRawQuery(primaryQuery) }
+            val primaryResult = runCatching { cardRepository.searchWithRawQuery(primaryQuery, order = "edhrec") }
             val primaryCards = primaryResult.getOrDefault(emptyList())
 
             // E2 fallback: when the otag query ERRORS or returns EMPTY, retry with the legacy
@@ -136,7 +136,7 @@ class CandidatePoolGenerator(
                         roleFragment = fb,
                         budgetFragment = budgetFragment,
                     )
-                    runCatching { cardRepository.searchWithRawQuery(fallbackQuery) }.getOrDefault(emptyList())
+                    runCatching { cardRepository.searchWithRawQuery(fallbackQuery, order = "edhrec") }.getOrDefault(emptyList())
                 } ?: primaryCards
             } else {
                 primaryCards
@@ -225,12 +225,12 @@ class CandidatePoolGenerator(
 
     private fun legalityFragment(profile: DeckProfile): String? = when (profile.format) {
         com.mmg.manahub.core.model.DeckFormat.COMMANDER -> "legal:commander"
-       /* com.mmg.manahub.core.model.DeckFormat.STANDARD -> "legal:standard"
+        com.mmg.manahub.core.model.DeckFormat.STANDARD -> "legal:standard"
         com.mmg.manahub.core.model.DeckFormat.PIONEER -> "legal:pioneer"
         com.mmg.manahub.core.model.DeckFormat.MODERN -> "legal:modern"
         com.mmg.manahub.core.model.DeckFormat.LEGACY -> "legal:legacy"
         com.mmg.manahub.core.model.DeckFormat.VINTAGE -> "legal:vintage"
-        com.mmg.manahub.core.model.DeckFormat.PAUPER -> "legal:pauper"*/
+        com.mmg.manahub.core.model.DeckFormat.PAUPER -> "legal:pauper"
         // Casual and Draft/limited have no universal Scryfall legality token; omit the fragment.
         com.mmg.manahub.core.model.DeckFormat.CASUAL,
         com.mmg.manahub.core.model.DeckFormat.DRAFT -> null

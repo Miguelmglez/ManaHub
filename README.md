@@ -58,6 +58,12 @@ Build and manage decks backed by your collection and real-time Scryfall data.
 - Import / export in Moxfield / MTGO text format
 - Format validation (Standard, Pioneer, Modern, Legacy, Vintage, Pauper, Commander, Casual)
 - Card detail with double-faced support; quick add/remove from search or your collection
+- **Deck creation wizard**: guided multi-step builder (Commander & Casual) that matches your
+  collection against community deck templates (EDHREC/Archidekt data), with staged generation
+  progress, per-category fill report, and community picks grouped by role (Removal, Ramp, …)
+  clearly separated from cards you own
+- **Collection discoveries**: synergy clusters detected in your own collection (strategies and
+  tribes), each with a one-tap "Build this" handoff into the wizard
 
 ### 👥 Friends
 Friend requests (incoming/outgoing), invite by link or QR, search by Game Tag, browse a friend's collection, head-to-head stats and match history.
@@ -122,7 +128,7 @@ Coming soon.
 | Voice | Vosk (offline, on-device, grammar-restricted) |
 | Card data | Scryfall API |
 
-SDK: `minSdk = 29` (Android 10) · `targetSdk = 35` · `compileSdk = 36`. JDK 17.
+SDK: `minSdk = 29` (Android 10) · `targetSdk = 36` (Android 16) · `compileSdk = 37`. JDK 17.
 
 Release builds use R8 (minification + resource shrinking) with a custom `proguard-rules.pro`. Sensitive values (`YOUTUBE_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `CLOUDFLARE_WORKER_URL`, `COMMUNITY_WORKER_URL`) are injected via `BuildConfig` from `local.properties` (git-ignored) or CI environment variables.
 

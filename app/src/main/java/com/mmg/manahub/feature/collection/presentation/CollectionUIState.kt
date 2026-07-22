@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.collection.presentation
 
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.CollectionCardGroup
+import com.mmg.manahub.core.model.CollectionGroupingMode
+import com.mmg.manahub.core.model.CollectionSection
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -21,6 +23,10 @@ data class CollectionUiState(
     val activeQuery:         AdvancedSearchQuery?      = null,
     val sortOrder:           SortOrder                 = SortOrder.DATE_ADDED,
     val viewMode:            CollectionViewMode        = CollectionViewMode.GRID,
+    /** "Group by" selection for the Cards tab. [CollectionGroupingMode.NONE] = flat [cards] rendering. */
+    val groupingMode:        CollectionGroupingMode    = CollectionGroupingMode.NONE,
+    /** Populated only when [groupingMode] != [CollectionGroupingMode.NONE]; empty otherwise. */
+    val sections:            List<CollectionSection>   = emptyList(),
     val hasStaleCards:       Boolean                   = false,
     val selectedTab:         CollectionTab             = CollectionTab.CARDS,
     val syncState:           SyncState                 = SyncState.IDLE,

@@ -147,6 +147,12 @@ class SuggestAddsFromCommunityUseCase(
     private fun isLegal(card: Card, format: DeckFormat): Boolean {
         fun ok(s: String) = s.equals("legal", true) || s.equals("restricted", true)
         return when (format) {
+            DeckFormat.STANDARD -> ok(card.legalityStandard)
+            DeckFormat.PIONEER -> ok(card.legalityPioneer)
+            DeckFormat.MODERN -> ok(card.legalityModern)
+            DeckFormat.LEGACY -> ok(card.legalityLegacy)
+            DeckFormat.VINTAGE -> ok(card.legalityVintage)
+            DeckFormat.PAUPER -> ok(card.legalityPauper)
             DeckFormat.COMMANDER -> ok(card.legalityCommander)
             DeckFormat.CASUAL -> true
             DeckFormat.DRAFT -> true

@@ -30,6 +30,7 @@ fun card(
     userTags: List<CardTag> = emptyList(),
     suggestedTags: List<SuggestedTag> = emptyList(),
     manaCost: String? = null,
+    rarity: String = "rare",
 ): Card = Card(
     scryfallId = id,
     name = name,
@@ -49,7 +50,7 @@ fun card(
     setCode = "TST",
     setName = "Test Set",
     collectorNumber = "1",
-    rarity = "rare",
+    rarity = rarity,
     releasedAt = "2024-01-01",
     frameEffects = emptyList(),
     promoTypes = emptyList(),

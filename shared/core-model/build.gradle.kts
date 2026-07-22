@@ -25,7 +25,7 @@ kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {
         namespace = "com.mmg.manahub.core.model"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 29
 
         // Enable a JVM host unit-test component so commonTest runs as an Android host test
@@ -38,6 +38,14 @@ kotlin {
     wasmJs {
         browser()
     }
+
+    // ── Plain JVM target (Deck Engine Unification plan, RUN 5 / D5) ──────────────────────────
+    // Lets a plain Kotlin/JVM tool (:tools:tag-pipeline, a bulk-data CLI) depend on this module's
+    // commonMain WITHOUT going through the Android Gradle Plugin (an Android application module
+    // like :app cannot be depended on by another Gradle module at all). commonMain here is already
+    // pure Kotlin (zero Android/browser imports, per the HARD RULE above), so adding this target is
+    // a zero-risk, purely additive Gradle-graph change — no source code moves.
+    jvm()
 
     // JVM toolchain — match :app (JVM 17).
     jvmToolchain(17)
@@ -59,6 +67,11 @@ kotlin {
             dependencies {}
         }
         wasmJsMain {
+            dependencies {}
+        }
+        // jvmMain intentionally has no code — the jvm() target only exists so :tools:tag-pipeline
+        // can consume commonMain; there is no jvm-specific actual to provide here.
+        jvmMain {
             dependencies {}
         }
     }

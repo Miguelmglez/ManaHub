@@ -204,4 +204,54 @@ class AddCardToCollectionUseCaseTest {
             )
         }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 4 — Broken-image fix (2026-07-17): best-effort English-sibling warm-cache
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given non-English card when invoke then English sibling is warmed via getCardBySetAndNumber`() = runTest {
+        val foreignCard = TestFixtures.buildCard("id-es").copy(lang = "es", setCode = "lea", collectorNumber = "5")
+        coEvery { cardRepository.getCardById("id-es") } returns DataResult.Success(foreignCard)
+        coEvery { cardRepository.getCardBySetAndNumber("lea", "5") } returns
+            DataResult.Success(TestFixtures.buildCard("id-en"))
+
+        useCase(scryfallId = "id-es")
+
+        coVerify(exactly = 1) { cardRepository.getCardBySetAndNumber("lea", "5") }
+    }
+
+    @Test
+    fun `given English card when invoke then getCardBySetAndNumber is never called`() = runTest {
+        coEvery { cardRepository.getCardById("id-001") } returns DataResult.Success(TestFixtures.buildCard("id-001"))
+
+        useCase(scryfallId = "id-001")
+
+        coVerify(exactly = 0) { cardRepository.getCardBySetAndNumber(any(), any()) }
+    }
+
+    @Test
+    fun `given non-English card when English sibling fetch fails then add still succeeds`() = runTest {
+        val foreignCard = TestFixtures.buildCard("id-es2").copy(lang = "es", setCode = "lea", collectorNumber = "6")
+        coEvery { cardRepository.getCardById("id-es2") } returns DataResult.Success(foreignCard)
+        coEvery { cardRepository.getCardBySetAndNumber("lea", "6") } throws RuntimeException("network down")
+
+        val result = useCase(scryfallId = "id-es2")
+
+        assertTrue(result is DataResult.Success)
+        coVerify(exactly = 1) { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `given non-English card when addReturningOutcome invoked then English sibling is warmed`() = runTest {
+        val foreignCard = TestFixtures.buildCard("id-es3").copy(lang = "de", setCode = "lea", collectorNumber = "7")
+        coEvery { cardRepository.getCardById("id-es3") } returns DataResult.Success(foreignCard)
+        coEvery { cardRepository.getCardBySetAndNumber("lea", "7") } returns
+            DataResult.Success(TestFixtures.buildCard("id-en3"))
+
+        val result = useCase.addReturningOutcome(scryfallId = "id-es3")
+
+        assertTrue(result is DataResult.Success)
+        coVerify(exactly = 1) { cardRepository.getCardBySetAndNumber("lea", "7") }
+    }
 }

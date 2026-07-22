@@ -74,6 +74,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.mtg_card_back
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -782,7 +785,7 @@ private fun LibraryPile(
             contentAlignment = Alignment.BottomCenter,
         ) {
             Image(
-                painter = painterResource(R.drawable.mtg_card_back),
+                painter = painterResource(Res.drawable.mtg_card_back),
                 contentDescription = stringResource(R.string.playtest_battle_library_cd, librarySize),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

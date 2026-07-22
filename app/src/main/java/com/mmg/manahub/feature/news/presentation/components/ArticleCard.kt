@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -115,16 +116,24 @@ fun ArticleCard(
 
 @Composable
 internal fun LanguageBadge(code: String) {
-    val mc = MaterialTheme.magicColors
-    Surface(
-        shape = RoundedCornerShape(4.dp),
-        color = mc.primaryAccent.copy(alpha = 0.15f),
-    ) {
+    val flag = com.mmg.manahub.core.util.CardConstants.getFlag(code)
+    if (flag.isNotEmpty()) {
         Text(
-            text = code.uppercase(),
-            style = MaterialTheme.magicTypography.labelSmall,
-            color = mc.primaryAccent,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            text = flag,
+            style = MaterialTheme.magicTypography.labelLarge.copy(fontSize = 14.sp)
         )
+    } else {
+        val mc = MaterialTheme.magicColors
+        Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = mc.primaryAccent.copy(alpha = 0.15f),
+        ) {
+            Text(
+                text = code.uppercase(),
+                style = MaterialTheme.magicTypography.labelSmall,
+                color = mc.primaryAccent,
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            )
+        }
     }
 }

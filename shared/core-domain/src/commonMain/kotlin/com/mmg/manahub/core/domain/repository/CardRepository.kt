@@ -57,6 +57,17 @@ interface CardRepository {
     /** Fetches a card by set code and collector number (returns English version by default). */
     suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card>
 
+    /**
+     * Broken-image fix (2026-07-17). Batch-reads the ENGLISH printing already cached in Room for
+     * each `(setCode, collectorNumber)` pair in [pairs] — Room ONLY, never a network fetch (must
+     * stay instant for offline-safe collection-list rendering). Used to override a non-English
+     * representative card's image fields with its English sibling's: many non-English Scryfall
+     * printings have no native image, while the English printing of the same set + collector
+     * number is guaranteed to (same illustration). A pair with no cached English row is simply
+     * absent from the returned map — not an error; callers keep the representative's own image.
+     */
+    suspend fun getCachedEnglishSiblings(pairs: Set<Pair<String, String>>): Map<Pair<String, String>, Card>
+
     /** Fetches all prints (versions) of a card by its exact English name. */
     suspend fun getCardPrints(name: String): DataResult<List<Card>>
 
@@ -74,8 +85,15 @@ interface CardRepository {
     /** Fetches a card by its exact English name (e.g. "Lightning Bolt"). */
     suspend fun getCardByExactName(name: String): Result<Card>
 
-    /** Executes a raw Scryfall query string and returns matching cards. */
-    suspend fun searchWithRawQuery(query: String): List<Card>
+    /**
+     * Executes a raw Scryfall query string and returns matching cards.
+     *
+     * @param order optional Scryfall `order` param (e.g. `"edhrec"`). Null preserves the historic
+     *   default (name-ASC) so existing callers (e.g. `AdvancedSearchViewModel`) stay byte-identical.
+     *   Deck Builder v2 (Phase 0, root cause 1.2.1) passes `"edhrec"` so a candidate pool's first
+     *   page is already popularity-ranked instead of alphabetical before any `take(n)` truncation.
+     */
+    suspend fun searchWithRawQuery(query: String, order: String? = null): List<Card>
 
     /** Fetches a list of playable Magic sets sorted by release date descending. */
     suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>>
@@ -94,8 +112,26 @@ interface CardRepository {
     )
     suspend fun evictStaleCache()
 
-    /** Replace the confirmed tag list for a card already in the local cache. */
+    /**
+     * Replace the confirmed tag list for a card already in the local cache.
+     *
+     * This is a PLAIN OVERWRITE -- only safe when the caller already holds the full authoritative
+     * tag list (e.g. [confirmSuggestedTag]). A caller that only knows a PARTIAL set of tags to add
+     * (merged with whatever is already persisted) must use [unionCardTags] instead, which merges
+     * atomically and closes the TOCTOU race two concurrent partial-merge callers would otherwise hit.
+     */
     suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>)
+
+    /**
+     * Atomically merges [tags] into a card's existing confirmed-tag list (union, never a plain
+     * overwrite) -- Deck Engine Unification plan RUN 7b (BUG 2 fix). Reads the CURRENT persisted
+     * tags and writes back the union inside a single Room transaction, so two concurrent partial
+     * enrichment jobs targeting the same card (e.g. the on-device analyzer's background resolution
+     * and [com.mmg.manahub.core.domain.usecase.card.RefreshCardStrategyTagsUseCase]'s precomputed-
+     * table lookup, both fired on the same cache-miss card-detail view) can never lose one
+     * contribution to the other, regardless of write ordering.
+     */
+    suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>)
 
     /** Replace the user-added tag list for a card. */
     suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>)

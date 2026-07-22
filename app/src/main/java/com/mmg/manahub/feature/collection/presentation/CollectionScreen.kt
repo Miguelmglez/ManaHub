@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.items
@@ -41,7 +43,10 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CollectionsBookmark
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
@@ -66,6 +71,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -80,20 +86,26 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.CollectionCardGroup
+import com.mmg.manahub.core.model.CollectionGroupingMode
+import com.mmg.manahub.core.model.CollectionSection
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.sync.SyncState
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
 import com.mmg.manahub.core.ui.components.ManaHubSelector
 import com.mmg.manahub.core.ui.components.StaleWarningBanner
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchViewModel
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -109,7 +121,7 @@ private const val TAB_TRADES = 2
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CollectionScreen(
-    onCardClick:              (scryfallId: String) -> Unit,
+    onCardClick:              (scryfallId: String, sharedTransitionKey: String?) -> Unit,
     onAddCardClick:           () -> Unit,
     onDeckClick:              (deckId: String) -> Unit,
     onCreateDeck:             () -> Unit = {},
@@ -138,6 +150,7 @@ fun CollectionScreen(
         onBrowseCommunityDecks = onBrowseCommunityDecks,
         onViewModeToggle      = viewModel::onViewModeToggle,
         onSortChange          = viewModel::onSortChange,
+        onGroupingChange      = viewModel::onGroupingChange,
         onSearchQueryChange   = viewModel::onSearchQueryChange,
         onClearFilters        = {
             viewModel.clearAdvancedFilters()
@@ -173,7 +186,7 @@ fun CollectionScreen(
 @Composable
 private fun CollectionContent(
     uiState:              CollectionUiState,
-    onCardClick:          (String) -> Unit,
+    onCardClick:          (String, String?) -> Unit,
     onAddCardClick:       () -> Unit,
     onDeckClick:          (String) -> Unit,
     onCreateDeck:         () -> Unit = {},
@@ -181,6 +194,7 @@ private fun CollectionContent(
     onBrowseCommunityDecks: () -> Unit = {},
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
+    onGroupingChange:     (CollectionGroupingMode) -> Unit,
     onSearchQueryChange:  (String) -> Unit,
     onClearFilters:       () -> Unit,
     onErrorDismissed:     () -> Unit,
@@ -315,6 +329,7 @@ private fun CollectionContent(
                         onShowAdvancedSearch  = onShowAdvancedSearch,
                         onViewModeToggle      = onViewModeToggle,
                         onSortChange          = onSortChange,
+                        onGroupingChange      = onGroupingChange,
                         gridState             = gridState,
                         listState             = listState,
                         sharedTransitionScope = sharedTransitionScope,
@@ -327,7 +342,7 @@ private fun CollectionContent(
                         onBrowseCommunityDecks = onBrowseCommunityDecks,
                     )
                     CollectionTab.TRADES  -> TradesScreen(
-                        onCardClick           = onCardClick,
+                        onCardClick           = { onCardClick(it, null) },
                         onNavigateToProposal  = onNavigateToTradeProposal,
                         onNavigateToThread    = onNavigateToTradeThread,
                     )
@@ -352,13 +367,14 @@ private fun CollectionContent(
 @Composable
 private fun CardsTabContent(
     uiState:              CollectionUiState,
-    onCardClick:          (String) -> Unit,
+    onCardClick:          (String, String?) -> Unit,
     onAddCardClick:       () -> Unit,
     onSearchQueryChange:  (String) -> Unit,
     onClearFilters:       () -> Unit,
     onShowAdvancedSearch: () -> Unit,
     onViewModeToggle:     () -> Unit,
     onSortChange:         (SortOrder) -> Unit,
+    onGroupingChange:     (CollectionGroupingMode) -> Unit,
     gridState:            LazyGridState,
     listState:            LazyListState,
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -473,15 +489,31 @@ private fun CardsTabContent(
                 }
             }
 
-            ManaHubSelector(
-                icon = Icons.AutoMirrored.Filled.Sort,
-                label = stringResource(R.string.collection_sort_label),
-                valueText = stringResource(uiState.sortOrder.displayResId),
-                items = SortOrder.entries,
-                selectedItem = uiState.sortOrder,
-                onSelect = onSortChange,
-                itemLabel = { stringResource(it.displayResId) }
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+            ) {
+                ManaHubBottomSheetSelector(
+                    icon = Icons.AutoMirrored.Filled.Sort,
+                    label = stringResource(R.string.collection_sort_label),
+                    valueText = stringResource(uiState.sortOrder.displayResId),
+                    items = SortOrder.entries,
+                    selectedItem = uiState.sortOrder,
+                    onSelect = onSortChange,
+                    itemLabel = { stringResource(it.displayResId) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ManaHubBottomSheetSelector(
+                    icon = Icons.Default.Layers,
+                    label = stringResource(R.string.collection_grouping_label),
+                    valueText = stringResource(uiState.groupingMode.displayResId),
+                    items = CollectionGroupingMode.entries,
+                    selectedItem = uiState.groupingMode,
+                    onSelect = onGroupingChange,
+                    itemLabel = { stringResource(it.displayResId) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         // Loading
@@ -504,19 +536,25 @@ private fun CardsTabContent(
             return@Column
         }
 
-        // Grid or list
+        // Grid or list — sectioned rendering kicks in whenever a grouping mode is active
+        // (uiState.sections is non-empty); flat rendering (uiState.cards) is otherwise
+        // byte-identical to before this feature landed.
         when (uiState.viewMode) {
             CollectionViewMode.GRID -> CardGrid(
-                cards       = uiState.cards,
-                onCardClick = onCardClick,
-                state       = gridState,
+                cards        = uiState.cards,
+                sections     = uiState.sections,
+                groupingMode = uiState.groupingMode,
+                onCardClick  = onCardClick,
+                state        = gridState,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
             CollectionViewMode.LIST -> CardList(
-                cards       = uiState.cards,
-                onCardClick = onCardClick,
-                state       = listState,
+                cards        = uiState.cards,
+                sections     = uiState.sections,
+                groupingMode = uiState.groupingMode,
+                onCardClick  = onCardClick,
+                state        = listState,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
@@ -584,12 +622,18 @@ private fun SearchBar(
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CardGrid(
-    cards:       List<CollectionCardGroup>,
-    onCardClick: (String) -> Unit,
-    state:       LazyGridState,
+    cards:        List<CollectionCardGroup>,
+    sections:     List<CollectionSection>,
+    groupingMode: CollectionGroupingMode,
+    onCardClick:  (String, String?) -> Unit,
+    state:        LazyGridState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
+    // In-memory only (resets on leaving the screen) — same lifetime as the rest of this
+    // screen's transient UI state (e.g. showSortMenu).
+    val collapsedSections = remember { mutableStateMapOf<String, Boolean>() }
+
     LazyVerticalGrid(
         columns               = GridCells.Adaptive(minSize = 100.dp),
         state                 = state,
@@ -597,30 +641,45 @@ private fun CardGrid(
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(cards, key = { _, item -> item.groupKey }) { index, item ->
-            var visible by rememberSaveable(key = item.groupKey) { mutableStateOf(false) }
-            LaunchedEffect(item.groupKey) { visible = true }
-            val delay = (index % 12) * 30
-
-            // Stable container to prevent LazyVerticalGrid from collapsing when returning from
-            // a detail screen (which resets visibility to false for a frame during stagger).
-            // aspectRatio 0.75f is a safe approximation for MTG card dimensions in this grid.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.75f)
-            ) {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(300, delayMillis = delay)) +
-                            scaleIn(tween(300, delayMillis = delay), initialScale = 0.92f),
-                ) {
-                    CardGridItem(
-                        item = item,
-                        onClick = { onCardClick(item.card.scryfallId) },
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope
+        if (groupingMode == CollectionGroupingMode.NONE) {
+            itemsIndexed(cards, key = { _, item -> item.groupKey }) { index, item ->
+                CardGridCell(
+                    item = item,
+                    visibilityKey = item.groupKey,
+                    index = index,
+                    onCardClick = { onCardClick(it, item.groupKey) },
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+            }
+        } else {
+            sections.forEach { section ->
+                item(span = { GridItemSpan(maxLineSpan) }, key = "header|${section.labelToken}") {
+                    val isCollapsed = collapsedSections[section.labelToken] == true
+                    CollectionGroupHeader(
+                        section = section,
+                        mode = groupingMode,
+                        expanded = !isCollapsed,
+                        onToggle = { collapsedSections[section.labelToken] = !isCollapsed },
                     )
+                }
+                if (collapsedSections[section.labelToken] != true) {
+                    itemsIndexed(
+                        section.items,
+                        // Composite key: TAG mode lets one CollectionCardGroup appear in
+                        // multiple sections, so the bare groupKey alone would collide.
+                        key = { _, item -> "${section.labelToken}|${item.groupKey}" },
+                    ) { index, item ->
+                        val uniqueKey = "${section.labelToken}|${item.groupKey}"
+                        CardGridCell(
+                            item = item,
+                            visibilityKey = uniqueKey,
+                            index = index,
+                            onCardClick = { onCardClick(it, uniqueKey) },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
                 }
             }
         }
@@ -629,31 +688,293 @@ private fun CardGrid(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun CardList(
-    cards:       List<CollectionCardGroup>,
+private fun CardGridCell(
+    item:        CollectionCardGroup,
+    visibilityKey: String,
+    index:       Int,
     onCardClick: (String) -> Unit,
-    state:       LazyListState,
+    sharedTransitionScope: SharedTransitionScope?,
+    animatedVisibilityScope: AnimatedVisibilityScope?,
+) {
+    var visible by rememberSaveable(key = visibilityKey) { mutableStateOf(false) }
+    LaunchedEffect(visibilityKey) { visible = true }
+    val delay = (index % 12) * 30
+
+    // Stable container to prevent LazyVerticalGrid from collapsing when returning from
+    // a detail screen (which resets visibility to false for a frame during stagger).
+    // aspectRatio 0.75f is a safe approximation for MTG card dimensions in this grid.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.75f)
+    ) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(300, delayMillis = delay)) +
+                    scaleIn(tween(300, delayMillis = delay), initialScale = 0.92f),
+        ) {
+            CardGridItem(
+                item = item,
+                onClick = { onCardClick(item.card.scryfallId) },
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
+                sharedTransitionKey = visibilityKey
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun CardList(
+    cards:        List<CollectionCardGroup>,
+    sections:     List<CollectionSection>,
+    groupingMode: CollectionGroupingMode,
+    onCardClick:  (String, String?) -> Unit,
+    state:        LazyListState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
+    val collapsedSections = remember { mutableStateMapOf<String, Boolean>() }
+
     androidx.compose.foundation.lazy.LazyColumn(
         state               = state,
         contentPadding      = PaddingValues(top = 4.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        items(
-            items = cards,
-            key   = { it.groupKey },
-        ) { item ->
-            CardListItem(
-                item    = item,
-                onClick = { onCardClick(item.card.scryfallId) },
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
+        if (groupingMode == CollectionGroupingMode.NONE) {
+            items(items = cards, key = { it.groupKey }) { item ->
+                CardListRow(
+                    item = item,
+                    onCardClick = { onCardClick(it, item.groupKey) },
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    sharedTransitionKey = item.groupKey
+                )
+            }
+        } else {
+            sections.forEach { section ->
+                // Unqualified `item(...)`: singular `item` is declared as an INTERFACE MEMBER on
+                // both `LazyListScope` and `LazyGridScope` (unlike `items`/`itemsIndexed`, which
+                // are top-level List<T> convenience extensions) — there is no top-level
+                // `androidx.compose.foundation.lazy(.grid).item` symbol to import, and importing
+                // one fails to resolve. It's picked up automatically via the implicit
+                // `LazyListScope` receiver here (CardGrid's `LazyGridScope` receiver resolves its
+                // own member the same way).
+                item(key = "header|${section.labelToken}") {
+                    val isCollapsed = collapsedSections[section.labelToken] == true
+                    CollectionGroupHeader(
+                        section = section,
+                        mode = groupingMode,
+                        expanded = !isCollapsed,
+                        onToggle = { collapsedSections[section.labelToken] = !isCollapsed },
+                    )
+                }
+                if (collapsedSections[section.labelToken] != true) {
+                    items(
+                        items = section.items,
+                        // Composite key — see CardGrid's identical comment (TAG multi-membership).
+                        key = { "${section.labelToken}|${it.groupKey}" },
+                    ) { item ->
+                        val uniqueKey = "${section.labelToken}|${item.groupKey}"
+                        CardListRow(
+                            item = item,
+                            onCardClick = { onCardClick(it, uniqueKey) },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            sharedTransitionKey = uniqueKey
+                        )
+                    }
+                }
+            }
         }
     }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun CardListRow(
+    item:        CollectionCardGroup,
+    onCardClick: (String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope?,
+    animatedVisibilityScope: AnimatedVisibilityScope?,
+    sharedTransitionKey: String? = null,
+) {
+    CardListItem(
+        item    = item,
+        onClick = { onCardClick(item.card.scryfallId) },
+        sharedTransitionScope = sharedTransitionScope,
+        animatedVisibilityScope = animatedVisibilityScope,
+        sharedTransitionKey = sharedTransitionKey
+    )
+    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.magicColors.surfaceVariant)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Group section header
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Full-span section header for the grouped Cards tab (grid and list). Tapping anywhere on the
+ * row collapses/expands the section — the caller (see the `collapsedSections` map in
+ * [CardGrid]/[CardList]) simply omits the section's items from the Lazy scope while collapsed.
+ */
+@Composable
+private fun CollectionGroupHeader(
+    section:  CollectionSection,
+    mode:     CollectionGroupingMode,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    val displayLabel = collectionGroupLabel(section.labelToken, mode, section.items)
+    val items = section.items
+    val totalCopies = section.totalCopies
+    val totalValueEur = section.totalValueEur
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(ChipShape)
+            .background(mc.backgroundSecondary.copy(alpha = 0.6f))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = spacing.lg, vertical = spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+            ) {
+                when (mode) {
+                    CollectionGroupingMode.SET -> {
+                        com.mmg.manahub.core.ui.components.SetSymbol(
+                            setCode = section.labelToken,
+                            rarity = com.mmg.manahub.core.ui.components.CardRarity.COMMON,
+                            size = 20.dp
+                        )
+                    }
+                    CollectionGroupingMode.COLOR -> {
+                        when (section.labelToken) {
+                            "Multicolor" -> Icon(
+                                imageVector = com.mmg.manahub.core.ui.components.CounterIcon,
+                                contentDescription = null,
+                                tint = mc.textPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            "Land" -> Icon(
+                                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_land),
+                                contentDescription = null,
+                                tint = mc.textPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            else -> com.mmg.manahub.core.ui.components.ManaSymbolImage(
+                                token = section.labelToken,
+                                size = 18.dp
+                            )
+                        }
+                    }
+                    else -> Unit
+                }
+                
+                Text(
+                    text = displayLabel,
+                    style = ty.titleMedium,
+                    color = mc.goldMtg,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+            
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = mc.textSecondary,
+                modifier = Modifier.padding(start = spacing.sm)
+            )
+        }
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.collection_group_count, items.size, totalCopies),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+            )
+            if (totalValueEur != null) {
+                Text(
+                    "€%.2f".format(totalValueEur),
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Resolves the localized display label for a group's [labelToken]. Fixed tokens (type buckets,
+ * WUBRG colors, "Lands"/"7+"/set codes/rarities) map to `stringResource`s; [CollectionGroupingMode.TAG]
+ * resolves the raw [com.mmg.manahub.core.model.CardTag.key] token back to a real [CardTag] found on
+ * one of the section's own items and calls its Android-only [label] extension — `shared/core-model`'s
+ * pure [groupCollection] cannot do this itself (see `CollectionGrouping.kt`'s KDoc).
+ */
+@Composable
+private fun collectionGroupLabel(
+    labelToken: String,
+    mode: CollectionGroupingMode,
+    items: List<CollectionCardGroup>,
+): String = when (mode) {
+    CollectionGroupingMode.TYPE -> when (labelToken) {
+        "Creatures"     -> stringResource(R.string.deckdetail_group_creatures)
+        "Instants"      -> stringResource(R.string.deckdetail_group_instants)
+        "Sorceries"     -> stringResource(R.string.deckdetail_group_sorceries)
+        "Enchantments"  -> stringResource(R.string.deckdetail_group_enchantments)
+        "Artifacts"     -> stringResource(R.string.deckdetail_group_artifacts)
+        "Planeswalkers" -> stringResource(R.string.deckdetail_group_planeswalkers)
+        "Lands"         -> stringResource(R.string.deckbuilder_lands)
+        else            -> stringResource(R.string.deckdetail_group_other)
+    }
+    CollectionGroupingMode.COLOR -> when (labelToken) {
+        "W"          -> stringResource(R.string.collection_filter_white)
+        "U"          -> stringResource(R.string.collection_filter_blue)
+        "B"          -> stringResource(R.string.collection_filter_black)
+        "R"          -> stringResource(R.string.collection_filter_red)
+        "G"          -> stringResource(R.string.collection_filter_green)
+        "Multicolor" -> stringResource(R.string.collection_filter_multicolor)
+        "Colorless"  -> stringResource(R.string.stats_color_colorless)
+        else         -> stringResource(R.string.deckbuilder_lands) // "Land"
+    }
+    CollectionGroupingMode.CMC -> when {
+        labelToken == "Lands" -> stringResource(R.string.deckbuilder_lands)
+        labelToken == "7+"    -> stringResource(R.string.deckbuilder_cost_7_plus)
+        else                  -> stringResource(R.string.deckbuilder_cost_value, labelToken.toIntOrNull() ?: 0)
+    }
+    CollectionGroupingMode.SET -> items.firstOrNull()?.card?.setName?.ifBlank { labelToken.uppercase() } ?: labelToken.uppercase()
+    CollectionGroupingMode.RARITY -> labelToken.replaceFirstChar { it.uppercase() }.ifBlank { stringResource(R.string.deckdetail_group_other) }
+    CollectionGroupingMode.TAG -> {
+        if (labelToken == "untagged") {
+            stringResource(R.string.deckbuilder_group_untagged)
+        } else {
+            val tag = items.firstNotNullOfOrNull { group ->
+                (group.card.tags + group.card.userTags).find { it.key == labelToken }
+            }
+            tag?.label() ?: labelToken.replace('_', ' ').replaceFirstChar { it.uppercase() }
+        }
+    }
+    CollectionGroupingMode.NONE -> labelToken
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -726,4 +1047,14 @@ val SortOrder.displayResId get() = when (this) {
     SortOrder.PRICE_DESC -> R.string.collection_sort_price_desc
     SortOrder.PRICE_ASC  -> R.string.collection_sort_price_asc
     SortOrder.RARITY     -> R.string.collection_sort_rarity
+}
+
+val CollectionGroupingMode.displayResId get() = when (this) {
+    CollectionGroupingMode.NONE   -> R.string.collection_grouping_none
+    CollectionGroupingMode.TYPE   -> R.string.collection_grouping_type
+    CollectionGroupingMode.COLOR  -> R.string.collection_grouping_color
+    CollectionGroupingMode.CMC    -> R.string.collection_sort_cmc
+    CollectionGroupingMode.SET    -> R.string.collection_grouping_set
+    CollectionGroupingMode.RARITY -> R.string.collection_sort_rarity
+    CollectionGroupingMode.TAG    -> R.string.collection_grouping_tag
 }

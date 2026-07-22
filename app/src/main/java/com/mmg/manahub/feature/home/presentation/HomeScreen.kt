@@ -109,6 +109,10 @@ fun HomeScreen(
     // Deck Doctor Community/Archetype plan, Phase 5 — kept OUTSIDE HomeUiState on purpose, see
     // HomeViewModel.trendingFlow's KDoc.
     val trending by viewModel.trendingFlow.collectAsStateWithLifecycle()
+    // Home widget board overhaul, TASK 5b — kept OUTSIDE HomeUiState for the same reason, see
+    // HomeViewModel.communityDecksFlow's KDoc.
+    val communityDecks by viewModel.communityDecksFlow.collectAsStateWithLifecycle()
+    val communityDecksCategory by viewModel.communityDecksCategoryFlow.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
     var showGallerySheet by remember { mutableStateOf(false) }
 
@@ -116,13 +120,14 @@ fun HomeScreen(
     // can show that the user was on Home. Fires once per entry (keyed on Unit).
     LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("screen_viewed: home") }
 
-    // The active game lives in the activity-scoped GameViewModel and is passed in
-    // from AppNavGraph; it always wins the hero slot when present.
-    val effectiveState = if (activeGame != null) uiState.copy(hero = activeGame) else uiState
+    // The active game override is disabled for now (user request: only show Welcome and Loading).
+    val effectiveState = uiState
 
     HomeScreen(
         uiState = effectiveState,
         trending = trending,
+        communityDecks = communityDecks,
+        communityDecksCategory = communityDecksCategory,
         onAction = { action ->
             when (action) {
                 HomeAction.CustomizeQuickStart -> showCustomizeSheet = true
@@ -135,9 +140,11 @@ fun HomeScreen(
                 HomeAction.OpenWidgetGallery -> showGallerySheet = true
                 // Resolve the "most recent deck" here — this is the only layer with access to
                 // uiState.decks (the static FirstStepItem catalog can't bake a dynamic id in).
+                // uiState.decks is nullable while loading (TASK 7b) — null-safe firstOrNull.
                 HomeAction.PlaytestRecentDeck ->
-                    onAction(HomeAction.NavigatePlaytest(uiState.decks.firstOrNull()?.id))
-                // Board mutations + discover/news widget actions are handled in the ViewModel.
+                    onAction(HomeAction.NavigatePlaytest(uiState.decks?.firstOrNull()?.id))
+                // Board mutations + discover/news/community-decks widget actions are handled in
+                // the ViewModel.
                 is HomeAction.MoveWidget,
                 is HomeAction.AddWidget,
                 is HomeAction.RemoveWidget,
@@ -146,6 +153,7 @@ fun HomeScreen(
                 HomeAction.RefreshDiscover,
                 HomeAction.RefreshRandomCard,
                 is HomeAction.SelectDiscoverSet,
+                is HomeAction.SelectCommunityDecksCategory,
                 HomeAction.ResetNewsFilters,
                 -> viewModel.onAction(action)
                 // RateApp needs an Activity context to launch the store; resolve it upstream.
@@ -206,12 +214,34 @@ fun HomeScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     // Deck Doctor Community/Archetype plan, Phase 5.
     trending: com.mmg.manahub.core.model.TrendingSnapshot? = null,
+    // Home widget board overhaul, TASK 5b.
+    communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
+    communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
 ) {
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(modifier = modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
+
+        // TASK 1: while the board's first combine emission is still pending, render a skeleton
+        // instead of an empty/partial grid so the transition to real content is smooth (no giant
+        // pop-in once everything resolves at once). The top bar stays visible throughout.
+        if (uiState.isLoading) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+                HomeTopBar(
+                    uiState = uiState,
+                    onAvatarClick = { onAction(HomeAction.OpenProfile) },
+                    modifier = Modifier.padding(horizontal = spacing.lg),
+                )
+                HomeBoardSkeleton(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = spacing.lg),
+                )
+            }
+            return@Box
+        }
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -250,10 +280,12 @@ fun HomeScreen(
                     animatedVisibilityScope = animatedVisibilityScope,
                     modifier = Modifier.animateItem(),
                     trending = trending,
+                    communityDecks = communityDecks,
+                    communityDecksCategory = communityDecksCategory,
                 )
             }
 
-            if (uiState.layout.isEmpty() && !uiState.isLoading) {
+            if (uiState.layout.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyState(
                         title = stringResource(R.string.home_empty_title),
@@ -337,7 +369,7 @@ private fun HomeTopBar(
     val spacing = MaterialTheme.spacing
 
     val playerName = uiState.playerName
-    val greeting = greetingText(uiState.isAuthenticated, playerName)
+    val greeting = greetingText(playerName)
     val openProfileDescription = stringResource(R.string.home_open_profile_a11y)
 
     Row(
@@ -393,15 +425,81 @@ private fun HomeTopBar(
     }
 }
 
-@Composable
-private fun greetingText(isAuthenticated: Boolean, name: String?): String {
-    if (name.isNullOrBlank()) return stringResource(R.string.home_greeting_signed_out)
-    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    return when {
-        hour < 12 -> stringResource(R.string.home_greeting_morning, name)
-        hour < 17 -> stringResource(R.string.home_greeting_afternoon, name)
-        else -> stringResource(R.string.home_greeting_evening, name)
+/** Milliseconds in a day — used to derive the deterministic daily greeting-variant index. */
+private const val GREETING_DAY_MS = 24L * 60L * 60L * 1000L
+
+/** Morning band (05:00–11:59): 4 MTG-flavored variants (Home widget board overhaul, TASK 2). */
+private val MORNING_GREETINGS = intArrayOf(
+    R.string.home_greeting_morning_1,
+    R.string.home_greeting_morning_2,
+    R.string.home_greeting_morning_3,
+    R.string.home_greeting_morning_4,
+)
+
+/** Afternoon band (12:00–16:59). */
+private val AFTERNOON_GREETINGS = intArrayOf(
+    R.string.home_greeting_afternoon_1,
+    R.string.home_greeting_afternoon_2,
+    R.string.home_greeting_afternoon_3,
+    R.string.home_greeting_afternoon_4,
+)
+
+/** Evening band (17:00–20:59). */
+private val EVENING_GREETINGS = intArrayOf(
+    R.string.home_greeting_evening_1,
+    R.string.home_greeting_evening_2,
+    R.string.home_greeting_evening_3,
+)
+
+/** Night band (21:00–04:59). */
+private val NIGHT_GREETINGS = intArrayOf(
+    R.string.home_greeting_night_1,
+    R.string.home_greeting_night_2,
+    R.string.home_greeting_night_3,
+    R.string.home_greeting_night_4,
+)
+
+/** Signed-out fallback (no player name resolved yet). */
+private val SIGNED_OUT_GREETINGS = intArrayOf(
+    R.string.home_greeting_signed_out_1,
+    R.string.home_greeting_signed_out_2,
+    R.string.home_greeting_signed_out_3,
+)
+
+/**
+ * Resolves the greeting variant's string-resource id, given a caller-supplied [hour] (0..23),
+ * [epochDay] (days since epoch), and whether a [name] is available.
+ *
+ * Pure and non-`@Composable` on purpose (Home widget board overhaul, TASK 2) so it is unit
+ * testable without Compose UI test infra — see `HomeScreenGreetingTest`. Selection is
+ * DETERMINISTIC — seeded by [epochDay], mirroring [RulesTipWidget]'s `RULES_TIP_SHUFFLE_SEED`
+ * pattern — so the greeting is stable across recompositions and within the same day, but varies
+ * day to day. Never uses an unseeded `Random()` per call.
+ */
+internal fun resolveGreetingVariant(hour: Int, epochDay: Long, hasName: Boolean): Int {
+    val variants = if (!hasName) {
+        SIGNED_OUT_GREETINGS
+    } else {
+        when (hour) {
+            in 5..11 -> MORNING_GREETINGS
+            in 12..16 -> AFTERNOON_GREETINGS
+            in 17..20 -> EVENING_GREETINGS
+            else -> NIGHT_GREETINGS
+        }
     }
+    val index = (epochDay % variants.size).toInt()
+    return variants[index]
+}
+
+/** Picks a time-of-day-appropriate, MTG-flavored greeting variant (Home widget board overhaul, TASK 2). */
+@Composable
+private fun greetingText(name: String?): String {
+    val epochDay = remember { System.currentTimeMillis() / GREETING_DAY_MS }
+    if (name.isNullOrBlank()) {
+        return stringResource(resolveGreetingVariant(hour = 0, epochDay = epochDay, hasName = false))
+    }
+    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    return stringResource(resolveGreetingVariant(hour = hour, epochDay = epochDay, hasName = true), name)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

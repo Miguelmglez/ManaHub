@@ -21,8 +21,9 @@ sealed class Screen(val route: String) {
     }
     object CollectionAddCard  : Screen("collection/add")
     object CollectionScanner  : Screen("collection/scanner")
-    object CollectionCardDetail : Screen("collection/detail/{scryfallId}") {
-        fun createRoute(scryfallId: String) = "collection/detail/${Uri.encode(scryfallId)}"
+    object CollectionCardDetail : Screen("collection/detail/{scryfallId}?sharedTransitionKey={sharedTransitionKey}") {
+        fun createRoute(scryfallId: String, sharedTransitionKey: String? = null) =
+            "collection/detail/${Uri.encode(scryfallId)}" + (sharedTransitionKey?.let { "?sharedTransitionKey=${Uri.encode(it)}" } ?: "")
     }
 
     // ── Decks (sub-section of Collection) ────────────────────────────────────
@@ -50,6 +51,51 @@ sealed class Screen(val route: String) {
 
     object DeckAddCards : Screen("collection/decks/{deckId}/add") {
         fun createRoute(deckId: String) = "collection/decks/$deckId/add"
+    }
+
+    /**
+     * Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.4) — the 4-step wizard + generation +
+     * result flow. A single destination with INTERNAL phase state (mirrors the Playtest
+     * mulligan/battle-phase-in-one-screen precedent), never a second nav destination per step.
+     * Always creates a FRESH draft (no `deckId` arg, unlike [DeckStudio]) — the wizard owns its own
+     * deck-creation lifecycle and hands off to [DeckStudio] only on the Result screen's "Open in
+     * Deck Studio" CTA.
+     *
+     * Optional query args pre-fill the wizard from a Discoveries v2 "Build this" tap (D11). Deck
+     * Engine Unification plan (D2): these carry the UNIFIED taxonomy directly — [archetype] is a
+     * raw [com.mmg.manahub.feature.decks.domain.engine.ArchetypeId] enum name, [theme] a raw
+     * [com.mmg.manahub.feature.decks.domain.engine.ThemeId] enum name, [tribe] a raw
+     * `tribe:<subtype>` key, [colors] a concatenated
+     * [com.mmg.manahub.feature.decks.domain.engine.ManaColor] symbol string (e.g. "WU"). All blank
+     * by default (a plain "Build from seed" entry point passes none).
+     */
+    object DeckWizard : Screen("deck/wizard?archetype={archetype}&theme={theme}&tribe={tribe}&colors={colors}&seeds={seeds}") {
+        const val baseRoute = "deck/wizard"
+
+        /**
+         * @param seeds Deck Engine Unification plan D7 (Phase 4.3) — a Commander Spellbook combo's
+         *   component card names, joined with `|` (NOT `,` — many real MTG card names contain a
+         *   literal comma, e.g. "Urza, Lord High Artificer") then percent-encoded as ONE query
+         *   value; see [com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel]'s
+         *   init for the matching `split("|")`. When present, forces the wizard's Flow A
+         *   (cards-first) entry, mirroring how [archetype]/[theme]/[tribe]/[colors] force Flow
+         *   B/C's picks.
+         */
+        fun createRoute(
+            archetype: String? = null,
+            theme: String? = null,
+            tribe: String? = null,
+            colors: String? = null,
+            seeds: List<String>? = null,
+        ): String {
+            val params = mutableListOf<String>()
+            if (!archetype.isNullOrEmpty()) params += "archetype=${Uri.encode(archetype)}"
+            if (!theme.isNullOrEmpty()) params += "theme=${Uri.encode(theme)}"
+            if (!tribe.isNullOrEmpty()) params += "tribe=${Uri.encode(tribe)}"
+            if (!colors.isNullOrEmpty()) params += "colors=${Uri.encode(colors)}"
+            if (!seeds.isNullOrEmpty()) params += "seeds=${Uri.encode(seeds.joinToString("|"))}"
+            return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
+        }
     }
     // Screen.DeckImprovement (the standalone Deck Doctor screen) was RETIRED in Phase 0.5 of
     // docs/claude-code-prompt-deck-doctor-community.md (D10) — Deck Studio's Suggestions tab

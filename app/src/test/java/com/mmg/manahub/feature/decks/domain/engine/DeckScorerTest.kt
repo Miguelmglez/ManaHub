@@ -527,6 +527,67 @@ class DeckScorerTest {
         assertTrue(fit.isLegal)
     }
 
+    // ── Deck Builder v2 Phase 0: restored 60-card format legality branches ────────
+
+    @Test
+    fun `given STANDARD-banned card when fit against STANDARD then isLegal is false`() {
+        val profile = minimalProfile(format = DeckFormat.STANDARD)
+        val c = card(id = "std-banned", legalityStandard = "banned")
+
+        val fit = scorer.fit(c, profile, isOwned = false)
+
+        assertFalse(fit.isLegal)
+    }
+
+    @Test
+    fun `given STANDARD-legal card when fit against PIONEER then isLegal reads legalityPioneer not legalityStandard`() {
+        val profile = minimalProfile(format = DeckFormat.PIONEER)
+        val c = card(id = "pio-banned", legalityStandard = "legal", legalityPioneer = "banned")
+
+        val fit = scorer.fit(c, profile, isOwned = false)
+
+        assertFalse("PIONEER must read its OWN legality field, not fall back to Standard's", fit.isLegal)
+    }
+
+    @Test
+    fun `given legal cards when fit against each restored 60-card format then isLegal is true`() {
+        val cases = listOf(
+            DeckFormat.STANDARD to "legalityStandard",
+            DeckFormat.MODERN to "legalityModern",
+            DeckFormat.LEGACY to "legalityLegacy",
+            DeckFormat.VINTAGE to "legalityVintage",
+            DeckFormat.PAUPER to "legalityPauper",
+        )
+        cases.forEach { (format, _) ->
+            val profile = minimalProfile(format = format)
+            val c = when (format) {
+                DeckFormat.STANDARD -> card(id = "ok-${format.name}", legalityStandard = "legal")
+                DeckFormat.MODERN -> card(id = "ok-${format.name}", legalityModern = "legal")
+                DeckFormat.LEGACY -> card(id = "ok-${format.name}", legalityLegacy = "legal")
+                DeckFormat.VINTAGE -> card(id = "ok-${format.name}", legalityVintage = "legal")
+                DeckFormat.PAUPER -> card(id = "ok-${format.name}", legalityPauper = "legal")
+                else -> error("unreachable")
+            }
+            val fit = scorer.fit(c, profile, isOwned = false)
+            assertTrue("$format must accept a legal card", fit.isLegal)
+        }
+    }
+
+    @Test
+    fun `isSixtyCardConstructed covers all 7 non-Commander non-Draft formats`() {
+        val expectedTrue = setOf(
+            DeckFormat.STANDARD, DeckFormat.PIONEER, DeckFormat.MODERN, DeckFormat.LEGACY,
+            DeckFormat.VINTAGE, DeckFormat.PAUPER, DeckFormat.CASUAL,
+        )
+        DeckFormat.entries.forEach { format ->
+            assertEquals(
+                "isSixtyCardConstructed for $format",
+                format in expectedTrue,
+                format.isSixtyCardConstructed,
+            )
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     //  Group 8: rankAdds()
     // ═══════════════════════════════════════════════════════════════════════════

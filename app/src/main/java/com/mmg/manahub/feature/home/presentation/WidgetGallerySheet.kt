@@ -597,7 +597,8 @@ private val HomeWidgetType.description: String
         HomeWidgetType.LATEST_SETS -> stringResource(R.string.home_widget_desc_latest_sets)
         HomeWidgetType.MTG_NEWS -> stringResource(R.string.home_widget_desc_news)
         HomeWidgetType.RULES_TIP -> stringResource(R.string.home_widget_desc_rules_tip)
-        HomeWidgetType.SOCIAL_HUB -> stringResource(R.string.home_widget_desc_social_hub)
         HomeWidgetType.TRADES_HUB -> stringResource(R.string.home_widget_desc_trades_hub)
+        HomeWidgetType.FRIENDS -> stringResource(R.string.home_widget_desc_friends)
         HomeWidgetType.TRENDING_COMMANDERS -> stringResource(R.string.home_widget_desc_trending_commanders)
+        HomeWidgetType.COMMUNITY_DECKS -> stringResource(R.string.home_widget_desc_community_decks)
     }

@@ -20,7 +20,17 @@ import kotlin.test.assertTrue
 private class FakeCardRepository(
     private val byId: Map<String, Card> = emptyMap(),
     private val errorMessage: String? = null,
+    // Broken-image fix (2026-07-17). Controls the best-effort English-sibling warm-cache call —
+    // absent by default (DataResult.Error, matching "sibling not cached/reachable yet").
+    private val bySetAndNumber: Map<Pair<String, String>, Card> = emptyMap(),
 ) : CardRepository {
+    // Broken-image fix (2026-07-17). Call-tracking for the warm-cache invocation, mirroring
+    // FakeUserCardRepository's mergeCallCount/lastCall pattern below.
+    var getCardBySetAndNumberCallCount = 0
+        private set
+    var lastSetAndNumberCall: Pair<String, String>? = null
+        private set
+
     override suspend fun searchCardByName(query: String): DataResult<Card> = error("unused")
     override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> = error("unused")
     override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<com.mmg.manahub.core.model.PaginatedCards> = error("unused")
@@ -30,19 +40,25 @@ private class FakeCardRepository(
             ?: DataResult.Error("not found")
     override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
-    override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> = error("unused")
+    override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> {
+        getCardBySetAndNumberCallCount++
+        lastSetAndNumberCall = set to number
+        return bySetAndNumber[set to number]?.let { DataResult.Success(it) } ?: DataResult.Error("not found")
+    }
+    override suspend fun getCachedEnglishSiblings(pairs: Set<Pair<String, String>>): Map<Pair<String, String>, Card> = error("unused")
     override suspend fun getLanguagePrints(setCode: String, collectorNumber: String): DataResult<List<Card>> = error("unused")
     override suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>> = error("unused")
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardByExactName(name: String): Result<Card> = error("unused")
-    override suspend fun searchWithRawQuery(query: String): List<Card> = error("unused")
+    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> = error("unused")
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = error("unused")
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
     override suspend fun refreshCollectionPrices() = error("unused")
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
     override suspend fun evictStaleCache() = error("unused")
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
+    override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
     override suspend fun updateUserTags(scryfallId: String, userTags: List<CardTag>) = error("unused")
     override suspend fun updateSuggestedTags(scryfallId: String, suggestions: List<SuggestedTag>) = error("unused")
     override suspend fun confirmSuggestedTag(scryfallId: String, tag: CardTag) = error("unused")
@@ -243,5 +259,80 @@ class UpdateCollectionEntryUseCaseTest {
         )
 
         assertEquals(null, userCardRepository.lastCall?.userId)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  Broken-image fix (2026-07-17): best-effort English-sibling warm-cache
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun invoke_nonEnglishCard_warmsEnglishSiblingViaGetCardBySetAndNumber() = runTest {
+        val foreignCard = buildCard(scryfallId = "scry-es").copy(lang = "es", setCode = "lea", collectorNumber = "5")
+        val cardRepository = FakeCardRepository(
+            byId = mapOf("scry-es" to foreignCard),
+            bySetAndNumber = mapOf(("lea" to "5") to buildCard(scryfallId = "scry-en")),
+        )
+        val useCase = UpdateCollectionEntryUseCase(
+            cardRepository = cardRepository,
+            userCardRepository = FakeUserCardRepository(),
+        )
+
+        useCase(
+            entryId = "entry-1",
+            newScryfallId = "scry-es",
+            isFoil = false,
+            condition = "NM",
+            language = "es",
+            quantity = 1,
+        )
+
+        assertEquals(1, cardRepository.getCardBySetAndNumberCallCount)
+        assertEquals("lea" to "5", cardRepository.lastSetAndNumberCall)
+    }
+
+    @Test
+    fun invoke_englishCard_neverCallsGetCardBySetAndNumber() = runTest {
+        val card = buildCard(scryfallId = "scry-new") // lang = "en" per the fixture default
+        val cardRepository = FakeCardRepository(byId = mapOf("scry-new" to card))
+        val useCase = UpdateCollectionEntryUseCase(
+            cardRepository = cardRepository,
+            userCardRepository = FakeUserCardRepository(),
+        )
+
+        useCase(
+            entryId = "entry-1",
+            newScryfallId = "scry-new",
+            isFoil = false,
+            condition = "NM",
+            language = "en",
+            quantity = 1,
+        )
+
+        assertEquals(0, cardRepository.getCardBySetAndNumberCallCount)
+    }
+
+    @Test
+    fun invoke_nonEnglishCard_whenSiblingFetchFails_stillDelegatesToRepositoryMerge() = runTest {
+        // No matching entry in bySetAndNumber → FakeCardRepository.getCardBySetAndNumber returns
+        // DataResult.Error, exercising the runCatching{} best-effort path in the use case.
+        val foreignCard = buildCard(scryfallId = "scry-de").copy(lang = "de", setCode = "lea", collectorNumber = "9")
+        val cardRepository = FakeCardRepository(byId = mapOf("scry-de" to foreignCard))
+        val userCardRepository = FakeUserCardRepository(outcome = UpdateEntryOutcome.UPDATED)
+        val useCase = UpdateCollectionEntryUseCase(
+            cardRepository = cardRepository,
+            userCardRepository = userCardRepository,
+        )
+
+        val result = useCase(
+            entryId = "entry-1",
+            newScryfallId = "scry-de",
+            isFoil = false,
+            condition = "NM",
+            language = "de",
+            quantity = 1,
+        )
+
+        assertTrue(result is DataResult.Success)
+        assertEquals(1, userCardRepository.mergeCallCount)
     }
 }

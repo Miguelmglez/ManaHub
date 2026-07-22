@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.mapper.toDomainDeck
 import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSlot
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DeckWithCards
@@ -71,9 +72,9 @@ class DeckRepositoryImpl(
                 DeckWithCards(
                     deck = it.deck.toDomainDeck(),
                     mainboard = it.cards.filter { c -> !c.isSideboard }
-                        .map { c -> DeckSlot(c.scryfallId, c.quantity) },
+                        .map { c -> DeckSlot(c.scryfallId, c.quantity, DeckCardSource.fromRaw(c.source)) },
                     sideboard = it.cards.filter { c -> c.isSideboard }
-                        .map { c -> DeckSlot(c.scryfallId, c.quantity) },
+                        .map { c -> DeckSlot(c.scryfallId, c.quantity, DeckCardSource.fromRaw(c.source)) },
                 )
             }
         }
@@ -146,6 +147,7 @@ class DeckRepositoryImpl(
         scryfallId: String,
         quantity: Int,
         isSideboard: Boolean,
+        source: DeckCardSource,
     ) {
         withContext(ioDispatcher) {
             deckDao.upsertDeckCard(
@@ -154,6 +156,7 @@ class DeckRepositoryImpl(
                     scryfallId = scryfallId,
                     quantity = quantity,
                     isSideboard = isSideboard,
+                    source = source.name,
                 )
             )
             deckDao.getDeckById(deckId)?.let { deck ->
@@ -186,9 +189,8 @@ class DeckRepositoryImpl(
             // pre-computed target quantities. Both boards are derived from the same
             // single DAO read to avoid a torn view.
             val rows = deckDao.getDeckCards(deckId)
-            val sourceQty = rows.firstOrNull {
-                it.scryfallId == scryfallId && it.isSideboard == fromSideboard
-            }?.quantity ?: 0
+            val sourceRow = rows.firstOrNull { it.scryfallId == scryfallId && it.isSideboard == fromSideboard }
+            val sourceQty = sourceRow?.quantity ?: 0
             if (sourceQty <= 0) return@withContext
             val toMove = quantity.coerceIn(1, sourceQty)
             val targetQty = rows.firstOrNull {
@@ -201,6 +203,9 @@ class DeckRepositoryImpl(
                 fromSideboard = fromSideboard,
                 newSourceQty = sourceQty - toMove,
                 newTargetQty = targetQty + toMove,
+                // Deck Engine Unification (D4): preserve the slot's provenance across the move
+                // instead of resetting it to the DAO default -- see moveCardQuantity's KDoc.
+                source = sourceRow?.source ?: "USER",
             )
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))
@@ -246,6 +251,26 @@ class DeckRepositoryImpl(
                 deckId = deckId,
                 archetypeOverride = archetypeOverride,
                 themesOverrideJson = if (themesOverride.isEmpty()) null else gson.toJson(themesOverride),
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    override suspend fun updateTribeOverride(deckId: String, tribeOverride: String?) {
+        withContext(ioDispatcher) {
+            deckDao.updateTribeOverride(
+                deckId = deckId,
+                tribeOverride = tribeOverride,
+                updatedAt = System.currentTimeMillis(),
+            )
+        }
+    }
+
+    override suspend fun updateStrategyLocked(deckId: String, locked: Boolean) {
+        withContext(ioDispatcher) {
+            deckDao.updateStrategyLocked(
+                deckId = deckId,
+                locked = locked,
                 updatedAt = System.currentTimeMillis(),
             )
         }

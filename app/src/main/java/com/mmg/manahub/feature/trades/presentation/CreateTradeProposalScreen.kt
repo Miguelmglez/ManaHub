@@ -627,7 +627,6 @@ fun CreateTradeProposalScreen(
                     showEditSheet = false
                     editingItem = null
                 },
-                manaCost = null,
                 cardImage = null,
                 confirmButtonText = stringResource(R.string.scanner_edit_save)
             )

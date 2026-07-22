@@ -48,12 +48,12 @@ fun requiredProperty(name: String): String =
 
 android {
     namespace = "com.mmg.manahub"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.mmg.manahub"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 18
         versionName = "2.0.0"
 
@@ -111,6 +111,18 @@ android {
                 // anything touched by the change that happened to be in flight). Bump the worker
                 // heap so `./gradlew test`/`testDebugUnitTest` can complete deterministically.
                 it.maxHeapSize = "4096m"
+
+                // Wizard Quality Campaign harness (Wave 1 KNOWN LIMITATION, fixed Wave 2): Gradle's
+                // `Test` task does NOT forward arbitrary `-D` JVM system properties from the CLI to
+                // the forked test worker on its own -- `-Dharness.runLabel=wave2` on the command
+                // line was silently lost, so every harness report's `label` field read "baseline"
+                // regardless of what was passed. Forward it explicitly via a Gradle PROJECT property
+                // (`-Pharness.runLabel=wave2`, not `-D`) so WizardQualityMatrixTest's
+                // `System.getProperty("harness.runLabel", "baseline")` actually sees it.
+                it.systemProperty(
+                    "harness.runLabel",
+                    (project.findProperty("harness.runLabel") as String?) ?: "baseline",
+                )
             }
         }
     }
@@ -306,9 +318,9 @@ dependencies {
     // implementation("org.tensorflow:tensorflow-lite:2.16.1")
     // implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
+    // Latin-only: ja/ko variants removed 2026-07-22 (Android 16 / API 36 migration) — their
+    // native libraries are not 16KB-page-size aligned and no fixed release exists upstream.
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1")
 
     implementation(libs.accompanist.permissions)
     implementation(libs.material.icons.extended)

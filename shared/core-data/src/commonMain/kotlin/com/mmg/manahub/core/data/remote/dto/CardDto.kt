@@ -64,6 +64,7 @@ data class CardFaceDto(
     // Card Versions & Languages, Phase 1A: reversible cards carry oracle_id per-face instead of
     // on the root CardDto — used as a fallback in toDomain() when the root value is null.
     @SerialName("oracle_id")   val oracleId:   String?  = null,
+    @SerialName("printed_name") val printedName: String? = null,
     @SerialName("mana_cost")   val manaCost:   String?  = null,
     @SerialName("type_line")   val typeLine:   String?  = null,
     @SerialName("oracle_text") val oracleText: String?  = null,
