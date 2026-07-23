@@ -3,10 +3,12 @@ package com.mmg.manahub.feature.communitydecks.presentation
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.core.model.CommunityDeckCard
 import com.mmg.manahub.core.model.CommunityDeckOwner
+import com.mmg.manahub.feature.communitydecks.domain.CommunityDeckImportCoordinator
 import com.mmg.manahub.feature.communitydecks.domain.usecase.GetCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.ImportCommunityDeckUseCase
 import io.mockk.coEvery
@@ -15,9 +17,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -34,9 +38,16 @@ import org.junit.Test
 /**
  * Unit tests for [CommunityDeckDetailViewModel].
  *
- * Uses [StandardTestDispatcher] for deterministic coroutine control and Turbine
- * for Channel event assertions. Crashlytics is mocked because the VM calls
- * `FirebaseCrashlytics.getInstance()` in its init block (outside runCatching).
+ * Uses [StandardTestDispatcher] for deterministic coroutine control and Turbine for Channel event
+ * assertions. Crashlytics is mocked because the VM calls `FirebaseCrashlytics.getInstance()` in its
+ * init block (outside runCatching).
+ *
+ * ## Import survives navigation (bug fix, 2026-07-22)
+ * The VM no longer calls [ImportCommunityDeckUseCase] directly — it delegates to a
+ * [CommunityDeckImportCoordinator], which is constructed here with an `appScope` backed by the SAME
+ * [testDispatcher] instance already passed to `Dispatchers.setMain(...)` (kotlinx-coroutines-test
+ * `runTest` reuses the scheduler behind an already-set `Main` dispatcher), so `advanceUntilIdle()`
+ * deterministically drives BOTH `viewModelScope` and the coordinator's app-scoped coroutine.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommunityDeckDetailViewModelTest {
@@ -45,7 +56,12 @@ class CommunityDeckDetailViewModelTest {
 
     private val getCommunityDeck: GetCommunityDeckUseCase = mockk()
     private val importCommunityDeck: ImportCommunityDeckUseCase = mockk()
+    private val userCardRepository: UserCardRepository = mockk()
     private val crashlytics: FirebaseCrashlytics = mockk(relaxed = true)
+
+    /** Shared across a test method's ViewModel instances — this is what lets an import survive a
+     * ViewModel being cleared and a new one being created for the same `archidektId`. */
+    private lateinit var importCoordinator: CommunityDeckImportCoordinator
 
     // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -80,6 +96,13 @@ class CommunityDeckDetailViewModelTest {
 
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns crashlytics
+
+        every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+        importCoordinator = CommunityDeckImportCoordinator(
+            importCommunityDeck = importCommunityDeck,
+            appScope = CoroutineScope(testDispatcher),
+        )
     }
 
     @After
@@ -91,13 +114,20 @@ class CommunityDeckDetailViewModelTest {
     /**
      * Creates the ViewModel AFTER stubs are set. The init block calls loadDeck(),
      * which launches in viewModelScope — advanceUntilIdle() must follow.
+     *
+     * @param coordinator defaults to the shared per-test [importCoordinator] — pass an explicit one
+     *   only to exercise a DIFFERENT coordinator instance (never needed for the "survives across
+     *   two ViewModel instances" scenario, which relies on reusing the SAME coordinator).
      */
-    private fun createViewModel(savedStateHandle: SavedStateHandle = buildSavedStateHandle()) =
-        CommunityDeckDetailViewModel(
-            savedStateHandle = savedStateHandle,
-            getCommunityDeck = getCommunityDeck,
-            importCommunityDeck = importCommunityDeck,
-        )
+    private fun createViewModel(
+        savedStateHandle: SavedStateHandle = buildSavedStateHandle(),
+        coordinator: CommunityDeckImportCoordinator = importCoordinator,
+    ) = CommunityDeckDetailViewModel(
+        savedStateHandle = savedStateHandle,
+        getCommunityDeck = getCommunityDeck,
+        importCoordinator = coordinator,
+        userCardRepository = userCardRepository,
+    )
 
     // ── Group 1: Loading state ──────────────────────────────────────────────
 
@@ -187,7 +217,7 @@ class CommunityDeckDetailViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        // Act — start import (runs in viewModelScope; won't complete).
+        // Act — start import (runs on the coordinator's app scope; won't complete).
         vm.importDeck()
         advanceUntilIdle()
 
@@ -348,7 +378,8 @@ class CommunityDeckDetailViewModelTest {
         vm.importDeck()
         advanceUntilIdle()
 
-        // Second import should be a no-op.
+        // Second import should be a no-op (guarded both locally in the VM and — authoritatively —
+        // inside CommunityDeckImportCoordinator.startImport's job.isActive check).
         vm.importDeck()
         advanceUntilIdle()
 
@@ -370,6 +401,68 @@ class CommunityDeckDetailViewModelTest {
 
         // Assert
         coVerify(exactly = 0) { importCommunityDeck(any(), any()) }
+    }
+
+    // ── Group 9: Import survives navigation (bug fix, 2026-07-22) ───────────
+
+    @Test
+    fun `given import started by one VM instance when a second VM instance is created for the same archidektId then it observes the in-flight import`() = runTest {
+        // Arrange — VM1 starts an import that never completes (simulating a slow network import
+        // still running when the user navigates away, clearing VM1).
+        val deck = buildCommunityDeck()
+        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(deck)
+        coEvery { importCommunityDeck(any(), any()) } coAnswers {
+            kotlinx.coroutines.awaitCancellation()
+        }
+
+        val vm1 = createViewModel()
+        advanceUntilIdle()
+        vm1.importDeck()
+        advanceUntilIdle()
+        assertTrue((vm1.uiState.value as CommunityDeckDetailUiState.Content).isImporting)
+
+        // Act — a FRESH ViewModel instance for the SAME archidektId + SAME coordinator (as if the
+        // user reopened the screen) — note vm1 is never explicitly cleared; the import keeps
+        // running on the coordinator's app scope regardless, which is exactly the point.
+        val vm2 = createViewModel()
+        advanceUntilIdle()
+
+        // Assert — vm2 immediately reflects the still-running import, it did NOT lose it.
+        val state2 = vm2.uiState.value as CommunityDeckDetailUiState.Content
+        assertTrue(state2.isImporting)
+    }
+
+    @Test
+    fun `given import already completed when a second VM instance is created for the same archidektId then it does not replay stale events`() = runTest {
+        // Arrange — VM1 runs an import to completion.
+        val deck = buildCommunityDeck()
+        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(deck)
+        coEvery { importCommunityDeck(any(), any()) } returns
+            ImportCommunityDeckUseCase.ImportResult.Success("deck-001", 2, 0)
+
+        val vm1 = createViewModel()
+        advanceUntilIdle()
+        vm1.events.test {
+            vm1.importDeck()
+            advanceUntilIdle()
+            awaitItem() // ShowImportResult
+            awaitItem() // NavigateToDeck
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Act — a second ViewModel instance for the SAME archidektId + SAME coordinator, created
+        // AFTER the import already finished (as if the user reopened the screen later).
+        val vm2 = createViewModel()
+        advanceUntilIdle()
+
+        // Assert — vm2's Content correctly reflects "not importing" (the terminal state), and
+        // critically it must NOT replay the ShowImportResult/NavigateToDeck events a second time.
+        val state2 = vm2.uiState.value as CommunityDeckDetailUiState.Content
+        assertFalse(state2.isImporting)
+
+        vm2.events.test {
+            expectNoEvents()
+        }
     }
 
     // ── Group 10: Retry / loadDeck ──────────────────────────────────────────
@@ -477,5 +570,69 @@ class CommunityDeckDetailViewModelTest {
 
         // Assert
         io.mockk.verify { crashlytics.log("community_deck_load_error") }
+    }
+
+    // ── Group 13: Owned-card identity keys (UI addition, 2026-07-22) ────────
+
+    /** Minimal [Card] fixture — mirrors `ImportCommunityDeckUseCaseTest.buildResolvedCard`. */
+    private fun buildOwnedCard(scryfallId: String, name: String) = com.mmg.manahub.core.model.Card(
+        scryfallId = scryfallId,
+        name = name,
+        printedName = null,
+        manaCost = null,
+        cmc = 0.0,
+        colors = emptyList(),
+        colorIdentity = emptyList(),
+        typeLine = "Artifact",
+        printedTypeLine = null,
+        oracleText = null,
+        printedText = null,
+        keywords = emptyList(),
+        power = null,
+        toughness = null,
+        loyalty = null,
+        setCode = "test",
+        setName = "Test Set",
+        collectorNumber = "1",
+        rarity = "common",
+        releasedAt = "2026-01-01",
+        frameEffects = emptyList(),
+        promoTypes = emptyList(),
+        lang = "en",
+        imageNormal = null,
+        imageArtCrop = null,
+        imageBackNormal = null,
+        priceUsd = null,
+        priceUsdFoil = null,
+        priceEur = null,
+        priceEurFoil = null,
+        legalityStandard = "legal",
+        legalityPioneer = "legal",
+        legalityModern = "legal",
+        legalityCommander = "legal",
+        flavorText = null,
+        artist = null,
+        scryfallUri = "",
+    )
+
+    @Test
+    fun `given owned cards in the user collection when loaded then ownedCardIdentityKeys reflects them`() = runTest {
+        // Arrange — Card.oracleId defaults to blank, so the identity key falls back to the name
+        // (Card Versions & Languages convention: oracleId.ifBlank { name }).
+        val deck = buildCommunityDeck()
+        coEvery { getCommunityDeck(testDeckId) } returns DataResult.Success(deck)
+        val ownedCard = com.mmg.manahub.core.model.UserCardWithCard(
+            userCard = com.mmg.manahub.core.model.UserCard(id = "uc-1", scryfallId = "sf-sol-ring"),
+            card = buildOwnedCard(scryfallId = "sf-sol-ring", name = "Sol Ring"),
+        )
+        every { userCardRepository.observeCollection() } returns flowOf(listOf(ownedCard))
+
+        // Act
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        val state = vm.uiState.value as CommunityDeckDetailUiState.Content
+        assertEquals(setOf("Sol Ring"), state.ownedCardIdentityKeys)
     }
 }

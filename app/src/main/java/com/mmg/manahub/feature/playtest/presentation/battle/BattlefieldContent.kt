@@ -34,14 +34,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RemoveCircleOutline
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -138,8 +140,6 @@ fun BattlefieldContent(
 ) {
     val haptic = LocalHapticFeedback.current
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val sp = MaterialTheme.spacing
 
     var boxCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -160,11 +160,25 @@ fun BattlefieldContent(
     var dragSession by remember { mutableStateOf<DragSession?>(null) }
     val pointerOffset = remember { mutableStateOf(Offset.Zero) }
 
+    // Tracks each hand card's on-screen center (relative to the root Box), keyed by
+    // instanceId. The hand fan (see HandStrip) is a centered, negatively-overlapped LazyRow —
+    // its cards do NOT spread evenly across the registered HAND zone's full width, so a
+    // width/count average cannot locate a drop point for reordering. This map lets onDragEnd
+    // resolve the actual visual drop index instead of guessing from zone width.
+    val handCardCenters = remember { mutableStateMapOf<Long, Offset>() }
+
+    // LIBRARY is registered in zoneBounds only so the draw-animation overlay can find its
+    // on-screen position (see the `animatingDrawCard` block below) and so tapping it can draw —
+    // it must NEVER resolve as a drag-and-drop TARGET (see PlayZone.LIBRARY KDoc: "only for
+    // tracking its position in UI"). Dropping a card onto Library previously vanished it
+    // entirely: moveCard has no branch that re-adds a card to the library, so the card was
+    // removed from its origin zone and never placed anywhere. Every drop-target hit-test below
+    // excludes it so a drop over the Library pile resolves to "no target" (the card snaps back).
     val hoveredZone: PlayZone? by remember {
         derivedStateOf {
             val session = dragSession ?: return@derivedStateOf null
             val pointer = session.startCenter + pointerOffset.value
-            zoneBounds.entries.firstOrNull { it.value.contains(pointer) }?.key
+            zoneBounds.entries.firstOrNull { it.key != PlayZone.LIBRARY && it.value.contains(pointer) }?.key
         }
     }
 
@@ -180,21 +194,26 @@ fun BattlefieldContent(
         val session = dragSession
         if (session != null && zoneBounds.isNotEmpty()) {
             val pointer = session.startCenter + pointerOffset.value
-            val target = zoneBounds.entries.firstOrNull { it.value.contains(pointer) }?.key
+            // LIBRARY is excluded — see the handCardCenters/hoveredZone comment above; it is a
+            // draw-only source, never a drop target.
+            val target = zoneBounds.entries.firstOrNull { it.key != PlayZone.LIBRARY && it.value.contains(pointer) }?.key
 
             if (target != null && target != session.fromZone) {
                 onMoveCard(session.card.instanceId, target)
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } else if (target == PlayZone.HAND && session.fromZone == PlayZone.HAND) {
-                val handBounds = zoneBounds[PlayZone.HAND]
-                if (handBounds != null) {
-                    val relX = pointer.x - handBounds.left
-                    val fromIndex = battlefield.hand.indexOfFirst { it.instanceId == session.card.instanceId }
-                    if (fromIndex != -1) {
-                        val cardStep = (handBounds.width / battlefield.hand.size).coerceAtLeast(1f)
-                        val toIndex = (relX / cardStep).toInt().coerceIn(battlefield.hand.indices)
-                        onReorderHand(fromIndex, toIndex)
-                    }
+                val fromIndex = battlefield.hand.indexOfFirst { it.instanceId == session.card.instanceId }
+                if (fromIndex != -1) {
+                    // Count how many OTHER hand cards' tracked on-screen centers sit to the left
+                    // of the drop point — this reflects the actual visual fan layout regardless
+                    // of hand size, unlike a width/card-count average (which breaks for small
+                    // hands under the fan's centered, negatively-overlapped arrangement). A card
+                    // whose center was never tracked (not yet laid out) sorts to the end.
+                    val toIndex = battlefield.hand
+                        .filterNot { it.instanceId == session.card.instanceId }
+                        .count { other -> (handCardCenters[other.instanceId]?.x ?: Float.MAX_VALUE) < pointer.x }
+                        .coerceIn(battlefield.hand.indices)
+                    onReorderHand(fromIndex, toIndex)
                 }
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } else if (target != null && target == session.fromZone &&
@@ -293,6 +312,7 @@ fun BattlefieldContent(
             onDragEnd = onDragEnd,
             onDragCancel = onDragCancel,
             onUpdateCardOffset = onUpdateCardOffset,
+            onHandCardPositioned = { instanceId, center -> handCardCenters[instanceId] = center },
         )
 
         if (isLandscape) {
@@ -374,22 +394,16 @@ fun BattlefieldContent(
                 val isLand = card.typeLine.contains("Land", ignoreCase = true)
 
                 if (currentZone != PlayZone.LANDS && currentZone != PlayZone.PERMANENTS) {
-                    Button(
+                    MagicCtaButton(
+                        text = if (isLand) "Play as Land" else "Play",
                         onClick = {
                             android.util.Log.d("Battlefield", "Play button clicked for instanceId=${playCard.instanceId}")
                             pendingMove = PendingMove(playCard.instanceId, if (isLand) PlayZone.LANDS else PlayZone.PERMANENTS)
                             isDismissingInspection = true
                         },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = mc.primaryAccent,
-                        ),
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(sp.sm))
-                        Text(text = if (isLand) "Play as Land" else "Play", style = ty.titleMedium)
-                    }
+                        color = MagicCtaColor.Primary,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                    )
                 }
 
                 Row(
@@ -397,62 +411,42 @@ fun BattlefieldContent(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (currentZone != PlayZone.GRAVEYARD) {
-                        Button(
+                        MagicCtaButton(
+                            text = "Graveyard",
                             onClick = {
-                                android.util.Log.d("Battlefield", "Grave button clicked for instanceId=${playCard.instanceId}")
                                 pendingMove = PendingMove(playCard.instanceId, PlayZone.GRAVEYARD)
                                 isDismissingInspection = true
                             },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = mc.lifeNegative,
-                                contentColor = mc.surface,
-                            ),
+                            color = MagicCtaColor.Error,
                             modifier = Modifier.weight(1f).height(48.dp),
-                        ) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(sp.xs))
-                            Text("Grave", style = ty.labelLarge)
-                        }
+                        )
                     }
 
                     if (currentZone != PlayZone.EXILE) {
-                        Button(
+                        MagicCtaButton(
+                            text = "Exile",
                             onClick = {
-                                android.util.Log.d("Battlefield", "Exile button clicked for instanceId=${playCard.instanceId}")
                                 pendingMove = PendingMove(playCard.instanceId, PlayZone.EXILE)
                                 isDismissingInspection = true
                             },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = mc.secondaryAccent,
-                                contentColor = mc.surface,
-                            ),
+                            color = MagicCtaColor.Neutral,
                             modifier = Modifier.weight(1f).height(48.dp),
-                        ) {
-                            Icon(Icons.Default.RemoveCircleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(sp.xs))
-                            Text("Exile", style = ty.labelLarge)
-                        }
+                        )
                     }
                 }
 
                 if (currentZone != PlayZone.HAND) {
-                    Button(
+                    MagicCtaButton(
+                        text = "Return to Hand",
                         onClick = {
                             android.util.Log.d("Battlefield", "Hand button clicked for instanceId=${playCard.instanceId}")
                             pendingMove = PendingMove(playCard.instanceId, PlayZone.HAND)
                             isDismissingInspection = true
                         },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = mc.surfaceVariant,
-                            contentColor = mc.textPrimary,
-                        ),
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                    ) {
-                        Text("Return to Hand", style = ty.labelMedium)
-                    }
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Primary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         )
@@ -490,6 +484,7 @@ private data class BattlefieldProps(
     val onDragEnd: () -> Unit,
     val onDragCancel: () -> Unit,
     val onUpdateCardOffset: (instanceId: Long, x: Float, y: Float) -> Unit,
+    val onHandCardPositioned: (Long, Offset) -> Unit,
 )
 
 // ── Portrait layout ─────────────────────────────────────────────────────────
@@ -505,7 +500,6 @@ private fun PortraitBattlefield(props: BattlefieldProps) {
 
             CommandZoneArea(
                 commanderCard = commander,
-                librarySize   = props.battlefield.library.size,
                 onClick       = { props.onInspectCommander(commander, cardRect) },
                 modifier      = Modifier
                     .padding(horizontal = sp.md, vertical = sp.xs)
@@ -612,6 +606,7 @@ private fun PortraitBattlefield(props: BattlefieldProps) {
             onDragDelta = props.onDragDelta,
             onDragEnd = props.onDragEnd,
             onDragCancel = props.onDragCancel,
+            onCardPositioned = props.onHandCardPositioned,
             modifier = Modifier.padding(horizontal = sp.md, vertical = sp.xs),
         )
     }
@@ -639,7 +634,6 @@ private fun LandscapeBattlefield(props: BattlefieldProps) {
 
                 CommandZoneArea(
                     commanderCard = cmdr,
-                    librarySize   = props.battlefield.library.size,
                     onClick       = { props.onInspectCommander(cmdr, cardRect) },
                     modifier      = Modifier
                         .fillMaxWidth()
@@ -734,6 +728,7 @@ private fun LandscapeBattlefield(props: BattlefieldProps) {
                 onDragDelta = props.onDragDelta,
                 onDragEnd = props.onDragEnd,
                 onDragCancel = props.onDragCancel,
+                onCardPositioned = props.onHandCardPositioned,
             )
         }
     }
@@ -795,7 +790,7 @@ private fun LibraryPile(
         Text(
             text = stringResource(R.string.playtest_battle_draw_card),
             style = ty.labelSmall,
-            color = mc.textSecondary,
+            color = mc.textPrimary,
             modifier = Modifier.padding(top = sp.xxs),
         )
     }
@@ -833,7 +828,7 @@ private fun GraveyardPile(
             contentAlignment = Alignment.Center,
         ) {
             if (graveyard.isEmpty()) {
-                Text(text = "Grave", style = ty.labelMedium, color = mc.textDisabled)
+                Text(text = "(0)", style = ty.labelMedium, color = mc.textDisabled)
             } else {
                 val topCard = graveyard.last()
                 AsyncImage(
@@ -848,7 +843,7 @@ private fun GraveyardPile(
         Text(
             text = "Graveyard",
             style = ty.labelSmall,
-            color = mc.textSecondary,
+            color = mc.textPrimary,
             modifier = Modifier.padding(top = sp.xxs),
         )
     }
@@ -886,7 +881,7 @@ private fun ExilePile(
             contentAlignment = Alignment.Center,
         ) {
             if (exile.isEmpty()) {
-                Text(text = "Exile", style = ty.labelMedium, color = mc.textDisabled)
+                Text(text = "(0)", style = ty.labelMedium, color = mc.textDisabled)
             } else {
                 val topCard = exile.last()
                 AsyncImage(
@@ -901,7 +896,7 @@ private fun ExilePile(
         Text(
             text = "Exile",
             style = ty.labelSmall,
-            color = mc.textSecondary,
+            color = mc.textPrimary,
             modifier = Modifier.padding(top = sp.xxs),
         )
     }
@@ -1030,7 +1025,7 @@ private fun FreeFormFieldZone(
         Text(
             text = label,
             style = ty.labelSmall,
-            color = mc.textSecondary.copy(alpha = 0.4f),
+            color = mc.textPrimary.copy(alpha = 0.4f),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(sp.xs),
@@ -1054,6 +1049,7 @@ private fun HandStrip(
     onDragDelta: (Offset) -> Unit,
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
+    onCardPositioned: (Long, Offset) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
@@ -1120,6 +1116,7 @@ private fun HandStrip(
                         onDragDelta = onDragDelta,
                         onDragEnd = onDragEnd,
                         onDragCancel = onDragCancel,
+                        onPositioned = { rect -> onCardPositioned(playCard.instanceId, rect.center) },
                     )
                 }
             }
@@ -1142,6 +1139,7 @@ private fun DraggableFieldCard(
     onDragEnd: () -> Unit,
     onDragCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    onPositioned: ((Rect) -> Unit)? = null,
 ) {
     var rectInBox by remember(playCard.instanceId) { mutableStateOf(Rect.Zero) }
 
@@ -1156,6 +1154,7 @@ private fun DraggableFieldCard(
             .onGloballyPositioned { coords ->
                 if (boxCoords != null && boxCoords.isAttached && coords.isAttached) {
                     rectInBox = boxCoords.localBoundingBoxOf(coords)
+                    onPositioned?.invoke(rectInBox)
                 }
             }
             .pointerInput(playCard.instanceId) {

@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.decks.domain.usecase
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
@@ -77,24 +78,50 @@ sealed class ImportOutcome {
  * zero edits.
  *
  * ## What every source shares (preserved from the two originals, never reinvented)
- * - Skip-on-unresolvable: a card that fails Scryfall resolution ([CardRepository.searchCardByName])
- *   is SKIPPED, never aborts the batch.
+ * - Skip-on-unresolvable: a card that fails resolution is SKIPPED, never aborts the batch.
  * - The `>50%`-failure-rate telemetry breadcrumb (`deck_import_high_failure_rate`), fired once per
  *   import when more than half the cards failed to resolve.
- * - Every card resolution routes through [CardRepository.searchCardByName], which is itself
- *   rate-limited through `ScryfallRequestQueue` and writes via the safe INSERT-OR-IGNORE + `@Update`
- *   upsert (never `OnConflictStrategy.REPLACE` on `CardEntity`) — this use case never touches Room
- *   directly, it only calls the repository.
- * - `onProgress(resolved+failed, total)` after each card.
+ * - `onProgress(resolved+failed, total)` after each card, fired during the RESOLUTION phase (before
+ *   any deck write — see "Resolve-then-write" below), so the UI's progress bar tracks the actually
+ *   slow part of the pipeline.
  * - Commander assignment (first resolved commander-flagged card wins) + community-source attribution
  *   stamping ([DeckRepository.updateDeckAttribution]) when the source carries either.
  *
+ * ## Card resolution: known-id batch fast path + fuzzy-name fallback (bug fix, 2026-07-22)
+ * A source that already supplies an exact Scryfall PRINTING id per card ([ImportSource
+ * .FromCommunityDeck], via [CommunityDeckCard.scryfallId]) resolves through a SINGLE batched
+ * pre-warm ([CardRepository.warmCacheForIds]) + Room-only read ([CardRepository.getCardsByIds])
+ * over every known id up front, instead of one fuzzy [CardRepository.searchCardByName] network
+ * round-trip per card — this is both far faster (2 batched HTTP calls instead of ~N) and far more
+ * reliable (fuzzy name search can fail or mis-resolve on split/adventure/DFC names, punctuation, or
+ * ambiguous short names, when the exact id was already known). A known id that the batch fetch
+ * couldn't resolve (Scryfall's `/cards/collection` returned it `not_found` — a retired/dead printing
+ * id) falls back to [CardRepository.searchCardByName] as a second attempt before the card counts as
+ * failed. A source with no known id per card ([ImportSource.PastedText], [ImportSource.DeckstatsUrl])
+ * is unaffected — every card still resolves via [CardRepository.searchCardByName] exactly as before.
+ * General rule for future sources: prefer known-id batch resolution over fuzzy name search whenever
+ * the source already supplies an exact id.
+ *
+ * ## Resolve-then-write: no partially-imported deck is ever observable (bug fix, 2026-07-22)
+ * EVERY card is resolved in memory FIRST; the deck is only created/written to AFTER resolution
+ * completes. For a brand-new deck ([targetDeckId] null) the entire resolved card list is flushed in
+ * ONE atomic transaction via [DeckRepository.replaceAllCards] — never N sequential
+ * [DeckRepository.addCardToDeck] calls — so a deck (once it exists in Room) always has its FULL
+ * card list from the first observable moment; a cancellation mid-resolution (e.g. the caller's
+ * coroutine scope is cancelled by screen navigation) leaves NOTHING written, never a half-built
+ * deck. This is why callers that must survive navigation (e.g.
+ * `CommunityDeckImportCoordinator`) should launch this use case on a scope that outlives the
+ * screen, not `viewModelScope`.
+ *
  * ## Two write modes
- * - [targetDeckId] non-null: writes INTO that existing live deck (mirrors [ImportDeckUseCase]'s
- *   original contract — no rename, no new deck).
- * - [targetDeckId] null: CREATES a new deck first (mirrors [com.mmg.manahub.feature.communitydecks
+ * - [targetDeckId] non-null: writes INTO that existing live deck via per-card
+ *   [DeckRepository.addCardToDeck] (mirrors [ImportDeckUseCase]'s original incremental-merge
+ *   contract exactly — preserves whatever the deck already contains; no rename, no new deck).
+ * - [targetDeckId] null: CREATES a new deck, then writes every resolved card via ONE
+ *   [DeckRepository.replaceAllCards] call (mirrors [com.mmg.manahub.feature.communitydecks
  *   .domain.usecase.ImportCommunityDeckUseCase]'s original contract), named/formatted from the
- *   source when available.
+ *   source when available. Safe to do atomically because there is no pre-existing card list on a
+ *   freshly-created deck to merge with.
  */
 @OptIn(ExperimentalTime::class)
 class ImportDeckCardsUseCase(
@@ -126,7 +153,20 @@ class ImportDeckCardsUseCase(
 
     // ── Per-source parsing → a common internal representation ──────────────────────
 
-    private data class ParsedCard(val name: String, val quantity: Int, val isSideboard: Boolean, val isCommander: Boolean)
+    /**
+     * @param knownScryfallId an already-resolved Scryfall PRINTING id, when the source supplied one
+     *   (currently only [ImportSource.FromCommunityDeck], via [CommunityDeckCard.scryfallId]) — lets
+     *   [writeImport] skip the fuzzy [CardRepository.searchCardByName] round-trip for this card. Null
+     *   for every other source ([ImportSource.PastedText], [ImportSource.DeckstatsUrl]), which never
+     *   have a pre-resolved id and keep resolving by name exactly as before.
+     */
+    private data class ParsedCard(
+        val name: String,
+        val quantity: Int,
+        val isSideboard: Boolean,
+        val isCommander: Boolean,
+        val knownScryfallId: String? = null,
+    )
     private data class Attribution(val sourceUrl: String?, val sourceAuthor: String?, val sourceService: String)
     private data class ParsedImport(
         val cards: List<ParsedCard>,
@@ -148,7 +188,17 @@ class ImportDeckCardsUseCase(
     }
 
     private fun parseCommunityDeck(deck: CommunityDeck): ParsedImport = ParsedImport(
-        cards = deck.cards.map { ParsedCard(it.name, it.quantity, isSideboard = it.isSideboard, isCommander = it.isCommander) },
+        cards = deck.cards.map {
+            ParsedCard(
+                name = it.name,
+                quantity = it.quantity,
+                isSideboard = it.isSideboard,
+                isCommander = it.isCommander,
+                // Bug fix, 2026-07-22: Archidekt already resolved an exact printing for this entry —
+                // use it directly (batched in writeImport) instead of a fresh fuzzy name search.
+                knownScryfallId = it.scryfallId.takeIf { id -> id.isNotBlank() },
+            )
+        },
         suggestedName = deck.name,
         suggestedDescription = deck.description,
         suggestedFormat = deck.format,
@@ -169,6 +219,83 @@ class ImportDeckCardsUseCase(
         )
     }
 
+    /** One successfully-resolved card, carrying only what the write phase needs. */
+    private data class ResolvedCard(val card: Card, val quantity: Int, val isSideboard: Boolean)
+
+    /** Outcome of the pure, side-effect-free (on [deckRepository]) resolution phase. */
+    private data class ResolutionResult(
+        val resolvedCards: List<ResolvedCard>,
+        val resolvedCount: Int,
+        val failedCount: Int,
+        val commanderScryfallId: String?,
+    )
+
+    /**
+     * Resolves every [ParsedImport.cards] entry to a [Card] — NO [deckRepository] write happens
+     * here (bug fix, 2026-07-22: resolution must complete fully in memory before any deck exists,
+     * so a cancellation mid-import never leaves a half-populated deck — see the class KDoc's
+     * "Resolve-then-write").
+     *
+     * Cards carrying a [ParsedCard.knownScryfallId] (currently only [ImportSource.FromCommunityDeck])
+     * are resolved via ONE batched [CardRepository.warmCacheForIds] + [CardRepository.getCardsByIds]
+     * pre-warm over every known id up front, instead of a fuzzy [CardRepository.searchCardByName]
+     * round-trip per card (bug fix, 2026-07-22 — see the class KDoc's "known-id batch fast path").
+     * A known id the batch fetch couldn't resolve falls back to [CardRepository.searchCardByName].
+     */
+    private suspend fun resolveCards(
+        parsed: ParsedImport,
+        targetDeckId: String?,
+        onProgress: (resolved: Int, total: Int) -> Unit,
+    ): ResolutionResult {
+        val knownIds = parsed.cards.mapNotNull { it.knownScryfallId }.distinct()
+        val warmedById: Map<String, Card> = if (knownIds.isNotEmpty()) {
+            cardRepository.warmCacheForIds(knownIds)
+            cardRepository.getCardsByIds(knownIds).associateBy { it.scryfallId }
+        } else {
+            emptyMap()
+        }
+
+        var resolvedCount = 0
+        var failedCount = 0
+        var commanderScryfallId: String? = null
+        val totalPhysicalCards = parsed.cards.sumOf { it.quantity }
+        var physicalProcessedCount = 0
+        val resolvedCards = mutableListOf<ResolvedCard>()
+
+        parsed.cards.forEachIndexed { index, card ->
+            val fromWarmedCache = card.knownScryfallId?.let { warmedById[it] }
+            val result: DataResult<Card> = fromWarmedCache
+                ?.let { DataResult.Success(it) }
+                ?: cardRepository.searchCardByName(card.name)
+
+            if (result is DataResult.Success) {
+                resolvedCards += ResolvedCard(result.data, card.quantity, card.isSideboard)
+                // Commander auto-assignment is scoped to NEW-deck creation only (targetDeckId
+                // == null) — see the class KDoc's "Two write modes". Importing pasted TEXT
+                // into an EXISTING live deck (ImportDeckUseCase's original contract) must NEVER
+                // silently overwrite that deck's already-chosen commander; the original
+                // ImportDeckUseCase never touched `commanderCardId` at all.
+                if (targetDeckId == null && card.isCommander && commanderScryfallId == null) {
+                    commanderScryfallId = result.data.scryfallId
+                }
+                resolvedCount++
+            } else {
+                // Never the card name itself (PII-adjacent) — index + name length only.
+                crashReporter.log("deck_import_card_unresolved: index=$index, name_length=${card.name.length}")
+                failedCount++
+            }
+            physicalProcessedCount += card.quantity
+            onProgress(physicalProcessedCount, totalPhysicalCards)
+        }
+
+        if (parsed.cards.isNotEmpty() && failedCount > parsed.cards.size / 2) {
+            crashReporter.log("deck_import_high_failure_rate")
+            crashReporter.recordException(IllegalStateException("$failedCount/${parsed.cards.size} cards unresolved"))
+        }
+
+        return ResolutionResult(resolvedCards, resolvedCount, failedCount, commanderScryfallId)
+    }
+
     // ── Unified write path ──────────────────────────────────────────────────────────
 
     private suspend fun writeImport(
@@ -176,8 +303,15 @@ class ImportDeckCardsUseCase(
         targetDeckId: String?,
         onProgress: (resolved: Int, total: Int) -> Unit,
     ): ImportOutcome {
-        val deckId = targetDeckId ?: run {
-            try {
+        return try {
+            // Phase 1: resolve every card in memory. NOTHING is written to deckRepository yet, so
+            // a cancellation here (e.g. the caller's scope is torn down by screen navigation) leaves
+            // no trace — see the class KDoc's "Resolve-then-write".
+            val resolution = resolveCards(parsed, targetDeckId, onProgress)
+
+            // Phase 2: create the deck (new-deck path only) — its own breadcrumb + early return,
+            // preserved verbatim from before this refactor.
+            val deckId = targetDeckId ?: try {
                 deckRepository.createDeck(
                     name = parsed.suggestedName ?: DEFAULT_DECK_NAME,
                     description = parsed.suggestedDescription ?: DEFAULT_DECK_DESCRIPTION,
@@ -188,48 +322,29 @@ class ImportDeckCardsUseCase(
                 crashReporter.recordException(t)
                 return ImportOutcome.Error(t.message ?: "Import failed")
             }
-        }
 
-        return try {
-            var resolvedCount = 0
-            var failedCount = 0
-            var commanderScryfallId: String? = null
-            val totalPhysicalCards = parsed.cards.sumOf { it.quantity }
-            var physicalProcessedCount = 0
-
-            parsed.cards.forEachIndexed { index, card ->
-                val result = cardRepository.searchCardByName(card.name)
-                if (result is DataResult.Success) {
+            // Phase 3: single write. A brand-new deck (targetDeckId == null) has no pre-existing
+            // card list to merge with, so the whole resolved list is flushed atomically in ONE
+            // transaction. An EXISTING deck (targetDeckId != null) keeps the original incremental
+            // per-card merge contract (ImportDeckUseCase) — replaceAllCards would wipe whatever the
+            // live deck already contains, which this write mode must never do.
+            if (targetDeckId == null) {
+                deckRepository.replaceAllCards(
+                    deckId = deckId,
+                    slots = resolution.resolvedCards.map { Triple(it.card.scryfallId, it.quantity, it.isSideboard) },
+                )
+            } else {
+                resolution.resolvedCards.forEach { resolved ->
                     deckRepository.addCardToDeck(
                         deckId = deckId,
-                        scryfallId = result.data.scryfallId,
-                        quantity = card.quantity,
-                        isSideboard = card.isSideboard,
+                        scryfallId = resolved.card.scryfallId,
+                        quantity = resolved.quantity,
+                        isSideboard = resolved.isSideboard,
                     )
-                    // Commander auto-assignment is scoped to NEW-deck creation only (targetDeckId
-                    // == null) — see the class KDoc's "Two write modes". Importing pasted TEXT
-                    // into an EXISTING live deck (ImportDeckUseCase's original contract) must NEVER
-                    // silently overwrite that deck's already-chosen commander; the original
-                    // ImportDeckUseCase never touched `commanderCardId` at all.
-                    if (targetDeckId == null && card.isCommander && commanderScryfallId == null) {
-                        commanderScryfallId = result.data.scryfallId
-                    }
-                    resolvedCount++
-                } else {
-                    // Never the card name itself (PII-adjacent) — index + name length only.
-                    crashReporter.log("deck_import_card_unresolved: index=$index, name_length=${card.name.length}")
-                    failedCount++
                 }
-                physicalProcessedCount += card.quantity
-                onProgress(physicalProcessedCount, totalPhysicalCards)
             }
 
-            if (parsed.cards.isNotEmpty() && failedCount > parsed.cards.size / 2) {
-                crashReporter.log("deck_import_high_failure_rate")
-                crashReporter.recordException(IllegalStateException("$failedCount/${parsed.cards.size} cards unresolved"))
-            }
-
-            commanderScryfallId?.let { commanderId ->
+            resolution.commanderScryfallId?.let { commanderId ->
                 deckRepository.observeDeckWithCards(deckId).let { flow ->
                     val current = flow.first()?.deck
                     if (current != null) {
@@ -254,7 +369,7 @@ class ImportDeckCardsUseCase(
                 )
             }
 
-            ImportOutcome.Success(deckId = deckId, resolvedCount = resolvedCount, failedCount = failedCount)
+            ImportOutcome.Success(deckId = deckId, resolvedCount = resolution.resolvedCount, failedCount = resolution.failedCount)
         } catch (t: Throwable) {
             crashReporter.log("deck_import_failed")
             crashReporter.recordException(t)

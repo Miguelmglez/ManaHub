@@ -53,9 +53,11 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -66,6 +68,7 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
 import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
+import org.jetbrains.compose.resources.painterResource
 // BudgetFilterBar lives in this same package (feature/decks/presentation/components/) since
 // Phase 0.5 relocated it out of improvement/components/ — no import needed.
 
@@ -324,6 +327,9 @@ private fun SeedResultRow(card: Card, onAdd: () -> Unit) {
             AsyncImage(
                 model = card.imageArtCrop,
                 contentDescription = null,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
+                fallback = painterResource(Res.drawable.mtg_card_back),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(ChipShape),
             )
@@ -356,6 +362,9 @@ private fun SeedHeroRow(card: Card, onRemove: () -> Unit) {
             AsyncImage(
                 model = card.imageArtCrop,
                 contentDescription = null,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
+                fallback = painterResource(Res.drawable.mtg_card_back),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(width = 64.dp, height = 46.dp).clip(ChipShape),
             )

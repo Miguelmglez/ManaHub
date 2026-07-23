@@ -47,4 +47,31 @@ class CommunityDeckCardTest {
         assertFalse(mainboard.isCommander)
         assertFalse(mainboard.isSideboard)
     }
+
+    // ── excludedFromDeckCount -> isSideboard (bug fix, 2026-07-22) ───────────
+    // A Maybeboard/custom-excluded-category card is recategorized as sideboard-like rather than
+    // dropped by the mapper — see `CommunityDeckMappers.kt` for the flag-not-name-based rationale.
+
+    @Test
+    fun excludedFromDeckCount_makesCardSideboardEvenWithoutASideboardCategory() {
+        val card = buildCard("id").copy(categories = listOf("Maybeboard"), excludedFromDeckCount = true)
+
+        assertTrue(card.isSideboard)
+    }
+
+    @Test
+    fun excludedFromDeckCount_withArbitraryCustomCategoryNameIsStillSideboard() {
+        // Archidekt lets users name a category anything (e.g. "Bench") and flag it excluded —
+        // the category NAME must never matter, only excludedFromDeckCount.
+        val card = buildCard("id").copy(categories = listOf("Bench"), excludedFromDeckCount = true)
+
+        assertTrue(card.isSideboard)
+    }
+
+    @Test
+    fun notExcludedAndNoSideboardCategory_isNotSideboard() {
+        val card = buildCard("id").copy(categories = listOf("Mainboard"), excludedFromDeckCount = false)
+
+        assertFalse(card.isSideboard)
+    }
 }

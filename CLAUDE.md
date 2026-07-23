@@ -165,6 +165,20 @@ Box { Scaffold { ... }; MagicToastHost(toastState) }
 Reuse before writing inline: `EmptyState`, `InlineErrorState`, `FullErrorState`, `MagicToast(Host/State)`,
 `CardGridItem`, `CardListItem`, `AddToCollectionSheet`, `CardSearchSheet`, `TradeSelectionSheet`.
 
+**Mandatory component usage:**
+- **Card names:** always use `CardName` (substitutes "A-" prefix + post-"//" with Alchemy icon, supports `showFrontOnly`/`fontWeight`)
+- **Alerts/dialogs:** use `MagicAlertDialog` (never Material3 `AlertDialog`); provides title/text/confirm/dismiss buttons with MagicTheme styling
+- **CTA buttons:** use `MagicCtaButton` (style: `Filled`/`Outlined`/`Ghost`; color: `Primary`/`Accent`/`Error`/`Success`/`Warning`/`Info`/`Neutral`/`Gold`/`Surface` + Solid variants; supports icon/loading state)
+- **Toasts:** use `MagicToast(Host/State)` (never `SnackbarHost`); type: `SUCCESS`/`INFO`/`WARNING`/`ERROR`
+- **Card inspection overlay:** use `MagicCardInspectionOverlay` for enlarged card views with animation, supports paging + custom actions below card
+- **Card image placeholder:** use `mtg_card_back.jpg` as fallback while image loads or on error (located `shared/core-ui/src/commonMain/composeResources/drawable/`)
+- **Tag chips:** always use `CardTagChip(label, category, ...)` (never an inline `Surface`/`InputChip`/
+  `SuggestionChip` for a `CardTag`) — color-codes by `TagCategory` (tonal fill + full-opacity accent
+  text/border, with a runtime WCAG contrast guard that falls back to `textPrimary` whenever the raw
+  accent can't clear 4.5:1 against its own tonal fill — computed per-render, not a theme branch, so it
+  self-corrects on any current or future palette). Never localizes the label itself — pass the
+  already-resolved text (`CardTag.label()` on Android / `CardTag.displayLabel` in commonMain).
+
 ### Navigation
 Routes are a sealed class in `Screen.kt`; forward-slash hierarchy (e.g. `"collection/detail/{scryfallId}"`).
 Bottom tabs: Collection, Stats, [central FAB = Game], Profile.
@@ -292,9 +306,23 @@ Identify which owns a behavior before adding methods.
   `feedback_tournament_single_write_path_2026-06-16`
 
 ### Deck Playtest (`feature/playtest/`, Phase 1 + Phase 2 battlefield complete)
-**Hidden for release (2026-07-14) via `DeckFeatureFlags.PLAYTEST_ENABLED = false`** — code intact,
-all entry points gated (flip back to `true` to re-enable). Room v35→v36 added `playtest_sessions`,
+Hidden for release 2026-07-14 via `DeckFeatureFlags.PLAYTEST_ENABLED = false`, then **re-enabled
+2026-07-22** after an edge-case audit fixed a card-conservation data-loss bug (see
+`feedback_playtest_edge_case_audit_2026-07-22` memory). Room v35→v36 added `playtest_sessions`,
 `playtest_card_stats`, `playtest_survey_answers`. Must-know:
+- **`PlayZone.LIBRARY` is a draw-only source — never a drag-and-drop drop target.** It is still
+  registered in `BattlefieldContent`'s `zoneCoords`/`zoneBounds` (needed for the draw-animation
+  start point and tap-to-draw), but every drop-target hit-test explicitly excludes it
+  (`it.key != PlayZone.LIBRARY`), and `PlaytestHandViewModel.moveCard` early-returns a no-op on
+  `toZone == PlayZone.LIBRARY` as defense-in-depth. A card moved onto Library previously vanished
+  entirely (removed from its origin zone, never re-added anywhere) — see the memory above for the
+  full root cause. Any NEW UI-position-tracked-but-not-a-drop-target zone must follow the same
+  exclude-from-hit-test pattern.
+- `moveCard` resets a card's free-form `xOffset`/`yOffset` to `0f` whenever it enters
+  `LANDS`/`PERMANENTS` (every `moveCard` call is an inter-zone transition — same-zone repositioning
+  goes through `updateCardOffset` instead), so a card that detours through GRAVEYARD/EXILE/HAND and
+  back onto the field re-triggers `FreeFormFieldZone`'s auto-cascade placement instead of rendering
+  at stale pre-detour coordinates.
 - **Explicit-save-only**: redraw/mulligan loops are in-memory; nothing persists until "Save test" via
   `PlaytestDao.saveTestAtomically(@Transaction)` (the only sanctioned write path).
 - `deck_id` is plain indexed TEXT, **not** a FK (decks are soft-deleted). Card stats are INT counts,
@@ -332,7 +360,7 @@ all entry points gated (flip back to `true` to re-enable). Room v35→v36 added 
   mainboard, LazyRow key-by-index for duplicates, adaptive hand fan + arc rotation) → memory. The
   `PlaytestHandViewModelTest` needs `mockkStatic(FirebaseCrashlytics::class)` (logs outside runCatching).
 - → memory: `project_playtest_persistence`, `project_playtest_battlefield_phase2`,
-  `feedback_playtest_bugs_2026-05-28`
+  `feedback_playtest_bugs_2026-05-28`, `feedback_playtest_edge_case_audit_2026-07-22`
 
 ### Online sessions
 **Hidden for release (2026-07-14) via new `feature/online/presentation/OnlineFeatureFlags
@@ -427,7 +455,31 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   key. `StrategyAnalyzer.analyze()` returns empty on a blank `oracleText` BEFORE evaluating any rule,
   including `typeLineAnyOf`-only ones — a type-line-only detector still needs a non-blank oracle text
   fixture to be exercised in tests.
-- → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`
+- **Collection/Deck Studio show tags from Room only — a one-time startup backfill keeps that Room
+  data populated.** Search-result pages no longer trigger `card_strategy_tags` resolution (only
+  opening Card Detail does); `CardRepository.backfillMissingStrategyTags(40)` runs at startup right
+  after `backfillMissingOracleIds(20)` (same `appScope.launch` block, same order — a blank
+  `oracleId` card can never have a precomputed row) to resolve owned-but-never-resolved cards
+  exactly once. Self-terminating via `CardDao.getScryfallIdsMissingStrategyTags`'s `NOT EXISTS
+  card_strategy_tags_cache` check, never `cards.tags = '[]'`.
+- **`TagDictionary.get(key)` is NOT a validity filter — a miss does not mean "unknown/drifted key".**
+  The dictionary only holds hand-authored ARCHETYPE/STRATEGY/ROLE/KEYWORD entries; `TypeLineAnalyzer`
+  synthesizes `TagCategory.TYPE` tags (card types + creature subtypes — "creature", "artifact", "elf",
+  ...) directly from the type line and NEVER registers them in the dictionary, so a miss on a
+  TYPE-shaped key is the expected/only shape, not a taxonomy-drift signal. Any code that resolves a raw
+  tag key (Supabase `card_strategy_tags` payload, a persisted `cards.tags` JSON blob, etc.) via
+  `TagDictionary.get()` must fall back to `CardTag(key, TagCategory.TYPE)` on a miss, never drop the
+  tag — dropping silently loses every TYPE tag (`CardStrategyTagsRepositoryImpl.toFound()` did exactly
+  this until 2026-07-23; see `feedback_card_strategy_tags_type_dictionary_miss` in memory).
+- **Collection's TAG grouping (`CollectionGroupingMode.TAG`) is deliberately restricted to
+  `TagCategory.STRATEGY` tags only** — a scope difference from CardDetail/Deck Studio, which show
+  every category (color-coded). This is intentional, not an oversight left over from the
+  TYPE-tag-miss fix above: do not widen `groupCollection()`'s TAG branch
+  (`shared/core-model/.../CollectionGrouping.kt`) or `CollectionScreen.kt`'s `collectionGroupLabel()`
+  to all categories.
+- → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`,
+  `project_strategy_tags_backfill_2026-07-22`, `feedback_card_strategy_tags_type_dictionary_miss`,
+  `project_card_tag_category_colors_2026-07-23`, `feedback_collection_tag_grouping_strategy_only`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
 **Suggestions tab hidden again (2026-07-21, temporary)**: `DeckFeatureFlags
@@ -467,6 +519,14 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
   EXISTING deck opened in Studio is NEVER auto-deleted — even if empty + default-named. (Critical data-loss
   guard added when existing decks started routing through Studio; without it, opening a real empty deck and
   backing out deleted it.) Delete completes BEFORE nav.
+- **Sideboard/mainboard movement (`MovementRow`, the Sideboard section) is format-agnostic and
+  ALWAYS rendered** (fixed 2026-07-22 — it used to be hidden behind `!isCommanderFormat` in
+  `DeckStudioScreen.kt`'s `BuildTab` with no domain-layer backing: `moveQuantityToSideboard`/
+  `moveQuantityToMainboard`/`totalCards` were never format-restricted). A Commander import can
+  legitimately populate the sideboard (see the Community Deck import bullet below), so never
+  reintroduce a format gate here — before gating ANY Deck Studio UI section on a format/mode flag,
+  verify the ViewModel/repository underneath actually enforces that restriction; if it doesn't, the
+  UI gate is stale.
 - Free-text budget: **never build `BudgetConstraints` from raw `TextField` text** — raw String + last-valid +
   error flag, parse-guard in the VM. The Deck Doctor incremental `AnalysisCache`/`GapSignature`/
   `loadAnalysis`/`recomputeIncremental`/`recomputeAdds` machinery lives in `DeckDoctorOrchestrator`
@@ -665,6 +725,31 @@ priority/Home trending widget (Phase 5) + unified import pipeline (Phase 6) are 
 flag-gated behind `communityEngineEnabledFlow` (D4, default OFF). → memory: `project_archetype_engine`,
 `project_deck_doctor_phase2_motor_a`, `project_community_aggregate_worker`, `project_motor_b_community_suggestions`,
 `project_community_hub_seedbuild_trending`, `project_import_unification`
+
+**`ImportDeckCardsUseCase` card resolution (bug fix, 2026-07-22): always prefer known-id batch
+resolution over fuzzy name search whenever the source already supplies an exact Scryfall id.** A
+card entry carrying a pre-resolved `scryfallId` (currently only `ImportSource.FromCommunityDeck`,
+via `CommunityDeckCard.scryfallId`) is resolved through ONE batched `CardRepository.warmCacheForIds`
++ `getCardsByIds` pre-warm over every known id, never a fresh per-card
+`CardRepository.searchCardByName` — fuzzy name search is slower (one network round-trip per card)
+and less reliable (fails/mis-resolves on split/adventure/DFC names, punctuation, ambiguous short
+names) than an id the source already gave us. A known id the batch fetch can't resolve (a
+retired/dead printing id) falls back to `searchCardByName` as a second attempt before the card
+counts as failed — never straight to failed. Apply this rule to any FUTURE import source that
+supplies an id (Moxfield, a future deckstats shape, etc.). Also: **the deck write is
+resolve-then-write, never incremental-while-resolving** — a brand-new deck's ENTIRE resolved card
+list is flushed in one atomic `DeckRepository.replaceAllCards` call, never N sequential
+`addCardToDeck` calls, so a deck is never observable half-populated (a cancellation during
+resolution, e.g. from screen navigation, leaves nothing written). An import into an EXISTING deck
+keeps the original incremental per-card `addCardToDeck` merge (there IS a pre-existing card list to
+preserve there). **Archidekt's excluded-from-deck zones (Maybeboard, or ANY user-named custom
+category flagged `includedInDeck = false`) are recategorized as sideboard-like
+(`CommunityDeckCard.excludedFromDeckCount` → `isSideboard`), never dropped** (refined 2026-07-22 —
+an earlier pass dropped them to fix an over-count bug, which silently discarded real cards the user
+expected to see). Archidekt lets users name a category anything, so **key every decision off the
+`includedInDeck` FLAG, never a category name string/allowlist**. → memory:
+`feedback_community_deck_import_reliability_and_atomicity`,
+`project_community_deck_import_coordinator`
 
 ### Home dashboard (`feature/home/`)
 Free-first, account-enhanced start screen. Fully implemented (2026-06-08). Must-know:

@@ -23,6 +23,16 @@ package com.mmg.manahub.core.model
  * @property setName the printing's set name.
  * @property priceUsd the printing's TCGplayer USD price, when known.
  * @property priceEur the printing's Cardmarket EUR price, when known.
+ * @property excludedFromDeckCount true when AT LEAST ONE category this entry carries is flagged
+ *   `includedInDeck = false` on the Archidekt deck (Maybeboard, a user's custom "Cut"/"Bench"
+ *   bucket, ...). Bug fix, 2026-07-22: such entries used to be DROPPED entirely by the mapper;
+ *   they are now kept and treated as sideboard-like via [isSideboard] instead, so they still show
+ *   up (and can be moved back to the mainboard) rather than silently vanishing. Deliberately an
+ *   ANY-of match, not ALL-of (corrected same day): Archidekt's auto-categorization tags most cards
+ *   with a second functional/type category regardless of Maybeboard status, so a genuinely-excluded
+ *   entry usually also carries an ordinary category — an ALL-of match almost never fires against
+ *   real decks. See `ArchidektDeckDetailDto.toDomain()`'s KDoc for why category NAMES are never
+ *   matched directly.
  */
 data class CommunityDeckCard(
     val name: String,
@@ -38,11 +48,17 @@ data class CommunityDeckCard(
     val setName: String = "",
     val priceUsd: Double? = null,
     val priceEur: Double? = null,
+    val excludedFromDeckCount: Boolean = false,
 ) {
-    /** True when this entry belongs to the Sideboard category. */
+    /**
+     * True when this entry belongs to the Sideboard category, OR when [excludedFromDeckCount] is
+     * true (an Archidekt Maybeboard / custom excluded-category entry) — both are "not really in
+     * the 100/60-card deck" zones and are treated uniformly as sideboard for display, counting,
+     * and import purposes.
+     */
     val isSideboard: Boolean
-        get() = categories.any { 
-            it.equals("Sideboard", ignoreCase = true) || it.equals("Side", ignoreCase = true) 
+        get() = excludedFromDeckCount || categories.any {
+            it.equals("Sideboard", ignoreCase = true) || it.equals("Side", ignoreCase = true)
         }
 
     /** True when this entry is the deck's commander. */

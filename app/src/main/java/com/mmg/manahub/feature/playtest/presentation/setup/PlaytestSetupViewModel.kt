@@ -31,6 +31,15 @@ data class PlaytestSetupUiState(
     val deckName: String = "",
     val deckFormat: String = "",
     val drawCount: Int = 7,
+    /** "Cards to start the game" — target size of the FINAL kept opening hand. */
+    val startCount: Int = 7,
+    /**
+     * Upper bound for [drawCount], derived from the deck's own mainboard size (minus the
+     * commander, mirroring [BuildLibraryUseCase]'s own exclusion) so the stepper can never let
+     * the user pick more cards than the deck actually has. Defaults to the pre-load hardcoded
+     * cap of 10 and is recomputed once the deck loads.
+     */
+    val maxDrawCount: Int = 10,
     val eligibility: PlaytestEligibility? = null,
     val commanderCard: Card? = null,
     val deckImageUrl: String? = null,
@@ -147,11 +156,21 @@ class PlaytestSetupViewModel(
                 }
 
                 resolvedCommanderCard = commanderCard
-                _uiState.update {
-                    it.copy(
+                // Mirrors BuildLibraryUseCase's own commander exclusion: the commander (when
+                // present) never sits in the drawable library, so the stepper's ceiling must
+                // exclude it too — otherwise "Cards to draw" could exceed the deck's actual
+                // drawable card count. Coerced to [1, 10] to preserve the original stepper range.
+                val maxDrawCount = (mainboardCount - (if (commanderCard != null) 1 else 0))
+                    .coerceIn(1, 10)
+                _uiState.update { current ->
+                    val clampedDrawCount = current.drawCount.coerceIn(1, maxDrawCount)
+                    current.copy(
                         isLoading             = false,
                         deckName              = deckWithCards.deck.name,
                         deckFormat            = deckWithCards.deck.format,
+                        drawCount             = clampedDrawCount,
+                        startCount            = current.startCount.coerceIn(1, clampedDrawCount),
+                        maxDrawCount          = maxDrawCount,
                         eligibility           = adjustedEligibility,
                         commanderCard         = commanderCard,
                         deckImageUrl          = deckImageUrl,
@@ -168,27 +187,44 @@ class PlaytestSetupViewModel(
     }
 
     fun setDrawCount(count: Int) {
-        _uiState.update { it.copy(drawCount = count.coerceIn(1, 10)) }
+        _uiState.update { current ->
+            val newDrawCount = count.coerceIn(1, current.maxDrawCount)
+            current.copy(
+                drawCount  = newDrawCount,
+                // startCount can never exceed the (possibly lowered) drawCount.
+                startCount = current.startCount.coerceAtMost(newDrawCount),
+            )
+        }
+    }
+
+    /** "Cards to start the game" — bounded [1, drawCount] (can never exceed cards drawn). */
+    fun setStartCount(count: Int) {
+        _uiState.update { it.copy(startCount = count.coerceIn(1, it.drawCount)) }
     }
 
     fun onDrawHand() {
         if (isNavigating) return
         val state = _uiState.value
-        if (state.eligibility !is PlaytestEligibility.Eligible) return
-
         val deck = resolvedDeckWithCards?.deck ?: return
+
+        // Setup screen keeps showing the ineligibility warning banner, but no longer blocks the
+        // user from running the test anyway (Deck Playtest adjustments plan, Part A). The
+        // bypass is surfaced in telemetry so ineligible-but-run sessions stay visible.
+        val wasIneligible = state.eligibility !is PlaytestEligibility.Eligible
         isNavigating = true
         FirebaseCrashlytics.getInstance().apply {
-            log("playtest_draw_hand_initiated: deckId=$deckId format=${deck.format} drawCount=${state.drawCount}")
+            log("playtest_draw_hand_initiated: deckId=$deckId format=${deck.format} drawCount=${state.drawCount} startCount=${state.startCount}")
             setCustomKey("playtest_deck_id", deckId)
             setCustomKey("playtest_format", deck.format)
             setCustomKey("playtest_draw_count", state.drawCount)
+            setCustomKey("playtest_bypassed_ineligible", wasIneligible)
         }
         val setup = PlaytestSetup(
             deckId         = deckId,
             deckName       = deck.name,
             deckFormat     = deck.format,
             drawCount      = state.drawCount,
+            startCount     = state.startCount,
             isOnThePlay    = true,
             commanderCard  = resolvedCommanderCard,
         )

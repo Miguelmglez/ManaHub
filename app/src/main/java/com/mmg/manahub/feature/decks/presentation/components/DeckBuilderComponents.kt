@@ -55,12 +55,15 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.BasicLandDistribution
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCard
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import org.jetbrains.compose.resources.painterResource
 
 // ── DeckCardRow ───────────────────────────────────────────────────────────────
 
@@ -86,6 +89,9 @@ fun DeckCardRow(
         AsyncImage(
             model              = card.imageArtCrop,
             contentDescription = null,
+            placeholder        = painterResource(Res.drawable.mtg_card_back),
+            error              = painterResource(Res.drawable.mtg_card_back),
+            fallback           = painterResource(Res.drawable.mtg_card_back),
             contentScale       = ContentScale.Crop,
             modifier           = Modifier
                 .size(width = 44.dp, height = 32.dp)
@@ -170,29 +176,38 @@ fun CommanderBanner(
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
+
     ) {
         AsyncImage(
-            model              = commander.imageArtCrop,
+            model              = commander.imageNormal,
             contentDescription = null,
+            placeholder        = painterResource(Res.drawable.mtg_card_back),
+            error              = painterResource(Res.drawable.mtg_card_back),
+            fallback           = painterResource(Res.drawable.mtg_card_back),
             contentScale       = ContentScale.Crop,
             modifier           = Modifier
-                .size(width = 48.dp, height = 34.dp)
+                .size(width = 44.dp, height = 60.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .background(mc.surfaceVariant),
         )
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .height(34.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
             CardName(
                 name          = commander.name,
                 showFrontOnly = true,
                 style         = MaterialTheme.magicTypography.bodyMedium,
                 color         = mc.textPrimary,
                 maxLines      = 1,
-                overflow      = TextOverflow.Ellipsis,
+                overflow      = TextOverflow.Ellipsis
             )
             Text(
                 text     = commander.typeLine,
                 style    = MaterialTheme.magicTypography.labelSmall,
-                color    = mc.textDisabled,
+                color    = mc.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -449,13 +464,21 @@ fun CommanderSearchSheet(
                             AsyncImage(
                                 model              = card.imageArtCrop,
                                 contentDescription = null,
+                                placeholder        = painterResource(Res.drawable.mtg_card_back),
+                                error              = painterResource(Res.drawable.mtg_card_back),
+                                fallback           = painterResource(Res.drawable.mtg_card_back),
                                 contentScale       = ContentScale.Crop,
                                 modifier           = Modifier
                                     .size(width = 48.dp, height = 34.dp)
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(mc.surfaceVariant),
                             )
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(34.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
                                 CardName(
                                     name     = card.name,
                                     style    = MaterialTheme.magicTypography.bodyMedium,

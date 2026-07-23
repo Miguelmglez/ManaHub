@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
@@ -89,6 +89,9 @@ import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.GroupingFlowSelector
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -187,6 +190,7 @@ fun DeckStudioScreen(
     val playerName by viewModel.playerNameFlow.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val toastState = rememberMagicToastState()
@@ -293,9 +297,6 @@ fun DeckStudioScreen(
                     title = uiState.deck?.name ?: stringResource(R.string.deck_studio_title),
                     format = uiState.deck?.format,
                     onBack = handleBack,
-                    // Playtest is available only for a non-empty, persisted deck.
-                    playtestEnabled = !uiState.isEmptyDeck && uiState.deck?.id != null,
-                    onPlaytest = { uiState.deck?.id?.let(onPlaytest) },
                     onBuildFromSeed = handleBuildFromSeed,
                     onBrowseInspirations = { viewModel.openInspirations() },
                     onEdit = { showEditDeckSheet = true },
@@ -312,6 +313,23 @@ fun DeckStudioScreen(
                     shareEnabled = !uiState.isEmptyDeck,
                 )
             },
+            bottomBar = {
+                val playtestEnabled = !uiState.isEmptyDeck && uiState.deck?.id != null
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(mc.background)
+                        .navigationBarsPadding()
+                        .padding(horizontal = spacing.lg, vertical = spacing.md)
+                ) {
+                    MagicCtaButton(
+                        text = stringResource(R.string.deck_studio_playtest),
+                        onClick = { uiState.deck?.id?.let(onPlaytest) },
+                        enabled = playtestEnabled,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = spacing.md).height(56.dp)
+                    )
+                }
+            },
             floatingActionButton = {
                 // FAB only on the Build tab.
                 AnimatedVisibility(
@@ -327,7 +345,7 @@ fun DeckStudioScreen(
                         containerColor = mc.primaryAccent,
                         contentColor = mc.background,
                         shape = CardShape,
-                        modifier = Modifier.navigationBarsPadding(),
+                        modifier = Modifier,
                     ) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.deck_studio_add_card_fab))
                     }
@@ -451,7 +469,10 @@ fun DeckStudioScreen(
 
         MagicToastHost(
             state = toastState,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 80.dp),
         )
 
         // C3: the inline card-detail sheet for taps on a card in the deck list / commander
@@ -751,8 +772,6 @@ private fun DeckStudioTopBar(
     title: String,
     format: String?,
     onBack: () -> Unit,
-    playtestEnabled: Boolean,
-    onPlaytest: () -> Unit,
     onBuildFromSeed: () -> Unit,
     onBrowseInspirations: () -> Unit,
     onEdit: () -> Unit,
@@ -791,18 +810,6 @@ private fun DeckStudioTopBar(
                             modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs),
                         )
                     }
-                }
-            }
-            // Playtest (Group C / C1): launches the playtest setup for the current deck.
-            // Enabled only when the deck is non-empty and persisted.
-            // HIDDEN for release behind DeckFeatureFlags.PLAYTEST_ENABLED (UI-only; params/plumbing stay).
-            if (DeckFeatureFlags.PLAYTEST_ENABLED) {
-                IconButton(onClick = onPlaytest, enabled = playtestEnabled) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = stringResource(R.string.deck_studio_playtest),
-                        tint = mc.primaryAccent,
-                    )
                 }
             }
             // Overflow menu (Phase 3 + Group D): "Build from seed" (seed sheet),
@@ -956,35 +963,41 @@ private fun BuildTab(
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
         ?.maxCopies ?: 4
 
-    if (uiState.isLoading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
-        }
-        return
-    }
+    // Smooth crossfade between the loading spinner and the loaded content (UI polish, 2026-07-22),
+    // matching the sibling (dead) DeckBuilderScreen.kt's ViewStepContent AnimatedContent pattern —
+    // avoids the abrupt jump-cut previously felt right after a Community Deck import navigates
+    // into a freshly-created deck whose data is still loading from Room.
+    AnimatedContent(
+        targetState = uiState.isLoading,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+        },
+        label = "DeckStudioBuildTabLoading",
+    ) { isLoading ->
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            }
+        } else if (uiState.isEmptyDeck) {
+            val currentFormat = uiState.deck?.format
+                ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
+            EmptyDeckState(
+                selectedFormat = currentFormat,
+                onFormatChange = onFormatChange,
+                onBuildFromSeed = onBuildFromSeed,
+                onBrowseInspirations = onBrowseInspirations,
+                onImportDeck = onImportDeck,
+            )
+        } else {
+            val mainboardCards = uiState.cards.filter { !it.isSideboard }
+            val sideboardCards = uiState.cards.filter { it.isSideboard }.sortedBy { it.card?.name }
 
-    if (uiState.isEmptyDeck) {
-        val currentFormat = uiState.deck?.format
-            ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-        EmptyDeckState(
-            selectedFormat = currentFormat,
-            onFormatChange = onFormatChange,
-            onBuildFromSeed = onBuildFromSeed,
-            onBrowseInspirations = onBrowseInspirations,
-            onImportDeck = onImportDeck,
-        )
-        return
-    }
-
-    val mainboardCards = uiState.cards.filter { !it.isSideboard }
-    val sideboardCards = uiState.cards.filter { it.isSideboard }.sortedBy { it.card?.name }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        state = rememberLazyListState(),
-        contentPadding = PaddingValues(bottom = FabClearance),
-        verticalArrangement = Arrangement.spacedBy(spacing.md),
-    ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = rememberLazyListState(),
+                contentPadding = PaddingValues(bottom = FabClearance),
+                verticalArrangement = Arrangement.spacedBy(spacing.md),
+            ) {
         item(key = "summary") {
             val targetCount = if (isCommanderFormat) 100 else 60
             val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
@@ -1132,17 +1145,24 @@ private fun BuildTab(
                                 onClick = { onDeckCardClick(entry.scryfallId) },
                                 onRemove = { onRemoveCard(entry.scryfallId, false) },
                             )
-                            if (!isCommanderFormat) {
-                                val qtyInSideboard = uiState.cards.find { it.scryfallId == entry.scryfallId && it.isSideboard }?.quantity ?: 0
-                                MovementRow(
-                                    labelTo = stringResource(R.string.deckbuilder_move_to_sideboard),
-                                    onMoveTo = { onMoveToSideboard(entry.scryfallId) },
-                                    labelFrom = if (qtyInSideboard > 0) stringResource(R.string.deckbuilder_from_sideboard) else null,
-                                    onMoveFrom = if (qtyInSideboard > 0) {
-                                        { onMoveToMainboard(entry.scryfallId) }
-                                    } else null,
-                                )
-                            }
+                            // Mainboard<->sideboard movement is format-agnostic (bug fix,
+                            // 2026-07-22): DeckStudioViewModel.moveQuantityToSideboard/
+                            // moveQuantityToMainboard and DeckRepository.moveCardQuantity have no
+                            // format restriction, and a Commander import can legitimately land
+                            // cards in the sideboard (Archidekt Maybeboard/custom-excluded
+                            // categories — see CommunityDeckMappers.kt). Previously gated behind
+                            // `!isCommanderFormat`, which hid this affordance for Commander decks
+                            // with no domain-level backing (parity fix vs. the legacy
+                            // DeckBuilderScreen.kt editor, which always showed it).
+                            val qtyInSideboard = uiState.cards.find { it.scryfallId == entry.scryfallId && it.isSideboard }?.quantity ?: 0
+                            MovementRow(
+                                labelTo = stringResource(R.string.deckbuilder_move_to_sideboard),
+                                onMoveTo = { onMoveToSideboard(entry.scryfallId) },
+                                labelFrom = if (qtyInSideboard > 0) stringResource(R.string.deckbuilder_from_sideboard) else null,
+                                onMoveFrom = if (qtyInSideboard > 0) {
+                                    { onMoveToMainboard(entry.scryfallId) }
+                                } else null,
+                            )
                             // C5: per-card over-limit / off-identity construction warning.
                             WarningOverlay(
                                 entry = entry,
@@ -1160,49 +1180,54 @@ private fun BuildTab(
             }
         }
 
-        if (!isCommanderFormat) {
-            item(key = "sideboard_header") {
-                SectionHeader(
-                    title = stringResource(R.string.deckdetail_tab_sideboard, sideboardCards.sumOf { it.quantity }),
-                    expanded = uiState.sideboardExpanded,
-                    onToggle = onToggleSideboard,
-                    modifier = Modifier.animateItem(),
-                )
-            }
-            if (uiState.sideboardExpanded) {
-                if (sideboardCards.isEmpty()) {
-                    item(key = "sideboard_empty") {
-                        Text(
-                            text = stringResource(R.string.deckbuilder_sideboard_empty),
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                            modifier = Modifier.padding(horizontal = spacing.xxl, vertical = spacing.sm).animateItem(),
-                        )
-                    }
-                } else {
-                    items(sideboardCards, key = { "side_${it.scryfallId}" }) { entry ->
-                        Surface(
-                            shape = CardShape,
-                            color = mc.backgroundSecondary,
-                            border = BorderStroke(0.5.dp, mc.surfaceVariant),
-                            modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
-                        ) {
-                            Column {
-                                CardRow(
-                                    entry = entry,
-                                    isInCollection = entry.scryfallId in uiState.collectionIds,
-                                    onClick = { onDeckCardClick(entry.scryfallId) },
-                                    onRemove = { onRemoveCard(entry.scryfallId, true) },
-                                )
-                                MovementRow(
-                                    labelTo = stringResource(R.string.deckbuilder_move_to_mainboard),
-                                    onMoveTo = { onMoveToMainboard(entry.scryfallId) },
-                                )
-                            }
+        // Sideboard is format-agnostic (bug fix, 2026-07-22 — see the mainboard MovementRow
+        // comment above for the full rationale): always render it, mirroring the legacy
+        // DeckBuilderScreen.kt editor's unconditional behavior. A Commander-format import can
+        // legitimately have sideboard-zone cards (Archidekt Maybeboard/custom-excluded
+        // categories), which previously had no UI to view or move for Commander decks.
+        item(key = "sideboard_header") {
+            SectionHeader(
+                title = stringResource(R.string.deckdetail_tab_sideboard, sideboardCards.sumOf { it.quantity }),
+                expanded = uiState.sideboardExpanded,
+                onToggle = onToggleSideboard,
+                modifier = Modifier.animateItem(),
+            )
+        }
+        if (uiState.sideboardExpanded) {
+            if (sideboardCards.isEmpty()) {
+                item(key = "sideboard_empty") {
+                    Text(
+                        text = stringResource(R.string.deckbuilder_sideboard_empty),
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(horizontal = spacing.xxl, vertical = spacing.sm).animateItem(),
+                    )
+                }
+            } else {
+                items(sideboardCards, key = { "side_${it.scryfallId}" }) { entry ->
+                    Surface(
+                        shape = CardShape,
+                        color = mc.backgroundSecondary,
+                        border = BorderStroke(0.5.dp, mc.surfaceVariant),
+                        modifier = Modifier.padding(horizontal = spacing.lg).animateItem(),
+                    ) {
+                        Column {
+                            CardRow(
+                                entry = entry,
+                                isInCollection = entry.scryfallId in uiState.collectionIds,
+                                onClick = { onDeckCardClick(entry.scryfallId) },
+                                onRemove = { onRemoveCard(entry.scryfallId, true) },
+                            )
+                            MovementRow(
+                                labelTo = stringResource(R.string.deckbuilder_move_to_mainboard),
+                                onMoveTo = { onMoveToMainboard(entry.scryfallId) },
+                            )
                         }
                     }
                 }
             }
+        }
+    }
         }
     }
 }
@@ -1820,46 +1845,21 @@ private fun SuggestionsTab(
     }
 
     if (showUnlockConfirmDialog) {
-        val ty = MaterialTheme.magicTypography
-        androidx.compose.material3.AlertDialog(
+        MagicAlertDialog(
             onDismissRequest = { showUnlockConfirmDialog = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.deck_studio_unlock_strategy_confirm_title),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                )
+            title = stringResource(R.string.deck_studio_unlock_strategy_confirm_title),
+            text = stringResource(R.string.deck_studio_unlock_strategy_confirm_body),
+            confirmLabel = stringResource(R.string.deck_studio_unlock_strategy_confirm_action),
+            onConfirm = {
+                showUnlockConfirmDialog = false
+                onUnlockStrategy()
             },
-            text = {
-                Text(
-                    text = stringResource(R.string.deck_studio_unlock_strategy_confirm_body),
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                )
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = {
+                FirebaseCrashlytics.getInstance().log("deck_studio_unlock_strategy_declined")
+                showUnlockConfirmDialog = false
             },
-            confirmButton = {
-                androidx.compose.material3.TextButton(
-                    onClick = {
-                        showUnlockConfirmDialog = false
-                        onUnlockStrategy()
-                    },
-                ) {
-                    Text(
-                        text = stringResource(R.string.deck_studio_unlock_strategy_confirm_action),
-                        style = ty.labelMedium,
-                        color = mc.lifeNegative,
-                    )
-                }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    FirebaseCrashlytics.getInstance().log("deck_studio_unlock_strategy_declined")
-                    showUnlockConfirmDialog = false
-                }) {
-                    Text(text = stringResource(R.string.action_cancel), style = ty.labelMedium, color = mc.textSecondary)
-                }
-            },
-            containerColor = mc.background,
+            confirmColor = MagicCtaColor.Error
         )
     }
 

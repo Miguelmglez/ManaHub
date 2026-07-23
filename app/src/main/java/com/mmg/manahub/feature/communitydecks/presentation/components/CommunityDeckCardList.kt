@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.CommunityDeckCard
 import com.mmg.manahub.core.ui.components.CardListItem
@@ -78,7 +81,12 @@ private fun typeGroupOf(card: CommunityDeckCard): String {
  * Keys are composed from the zone/group prefix + a stable index so duplicate card names
  * (which can legitimately appear across or within zones, or across type groups) never collide.
  *
- * @param cards all card entries of the deck.
+ * @param cards all card entries of the deck. Excluded-from-deck categories (Maybeboard, a custom
+ *   "Cut" bucket, ...) are already filtered out upstream by `ArchidektDeckDetailDto.toDomain()` —
+ *   every entry here is authoritatively in-deck; no further category filtering is needed here.
+ * @param ownedCardIdentityKeys identity keys (`oracleId.ifBlank { name }`, the Card Versions &
+ *   Languages convention) of cards already in the user's local collection. A row whose card
+ *   matches renders an "already owned" badge (see [cardRows]).
  * @param onCardClick invoked with a card's [CommunityDeckCard.scryfallId] when a resolved row
  *   is tapped. Rows whose `scryfallId` is blank (Archidekt didn't resolve a printing) render
  *   without an image and are not clickable.
@@ -93,17 +101,14 @@ fun LazyListScope.communityDeckCardItems(
     onToggleMainboard: () -> Unit = {},
     onToggleSideboard: () -> Unit = {},
     onCardClick: (String) -> Unit = {},
+    ownedCardIdentityKeys: Set<String> = emptySet(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     // Archidekt cards can be in multiple categories. Sideboard is usually explicit.
-    // We also explicitly exclude "Maybeboard" from the main zones to avoid duplicates
-    // or cluttering the Mainboard if Archidekt marks them with a generic type category.
     val commanders = cards.filter { it.isCommander }
     val sideboard = cards.filter { it.isSideboard && !it.isCommander }
-    val mainboard = cards.filter { card ->
-        !card.isCommander && !card.isSideboard && !card.categories.any { it.contains("maybe", ignoreCase = true) }
-    }
+    val mainboard = cards.filter { card -> !card.isCommander && !card.isSideboard }
     val mainboardCount = mainboard.sumOf { it.quantity }
     val sideboardCount = sideboard.sumOf { it.quantity }
 
@@ -120,6 +125,7 @@ fun LazyListScope.communityDeckCardItems(
                 items = commanders,
                 prefix = "commander",
                 onCardClick = onCardClick,
+                ownedCardIdentityKeys = ownedCardIdentityKeys,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
@@ -151,6 +157,7 @@ fun LazyListScope.communityDeckCardItems(
                     items = group,
                     prefix = "main_$label",
                     onCardClick = onCardClick,
+                    ownedCardIdentityKeys = ownedCardIdentityKeys,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
@@ -171,6 +178,7 @@ fun LazyListScope.communityDeckCardItems(
                 items = sideboard,
                 prefix = "side",
                 onCardClick = onCardClick,
+                ownedCardIdentityKeys = ownedCardIdentityKeys,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
             )
@@ -193,6 +201,7 @@ fun CommunityDeckCardList(
     cards: List<CommunityDeckCard>,
     modifier: Modifier = Modifier,
     onCardClick: (String) -> Unit = {},
+    ownedCardIdentityKeys: Set<String> = emptySet(),
 ) {
     var commanderExpanded by remember { mutableStateOf(true) }
     var mainboardExpanded by remember { mutableStateOf(true) }
@@ -208,6 +217,7 @@ fun CommunityDeckCardList(
             onToggleMainboard = { mainboardExpanded = !mainboardExpanded },
             onToggleSideboard = { sideboardExpanded = !sideboardExpanded },
             onCardClick = onCardClick,
+            ownedCardIdentityKeys = ownedCardIdentityKeys,
         )
     }
 }
@@ -215,12 +225,17 @@ fun CommunityDeckCardList(
 /**
  * Emits [items] as rich [CardListItem] rows, with a stable, collision-free key derived
  * from the zone/group [prefix] + the item index.
+ *
+ * A row whose card's identity key (`oracleId.ifBlank { name }`, the Card Versions & Languages
+ * convention — mirrors `QueueCardItem` in `ScannerScreen.kt`) is present in [ownedCardIdentityKeys]
+ * renders an "already in your collection" icon via [CardListItem]'s `extraSupportingContent` slot.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun LazyListScope.cardRows(
     items: List<CommunityDeckCard>,
     prefix: String,
     onCardClick: (String) -> Unit,
+    ownedCardIdentityKeys: Set<String> = emptySet(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
@@ -229,6 +244,7 @@ private fun LazyListScope.cardRows(
         key = { index -> "${prefix}_${index}_${items[index].name}" },
     ) { index ->
         val card = items[index]
+        val isOwned = (card.oracleId.ifBlank { card.name }) in ownedCardIdentityKeys
         CardListItem(
             name = card.name,
             imageUrl = card.imageUrl,
@@ -244,6 +260,16 @@ private fun LazyListScope.cardRows(
             sharedTransitionScope = sharedTransitionScope,
             animatedVisibilityScope = animatedVisibilityScope,
             scryfallId = card.scryfallId,
+            extraSupportingContent = if (isOwned) {
+                {
+                    Icon(
+                        imageVector = Icons.Rounded.CollectionsBookmark,
+                        contentDescription = stringResource(R.string.scanner_already_in_collection),
+                        tint = MaterialTheme.magicColors.primaryAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            } else null,
         )
     }
 }

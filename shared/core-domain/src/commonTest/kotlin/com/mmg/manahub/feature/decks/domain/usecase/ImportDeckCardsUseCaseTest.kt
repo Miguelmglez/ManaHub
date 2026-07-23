@@ -27,8 +27,17 @@ private object NoOpCrashReporter : CrashReporter {
     override fun setCustomKey(key: String, value: String) = Unit
 }
 
-/** Minimal, hand-written [CardRepository] fake resolving by exact name from [byName]. */
-private class FakeImportCardRepository(private val byName: Map<String, Card>) : CardRepository {
+/**
+ * Minimal, hand-written [CardRepository] fake resolving by exact name from [byName], plus a
+ * batch-by-id path ([byId]) exercising the known-scryfallId fast path (Bug fix, 2026-07-22).
+ */
+private class FakeImportCardRepository(
+    private val byName: Map<String, Card>,
+    private val byId: Map<String, Card> = emptyMap(),
+) : CardRepository {
+    /** Ids passed to [warmCacheForIds], in call order — one call per invocation (not flattened). */
+    val warmCacheCalls = mutableListOf<List<String>>()
+
     override suspend fun searchCardByName(query: String): DataResult<Card> =
         byName[query]?.let { DataResult.Success(it) } ?: DataResult.Error("not found")
     override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> = error("unused")
@@ -36,6 +45,7 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
+    override suspend fun backfillMissingStrategyTags(limit: Int) = error("unused")
     override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> = error("unused")
     override suspend fun getCachedEnglishSiblings(pairs: Set<Pair<String, String>>): Map<Pair<String, String>, Card> = error("unused")
     // Pre-existing gap fixed while touching this fake for the A3 backfill additions above
@@ -47,7 +57,8 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
     override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardByExactName(name: String): Result<Card> = error("unused")
     override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> = error("unused")
-    override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = error("unused")
+    override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> =
+        scryfallIds.mapNotNull { byId[it] }
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
     override suspend fun refreshCollectionPrices() = error("unused")
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
@@ -58,7 +69,9 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
     override suspend fun updateSuggestedTags(scryfallId: String, suggestions: List<SuggestedTag>) = error("unused")
     override suspend fun confirmSuggestedTag(scryfallId: String, tag: CardTag) = error("unused")
     override suspend fun dismissSuggestedTag(scryfallId: String, tag: CardTag) = error("unused")
-    override suspend fun warmCacheForIds(scryfallIds: List<String>) = error("unused")
+    override suspend fun warmCacheForIds(scryfallIds: List<String>) {
+        warmCacheCalls += scryfallIds
+    }
 }
 
 /** Minimal, hand-written [DeckRepository] fake — an in-memory single-deck store, enough for
@@ -66,6 +79,8 @@ private class FakeImportCardRepository(private val byName: Map<String, Card>) : 
 private class FakeDeckRepository(private var nextDeckId: String = "created-deck-id") : DeckRepository {
     val createdDecks = mutableListOf<Triple<String, String, String>>() // name, description, format
     val addedCards = mutableListOf<AddCall>()
+    /** One entry per [replaceAllCards] call — (deckId, slots). */
+    val replaceAllCardsCalls = mutableListOf<Pair<String, List<Triple<String, Int, Boolean>>>>()
     var attribution: Attribution? = null
     private val deckFlow = MutableStateFlow<Deck?>(null)
 
@@ -98,7 +113,9 @@ private class FakeDeckRepository(private var nextDeckId: String = "created-deck-
     override suspend fun updateDeckAttribution(deckId: String, sourceUrl: String?, sourceAuthor: String?, sourceService: String?, importedAt: Long?) {
         attribution = Attribution(deckId, sourceUrl, sourceAuthor, sourceService)
     }
-    override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) = Unit
+    override suspend fun replaceAllCards(deckId: String, slots: List<Triple<String, Int, Boolean>>) {
+        replaceAllCardsCalls += deckId to slots
+    }
     override suspend fun updateArchetypeOverride(deckId: String, archetypeOverride: String?, themesOverride: List<String>) = Unit
     override suspend fun updateTribeOverride(deckId: String, tribeOverride: String?) = Unit
     override suspend fun updateStrategyLocked(deckId: String, locked: Boolean) = Unit
@@ -162,8 +179,11 @@ class ImportDeckCardsUseCaseTest {
         val success = outcome as ImportOutcome.Success
         assertEquals(1, success.resolvedCount)
         assertEquals(0, success.failedCount)
-        assertEquals(1, deckRepository.addedCards.size)
-        assertEquals(bolt.scryfallId, deckRepository.addedCards.first().scryfallId)
+        // Bug fix, 2026-07-22 (Resolve-then-write): a brand-new deck (targetDeckId == null) writes
+        // its resolved cards via ONE atomic replaceAllCards call, never per-card addCardToDeck.
+        assertEquals(0, deckRepository.addedCards.size)
+        assertEquals(1, deckRepository.replaceAllCardsCalls.size)
+        assertEquals(listOf(Triple(bolt.scryfallId, 4, false)), deckRepository.replaceAllCardsCalls.single().second)
         assertEquals("deckstats", deckRepository.attribution?.sourceService)
     }
 
@@ -182,6 +202,105 @@ class ImportDeckCardsUseCaseTest {
 
         assertEquals(0, deckRepository.createdDecks.size)
         assertEquals(0, deckRepository.updateDeckCallCount)
+        // An EXISTING deck (targetDeckId != null) keeps the original incremental per-card merge —
+        // never the atomic replaceAllCards path (that would wipe whatever the deck already had).
+        assertEquals(1, deckRepository.addedCards.size)
+        assertEquals(0, deckRepository.replaceAllCardsCalls.size)
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Known-scryfallId batch fast path (Bug fix, 2026-07-22)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun knownScryfallIdFoundInWarmedCacheNeverCallsSearchCardByName() = runTest {
+        val deckRepository = FakeDeckRepository()
+        val cardRepository = FakeImportCardRepository(byName = emptyMap(), byId = mapOf(bolt.scryfallId to bolt))
+        val useCase = ImportDeckCardsUseCase(deckRepository, cardRepository, NoOpCrashReporter)
+
+        val deck = com.mmg.manahub.core.model.CommunityDeck(
+            archidektId = 1, name = "D", description = "", format = "modern",
+            owner = com.mmg.manahub.core.model.CommunityDeckOwner(1, "u", ""),
+            viewCount = 0, createdAt = "", updatedAt = "",
+            cards = listOf(
+                com.mmg.manahub.core.model.CommunityDeckCard(
+                    name = "Lightning Bolt", quantity = 4, categories = emptyList(),
+                    oracleId = "oracle-bolt", scryfallId = bolt.scryfallId,
+                ),
+            ),
+            sourceUrl = "https://archidekt.com/decks/1",
+        )
+
+        val outcome = useCase(source = ImportSource.FromCommunityDeck(deck), targetDeckId = null)
+
+        val success = outcome as ImportOutcome.Success
+        assertEquals(1, success.resolvedCount)
+        assertEquals(0, success.failedCount)
+        assertEquals(listOf(listOf(bolt.scryfallId)), cardRepository.warmCacheCalls)
+        assertEquals(1, deckRepository.replaceAllCardsCalls.size)
+        assertEquals(listOf(Triple(bolt.scryfallId, 4, false)), deckRepository.replaceAllCardsCalls.single().second)
+    }
+
+    @Test
+    fun knownScryfallIdMissingFromWarmedCacheFallsBackToSearchCardByName() = runTest {
+        val deckRepository = FakeDeckRepository()
+        // The known id is a dead/retired printing id that the batch fetch can't resolve (absent
+        // from `byId`); the card's ORACLE name is still resolvable via a fuzzy fallback search.
+        val cardRepository = FakeImportCardRepository(byName = mapOf("Lightning Bolt" to bolt), byId = emptyMap())
+        val useCase = ImportDeckCardsUseCase(deckRepository, cardRepository, NoOpCrashReporter)
+
+        val deck = com.mmg.manahub.core.model.CommunityDeck(
+            archidektId = 1, name = "D", description = "", format = "modern",
+            owner = com.mmg.manahub.core.model.CommunityDeckOwner(1, "u", ""),
+            viewCount = 0, createdAt = "", updatedAt = "",
+            cards = listOf(
+                com.mmg.manahub.core.model.CommunityDeckCard(
+                    name = "Lightning Bolt", quantity = 1, categories = emptyList(),
+                    oracleId = "oracle-bolt", scryfallId = "dead-printing-id",
+                ),
+            ),
+            sourceUrl = "https://archidekt.com/decks/1",
+        )
+
+        val outcome = useCase(source = ImportSource.FromCommunityDeck(deck), targetDeckId = null)
+
+        val success = outcome as ImportOutcome.Success
+        assertEquals(1, success.resolvedCount)
+        assertEquals(0, success.failedCount)
+        assertEquals(listOf(listOf("dead-printing-id")), cardRepository.warmCacheCalls)
+        assertEquals(listOf(Triple(bolt.scryfallId, 1, false)), deckRepository.replaceAllCardsCalls.single().second)
+    }
+
+    @Test
+    fun pastedTextSourceNeverCallsWarmCacheForIds() = runTest {
+        val deckRepository = FakeDeckRepository()
+        val cardRepository = FakeImportCardRepository(mapOf("Lightning Bolt" to bolt))
+        val useCase = ImportDeckCardsUseCase(deckRepository, cardRepository, NoOpCrashReporter)
+
+        useCase(source = ImportSource.PastedText("4 Lightning Bolt"), targetDeckId = "existing-deck-id")
+
+        // PastedText never carries a known scryfallId — zero regression: the known-id batch path
+        // must never engage for a source that has no id to give it.
+        assertTrue(cardRepository.warmCacheCalls.isEmpty())
+        assertEquals(1, deckRepository.addedCards.size)
+    }
+
+    @Test
+    fun deckstatsUrlSourceNeverCallsWarmCacheForIds() = runTest {
+        val deckRepository = FakeDeckRepository()
+        val cardRepository = FakeImportCardRepository(mapOf("Lightning Bolt" to bolt))
+        val useCase = ImportDeckCardsUseCase(
+            deckRepository = deckRepository,
+            cardRepository = cardRepository,
+            crashReporter = NoOpCrashReporter,
+            deckstatsFetcher = DeckstatsFetcher {
+                DeckstatsDeck(name = "D", cards = listOf(DeckstatsCard("Lightning Bolt", 4, isSideboard = false, isCommander = false)))
+            },
+        )
+
+        useCase(source = ImportSource.DeckstatsUrl("https://deckstats.net/decks/1/2-d"))
+
+        assertTrue(cardRepository.warmCacheCalls.isEmpty())
     }
 
     @Test

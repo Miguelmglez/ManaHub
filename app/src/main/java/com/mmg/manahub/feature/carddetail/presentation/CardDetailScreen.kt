@@ -76,7 +76,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -134,10 +133,14 @@ import com.mmg.manahub.core.model.UserDefinedTag
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.CardTagChip
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.LanguageBadge
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaCostImages
@@ -156,6 +159,8 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.ui.theme.Spacing
+import com.mmg.manahub.core.ui.theme.spacing
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -392,44 +397,28 @@ fun CardDetailScreen(
 
     // Delete confirmation
     uiState.cardToDelete?.let { uc ->
-        AlertDialog(
+        MagicAlertDialog(
             onDismissRequest = viewModel::onDismissDeleteConfirm,
-            title = { Text(stringResource(R.string.carddetail_delete_copy_title)) },
-            text = { Text(stringResource(R.string.carddetail_delete_copy_message)) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.onDeleteCard(uc.id) }) {
-                    Text(
-                        stringResource(R.string.action_remove),
-                        color = MaterialTheme.magicColors.lifeNegative
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::onDismissDeleteConfirm) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+            title = stringResource(R.string.carddetail_delete_copy_title),
+            text = stringResource(R.string.carddetail_delete_copy_message),
+            confirmLabel = stringResource(R.string.action_remove),
+            onConfirm = { viewModel.onDeleteCard(uc.id) },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = viewModel::onDismissDeleteConfirm,
+            confirmColor = MagicCtaColor.Error
         )
     }
 
     uiState.wishlistEntryToDelete?.let { entry ->
-        AlertDialog(
+        MagicAlertDialog(
             onDismissRequest = viewModel::onDismissWishlistDeleteConfirm,
-            title = { Text(stringResource(R.string.carddetail_remove_wishlist_title)) },
-            text = { Text(stringResource(R.string.carddetail_remove_wishlist_message)) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.onDeleteWishlistEntry(entry.id) }) {
-                    Text(
-                        stringResource(R.string.action_remove),
-                        color = MaterialTheme.magicColors.lifeNegative
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::onDismissWishlistDeleteConfirm) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+            title = stringResource(R.string.carddetail_remove_wishlist_title),
+            text = stringResource(R.string.carddetail_remove_wishlist_message),
+            confirmLabel = stringResource(R.string.action_remove),
+            onConfirm = { viewModel.onDeleteWishlistEntry(entry.id) },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = viewModel::onDismissWishlistDeleteConfirm,
+            confirmColor = MagicCtaColor.Error
         )
     }
 
@@ -802,8 +791,23 @@ private fun CardDetailContent(
                             exit = fadeOut()
                         )
                     ) {
-                        card.manaCost?.let {
-                            ManaCostImages(manaCost = it, symbolSize = 20.dp)
+
+
+                        card.manaCost?.let { cost ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val costs = cost.split(" // ")
+                                costs.forEachIndexed { index, singleCost ->
+                                    ManaCostImages(manaCost = singleCost, symbolSize = 20.dp)
+                                    if (index < costs.size - 1) {
+                                        Text(
+                                            " // ",
+                                            style = MaterialTheme.magicTypography.titleMedium,
+                                            color = MaterialTheme.magicColors.textSecondary,
+                                            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.xxs)
+                                        )
+                                    }
+                                }
+                            }
                         }
                         FaceFlippable(rotation = rotation) { isBack ->
                             val typeText = if (isBack) {
@@ -1892,28 +1896,9 @@ private fun TagsSection(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     autoTags.forEach { tag ->
-                        if (isInCollection) {
-                            InputChip(
-                                selected = true,
-                                onClick = {  },
-                                label = {
-                                    Text(
-                                        tag.label(),
-                                        style = MaterialTheme.magicTypography.labelSmall
-                                    )
-                                }
-                            )
-                        } else {
-                            SuggestionChip(
-                                onClick = {},
-                                label = {
-                                    Text(
-                                        tag.label(),
-                                        style = MaterialTheme.magicTypography.labelSmall
-                                    )
-                                },
-                            )
-                        }
+                        // Decorative-only (no onClick) — both the collected and non-collected
+                        // renderings were previously no-op-clickable InputChip/SuggestionChip.
+                        CardTagChip(label = tag.label(), category = tag.category)
                     }
                 }
             }
@@ -1934,25 +1919,14 @@ private fun TagsSection(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         userTags.forEach { tag ->
-                            InputChip(
-                                selected = true,
-                                onClick = { onRemoveUserTag(tag) },
-                                label = {
-                                    Text(
-                                        tag.label(),
-                                        style = MaterialTheme.magicTypography.labelSmall
-                                    )
-                                },
-                                trailingIcon = {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = stringResource(
-                                            R.string.carddetail_tags_remove_description,
-                                            tag.label()
-                                        ),
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                },
+                            CardTagChip(
+                                label = tag.label(),
+                                category = tag.category,
+                                onRemove = { onRemoveUserTag(tag) },
+                                removeContentDescription = stringResource(
+                                    R.string.carddetail_tags_remove_description,
+                                    tag.label()
+                                ),
                             )
                         }
                     }
@@ -2159,6 +2133,7 @@ private fun SuggestedTagCard(
 private data class TagItem(
     val key: String,
     val label: String,
+    val category: TagCategory,
     val isUserDefined: Boolean = false,
     val isApplied: Boolean = false,
 )
@@ -2255,7 +2230,7 @@ private fun TagPickerSheet(
                 item {
                     TagPickerSection(
                         title = stringResource(R.string.carddetail_tags_picker_auto),
-                        tags = cardAutoTags.map { TagItem(it.key, it.label()) },
+                        tags = cardAutoTags.map { TagItem(it.key, it.label(), category = it.category) },
                         onAdd = { key ->
                             val tag = cardAutoTags.find { it.key == key } ?: return@TagPickerSection
                             onAddUserTag(tag); onDismiss()
@@ -2273,7 +2248,8 @@ private fun TagPickerSheet(
                         tags = availableSuggestions.map { sug ->
                             TagItem(
                                 sug.tag.key,
-                                "${sug.tag.label()}  ${(sug.confidence * 100).toInt()}%"
+                                "${sug.tag.label()}  ${(sug.confidence * 100).toInt()}%",
+                                category = sug.tag.category,
                             )
                         },
                         onAdd = { key ->
@@ -2291,15 +2267,17 @@ private fun TagPickerSheet(
                     CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
                 val userDefined =
                     userDefinedTags.filter { it.categoryKey == category.name }
-                val items = canonical.map { TagItem(it.key, it.label(), isUserDefined = false) } +
-                        userDefined.map {
-                            TagItem(
-                                it.key,
-                                it.label,
-                                isUserDefined = true,
-                                isApplied = it.key in userTagKeys
-                            )
-                        }
+                val items = canonical.map {
+                    TagItem(it.key, it.label(), category = it.category, isUserDefined = false)
+                } + userDefined.map {
+                    TagItem(
+                        it.key,
+                        it.label,
+                        category = category,
+                        isUserDefined = true,
+                        isApplied = it.key in userTagKeys
+                    )
+                }
                 if (items.isNotEmpty()) {
                     item(key = "cat_${category.name}") {
                         TagPickerSection(
@@ -2329,6 +2307,7 @@ private fun TagPickerSheet(
                         TagItem(
                             it.key,
                             it.label,
+                            category = TagCategory.CUSTOM,
                             isUserDefined = true,
                             isApplied = it.key in userTagKeys
                         )
@@ -2356,32 +2335,27 @@ private fun TagPickerSheet(
 
     // ── Edit tag label dialog ─────────────────────────────────────────────────
     editingTagKey?.let { key ->
-        AlertDialog(
+        MagicAlertDialog(
             onDismissRequest = { editingTagKey = null },
-            title = { Text(stringResource(R.string.carddetail_rename_tag)) },
-            text = {
+            title = stringResource(R.string.carddetail_rename_tag),
+            confirmLabel = stringResource(R.string.action_save),
+            onConfirm = {
+                if (editingTagLabel.isNotBlank()) {
+                    onUpdateUserDefinedTag(key, editingTagLabel)
+                }
+                editingTagKey = null
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = { editingTagKey = null },
+            content = {
                 OutlinedTextField(
                     value = editingTagLabel,
                     onValueChange = { editingTagLabel = it },
                     placeholder = { Text(stringResource(R.string.carddetail_new_name_hint)) },
                     singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (editingTagLabel.isNotBlank()) {
-                            onUpdateUserDefinedTag(key, editingTagLabel)
-                        }
-                        editingTagKey = null
-                    },
-                ) { Text(stringResource(R.string.action_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    editingTagKey = null
-                }) { Text(stringResource(R.string.action_cancel)) }
-            },
+            }
         )
     }
 
@@ -2500,27 +2474,16 @@ private fun TagPickerSection(
         ) {
             tags.forEach { tag ->
                 if (tag.isUserDefined && (onEdit != null || onDelete != null)) {
-                    // User-defined tag: chip + edit + delete icons in a small row
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = mc.surface,
-                        border = BorderStroke(0.5.dp, mc.surfaceVariant),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(
-                                start = 10.dp,
-                                end = 2.dp,
-                                top = 4.dp,
-                                bottom = 4.dp
-                            ),
-                        ) {
-                            Text(
-                                tag.label,
-                                style = ty.labelSmall,
-                                color = if (tag.isApplied) mc.textDisabled else mc.textPrimary,
-                                modifier = if (!tag.isApplied) Modifier.clickable { onAdd(tag.key) } else Modifier,
-                            )
+                    // User-defined tag: chip + optional "applied" check + edit/delete icons.
+                    // The whole chip is tappable-to-add (matching the original label-only
+                    // clickable region's intent, just with a larger — CLAUDE.md-preferred —
+                    // touch target); the icon buttons still consume their own taps first via
+                    // Compose's normal nested-clickable resolution.
+                    CardTagChip(
+                        label = tag.label,
+                        category = tag.category,
+                        onClick = if (!tag.isApplied) ({ onAdd(tag.key) }) else null,
+                        trailing = {
                             if (tag.isApplied) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
@@ -2563,14 +2526,11 @@ private fun TagPickerSection(
                                     )
                                 }
                             }
-                        }
-                    }
-                } else {
-                    // Built-in tag: standard suggestion chip
-                    SuggestionChip(
-                        onClick = { onAdd(tag.key) },
-                        label = { Text(tag.label, style = ty.labelSmall) },
+                        },
                     )
+                } else {
+                    // Built-in tag: tap to add.
+                    CardTagChip(label = tag.label, category = tag.category, onClick = { onAdd(tag.key) })
                 }
             }
         }
@@ -2583,23 +2543,22 @@ private fun NewCategoryDialog(
     onConfirm: (String) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.carddetail_new_category_title)) },
-        text = {
+        title = stringResource(R.string.carddetail_new_category_title),
+        confirmLabel = stringResource(R.string.carddetail_create_button),
+        onConfirm = { onConfirm(name) },
+        dismissLabel = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        content = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 placeholder = { Text(stringResource(R.string.carddetail_category_name_hint)) },
                 singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) {
-                Text(stringResource(R.string.carddetail_create_button))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        }
     )
 }
 

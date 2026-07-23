@@ -34,7 +34,6 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,6 +48,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -729,37 +732,15 @@ private fun CancelConfirmationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.backgroundSecondary,
-        title = {
-            Text(
-                stringResource(R.string.trades_cancel_confirm_title),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
-            Text(
-                stringResource(R.string.trades_cancel_confirm_body),
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textSecondary,
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
-            ) {
-                Text(stringResource(R.string.trades_cancel_confirm_yes), color = mc.background)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.trades_cancel_keep), color = mc.primaryAccent)
-            }
-        },
+        title = stringResource(R.string.trades_cancel_confirm_title),
+        text = stringResource(R.string.trades_cancel_confirm_body),
+        confirmLabel = stringResource(R.string.trades_cancel_confirm_yes),
+        onConfirm = onConfirm,
+        dismissLabel = stringResource(R.string.trades_cancel_keep),
+        onDismiss = onDismiss,
+        confirmColor = MagicCtaColor.Error
     )
 }
 
@@ -791,17 +772,10 @@ private fun MarkCompleteDialog(
         return if (items.size > 5) "$shown\n…and ${items.size - 5} more" else shown
     }
 
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.backgroundSecondary,
-        title = {
-            Text(
-                stringResource(R.string.trades_complete_dialog_title),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
+        title = stringResource(R.string.trades_complete_dialog_title),
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md)) {
                 if (!hasItems) {
                     Text(
@@ -847,38 +821,28 @@ private fun MarkCompleteDialog(
                 }
             }
         },
-        confirmButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
-                if (hasItems) {
-                    Button(
-                        onClick = onUpdateAndComplete,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            stringResource(R.string.trades_complete_update_and_complete),
-                            color = mc.background,
-                        )
-                    }
-                }
-                TextButton(
-                    onClick = onJustComplete,
+        buttons = {
+            if (hasItems) {
+                MagicCtaButton(
+                    onClick = onUpdateAndComplete,
+                    text = stringResource(R.string.trades_complete_update_and_complete),
+                    color = MagicCtaColor.Primary,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        stringResource(R.string.trades_complete_just_complete),
-                        color = mc.textSecondary,
-                    )
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.action_cancel), color = mc.textDisabled)
-                }
+                )
             }
-        },
-        dismissButton = null,
+            MagicCtaButton(
+                onClick = onJustComplete,
+                text = stringResource(R.string.trades_complete_just_complete),
+                style = MagicCtaStyle.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MagicCtaButton(
+                onClick = onDismiss,
+                text = stringResource(R.string.action_cancel),
+                style = MagicCtaStyle.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     )
 }
 
@@ -900,58 +864,38 @@ private fun RevokeConfirmationDialog(
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.backgroundSecondary,
-        title = {
-            Text(
-                stringResource(R.string.trades_revoke_confirm_title),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
-            Text(
-                stringResource(
-                    if (hasSynced) R.string.trades_revoke_confirm_synced_body
-                    else R.string.trades_revoke_confirm_body
+        title = stringResource(R.string.trades_revoke_confirm_title),
+        text = stringResource(
+            if (hasSynced) R.string.trades_revoke_confirm_synced_body
+            else R.string.trades_revoke_confirm_body
+        ),
+        buttons = {
+            MagicCtaButton(
+                onClick = if (hasSynced) onRevokeAndReverse else onJustRevoke,
+                text = stringResource(
+                    if (hasSynced) R.string.trades_revoke_and_reverse
+                    else R.string.trades_revoke_just_revoke
                 ),
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textSecondary,
+                color = MagicCtaColor.Error,
+                modifier = Modifier.fillMaxWidth(),
             )
-        },
-        confirmButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
-                Button(
-                    onClick = if (hasSynced) onRevokeAndReverse else onJustRevoke,
-                    colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
+            if (hasSynced) {
+                MagicCtaButton(
+                    onClick = onJustRevoke,
+                    text = stringResource(R.string.trades_revoke_just_revoke),
+                    style = MagicCtaStyle.Ghost,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        stringResource(
-                            if (hasSynced) R.string.trades_revoke_and_reverse
-                            else R.string.trades_revoke_just_revoke
-                        ),
-                        color = mc.background,
-                    )
-                }
-                if (hasSynced) {
-                    TextButton(
-                        onClick = onJustRevoke,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.trades_revoke_just_revoke), color = mc.textSecondary)
-                    }
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.trades_revoke_keep), color = mc.textDisabled)
-                }
+                )
             }
-        },
-        dismissButton = null,
+            MagicCtaButton(
+                onClick = onDismiss,
+                text = stringResource(R.string.trades_revoke_keep),
+                style = MagicCtaStyle.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     )
 }
 
@@ -968,37 +912,15 @@ private fun GiftAcceptDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.backgroundSecondary,
-        title = {
-            Text(
-                text = stringResource(R.string.trades_gift_accept_title),
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
-            Text(
-                text = stringResource(R.string.trades_gift_accept_body),
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textSecondary,
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = mc.lifePositive),
-            ) {
-                Text(stringResource(R.string.trades_gift_accept_confirm), color = mc.background)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel), color = mc.textSecondary)
-            }
-        },
+        title = stringResource(R.string.trades_gift_accept_title),
+        text = stringResource(R.string.trades_gift_accept_body),
+        confirmLabel = stringResource(R.string.trades_gift_accept_confirm),
+        onConfirm = onConfirm,
+        dismissLabel = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmColor = MagicCtaColor.Success
     )
 }
 
@@ -1034,24 +956,11 @@ private fun NegotiationErrorDialog(
         )
     }
 
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.backgroundSecondary,
-        title = {
-            Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
-        },
-        text = {
-            Text(
-                body,
-                style = MaterialTheme.magicTypography.bodyMedium,
-                color = mc.textSecondary,
-                textAlign = TextAlign.Start
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_confirm), color = mc.primaryAccent)
-            }
-        },
+        title = title,
+        text = body,
+        confirmLabel = stringResource(R.string.action_confirm),
+        onConfirm = onDismiss,
     )
 }

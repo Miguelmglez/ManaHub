@@ -10,6 +10,7 @@ import com.mmg.manahub.core.data.remote.dto.CardStrategyTagsRowDto
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsSubmission
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.TagCategory
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -188,17 +189,20 @@ class CardStrategyTagsRepositoryImplTest {
         assertIs<CardStrategyTagsResult.Error>(result)
     }
 
-    // ── Unresolvable tag key ─────────────────────────────────────────────────
+    // ── Dictionary-less tag key (TYPE tags, e.g. from TypeLineAnalyzer) ──────
 
     @Test
-    fun `given a payload tag key not in TagDictionary when getStrategyTags then that key is silently dropped`() = runTest {
-        val remote = FakeRemote(behavior = { row("oracle-6", tags = listOf("removal", "totally_unknown_future_tag")) })
+    fun `given a payload tag key not in TagDictionary when getStrategyTags then it is kept as a TYPE tag, not dropped`() = runTest {
+        // "creature" mirrors a real TypeLineAnalyzer-emitted key: TagDictionary never registers
+        // TYPE-category keys (see TagDictionary.kt's own doc comment), so a dictionary miss here
+        // is the expected shape for a type-line tag, not a taxonomy-drift signal.
+        val remote = FakeRemote(behavior = { row("oracle-6", tags = listOf("removal", "creature")) })
         val repo = repository(remote)
 
         val result = repo.getStrategyTags("oracle-6")
 
         assertIs<CardStrategyTagsResult.Found>(result)
-        assertEquals(listOf(CardTag.REMOVAL), result.tags)
+        assertEquals(listOf(CardTag.REMOVAL, CardTag("creature", TagCategory.TYPE)), result.tags)
     }
 
     // ── submitStrategyTags (plan §8a addendum — device write-back) ──────────

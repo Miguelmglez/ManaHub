@@ -94,11 +94,16 @@ fun playtestKoinModule(
         )
     }
     viewModel {
+        // NOTE: DrawHandUseCase (registered above) is no longer wired into this ViewModel —
+        // buildAndDraw/onMulligan now call the shared top-level drawWithForced() function
+        // directly (Deck Playtest adjustments plan, Part D: "Custom your hand" needs the SAME
+        // forced-aware draw primitive on every draw path, not just the plain one). The
+        // registration itself is left in place; DrawHandUseCase.invoke() is still directly
+        // unit-tested and remains a valid standalone primitive.
         PlaytestHandViewModel(
             deckRepository = get(),
             cardDao = get(),
             buildLibraryUseCase = get(),
-            drawHandUseCase = get(),
             londonMulliganUseCase = get(),
             savePlaytestUseCase = get(),
             savePlaytestSurveyUseCase = get(),
