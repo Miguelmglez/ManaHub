@@ -51,6 +51,7 @@ class FixtureCardRepository(
     override suspend fun getCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
+    override suspend fun backfillMissingStrategyTags(limit: Int) = error("unused")
     override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> = error("unused")
     override suspend fun getCachedEnglishSiblings(pairs: Set<Pair<String, String>>): Map<Pair<String, String>, Card> = error("unused")
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")

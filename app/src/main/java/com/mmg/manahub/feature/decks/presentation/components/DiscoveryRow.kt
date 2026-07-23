@@ -30,16 +30,19 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
+import org.jetbrains.compose.resources.painterResource
 
 /** Height of the cluster-strength indicator bar track. */
 private val FitBarHeight = 6.dp
@@ -140,6 +143,9 @@ internal fun DiscoveryRow(
                         AsyncImage(
                             model = magicCard.card.imageArtCrop,
                             contentDescription = stringResource(R.string.deck_studio_inspiration_card_art),
+                            placeholder = painterResource(Res.drawable.mtg_card_back),
+                            error = painterResource(Res.drawable.mtg_card_back),
+                            fallback = painterResource(Res.drawable.mtg_card_back),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .size(width = ArtThumbWidth, height = ArtThumbHeight)
@@ -228,6 +234,9 @@ internal fun DiscoveryRowV2(
                         AsyncImage(
                             model = card.imageArtCrop,
                             contentDescription = stringResource(R.string.deck_studio_inspiration_card_art),
+                            placeholder = painterResource(Res.drawable.mtg_card_back),
+                            error = painterResource(Res.drawable.mtg_card_back),
+                            fallback = painterResource(Res.drawable.mtg_card_back),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .size(width = ArtThumbWidth, height = ArtThumbHeight)

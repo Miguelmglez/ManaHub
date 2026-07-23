@@ -11,6 +11,7 @@ import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CardStrategyTagsSubmission
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.TagCategory
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -132,12 +133,18 @@ class CardStrategyTagsRepositoryImpl(
             null
         }
 
-    /** Resolves raw string tag keys to [CardTag]s via [TagDictionary] — an unresolvable key (a
-     *  taxonomy drift between the offline pipeline and this build's dictionary) is silently
-     *  dropped rather than guessed at a category. */
+    /** Resolves raw string tag keys to [CardTag]s. [TagDictionary] only holds hand-authored
+     *  ARCHETYPE/STRATEGY/ROLE/KEYWORD entries — it is NOT a validity filter for every tag key
+     *  the pipeline can emit. [com.mmg.manahub.core.data.tagging.TypeLineAnalyzer] synthesizes
+     *  [com.mmg.manahub.core.model.TagCategory.TYPE] tags (card types + creature subtypes, e.g.
+     *  "creature"/"artifact"/"elf") directly from the type line and never registers them in the
+     *  dictionary, so a dictionary miss on its own does NOT mean "unknown/drifted key" — it is
+     *  the expected shape for every TYPE tag. A dictionary hit keeps its authored category;
+     *  a miss falls back to [com.mmg.manahub.core.model.TagCategory.TYPE] (the only analyzer that
+     *  emits dictionary-less keys today), rather than being dropped. */
     private fun toFound(payload: CardStrategyTagsPayloadDto, isStale: Boolean): CardStrategyTagsResult.Found =
         CardStrategyTagsResult.Found(
-            tags    = payload.tags.mapNotNull { key -> TagDictionary.get(key)?.let { CardTag(key, it.category) } },
+            tags    = payload.tags.map { key -> CardTag(key, TagDictionary.get(key)?.category ?: TagCategory.TYPE) },
             tribes  = payload.tribes,
             isStale = isStale,
         )

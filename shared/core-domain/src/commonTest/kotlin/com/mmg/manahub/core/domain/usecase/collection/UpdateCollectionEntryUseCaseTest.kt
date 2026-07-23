@@ -40,6 +40,7 @@ private class FakeCardRepository(
             ?: DataResult.Error("not found")
     override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
+    override suspend fun backfillMissingStrategyTags(limit: Int) = error("unused")
     override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> {
         getCardBySetAndNumberCallCount++
         lastSetAndNumberCall = set to number

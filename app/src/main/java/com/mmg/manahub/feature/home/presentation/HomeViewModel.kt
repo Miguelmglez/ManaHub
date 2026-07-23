@@ -1602,11 +1602,7 @@ class HomeViewModel(
             STEP_FIRST_SCAN_CARD       -> true
             STEP_FIRST_CREATE_DECK     -> deckCount == 0
             STEP_FIRST_PLAY_GAME       -> true
-            // Hidden while Deck Playtest itself is flag-disabled (DeckFeatureFlags.PLAYTEST_ENABLED)
-            // — otherwise this step's CTA (HomeAction.PlaytestRecentDeck) would surface a shortcut
-            // into a hidden feature.
-            STEP_FIRST_PLAYTEST_DECK   -> com.mmg.manahub.feature.decks.presentation.DeckFeatureFlags.PLAYTEST_ENABLED &&
-                deckCount > 0 && totalPlaytestCount == 0
+            STEP_FIRST_PLAYTEST_DECK   -> deckCount > 0 && totalPlaytestCount == 0
             STEP_FIRST_CREATE_ACCOUNT  -> !isAuthenticated
             STEP_FIRST_COMPLETE_PROFILE -> isAuthenticated && !isProfileComplete
             STEP_FIRST_ADD_FRIEND      -> isAuthenticated && friendCount == 0

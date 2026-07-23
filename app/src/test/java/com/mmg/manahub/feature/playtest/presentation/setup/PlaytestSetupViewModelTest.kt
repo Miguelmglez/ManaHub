@@ -183,10 +183,12 @@ class PlaytestSetupViewModelTest {
         unmockkStatic(FirebaseCrashlytics::class)
     }
 
-    // ── Group 1: Ineligible deck → no NavigateToHand event ────────────────────
+    // ── Group 1: Ineligible deck → onDrawHand navigates ANYWAY (Part A: warn, don't block) ────
 
     @Test
-    fun `given standard deck with 59 cards when onDrawHand called then NavigateToHand is NOT emitted`() = runTest {
+    fun `given standard deck with 59 cards when onDrawHand called then NavigateToHand is emitted anyway`() = runTest {
+        // Part A of the Deck Playtest adjustments plan: the setup screen keeps showing the
+        // ineligibility warning banner, but no longer blocks the user from running the test.
         val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 59)
         stubDeck(deckWithCards)
         viewModel = buildViewModel()
@@ -198,13 +200,16 @@ class PlaytestSetupViewModelTest {
         viewModel.events.test {
             viewModel.onDrawHand()
             advanceUntilIdle()
-            expectNoEvents()
+            assertTrue(
+                "onDrawHand must emit NavigateToHand even when the deck is ineligible",
+                awaitItem() is PlaytestSetupEvent.NavigateToHand,
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `given unsupported format when onDrawHand called then NavigateToHand is NOT emitted`() = runTest {
+    fun `given unsupported format when onDrawHand called then NavigateToHand is emitted anyway`() = runTest {
         val deckWithCards = makeDeckWithCards(format = "sealed", cardCount = 60)
         stubDeck(deckWithCards)
         viewModel = buildViewModel()
@@ -213,7 +218,10 @@ class PlaytestSetupViewModelTest {
         viewModel.events.test {
             viewModel.onDrawHand()
             advanceUntilIdle()
-            expectNoEvents()
+            assertTrue(
+                "onDrawHand must emit NavigateToHand even for an unsupported format",
+                awaitItem() is PlaytestSetupEvent.NavigateToHand,
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -499,5 +507,125 @@ class PlaytestSetupViewModelTest {
 
         assertNull("eligibility must remain null when deck is not found", viewModel.uiState.value.eligibility)
         assertTrue("errorMessage must be set when deck is not found", !viewModel.uiState.value.errorMessage.isNullOrEmpty())
+    }
+
+    // ── Group 9: maxDrawCount clamp (Part B) ──────────────────────────────────
+
+    @Test
+    fun `given deck with 5 mainboard cards and no commander then maxDrawCount is 5`() = runTest {
+        val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 5)
+        stubDeck(deckWithCards)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        assertEquals(5, viewModel.uiState.value.maxDrawCount)
+        assertEquals(
+            "the default drawCount (7) must be clamped down to the new maxDrawCount",
+            5,
+            viewModel.uiState.value.drawCount,
+        )
+    }
+
+    @Test
+    fun `given commander deck with 15 mainboard cards including commander then maxDrawCount excludes the commander`() = runTest {
+        val commanderId = "commander-001"
+        val commanderSlot = DeckSlot(scryfallId = commanderId, quantity = 1)
+        val otherSlots = (1..14).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        val deckWithCards = DeckWithCards(
+            deck = Deck(
+                id              = "deck-test",
+                name            = "Commander Deck",
+                format          = "commander",
+                commanderCardId = commanderId,
+            ),
+            mainboard = otherSlots + commanderSlot,
+            sideboard = emptyList(),
+        )
+        every { deckRepository.observeDeckWithCards("deck-test") } returns flowOf(deckWithCards)
+        every { deckRepository.observeAllDeckSummaries() } returns flowOf(emptyList())
+        coEvery { cardDao.getByIds(any()) } returns emptyList()
+        coEvery { cardDao.getById(commanderId) } returns makeCardEntity(commanderId)
+
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        // 15 mainboard cards total, 1 of which is the commander => 14 actually drawable.
+        assertEquals(14, viewModel.uiState.value.maxDrawCount)
+    }
+
+    @Test
+    fun `given deck with more than 10 mainboard cards then maxDrawCount is capped at 10`() = runTest {
+        val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 60)
+        stubDeck(deckWithCards)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        assertEquals(10, viewModel.uiState.value.maxDrawCount)
+    }
+
+    // ── Group 10: startCount clamping (Part C) ────────────────────────────────
+
+    @Test
+    fun `given eligible deck when setStartCount called with 0 then it is clamped to 1`() = runTest {
+        val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 60)
+        stubDeck(deckWithCards)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.setStartCount(0)
+
+        assertEquals(1, viewModel.uiState.value.startCount)
+    }
+
+    @Test
+    fun `given eligible deck when setStartCount called above drawCount then it is clamped to drawCount`() = runTest {
+        val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 60)
+        stubDeck(deckWithCards)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.setStartCount(999)
+
+        assertEquals(viewModel.uiState.value.drawCount, viewModel.uiState.value.startCount)
+    }
+
+    @Test
+    fun `given startCount above a lowered drawCount when setDrawCount called then startCount is re-coerced down`() = runTest {
+        val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 60)
+        stubDeck(deckWithCards)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.setStartCount(9)
+        assertEquals(9, viewModel.uiState.value.startCount)
+
+        viewModel.setDrawCount(5)
+
+        assertEquals(5, viewModel.uiState.value.drawCount)
+        assertEquals(
+            "startCount must be re-coerced down when drawCount drops below its current value",
+            5,
+            viewModel.uiState.value.startCount,
+        )
+    }
+
+    @Test
+    fun `given eligible deck when onDrawHand called then NavigateToHand setup carries startCount`() = runTest {
+        val deckWithCards = makeDeckWithCards(format = "standard", cardCount = 60)
+        stubDeck(deckWithCards)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+
+        viewModel.setDrawCount(10)
+        viewModel.setStartCount(7)
+
+        viewModel.events.test {
+            viewModel.onDrawHand()
+            advanceUntilIdle()
+            val event = awaitItem() as PlaytestSetupEvent.NavigateToHand
+            assertEquals(10, event.setup.drawCount)
+            assertEquals(7, event.setup.startCount)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

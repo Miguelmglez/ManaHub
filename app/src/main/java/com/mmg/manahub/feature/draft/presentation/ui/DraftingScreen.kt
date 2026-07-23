@@ -83,6 +83,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -1029,8 +1030,29 @@ private fun PoolGroupHeader(label: String, count: Int) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(sp.xs)
     ) {
-        if (label.length == 1 && label[0] in "WUBRG") {
-            ManaSymbolImage(token = label, size = 18.dp)
+        when {
+            label.length == 1 && label[0] in "WUBRG" -> {
+                ManaSymbolImage(token = label, size = 18.dp)
+            }
+            label == "Colorless" -> {
+                ManaSymbolImage(token = "C", size = 18.dp)
+            }
+            label == "Multicolor" -> {
+                Icon(
+                    imageVector = com.mmg.manahub.core.ui.components.CounterIcon,
+                    contentDescription = null,
+                    tint = mc.textPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            label == "Land" || label == "Lands" -> {
+                Icon(
+                    painter = painterResource(R.drawable.ic_land),
+                    contentDescription = null,
+                    tint = mc.textPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
         Text(
             text = "$colorName ($count)",

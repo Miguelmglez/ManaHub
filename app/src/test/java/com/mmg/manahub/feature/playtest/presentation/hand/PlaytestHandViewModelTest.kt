@@ -12,8 +12,8 @@ import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.PlayZone
 import com.mmg.manahub.core.model.PlaytestPhase
 import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.core.model.computeRequiredBottomCount
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
-import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestSurveyUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestUseCase
@@ -44,10 +44,11 @@ import org.junit.Test
 /**
  * Unit tests for [PlaytestHandViewModel].
  *
- * Strategy: inject real use-case instances (BuildLibraryUseCase, DrawHandUseCase,
- * LondonMulliganUseCase) so the ViewModel's core flow logic is tested end-to-end
- * without mocking the shuffle internals. Only DeckRepository, CardDao, SavePlaytestUseCase
- * and SavePlaytestSurveyUseCase are mocked.
+ * Strategy: inject real use-case instances (BuildLibraryUseCase, LondonMulliganUseCase) so the
+ * ViewModel's core flow logic is tested end-to-end without mocking the shuffle internals
+ * (buildAndDraw/onMulligan draw via the shared top-level `drawWithForced()` function directly,
+ * not an injected DrawHandUseCase — see PlaytestHandViewModel). Only DeckRepository, CardDao,
+ * SavePlaytestUseCase and SavePlaytestSurveyUseCase are mocked.
  */
 @ExperimentalCoroutinesApi
 class PlaytestHandViewModelTest {
@@ -66,7 +67,6 @@ class PlaytestHandViewModelTest {
     // ── Real use cases ────────────────────────────────────────────────────────
 
     private val buildLibraryUseCase = BuildLibraryUseCase()
-    private val drawHandUseCase = DrawHandUseCase()
     private val londonMulliganUseCase = LondonMulliganUseCase()
 
     // ── SUT ───────────────────────────────────────────────────────────────────
@@ -174,11 +174,16 @@ class PlaytestHandViewModelTest {
     /**
      * Builds a [PlaytestSetup] for a standard deck with [drawCount] cards.
      */
-    private fun makeSetup(drawCount: Int = 7, format: String = "standard"): PlaytestSetup = PlaytestSetup(
+    private fun makeSetup(
+        drawCount: Int = 7,
+        startCount: Int = 7,
+        format: String = "standard",
+    ): PlaytestSetup = PlaytestSetup(
         deckId       = "deck-test",
         deckName     = "Test Deck",
         deckFormat   = format,
         drawCount    = drawCount,
+        startCount   = startCount,
         isOnThePlay  = true,
         commanderCard = null,
     )
@@ -189,6 +194,14 @@ class PlaytestHandViewModelTest {
      */
     private fun stubDeckWithCards(cardCount: Int) {
         val slots = (1..cardCount).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+    }
+
+    /**
+     * Stubs DeckRepository and CardDao so that buildAndDraw() can resolve a deck with the exact
+     * given [slots] (arbitrary quantities — used for "Custom your hand" multi-copy scenarios).
+     */
+    private fun stubDeckWithSlots(slots: List<DeckSlot>) {
         val deckWithCards = DeckWithCards(
             deck      = Deck(id = "deck-test", name = "Test Deck", format = "standard"),
             mainboard = slots,
@@ -212,7 +225,6 @@ class PlaytestHandViewModelTest {
             deckRepository           = deckRepository,
             cardDao                  = cardDao,
             buildLibraryUseCase      = buildLibraryUseCase,
-            drawHandUseCase          = drawHandUseCase,
             londonMulliganUseCase    = londonMulliganUseCase,
             savePlaytestUseCase      = savePlaytestUseCase,
             savePlaytestSurveyUseCase = savePlaytestSurveyUseCase,
@@ -293,52 +305,61 @@ class PlaytestHandViewModelTest {
         assertEquals(0, viewModel.uiState.value.snapshot!!.mulligansUsed)
     }
 
-    // ── Group 2: Mulligan block at limit ──────────────────────────────────────
+    // ── Group 2: Mulligan blocking under the Part C required-bottom-count rework ──────────────
+    // Historical behavior blocked further mulligans once mulligansUsed >= drawCount - 1. Under
+    // the "Cards to start the game" rework, the >=1-card kept-hand floor is guaranteed entirely
+    // by computeRequiredBottomCount()'s own coerceIn(0, drawCount - 1) clamp — onMulligan's guard
+    // (mirroring that formula) can therefore never actually trip except via the separate
+    // hand.size <= 1 safety guard, so mulligan is now allowed repeatedly as long as the hand has
+    // more than 1 card.
 
     @Test
-    fun `given drawCount 3 and mulligansUsed 2 when onMulligan called then hand is NOT changed`() = runTest {
-        // drawCount=3, so the limit is drawCount-1=2. Two mulligans already taken.
-        // The next mulligan would result in a 3-card hand where 2 must be bottomed, leaving 1 card.
-        // But onMulligan at mulligansUsed==2 would push to mulligansUsed==3, kept=0 — blocked.
+    fun `given drawCount 3 when onMulligan called repeatedly beyond the old limit then mulligan is still allowed`() = runTest {
         stubDeckWithCards(cardCount = 20)
         viewModel.initWithSetup(makeSetup(drawCount = 3))
         advanceUntilIdle()
 
-        // Take 2 mulligans to reach the limit.
-        viewModel.onMulligan()
-        viewModel.onMulligan()
+        repeat(5) { viewModel.onMulligan() }
 
-        val snapshotAtLimit = viewModel.uiState.value.snapshot!!
-        assertEquals(2, snapshotAtLimit.mulligansUsed)
-        val handAtLimit = snapshotAtLimit.hand
-
-        // Attempt one more mulligan — must be a no-op.
-        viewModel.onMulligan()
-
-        val snapshotAfterBlockedMulligan = viewModel.uiState.value.snapshot!!
-        assertEquals("mulligansUsed must not increment past drawCount-1", 2, snapshotAfterBlockedMulligan.mulligansUsed)
-        assertEquals("hand must not change when mulligan is blocked", handAtLimit, snapshotAfterBlockedMulligan.hand)
+        assertEquals(
+            "mulligan is no longer capped at drawCount - 1; only the hand.size <= 1 floor blocks it",
+            5,
+            viewModel.uiState.value.snapshot!!.mulligansUsed,
+        )
+        assertEquals(3, viewModel.uiState.value.snapshot!!.hand.size)
     }
 
     @Test
-    fun `given drawCount 2 and mulligansUsed 1 when onMulligan called then mulligan is blocked`() = runTest {
-        // drawCount=2 → limit is 1. After 1 mulligan the button must be disabled.
+    fun `given drawCount 2 when onMulligan called twice then both mulligans are allowed`() = runTest {
         stubDeckWithCards(cardCount = 20)
         viewModel.initWithSetup(makeSetup(drawCount = 2))
         advanceUntilIdle()
 
         viewModel.onMulligan()
-
-        val snapshot = viewModel.uiState.value.snapshot!!
-        assertEquals(1, snapshot.mulligansUsed)
-        val handBefore = snapshot.hand
-
-        // Second mulligan must be blocked.
         viewModel.onMulligan()
 
-        val snapshotAfter = viewModel.uiState.value.snapshot!!
-        assertEquals("mulligansUsed must not exceed drawCount-1=1", 1, snapshotAfter.mulligansUsed)
-        assertEquals("hand must be unchanged when mulligan is blocked", handBefore, snapshotAfter.hand)
+        assertEquals(2, viewModel.uiState.value.snapshot!!.mulligansUsed)
+        assertEquals(2, viewModel.uiState.value.snapshot!!.hand.size)
+    }
+
+    @Test
+    fun `given drawCount 1 when onMulligan called then it is blocked by the 1-card hand floor`() = runTest {
+        // The only real remaining guard: a 1-card hand can never mulligan (hand.size <= 1).
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 1))
+        advanceUntilIdle()
+
+        val handBefore = viewModel.uiState.value.snapshot!!.hand
+        assertEquals(1, handBefore.size)
+
+        viewModel.onMulligan()
+
+        assertEquals(
+            "mulligansUsed must stay 0 when the 1-card hand floor blocks the mulligan",
+            0,
+            viewModel.uiState.value.snapshot!!.mulligansUsed,
+        )
+        assertEquals("hand must be unchanged when mulligan is blocked", handBefore, viewModel.uiState.value.snapshot!!.hand)
     }
 
     @Test
@@ -844,6 +865,84 @@ class PlaytestHandViewModelTest {
     }
 
     @Test
+    fun `given a hand card when moveCard to LIBRARY then it is a no-op and total cards is conserved`() = runTest {
+        // Regression test for the Deck Playtest audit finding: LIBRARY is a draw-only source
+        // (see PlayZone.LIBRARY KDoc), never a valid move destination. Before the fix, dropping a
+        // card onto the Library pile removed it from its origin zone with no branch to re-add it
+        // anywhere — a silent delete that broke the hand+lands+permanents+graveyard+library
+        // conservation invariant. moveCard now guards toZone==LIBRARY as an early no-op
+        // (defense-in-depth alongside the UI-level drop-target exclusion in BattlefieldContent).
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val totalBefore = viewModel.totalCards()
+        val before = viewModel.uiState.value.battlefield
+        val target = before!!.hand.first()
+
+        viewModel.moveCard(target.instanceId, PlayZone.LIBRARY)
+
+        assertEquals("moveCard to LIBRARY must be a complete no-op", before, viewModel.uiState.value.battlefield)
+        assertEquals("total cards must be conserved — the card must not vanish", totalBefore, viewModel.totalCards())
+        assertTrue(
+            "the card must remain exactly where it was (still in hand)",
+            viewModel.uiState.value.battlefield!!.hand.any { it.instanceId == target.instanceId },
+        )
+    }
+
+    @Test
+    fun `given a card in LANDS when moveCard to LIBRARY then it is a no-op and total cards is conserved`() = runTest {
+        // Same regression as above, exercised from LANDS (the exact repro in the audit report:
+        // "drag any card from HAND/LANDS/PERMANENTS onto the Library pile icon — card vanishes").
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val handCard = viewModel.uiState.value.battlefield!!.hand.first()
+        viewModel.moveCard(handCard.instanceId, PlayZone.LANDS)
+
+        val totalBefore = viewModel.totalCards()
+        val before = viewModel.uiState.value.battlefield
+
+        viewModel.moveCard(handCard.instanceId, PlayZone.LIBRARY)
+
+        assertEquals("moveCard to LIBRARY must be a complete no-op", before, viewModel.uiState.value.battlefield)
+        assertEquals("total cards must be conserved — the card must not vanish", totalBefore, viewModel.totalCards())
+        assertTrue(
+            "the card must remain exactly where it was (still in lands)",
+            viewModel.uiState.value.battlefield!!.lands.any { it.instanceId == handCard.instanceId },
+        )
+    }
+
+    @Test
+    fun `given a card returning to LANDS from GRAVEYARD when moveCard then xOffset and yOffset reset to 0`() = runTest {
+        // Regression test for the stale-offset finding: a card that previously sat on the field
+        // at a non-zero free-form position, then detoured through GRAVEYARD, must land back at
+        // (0,0) when it re-enters LANDS/PERMANENTS so FreeFormFieldZone's auto-cascade placement
+        // re-triggers instead of rendering it at its stale pre-detour coordinates.
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+        viewModel.onKeep()
+
+        val handCard = viewModel.uiState.value.battlefield!!.hand.first()
+        viewModel.moveCard(handCard.instanceId, PlayZone.LANDS)
+        viewModel.updateCardOffset(handCard.instanceId, x = 123f, y = 456f)
+        val landed = viewModel.uiState.value.battlefield!!.lands.first { it.instanceId == handCard.instanceId }
+        assertEquals(123f, landed.xOffset, 0f)
+        assertEquals(456f, landed.yOffset, 0f)
+
+        viewModel.moveCard(handCard.instanceId, PlayZone.GRAVEYARD)
+        viewModel.moveCard(handCard.instanceId, PlayZone.LANDS)
+
+        val relanded = viewModel.uiState.value.battlefield!!.lands.first { it.instanceId == handCard.instanceId }
+        assertEquals("xOffset must reset to 0 on re-entering the field", 0f, relanded.xOffset, 0f)
+        assertEquals("yOffset must reset to 0 on re-entering the field", 0f, relanded.yOffset, 0f)
+    }
+
+    @Test
     fun `given a tapped land when moveCard back to HAND then isTapped resets to false`() = runTest {
         // Documented semantics: returning a card to the hand UNTAPS it (a hand card has no
         // tapped concept; re-playing it should start untapped).
@@ -1049,6 +1148,211 @@ class PlaytestHandViewModelTest {
             "toggleTap on a HAND card must leave the battlefield unchanged",
             before,
             viewModel.uiState.value.battlefield,
+        )
+    }
+
+    // ── Group 15: computeRequiredBottomCount (Part C) ──────────────────────────
+
+    @Test
+    fun `computeRequiredBottomCount table-driven cases`() {
+        data class Case(val drawCount: Int, val startCount: Int, val mulligansUsed: Int, val expected: Int)
+
+        val cases = listOf(
+            // The user's own worked example: draw=10, start=7, mulligans=4 -> required=4,
+            // final kept hand = 10 - 4 = 6.
+            Case(drawCount = 10, startCount = 7, mulligansUsed = 4, expected = 4),
+            // No gap, no mulligans -> nothing to bottom.
+            Case(drawCount = 7, startCount = 7, mulligansUsed = 0, expected = 0),
+            // Gap alone, before any mulligan (new Part C behavior).
+            Case(drawCount = 10, startCount = 7, mulligansUsed = 0, expected = 3),
+            // Classic London Mulligan, no start-count gap: required == mulligansUsed.
+            Case(drawCount = 7, startCount = 7, mulligansUsed = 2, expected = 2),
+            // Mulligan count dominates a smaller gap.
+            Case(drawCount = 10, startCount = 7, mulligansUsed = 5, expected = 5),
+            // Formula's own floor clamp: required can never reach/exceed drawCount, guaranteeing
+            // a kept hand of at least 1 card no matter how large mulligansUsed grows.
+            Case(drawCount = 3, startCount = 7, mulligansUsed = 10, expected = 2),
+        )
+
+        cases.forEach { case ->
+            assertEquals(
+                "drawCount=${case.drawCount} startCount=${case.startCount} mulligansUsed=${case.mulligansUsed}",
+                case.expected,
+                computeRequiredBottomCount(case.drawCount, case.startCount, case.mulligansUsed),
+            )
+        }
+    }
+
+    @Test
+    fun `given drawCount greater than startCount when onKeep called with 0 mulligans then bottom-N selector opens`() = runTest {
+        // Part C: the drawCount vs startCount gap alone (even at mulligansUsed == 0) must open
+        // the bottom-N selector — previously Keep skipped it entirely at 0 mulligans.
+        stubDeckWithCards(cardCount = 20)
+        viewModel.initWithSetup(makeSetup(drawCount = 10, startCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onKeep()
+
+        val state = viewModel.uiState.value
+        assertTrue("bottom-N selector must open when drawCount(10) > startCount(7)", state.showBottomNSelector)
+        assertEquals(PlaytestPhase.MULLIGAN, state.phase)
+    }
+
+    @Test
+    fun `given the worked example draw10 start7 mulligans4 then final kept hand has 6 cards`() = runTest {
+        stubDeckWithCards(cardCount = 40)
+        viewModel.initWithSetup(makeSetup(drawCount = 10, startCount = 7))
+        advanceUntilIdle()
+
+        repeat(4) { viewModel.onMulligan() }
+        assertEquals(4, viewModel.uiState.value.snapshot!!.mulligansUsed)
+
+        viewModel.onKeep()
+        assertTrue(viewModel.uiState.value.showBottomNSelector)
+
+        repeat(4) { index -> viewModel.toggleBottomSelection(index) }
+        viewModel.onConfirmBottomN()
+
+        assertEquals(
+            "final kept hand must be drawCount(10) - required(4) = 6",
+            6,
+            viewModel.uiState.value.snapshot!!.hand.size,
+        )
+    }
+
+    // ── Group 16: "Custom your hand" (Part D) ───────────────────────────────────
+
+    @Test
+    fun `given a forced card selection when applied then it is present in the drawn hand`() = runTest {
+        val slots = listOf(DeckSlot(scryfallId = "card-1", quantity = 2)) +
+            (2..19).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onSetCustomHandCount("card-1", 2)
+        viewModel.onConfirmCustomHandSheet()
+
+        val hand = viewModel.uiState.value.snapshot!!.hand
+        assertEquals("both forced copies must be present in the re-dealt hand", 2, hand.count { it.scryfallId == "card-1" })
+        assertEquals(7, hand.size)
+    }
+
+    @Test
+    fun `given a forced card index when toggleBottomSelection called then it is rejected`() = runTest {
+        val slots = listOf(DeckSlot(scryfallId = "card-1", quantity = 2)) +
+            (2..19).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onSetCustomHandCount("card-1", 2)
+        viewModel.onConfirmCustomHandSheet()
+
+        val forcedIndex = viewModel.uiState.value.snapshot!!.hand.indexOfFirst { it.scryfallId == "card-1" }
+        assertTrue("forced card must be present in the hand", forcedIndex >= 0)
+
+        viewModel.toggleBottomSelection(forcedIndex)
+
+        assertTrue(
+            "a protected (forced) index must never be added to the bottom-N selection",
+            viewModel.uiState.value.selectedBottomIndices.isEmpty(),
+        )
+    }
+
+    @Test
+    fun `given a mulliganed session when Custom Hand is applied then mulligansUsed and bottomedScryfallIds are preserved`() = runTest {
+        val slots = listOf(DeckSlot(scryfallId = "card-1", quantity = 2)) +
+            (2..19).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onMulligan()
+        val mulligansBefore = viewModel.uiState.value.snapshot!!.mulligansUsed
+        val bottomedBefore = viewModel.uiState.value.snapshot!!.bottomedScryfallIds
+        val snapshotIdBefore = viewModel.uiState.value.snapshot!!.id
+
+        viewModel.onSetCustomHandCount("card-1", 2)
+        viewModel.onConfirmCustomHandSheet()
+
+        val after = viewModel.uiState.value.snapshot!!
+        assertEquals("mulligansUsed must be preserved by an instant Custom Hand apply — this is a re-deal, not a mulligan", mulligansBefore, after.mulligansUsed)
+        assertEquals("bottomedScryfallIds must be preserved", bottomedBefore, after.bottomedScryfallIds)
+        assertTrue("applying Custom Hand must mint a fresh snapshot id for the enter animation", after.id != snapshotIdBefore)
+        assertEquals("both forced copies must be present in the re-dealt hand", 2, after.hand.count { it.scryfallId == "card-1" })
+    }
+
+    @Test
+    fun `given a Custom Hand selection when onMulligan is called then forced cards still appear in the new hand`() = runTest {
+        val slots = listOf(DeckSlot(scryfallId = "card-1", quantity = 2)) +
+            (2..19).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onSetCustomHandCount("card-1", 2)
+        viewModel.onConfirmCustomHandSheet()
+
+        viewModel.onMulligan()
+
+        val forcedCount = viewModel.uiState.value.snapshot!!.hand.count { it.scryfallId == "card-1" }
+        assertEquals("forced cards must survive a mulligan", 2, forcedCount)
+    }
+
+    @Test
+    fun `given a Custom Hand selection when onRedraw is called then forced cards still appear in the new hand`() = runTest {
+        val slots = listOf(DeckSlot(scryfallId = "card-1", quantity = 2)) +
+            (2..19).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        viewModel.onSetCustomHandCount("card-1", 2)
+        viewModel.onConfirmCustomHandSheet()
+
+        viewModel.onRedraw()
+        advanceUntilIdle()
+
+        val forcedCount = viewModel.uiState.value.snapshot!!.hand.count { it.scryfallId == "card-1" }
+        assertEquals("forced cards must survive a redraw", 2, forcedCount)
+    }
+
+    @Test
+    fun `given a forced count exceeding deck quantity when onSetCustomHandCount called then it is clamped`() = runTest {
+        val slots = listOf(DeckSlot(scryfallId = "card-1", quantity = 2)) +
+            (2..19).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        // Only 2 copies of "card-1" exist in the deck; requesting 5 must clamp to 2.
+        viewModel.onSetCustomHandCount("card-1", 5)
+
+        assertEquals(2, viewModel.uiState.value.customHandSelection["card-1"])
+    }
+
+    @Test
+    fun `given selections already at the drawCount cap when onSetCustomHandCount called for another card then it clamps to remaining headroom`() = runTest {
+        val slots = listOf(
+            DeckSlot(scryfallId = "card-1", quantity = 7),
+            DeckSlot(scryfallId = "card-2", quantity = 7),
+        ) + (3..18).map { DeckSlot(scryfallId = "card-$it", quantity = 1) }
+        stubDeckWithSlots(slots)
+        viewModel.initWithSetup(makeSetup(drawCount = 7))
+        advanceUntilIdle()
+
+        // card-1 already claims all 7 slots.
+        viewModel.onSetCustomHandCount("card-1", 7)
+        assertEquals(7, viewModel.uiState.value.customHandSelection["card-1"])
+
+        // card-2 has 0 headroom left under the drawCount(7) cap.
+        viewModel.onSetCustomHandCount("card-2", 3)
+
+        assertEquals(
+            "no headroom left once card-1 alone already fills drawCount",
+            null,
+            viewModel.uiState.value.customHandSelection["card-2"],
         )
     }
 }

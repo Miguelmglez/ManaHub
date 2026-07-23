@@ -18,8 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -29,9 +30,9 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -61,14 +62,18 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.DeckSlotEntry
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.CardTagChip
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * The inline card-detail bottom sheet for the Deck Studio editor.
@@ -125,105 +130,208 @@ internal fun CardDetailSheet(
         sheetState = sheetState,
         containerColor = mc.background,
         dragHandle = null,
+        tonalElevation = 0.dp,
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
                 .padding(bottom = spacing.xl),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.xs, vertical = spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close), tint = mc.textSecondary)
-                }
-            }
-            if (card != null) {
-                val hasBackFace = !card.imageBackNormal.isNullOrBlank()
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = spacing.sm, vertical = spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Start
                 ) {
-                    val rotation by animateFloatAsState(
-                        targetValue = if (showBackFace) -180f else 0f,
-                        animationSpec = tween(durationMillis = 500),
-                        label = "CardFlip",
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.75f)
-                            .aspectRatio(0.716f)
-                            .graphicsLayer {
-                                rotationY = rotation
-                                cameraDistance = 12f * density
-                            }
-                            .clip(CardShape)
-                            .then(
-                                if (hasBackFace) Modifier.clickable { showBackFace = !showBackFace } else Modifier
-                            ),
-                        contentAlignment = Alignment.Center,
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
                     ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current).data(card.imageNormal ?: card.imageArtCrop).crossfade(true).build(),
-                            contentDescription = card.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (rotation >= -90f) 1f else 0f },
-                        )
-                        if (hasBackFace) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current).data(card.imageBackNormal).crossfade(true).build(),
-                                contentDescription = card.name,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().graphicsLayer { rotationY = 180f; alpha = if (rotation < -90f) 1f else 0f },
+                        Surface(
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = mc.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.action_close),
+                                tint = mc.textPrimary,
+                                modifier = Modifier.padding(6.dp)
                             )
                         }
                     }
                 }
+            }
 
-                Column(modifier = Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val displayName = card.printedName?.takeIf { it.isNotBlank() } ?: card.name
-                        CardName(
-                            name = displayName,
-                            showFrontOnly = true,
-                            style = ty.titleMedium,
-                            color = mc.textPrimary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
+            if (card != null) {
+                item {
+                    val hasBackFace = !card.imageBackNormal.isNullOrBlank()
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        val rotation by animateFloatAsState(
+                            targetValue = if (showBackFace) -180f else 0f,
+                            animationSpec = tween(durationMillis = 500),
+                            label = "CardFlip",
                         )
-                        card.manaCost?.let { ManaCostImages(manaCost = it, symbolSize = 18.dp) }
-                    }
-                    val typeLine = card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
-                    Text(typeLine, style = ty.labelMedium, color = mc.textSecondary)
-                    HorizontalDivider(color = mc.surfaceVariant)
 
-                    val oracleDisplayText = card.oracleText?.takeIf { it.isNotBlank() } ?: card.printedText ?: ""
-                    OracleText(text = oracleDisplayText, style = ty.bodySmall)
-
-                    // Tag chips
-                    if (tags.isNotEmpty()) {
-                        Spacer(Modifier.height(spacing.sm))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                            modifier = Modifier.fillMaxWidth(),
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .aspectRatio(0.716f)
+                                .clip(CardShape),
+                            shape = CardShape,
+                            shadowElevation = 8.dp,
+                            tonalElevation = 4.dp,
+                            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
                         ) {
-                            tags.forEach { tag ->
-                                Surface(
-                                    color = mc.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = ChipShape,
-                                    border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.2f)),
-                                ) {
-                                    Text(
-                                        text = tag.label(),
-                                        style = ty.labelSmall,
-                                        color = mc.textSecondary,
-                                        modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        rotationY = rotation
+                                        cameraDistance = 12f * density
+                                    }
+                                    .then(
+                                        if (hasBackFace) Modifier.clickable {
+                                            showBackFace = !showBackFace
+                                        } else Modifier
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(card.imageNormal ?: card.imageArtCrop)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = card.name,
+                                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                                    error = painterResource(Res.drawable.mtg_card_back),
+                                    fallback = painterResource(Res.drawable.mtg_card_back),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer { alpha = if (rotation >= -90f) 1f else 0f },
+                                )
+                                if (hasBackFace) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(card.imageBackNormal)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = card.name,
+                                        placeholder = painterResource(Res.drawable.mtg_card_back),
+                                        error = painterResource(Res.drawable.mtg_card_back),
+                                        fallback = painterResource(Res.drawable.mtg_card_back),
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                rotationY = 180f
+                                                alpha = if (rotation < -90f) 1f else 0f
+                                            },
                                     )
+                                }
+                            }
+                        }
+
+                        if (hasBackFace) {
+                            Surface(
+                                shape = ChipShape,
+                                color = mc.primaryAccent.copy(alpha = 0.1f),
+                                modifier = Modifier.padding(top = spacing.xs)
+                            ) {
+                                Text(
+                                    text = stringResource(if (showBackFace) R.string.carddetail_flip_see_front else R.string.carddetail_flip_see_back),
+                                    style = ty.labelSmall,
+                                    color = mc.primaryAccent,
+                                    modifier = Modifier.padding(
+                                        horizontal = spacing.md,
+                                        vertical = spacing.xxs
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Column(
+                        modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(spacing.xs)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            val displayName = card.printedName?.takeIf { it.isNotBlank() } ?: card.name
+                            CardName(
+                                name = displayName,
+                                showFrontOnly = false,
+                                style = ty.titleLarge,
+                                color = mc.textPrimary,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.weight(1f),
+                            )
+
+                        }
+                        val typeLine = card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
+                        Text(
+                            typeLine,
+                            style = ty.bodyMedium,
+                            color = mc.textSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        card.manaCost?.let { cost ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val costs = cost.split(" // ")
+                                costs.forEachIndexed { index, singleCost ->
+                                    ManaCostImages(manaCost = singleCost, symbolSize = 20.dp)
+                                    if (index < costs.size - 1) {
+                                        Text(
+                                            " // ",
+                                            style = ty.titleMedium,
+                                            color = mc.textSecondary,
+                                            modifier = Modifier.padding(horizontal = spacing.xxs)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Surface(
+                            color = mc.surfaceVariant.copy(alpha = 0.2f),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = spacing.sm)
+                        ) {
+                            Column(modifier = Modifier.padding(spacing.md)) {
+                                val oracleDisplayText =
+                                    card.oracleText?.takeIf { it.isNotBlank() } ?: card.printedText
+                                    ?: ""
+                                OracleText(
+                                    text = oracleDisplayText,
+                                    style = ty.bodyMedium,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        // Tag chips — color-coded by TagCategory (read-only, no onClick).
+                        if (tags.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                tags.forEach { tag ->
+                                    CardTagChip(label = tag.label(), category = tag.category)
                                 }
                             }
                         }
@@ -232,87 +340,119 @@ internal fun CardDetailSheet(
             }
 
             // ── Action area ───────────────────────────────────────────────────
-            when {
-                // Case 1: "Choose Commander" search flow.
-                isCommanderSelectionContext -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                    ) {
-                        if (isCommander) {
+            item {
+                when {
+                    // Case 1: "Choose Commander" search flow.
+                    isCommanderSelectionContext -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg),
+                            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                        ) {
+                            if (isCommander) {
+                                CommanderStatusBadge()
+                                OutlinedButton(
+                                    onClick = onRemoveCommander,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                                    border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
+                                    shape = ChipShape,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = null,
+                                        tint = mc.lifeNegative,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(spacing.xs))
+                                    Text(
+                                        text = stringResource(R.string.deckbuilder_remove_commander),
+                                        color = mc.lifeNegative,
+                                        style = ty.bodyMedium,
+                                    )
+                                }
+                            } else if (card != null) {
+                                Button(
+                                    onClick = { onChooseAsCommander(card) },
+                                    modifier = Modifier.fillMaxWidth()
+                                        .height(CommanderCtaHeight),
+                                    colors = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
+                                    shape = ChipShape,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        null,
+                                        tint = mc.onAccent,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(spacing.sm))
+                                    Text(
+                                        text = stringResource(R.string.deckbuilder_choose_as_commander),
+                                        style = ty.titleMedium,
+                                        color = mc.onAccent,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Case 2: current commander, viewed from the normal deck list.
+                    isCommander -> {
+                        Box(modifier = Modifier.fillMaxWidth().padding(spacing.lg)) {
                             CommanderStatusBadge()
-                            OutlinedButton(
-                                onClick = onRemoveCommander,
-                                modifier = Modifier.align(Alignment.CenterHorizontally),
-                                border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
-                                shape = ChipShape,
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(spacing.xs))
-                                Text(
-                                    text = stringResource(R.string.deckbuilder_remove_commander),
-                                    color = mc.lifeNegative,
-                                    style = ty.bodyMedium,
-                                )
-                            }
-                        } else if (card != null) {
-                            Button(
-                                onClick = { onChooseAsCommander(card) },
-                                modifier = Modifier.fillMaxWidth().height(CommanderCtaHeight),
-                                colors = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),
-                                shape = ChipShape,
-                            ) {
-                                Icon(Icons.Default.Star, null, tint = mc.onAccent, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(spacing.sm))
-                                Text(
-                                    text = stringResource(R.string.deckbuilder_choose_as_commander),
-                                    style = ty.titleMedium,
-                                    color = mc.onAccent,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
                         }
                     }
-                }
 
-                // Case 2: current commander, viewed from the normal deck list.
-                isCommander -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(spacing.lg)) {
-                        CommanderStatusBadge()
-                    }
-                }
-
-                // Case 3: regular deck card — +/- quantity counter.
-                else -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(spacing.lg),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.md),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.deckdetail_in_deck_label),
-                            style = ty.labelMedium,
-                            color = mc.textSecondary,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(onClick = onRemove, enabled = deckCard.quantity > 0) {
-                            Icon(
-                                Icons.Default.Remove,
-                                contentDescription = stringResource(R.string.action_remove),
-                                tint = if (deckCard.quantity > 0) mc.primaryAccent else mc.textDisabled,
-                            )
-                        }
-                        Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.15f)) {
+                    // Case 3: regular deck card — +/- quantity counter.
+                    else -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(spacing.lg),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.md),
+                        ) {
                             Text(
-                                text = "${deckCard.quantity}",
-                                style = ty.titleMedium,
-                                color = mc.primaryAccent,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.xs),
+                                text = stringResource(R.string.deckdetail_in_deck_label),
+                                style = ty.labelMedium,
+                                color = mc.textSecondary,
+                                modifier = Modifier.weight(1f),
                             )
-                        }
-                        IconButton(onClick = onAdd) {
-                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.action_add), tint = mc.primaryAccent)
+                            IconButton(
+                                onClick = onRemove,
+                                enabled = deckCard.quantity > 0,
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    contentColor = mc.primaryAccent,
+                                    disabledContentColor = mc.textDisabled
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Default.Remove,
+                                    contentDescription = stringResource(R.string.action_remove),
+                                )
+                            }
+                            Surface(
+                                shape = ChipShape,
+                                color = mc.primaryAccent.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.3f))
+                            ) {
+                                Text(
+                                    text = "${deckCard.quantity}",
+                                    style = ty.titleLarge,
+                                    color = mc.primaryAccent,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(
+                                        horizontal = spacing.lg,
+                                        vertical = spacing.xs
+                                    ),
+                                )
+                            }
+                            IconButton(
+                                onClick = onAdd,
+                                colors = IconButtonDefaults.iconButtonColors(contentColor = mc.primaryAccent)
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = stringResource(R.string.action_add)
+                                )
+                            }
                         }
                     }
                 }
@@ -320,15 +460,29 @@ internal fun CardDetailSheet(
 
             // Delete / remove-all — hidden in pure commander-selection context.
             if (!isCommanderSelectionContext) {
-                OutlinedButton(
-                    onClick = onDelete,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg, vertical = spacing.xs),
-                    border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.6f)),
-                    shape = ChipShape,
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = mc.lifeNegative, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(spacing.xs))
-                    Text(stringResource(R.string.action_remove_all), color = mc.lifeNegative, style = ty.labelLarge)
+                item {
+                    OutlinedButton(
+                        onClick = onDelete,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.lg, vertical = spacing.xs)
+                            .height(48.dp),
+                        border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.4f)),
+                        shape = ChipShape,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.lifeNegative)
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(spacing.sm))
+                        Text(
+                            stringResource(if (isCommander) R.string.deckbuilder_remove_commander else R.string.action_remove_all),
+                            style = ty.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -343,8 +497,8 @@ private fun CommanderStatusBadge() {
     val spacing = MaterialTheme.spacing
     Surface(
         shape = ChipShape,
-        color = mc.goldMtg.copy(alpha = 0.15f),
-        border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
+        color = mc.goldMtg.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.3f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -352,13 +506,19 @@ private fun CommanderStatusBadge() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            Icon(Icons.Default.Star, null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
+            Icon(
+                Icons.Default.Star,
+                null,
+                tint = mc.goldMtg,
+                modifier = Modifier.size(22.dp)
+            )
             Spacer(Modifier.width(spacing.sm))
             Text(
                 text = stringResource(R.string.deckbuilder_commander_label).uppercase(),
-                style = ty.labelLarge,
+                style = ty.titleMedium,
                 color = mc.goldMtg,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified
             )
         }
     }

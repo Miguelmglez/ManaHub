@@ -8,17 +8,20 @@ import com.mmg.manahub.core.data.local.dao.CardDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.BattlefieldState
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.HandSnapshot
 import com.mmg.manahub.core.model.PlayCard
 import com.mmg.manahub.core.model.PlayZone
 import com.mmg.manahub.core.model.PlaytestPhase
 import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.core.model.PlaytestSurveyAnswers
+import com.mmg.manahub.core.model.computeProtectedIndices
+import com.mmg.manahub.core.model.computeRequiredBottomCount
 import com.mmg.manahub.feature.playtest.domain.usecase.BuildLibraryUseCase
-import com.mmg.manahub.feature.playtest.domain.usecase.DrawHandUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.LondonMulliganUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestSurveyUseCase
 import com.mmg.manahub.feature.playtest.domain.usecase.SavePlaytestUseCase
+import com.mmg.manahub.feature.playtest.domain.usecase.drawWithForced
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -44,6 +47,18 @@ data class PlaytestHandUiState(
     /** Indices (into snapshot.hand) selected for bottom-N. */
     val selectedBottomIndices: Set<Int> = emptySet(),
     val showBottomNSelector: Boolean = false,
+    /**
+     * "Custom your hand" forced-card selection: scryfallId → forced copy count. Survives every
+     * redraw/mulligan for the rest of the session (only cleared by building a fresh
+     * [PlaytestHandViewModel] instance, i.e. leaving the screen).
+     */
+    val customHandSelection: Map<String, Int> = emptyMap(),
+    val showCustomHandSheet: Boolean = false,
+    /**
+     * The deck's own mainboard, grouped by card with its in-deck quantity (commander excluded) —
+     * the source list for the "Custom your hand" sheet. No network calls; already-loaded data.
+     */
+    val availableCards: List<Pair<Card, Int>> = emptyList(),
     // DORMANT: showSaveSheet / showSurveySheet / savedSessionId / isSaving back the
     // save + survey flow, which is currently unreachable. Kept intact for when
     // playtest stats tracking returns.
@@ -70,7 +85,6 @@ class PlaytestHandViewModel(
     private val deckRepository: DeckRepository,
     private val cardDao: CardDao,
     private val buildLibraryUseCase: BuildLibraryUseCase,
-    private val drawHandUseCase: DrawHandUseCase,
     private val londonMulliganUseCase: LondonMulliganUseCase,
     private val savePlaytestUseCase: SavePlaytestUseCase,
     private val savePlaytestSurveyUseCase: SavePlaytestSurveyUseCase,
@@ -119,6 +133,14 @@ class PlaytestHandViewModel(
      */
     private var sessionStartedAt: Long = 0L
 
+    /**
+     * The deck's own mainboard, grouped by card with its in-deck quantity (commander excluded) —
+     * source list for the "Custom your hand" sheet. Recomputed on every [buildAndDraw] call
+     * (cheap: derived from data already fetched in that same IO block, no extra network/DB
+     * round-trip) and mirrored into [PlaytestHandUiState.availableCards].
+     */
+    private var mainboardCardCounts: List<Pair<Card, Int>> = emptyList()
+
     // ── Initialise from setup ─────────────────────────────────────────────────
 
     /**
@@ -163,16 +185,20 @@ class PlaytestHandViewModel(
         val state = _uiState.value
         val snapshot = state.snapshot ?: return
         val setup = state.setup ?: return
-        // Prevent reaching a 0-card kept hand: the minimum keepable hand is 1 card.
-        // mulligansUsed >= drawCount - 1 means the next Keep would require bottoming
-        // everything, leaving an empty hand.
-        if (snapshot.mulligansUsed >= setup.drawCount - 1) return
+        // Prevent reaching a 0-card kept hand: the minimum keepable hand is 1 card. This is
+        // now guaranteed by computeRequiredBottomCount()'s own coerceIn(0, drawCount - 1) clamp
+        // (it can never return >= drawCount), so this check can no longer actually trip in
+        // practice — it is kept as defense-in-depth documenting the invariant, the same style as
+        // moveCard's toZone==LIBRARY guard, in case the formula ever changes.
+        val nextRequired = computeRequiredBottomCount(setup.drawCount, setup.startCount, snapshot.mulligansUsed + 1)
+        if (nextRequired >= setup.drawCount) return
         if (snapshot.hand.size <= 1) return // Safety guard for small hands.
 
         val (newHand, newLibrary) = londonMulliganUseCase(
             currentHand    = snapshot.hand,
             currentLibrary = snapshot.library,
             drawCount      = setup.drawCount,
+            forced         = state.customHandSelection,
         )
 
         val newMulligansUsed = snapshot.mulligansUsed + 1
@@ -193,15 +219,19 @@ class PlaytestHandViewModel(
 
     /**
      * "Keep": triggered when the user decides to keep the current hand.
-     * If mulligansUsed > 0, shows the bottom-N selector first (which ends by calling
-     * [enterPlayPhase]). If mulligansUsed == 0, enters the PLAY phase directly.
+     * If the required bottom-N count (drawCount vs. startCount gap, or mulligansUsed — see
+     * [computeRequiredBottomCount]) is > 0, shows the bottom-N selector first (which ends by
+     * calling [enterPlayPhase]). Otherwise enters the PLAY phase directly.
      *
      * Note: this no longer opens the (now dormant) save sheet — keeping a hand starts
      * the simulated game.
      */
     fun onKeep() {
-        val snapshot = _uiState.value.snapshot ?: return
-        if (snapshot.mulligansUsed > 0) {
+        val state = _uiState.value
+        val snapshot = state.snapshot ?: return
+        val setup = state.setup ?: return
+        val required = computeRequiredBottomCount(setup.drawCount, setup.startCount, snapshot.mulligansUsed)
+        if (required > 0) {
             _uiState.update { it.copy(showBottomNSelector = true, selectedBottomIndices = emptySet()) }
         } else {
             enterPlayPhase()
@@ -210,10 +240,34 @@ class PlaytestHandViewModel(
 
     // ── Bottom-N selector ─────────────────────────────────────────────────────
 
+    /**
+     * The number of cards the player must actually select in the bottom-N step, right now.
+     *
+     * Normally this is just [computeRequiredBottomCount]. It is additionally clamped to the
+     * number of UNPROTECTED hand cards available (`hand.size - protected count`) — a rare edge
+     * case where many "Custom your hand" forced cards plus many mulligans leave fewer selectable
+     * cards than the formula asks for. The forced-card guarantee wins in that case: the kept hand
+     * may end up slightly larger than `startCount`, which is an acceptable, documented trade-off
+     * rather than a dead-end where Confirm can never be enabled.
+     */
+    private fun effectiveRequiredBottomCount(
+        snapshot: HandSnapshot,
+        setup: PlaytestSetup,
+        forced: Map<String, Int>,
+    ): Int {
+        val required = computeRequiredBottomCount(setup.drawCount, setup.startCount, snapshot.mulligansUsed)
+        val protectedCount = computeProtectedIndices(snapshot.hand, forced).size
+        val selectable = (snapshot.hand.size - protectedCount).coerceAtLeast(0)
+        return required.coerceAtMost(selectable)
+    }
+
     fun toggleBottomSelection(index: Int) {
         val state = _uiState.value
         val snapshot = state.snapshot ?: return
-        val required = snapshot.mulligansUsed
+        val setup = state.setup ?: return
+        // A "Custom your hand" forced card can never be bottomed — it must stay in the kept hand.
+        if (index in computeProtectedIndices(snapshot.hand, state.customHandSelection)) return
+        val required = effectiveRequiredBottomCount(snapshot, setup, state.customHandSelection)
         val current = state.selectedBottomIndices.toMutableSet()
         if (index in current) {
             current.remove(index)
@@ -226,8 +280,10 @@ class PlaytestHandViewModel(
     fun onConfirmBottomN() {
         val state = _uiState.value
         val snapshot = state.snapshot ?: return
+        val setup = state.setup ?: return
+        val required = effectiveRequiredBottomCount(snapshot, setup, state.customHandSelection)
         val indices = state.selectedBottomIndices.toList()
-        if (indices.size != snapshot.mulligansUsed) return
+        if (indices.size != required) return
 
         val (finalHand, finalLibrary) = londonMulliganUseCase.applyBottomN(
             hand          = snapshot.hand,
@@ -258,6 +314,87 @@ class PlaytestHandViewModel(
 
     fun onDismissBottomN() {
         _uiState.update { it.copy(showBottomNSelector = false, selectedBottomIndices = emptySet()) }
+    }
+
+    // ── Custom your hand (MULLIGAN phase only) ────────────────────────────────
+    // Lets the user force specific deck cards into the opening hand, bounded by deck copy count
+    // AND by drawCount total. The selection survives every redraw/mulligan for the rest of the
+    // session (buildAndDraw/onMulligan both thread customHandSelection through drawWithForced).
+    // Applying a selection is INSTANT — it rebuilds the currently-displayed hand right away,
+    // preserving mulligansUsed/bottomedScryfallIds (this is a re-deal, not a mulligan).
+
+    fun onOpenCustomHandSheet() {
+        _uiState.update { it.copy(showCustomHandSheet = true) }
+    }
+
+    /**
+     * Dismissing the sheet (tap outside, system back, drag-to-close) has no separate discard
+     * path — every +/- tap is already committed to [PlaytestHandUiState.customHandSelection]
+     * immediately (same pattern as the Setup screen's steppers), so dismissing just closes the
+     * sheet and triggers the same instant re-apply as an explicit confirm.
+     */
+    fun onDismissCustomHandSheet() {
+        onConfirmCustomHandSheet()
+    }
+
+    fun onConfirmCustomHandSheet() {
+        _uiState.update { it.copy(showCustomHandSheet = false) }
+        // Custom Hand only affects the DRAWN hand during the mulligan loop — it has no meaning
+        // once the battlefield (PLAY phase) exists, so this is a no-op there.
+        if (_uiState.value.phase == PlaytestPhase.MULLIGAN) {
+            applyCustomHandSelection()
+        }
+    }
+
+    /**
+     * Sets the forced copy count for [scryfallId], clamped twice: first to how many copies of
+     * this card actually exist in the deck ([quantityInDeck] as reported by
+     * [PlaytestHandUiState.availableCards]), then to whatever headroom remains under the overall
+     * `drawCount` cap once every OTHER forced card's count is accounted for (mirrors the
+     * DeckStudio add-card qty-stepper capping pattern, against `drawCount` instead of a deck
+     * legality limit).
+     */
+    fun onSetCustomHandCount(scryfallId: String, count: Int) {
+        val state = _uiState.value
+        val setup = state.setup ?: return
+        val quantityInDeck = mainboardCardCounts.firstOrNull { (card, _) -> card.scryfallId == scryfallId }?.second ?: 0
+        val clampedToDeck = count.coerceIn(0, quantityInDeck)
+        val othersSum = state.customHandSelection.filterKeys { it != scryfallId }.values.sum()
+        val remainingCap = (setup.drawCount - othersSum).coerceAtLeast(0)
+        val finalCount = clampedToDeck.coerceAtMost(remainingCap)
+        val newSelection = if (finalCount <= 0) {
+            state.customHandSelection - scryfallId
+        } else {
+            state.customHandSelection + (scryfallId to finalCount)
+        }
+        _uiState.update { it.copy(customHandSelection = newSelection) }
+    }
+
+    /**
+     * Instantly rebuilds the current hand honoring [PlaytestHandUiState.customHandSelection]:
+     * combines the current hand + library, reshuffles, and redraws via [drawWithForced]. Preserves
+     * `mulligansUsed`/`bottomedScryfallIds`/`startedAt` from the current snapshot — this is a
+     * re-deal, not a mulligan or a redraw, and must never touch those fields (confirmed with
+     * product: applying Custom Hand does not count as a mulligan).
+     */
+    private fun applyCustomHandSelection() {
+        val state = _uiState.value
+        val snapshot = state.snapshot ?: return
+        val setup = state.setup ?: return
+
+        val combined = (snapshot.hand + snapshot.library).toMutableList()
+        combined.shuffle()
+        val (newHand, newLibrary) = drawWithForced(combined, setup.drawCount, state.customHandSelection)
+
+        FirebaseCrashlytics.getInstance().log(
+            "playtest_custom_hand_applied: forcedCards=${state.customHandSelection.values.sum()} handSize=${newHand.size}"
+        )
+        val newSnapshot = snapshot.copy(
+            id      = ++snapshotIdCounter,
+            hand    = newHand,
+            library = newLibrary,
+        )
+        _uiState.update { it.copy(snapshot = newSnapshot) }
     }
 
     // ── Drag-and-drop reorder ─────────────────────────────────────────────────
@@ -489,6 +626,16 @@ class PlaytestHandViewModel(
      */
     fun moveCard(instanceId: Long, toZone: PlayZone) {
         Log.d("PlaytestViewModel", "moveCard: instanceId=$instanceId toZone=$toZone")
+        // LIBRARY is a draw-only source (see PlayZone.LIBRARY KDoc) — it must never be a move
+        // DESTINATION. The `when (toZone)` block below has no branch that re-adds a card to
+        // library, so acting on toZone=LIBRARY here would remove the card from its origin zone
+        // and never put it anywhere: a silent delete that breaks the
+        // hand+lands+permanents+graveyard+library conservation invariant. The primary guard
+        // against this is the drop-target hit-test in BattlefieldContent (Library is excluded
+        // from the registered drop targets there), but this early return is defense-in-depth —
+        // rejecting the move (no-op) rather than ever executing it — in case a future caller or
+        // gesture-handling bug invokes moveCard with toZone=LIBRARY directly.
+        if (toZone == PlayZone.LIBRARY) return
         // Read AND write the same atomic snapshot to avoid stale-capture races (two rapid
         // moves operating on the same base state would lose one of the mutations).
         _uiState.update { state ->
@@ -508,8 +655,20 @@ class PlaytestHandViewModel(
                 PlayZone.LIBRARY    -> battlefield
             }
 
-            // Returning a card to hand untaps it; otherwise preserve tap state.
-            val moved = if (toZone == PlayZone.HAND) card.copy(isTapped = false) else card
+            // Returning a card to hand untaps it. Moving onto the field (LANDS/PERMANENTS)
+            // resets the free-form xOffset/yOffset to 0f so FreeFormFieldZone's auto-cascade
+            // placement (which only cascades when xOffset==yOffset==0f) re-triggers. moveCard is
+            // only ever called on an inter-zone transition (the fromZone==toZone case already
+            // returned above) — same-zone drag repositioning goes through updateCardOffset
+            // instead — so a card entering LANDS/PERMANENTS here is always NEWLY arriving on the
+            // field, never being repositioned within it. Without this reset a card that detours
+            // through GRAVEYARD/EXILE/HAND and back onto the field would render at its stale
+            // pre-detour coordinates, potentially overlapping another card.
+            val moved = when {
+                toZone == PlayZone.HAND -> card.copy(isTapped = false)
+                toZone == PlayZone.LANDS || toZone == PlayZone.PERMANENTS -> card.copy(xOffset = 0f, yOffset = 0f)
+                else -> card
+            }
 
             // Add to destination zone.
             val updated = when (toZone) {
@@ -677,21 +836,32 @@ class PlaytestHandViewModel(
                     }
                 }
 
-                library
+                // Grouped mainboard (card + in-deck quantity, commander excluded) for the
+                // "Custom your hand" sheet — derived from data already fetched above, no extra
+                // network/DB round-trip.
+                val mainboardCounts = deckWithCards.mainboard
+                    .filter { it.scryfallId != commanderId }
+                    .mapNotNull { slot -> cardLookup[slot.scryfallId]?.let { it to slot.quantity } }
+
+                library to mainboardCounts
             } ?: run {
                 _uiState.update { it.copy(isLoading = false, errorMessage = "Failed to load deck cards") }
                 return@launch
             }
+            val (library, mainboardCounts) = result
+            mainboardCardCounts = mainboardCounts
 
             // Record library size exactly once per session (before the first draw).
             // `null` (not 0) is the "not yet registered" sentinel so a legitimately empty
             // library is recorded as 0 rather than triggering a re-registration each draw.
             if (originalLibrarySize == null) {
-                originalLibrarySize = result.size
-                FirebaseCrashlytics.getInstance().setCustomKey("playtest_library_size", result.size)
+                originalLibrarySize = library.size
+                FirebaseCrashlytics.getInstance().setCustomKey("playtest_library_size", library.size)
             }
 
-            val (hand, remainingLibrary) = drawHandUseCase(result, setup.drawCount)
+            // Forced-aware draw: guarantees any "Custom your hand" selection survives redraws too
+            // (onRedraw calls buildAndDraw without clearing customHandSelection).
+            val (hand, remainingLibrary) = drawWithForced(library, setup.drawCount, _uiState.value.customHandSelection)
 
             FirebaseCrashlytics.getInstance().log("playtest_hand_drawn: handSize=${hand.size} mulligansUsed=0 libraryRemaining=${remainingLibrary.size}")
             val snapshot = HandSnapshot(
@@ -711,6 +881,7 @@ class PlaytestHandViewModel(
                     selectedBottomIndices = emptySet(),
                     showBottomNSelector   = false,
                     showSaveSheet         = false,
+                    availableCards        = mainboardCounts,
                 )
             }
         }

@@ -6,22 +6,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.model.HandSnapshot
@@ -84,48 +82,32 @@ fun PlaytestSaveSheet(
             Spacer(Modifier.height(4.dp))
 
             // Save without survey.
-            Button(
-                onClick  = onSaveWithoutSurvey,
-                enabled  = !isSaving,
+            MagicCtaButton(
+                text = stringResource(R.string.playtest_save_without_survey),
+                onClick = onSaveWithoutSurvey,
+                enabled = !isSaving,
                 modifier = Modifier.fillMaxWidth(),
-                shape    = RoundedCornerShape(10.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor         = mc.primaryAccent,
-                    disabledContainerColor = mc.primaryAccent.copy(alpha = 0.4f),
-                ),
-            ) {
-                Text(
-                    text  = stringResource(R.string.playtest_save_without_survey),
-                    style = ty.labelLarge,
-                    color = mc.background,
-                )
-            }
+                color = MagicCtaColor.Primary,
+            )
 
             // Save + survey.
-            OutlinedButton(
-                onClick  = onSaveAndSurvey,
-                enabled  = !isSaving,
+            MagicCtaButton(
+                text = stringResource(R.string.playtest_save_and_survey),
+                onClick = onSaveAndSurvey,
+                enabled = !isSaving,
                 modifier = Modifier.fillMaxWidth(),
-                shape    = RoundedCornerShape(10.dp),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
-            ) {
-                Text(
-                    text  = stringResource(R.string.playtest_save_and_survey),
-                    style = ty.labelLarge,
-                )
-            }
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Primary,
+            )
 
             // Discard.
-            TextButton(
-                onClick  = onDiscard,
+            MagicCtaButton(
+                text = stringResource(R.string.playtest_discard),
+                onClick = onDiscard,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text  = stringResource(R.string.playtest_discard),
-                    style = ty.labelLarge,
-                    color = mc.textDisabled,
-                )
-            }
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Error,
+            )
         }
     }
 }

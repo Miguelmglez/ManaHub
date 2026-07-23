@@ -5,8 +5,6 @@ package com.mmg.manahub.feature.decks.presentation
  * corresponding UI entry point again. See docs/hidden-features/ for the re-enable checklist
  * per feature. Hiding is UI-only — all underlying logic/ViewModels/composables stay compiled.
  *
- * [PLAYTEST_ENABLED] was hidden 2026-07-14 for an upcoming release and is UNCHANGED by this pass.
- *
  * **2026-07-17 (Deck Builder v2 Phase 3/5 flag restructure, plan D10/§3.7):**
  * [DECK_BUILDER_V2_ENABLED] and [DISCOVERIES_V2_ENABLED] flipped ON as their respective surfaces
  * landed (wizard + generation/result screens; Discoveries v2 clustering), with their LEGACY
@@ -28,9 +26,6 @@ package com.mmg.manahub.feature.decks.presentation
  * v2 flag) still works for a side-by-side comparison session.
  */
 object DeckFeatureFlags {
-    /** Deck Playtest entry points (DeckList per-deck button + Deck Studio top-bar button). */
-    const val PLAYTEST_ENABLED = false
-
     /** Deck Studio "Suggestions" tab (inline Deck Doctor). Hidden 2026-07-21 (temporary — was
      * `true` since the Community/Archetype plan Suggestions-tab launch). Flip to `true` to
      * re-enable; see `docs/hidden-features/deck-studio-suggestions.md`. */
