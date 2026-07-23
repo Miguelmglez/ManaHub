@@ -71,13 +71,15 @@ class CardRepositoryImpl @Inject constructor(
             val result = remote.searchCards(query, page, bypassCache)
             if (result.isSuccess) {
                 val cards = result.getOrThrow()
-                // Single batch DB read for existing cache entries; tag resolution is deferred to a
-                // background job (see scheduleTagResolutionBatch) so search results return without
-                // waiting on it.
+                // Single batch DB read for existing cache entries. Strategy tags are intentionally
+                // NOT resolved here: search results can include many cards the user never opens, and
+                // a strategy-tag lookup is a per-card Supabase network call. Tags are resolved lazily,
+                // once, when a card is actually opened in CardDetailScreen via
+                // RefreshCardStrategyTagsUseCase, which already has its own Room-backed cache
+                // (CardStrategyTagsRepositoryImpl / CardStrategyTagsCache, 14-day TTL).
                 val cachedMap = cardDao.getByIds(cards.map { it.scryfallId }).associateBy { it.scryfallId }
                 val entities = entitiesPreservingTagsBatch(cards, cachedMap)
                 cardDao.upsertAll(entities)
-                scheduleTagResolutionBatch(cards, cachedMap)
                 DataResult.Success(cards)
             } else {
                 val exception = result.exceptionOrNull()
@@ -94,11 +96,11 @@ class CardRepositoryImpl @Inject constructor(
             val result = remote.searchCardsPaginated(query, page, bypassCache)
             if (result.isSuccess) {
                 val paginated = result.getOrThrow()
-                // Single batch DB read for existing cache entries; tag resolution deferred (see above).
+                // Single batch DB read for existing cache entries. Strategy tags are intentionally
+                // NOT resolved here — see searchCards() above for the full rationale.
                 val cachedMap = cardDao.getByIds(paginated.cards.map { it.scryfallId }).associateBy { it.scryfallId }
                 val entities = entitiesPreservingTagsBatch(paginated.cards, cachedMap)
                 cardDao.upsertAll(entities)
-                scheduleTagResolutionBatch(paginated.cards, cachedMap)
                 DataResult.Success(paginated)
             } else {
                 val exception = result.exceptionOrNull()
@@ -344,6 +346,35 @@ class CardRepositoryImpl @Inject constructor(
         // background backfill starving other in-flight Scryfall calls at app start. Failure-silent
         // per card so one bad fetch never aborts the rest of the batch.
         staleIds.forEach { id -> runCatching { refreshCardById(id) } }
+    }
+
+    /**
+     * One-time strategy-tags backfill (2026-07-22) -- see the [CardRepository.backfillMissingStrategyTags]
+     * KDoc for the full rationale. Sequential (not parallel), same rationale as
+     * [backfillMissingOracleIds]/[scheduleTagResolutionBatch]: avoid bursting Supabase with
+     * simultaneous per-card lookups. Reuses the EXACT [resolveCardStrategyTags] ->
+     * [CardDao.updateTagsAndSuggestions] path used by every other resolution site in this file, so a
+     * resolved candidate also populates `card_strategy_tags_cache` -- the same write that makes
+     * [CardDao.getScryfallIdsMissingStrategyTags] self-terminating. Failure-silent per card so one
+     * bad resolution never aborts the rest of the batch.
+     */
+    override suspend fun backfillMissingStrategyTags(limit: Int) = withContext(ioDispatcher) {
+        val candidateIds = runCatching { cardDao.getScryfallIdsMissingStrategyTags(limit) }.getOrElse { emptyList() }
+        if (candidateIds.isEmpty()) return@withContext
+
+        val auto    = userPrefs.tagAutoThresholdFlow.first()
+        val suggest = userPrefs.tagSuggestThresholdFlow.first()
+        candidateIds.forEach { scryfallId ->
+            runCatching {
+                val entity = cardDao.getById(scryfallId) ?: return@runCatching
+                val result = resolveCardStrategyTags(entity.toDomainCard(), entity.tags, auto, suggest)
+                cardDao.updateTagsAndSuggestions(
+                    scryfallId    = scryfallId,
+                    tagsJson      = result.confirmedTags.toTagsJson(),
+                    suggestedJson = result.suggestedTags.toSuggestedTagsJson(),
+                )
+            }.onFailure { e -> recordSafeNonFatal("card_strategy_tags_backfill_failed", e) }
+        }
     }
 
     /**

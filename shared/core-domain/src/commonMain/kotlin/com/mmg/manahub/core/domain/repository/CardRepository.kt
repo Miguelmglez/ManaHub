@@ -54,6 +54,22 @@ interface CardRepository {
      */
     suspend fun backfillMissingOracleIds(limit: Int = 20)
 
+    /**
+     * One-time strategy-tags backfill (2026-07-22). Search-result pages no longer trigger Supabase
+     * `card_strategy_tags` resolution (only opening Card Detail does), so a card cached before that
+     * change -- or never opened in Card Detail -- can sit in Room with no tags forever even though
+     * Collection/Deck Studio read tags purely from Room. Finds up to [limit] owned cards
+     * (collection/wishlist/deck) with a populated `oracleId` that have never been resolved against
+     * the precomputed table, and resolves each sequentially through the SAME path every other
+     * resolution site uses. Self-terminating: a resolved card (even to zero tags) populates the
+     * `card_strategy_tags_cache` table and drops out of future candidate lists -- no "done" flag
+     * needed, same property as [backfillMissingOracleIds]. Must run AFTER
+     * [backfillMissingOracleIds] at startup: a blank `oracleId` card can never have a precomputed
+     * row, so oracle-id backfill is a prerequisite for this to find real candidates. Best-effort and
+     * failure-silent per card -- one bad resolution must never abort the batch or block app start.
+     */
+    suspend fun backfillMissingStrategyTags(limit: Int = 40)
+
     /** Fetches a card by set code and collector number (returns English version by default). */
     suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card>
 

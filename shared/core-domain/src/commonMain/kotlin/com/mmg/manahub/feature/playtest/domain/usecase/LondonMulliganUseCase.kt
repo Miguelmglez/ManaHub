@@ -22,22 +22,22 @@ class LondonMulliganUseCase {
      * @param currentHand The cards currently in the player's hand.
      * @param currentLibrary The remaining library cards.
      * @param drawCount The configured draw count (e.g. 7). Always draws this many.
+     * @param forced "Custom your hand" scryfallId → forced copy count. Guarantees these cards are
+     *   present in the redrawn hand (bounded by pool availability) — see [drawWithForced].
      * @return Triple of (newHand, newLibrary, cardsReturnedToLibrary).
      */
     operator fun invoke(
         currentHand: List<Card>,
         currentLibrary: List<Card>,
         drawCount: Int,
+        forced: Map<String, Int> = emptyMap(),
     ): Pair<List<Card>, List<Card>> {
         // Combine hand + library, then shuffle.
         val combined = (currentHand + currentLibrary).toMutableList()
         combined.shuffle()
 
-        // Draw configured count.
-        val safeCount = drawCount.coerceAtMost(combined.size)
-        val newHand = combined.take(safeCount)
-        val newLibrary = combined.drop(safeCount)
-        return newHand to newLibrary
+        // Draw configured count, guaranteeing any forced cards land in the hand.
+        return drawWithForced(combined, drawCount, forced)
     }
 
     /**

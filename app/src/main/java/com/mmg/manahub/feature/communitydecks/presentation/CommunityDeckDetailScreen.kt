@@ -75,15 +75,20 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.TimeAgoFormatter
 import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.feature.communitydecks.presentation.components.CommunityDeckAttribution
@@ -224,6 +229,7 @@ fun CommunityDeckDetailScreen(
                         commanderExpanded = state.commanderExpanded,
                         mainboardExpanded = state.mainboardExpanded,
                         sideboardExpanded = state.sideboardExpanded,
+                        ownedCardIdentityKeys = state.ownedCardIdentityKeys,
                         onToggleCommander = viewModel::toggleCommander,
                         onToggleMainboard = viewModel::toggleMainboard,
                         onToggleSideboard = viewModel::toggleSideboard,
@@ -263,6 +269,7 @@ private fun CommunityDeckDetailContent(
     onCardClick: (String) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    ownedCardIdentityKeys: Set<String> = emptySet(),
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
@@ -280,6 +287,7 @@ private fun CommunityDeckDetailContent(
                 DeckHeaderArea(
                     deck = deck,
                     isStale = isStale,
+                    ownedCardIdentityKeys = ownedCardIdentityKeys,
                 )
             }
 
@@ -320,6 +328,7 @@ private fun CommunityDeckDetailContent(
                     onToggleMainboard = onToggleMainboard,
                     onToggleSideboard = onToggleSideboard,
                     onCardClick = onCardClick,
+                    ownedCardIdentityKeys = ownedCardIdentityKeys,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
@@ -339,10 +348,12 @@ private fun CommunityDeckDetailContent(
 private fun DeckHeaderArea(
     deck: CommunityDeck,
     isStale: Boolean,
+    ownedCardIdentityKeys: Set<String> = emptySet(),
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val preferredCurrency = LocalPreferredCurrency.current
 
     Column(
         modifier = Modifier
@@ -405,6 +416,52 @@ private fun DeckHeaderArea(
             deck.createdAt.toEpochMillisOrNull()?.let { millis ->
                 Text(
                     text = TimeAgoFormatter.format(millis),
+                    style = ty.bodyMedium,
+                    color = mc.textDisabled,
+                )
+            }
+        }
+
+        // Deck cost + collection coverage row (UI addition, 2026-07-22). Mainboard + commander
+        // only — mirrors the mainboard/sideboard split `CommunityDeckCardList.kt` already uses.
+        val nonSideboardCards = deck.cards.filterNot { it.isSideboard }
+        val totalPrice = nonSideboardCards.fold(null as Double?) { acc, card ->
+            val (price, _) = PriceFormatter.selectPrice(card.priceUsd, card.priceEur, preferredCurrency)
+            if (price == null) acc else (acc ?: 0.0) + price * card.quantity
+        }
+        // Quantity-weighted, not distinct-by-identity (bug fix, 2026-07-22): the deck's displayed
+        // total elsewhere (e.g. "Mainboard (N)" in CommunityDeckCardList.kt) is a QUANTITY sum, so
+        // owned+missing must sum to that same total or the two numbers never reconcile for any
+        // deck with duplicate/basic-land quantities. "Owned" is still per-identity (owning ANY
+        // copy/printing of a card counts, matching ScannerViewModel's `ownedCardIdentityKeys`
+        // precedent) — only the bucket a unit of quantity is attributed to changed, not the
+        // ownership test itself.
+        val totalCardCount = nonSideboardCards.sumOf { it.quantity }
+        val ownedCount = nonSideboardCards.sumOf { card ->
+            if ((card.oracleId.ifBlank { card.name }) in ownedCardIdentityKeys) card.quantity else 0
+        }
+        val missingCount = totalCardCount - ownedCount
+
+        if (totalCardCount > 0) {
+            Spacer(Modifier.height(spacing.sm))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                totalPrice?.let { price ->
+                    Text(
+                        text = PriceFormatter.format(price, preferredCurrency),
+                        style = ty.bodyMedium,
+                        color = mc.goldMtg,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.width(spacing.lg))
+                }
+                Text(
+                    text = stringResource(R.string.community_deck_owned_count, ownedCount),
+                    style = ty.bodyMedium,
+                    color = mc.textSecondary,
+                )
+                Spacer(Modifier.width(spacing.sm))
+                Text(
+                    text = stringResource(R.string.community_deck_missing_count, missingCount),
                     style = ty.bodyMedium,
                     color = mc.textDisabled,
                 )
@@ -496,27 +553,17 @@ private fun ImportBar(
                 }
             }
 
-            if (!isImporting) {
-                Button(
-                    onClick = onImport,
-                    enabled = enabled,
-                    shape = ButtonShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor = mc.onAccent,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.community_deck_import).uppercase(),
-                        style = ty.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp
-                    )
-                }
-            }
+            MagicCtaButton(
+                text = stringResource(R.string.community_deck_import),
+                onClick = onImport,
+                enabled = enabled,
+                isLoading = isImporting,
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Accent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+            )
         }
     }
 }

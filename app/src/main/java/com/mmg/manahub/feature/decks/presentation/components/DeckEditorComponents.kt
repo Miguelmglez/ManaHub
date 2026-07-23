@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -72,14 +74,17 @@ import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import org.jetbrains.compose.resources.painterResource
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Shared deck-editor composables
@@ -124,23 +129,40 @@ internal fun CardRow(
             AsyncImage(
                 model = entry.card?.imageNormal,
                 contentDescription = null,
-                modifier = Modifier.size(width = 44.dp, height = 60.dp).clip(ChipShape),
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
+                fallback = painterResource(Res.drawable.mtg_card_back),
+                modifier = Modifier.size(width = 44.dp, height = 60.dp),
                 contentScale = ContentScale.Crop
             )
-            Column(Modifier.weight(1f)) {
+            Box(Modifier.weight(1f).height(60.dp)) {
                 CardName(
                     name          = entry.card?.name ?: stringResource(R.string.deck_default_name),
                     showFrontOnly = true,
                     style         = ty.bodyMedium,
                     color         = mc.textPrimary,
                     maxLines      = 1,
-                    overflow      = TextOverflow.Ellipsis
+                    overflow      = TextOverflow.Ellipsis,
+                    modifier      = Modifier.align(Alignment.TopStart)
                 )
                 entry.card?.typeLine?.let {
-                    Text(it, style = ty.bodySmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        it,
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
                 }
-                entry.card?.manaCost?.let {
-                    ManaCostImages(manaCost = it, symbolSize = 14.dp)
+
+                val manaCost = entry.card?.manaCost
+                if (manaCost != null) {
+                    ManaCostImages(
+                        manaCost = manaCost,
+                        symbolSize = 14.dp,
+                        modifier = Modifier.align(Alignment.BottomStart)
+                    )
                 }
             }
             if (entry.quantity > 1) {
@@ -149,7 +171,7 @@ internal fun CardRow(
                 }
             }
             if (isInCollection) {
-                Icon(Icons.Default.Star, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(14.dp))
+                Icon(Icons.Rounded.CollectionsBookmark, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(14.dp))
             }
             IconButton(onClick = onRemove) {
                 Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
@@ -208,8 +230,29 @@ internal fun GroupHeader(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-            if (label.length == 1 && label[0] in "WUBRG") {
-                ManaSymbolImage(token = label, size = 20.dp)
+            when {
+                label.length == 1 && label[0] in "WUBRG" -> {
+                    ManaSymbolImage(token = label, size = 20.dp)
+                }
+                label == "Colorless" -> {
+                    ManaSymbolImage(token = "C", size = 20.dp)
+                }
+                label == "Multicolor" -> {
+                    Icon(
+                        imageVector = com.mmg.manahub.core.ui.components.CounterIcon,
+                        contentDescription = null,
+                        tint = mc.textPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                label == "Land" || label == "Lands" -> {
+                    Icon(
+                        painter = androidx.compose.ui.res.painterResource(R.drawable.ic_land),
+                        contentDescription = null,
+                        tint = mc.textPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
             Text(colorName, style = ty.titleMedium, color = mc.goldMtg)
             Text("($count)", style = ty.bodyMedium, color = mc.textSecondary)
@@ -445,6 +488,9 @@ internal fun EditDeckSheet(
                             AsyncImage(
                                 model = dc.card?.imageArtCrop,
                                 contentDescription = null,
+                                placeholder = painterResource(Res.drawable.mtg_card_back),
+                                error = painterResource(Res.drawable.mtg_card_back),
+                                fallback = painterResource(Res.drawable.mtg_card_back),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )

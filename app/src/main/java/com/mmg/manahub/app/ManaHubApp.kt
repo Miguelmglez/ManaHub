@@ -546,6 +546,11 @@ class ManaHubApp : Application(), KoinComponent {
             // (oracle_id = ''). Small batch (20), sequential, failure-silent — never blocks app
             // start.
             runCatching { cardRepository.backfillMissingOracleIds(20) }
+            // Strategy-tags backfill (2026-07-22): must run AFTER the oracle_id backfill above —
+            // a blank oracle_id card can never have a precomputed Supabase row, so this call only
+            // finds real candidates once oracle_id is populated. Small batch (40), sequential,
+            // self-terminating (see CardRepository.backfillMissingStrategyTags KDoc), failure-silent.
+            runCatching { cardRepository.backfillMissingStrategyTags(40) }
         }
 
         // Start the gamification engine collecting the progression bus (idempotent), then

@@ -2406,13 +2406,8 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `STEP_FIRST_PLAYTEST_DECK stays hidden while Playtest is flag-disabled, even with a deck and zero playtest sessions`() =
+    fun `STEP_FIRST_PLAYTEST_DECK is visible with a deck and zero playtest sessions`() =
         runTest(testDispatcher) {
-            // Deck Playtest is hidden for release (2026-07-14, DeckFeatureFlags.PLAYTEST_ENABLED =
-            // false) — this step's CTA is HomeAction.PlaytestRecentDeck, so it must not surface a
-            // shortcut into a hidden feature even when its data condition (deckCount > 0 &&
-            // totalPlaytestCount == 0) is otherwise satisfied. Re-enable this assertion's INVERSE
-            // (assertTrue) once PLAYTEST_ENABLED flips back to true.
             deckSummariesFlow.value = listOf(deckSummary())
             every { playtestRepository.observeTotalTestCount() } returns flowOf(0)
 
@@ -2421,7 +2416,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             val steps = (vm.state.value.hero as? HomeHeroState.Welcome)?.steps.orEmpty()
-            assertFalse(steps.any { it.id == STEP_FIRST_PLAYTEST_DECK })
+            assertTrue(steps.any { it.id == STEP_FIRST_PLAYTEST_DECK })
         }
 
     @Test

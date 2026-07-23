@@ -108,7 +108,7 @@ fun DeckListScreen(
                                 deck             = deck,
                                 onClick          = { onDeckClick(deck.id) },
                                 onDelete         = { viewModel.deleteDeck(deck.id) },
-                                onPlaytest       = if (DeckFeatureFlags.PLAYTEST_ENABLED) ({ onPlaytestClick(deck.id) }) else null,
+                                onPlaytest       = if (deck.cardCount > 0) ({ onPlaytestClick(deck.id) }) else null,
                                 cardBackPainter  = painterResource(Res.drawable.mtg_card_back),
                             )
                         }

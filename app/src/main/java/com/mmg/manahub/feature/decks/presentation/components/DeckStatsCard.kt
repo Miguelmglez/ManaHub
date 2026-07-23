@@ -50,11 +50,14 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.util.TimeAgoFormatter
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * Collapsible card that shows per-deck game statistics on the deck detail screen.
@@ -276,6 +279,9 @@ private fun CardScoreGrid(
                         .crossfade(true)
                         .build(),
                     contentDescription = score.card.name,
+                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                    error = painterResource(Res.drawable.mtg_card_back),
+                    fallback = painterResource(Res.drawable.mtg_card_back),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -337,6 +343,9 @@ private fun WeakCardGrid(
                         .crossfade(true)
                         .build(),
                     contentDescription = score.card.name,
+                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                    error = painterResource(Res.drawable.mtg_card_back),
+                    fallback = painterResource(Res.drawable.mtg_card_back),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()

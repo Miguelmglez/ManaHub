@@ -31,8 +31,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -40,10 +38,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.theme.magicColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -192,21 +192,21 @@ fun PlaytestSurveySheet(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (currentPanelIndex > 0) {
-                    OutlinedButton(
+                    MagicCtaButton(
+                        text = stringResource(R.string.playtest_survey_back),
                         onClick = { currentPanelIndex-- },
-                        shape   = RoundedCornerShape(10.dp),
-                        colors  = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
+                        style = MagicCtaStyle.Outlined,
                         modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.playtest_survey_back), style = ty.labelLarge)
-                    }
+                    )
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
 
                 val isLast = currentPanelIndex == builtPanels.lastIndex
-                Button(
-                    onClick  = {
+                MagicCtaButton(
+                    text = if (isLast) stringResource(R.string.playtest_survey_finish)
+                    else stringResource(R.string.playtest_survey_next),
+                    onClick = {
                         if (isLast) {
                             val types = builtPanels
                                 .flatMap { it.questions }
@@ -219,17 +219,8 @@ fun PlaytestSurveySheet(
                             currentPanelIndex++
                         }
                     },
-                    shape    = RoundedCornerShape(10.dp),
-                    colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
                     modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        text  = if (isLast) stringResource(R.string.playtest_survey_finish)
-                                else stringResource(R.string.playtest_survey_next),
-                        style = ty.labelLarge,
-                        color = mc.background,
-                    )
-                }
+                )
             }
         }
     }

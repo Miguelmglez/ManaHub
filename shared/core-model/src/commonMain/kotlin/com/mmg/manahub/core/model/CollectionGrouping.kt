@@ -89,6 +89,9 @@ private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {
  * legitimately appear in MULTIPLE returned sections (one per tag it carries) — this is
  * intentional, not a bug; callers building a Lazy list/grid MUST key items by
  * `"$labelToken|${item.groupKey}"`, never the bare `groupKey`, to avoid a duplicate-key crash.
+ * [CollectionGroupingMode.TAG] only considers [TagCategory.STRATEGY] tags (deliberate,
+ * Collection-only scope restriction — a card whose only tags are non-STRATEGY buckets as
+ * untagged); CardDetail and Deck Studio show every category and are unaffected.
  *
  * An empty [groups] input always returns an empty list, regardless of [mode].
  */
@@ -148,9 +151,14 @@ fun groupCollection(
         }
 
         CollectionGroupingMode.TAG -> {
+            // Collection's TAG grouping is deliberately restricted to STRATEGY-category tags
+            // only — CardDetail/Deck Studio show ALL categories (color-coded), but here every
+            // other category (TYPE/KEYWORD/ROLE/TRIBAL/ARCHETYPE/CUSTOM) would flood the section
+            // list with noise. See CLAUDE.md's "Card tagging engine" section for the rationale.
             val buckets = LinkedHashMap<String, MutableList<CollectionCardGroup>>()
             groups.forEach { group ->
                 val keys = (group.card.tags + group.card.userTags)
+                    .filter { it.category == TagCategory.STRATEGY }
                     .map { it.key }
                     .distinct()
                 if (keys.isEmpty()) {

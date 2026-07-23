@@ -82,6 +82,7 @@ class RefreshCardStrategyTagsUseCaseTest {
         override suspend fun getCardById(scryfallId: String): DataResult<Card> = error("unused")
         override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
         override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
+        override suspend fun backfillMissingStrategyTags(limit: Int) = error("unused")
         override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
         override suspend fun refreshCollectionPrices() = error("unused")
         override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")

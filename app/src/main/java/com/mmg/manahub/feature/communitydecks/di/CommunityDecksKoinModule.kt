@@ -11,6 +11,7 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.feature.communitydecks.data.CommunityDeckCacheImpl
+import com.mmg.manahub.feature.communitydecks.domain.CommunityDeckImportCoordinator
 import com.mmg.manahub.feature.communitydecks.domain.usecase.GetCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.ImportCommunityDeckUseCase
 import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
@@ -101,6 +102,15 @@ fun communityDecksKoinModule(
     // ManaHubApp `modules(...)` call — declaration order does not matter to Koin).
     single { ImportCommunityDeckUseCase(importDeckCardsUseCase = get()) }
 
+    // ── Import-survives-navigation coordinator (bug fix, 2026-07-22). Runs the import on the
+    //    app-scoped CoroutineScope (the same Hilt-bridged `@ApplicationScope` singleton
+    //    `decksKoinModule` already registers as a plain `CoroutineScope` — resolved here via
+    //    `get()`, NOT a fresh scope, so it is the SAME instance shared with the rest of the app and
+    //    outlives any single screen). See CommunityDeckImportCoordinator's KDoc for the full
+    //    rationale (viewModelScope cancellation on navigation used to silently drop in-flight
+    //    imports). ──
+    single { CommunityDeckImportCoordinator(importCommunityDeck = get(), appScope = get()) }
+
     // ── The Koin island: both Community Decks ViewModels are now resolved by Koin, not Hilt. ──
     // Koin injects the SavedStateHandle (carrying the `cardName` / `archidektId` nav args) into each
     // `viewModel { }` factory, so the nav-arg behaviour is identical to the previous Hilt resolution.
@@ -123,7 +133,10 @@ fun communityDecksKoinModule(
         CommunityDeckDetailViewModel(
             savedStateHandle = get(),
             getCommunityDeck = get(),
-            importCommunityDeck = get(),
+            importCoordinator = get(),
+            // UserCardRepository (coreBridgeKoinModule) — "already owned" identity-key tracking for
+            // the header collection-coverage row + per-card badges (UI addition, 2026-07-22).
+            userCardRepository = get(),
         )
     }
 }

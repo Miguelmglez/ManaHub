@@ -79,16 +79,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.CollectionCardGroup
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionSection
 import com.mmg.manahub.core.model.CollectionViewMode
+import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.components.CardGridItem
@@ -384,180 +395,220 @@ private fun CardsTabContent(
     val filterCount = uiState.activeFilterCount
     var showSortMenu by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Stale data warning
-        AnimatedVisibility(visible = uiState.hasStaleCards) {
-            StaleWarningBanner()
-        }
+    val density = LocalDensity.current
+    var headerHeightPx by remember { mutableFloatStateOf(0f) }
+    val headerHeightDp: Dp = with(density) { headerHeightPx.toDp() }
 
-        // Search bar + advanced search button (with active-filter badge)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SearchBar(
-                query         = uiState.searchQuery,
-                onQueryChange = onSearchQueryChange,
-                modifier      = Modifier.weight(1f),
-            )
-            BadgedBox(
-                badge = {
-                    if (filterCount > 0) {
-                        Badge(
-                            containerColor = mc.primaryAccent,
-                            contentColor   = mc.background,
-                        ) { Text("$filterCount") }
-                    }
+    // Loading
+    if (uiState.isLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = mc.primaryAccent)
+        }
+        return
+    }
+
+    val hasActiveSearchOrFilter = uiState.searchQuery.isNotBlank() || filterCount > 0
+
+    // Genuinely empty collection (nothing added yet, nothing to filter) — full-screen state,
+    // no header needed since there's no search/filter UI to offer yet.
+    if (uiState.cards.isEmpty() && !hasActiveSearchOrFilter) {
+        EmptyState(
+            icon        = Icons.Default.CollectionsBookmark,
+            title       = stringResource(R.string.collection_empty_title),
+            subtitle    = stringResource(R.string.collection_empty_subtitle),
+            actionLabel = stringResource(R.string.collection_empty_action),
+            onAction    = onAddCardClick,
+        )
+        return
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // ── Card list / grid / filtered-to-zero content ──────────────────
+        // A search/filter combination that legitimately matches zero cards must NOT drop the
+        // header below (search bar + advanced-search filters are the only way back) — only the
+        // content area swaps to a scoped empty message, keyed off the SAME headerHeightDp offset
+        // CardGrid/CardList already use.
+        if (uiState.cards.isEmpty()) {
+            EmptyState(
+                icon        = Icons.Default.Search,
+                title       = stringResource(R.string.collection_no_results_title),
+                subtitle    = stringResource(R.string.collection_no_results_subtitle),
+                actionLabel = stringResource(R.string.collection_no_results_action),
+                onAction    = {
+                    // Clears BOTH the plain search text and any advanced-search filters — a
+                    // zero-result state can be caused by either one alone, and `onClearFilters`
+                    // by itself only resets the advanced query, leaving the search bar text (and
+                    // the empty result) unchanged.
+                    onSearchQueryChange("")
+                    onClearFilters()
                 },
-            ) {
-                IconButton(
-                    onClick = onShowAdvancedSearch,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (filterCount > 0) mc.primaryAccent.copy(alpha = 0.15f)
-                            else mc.primaryAccent.copy(alpha = 0.1f)
-                        ),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = stringResource(R.string.advsearch_button),
-                        tint = mc.primaryAccent,
-                    )
-                }
-            }
-        }
-
-        // Active filters indicator
-        AnimatedVisibility(visible = filterCount > 0) {
-            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.collection_active_filters, filterCount),
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.primaryAccent,
+                    .fillMaxSize()
+                    .padding(top = headerHeightDp),
+            )
+        } else {
+            when (uiState.viewMode) {
+                CollectionViewMode.GRID -> CardGrid(
+                    cards        = uiState.cards,
+                    sections     = uiState.sections,
+                    groupingMode = uiState.groupingMode,
+                    onCardClick  = onCardClick,
+                    state        = gridState,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    topPadding   = headerHeightDp,
                 )
-                TextButton(
-                    onClick = onClearFilters,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.collection_clear_filters),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        color = mc.lifeNegative,
-                    )
-                }
+                CollectionViewMode.LIST -> CardList(
+                    cards        = uiState.cards,
+                    sections     = uiState.sections,
+                    groupingMode = uiState.groupingMode,
+                    onCardClick  = onCardClick,
+                    state        = listState,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    topPadding   = headerHeightDp,
+                )
             }
         }
 
-        // Card count + Sort/View controls
-        val totalCopies = uiState.cards.sumOf { it.totalQuantity }
+        // ── Collapsible header (slides up/down) ──────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .zIndex(1f)
+                .background(mc.background)
+                .onSizeChanged { headerHeightPx = it.height.toFloat() }
         ) {
+            // Stale data warning
+            AnimatedVisibility(visible = uiState.hasStaleCards) {
+                StaleWarningBanner()
+            }
+
+            // Search bar + advanced search button (with active-filter badge)
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
-                    style = MaterialTheme.magicTypography.labelLarge,
-                    color = mc.textSecondary,
-                    modifier = Modifier.weight(1f)
+                SearchBar(
+                    query         = uiState.searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    modifier      = Modifier.weight(1f),
                 )
-
-                IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        imageVector = if (uiState.viewMode == CollectionViewMode.GRID) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
-                        contentDescription = stringResource(R.string.collection_view_grid),
-                        tint = mc.textSecondary,
-                        modifier = Modifier.size(24.dp)
-                    )
+                BadgedBox(
+                    badge = {
+                        if (filterCount > 0) {
+                            Badge(
+                                containerColor = mc.primaryAccent,
+                                contentColor   = mc.background,
+                            ) { Text("$filterCount") }
+                        }
+                    },
+                ) {
+                    IconButton(
+                        onClick = onShowAdvancedSearch,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (filterCount > 0) mc.primaryAccent.copy(alpha = 0.15f)
+                                else mc.primaryAccent.copy(alpha = 0.1f)
+                            ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = stringResource(R.string.advsearch_button),
+                            tint = mc.primaryAccent,
+                        )
+                    }
                 }
             }
 
+            // Active filters indicator
+            AnimatedVisibility(visible = filterCount > 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.collection_active_filters, filterCount),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.primaryAccent,
+                    )
+                    TextButton(
+                        onClick = onClearFilters,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.collection_clear_filters),
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.lifeNegative,
+                        )
+                    }
+                }
+            }
+
+            // Card count + Sort/View controls
+            val totalCopies = uiState.cards.sumOf { it.totalQuantity }
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 0.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ManaHubBottomSheetSelector(
-                    icon = Icons.AutoMirrored.Filled.Sort,
-                    label = stringResource(R.string.collection_sort_label),
-                    valueText = stringResource(uiState.sortOrder.displayResId),
-                    items = SortOrder.entries,
-                    selectedItem = uiState.sortOrder,
-                    onSelect = onSortChange,
-                    itemLabel = { stringResource(it.displayResId) },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                )
-                ManaHubBottomSheetSelector(
-                    icon = Icons.Default.Layers,
-                    label = stringResource(R.string.collection_grouping_label),
-                    valueText = stringResource(uiState.groupingMode.displayResId),
-                    items = CollectionGroupingMode.entries,
-                    selectedItem = uiState.groupingMode,
-                    onSelect = onGroupingChange,
-                    itemLabel = { stringResource(it.displayResId) },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "${uiState.cards.size} ${stringResource(R.string.collection_unique_cards)} · $totalCopies ${stringResource(R.string.collection_total_copies)}",
+                        style = MaterialTheme.magicTypography.labelLarge,
+                        color = mc.textSecondary,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    IconButton(onClick = onViewModeToggle, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            imageVector = if (uiState.viewMode == CollectionViewMode.GRID) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
+                            contentDescription = stringResource(R.string.collection_view_grid),
+                            tint = mc.textSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+                ) {
+                    ManaHubBottomSheetSelector(
+                        icon = Icons.AutoMirrored.Filled.Sort,
+                        valueText = stringResource(uiState.sortOrder.displayResId),
+                        items = SortOrder.entries,
+                        selectedItem = uiState.sortOrder,
+                        onSelect = onSortChange,
+                        itemLabel = { stringResource(it.displayResId) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ManaHubBottomSheetSelector(
+                        icon = Icons.Default.Layers,
+                        valueText = stringResource(uiState.groupingMode.displayResId),
+                        items = CollectionGroupingMode.entries,
+                        selectedItem = uiState.groupingMode,
+                        onSelect = onGroupingChange,
+                        itemLabel = { stringResource(it.displayResId) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
-        }
-
-        // Loading
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = mc.primaryAccent)
-            }
-            return@Column
-        }
-
-        // Empty state
-        if (uiState.cards.isEmpty()) {
-            EmptyState(
-                icon        = Icons.Default.CollectionsBookmark,
-                title       = stringResource(R.string.collection_empty_title),
-                subtitle    = stringResource(R.string.collection_empty_subtitle),
-                actionLabel = stringResource(R.string.collection_empty_action),
-                onAction    = onAddCardClick,
-            )
-            return@Column
-        }
-
-        // Grid or list — sectioned rendering kicks in whenever a grouping mode is active
-        // (uiState.sections is non-empty); flat rendering (uiState.cards) is otherwise
-        // byte-identical to before this feature landed.
-        when (uiState.viewMode) {
-            CollectionViewMode.GRID -> CardGrid(
-                cards        = uiState.cards,
-                sections     = uiState.sections,
-                groupingMode = uiState.groupingMode,
-                onCardClick  = onCardClick,
-                state        = gridState,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-            CollectionViewMode.LIST -> CardList(
-                cards        = uiState.cards,
-                sections     = uiState.sections,
-                groupingMode = uiState.groupingMode,
-                onCardClick  = onCardClick,
-                state        = listState,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
         }
     }
 }
@@ -629,6 +680,7 @@ private fun CardGrid(
     state:        LazyGridState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    topPadding: Dp = 0.dp,
 ) {
     // In-memory only (resets on leaving the screen) — same lifetime as the rest of this
     // screen's transient UI state (e.g. showSortMenu).
@@ -637,7 +689,7 @@ private fun CardGrid(
     LazyVerticalGrid(
         columns               = GridCells.Adaptive(minSize = 100.dp),
         state                 = state,
-        contentPadding        = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 80.dp),
+        contentPadding        = PaddingValues(start = 12.dp, top = topPadding + 12.dp, end = 12.dp, bottom = 80.dp),
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -734,12 +786,13 @@ private fun CardList(
     state:        LazyListState,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    topPadding: Dp = 0.dp,
 ) {
     val collapsedSections = remember { mutableStateMapOf<String, Boolean>() }
 
     androidx.compose.foundation.lazy.LazyColumn(
         state               = state,
-        contentPadding      = PaddingValues(top = 4.dp, bottom = 80.dp),
+        contentPadding      = PaddingValues(top = topPadding + 4.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         if (groupingMode == CollectionGroupingMode.NONE) {
@@ -859,7 +912,7 @@ private fun CollectionGroupHeader(
                     CollectionGroupingMode.SET -> {
                         com.mmg.manahub.core.ui.components.SetSymbol(
                             setCode = section.labelToken,
-                            rarity = com.mmg.manahub.core.ui.components.CardRarity.COMMON,
+                            rarity = com.mmg.manahub.core.ui.components.CardRarity.RARE,
                             size = 20.dp
                         )
                     }
@@ -868,14 +921,18 @@ private fun CollectionGroupHeader(
                             "Multicolor" -> Icon(
                                 imageVector = com.mmg.manahub.core.ui.components.CounterIcon,
                                 contentDescription = null,
-                                tint = mc.textPrimary,
+                                tint = mc.goldMtg,
                                 modifier = Modifier.size(18.dp)
                             )
                             "Land" -> Icon(
                                 painter = androidx.compose.ui.res.painterResource(R.drawable.ic_land),
                                 contentDescription = null,
-                                tint = mc.textPrimary,
+                                tint = mc.goldMtg,
                                 modifier = Modifier.size(18.dp)
+                            )
+                            "Colorless" -> com.mmg.manahub.core.ui.components.ManaSymbolImage(
+                                token = "C",
+                                size = 18.dp
                             )
                             else -> com.mmg.manahub.core.ui.components.ManaSymbolImage(
                                 token = section.labelToken,
@@ -968,8 +1025,12 @@ private fun collectionGroupLabel(
         if (labelToken == "untagged") {
             stringResource(R.string.deckbuilder_group_untagged)
         } else {
+            // Filtered to STRATEGY here too — defense-in-depth mirroring groupCollection()'s
+            // restriction (CollectionGrouping.kt), so this lookup can never resolve `labelToken`
+            // against a same-key, different-category CardTag.
             val tag = items.firstNotNullOfOrNull { group ->
-                (group.card.tags + group.card.userTags).find { it.key == labelToken }
+                (group.card.tags + group.card.userTags)
+                    .find { it.key == labelToken && it.category == TagCategory.STRATEGY }
             }
             tag?.label() ?: labelToken.replace('_', ' ').replaceFirstChar { it.uppercase() }
         }

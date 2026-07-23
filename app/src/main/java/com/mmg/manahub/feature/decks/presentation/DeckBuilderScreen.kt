@@ -191,9 +191,9 @@ fun DeckMagicDetailScreen(
                         }
                     }
 
-                    // Playtest button — launches setup screen for this deck. Hidden entirely
-                    // (not just disabled) while DeckFeatureFlags.PLAYTEST_ENABLED is false.
-                    if (DeckFeatureFlags.PLAYTEST_ENABLED) {
+                    // Playtest button — launches setup screen for this deck. Hidden on a 0-card
+                    // deck (nothing to draw a hand from).
+                    if (uiState.cards.isNotEmpty()) {
                         uiState.deck?.id?.let { deckId ->
                             FilledTonalButton(
                                 onClick = { onPlaytest(deckId) },

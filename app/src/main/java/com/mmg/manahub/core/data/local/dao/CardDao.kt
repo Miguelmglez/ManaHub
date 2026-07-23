@@ -95,6 +95,32 @@ abstract class CardDao {
     """)
     abstract suspend fun getScryfallIdsWithBlankOracleId(limit: Int): List<String>
 
+    // Strategy-tags backfill (2026-07-22). Feeds CardRepositoryImpl.backfillMissingStrategyTags:
+    // finds owned cards (collection/wishlist/deck) with a real oracle_id that have never been
+    // resolved against the Supabase `card_strategy_tags` table under the current on-open-only
+    // resolution model, capped at [limit]. "Never resolved" is NOT WHERE tags = '[]' -- a card
+    // that was genuinely resolved with zero tags would otherwise be requeried forever. Instead it
+    // is keyed off absence from card_strategy_tags_cache (populated by
+    // CardStrategyTagsRepositoryImpl.getStrategyTags on every resolution, hit or miss), which makes
+    // the query self-terminating: once a card is resolved (even to an empty result), it drops out
+    // of future candidate lists. card_strategy_tags_cache/CardStrategyTagsCacheEntity live in this
+    // same module/database (not shared/core-data -- only the CardStrategyTagsRepositoryImpl
+    // consumer class is KMP-commonMain; its Room-backed cache stays Android-only, same as CardDao),
+    // so this cross-table reference is a plain intra-database Room query -- no cross-module DAO
+    // indirection needed, same as getScryfallIdsWithBlankOracleId above.
+    @Query("""
+        SELECT DISTINCT c.scryfall_id FROM cards c
+        WHERE c.oracle_id != ''
+          AND NOT EXISTS (SELECT 1 FROM card_strategy_tags_cache t WHERE t.oracle_id = c.oracle_id)
+          AND (
+              c.scryfall_id IN (SELECT scryfall_id FROM user_card_collection WHERE is_deleted = 0)
+              OR c.scryfall_id IN (SELECT scryfall_id FROM local_wishlists)
+              OR c.scryfall_id IN (SELECT scryfall_id FROM deck_cards)
+          )
+        LIMIT :limit
+    """)
+    abstract suspend fun getScryfallIdsMissingStrategyTags(limit: Int): List<String>
+
     @Query("UPDATE cards SET tags = :tagsJson WHERE scryfall_id = :scryfallId")
     abstract suspend fun updateTags(scryfallId: String, tagsJson: String)
 
