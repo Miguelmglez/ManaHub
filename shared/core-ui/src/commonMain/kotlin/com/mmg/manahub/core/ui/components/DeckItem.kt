@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -29,7 +28,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +43,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import org.jetbrains.compose.resources.painterResource
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.ic_test
 import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -144,39 +147,17 @@ fun DeckItem(
                         ),
                 )
 
-                // ── Play button overlay ──────────────────────────────────────────
-                if (onPlaytest != null && !reduced) {
-                    Surface(
-                        onClick = onPlaytest,
-                        color = mc.primaryAccent,
-                        shape = CircleShape,
-                        shadowElevation = 4.dp,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(MaterialTheme.spacing.sm)
-                            .size(44.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Start Playtest",
-                                tint = mc.background,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
-                }
 
                 // ── Format badge — top-right overlay ────────────────────────────
                 val formatLower = deck.format.lowercase()
                 val formatColor = when (formatLower) {
                     "commander" -> mc.goldMtg.copy(alpha = 0.9f)
-                    "casual"    -> mc.primaryAccent.copy(alpha = 0.9f)
-                    "draft"     -> mc.secondaryAccent.copy(alpha = 0.9f)
-                    "standard"  -> mc.lifePositive.copy(alpha = 0.9f)
-                    "modern"    -> mc.lifeNegative.copy(alpha = 0.9f)
-                    "pioneer"   -> mc.manaU.copy(alpha = 0.9f)
-                    else        -> mc.surfaceVariant.copy(alpha = 0.9f)
+                    "casual" -> mc.primaryAccent.copy(alpha = 0.9f)
+                    "draft" -> mc.secondaryAccent.copy(alpha = 0.9f)
+                    "standard" -> mc.lifePositive.copy(alpha = 0.9f)
+                    "modern" -> mc.lifeNegative.copy(alpha = 0.9f)
+                    "pioneer" -> mc.manaU.copy(alpha = 0.9f)
+                    else -> mc.surfaceVariant.copy(alpha = 0.9f)
                 }
 
                 Surface(
@@ -296,6 +277,18 @@ fun DeckItem(
                 }
 
                 if (!reduced) {
+                    // ── Play button overlay ──────────────────────────────────────────
+                    if (onPlaytest != null && !reduced) {
+                        IconButton(onClick = onPlaytest) {
+                            Icon(
+                                painter = painterResource(Res.drawable.ic_test),
+                                contentDescription = "Start Playtest",
+                                tint = mc.secondaryAccent,
+                                modifier = Modifier.padding(end =MaterialTheme.spacing.md).size(24.dp),
+                            )
+                        }
+
+                    }
                     if (onDelete != null) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(
@@ -312,41 +305,18 @@ fun DeckItem(
     }
 
     if (showDeleteDialog && onDelete != null) {
-        AlertDialog(
+        MagicAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = {
-                Text(
-                    text = "Delete deck",
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                )
+            title = "Delete deck",
+            text = "Delete \"${deck.name}\"? This cannot be undone.",
+            confirmLabel = "Delete",
+            onConfirm = {
+                onDelete()
+                showDeleteDialog = false
             },
-            text = {
-                Text(
-                    text = "Delete \"${deck.name}\"? This cannot be undone.",
-                    style = ty.bodyMedium,
-                    color = mc.textSecondary,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
-                    Text(
-                        text = "Delete",
-                        style = ty.labelLarge,
-                        color = mc.lifeNegative,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(
-                        text = "Cancel",
-                        style = ty.labelLarge,
-                        color = mc.primaryAccent,
-                    )
-                }
-            },
-            containerColor = mc.backgroundSecondary,
+            dismissLabel = "Cancel",
+            onDismiss = { showDeleteDialog = false },
+            confirmColor = MagicCtaColor.Error
         )
     }
 }

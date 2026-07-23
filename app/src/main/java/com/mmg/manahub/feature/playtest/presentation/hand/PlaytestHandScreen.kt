@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.playtest.presentation.hand
 
+import android.R.attr.contentDescription
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -10,6 +11,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,8 +38,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -50,23 +53,33 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
@@ -86,9 +99,12 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.model.HandSnapshot
 import com.mmg.manahub.core.model.PlaytestPhase
 import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.core.model.computeProtectedIndices
+import com.mmg.manahub.core.model.computeRequiredBottomCount
 import com.mmg.manahub.feature.playtest.presentation.battle.BattlefieldContent
 import com.mmg.manahub.feature.playtest.presentation.components.BottomNSelector
 import com.mmg.manahub.feature.playtest.presentation.components.CommandZoneArea
+import com.mmg.manahub.feature.playtest.presentation.components.CustomHandSheet
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestHandCard
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestSaveSheet
 import com.mmg.manahub.feature.playtest.presentation.components.PlaytestSurveySheet
@@ -129,12 +145,15 @@ fun PlaytestHandScreen(
                     toastState.show(saveSuccessMessage, MagicToastType.SUCCESS)
                     onBack()
                 }
+
                 is PlaytestHandEvent.NavigateBack -> {
                     onBack()
                 }
+
                 is PlaytestHandEvent.ShowError -> {
                     toastState.show(e.message, MagicToastType.ERROR)
                 }
+
                 is PlaytestHandEvent.ShowInfo -> {
                     // Resolve the carried string-resource name on the UI layer so the
                     // ViewModel stays free of Android resource references. Unknown keys
@@ -180,17 +199,17 @@ fun PlaytestHandScreen(
             .onGloballyPositioned { boxCoords = it }
     ) {
         Scaffold(
-            containerColor      = mc.background,
+            containerColor = mc.background,
             contentWindowInsets = WindowInsets(0),
             topBar = {
                 TopAppBar(
                     title = {
                         Row(
-                            verticalAlignment     = Alignment.CenterVertically,
+                            verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                         ) {
                             Text(
-                                text  = if (isPlayPhase) {
+                                text = if (isPlayPhase) {
                                     stringResource(R.string.playtest_battle_title)
                                 } else {
                                     stringResource(
@@ -208,12 +227,15 @@ fun PlaytestHandScreen(
                                     shape = ChipShape,
                                 ) {
                                     Text(
-                                        text     = stringResource(R.string.playtest_mulligan_chip, mulligans),
-                                        style    = ty.labelSmall,
-                                        color    = mc.primaryAccent,
+                                        text = stringResource(
+                                            R.string.playtest_mulligan_chip,
+                                            mulligans
+                                        ),
+                                        style = ty.labelSmall,
+                                        color = mc.primaryAccent,
                                         modifier = Modifier.padding(
                                             horizontal = MaterialTheme.spacing.sm,
-                                            vertical   = MaterialTheme.spacing.xxs,
+                                            vertical = MaterialTheme.spacing.xxs,
                                         ),
                                     )
                                 }
@@ -231,6 +253,20 @@ fun PlaytestHandScreen(
                             )
                         }
                     },
+                    actions = {
+                        // "Custom your hand" — MULLIGAN phase only. Once the battlefield exists
+                        // (PLAY phase) there is no drawn hand left to force cards into, so the
+                        // action is hidden entirely rather than shown-disabled.
+                        if (!isPlayPhase) {
+                            IconButton(onClick = viewModel::onOpenCustomHandSheet) {
+                                Icon(
+                                    Icons.Default.Style,
+                                    contentDescription = stringResource(R.string.playtest_custom_hand_action),
+                                    tint = mc.textPrimary,
+                                )
+                            }
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = mc.background),
                 )
             },
@@ -242,41 +278,54 @@ fun PlaytestHandScreen(
             ) {
                 when {
                     uiState.isLoading -> CircularProgressIndicator(
-                        color    = mc.primaryAccent,
+                        color = mc.primaryAccent,
                         modifier = Modifier.align(Alignment.Center),
                     )
 
                     uiState.errorMessage != null -> FullErrorState(
-                        message    = uiState.errorMessage!!,
+                        message = uiState.errorMessage!!,
                         retryLabel = stringResource(R.string.action_back),
-                        onRetry    = onBack,
+                        onRetry = onBack,
                     )
 
                     isPlayPhase && uiState.battlefield != null -> BattlefieldContent(
-                        setup              = setup,
-                        battlefield        = uiState.battlefield!!,
-                        onDrawCard         = viewModel::drawCard,
-                        onMoveCard         = viewModel::moveCard,
-                        onReorderHand      = viewModel::onReorderHand,
-                        onToggleTap        = viewModel::toggleTap,
+                        setup = setup,
+                        battlefield = uiState.battlefield!!,
+                        onDrawCard = viewModel::drawCard,
+                        onMoveCard = viewModel::moveCard,
+                        onReorderHand = viewModel::onReorderHand,
+                        onToggleTap = viewModel::toggleTap,
                         onUpdateCardOffset = viewModel::updateCardOffset,
-                        onInspectCommander = { card, rect -> inspectionSession = InspectionSession(card, rect) },
+                        onInspectCommander = { card, rect ->
+                            inspectionSession = InspectionSession(card, rect)
+                        },
                     )
 
                     uiState.snapshot != null -> HandContent(
-                        setup                = setup,
-                        snapshot             = uiState.snapshot!!,
-                        onCardClick          = { card, rect -> inspectionSession = InspectionSession(card, rect) },
-                        onInspectCommander   = { card, rect -> inspectionSession = InspectionSession(card, rect) },
-                        onReorder            = viewModel::onReorderHand,
-                        onRedraw             = viewModel::onRedraw,
-                        onKeep               = viewModel::onKeep,
-                        onMulligan           = viewModel::onMulligan,
-                        boxCoords            = boxCoords,
-                        // Mulligan is disabled when the minimum keepable hand (1 card) would
-                        // be reached on the next Keep: mulligansUsed >= drawCount - 1.
-                        canMulligan          = uiState.snapshot!!.hand.size > 1 &&
-                            uiState.snapshot!!.mulligansUsed < setup.drawCount - 1,
+                        setup = setup,
+                        snapshot = uiState.snapshot!!,
+                        onCardClick = { card, rect ->
+                            inspectionSession = InspectionSession(card, rect)
+                        },
+                        onInspectCommander = { card, rect ->
+                            inspectionSession = InspectionSession(card, rect)
+                        },
+                        onReorder = viewModel::onReorderHand,
+                        onRedraw = viewModel::onRedraw,
+                        onKeep = viewModel::onKeep,
+                        onMulligan = viewModel::onMulligan,
+                        boxCoords = boxCoords,
+                        // Mulligan is disabled once the next mulligan's required bottom-N count
+                        // would reach/exceed drawCount (the ≥1-card kept-hand floor). This mirrors
+                        // PlaytestHandViewModel.onMulligan's own guard exactly, via the same
+                        // shared computeRequiredBottomCount() — the two must never drift, or the
+                        // button could show enabled while the tap silently no-ops (or vice versa).
+                        canMulligan = uiState.snapshot!!.hand.size > 1 &&
+                                computeRequiredBottomCount(
+                                    setup.drawCount,
+                                    setup.startCount,
+                                    uiState.snapshot!!.mulligansUsed + 1,
+                                ) < setup.drawCount,
                     )
                 }
             }
@@ -288,17 +337,24 @@ fun PlaytestHandScreen(
             // Explicitly enabled only while the overlay is visible (see the mutual-exclusion
             // invariant above) so it never competes with the PLAY-phase BackHandler.
             BackHandler(enabled = true) { viewModel.onDismissBottomN() }
+            val bottomNSnapshot = uiState.snapshot!!
             BottomNSelector(
-                hand            = uiState.snapshot!!.hand,
-                mulligansUsed   = uiState.snapshot!!.mulligansUsed,
+                hand = bottomNSnapshot.hand,
+                requiredCount = computeRequiredBottomCount(
+                    setup.drawCount, setup.startCount, bottomNSnapshot.mulligansUsed,
+                ),
                 selectedIndices = uiState.selectedBottomIndices,
-                onToggle        = viewModel::toggleBottomSelection,
-                onConfirm       = viewModel::onConfirmBottomN,
+                disabledIndices = computeProtectedIndices(
+                    bottomNSnapshot.hand,
+                    uiState.customHandSelection
+                ),
+                onToggle = viewModel::toggleBottomSelection,
+                onConfirm = viewModel::onConfirmBottomN,
             )
         }
 
         MagicToastHost(
-            state    = toastState,
+            state = toastState,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
 
@@ -318,16 +374,27 @@ fun PlaytestHandScreen(
         }
     }
 
+    // "Custom your hand" sheet (MULLIGAN phase only — see the topbar action gating above).
+    if (uiState.showCustomHandSheet) {
+        CustomHandSheet(
+            availableCards = uiState.availableCards,
+            selection = uiState.customHandSelection,
+            drawCount = setup.drawCount,
+            onCountChange = viewModel::onSetCustomHandCount,
+            onDismiss = viewModel::onDismissCustomHandSheet,
+        )
+    }
+
     // Save sheet.
     if (uiState.showSaveSheet && uiState.setup != null && uiState.snapshot != null) {
         PlaytestSaveSheet(
-            setup               = uiState.setup!!,
-            snapshot            = uiState.snapshot!!,
-            isSaving            = uiState.isSaving,
+            setup = uiState.setup!!,
+            snapshot = uiState.snapshot!!,
+            isSaving = uiState.isSaving,
             onSaveWithoutSurvey = viewModel::onSaveWithoutSurvey,
-            onSaveAndSurvey     = viewModel::onSaveAndOpenSurvey,
-            onDiscard           = viewModel::onDiscard,
-            onDismiss           = viewModel::onDismissSaveSheet,
+            onSaveAndSurvey = viewModel::onSaveAndOpenSurvey,
+            onDiscard = viewModel::onDiscard,
+            onDismiss = viewModel::onDismissSaveSheet,
         )
     }
 
@@ -335,7 +402,7 @@ fun PlaytestHandScreen(
     if (uiState.showSurveySheet && uiState.snapshot != null) {
         PlaytestSurveySheet(
             handCards = uiState.snapshot!!.hand,
-            onFinish  = { answers, types, refs ->
+            onFinish = { answers, types, refs ->
                 viewModel.onSurveyFinished(answers, types, refs)
             },
             onDismiss = viewModel::onDismissSurveySheet,
@@ -347,13 +414,13 @@ fun PlaytestHandScreen(
     if (uiState.showEndTestConfirm) {
         MagicAlertDialog(
             onDismissRequest = viewModel::dismissEndTest,
-            title            = stringResource(R.string.playtest_battle_confirm_end_title),
-            text             = stringResource(R.string.playtest_battle_confirm_end_body),
-            confirmLabel     = stringResource(R.string.playtest_battle_confirm_end_confirm),
-            onConfirm        = viewModel::confirmEndTest,
-            dismissLabel     = stringResource(R.string.playtest_battle_confirm_end_cancel),
-            onDismiss        = viewModel::dismissEndTest,
-            confirmColor     = mc.lifeNegative,
+            title = stringResource(R.string.playtest_battle_confirm_end_title),
+            text = stringResource(R.string.playtest_battle_confirm_end_body),
+            confirmLabel = stringResource(R.string.playtest_battle_confirm_end_confirm),
+            onConfirm = viewModel::confirmEndTest,
+            dismissLabel = stringResource(R.string.playtest_battle_confirm_end_cancel),
+            onDismiss = viewModel::dismissEndTest,
+            confirmColor = MagicCtaColor.Error,
         )
     }
 }
@@ -378,29 +445,29 @@ private fun HandContent(
 
     if (isLandscape) {
         LandscapeHandContent(
-            setup              = setup,
-            snapshot           = snapshot,
-            onCardClick        = onCardClick,
+            setup = setup,
+            snapshot = snapshot,
+            onCardClick = onCardClick,
             onInspectCommander = onInspectCommander,
-            onReorder          = onReorder,
-            onRedraw           = onRedraw,
-            onKeep             = onKeep,
-            onMulligan         = onMulligan,
-            canMulligan        = canMulligan,
-            boxCoords          = boxCoords,
+            onReorder = onReorder,
+            onRedraw = onRedraw,
+            onKeep = onKeep,
+            onMulligan = onMulligan,
+            canMulligan = canMulligan,
+            boxCoords = boxCoords,
         )
     } else {
         PortraitHandContent(
-            setup              = setup,
-            snapshot           = snapshot,
-            onCardClick        = onCardClick,
+            setup = setup,
+            snapshot = snapshot,
+            onCardClick = onCardClick,
             onInspectCommander = onInspectCommander,
-            onReorder          = onReorder,
-            onRedraw           = onRedraw,
-            onKeep             = onKeep,
-            onMulligan         = onMulligan,
-            canMulligan        = canMulligan,
-            boxCoords          = boxCoords,
+            onReorder = onReorder,
+            onRedraw = onRedraw,
+            onKeep = onKeep,
+            onMulligan = onMulligan,
+            canMulligan = canMulligan,
+            boxCoords = boxCoords,
         )
     }
 }
@@ -432,9 +499,8 @@ private fun PortraitHandContent(
 
             CommandZoneArea(
                 commanderCard = commander,
-                librarySize   = snapshot.library.size,
-                onClick       = { onInspectCommander(commander, cardRect) },
-                modifier      = Modifier
+                onClick = { onInspectCommander(commander, cardRect) },
+                modifier = Modifier
                     .padding(horizontal = sp.md, vertical = sp.xs)
                     .onGloballyPositioned { coords ->
                         if (boxCoords != null && boxCoords.isAttached && coords.isAttached) {
@@ -450,9 +516,9 @@ private fun PortraitHandContent(
         // London mulligan helper text.
         if (snapshot.mulligansUsed > 0) {
             Text(
-                text     = stringResource(R.string.playtest_mulligan_keep_hint, snapshot.mulligansUsed),
-                style    = ty.bodySmall,
-                color    = mc.textSecondary,
+                text = stringResource(R.string.playtest_mulligan_keep_hint, snapshot.mulligansUsed),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
                 modifier = Modifier
                     .padding(horizontal = sp.lg)
                     .padding(bottom = sp.xs),
@@ -461,29 +527,30 @@ private fun PortraitHandContent(
 
         // Hand area — animated on snapshot id change.
         AnimatedContent(
-            targetState    = snapshot.id,
+            targetState = snapshot.id,
             transitionSpec = {
                 (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 4 }) togetherWith
-                    (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 4 })
+                        (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 4 })
             },
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            label    = "HandAnimation",
+            label = "HandAnimation",
         ) { snapshotId ->
             HandGrid(
-                hand        = snapshot.hand,
-                snapshotId  = snapshotId,
+                hand = snapshot.hand,
+                snapshotId = snapshotId,
                 onCardClick = onCardClick,
-                boxCoords   = boxCoords,
+                onReorder = onReorder,
+                boxCoords = boxCoords,
             )
         }
 
         // Bottom action bar.
         BottomActionBar(
-            onRedraw    = onRedraw,
-            onKeep      = onKeep,
-            onMulligan  = onMulligan,
+            onRedraw = onRedraw,
+            onKeep = onKeep,
+            onMulligan = onMulligan,
             canMulligan = canMulligan,
         )
     }
@@ -516,7 +583,7 @@ private fun LandscapeHandContent(
         // LEFT: commander zone + mulligan hint. The 160dp rail width is a fixed layout
         // constant (not an 8dp-grid spacing token).
         Column(
-            modifier            = Modifier
+            modifier = Modifier
                 .width(LANDSCAPE_RAIL_WIDTH)
                 .fillMaxHeight()
                 .padding(horizontal = sp.sm, vertical = sp.sm),
@@ -529,9 +596,8 @@ private fun LandscapeHandContent(
 
                 CommandZoneArea(
                     commanderCard = cmdr,
-                    librarySize   = snapshot.library.size,
-                    onClick       = { onInspectCommander(cmdr, cardRect) },
-                    modifier      = Modifier
+                    onClick = { onInspectCommander(cmdr, cardRect) },
+                    modifier = Modifier
                         .fillMaxWidth()
                         .onGloballyPositioned { coords ->
                             if (boxCoords != null && boxCoords.isAttached && coords.isAttached) {
@@ -542,9 +608,12 @@ private fun LandscapeHandContent(
             }
             if (snapshot.mulligansUsed > 0) {
                 Text(
-                    text     = stringResource(R.string.playtest_mulligan_keep_hint, snapshot.mulligansUsed),
-                    style    = ty.bodySmall,
-                    color    = mc.textSecondary,
+                    text = stringResource(
+                        R.string.playtest_mulligan_keep_hint,
+                        snapshot.mulligansUsed
+                    ),
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
                     modifier = Modifier.padding(top = sp.sm),
                 )
             }
@@ -552,31 +621,32 @@ private fun LandscapeHandContent(
 
         // CENTER: hand fan — takes all remaining horizontal space.
         AnimatedContent(
-            targetState    = snapshot.id,
+            targetState = snapshot.id,
             transitionSpec = {
                 (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 4 }) togetherWith
-                    (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 4 })
+                        (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 4 })
             },
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
-            label    = "HandAnimationLandscape",
+            label = "HandAnimationLandscape",
         ) { snapshotId ->
             HandGrid(
-                hand        = snapshot.hand,
-                snapshotId  = snapshotId,
+                hand = snapshot.hand,
+                snapshotId = snapshotId,
                 onCardClick = onCardClick,
-                boxCoords   = boxCoords,
+                onReorder = onReorder,
+                boxCoords = boxCoords,
             )
         }
 
         // RIGHT: vertical action bar.
         SideActionBar(
-            onRedraw    = onRedraw,
-            onKeep      = onKeep,
-            onMulligan  = onMulligan,
+            onRedraw = onRedraw,
+            onKeep = onKeep,
+            onMulligan = onMulligan,
             canMulligan = canMulligan,
-            modifier    = Modifier
+            modifier = Modifier
                 .width(LANDSCAPE_ACTION_RAIL_WIDTH)
                 .fillMaxHeight(),
         )
@@ -590,11 +660,23 @@ private fun HandGrid(
     hand: List<Card>,
     snapshotId: Int,
     onCardClick: (Card, Rect) -> Unit,
+    onReorder: (from: Int, to: Int) -> Unit,
     boxCoords: LayoutCoordinates?,
 ) {
     if (hand.isEmpty()) return
 
     val sp = MaterialTheme.spacing
+    val haptic = LocalHapticFeedback.current
+
+    // Tracks each grid item's current on-screen rect (relative to boxCoords), keyed by index —
+    // mirrors the position-tracking drop-resolution approach used for the PLAY-phase hand fan
+    // in BattlefieldContent.HandStrip. Remembered per snapshotId so a mulligan/redraw (which
+    // mints a fresh snapshot id) starts with a clean map; a same-snapshot reorder keeps the map
+    // (indices stay valid — reordering doesn't change the index range).
+    val itemRects = remember(snapshotId) { mutableStateMapOf<Int, Rect>() }
+    var dragIndex by remember(snapshotId) { mutableStateOf<Int?>(null) }
+    var dragStartCenter by remember(snapshotId) { mutableStateOf(Offset.Zero) }
+    var dragDelta by remember(snapshotId) { mutableStateOf(Offset.Zero) }
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 110.dp),
@@ -605,19 +687,70 @@ private fun HandGrid(
     ) {
         gridItemsIndexed(hand, key = { index, _ -> "hand_${snapshotId}_${index}" }) { index, card ->
             var cardRect by remember { mutableStateOf(Rect.Zero) }
+            val isDragging = dragIndex == index
 
             PlaytestHandCard(
-                card       = card,
-                width      = Dp.Unspecified,
-                onClick    = { onCardClick(card, cardRect) },
-                isDragging = false,
-                modifier   = Modifier
+                card = card,
+                width = Dp.Unspecified,
+                onClick = { onCardClick(card, cardRect) },
+                isDragging = isDragging,
+                modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(63f / 88f)
+                    // Lift + follow the finger while dragging; snaps back to its grid slot the
+                    // instant dragIndex clears (drag end triggers the reorder, if any, in the
+                    // same recomposition).
+                    .zIndex(if (isDragging) 100f else 0f)
+                    .graphicsLayer {
+                        if (isDragging) {
+                            translationX = dragDelta.x
+                            translationY = dragDelta.y
+                        }
+                    }
                     .onGloballyPositioned { coords ->
                         if (boxCoords != null && boxCoords.isAttached && coords.isAttached) {
                             cardRect = boxCoords.localBoundingBoxOf(coords)
+                            itemRects[index] = cardRect
                         }
+                    }
+                    // Drag gesture is chained alongside PlaytestHandCard's own internal tap
+                    // detector (same coexistence pattern as BattlefieldContent.DraggableFieldCard
+                    // stacking a long-press-drag pointerInput next to a tap pointerInput).
+                    .pointerInput(snapshotId, index) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                val rect = itemRects[index]
+                                if (rect == null || rect == Rect.Zero) return@detectDragGesturesAfterLongPress
+                                dragIndex = index
+                                dragStartCenter = rect.center
+                                dragDelta = Offset.Zero
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDrag = { change, amount ->
+                                dragDelta += amount
+                                change.consume()
+                            },
+                            onDragEnd = {
+                                val from = dragIndex
+                                if (from != null) {
+                                    val pointer = dragStartCenter + dragDelta
+                                    // Nearest tracked item center to the drop point.
+                                    val to = itemRects.entries.minByOrNull { (_, rect) ->
+                                        val dx = rect.center.x - pointer.x
+                                        val dy = rect.center.y - pointer.y
+                                        dx * dx + dy * dy
+                                    }?.key ?: from
+                                    if (to != from) onReorder(from, to)
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                dragIndex = null
+                                dragDelta = Offset.Zero
+                            },
+                            onDragCancel = {
+                                dragIndex = null
+                                dragDelta = Offset.Zero
+                            },
+                        )
                     }
             )
         }
@@ -633,11 +766,10 @@ private fun BottomActionBar(
     canMulligan: Boolean,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val sp = MaterialTheme.spacing
 
     Surface(
-        color    = mc.surface,
+        color = mc.surface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -654,11 +786,11 @@ private fun BottomActionBar(
             )
 
             Row(
-                modifier              = Modifier
+                modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = sp.lg, vertical = sp.md),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(sp.md),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Mulligan (Left)
                 FilledTonalIconButton(
@@ -678,24 +810,12 @@ private fun BottomActionBar(
                 }
 
                 // Keep/Start (Center)
-                Button(
-                    onClick  = onKeep,
-                    shape    = ButtonShape,
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor   = mc.onAccent,
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
-                    modifier  = Modifier
-                        .weight(1f)
-                        .padding(horizontal = sp.lg)
-                        .height(64.dp),
-                ) {
-                    Text(
-                        text  = stringResource(R.string.playtest_action_start).uppercase(),
-                        style = ty.titleLarge.copy(fontWeight = FontWeight.Black),
-                    )
-                }
+                MagicCtaButton(
+                    text = stringResource(R.string.playtest_action_start),
+                    onClick = onKeep,
+                    color = MagicCtaColor.Primary,
+                    modifier = Modifier.weight(1.3f)
+                )
 
                 // New hand (Right)
                 FilledTonalIconButton(
@@ -708,7 +828,7 @@ private fun BottomActionBar(
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        Icons.Default.Casino,
+                        Icons.Default.Replay,
                         contentDescription = stringResource(R.string.playtest_action_new_hand),
                     )
                 }
@@ -732,75 +852,50 @@ private fun SideActionBar(
     modifier: Modifier = Modifier,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val sp = MaterialTheme.spacing
 
     Surface(
-        color    = mc.background,
+        color = mc.background,
         modifier = modifier,
     ) {
         Column(
-            modifier            = Modifier
+            modifier = Modifier
                 .fillMaxHeight()
                 .navigationBarsPadding()
                 .padding(horizontal = sp.sm, vertical = sp.sm),
-            verticalArrangement = Arrangement.spacedBy(sp.lg, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(sp.md, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // New hand
-            FilledTonalIconButton(
-                onClick  = onRedraw,
-                shape    = CircleShape,
-                colors   = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = mc.surfaceVariant,
-                    contentColor   = mc.textSecondary,
-                ),
-                modifier = Modifier.size(56.dp)
-            ) {
+            IconButton(onClick = onRedraw) {
                 Icon(
-                    Icons.Default.Casino,
-                    contentDescription = stringResource(R.string.playtest_action_new_hand),
-                )
-            }
+                    Icons.Default.Replay,
 
-            // Keep
-            Button(
-                onClick  = onKeep,
-                shape    = ButtonShape,
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor   = mc.onAccent,
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
-                modifier  = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
-            ) {
-                Text(
-                    text  = "GO",
-                    style = ty.titleLarge.copy(fontWeight = FontWeight.Black),
-                )
-            }
-
-            // Mulligan
-            FilledTonalIconButton(
-                onClick  = onMulligan,
-                enabled  = canMulligan,
-                shape    = CircleShape,
-                colors   = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = mc.secondaryAccent.copy(alpha = 0.15f),
-                    contentColor   = mc.secondaryAccent,
-                ),
-                modifier = Modifier.size(56.dp)
-            ) {
-                Icon(
-                    Icons.Default.History,
-                    contentDescription = stringResource(R.string.playtest_action_mulligan),
+                    tint = mc.primaryAccent,
+                    contentDescription = stringResource(R.string.playtest_action_new_hand)
                 )
             }
         }
+        // Keep
+        MagicCtaButton(
+            text = "START",
+            onClick = onKeep,
+            color = MagicCtaColor.Primary,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        IconButton(onClick = onMulligan) {
+            Icon(
+                Icons.Default.History,
+                tint = mc.secondaryAccent,
+                contentDescription = stringResource(R.string.playtest_action_new_hand)
+            )
+        }
+
     }
 }
+
+
 
 // ── Landscape layout constants ────────────────────────────────────────────────
 // Fixed rail widths for the landscape layout — these are deliberate layout dimensions,

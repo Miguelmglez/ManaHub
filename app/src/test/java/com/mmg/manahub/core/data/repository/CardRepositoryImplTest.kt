@@ -14,6 +14,7 @@ import com.mmg.manahub.util.TestFixtures
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -521,5 +522,97 @@ class CardRepositoryImplTest {
                 suggestedJson = any(),
             )
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Strategy-tags backfill (2026-07-22): backfillMissingStrategyTags
+    //  One-time, self-terminating startup pass for owned cards never resolved against the
+    //  precomputed Supabase table (see CardRepository.backfillMissingStrategyTags KDoc).
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given no candidates when backfillMissingStrategyTags then nothing is resolved`() = runTest {
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(40) } returns emptyList()
+
+        repository.backfillMissingStrategyTags(40)
+
+        coVerify(exactly = 0) { resolveCardStrategyTags(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { cardDao.updateTagsAndSuggestions(any(), any(), any()) }
+    }
+
+    @Test
+    fun `given candidates when backfillMissingStrategyTags then each is resolved sequentially via the shared resolution path`() = runTest {
+        val entity1 = TestFixtures.buildCardEntity(scryfallId = "id-001")
+        val entity2 = TestFixtures.buildCardEntity(scryfallId = "id-002")
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(40) } returns listOf("id-001", "id-002")
+        coEvery { cardDao.getById("id-001") } returns entity1
+        coEvery { cardDao.getById("id-002") } returns entity2
+        coEvery { resolveCardStrategyTags(match { it.scryfallId == "id-001" }, any(), any(), any()) } returns
+            ComputeCardTagsUseCase.Result(confirmedTags = listOf(CardTag.REMOVAL), suggestedTags = emptyList())
+        coEvery { resolveCardStrategyTags(match { it.scryfallId == "id-002" }, any(), any(), any()) } returns
+            ComputeCardTagsUseCase.Result(confirmedTags = listOf(CardTag.RAMP), suggestedTags = emptyList())
+
+        repository.backfillMissingStrategyTags(40)
+
+        // Each candidate's full resolve -> persist chain completes before the next candidate
+        // starts (a plain sequential forEach, never N concurrent launches) -- mirrors
+        // backfillMissingOracleIds/scheduleTagResolutionBatch's identical rationale.
+        coVerifyOrder {
+            cardDao.getById("id-001")
+            resolveCardStrategyTags(match { it.scryfallId == "id-001" }, any(), any(), any())
+            cardDao.updateTagsAndSuggestions(scryfallId = "id-001", tagsJson = any(), suggestedJson = any())
+            cardDao.getById("id-002")
+            resolveCardStrategyTags(match { it.scryfallId == "id-002" }, any(), any(), any())
+            cardDao.updateTagsAndSuggestions(scryfallId = "id-002", tagsJson = any(), suggestedJson = any())
+        }
+    }
+
+    @Test
+    fun `given one candidate fails to resolve when backfillMissingStrategyTags then the rest of the batch still completes`() = runTest {
+        val entity1 = TestFixtures.buildCardEntity(scryfallId = "id-fail")
+        val entity2 = TestFixtures.buildCardEntity(scryfallId = "id-ok")
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(40) } returns listOf("id-fail", "id-ok")
+        coEvery { cardDao.getById("id-fail") } returns entity1
+        coEvery { cardDao.getById("id-ok") } returns entity2
+        coEvery { resolveCardStrategyTags(match { it.scryfallId == "id-fail" }, any(), any(), any()) } throws
+            RuntimeException("strategy tags unavailable")
+        coEvery { resolveCardStrategyTags(match { it.scryfallId == "id-ok" }, any(), any(), any()) } returns
+            ComputeCardTagsUseCase.Result(confirmedTags = listOf(CardTag.REMOVAL), suggestedTags = emptyList())
+
+        repository.backfillMissingStrategyTags(40)
+
+        coVerify(exactly = 0) {
+            cardDao.updateTagsAndSuggestions(scryfallId = "id-fail", tagsJson = any(), suggestedJson = any())
+        }
+        coVerify(exactly = 1) {
+            cardDao.updateTagsAndSuggestions(scryfallId = "id-ok", tagsJson = any(), suggestedJson = any())
+        }
+    }
+
+    @Test
+    fun `given a candidate whose entity vanished before resolution when backfillMissingStrategyTags then it is skipped without aborting the batch`() = runTest {
+        val entity2 = TestFixtures.buildCardEntity(scryfallId = "id-ok")
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(40) } returns listOf("id-gone", "id-ok")
+        coEvery { cardDao.getById("id-gone") } returns null
+        coEvery { cardDao.getById("id-ok") } returns entity2
+        coEvery { resolveCardStrategyTags(match { it.scryfallId == "id-ok" }, any(), any(), any()) } returns
+            ComputeCardTagsUseCase.Result(confirmedTags = listOf(CardTag.REMOVAL), suggestedTags = emptyList())
+
+        repository.backfillMissingStrategyTags(40)
+
+        coVerify(exactly = 0) { resolveCardStrategyTags(match { it.scryfallId == "id-gone" }, any(), any(), any()) }
+        coVerify(exactly = 1) {
+            cardDao.updateTagsAndSuggestions(scryfallId = "id-ok", tagsJson = any(), suggestedJson = any())
+        }
+    }
+
+    @Test
+    fun `given the candidate query itself throws when backfillMissingStrategyTags then it is a silent no-op`() = runTest {
+        coEvery { cardDao.getScryfallIdsMissingStrategyTags(40) } throws RuntimeException("DB error")
+
+        // Must not propagate -- this is a best-effort startup pass, never allowed to crash app start.
+        repository.backfillMissingStrategyTags(40)
+
+        coVerify(exactly = 0) { resolveCardStrategyTags(any(), any(), any(), any()) }
     }
 }

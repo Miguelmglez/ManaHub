@@ -11,9 +11,10 @@ import org.junit.Test
 /**
  * Unit tests for [CanPlaytestDeckUseCase].
  *
- * Verifies format-specific thresholds (standard / casual / draft / commander),
- * exact-size enforcement for commander, unsupported formats, and
- * case-insensitive format matching.
+ * Verifies format-specific thresholds (standard / casual / draft / commander / the 60-card
+ * constructed formats added by Deck Doctor Phase 4 — pioneer / modern / legacy / vintage /
+ * pauper), exact-size enforcement for commander, unsupported formats, and case-insensitive
+ * format matching.
  */
 class CanPlaytestDeckUseCaseTest {
 
@@ -183,19 +184,70 @@ class CanPlaytestDeckUseCaseTest {
         assertEquals(PlaytestEligibility.Eligible, result)
     }
 
-    // ── Group 5: Unsupported formats ──────────────────────────────────────────
+    // ── Group 4b: Pioneer/Modern/Legacy/Vintage/Pauper (60-card constructed, Deck Doctor
+    // Phase 4 formats — DeckFormat.isSixtyCardConstructed) ─────────────────────
 
     @Test
-    fun `given pioneer format then Ineligible`() {
+    fun `given pioneer format with exactly 60 cards then Eligible`() {
         val result = useCase(deckWith("pioneer"), mainboardCount = 60)
+        assertEquals(PlaytestEligibility.Eligible, result)
+    }
+
+    @Test
+    fun `given pioneer format with 59 cards then Ineligible`() {
+        val result = useCase(deckWith("pioneer"), mainboardCount = 59)
         assertTrue(result is PlaytestEligibility.Ineligible)
     }
 
     @Test
-    fun `given modern format then Ineligible`() {
+    fun `given modern format with exactly 60 cards then Eligible`() {
         val result = useCase(deckWith("modern"), mainboardCount = 60)
+        assertEquals(PlaytestEligibility.Eligible, result)
+    }
+
+    @Test
+    fun `given modern format with 59 cards then Ineligible`() {
+        val result = useCase(deckWith("modern"), mainboardCount = 59)
         assertTrue(result is PlaytestEligibility.Ineligible)
     }
+
+    @Test
+    fun `given legacy format with exactly 60 cards then Eligible`() {
+        val result = useCase(deckWith("legacy"), mainboardCount = 60)
+        assertEquals(PlaytestEligibility.Eligible, result)
+    }
+
+    @Test
+    fun `given legacy format with 59 cards then Ineligible`() {
+        val result = useCase(deckWith("legacy"), mainboardCount = 59)
+        assertTrue(result is PlaytestEligibility.Ineligible)
+    }
+
+    @Test
+    fun `given vintage format with exactly 60 cards then Eligible`() {
+        val result = useCase(deckWith("vintage"), mainboardCount = 60)
+        assertEquals(PlaytestEligibility.Eligible, result)
+    }
+
+    @Test
+    fun `given vintage format with 59 cards then Ineligible`() {
+        val result = useCase(deckWith("vintage"), mainboardCount = 59)
+        assertTrue(result is PlaytestEligibility.Ineligible)
+    }
+
+    @Test
+    fun `given pauper format with exactly 60 cards then Eligible`() {
+        val result = useCase(deckWith("pauper"), mainboardCount = 60)
+        assertEquals(PlaytestEligibility.Eligible, result)
+    }
+
+    @Test
+    fun `given pauper format with 59 cards then Ineligible`() {
+        val result = useCase(deckWith("pauper"), mainboardCount = 59)
+        assertTrue(result is PlaytestEligibility.Ineligible)
+    }
+
+    // ── Group 5: Unsupported formats ──────────────────────────────────────────
 
     @Test
     fun `given blank format then Ineligible`() {

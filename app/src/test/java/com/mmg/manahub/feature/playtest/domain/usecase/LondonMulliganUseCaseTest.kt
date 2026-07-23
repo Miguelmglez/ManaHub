@@ -84,6 +84,30 @@ class LondonMulliganUseCaseTest {
         assertTrue(newLibrary.isEmpty())
     }
 
+    // ── Group 1b: "Custom your hand" forced param ─────────────────────────────
+
+    @Test
+    fun `given a forced card when mulligan then it is guaranteed in the new hand`() {
+        val hand    = (1..7).map { makeCard("h$it") }
+        val library = (1..46).map { makeCard("l$it") } + makeCard("bolt")
+
+        val (newHand, _) = useCase(hand, library, drawCount = 7, forced = mapOf("bolt" to 1))
+
+        assertTrue("forced card must survive the mulligan reshuffle", newHand.any { it.scryfallId == "bolt" })
+        assertEquals(7, newHand.size)
+    }
+
+    @Test
+    fun `given no forced param when mulligan then behavior is unchanged (default emptyMap)`() {
+        val hand    = (1..5).map { makeCard("h$it") }
+        val library = (1..48).map { makeCard("l$it") }
+
+        val (newHand, newLibrary) = useCase(hand, library, drawCount = 7)
+
+        assertEquals(53, newHand.size + newLibrary.size)
+        assertEquals(7, newHand.size)
+    }
+
     // ── Group 2: applyBottomN ─────────────────────────────────────────────────
 
     @Test

@@ -33,7 +33,6 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 @Composable
 fun CommandZoneArea(
     commanderCard: Card,
-    librarySize: Int,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
@@ -68,11 +67,6 @@ fun CommandZoneArea(
                 name  = commanderCard.name,
                 style = ty.bodyMedium,
                 color = mc.textPrimary,
-            )
-            Text(
-                text  = stringResource(R.string.playtest_library_size, librarySize),
-                style = ty.labelSmall,
-                color = mc.textSecondary,
             )
         }
 

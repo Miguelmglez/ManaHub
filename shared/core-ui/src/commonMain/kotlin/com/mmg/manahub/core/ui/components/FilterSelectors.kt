@@ -51,7 +51,7 @@ import com.mmg.manahub.core.ui.theme.spacing
 @Composable
 fun <T> ManaHubSelector(
     icon: ImageVector,
-    label: String,
+    label: String? = null,
     valueText: String,
     items: List<T>,
     selectedItem: T,
@@ -85,19 +85,25 @@ fun <T> ManaHubSelector(
                     tint = mc.primaryAccent,
                     modifier = Modifier.size(18.dp)
                 )
-                Text(
-                    text = label,
-                    style = ty.labelLarge,
-                    color = mc.textSecondary
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
+                if (label != null) {
+                    Text(
+                        text = label,
+                        style = ty.labelLarge,
+                        color = mc.textSecondary
+                    )
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                }
 
                 Text(
                     text = valueText,
                     style = ty.labelLarge,
                     color = mc.primaryAccent
                 )
+                
+                if (label == null) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
                 Icon(
                     imageVector = Icons.Default.ExpandMore,
                     contentDescription = null,
@@ -147,7 +153,7 @@ fun <T> ManaHubSelector(
 @Composable
 fun <T> ManaHubBottomSheetSelector(
     icon: ImageVector,
-    label: String,
+    label: String? = null,
     valueText: String,
     items: List<T>,
     selectedItem: T,
@@ -182,19 +188,25 @@ fun <T> ManaHubBottomSheetSelector(
                     tint = mc.primaryAccent,
                     modifier = Modifier.size(18.dp)
                 )
-                Text(
-                    text = label,
-                    style = ty.labelLarge,
-                    color = mc.textSecondary
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
+                if (label != null) {
+                    Text(
+                        text = label,
+                        style = ty.labelLarge,
+                        color = mc.textSecondary
+                    )
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                }
 
                 Text(
                     text = valueText,
                     style = ty.labelLarge,
                     color = mc.primaryAccent
                 )
+                
+                if (label == null) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
                 Icon(
                     imageVector = Icons.Default.ExpandMore,
                     contentDescription = null,

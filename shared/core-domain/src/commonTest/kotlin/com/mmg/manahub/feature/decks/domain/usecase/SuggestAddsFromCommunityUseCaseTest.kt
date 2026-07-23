@@ -34,6 +34,7 @@ private class FakeCardRepository(private val byId: Map<String, Card>, private va
         byId[scryfallId]?.let { DataResult.Success(it) } ?: DataResult.Error("not found")
     override suspend fun refreshCardById(scryfallId: String): DataResult<Card> = error("unused")
     override suspend fun backfillMissingOracleIds(limit: Int) = error("unused")
+    override suspend fun backfillMissingStrategyTags(limit: Int) = error("unused")
     override suspend fun getCardBySetAndNumber(set: String, number: String): DataResult<Card> = error("unused")
     override suspend fun getCachedEnglishSiblings(pairs: Set<Pair<String, String>>): Map<Pair<String, String>, Card> = error("unused")
     // Pre-existing gap fixed while touching this fake for the A3 backfill additions above

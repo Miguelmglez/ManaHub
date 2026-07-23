@@ -9,6 +9,9 @@ package com.mmg.manahub.core.model
  * @param deckName Display name shown in the hand screen top bar.
  * @param deckFormat Format string (e.g. "commander", "standard", "draft").
  * @param drawCount Number of cards to draw for the opening hand (1–10).
+ * @param startCount Target size of the FINAL kept opening hand ("Cards to start the game"),
+ *   e.g. 7. Combined with [drawCount] and the number of London mulligans taken, this drives the
+ *   bottom-N step at Keep time — see [computeRequiredBottomCount].
  * @param isOnThePlay True = on the play; false = on the draw.
  * @param commanderCard Hydrated commander card, set only when format == "commander".
  */
@@ -17,6 +20,7 @@ data class PlaytestSetup(
     val deckName: String,
     val deckFormat: String,
     val drawCount: Int = 7,
+    val startCount: Int = 7,
     val isOnThePlay: Boolean = true,
     val commanderCard: Card? = null,
 )

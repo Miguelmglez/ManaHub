@@ -221,13 +221,13 @@ class CollectionGroupingTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun tag_cardWithMultipleTags_appearsInEverySectionItCarries() {
-        val group = buildGroup(buildCard(tags = listOf(CardTag.RAMP, CardTag.REMOVAL)))
+    fun tag_cardWithMultipleStrategyTags_appearsInEverySectionItCarries() {
+        val group = buildGroup(buildCard(tags = listOf(CardTag.TOKENS, CardTag.GRAVEYARD)))
         val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
 
         val tokens = sections.map { it.labelToken }.toSet()
-        assertTrue("ramp" in tokens)
-        assertTrue("removal" in tokens)
+        assertTrue("tokens" in tokens)
+        assertTrue("graveyard" in tokens)
         assertEquals(2, sections.size)
     }
 
@@ -241,11 +241,32 @@ class CollectionGroupingTest {
 
     @Test
     fun tag_sameKeyInBothTagsAndUserTags_countedOnceInThatSection() {
-        val group = buildGroup(buildCard(tags = listOf(CardTag.RAMP), userTags = listOf(CardTag.RAMP)))
+        val group = buildGroup(buildCard(tags = listOf(CardTag.TOKENS), userTags = listOf(CardTag.TOKENS)))
         val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
 
         assertEquals(1, sections.size)
         assertEquals(1, sections[0].items.size)
+    }
+
+    @Test
+    fun tag_onlyNonStrategyTags_bucketsAsUntaggedSentinel() {
+        // CardTag.RAMP is TagCategory.ARCHETYPE and CardTag.REMOVAL is TagCategory.ROLE — neither
+        // is STRATEGY, so Collection's TAG grouping (deliberately restricted to STRATEGY, unlike
+        // CardDetail/Deck Studio which show every category) must treat this card as untagged.
+        val group = buildGroup(buildCard(tags = listOf(CardTag.RAMP, CardTag.REMOVAL)))
+        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
+
+        assertEquals(listOf("untagged"), sections.map { it.labelToken })
+    }
+
+    @Test
+    fun tag_mixedStrategyAndOtherCategoryTags_bucketsOnlyUnderStrategyTag() {
+        // CardTag.TOKENS is STRATEGY; CardTag.RAMP (ARCHETYPE) and CardTag.REMOVAL (ROLE) must be
+        // ignored — the card should land in exactly one section, "tokens".
+        val group = buildGroup(buildCard(tags = listOf(CardTag.TOKENS, CardTag.RAMP, CardTag.REMOVAL)))
+        val sections = groupCollection(listOf(group), CollectionGroupingMode.TAG)
+
+        assertEquals(listOf("tokens"), sections.map { it.labelToken })
     }
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -20,6 +20,9 @@ sealed interface CommunityDeckDetailUiState {
      * @property isImporting true while an import is in progress (blocks re-entry).
      * @property importProgress (processed, total) card-resolution progress, or null when idle.
      * @property isStale true when the deck was served from a stale cache (network refresh failed).
+     * @property ownedCardIdentityKeys identity keys (`oracleId.ifBlank { name }`, the Card Versions
+     *   & Languages convention) of cards already in the user's local collection — feeds the header's
+     *   collection-coverage row and each card row's "already owned" badge.
      */
     data class Content(
         val deck: CommunityDeck,
@@ -29,6 +32,7 @@ sealed interface CommunityDeckDetailUiState {
         val commanderExpanded: Boolean = true,
         val mainboardExpanded: Boolean = true,
         val sideboardExpanded: Boolean = true,
+        val ownedCardIdentityKeys: Set<String> = emptySet(),
     ) : CommunityDeckDetailUiState
 
     /** The initial deck fetch failed; [message] is a user-facing reason. */
