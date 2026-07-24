@@ -255,6 +255,10 @@ class DeckWizardViewModel(
      * "already-snapshotted collection" ownership split; avoids re-querying Room per step). */
     private var collectionSnapshot: List<com.mmg.manahub.core.model.UserCardWithCard> = emptyList()
 
+    /** Memory optimization: pre-mapped list of cards from [collectionSnapshot] to avoid repeated
+     * `.map { it.card }` calls on large collections during ranking/profile steps. */
+    private var cardSnapshot: List<Card> = emptyList()
+
     private var commanderSearchJob: Job? = null
     private var seedSearchJob: Job? = null
     private var themeTagsJob: Job? = null
@@ -301,7 +305,8 @@ class DeckWizardViewModel(
             runCatching {
                 val collection = userCardRepository.observeCollection().first()
                 collectionSnapshot = collection
-                collectionProfileUseCase(collection.map { it.card })
+                cardSnapshot = collection.map { it.card }
+                collectionProfileUseCase(cardSnapshot)
             }.onSuccess { profile ->
                 _uiState.update { it.copy(collectionProfile = profile, isLoadingProfile = false) }
                 // QA fix (RUN 3b follow-up): collectionSnapshot only lands here, asynchronously --
@@ -648,7 +653,7 @@ class DeckWizardViewModel(
                 selectedTribeLabel = null,
             )
         }
-        val suggested = rankOwnedCardsForProfileUseCase(entry.toStrategyProfile(state.colorIdentity), collectionSnapshot.map { it.card })
+        val suggested = rankOwnedCardsForProfileUseCase(entry.toStrategyProfile(state.colorIdentity), cardSnapshot)
         _uiState.update { it.copy(suggestedSeedCards = suggested) }
     }
 
@@ -722,7 +727,7 @@ class DeckWizardViewModel(
             return
         }
         val profile = StrategyProfile(archetype = state.selectedArchetype, themes = listOfNotNull(state.selectedDirectionTheme), colors = colors)
-        val suggested = rankOwnedCardsForProfileUseCase(profile, collectionSnapshot.map { it.card })
+        val suggested = rankOwnedCardsForProfileUseCase(profile, cardSnapshot)
         _uiState.update { it.copy(suggestedSeedCards = suggested) }
     }
 
@@ -746,7 +751,7 @@ class DeckWizardViewModel(
                 )
             else -> null
         } ?: return
-        val suggested = rankOwnedCardsForProfileUseCase(profile, collectionSnapshot.map { it.card })
+        val suggested = rankOwnedCardsForProfileUseCase(profile, cardSnapshot)
         _uiState.update { it.copy(suggestedSeedCards = suggested) }
     }
 

@@ -913,7 +913,11 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `selecting a color affinity entry writes the Direction pick and ranks suggested seeds`() = runTest(dispatcher) {
-        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
+        // colorIdentity = emptyList() (colorless) -- the ranking now filters suggested seeds by the
+        // picked color identity (bug fix, RankOwnedCardsForProfileUseCase), so a colorless owned
+        // card is a subset of ANY color pick and stays a stable fixture regardless of which color
+        // combo this test's Direction pick resolves to.
+        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO), colorIdentity = emptyList())
         every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWith(ownedAggroCard)))
         val vm = viewModel()
         advanceUntilIdle()
@@ -940,7 +944,8 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `picking a taxonomy archetype ranks color combos, and picking a combo writes colors + suggested seeds`() = runTest(dispatcher) {
-        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
+        // colorIdentity = emptyList() -- see the colorless-fixture note on the Flow B counterpart above.
+        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO), colorIdentity = emptyList())
         every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWith(ownedAggroCard)))
         val vm = viewModel()
         advanceUntilIdle()
@@ -1204,7 +1209,8 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `a Flow B pick made before the collection snapshot loads is recomputed once it lands`() = runTest(dispatcher) {
-        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
+        // colorIdentity = emptyList() -- see the colorless-fixture note further up in this file.
+        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO), colorIdentity = emptyList())
         every { userCardRepository.observeCollection() } returns flow {
             delay(1_000)
             emit(listOf(userCardWith(ownedAggroCard)))
@@ -1229,7 +1235,8 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `a Flow C pick made before the collection snapshot loads is recomputed once it lands`() = runTest(dispatcher) {
-        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
+        // colorIdentity = emptyList() -- see the colorless-fixture note further up in this file.
+        val ownedAggroCard = card(id = "aggro-1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO), colorIdentity = emptyList())
         every { userCardRepository.observeCollection() } returns flow {
             delay(1_000)
             emit(listOf(userCardWith(ownedAggroCard)))

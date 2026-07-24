@@ -181,7 +181,9 @@ Reuse before writing inline: `EmptyState`, `InlineErrorState`, `FullErrorState`,
 
 ### Navigation
 Routes are a sealed class in `Screen.kt`; forward-slash hierarchy (e.g. `"collection/detail/{scryfallId}"`).
-Bottom tabs: Collection, Stats, [central FAB = Game], Profile.
+**Start destination is `Screen.Home`** (not Collection). BottomBar is 3-slot: **[Home] [⚔ FAB = Game]
+[Library]** (Home dashboard redesign, 2026-06-08 — superseded the old 4-tab Collection/Stats/Game/Profile
+bar). → memory: `project_home_dashboard_redesign`
 
 ### DI
 **New/migrated code uses Koin** (`koinViewModel()`, Koin modules per feature) — this is the default for

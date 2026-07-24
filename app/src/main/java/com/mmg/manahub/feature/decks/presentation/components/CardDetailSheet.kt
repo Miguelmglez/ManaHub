@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.decks.presentation.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,7 +90,17 @@ import org.jetbrains.compose.resources.painterResource
  *  2. [isCommander] (outside the selection flow) — the current commander, status badge only.
  *  3. A regular deck card — the +/- quantity counter plus the remove-all button.
  *
- * @param deckCard the slot whose [DeckSlotEntry.card] is rendered (null Card → image hidden).
+ * @param deckCard the slot backing every callback (identity/quantity/onAdd/onRemove/onDelete/
+ *   onChooseAsCommander ALWAYS operate on `deckCard.card`'s original scryfallId — never the
+ *   English-preferred [displayCard] below).
+ * @param displayCard the English-preferred printing to render (image/name/type-line/oracle-text/
+ *   tags only) when `deckCard.card` was saved in a non-English language — see
+ *   [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.loadCardDetails]. Null while
+ *   [isLoadingDetail] is true, or when no redirect was needed (falls back to `deckCard.card`).
+ * @param isLoadingDetail true while [displayCard] is being resolved — a loading placeholder (the
+ *   card-back art, no text) is shown instead of `deckCard.card`'s own image/name/text, so the
+ *   saved non-English printing is never painted for a frame (mirrors the shared-element-flash fix
+ *   in [com.mmg.manahub.feature.carddetail.presentation.CardDetailViewModel]).
  * @param isCommander true when this card IS the current deck commander.
  * @param isCommanderSelectionContext true when opened from the "Choose Commander" flow.
  * @param tags the resolved tag chips for the card (may be empty).
@@ -104,6 +115,8 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 internal fun CardDetailSheet(
     deckCard: DeckSlotEntry,
+    displayCard: Card?,
+    isLoadingDetail: Boolean,
     isCommander: Boolean,
     isCommanderSelectionContext: Boolean,
     tags: List<CardTag>,
@@ -117,7 +130,12 @@ internal fun CardDetailSheet(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val card = deckCard.card
+    // The ORIGINAL printing — every callback below (onAdd/onRemove/onDelete/onChooseAsCommander)
+    // operates on this, never on [displayCard]. Only the visual block further down swaps.
+    val originalCard = deckCard.card
+    // The card actually RENDERED (image/name/type-line/oracle-text/tags): null while loading (shows
+    // the placeholder below), else the English-preferred [displayCard] or the original as fallback.
+    val visualCard = if (isLoadingDetail) null else (displayCard ?: originalCard)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden },
@@ -165,9 +183,9 @@ internal fun CardDetailSheet(
                 }
             }
 
-            if (card != null) {
+            if (visualCard != null) {
                 item {
-                    val hasBackFace = !card.imageBackNormal.isNullOrBlank()
+                    val hasBackFace = !visualCard.imageBackNormal.isNullOrBlank()
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -205,10 +223,10 @@ internal fun CardDetailSheet(
                             ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
-                                        .data(card.imageNormal ?: card.imageArtCrop)
+                                        .data(visualCard.imageNormal ?: visualCard.imageArtCrop)
                                         .crossfade(true)
                                         .build(),
-                                    contentDescription = card.name,
+                                    contentDescription = visualCard.name,
                                     placeholder = painterResource(Res.drawable.mtg_card_back),
                                     error = painterResource(Res.drawable.mtg_card_back),
                                     fallback = painterResource(Res.drawable.mtg_card_back),
@@ -220,10 +238,10 @@ internal fun CardDetailSheet(
                                 if (hasBackFace) {
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
-                                            .data(card.imageBackNormal)
+                                            .data(visualCard.imageBackNormal)
                                             .crossfade(true)
                                             .build(),
-                                        contentDescription = card.name,
+                                        contentDescription = visualCard.name,
                                         placeholder = painterResource(Res.drawable.mtg_card_back),
                                         error = painterResource(Res.drawable.mtg_card_back),
                                         fallback = painterResource(Res.drawable.mtg_card_back),
@@ -269,7 +287,7 @@ internal fun CardDetailSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val displayName = card.printedName?.takeIf { it.isNotBlank() } ?: card.name
+                            val displayName = visualCard.printedName?.takeIf { it.isNotBlank() } ?: visualCard.name
                             CardName(
                                 name = displayName,
                                 showFrontOnly = false,
@@ -280,7 +298,7 @@ internal fun CardDetailSheet(
                             )
 
                         }
-                        val typeLine = card.printedTypeLine?.takeIf { it.isNotBlank() } ?: card.typeLine
+                        val typeLine = visualCard.printedTypeLine?.takeIf { it.isNotBlank() } ?: visualCard.typeLine
                         Text(
                             typeLine,
                             style = ty.bodyMedium,
@@ -288,7 +306,7 @@ internal fun CardDetailSheet(
                             fontWeight = FontWeight.Medium
                         )
 
-                        card.manaCost?.let { cost ->
+                        visualCard.manaCost?.let { cost ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 val costs = cost.split(" // ")
                                 costs.forEachIndexed { index, singleCost ->
@@ -313,7 +331,7 @@ internal fun CardDetailSheet(
                         ) {
                             Column(modifier = Modifier.padding(spacing.md)) {
                                 val oracleDisplayText =
-                                    card.oracleText?.takeIf { it.isNotBlank() } ?: card.printedText
+                                    visualCard.oracleText?.takeIf { it.isNotBlank() } ?: visualCard.printedText
                                     ?: ""
                                 OracleText(
                                     text = oracleDisplayText,
@@ -334,6 +352,35 @@ internal fun CardDetailSheet(
                                     CardTagChip(label = tag.label(), category = tag.category)
                                 }
                             }
+                        }
+                    }
+                }
+            } else if (isLoadingDetail) {
+                // Loading placeholder: the sheet was opened for a non-English-saved printing and
+                // is resolving its English-preferred [displayCard] — show just the card-back art
+                // (no name/type-line/oracle-text/tags) so the saved non-English printing is never
+                // painted for a frame, mirroring CardDetailViewModel's entry-only redirect.
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth(0.8f)
+                                .aspectRatio(0.716f)
+                                .clip(CardShape),
+                            shape = CardShape,
+                            shadowElevation = 8.dp,
+                            tonalElevation = 4.dp,
+                            border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
+                        ) {
+                            Image(
+                                painter = painterResource(Res.drawable.mtg_card_back),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
                     }
                 }
@@ -369,9 +416,9 @@ internal fun CardDetailSheet(
                                         style = ty.bodyMedium,
                                     )
                                 }
-                            } else if (card != null) {
+                            } else if (originalCard != null) {
                                 Button(
-                                    onClick = { onChooseAsCommander(card) },
+                                    onClick = { onChooseAsCommander(originalCard) },
                                     modifier = Modifier.fillMaxWidth()
                                         .height(CommanderCtaHeight),
                                     colors = ButtonDefaults.buttonColors(containerColor = mc.goldMtg),

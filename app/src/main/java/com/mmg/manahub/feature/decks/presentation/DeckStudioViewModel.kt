@@ -65,7 +65,9 @@ import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.Companion.
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -168,6 +170,16 @@ data class DeckStudioUiState(
 
     // ── Card detail sheet ─────────────────────────────────────────────────────
     val detailTags: List<CardTag> = emptyList(),
+    /** English-preferred display card for the open [CardDetailSheet] (entry-only redirect, same
+     * rationale as [com.mmg.manahub.feature.carddetail.presentation.CardDetailViewModel]'s
+     * loadCard() fix — the deck-list thumbnail already shows the English sibling image, so the
+     * sheet must open on it too, or the image visibly flashes into the saved non-English
+     * printing). Null until [loadCardDetails] resolves it; the sheet falls back to the tapped
+     * card's own data while this is null / loading. */
+    val detailDisplayCard: Card? = null,
+    /** True while [loadCardDetails] is resolving [detailTags] + [detailDisplayCard] — the sheet
+     * shows a loading placeholder instead of painting the wrong-language image for a frame. */
+    val isLoadingCardDetail: Boolean = false,
 
     // ── Suggestions surface (Deck Doctor inline, Phase 2) ─────────────────────
     /** Read-only Health evaluation from the scoring engine. Null until first computed. */
@@ -253,10 +265,22 @@ data class DeckStudioUiState(
      * any of the three inputs change (kept in state, not computed in the Composable, so the pure
      * [DiscoverySearchFilter] stays the single source of truth and is unit-testable via the VM). */
     val filteredDiscoveriesV2: List<DeckDiscoveryV2> = emptyList(),
+    /** [discoveriesV2]'s members narrowed by the SAME [discoverySearchQuery]/
+     * [discoverySelectedCardNames] filter (via [DiscoverySearchFilter.matchingCards]) -- the flat
+     * "matching cards" preview shown directly under the Strategies tab search bar, kept in sync
+     * with [filteredDiscoveriesV2] by [recomputeFilteredDiscoveries] so the query filters both the
+     * cluster list AND this card-level preview. Empty when no search is active. */
+    val discoveryMatchingCards: List<Card> = emptyList(),
     /** Commander Spellbook combo results (Deck Engine Unification plan D7, Phase 4.3). Null until
      * [loadCombos] has run at least once (lazy: only fetched on first Combos-tab selection, never
      * on sheet open, so opening Inspirations never fires a network call by itself). */
     val comboResult: ComboResult? = null,
+    /** Every combo card name (across [comboResult]'s complete + almost-there variants, including
+     * each [com.mmg.manahub.feature.decks.domain.model.AlmostCombo.missingCardName]) resolved to a
+     * full [Card] via [CardRepository.getCardByExactName] -- populated once alongside
+     * [comboResult] so the Combos tab can render real card-art tiles instead of name-only chips.
+     * A name absent from this map (resolution failed/timed out) falls back to a text chip. */
+    val comboCardsByName: Map<String, Card> = emptyMap(),
     /** True while [loadCombos] is in flight. */
     val isLoadingCombos: Boolean = false,
     /** True once [loadCombos] has completed at least once (success OR degraded-empty) — guards
@@ -1159,13 +1183,42 @@ class DeckStudioViewModel(
 
     fun loadCardDetails(scryfallId: String) {
         viewModelScope.launch {
-            val card = (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data ?: return@launch
+            _uiState.update { it.copy(isLoadingCardDetail = true, detailDisplayCard = null) }
+            val card = (cardRepository.getCardById(scryfallId) as? DataResult.Success)?.data ?: run {
+                _uiState.update { it.copy(isLoadingCardDetail = false) }
+                return@launch
+            }
             val tags = if (card.tags.isNotEmpty() || card.userTags.isNotEmpty()) {
                 card.tags + card.userTags
             } else {
                 suggestTagsUseCase(card).confirmed
             }
-            _uiState.update { it.copy(detailTags = tags.distinctBy { t -> t.key }) }
+            // Entry-only English-first redirect for the sheet's IMAGE/name/type-line/oracle-text —
+            // same rationale as CardDetailViewModel.loadCard(): the deck-list thumbnail this sheet
+            // opened from already shows the English sibling image (Collection/Deck Studio image
+            // fallback), so painting the saved non-English printing here would flash a mismatch.
+            // The tapped [DeckSlotEntry]/scryfallId itself is untouched — only the DISPLAY card
+            // resolved here swaps; +/-/delete/commander actions keep operating on the original.
+            val displayCard = if (card.lang != "en") {
+                val languageResult = cardRepository.getLanguagePrints(card.setCode, card.collectorNumber)
+                val englishId = (languageResult as? DataResult.Success)?.data
+                    ?.firstOrNull { it.lang == "en" }
+                    ?.scryfallId
+                if (englishId != null && englishId != card.scryfallId) {
+                    (cardRepository.getCardById(englishId) as? DataResult.Success)?.data ?: card
+                } else {
+                    card
+                }
+            } else {
+                card
+            }
+            _uiState.update {
+                it.copy(
+                    detailTags = tags.distinctBy { t -> t.key },
+                    detailDisplayCard = displayCard,
+                    isLoadingCardDetail = false,
+                )
+            }
         }
     }
 
@@ -1702,6 +1755,11 @@ class DeckStudioViewModel(
                     query = state.discoverySearchQuery,
                     selectedCardNames = state.discoverySelectedCardNames,
                 ),
+                discoveryMatchingCards = DiscoverySearchFilter.matchingCards(
+                    discoveries = state.discoveriesV2,
+                    query = state.discoverySearchQuery,
+                    selectedCardNames = state.discoverySelectedCardNames,
+                ),
             )
         }
     }
@@ -1731,13 +1789,44 @@ class DeckStudioViewModel(
                 useCase(cardNames = cardNames)
             }.onSuccess { result ->
                 val combos = (result as? DataResult.Success)?.data ?: ComboResult.EMPTY
-                _uiState.update { it.copy(comboResult = combos, isLoadingCombos = false, combosLoaded = true) }
+                val cardsByName = resolveComboCards(combos)
+                _uiState.update {
+                    it.copy(
+                        comboResult = combos,
+                        comboCardsByName = cardsByName,
+                        isLoadingCombos = false,
+                        combosLoaded = true,
+                    )
+                }
             }.onFailure { t ->
                 crashReporter.log("deck_studio_combos_load_failed")
                 crashReporter.recordException(RuntimeException("[DeckStudio] deck_studio_combos_load_failed", t))
                 _uiState.update { it.copy(comboResult = ComboResult.EMPTY, isLoadingCombos = false, combosLoaded = true) }
             }
         }
+    }
+
+    /**
+     * Resolves every distinct card name referenced by [combos] (complete + almost-there,
+     * including each [com.mmg.manahub.feature.decks.domain.model.AlmostCombo.missingCardName]) to
+     * a full [Card] in parallel, mirroring the established
+     * [com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksSearchViewModel
+     * .resolveTrendingCards] pattern -- concurrent [CardRepository.getCardByExactName] calls
+     * (already rate-limited/cached by the Scryfall request queue underneath), unresolved names
+     * dropped rather than surfaced as an error so the Combos tab degrades to its text-chip
+     * fallback per-card instead of failing the whole tab. Capped at [MAX_COMBO_CARDS_TO_RESOLVE]
+     * distinct names to bound the burst of concurrent network calls for a large combo result.
+     */
+    private suspend fun resolveComboCards(combos: ComboResult): Map<String, Card> = coroutineScope {
+        val names = (
+            combos.complete.flatMap { it.cardNames } +
+                combos.almostThere.flatMap { it.ownedCardNames + it.missingCardName }
+            ).distinct().take(MAX_COMBO_CARDS_TO_RESOLVE)
+
+        names
+            .map { name -> name to async { runCatching { cardRepository.getCardByExactName(name) }.getOrNull()?.getOrNull() } }
+            .mapNotNull { (name, deferred) -> deferred.await()?.let { name to it } }
+            .toMap()
     }
 
     /**
@@ -1788,6 +1877,10 @@ class DeckStudioViewModel(
 
         /** Minimum seed-query length before a Scryfall search fires (mirrors DeckMagicViewModel). */
         const val SEED_QUERY_MIN_LENGTH = 2
+
+        /** Cap on distinct combo card names resolved to full [Card]s per [loadCombos] call, so a
+         * large combo result can't burst an unbounded number of concurrent Scryfall lookups. */
+        const val MAX_COMBO_CARDS_TO_RESOLVE = 40
 
         /** Debounce before a seed search runs, in ms (mirrors DeckMagicViewModel). */
         const val SEED_SEARCH_DEBOUNCE_MS = 400L

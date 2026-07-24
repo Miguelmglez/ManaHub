@@ -25,6 +25,7 @@
     <application
         android:name="com.mmg.manahub.app.ManaHubApp"
         android:allowBackup="true"
+        android:largeHeap="true"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:networkSecurityConfig="@xml/network_security_config"

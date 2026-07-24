@@ -4,6 +4,9 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -33,16 +36,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,13 +75,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.feature.decks.presentation.components.SynergyCardTile
 import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
@@ -92,6 +104,7 @@ import com.mmg.manahub.core.ui.components.GroupingFlowSelector
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -161,7 +174,7 @@ import androidx.compose.foundation.lazy.LazyRow
  * @param onPlaytest opens the playtest setup for the given (non-empty) deck id.
  * @param onReviewSurvey opens the post-game survey in REVIEW mode for a session id.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun DeckStudioScreen(
     onBack: () -> Unit,
@@ -183,6 +196,12 @@ fun DeckStudioScreen(
     // [seeds] (plan D7, 4.3): a combo's component card names, hands off to the wizard's Flow A --
     // null/empty for every other entry point (Discoveries v2's "Build this" passes null here too).
     onNavigateToWizard: (archetype: String?, theme: String?, tribe: String?, colors: String?, seeds: List<String>?) -> Unit = { _, _, _, _, _ -> },
+    // Visual-overhaul pass: non-null only when the hosting nav destination is inside a
+    // `SharedTransitionLayout` -- drives the Combos-tab card tiles' shared-element transition
+    // into the real CardDetailScreen (mirrors AddCardScreen/CollectionScreen's own optional
+    // params). Null degrades to a plain tap with no shared-element animation.
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     viewModel: DeckStudioViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -488,6 +507,8 @@ fun DeckStudioScreen(
 
             CardDetailSheet(
                 deckCard = selectedDeckCard,
+                displayCard = uiState.detailDisplayCard,
+                isLoadingDetail = uiState.isLoadingCardDetail,
                 isCommander = isAlreadyCommander,
                 isCommanderSelectionContext = isCardDetailInCommanderContext,
                 tags = uiState.detailTags,
@@ -616,11 +637,8 @@ fun DeckStudioScreen(
                 InspirationsSheetContentV2(
                     discoveries = uiState.discoveriesV2,
                     filteredDiscoveries = uiState.filteredDiscoveriesV2,
+                    matchingCards = uiState.discoveryMatchingCards,
                     isLoading = uiState.isLoadingDiscoveries,
-                    onCardClick = { id ->
-                        focusManager.clearFocus()
-                        onCardClick(id)
-                    },
                     onBuildThis = { discovery ->
                         viewModel.closeInspirations()
                         onNavigateToWizard(
@@ -639,11 +657,27 @@ fun DeckStudioScreen(
                     onToggleSearchCard = viewModel::onToggleDiscoverySearchCard,
                     onClearSearch = viewModel::onClearDiscoverySearch,
                     comboResult = uiState.comboResult,
+                    comboCardsByName = uiState.comboCardsByName,
                     isLoadingCombos = uiState.isLoadingCombos,
                     onUseComboAsSeed = { cardNames ->
                         viewModel.closeInspirations()
                         onNavigateToWizard(null, null, null, null, cardNames)
                     },
+                    // Combos tab only -- Strategies-tab card taps open the inline zoom overlay
+                    // (self-contained inside InspirationsSheetContentV2) and never call this.
+                    // Close the sheet BEFORE navigating (same sequencing as `onBuildThis`/
+                    // `onUseComboAsSeed` just above, and the coordination pattern in
+                    // `ScannerScreen.kt`'s `ScanQueueSheet` -- `onOpenCardDetail(fromQueue = true)`
+                    // flips `showQueueSheet` off in the SAME state update as opening the detail
+                    // overlay): otherwise the sheet's own show/hide animation is still playing
+                    // when CardDetailScreen's entry transition starts, and the two race visibly.
+                    onNavigateToCardDetail = { id ->
+                        focusManager.clearFocus()
+                        viewModel.closeInspirations()
+                        onCardClick(id)
+                    },
+                    sharedTransitionScope = null,
+                    animatedVisibilityScope = null,
                 )
             } else {
                 InspirationsSheetContent(
@@ -1235,6 +1269,13 @@ private fun BuildTab(
 /** Standard large primary/secondary action button height. */
 private val LargeButtonHeight = 52.dp
 
+/**
+ * The empty-deck landing panel (visual-overhaul pass): a hero header followed by up to three
+ * richly-illustrated option cards -- "Build from seed", "Browse inspirations", "Import deck list"
+ * -- each with its own accent color, icon badge, title, and short description, ending in a
+ * [MagicCtaButton]. Visuals only: every callback and the [DeckFeatureFlags]-driven
+ * primary/secondary promotion logic are unchanged from the previous plain-button layout.
+ */
 @Composable
 private fun EmptyDeckState(
     selectedFormat: DeckFormat?,
@@ -1246,123 +1287,166 @@ private fun EmptyDeckState(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    // Outer Column fills the space; Top section for format selection,
-    // Center section (Box with weight 1f) for the rest of the content.
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = spacing.lg, vertical = spacing.md),
+
+    // "Build from seed" and "Browse inspirations" are HIDDEN for release behind their
+    // DeckFeatureFlags. When BOTH are disabled, "Import deck" is promoted to the PRIMARY (Filled)
+    // CTA so the empty state still has a clear primary action (the + FAB remains the main
+    // add-cards affordance). Unchanged from the previous layout.
+    val seedEnabled = DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED || DeckFeatureFlags.DECK_BUILDER_V2_ENABLED
+    val inspirationsEnabled = DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED || DeckFeatureFlags.DISCOVERIES_V2_ENABLED
+    val importIsPrimary = !seedEnabled && !inspirationsEnabled
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
+        verticalArrangement = Arrangement.spacedBy(spacing.lg),
     ) {
-        Text(
-            stringResource(R.string.deck_studio_format_section),
-            style = ty.labelSmall,
-            color = mc.textSecondary,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Spacer(Modifier.height(spacing.xs))
-
-        DeckFormatChipRow(
-            selectedFormat = selectedFormat,
-            onFormatSelected = onFormatChange,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
-            ) {
-                // Title block first so the panel reads title → format → actions.
-                Icon(
-                    Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = mc.goldMtg,
-                    modifier = Modifier.size(48.dp)
+        item(key = "empty_format") {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Text(
+                    stringResource(R.string.deck_studio_format_section),
+                    style = ty.labelSmall,
+                    color = mc.textSecondary,
+                    modifier = Modifier.fillMaxWidth(),
                 )
+                DeckFormatChipRow(
+                    selectedFormat = selectedFormat,
+                    onFormatSelected = onFormatChange,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        item(key = "empty_hero") {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(mc.goldMtg.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = mc.goldMtg,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
+                Spacer(Modifier.height(spacing.xs))
                 Text(
                     stringResource(R.string.deck_studio_empty_title),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
                 )
                 Text(
                     stringResource(R.string.deck_studio_empty_subtitle),
                     style = ty.bodyMedium,
                     color = mc.textSecondary,
+                    modifier = Modifier.fillMaxWidth(0.9f),
                 )
+            }
+        }
 
-                // "Build from seed" and "Browse inspirations" are HIDDEN for release behind their
-                // DeckFeatureFlags. When BOTH are disabled, "Import deck" is promoted from the
-                // secondary OutlinedButton to the PRIMARY filled Button so the empty state still has
-                // a clear primary action (the + FAB remains the main add-cards affordance).
-                val seedEnabled = DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED || DeckFeatureFlags.DECK_BUILDER_V2_ENABLED
-                val inspirationsEnabled = DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED || DeckFeatureFlags.DISCOVERIES_V2_ENABLED
-                val importIsPrimary = !seedEnabled && !inspirationsEnabled
+        if (seedEnabled) {
+            item(key = "empty_option_seed") {
+                EmptyStateOptionCard(
+                    icon = Icons.Default.AutoAwesome,
+                    accent = mc.goldMtg,
+                    title = stringResource(R.string.deck_studio_build_from_seed),
+                    description = stringResource(R.string.deck_studio_build_from_seed_desc),
+                    ctaLabel = stringResource(R.string.deck_studio_build_from_seed),
+                    ctaColor = MagicCtaColor.Gold,
+                    isPrimary = true,
+                    onClick = onBuildFromSeed,
+                )
+            }
+        }
+        if (inspirationsEnabled) {
+            item(key = "empty_option_inspirations") {
+                EmptyStateOptionCard(
+                    icon = Icons.Default.Explore,
+                    accent = mc.primaryAccent,
+                    title = stringResource(R.string.deck_studio_browse_inspirations),
+                    description = stringResource(R.string.deck_studio_browse_inspirations_desc),
+                    ctaLabel = stringResource(R.string.deck_studio_browse_inspirations),
+                    ctaColor = MagicCtaColor.Primary,
+                    isPrimary = !seedEnabled,
+                    onClick = onBrowseInspirations,
+                )
+            }
+        }
+        item(key = "empty_option_import") {
+            EmptyStateOptionCard(
+                icon = Icons.Default.UploadFile,
+                accent = mc.secondaryAccent,
+                title = stringResource(R.string.deck_studio_import_deck),
+                description = stringResource(R.string.deck_studio_import_deck_desc),
+                ctaLabel = stringResource(R.string.deck_studio_import_deck),
+                ctaColor = MagicCtaColor.Accent,
+                isPrimary = importIsPrimary,
+                onClick = onImportDeck,
+            )
+        }
+    }
+}
 
-                // Primary action.
-                if (seedEnabled) {
-                    androidx.compose.material3.Button(
-                        onClick = onBuildFromSeed,
-                        modifier = Modifier.fillMaxWidth().height(LargeButtonHeight),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        shape = ButtonShape,
-                    ) {
-                        Text(
-                            stringResource(R.string.deck_studio_build_from_seed),
-                            style = ty.labelLarge,
-                            color = mc.background
-                        )
-                    }
+/**
+ * One illustrated option card in [EmptyDeckState]: an accent-tinted icon badge, title,
+ * description, and a full-width [MagicCtaButton]. [isPrimary] renders the button
+ * [MagicCtaStyle.Filled] (solid accent, high emphasis); otherwise [MagicCtaStyle.Outlined].
+ */
+@Composable
+private fun EmptyStateOptionCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: androidx.compose.ui.graphics.Color,
+    title: String,
+    description: String,
+    ctaLabel: String,
+    ctaColor: MagicCtaColor,
+    isPrimary: Boolean,
+    onClick: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Surface(
+        shape = CardShape,
+        color = mc.backgroundSecondary,
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.25f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.md)) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(accent.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
                 }
-                // Secondary actions.
-                if (inspirationsEnabled) {
-                    OutlinedButton(
-                        onClick = onBrowseInspirations,
-                        modifier = Modifier.fillMaxWidth().height(LargeButtonHeight),
-                        border = BorderStroke(1.dp, mc.primaryAccent),
-                        shape = ButtonShape,
-                    ) {
-                        Text(
-                            stringResource(R.string.deck_studio_browse_inspirations),
-                            style = ty.labelLarge,
-                            color = mc.primaryAccent
-                        )
-                    }
-                }
-                if (importIsPrimary) {
-                    androidx.compose.material3.Button(
-                        onClick = onImportDeck,
-                        modifier = Modifier.fillMaxWidth().height(LargeButtonHeight),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        shape = ButtonShape,
-                    ) {
-                        Text(
-                            stringResource(R.string.deck_studio_import_deck),
-                            style = ty.labelLarge,
-                            color = mc.background
-                        )
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = onImportDeck,
-                        modifier = Modifier.fillMaxWidth().height(LargeButtonHeight),
-                        border = BorderStroke(1.dp, mc.primaryAccent),
-                        shape = ButtonShape,
-                    ) {
-                        Text(
-                            stringResource(R.string.deck_studio_import_deck),
-                            style = ty.labelLarge,
-                            color = mc.primaryAccent
-                        )
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = ty.titleMedium, color = mc.textPrimary)
+                    Text(description, style = ty.bodySmall, color = mc.textSecondary)
                 }
             }
+            MagicCtaButton(
+                onClick = onClick,
+                text = ctaLabel,
+                style = if (isPrimary) MagicCtaStyle.Filled else MagicCtaStyle.Outlined,
+                color = ctaColor,
+                modifier = Modifier.fillMaxWidth().heightIn(min = LargeButtonHeight),
+            )
         }
     }
 }
@@ -1478,7 +1562,10 @@ private fun InspirationsSheetContent(
  * Deck Engine Unification plan D7 (Phase 4) redesign: this is now a two-tab synergy browser
  * (Strategies / Combos) with free-text + search-by-card filtering on the Strategies tab (4.1/4.2)
  * and a Commander Spellbook combos tab (4.3). Stateless per the file's own convention -- every
- * input is a param, every mutation a callback to [DeckStudioViewModel].
+ * input is a param, every mutation a callback to [DeckStudioViewModel]; the one exception is the
+ * Strategies tab's inline card-inspection overlay (visual-overhaul pass), which is ephemeral UI
+ * state, not business state, and is hosted here (not lifted to the VM) for the same reason every
+ * other `MagicCardInspectionOverlay` trigger in this codebase keeps its session state local.
  *
  * @param discoveries the FULL unfiltered cluster list -- only used to derive the search-by-card
  *   pickable pool ([DiscoverySearchFilter.pickableCardNames]); the Strategies tab itself renders
@@ -1486,13 +1573,22 @@ private fun InspirationsSheetContent(
  * @param filteredDiscoveries [discoveries] narrowed by [searchQuery]/[selectedCardNames]
  *   ([DeckStudioViewModel.filteredDiscoveriesV2] -- the VM is the single source of truth for the
  *   filter, this Composable stays a dumb reader).
+ * @param matchingCards the flat "matching cards" preview -- [discoveries]' members narrowed by
+ *   the SAME [searchQuery]/[selectedCardNames] filter ([DeckStudioViewModel.discoveryMatchingCards]).
+ * @param comboCardsByName every Combos-tab card name resolved to a full [Card]
+ *   ([DeckStudioViewModel.comboCardsByName]) so the Combos tab can render image tiles.
+ * @param onNavigateToCardDetail Combos-tab ONLY -- opens the real card detail screen for a
+ *   resolved scryfallId. The Strategies tab never calls this; its taps open the inline overlay.
+ * @param sharedTransitionScope / @param animatedVisibilityScope threaded straight through to the
+ *   Combos tab's card tiles for the shared-element transition into card detail.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun InspirationsSheetContentV2(
     discoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
     filteredDiscoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
+    matchingCards: List<Card>,
     isLoading: Boolean,
-    onCardClick: (String) -> Unit,
     onBuildThis: (com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2) -> Unit,
     inspirationsTab: InspirationsTab,
     onSelectTab: (InspirationsTab) -> Unit,
@@ -1502,77 +1598,116 @@ private fun InspirationsSheetContentV2(
     onToggleSearchCard: (String) -> Unit,
     onClearSearch: () -> Unit,
     comboResult: ComboResult?,
+    comboCardsByName: Map<String, Card>,
     isLoadingCombos: Boolean,
     onUseComboAsSeed: (List<String>) -> Unit,
+    onNavigateToCardDetail: (String) -> Unit,
+    sharedTransitionScope: SharedTransitionScope?,
+    animatedVisibilityScope: AnimatedVisibilityScope?,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
-    Column(
+    // Strategies-tab inline card inspection (visual-overhaul pass): a tap on any card tile --
+    // the search-matches preview or a per-category DiscoveryRowV2 row -- flies the card to a
+    // zoomed overlay in place, mirroring `PlaytestSetupScreen`'s single-card
+    // MagicCardInspectionOverlay pattern. rootCoordinates anchors every tile's captured Rect to
+    // THIS Box so the overlay's flight animation lines up regardless of scroll position.
+    var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var inspectionCard by remember { mutableStateOf<Card?>(null) }
+    var inspectionRect by remember { mutableStateOf(Rect.Zero) }
+    var isDismissingInspection by remember { mutableStateOf(false) }
+
+    Box(
         modifier = Modifier
             .fillMaxHeight(0.92f)
-            .padding(horizontal = spacing.lg),
+            .onGloballyPositioned { rootCoordinates = it },
     ) {
-        Text(
-            text = stringResource(R.string.deck_studio_inspirations_title),
-            style = ty.titleLarge,
-            color = mc.textPrimary,
-            modifier = Modifier.padding(top = spacing.md),
-        )
-        Text(
-            text = stringResource(R.string.deck_studio_inspirations_subtitle),
-            style = ty.bodySmall,
-            color = mc.textSecondary,
-            modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
-        )
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = spacing.lg)) {
+            Text(
+                text = stringResource(R.string.deck_studio_inspirations_title),
+                style = ty.titleLarge,
+                color = mc.textPrimary,
+                modifier = Modifier.padding(top = spacing.md),
+            )
+            Text(
+                text = stringResource(R.string.deck_studio_inspirations_subtitle),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+                modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
+            )
 
-        TabRow(
-            selectedTabIndex = inspirationsTab.ordinal,
-            containerColor = mc.backgroundSecondary,
-            contentColor = mc.primaryAccent,
-        ) {
-            Tab(
-                selected = inspirationsTab == InspirationsTab.STRATEGIES,
-                onClick = { onSelectTab(InspirationsTab.STRATEGIES) },
-                text = {
-                    Text(
-                        stringResource(R.string.deck_studio_inspirations_tab_strategies),
-                        style = ty.labelLarge,
-                    )
-                },
-            )
-            Tab(
-                selected = inspirationsTab == InspirationsTab.COMBOS,
-                onClick = { onSelectTab(InspirationsTab.COMBOS) },
-                text = {
-                    Text(
-                        stringResource(R.string.deck_studio_inspirations_tab_combos),
-                        style = ty.labelLarge,
-                    )
-                },
-            )
+            TabRow(
+                selectedTabIndex = inspirationsTab.ordinal,
+                containerColor = mc.backgroundSecondary,
+                contentColor = mc.primaryAccent,
+            ) {
+                Tab(
+                    selected = inspirationsTab == InspirationsTab.STRATEGIES,
+                    onClick = { onSelectTab(InspirationsTab.STRATEGIES) },
+                    text = {
+                        Text(
+                            stringResource(R.string.deck_studio_inspirations_tab_strategies),
+                            style = ty.labelLarge,
+                        )
+                    },
+                )
+                Tab(
+                    selected = inspirationsTab == InspirationsTab.COMBOS,
+                    onClick = { onSelectTab(InspirationsTab.COMBOS) },
+                    text = {
+                        Text(
+                            stringResource(R.string.deck_studio_inspirations_tab_combos),
+                            style = ty.labelLarge,
+                        )
+                    },
+                )
+            }
+            Spacer(Modifier.height(spacing.sm))
+
+            when (inspirationsTab) {
+                InspirationsTab.STRATEGIES -> StrategiesTabContent(
+                    discoveries = discoveries,
+                    filteredDiscoveries = filteredDiscoveries,
+                    matchingCards = matchingCards,
+                    isLoading = isLoading,
+                    rootCoordinates = rootCoordinates,
+                    onCardTap = { card, rect ->
+                        isDismissingInspection = false
+                        inspectionCard = card
+                        inspectionRect = rect
+                    },
+                    onBuildThis = onBuildThis,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = onSearchQueryChange,
+                    selectedCardNames = selectedCardNames,
+                    onToggleSearchCard = onToggleSearchCard,
+                    onClearSearch = onClearSearch,
+                )
+                InspirationsTab.COMBOS -> CombosTabContent(
+                    comboResult = comboResult,
+                    cardsByName = comboCardsByName,
+                    isLoading = isLoadingCombos,
+                    onCardClick = onNavigateToCardDetail,
+                    onUseComboAsSeed = onUseComboAsSeed,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+            }
         }
-        Spacer(Modifier.height(spacing.sm))
 
-        when (inspirationsTab) {
-            InspirationsTab.STRATEGIES -> StrategiesTabContent(
-                discoveries = discoveries,
-                filteredDiscoveries = filteredDiscoveries,
-                isLoading = isLoading,
-                onCardClick = onCardClick,
-                onBuildThis = onBuildThis,
-                searchQuery = searchQuery,
-                onSearchQueryChange = onSearchQueryChange,
-                selectedCardNames = selectedCardNames,
-                onToggleSearchCard = onToggleSearchCard,
-                onClearSearch = onClearSearch,
-            )
-            InspirationsTab.COMBOS -> CombosTabContent(
-                comboResult = comboResult,
-                isLoading = isLoadingCombos,
-                onCardClick = onCardClick,
-                onUseComboAsSeed = onUseComboAsSeed,
+        inspectionCard?.let { card ->
+            MagicCardInspectionOverlay(
+                card = card,
+                initialRect = inspectionRect,
+                isVisible = true,
+                isDismissing = isDismissingInspection,
+                onDismissRequest = { isDismissingInspection = true },
+                onDismiss = {
+                    inspectionCard = null
+                    isDismissingInspection = false
+                },
             )
         }
     }
@@ -1581,13 +1716,23 @@ private fun InspirationsSheetContentV2(
 /**
  * The Strategies tab (4.1 strictness lives entirely in [com.mmg.manahub.feature.decks.domain
  * .template.DiscoverSynergiesV2UseCase]; this composable is 4.2's search UI only).
+ *
+ * @param matchingCards the search-driven flat card preview shown directly under the search bar
+ *   (visual-overhaul pass) -- populated only while a query/card-pick is active, so the SAME
+ *   search input narrows both which clusters show ([filteredDiscoveries]) and which individual
+ *   cards show here, instead of the query only ever affecting the cluster list.
+ * @param rootCoordinates / @param onCardTap forwarded to every [SynergyCardTile] (both this tab's
+ *   own preview row and each [DiscoveryRowV2]'s member row) so a tap opens the inline inspection
+ *   overlay hosted by [InspirationsSheetContentV2].
  */
 @Composable
 private fun StrategiesTabContent(
     discoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
     filteredDiscoveries: List<com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2>,
+    matchingCards: List<Card>,
     isLoading: Boolean,
-    onCardClick: (String) -> Unit,
+    rootCoordinates: LayoutCoordinates?,
+    onCardTap: (Card, Rect) -> Unit,
     onBuildThis: (com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2) -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
@@ -1603,6 +1748,13 @@ private fun StrategiesTabContent(
     // worth VM state, mirrors this screen's own `tabs = buildList { ... }` local-derivation
     // precedent above.
     val pickableCardNames = remember(discoveries) { DiscoverySearchFilter.pickableCardNames(discoveries) }
+    // Every discovery member is already a resolved Card (DeckDiscoveryV2.members) -- these are
+    // owned collection cards, unlike the Combos tab's comboCardsByName which may miss unowned
+    // names. Same remember(discoveries) key as pickableCardNames above; last-write-wins on a
+    // duplicate name across clusters is fine, they're the same printing.
+    val cardsByPickableName = remember(discoveries) {
+        discoveries.flatMap { it.members }.associateBy { it.name }
+    }
 
     Column(Modifier.fillMaxSize()) {
         if (!isLoading && discoveries.isNotEmpty()) {
@@ -1635,14 +1787,51 @@ private fun StrategiesTabContent(
                     horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 ) {
                     items(pickableCardNames, key = { it }) { name ->
-                        FilterChip(
-                            selected = name in selectedCardNames,
-                            onClick = { onToggleSearchCard(name) },
-                            label = { Text(name, style = ty.labelMedium) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                                selectedLabelColor = mc.primaryAccent,
-                            ),
+                        val card = cardsByPickableName[name]
+                        if (card != null) {
+                            com.mmg.manahub.feature.decks.presentation.components.PickableSynergyCardTile(
+                                card = card,
+                                isSelected = name in selectedCardNames,
+                                rootCoordinates = rootCoordinates,
+                                onToggleSelect = { onToggleSearchCard(name) },
+                                onZoom = onCardTap,
+                            )
+                        } else {
+                            // Defensive fallback -- every name in pickableCardNames comes from a
+                            // DeckDiscoveryV2 member, which always carries a resolved Card, but
+                            // keep a text chip so an unresolved name never silently vanishes.
+                            FilterChip(
+                                selected = name in selectedCardNames,
+                                onClick = { onToggleSearchCard(name) },
+                                label = { Text(name, style = ty.labelMedium) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
+                                    selectedLabelColor = mc.primaryAccent,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Matching-cards preview (visual-overhaul pass): only while a search/pick is active,
+            // so it never duplicates the full unfiltered pool.
+            if (matchingCards.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.deck_studio_inspirations_matching_cards, matchingCards.size),
+                    style = ty.labelMedium,
+                    color = mc.textSecondary,
+                    modifier = Modifier.padding(bottom = spacing.xs),
+                )
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = spacing.sm),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                ) {
+                    items(matchingCards.take(20), key = { "match_${it.scryfallId}" }) { card ->
+                        SynergyCardTile(
+                            card = card,
+                            rootCoordinates = rootCoordinates,
+                            onTap = onCardTap,
                         )
                     }
                 }
@@ -1674,7 +1863,8 @@ private fun StrategiesTabContent(
                 items(filteredDiscoveries.take(20), key = { it.key.stableKey() }) { discovery ->
                     com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
                         discovery = discovery,
-                        onCardClick = onCardClick,
+                        rootCoordinates = rootCoordinates,
+                        onCardTap = onCardTap,
                         onBuildThis = { onBuildThis(discovery) },
                     )
                 }
@@ -1683,13 +1873,24 @@ private fun StrategiesTabContent(
     }
 }
 
-/** The Combos tab (Deck Engine Unification plan D7, 4.3). */
+/**
+ * The Combos tab (Deck Engine Unification plan D7, 4.3). Unlike the Strategies tab, card taps
+ * here navigate to the real card detail screen (with a shared-element transition when
+ * [sharedTransitionScope]/[animatedVisibilityScope] are non-null) rather than opening an inline
+ * overlay -- combo cards may include cards the user doesn't own yet (the missing card in an
+ * "almost there" combo), so jumping to the full detail screen (buy/wishlist actions) is more
+ * useful here than a bare zoom.
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CombosTabContent(
     comboResult: ComboResult?,
+    cardsByName: Map<String, Card>,
     isLoading: Boolean,
     onCardClick: (String) -> Unit,
     onUseComboAsSeed: (List<String>) -> Unit,
+    sharedTransitionScope: SharedTransitionScope?,
+    animatedVisibilityScope: AnimatedVisibilityScope?,
 ) {
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
@@ -1723,8 +1924,11 @@ private fun CombosTabContent(
                 items(comboResult.complete, key = { "combo_${it.id}" }) { combo ->
                     com.mmg.manahub.feature.decks.presentation.components.ComboRow(
                         combo = combo,
+                        cardsByName = cardsByName,
                         onCardClick = onCardClick,
                         onUseAsSeed = { onUseComboAsSeed(combo.cardNames) },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
                     )
                 }
             }
@@ -1740,8 +1944,11 @@ private fun CombosTabContent(
                 items(comboResult.almostThere, key = { "almost_${it.id}" }) { almost ->
                     com.mmg.manahub.feature.decks.presentation.components.AlmostComboRow(
                         almostCombo = almost,
+                        cardsByName = cardsByName,
                         onCardClick = onCardClick,
                         onUseAsSeed = { onUseComboAsSeed(almost.ownedCardNames + almost.missingCardName) },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
                     )
                 }
             }

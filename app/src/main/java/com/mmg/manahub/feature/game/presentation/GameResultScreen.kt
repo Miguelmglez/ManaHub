@@ -40,6 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -99,46 +102,31 @@ fun GameResultScreen(
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    /*OutlinedButton(
-                        onClick  = onSurvey,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors   = ButtonDefaults.outlinedButtonColors(
-                            contentColor = mc.goldMtg,
-                        ),
-                        border   = androidx.compose.foundation.BorderStroke(1.dp, mc.goldMtg),
-                    ) {
-                        Text(
-                            stringResource(R.string.gameresult_review_button),
-                            style = MaterialTheme.magicTypography.titleMedium,
-                        )
-                    }*/
+                    /*MagicCtaButton(
+                        onClick = onSurvey,
+                        text = stringResource(R.string.gameresult_review_button),
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Gold,
+                        modifier = Modifier.fillMaxWidth()
+                    )*/
                     Row(
                         modifier              = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        OutlinedButton(
-                            onClick  = onBackHome,
-                            modifier = Modifier.weight(1f),
-                            border   = androidx.compose.foundation.BorderStroke(1.dp, mc.secondaryAccent)
-                        ) {
-                            Text(
-                                stringResource(R.string.gameresult_back_home),
-                                style = MaterialTheme.magicTypography.titleMedium,
-                                color = mc.secondaryAccent
-                                )
-                        }
+                        MagicCtaButton(
+                            onClick = onBackHome,
+                            text = stringResource(R.string.gameresult_back_home),
+                            style = MagicCtaStyle.Outlined,
+                            color = MagicCtaColor.Accent,
+                            modifier = Modifier.weight(1f)
+                        )
                        /* TODO: Re-enable "Play Again" once rematch functionality is implemented
-                       Button(
-                            onClick  = onNewGame,
-                            modifier = Modifier.weight(1f),
-                            colors   = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                        ) {
-                            Text(
-                                stringResource(R.string.action_play_again),
-                                style = MaterialTheme.magicTypography.titleMedium,
-                                color = mc.background,
-                            )
-                        }*/
+                       MagicCtaButton(
+                            onClick = onNewGame,
+                            text = stringResource(R.string.action_play_again),
+                            color = MagicCtaColor.Primary,
+                            modifier = Modifier.weight(1f)
+                        )*/
                     }
                 }
             }
