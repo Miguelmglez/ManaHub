@@ -14,7 +14,7 @@ import org.koin.dsl.module
  * on Hilt. This continues the incremental, per-feature cutover proven by Spike D.
  *
  * ## Bridge pattern (same as Settings)
- * [StatsViewModel] depends on eight singletons still owned by the Hilt object graph. Rather than
+ * [StatsViewModel] depends on several singletons still owned by the Hilt object graph. Rather than
  * re-providing them in Koin — which would risk duplicate construction / divergent state — `ManaHubApp`
  * is the bridge: it `@Inject`s the already-constructed Hilt instances and passes them into
  * [statsKoinModule], which re-exposes the Stats-only ones to Koin as `single { }`.
@@ -26,10 +26,14 @@ import org.koin.dsl.module
  * - [GameSessionRepository] — shared with Profile + Home.
  * - [DeckRepository] — shared with Home.
  * - [ScryfallRemoteDataSource] — shared with Home.
+ * - `AuthRepository` / `TradesRepository` (Phase 4, 2026-07 stats expansion) — shared with
+ *   Trades/Home/Friends, both already global singles in `coreBridgeKoinModule`.
  *
- * `GetCollectionStatsUseCase`, `GetCollectionSetCodesUseCase` and `RefreshCollectionPricesUseCase`
- * (KMP migration batch 2) are now natively Koin-built in `SharedDomainKoinModule` — this module takes
- * NO constructor params anymore and resolves all three via `get()`, same as the shared repositories.
+ * `GetCollectionStatsUseCase`, `GetCollectionSetCodesUseCase`, `RefreshCollectionPricesUseCase`,
+ * `GetSetCompletionCountsUseCase` (added for the 2026-07 stats expansion's collection phase) and
+ * `GetTradeStatsUseCase` (added for its Phase 4/trades phase) are all natively Koin-built in
+ * `SharedDomainKoinModule` — this module takes NO constructor params anymore and resolves all five
+ * via `get()`, same as the shared repositories.
  *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
@@ -43,11 +47,19 @@ fun statsKoinModule(): Module = module {
         StatsViewModel(
             getStats = get(),
             getSetCodes = get(),
+            getSetCompletionCounts = get(),
             scryfallDataSource = get(),
             refreshPricesUseCase = get(),
             userPreferencesDataStore = get(),
             gameSessionRepository = get(),
             deckRepository = get(),
+            // Phase 4 (2026-07 stats expansion) — TRADES tab. AuthRepository/TradesRepository are
+            // already global singles in coreBridgeKoinModule (shared with Trades/Home/Friends);
+            // GetTradeStatsUseCase is a single in SharedDomainKoinModule. Resolved via get() only —
+            // registering any of these again here would throw DefinitionOverrideException.
+            authRepository = get(),
+            tradesRepository = get(),
+            getTradeStats = get(),
         )
     }
 }

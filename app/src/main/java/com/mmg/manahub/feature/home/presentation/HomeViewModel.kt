@@ -63,6 +63,7 @@ import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -72,6 +73,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -191,11 +193,15 @@ class HomeViewModel(
     /** Load state for the independent Random card widget (spinner vs. retry affordance). */
     private val randomCardLoadStateFlow = MutableStateFlow(DiscoverLoadState.LOADING)
 
+    private var fetchDiscoverJob: Job? = null
+    private var fetchRandomCardJob: Job? = null
+
     // ── First Steps carousel ──────────────────────────────────────────────────
 
     /** Emits the set of step IDs the user has explicitly skipped. */
     private val skippedFirstStepsFlow: Flow<Set<String>> =
         userPrefsDataStore.observeSkippedFirstSteps()
+            .distinctUntilChanged()
 
     /**
      * Whether the First Steps "You're all set!" completion card has already been shown once
@@ -203,18 +209,21 @@ class HomeViewModel(
      */
     private val firstStepsCompletionSeenFlow: Flow<Boolean> =
         userPrefsDataStore.firstStepsCompletionSeenFlow
+            .distinctUntilChanged()
 
     // ── Authentication ────────────────────────────────────────────────────────
 
     private val isAuthenticatedFlow: StateFlow<Boolean> =
         authRepository.sessionState
             .map { it is SessionState.Authenticated && !it.user.isAnonymous }
+            .distinctUntilChanged()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** Current authenticated user id, or null while signed out. Used for Trades inbox filtering. */
     private val currentUserIdFlow: StateFlow<String?> =
         authRepository.sessionState
             .map { (it as? SessionState.Authenticated)?.user?.id }
+            .distinctUntilChanged()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
@@ -240,16 +249,18 @@ class HomeViewModel(
 
     private val currencyFlow: StateFlow<PreferredCurrency> =
         userPrefsDataStore.preferredCurrencyFlow
+            .distinctUntilChanged()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PreferredCurrency.USD)
 
     private val collectionStatsFlow =
         currencyFlow.flatMapLatest { currency ->
             statsRepository.observeCollectionStats(currency)
-        }
+        }.distinctUntilChanged()
 
     /** Persisted news filter selection, shared with the full News screen. */
     private val newsFiltersFlow: StateFlow<NewsFilterPrefs> =
         userPrefsDataStore.observeNewsFilters()
+            .distinctUntilChanged()
             .catch {
                 crashlytics.setCustomKey("home_flow_error_source", "news_filters")
                 recordSafeNonFatal("home_flow_news_filters", it)
@@ -312,6 +323,7 @@ class HomeViewModel(
      */
     private val historyFlow: StateFlow<List<SessionHistoryEntry>> =
         gameSessionRepository.observeLocalSessionHistory(HISTORY_LIMIT)
+            .distinctUntilChanged()
             .catch {
                 crashlytics.setCustomKey("home_flow_error_source", "session_history")
                 recordSafeNonFatal("home_flow_session_history", it)
@@ -365,26 +377,33 @@ class HomeViewModel(
             // Latest sets are cached locally by DraftRepository; failure degrades to empty.
             val sets = runCatching {
                 when (val result = draftRepository.getDraftableSets()) {
-                    is com.mmg.manahub.core.model.DataResult.Success -> result.data.take(LATEST_SETS_LIMIT)
+                    is com.mmg.manahub.core.model.DataResult.Success -> result.data.take(
+                        LATEST_SETS_LIMIT
+                    )
+
                     else -> emptyList()
                 }
             }.getOrDefault(emptyList())
             emit(sets)
         }
-        .catch {
-            crashlytics.setCustomKey("home_flow_error_source", "latest_sets")
-            recordSafeNonFatal("home_flow_latest_sets", it)
-            crashlytics.log("home_flow_error: latest_sets")
-            emit(emptyList())
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+            .catch {
+                crashlytics.setCustomKey("home_flow_error_source", "latest_sets")
+                recordSafeNonFatal("home_flow_latest_sets", it)
+                crashlytics.log("home_flow_error: latest_sets")
+                emit(emptyList())
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /**
      * Discover-row slice: scoped set + cards + load state, bundled so the parent combine stays
      * a typed (non-vararg) overload (no Array<Any?> erasure).
      */
     private val discoverRowFlow: Flow<DiscoverRow> =
-        combine(discoverSetFlow, discoverCardsFlow, discoverLoadStateFlow) { set, cards, loadState ->
+        combine(
+            discoverSetFlow,
+            discoverCardsFlow,
+            discoverLoadStateFlow
+        ) { set, cards, loadState ->
             DiscoverRow(selectedSet = set, cards = cards, loadState = loadState)
         }
 
@@ -429,8 +448,9 @@ class HomeViewModel(
                     .flatMapLatest { (friends, userId) ->
                         flow {
                             emit(null)
-                            val suggestions = runCatching { tradeSuggestionsRepository.getSuggestions() }
-                                .getOrNull()?.getOrNull().orEmpty()
+                            val suggestions =
+                                runCatching { tradeSuggestionsRepository.getSuggestions() }
+                                    .getOrNull()?.getOrNull().orEmpty()
                             emit(buildSuggestionPreviews(suggestions, friends.orEmpty(), userId))
                         }
                     }
@@ -472,7 +492,8 @@ class HomeViewModel(
                 suggestion.wishingUserId
             }
             // Generate a unique ID for the suggestion match (TASK 4b crash fix).
-            val uniqueId = "${suggestion.offeringUserId}|${suggestion.wishingUserId}|${suggestion.cardId}|${suggestion.userCardId}"
+            val uniqueId =
+                "${suggestion.offeringUserId}|${suggestion.wishingUserId}|${suggestion.cardId}|${suggestion.userCardId}"
             TradeSuggestionPreview(
                 id = uniqueId,
                 card = DiscoverCard(
@@ -526,7 +547,8 @@ class HomeViewModel(
                 combine(
                     gamificationRepository.observeProgression().catch { emit(DEFAULT_PROGRESSION) },
                     gamificationRepository.observeActiveQuests().catch { emit(QuestBoard.empty) },
-                    gamificationRepository.observeDailyActivityStreak().catch { emit(DEFAULT_STREAK) },
+                    gamificationRepository.observeDailyActivityStreak()
+                        .catch { emit(DEFAULT_STREAK) },
                 ) { progression, board, streak ->
                     GamificationSnapshot(
                         enabled = true,
@@ -552,7 +574,8 @@ class HomeViewModel(
         else currentUserIdFlow.flatMapLatest { userId ->
             if (userId == null) flowOf(null)
             else tradesRepository.observeActiveProposals().map { proposals ->
-                val pending = proposals.filter { it.status == TradeStatus.PROPOSED && it.receiverId == userId }
+                val pending =
+                    proposals.filter { it.status == TradeStatus.PROPOSED && it.receiverId == userId }
                 if (pending.isEmpty()) {
                     TradeSummary(pendingCount = 0, latestItemCount = null)
                 } else {
@@ -592,7 +615,11 @@ class HomeViewModel(
                 val display = if (totalUsd <= 0.0 && totalEur <= 0.0) {
                     null
                 } else {
-                    PriceFormatter.formatFromScryfall(priceUsd = totalUsd, priceEur = totalEur, preferredCurrency = currency)
+                    PriceFormatter.formatFromScryfall(
+                        priceUsd = totalUsd,
+                        priceEur = totalEur,
+                        preferredCurrency = currency
+                    )
                 }
                 val cards = entries
                     .distinctBy { it.scryfallId }
@@ -607,7 +634,11 @@ class HomeViewModel(
                             typeLine = card.typeLine,
                         )
                     }
-                OpenForTradeSummary(count = entries.sumOf { it.quantity }, valueDisplay = display, cards = cards)
+                OpenForTradeSummary(
+                    count = entries.sumOf { it.quantity },
+                    valueDisplay = display,
+                    cards = cards
+                )
             }
                 .map<OpenForTradeSummary, OpenForTradeSummary?> { it }
                 .onStart { emit(null) }
@@ -656,7 +687,13 @@ class HomeViewModel(
 
     private fun socialExtrasFlow(authed: Boolean): Flow<SocialExtras> =
         if (!authed) {
-            flowOf(SocialExtras(friendCount = 0, latestFriendRequestName = null, friends = emptyList()))
+            flowOf(
+                SocialExtras(
+                    friendCount = 0,
+                    latestFriendRequestName = null,
+                    friends = emptyList()
+                )
+            )
         } else {
             combine(
                 friendRepository.observeFriendCount().catch { emit(0) },
@@ -686,7 +723,14 @@ class HomeViewModel(
                     flowOf(null)
                 } else {
                     tournamentRepository.observeCurrentRound(active.id)
-                        .map { round -> TournamentSummary(tournamentId = active.id, name = active.name, round = round, standing = null) }
+                        .map { round ->
+                            TournamentSummary(
+                                tournamentId = active.id,
+                                name = active.name,
+                                round = round,
+                                standing = null
+                            )
+                        }
                 }
             }
             .catch { emit(null) }
@@ -725,12 +769,12 @@ class HomeViewModel(
                     }.toSet()
             )
         }.map<WishlistStats, WishlistStats?> { it }
-        .catch {
-            crashlytics.setCustomKey("home_flow_error_source", "wishlist")
-            recordSafeNonFatal("home_flow_wishlist", it)
-            crashlytics.log("home_flow_error: wishlist")
-            emit(null)
-        }
+            .catch {
+                crashlytics.setCustomKey("home_flow_error_source", "wishlist")
+                recordSafeNonFatal("home_flow_wishlist", it)
+                crashlytics.log("home_flow_error: wishlist")
+                emit(null)
+            }
 
     /**
      * Newest-first collection additions for the RECENTLY_ADDED widget (Home feature overhaul
@@ -770,7 +814,9 @@ class HomeViewModel(
      * to 0 (step stays visible) rather than collapsing the board.
      */
     private val totalPlaytestCountFlow: Flow<Int> =
-        playtestRepository.observeTotalTestCount().catch { emit(0) }
+        playtestRepository.observeTotalTestCount()
+            .distinctUntilChanged()
+            .catch { emit(0) }
 
     private val uiState: StateFlow<HomeUiState> = run {
         val libraryFlow = combine(
@@ -831,19 +877,26 @@ class HomeViewModel(
         ) { args ->
             // combine(8 flows) uses the vararg overload — destructure manually.
             @Suppress("UNCHECKED_CAST")
-            val library    = args[0] as LibrarySnapshot
+            val library = args[0] as LibrarySnapshot
+
             @Suppress("UNCHECKED_CAST")
-            val activity   = args[1] as ActivitySnapshot
+            val activity = args[1] as ActivitySnapshot
+
             @Suppress("UNCHECKED_CAST")
-            val account    = args[2] as AccountSnapshot
+            val account = args[2] as AccountSnapshot
+
             @Suppress("UNCHECKED_CAST")
             val quickStart = args[3] as List<QuickStartAction>
+
             @Suppress("UNCHECKED_CAST")
             val playerName = args[4] as String
+
             @Suppress("UNCHECKED_CAST")
-            val skipped    = args[5] as Set<String>
+            val skipped = args[5] as Set<String>
+
             @Suppress("UNCHECKED_CAST")
             val playtestTotal = args[6] as Int
+
             @Suppress("UNCHECKED_CAST")
             val firstStepsCompletionSeen = args[7] as Boolean
 
@@ -867,15 +920,20 @@ class HomeViewModel(
             recentlyAddedFlow,
         ) { args ->
             @Suppress("UNCHECKED_CAST")
-            val layout       = args[0] as List<WidgetInstance>
+            val layout = args[0] as List<WidgetInstance>
+
             @Suppress("UNCHECKED_CAST")
-            val stats        = args[1] as StatsSnapshot
+            val stats = args[1] as StatsSnapshot
+
             @Suppress("UNCHECKED_CAST")
-            val discover     = args[2] as DiscoverSnapshot
+            val discover = args[2] as DiscoverSnapshot
+
             @Suppress("UNCHECKED_CAST")
-            val social       = args[3] as SocialSnapshot
+            val social = args[3] as SocialSnapshot
+
             @Suppress("UNCHECKED_CAST")
             val gamification = args[4] as GamificationSnapshot
+
             @Suppress("UNCHECKED_CAST")
             val recentlyAdded = args[5] as List<RecentlyAddedCard>?
 
@@ -963,7 +1021,11 @@ class HomeViewModel(
         userPrefsDataStore.homeCommunityDecksCategoryFlow
             .map { HomeCommunityDeckCategory.fromPersistedId(it) }
             .catch { emit(HomeCommunityDeckCategory.POPULAR) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeCommunityDeckCategory.POPULAR)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                HomeCommunityDeckCategory.POPULAR
+            )
 
     /**
      * Home COMMUNITY_DECKS widget's deck list for the currently-selected category (TASK 5b). Null
@@ -981,7 +1043,8 @@ class HomeViewModel(
                     pageSize = HOME_COMMUNITY_DECKS_LIMIT,
                 )
                 val result = runCatching { searchCommunityDecksUseCase(filters) }.getOrNull()
-                val decks = (result as? com.mmg.manahub.core.model.DataResult.Success)?.data?.decks.orEmpty()
+                val decks =
+                    (result as? com.mmg.manahub.core.model.DataResult.Success)?.data?.decks.orEmpty()
                 if (result !is com.mmg.manahub.core.model.DataResult.Success) {
                     crashlytics.log("home_community_decks_load_failed")
                 }
@@ -1062,7 +1125,8 @@ class HomeViewModel(
      * backend/RPC change is required; this stays entirely within the existing repository contract.
      */
     private suspend fun hydrateTradeItemCounts(userId: String) {
-        val cached = runCatching { tradesRepository.observeAllProposals().first() }.getOrElse { emptyList() }
+        val cached =
+            runCatching { tradesRepository.observeAllProposals().first() }.getOrElse { emptyList() }
         val rootIds = cached
             .sortedByDescending { it.updatedAt }
             .map { it.rootProposalId }
@@ -1118,6 +1182,7 @@ class HomeViewModel(
      */
     private fun fetchDiscoverCards(forceRefresh: Boolean) {
         if (!forceRefresh && discoverCardsFlow.value.isNotEmpty()) return
+        fetchDiscoverJob?.cancel()
         val set = discoverSetFlow.value
         val query = if (set != null) {
             "set:${set.code} -is:digital order:random"
@@ -1127,10 +1192,11 @@ class HomeViewModel(
         discoverLoadStateFlow.value = DiscoverLoadState.LOADING
         // Clear the row so the spinner shows immediately on a refresh and cards stream in fresh.
         discoverCardsFlow.value = emptyList()
-        viewModelScope.launch {
+        fetchDiscoverJob = viewModelScope.launch {
             // bypassCache = true avoids the in-memory map, but Scryfall's CDN still caches the page.
             // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
-            val outcome = runCatching { cardRepository.searchCards(query, page = 1, bypassCache = true) }
+            val outcome =
+                runCatching { cardRepository.searchCards(query, page = 1, bypassCache = true) }
             val result = outcome.getOrNull()
             val fetched = (result as? com.mmg.manahub.core.model.DataResult.Success)
                 ?.data
@@ -1153,13 +1219,12 @@ class HomeViewModel(
                 discoverLoadStateFlow.value = DiscoverLoadState.FAILED
                 return@launch
             }
-            // Stream each card into the row as it is mapped so the LazyRow starts rendering with
-            // the first card rather than waiting for all of them. De-dup by id (a repeated
-            // scryfallId would crash the LazyRow's stable-key contract).
+            // Map all cards first to update the flow once (batching).
+            // De-dup by id (a repeated scryfallId would crash the LazyRow's stable-key contract).
             val seen = HashSet<String>()
-            fetched.forEach { card ->
+            val mappedCards = fetched.mapNotNull { card ->
                 if (seen.add(card.scryfallId)) {
-                    val mapped = DiscoverCard(
+                    DiscoverCard(
                         id = card.scryfallId,
                         scryfallId = card.scryfallId,
                         name = card.name,
@@ -1167,12 +1232,14 @@ class HomeViewModel(
                         imageUrl = card.imageNormal ?: card.imageArtCrop,
                         typeLine = card.typeLine,
                     )
-                    discoverCardsFlow.update { it + mapped }
-                    // Flip to LOADED on the FIRST appended card so the row renders while the rest stream in.
-                    if (discoverLoadStateFlow.value != DiscoverLoadState.LOADED) {
-                        discoverLoadStateFlow.value = DiscoverLoadState.LOADED
-                    }
-                }
+                } else null
+            }
+            
+            if (mappedCards.isNotEmpty()) {
+                discoverCardsFlow.value = mappedCards
+                discoverLoadStateFlow.value = DiscoverLoadState.LOADED
+            } else {
+                discoverLoadStateFlow.value = DiscoverLoadState.FAILED
             }
         }
     }
@@ -1183,11 +1250,18 @@ class HomeViewModel(
      * [DiscoverLoadState.FAILED] without clearing the previously-shown card.
      */
     private fun fetchRandomCard() {
+        fetchRandomCardJob?.cancel()
         randomCardLoadStateFlow.value = DiscoverLoadState.LOADING
-        viewModelScope.launch {
+        fetchRandomCardJob = viewModelScope.launch {
             // bypassCache = true avoids the in-memory map, but Scryfall's CDN still caches the page.
             // Taking the first N of a CDN-cached page means refresh does nothing; we must shuffle client-side.
-            val outcome = runCatching { cardRepository.searchCards(DISCOVER_RANDOM_QUERY, page = 1, bypassCache = true) }
+            val outcome = runCatching {
+                cardRepository.searchCards(
+                    DISCOVER_RANDOM_QUERY,
+                    page = 1,
+                    bypassCache = true
+                )
+            }
             val result = outcome.getOrNull()
             val card = (result as? com.mmg.manahub.core.model.DataResult.Success)
                 ?.data
@@ -1254,14 +1328,17 @@ class HomeViewModel(
                 crashlytics.log("home_discover_retry_after_failure")
                 fetchDiscoverCards(forceRefresh = true)
             }
+
             HomeAction.RefreshDiscover -> {
                 crashlytics.log("home_discover_refresh_manual")
                 fetchDiscoverCards(forceRefresh = true)
             }
+
             HomeAction.RefreshRandomCard -> {
                 crashlytics.log("home_random_card_refresh_manual")
                 fetchRandomCard()
             }
+
             is HomeAction.SelectDiscoverSet -> selectDiscoverSet(action.set)
             is HomeAction.SelectCommunityDecksCategory -> selectCommunityDecksCategory(action.category)
             HomeAction.ResetNewsFilters -> resetNewsFilters()
@@ -1344,7 +1421,8 @@ class HomeViewModel(
         // gallery's drag&drop relies on. When the category has no existing entries yet, append at
         // the end (a brand-new category run of size 1 is trivially contiguous with itself).
         val lastSameCategoryIndex = current.indexOfLast { it.type.category == type.category }
-        val insertIndex = if (lastSameCategoryIndex >= 0) lastSameCategoryIndex + 1 else current.size
+        val insertIndex =
+            if (lastSameCategoryIndex >= 0) lastSameCategoryIndex + 1 else current.size
         val mutable = current.toMutableList()
         mutable.add(insertIndex, newInstance)
         persistLayout(mutable)
@@ -1402,8 +1480,8 @@ class HomeViewModel(
         val deckCountForSteps = deckCount
         val friendCount = social.extras.friendCount
         val isProfileComplete = !core.account.avatarUrl.isNullOrBlank()
-            && core.playerName != "Wizard"
-            && core.playerName.isNotBlank()
+                && core.playerName != "Wizard"
+                && core.playerName.isNotBlank()
 
         val visibleSteps = buildVisibleSteps(
             isAuthenticated = core.account.isAuthenticated,
@@ -1417,7 +1495,13 @@ class HomeViewModel(
             skipped = core.skippedFirstSteps,
         )
 
-        val hero = resolveHero(core.activity, core.playerName, visibleSteps, gamification, core.firstStepsCompletionSeen)
+        val hero = resolveHero(
+            core.activity,
+            core.playerName,
+            visibleSteps,
+            gamification,
+            core.firstStepsCompletionSeen
+        )
         val nudge = resolveNudge(core.account, collectionStats, deckCount, core.activity.totalGames)
 
         // TASK 3: persist the completion flag exactly once, the first time the hero actually
@@ -1480,7 +1564,11 @@ class HomeViewModel(
             tradeSummary = social.trades.summary,
             tradeSuggestionPreviews = social.trades.suggestionPreviews,
             openForTradePreview = social.trades.openForTrade?.let {
-                OpenForTradePreview(count = it.count, valueDisplay = it.valueDisplay, cards = it.cards)
+                OpenForTradePreview(
+                    count = it.count,
+                    valueDisplay = it.valueDisplay,
+                    cards = it.cards
+                )
             },
             activeTournamentSummary = social.activeTournament,
             friendCount = friendCount,
@@ -1598,28 +1686,28 @@ class HomeViewModel(
     ): List<FirstStepItem> = ALL_FIRST_STEPS.filter { step ->
         if (step.id in skipped) return@filter false
         when (step.id) {
-            STEP_FIRST_ADD_CARD        -> cardCount == 0
-            STEP_FIRST_SCAN_CARD       -> true
-            STEP_FIRST_CREATE_DECK     -> deckCount == 0
-            STEP_FIRST_PLAY_GAME       -> true
-            STEP_FIRST_PLAYTEST_DECK   -> deckCount > 0 && totalPlaytestCount == 0
-            STEP_FIRST_CREATE_ACCOUNT  -> !isAuthenticated
+            STEP_FIRST_ADD_CARD -> cardCount == 0
+            STEP_FIRST_SCAN_CARD -> true
+            STEP_FIRST_CREATE_DECK -> deckCount == 0
+            STEP_FIRST_PLAY_GAME -> true
+            STEP_FIRST_PLAYTEST_DECK -> deckCount > 0 && totalPlaytestCount == 0
+            STEP_FIRST_CREATE_ACCOUNT -> !isAuthenticated
             STEP_FIRST_COMPLETE_PROFILE -> isAuthenticated && !isProfileComplete
-            STEP_FIRST_ADD_FRIEND      -> isAuthenticated && friendCount == 0
-            STEP_FIRST_REVIEW_FRIEND   -> isAuthenticated && friendCount > 0
-            STEP_FIRST_CREATE_TRADE    -> isAuthenticated && friendCount > 0 && cardCount > 0
-            STEP_FIRST_OPEN_FOR_TRADE  -> cardCount > 0 && openForTradeCount == 0
+            STEP_FIRST_ADD_FRIEND -> isAuthenticated && friendCount == 0
+            STEP_FIRST_REVIEW_FRIEND -> isAuthenticated && friendCount > 0
+            STEP_FIRST_CREATE_TRADE -> isAuthenticated && friendCount > 0 && cardCount > 0
+            STEP_FIRST_OPEN_FOR_TRADE -> cardCount > 0 && openForTradeCount == 0
             // WISHLIST_PROGRESS is ACCOUNT_GATED and wishlistFlow forces wishlistCount to 0 while
             // signed out — without the isAuthenticated gate this step could never auto-hide for a
             // signed-out user (it would sit forever, uncompletable, CTA-ing into a widget they can't
             // use pre-auth). Matches the STEP_FIRST_ADD_FRIEND/STEP_FIRST_REVIEW_FRIEND style above.
-            STEP_FIRST_ADD_WISHLIST    -> isAuthenticated && wishlistCount == 0
+            STEP_FIRST_ADD_WISHLIST -> isAuthenticated && wishlistCount == 0
             STEP_FIRST_COLLECTION_STATS -> cardCount > 0
-            STEP_FIRST_DRAFT_GUIDE     -> true
-            STEP_FIRST_NEWS            -> true
-            STEP_FIRST_PREFERENCES     -> true
-            STEP_FIRST_RATE_APP        -> true
-            else                       -> false
+            STEP_FIRST_DRAFT_GUIDE -> true
+            STEP_FIRST_NEWS -> true
+            STEP_FIRST_PREFERENCES -> true
+            STEP_FIRST_RATE_APP -> true
+            else -> false
         }
     }
 
@@ -1666,12 +1754,16 @@ class HomeViewModel(
         return when (trigger) {
             NudgeTrigger.ACTION_REQUIRED ->
                 AccountNudge(message = account.actionRequiredMessage, trigger = trigger)
+
             NudgeTrigger.COLLECTION_MILESTONE ->
                 AccountNudge(messageRes = R.string.home_nudge_collection, trigger = trigger)
+
             NudgeTrigger.DECK_MILESTONE ->
                 AccountNudge(messageRes = R.string.home_nudge_decks, trigger = trigger)
+
             NudgeTrigger.GAME_MILESTONE ->
                 AccountNudge(messageRes = R.string.home_nudge_games, trigger = trigger)
+
             NudgeTrigger.SYNC_PENDING ->
                 AccountNudge(messageRes = R.string.home_nudge_games, trigger = trigger)
         }
@@ -1703,6 +1795,8 @@ class HomeViewModel(
         // Collection — the local collection works fully offline and reinforces "add your first card".
         WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
         // Discover
+        WidgetInstance(HomeWidgetType.COMMUNITY_DECKS, WidgetSize.MEDIUM),
+
         WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.DISCOVER_CARDS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.LATEST_SETS, WidgetSize.MEDIUM),
@@ -1715,21 +1809,21 @@ class HomeViewModel(
         WidgetInstance(HomeWidgetType.CONTEXT_HERO, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.QUICK_ACTIONS, WidgetSize.MEDIUM),
         // Stats
-        WidgetInstance(HomeWidgetType.GAME_STATS_HUB, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.COMMUNITY_DECKS, WidgetSize.MEDIUM),
         // Collection
         WidgetInstance(HomeWidgetType.YOUR_DECKS_SHELF, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.COLLECTION_STATS_HUB, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.RECENTLY_ADDED, WidgetSize.MEDIUM),
         // Social
-        WidgetInstance(HomeWidgetType.TRADES_HUB, WidgetSize.MEDIUM),
         // TASK 5c: SOCIAL_HUB replaced by FRIENDS (COMMUNITY_DECKS stays gallery-only, matching
         // TRENDING_COMMANDERS' board-length discipline below).
-        WidgetInstance(HomeWidgetType.FRIENDS, WidgetSize.MEDIUM),
         // Discover
         WidgetInstance(HomeWidgetType.LATEST_SETS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.MTG_NEWS, WidgetSize.MEDIUM),
         WidgetInstance(HomeWidgetType.RULES_TIP, WidgetSize.MEDIUM),
-    )
+        WidgetInstance(HomeWidgetType.DISCOVER_CARDS, WidgetSize.MEDIUM),
+        WidgetInstance(HomeWidgetType.CARD_OF_THE_DAY, WidgetSize.MEDIUM),
+        )
 
     // ── Internal snapshots ──────────────────────────────────────────────────────
 

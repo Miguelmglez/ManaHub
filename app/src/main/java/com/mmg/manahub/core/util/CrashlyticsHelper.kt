@@ -11,6 +11,11 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
  * original message might contain sensitive data.
  */
 fun recordSafeNonFatal(tag: String, e: Throwable) {
+    // If the error is already an OOM, don't attempt to wrap or report it here.
+    // Attempting to process an OOM often triggers another OOM in the Crashlytics
+    // background thread during stack trace trimming (secondary crash).
+    if (e is OutOfMemoryError) return
+
     val sanitized = RuntimeException("[$tag] ${e::class.simpleName}", e)
     FirebaseCrashlytics.getInstance().recordException(sanitized)
 }

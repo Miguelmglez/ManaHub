@@ -7,6 +7,8 @@ import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.GameModeCount
 import com.mmg.manahub.feature.game.domain.model.GameSessionData
+import com.mmg.manahub.feature.game.domain.model.ModeWinrate
+import com.mmg.manahub.feature.game.domain.model.PlayerCountWinrate
 import com.mmg.manahub.feature.game.domain.model.SessionDetail
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.feature.game.domain.model.SingleDeckStats
@@ -90,5 +92,20 @@ interface GameSessionRepository {
     /** Session summaries for [deckId], most-recent first (unlimited — caller truncates). */
     fun observeSessionSummariesForDeck(deckId: String): Flow<List<DeckSessionSummary>>
 
-    suspend fun deleteSession(sessionId: Long)
+    /** Deletes the session (and its linked survey via FK cascade). Returns true on success. */
+    suspend fun deleteSession(sessionId: Long): Boolean
+
+    /**
+     * Win-rate breakdown by game mode, resolved against the local seat (`is_local = 1`, ADR-001).
+     * Covers EVERY recorded game — unlike [observeLocalSessionHistory] this is not capped to a
+     * recent-history window (Phase 3, 2026-07 stats expansion).
+     */
+    fun observeWinrateByMode(): Flow<List<ModeWinrate>>
+
+    /**
+     * Win-rate breakdown by the exact persisted session player count, resolved against the local
+     * seat (`is_local = 1`, ADR-001). Bucketing into "2 / 3 / 4+" is a presentation concern for the
+     * caller (Phase 3, 2026-07 stats expansion).
+     */
+    fun observeWinrateByPlayerCount(): Flow<List<PlayerCountWinrate>>
 }

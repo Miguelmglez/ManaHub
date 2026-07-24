@@ -14,12 +14,15 @@ import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.GameModeCount
 import com.mmg.manahub.feature.game.domain.model.GameSessionData
+import com.mmg.manahub.feature.game.domain.model.ModeWinrate
+import com.mmg.manahub.feature.game.domain.model.PlayerCountWinrate
 import com.mmg.manahub.feature.game.domain.model.PlayerSummaryData
 import com.mmg.manahub.feature.game.domain.model.SessionDetail
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.feature.game.domain.model.SessionSummaryData
 import com.mmg.manahub.feature.game.domain.model.SingleDeckStats
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -211,8 +214,21 @@ class GameSessionRepositoryImpl(
             rows.map { DeckSessionSummary(id = it.id, playedAt = it.playedAt, winnerName = it.winnerName, surveyStatus = it.surveyStatus) }
         }
 
-    override suspend fun deleteSession(sessionId: Long) =
-        withContext(ioDispatcher) { dao.deleteSession(sessionId) }
+    override suspend fun deleteSession(sessionId: Long): Boolean = withContext(ioDispatcher) {
+        runCatching { dao.deleteSession(sessionId) }
+            .onFailure { e -> recordSafeNonFatal("game_session_delete", e) }
+            .isSuccess
+    }
+
+    override fun observeWinrateByMode(): Flow<List<ModeWinrate>> =
+        dao.observeWinrateByMode().map { rows ->
+            rows.map { row -> ModeWinrate(mode = row.mode, totalGames = row.totalGames, wins = row.wins) }
+        }
+
+    override fun observeWinrateByPlayerCount(): Flow<List<PlayerCountWinrate>> =
+        dao.observeWinrateByPlayerCount().map { rows ->
+            rows.map { row -> PlayerCountWinrate(playerCount = row.playerCount, totalGames = row.totalGames, wins = row.wins) }
+        }
 
     // ── Private mapping helpers ───────────────────────────────────────────────
 

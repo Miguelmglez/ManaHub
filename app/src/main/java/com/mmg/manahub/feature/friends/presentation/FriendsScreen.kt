@@ -25,14 +25,11 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -53,6 +50,8 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -268,24 +267,19 @@ fun FriendsScreen(
                     item {
                         val context = LocalContext.current
                         Spacer(Modifier.height(4.dp))
-                        OutlinedButton(
+                        MagicCtaButton(
                             onClick = { viewModel.onCopyGameTagClicked(context) },
+                            text = stringResource(R.string.friends_share_my_link),
+                            style = MagicCtaStyle.Outlined,
+                            icon = {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, mc.primaryAccent),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
-                        ) {
-                            Icon(
-                                Icons.Default.Share,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                stringResource(R.string.friends_share_my_link),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        }
+                        )
                     }
                 }
 
@@ -429,18 +423,10 @@ private fun SearchResultCard(friend: Friend, onSendInvitation: () -> Unit) {
                     Text(friend.gameTag, style = MaterialTheme.magicTypography.labelSmall, color = mc.textSecondary)
                 }
             }
-            Button(
+            MagicCtaButton(
                 onClick = onSendInvitation,
-                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    stringResource(R.string.friends_send_invitation),
-                    style = MaterialTheme.magicTypography.labelSmall,
-                    color = Color.White,
-                )
-            }
+                text = stringResource(R.string.friends_send_invitation),
+            )
         }
     }
 }

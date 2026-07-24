@@ -23,7 +23,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -36,6 +35,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -247,13 +248,11 @@ private fun GamesHistoryContent(
                         modifier = Modifier.padding(horizontal = 32.dp),
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(onClick = onRetry) {
-                        Text(
-                            text = stringResource(R.string.retry),
-                            color = mc.primaryAccent,
-                            style = mt.labelMedium,
-                        )
-                    }
+                    MagicCtaButton(
+                        onClick = onRetry,
+                        text = stringResource(R.string.retry),
+                        style = MagicCtaStyle.Ghost,
+                    )
                 }
             }
 

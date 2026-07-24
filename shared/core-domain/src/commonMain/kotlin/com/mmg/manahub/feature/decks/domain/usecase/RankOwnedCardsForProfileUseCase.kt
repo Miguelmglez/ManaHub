@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.decks.domain.usecase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 
@@ -28,6 +29,16 @@ class RankOwnedCardsForProfileUseCase {
         if (profileKeys.isEmpty()) return emptyList()
         return collection
             .distinctBy { it.name }
+            // Bug fix (Deck Wizard entry-flow audit): a picked StrategyProfile.colors was captured
+            // but never actually consulted -- every owned card matching the strategy/theme tag
+            // overlap surfaced as a "suggested seed" regardless of its own color identity, so an
+            // off-color card could be suggested for a deck whose colors the user had ALREADY picked
+            // in this same flow (Flow B colors-first / Flow C's post-combo re-rank). Empty
+            // profile.colors means "no color pick yet" (unchanged behavior -- every existing caller
+            // that hasn't resolved colors keeps ranking on strategy fit alone); once colors ARE set,
+            // only cards whose color identity is a subset of them (the same identity-inclusion rule
+            // used everywhere else in the engine, e.g. DeckWarning.OffColorIdentity) are eligible.
+            .filter { card -> profile.colors.isEmpty() || profile.colors.containsAll(card.colorIdentity.toManaColorSet()) }
             .map { card -> card to overlap(card, profileKeys) }
             .filter { it.second > 0 }
             .sortedWith(compareByDescending<Pair<Card, Int>> { it.second }.thenBy { it.first.name })
@@ -47,3 +58,9 @@ class RankOwnedCardsForProfileUseCase {
         const val DEFAULT_LIMIT = 12
     }
 }
+
+/** Same convention as [com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver]'s private
+ * file-local extension of the same name -- resolves raw Scryfall color-identity symbols onto
+ * [ManaColor], dropping anything unrecognized. */
+private fun List<String>.toManaColorSet(): Set<ManaColor> =
+    mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()

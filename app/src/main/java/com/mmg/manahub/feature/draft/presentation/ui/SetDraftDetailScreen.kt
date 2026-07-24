@@ -222,7 +222,7 @@ fun SetDraftDetailScreen(
                         selected = state.selectedTab == index,
                         onClick = { viewModel.onTabSelected(index) },
                         text = {
-                            Text(title, color = if (state.selectedTab == index) colors.primaryAccent else colors.textDisabled)
+                            Text(title.uppercase(), color = if (state.selectedTab == index) colors.primaryAccent else colors.textDisabled)
                         },
                     )
                 }

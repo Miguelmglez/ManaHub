@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.work.WorkManager
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import com.google.firebase.crashlytics.FirebaseCrashlytics
@@ -534,6 +535,13 @@ class ManaHubApp : Application(), KoinComponent {
                 .components {
                     add(SvgDecoder.Factory())
                     add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
+                }
+                .memoryCache {
+                    MemoryCache.Builder()
+                        // Large heap is enabled in Manifest, but we tune this down to 15% (from default 25%)
+                        // to ensure background services and OS components have enough free RAM.
+                        .maxSizePercent(this@ManaHubApp, 0.15)
+                        .build()
                 }
                 .build()
         }

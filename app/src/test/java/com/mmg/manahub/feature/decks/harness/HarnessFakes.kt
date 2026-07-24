@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.harness
 
+import com.mmg.manahub.core.domain.repository.CardPriceUpdate
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.model.Card
@@ -62,6 +63,7 @@ class FixtureCardRepository(
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
     override suspend fun refreshCollectionPrices() = error("unused")
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
+    override suspend fun updatePricesBatch(updates: List<CardPriceUpdate>) = error("unused")
     override suspend fun evictStaleCache() = error("unused")
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
     override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")

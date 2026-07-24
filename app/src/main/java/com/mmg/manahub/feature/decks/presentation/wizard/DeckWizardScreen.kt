@@ -18,18 +18,18 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -53,21 +53,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
+import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -336,7 +346,7 @@ private fun FormatStepContent(
 
     // C1 (design review): the sticky CTA is a real Column sibling (not a Box overlay with a
     // guessed bottom-padding reservation) — its real measured height, whatever the device's
-    // nav-bar inset turns out to be, is what the grid actually loses, never a magic-number guess.
+    // nav-bar inset turns out to be, is what the list actually loses, never a magic-number guess.
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = spacing.lg, vertical = spacing.md)) {
             Text(stringResource(R.string.deck_wizard_format_title), style = ty.titleLarge, color = mc.textPrimary)
@@ -347,11 +357,13 @@ private fun FormatStepContent(
                 modifier = Modifier.padding(top = spacing.xxs),
             )
         }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+        // Visual-overhaul pass: one-format-per-row list matching the "Pick a strategy" step's
+        // StrategyOptionRow shape (DeckWizardEntryFlows.kt) instead of the old icon-badge grid
+        // tile -- see FormatCard's KDoc for why the row body is a local duplicate rather than an
+        // import of that file-private composable.
+        LazyColumn(
             contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
             items(V1_FORMATS, key = { it.name }) { format ->
@@ -374,30 +386,54 @@ private fun FormatStepContent(
     }
 }
 
+/**
+ * One or two short, factual rules sentences per format so a [FormatCard] explains what the format
+ * actually IS instead of just naming it -- real MTG rules text (English), never invented. Returns
+ * `null` for any [DeckFormat] not covered here (there is none today, but this stays defensive).
+ */
+private fun formatRulesDescriptionRes(format: DeckFormat): Int? = when (format) {
+    DeckFormat.COMMANDER -> R.string.deck_wizard_format_desc_commander
+    DeckFormat.CASUAL -> R.string.deck_wizard_format_desc_casual
+    DeckFormat.STANDARD -> R.string.deck_wizard_format_desc_standard
+    DeckFormat.PIONEER -> R.string.deck_wizard_format_desc_pioneer
+    DeckFormat.MODERN -> R.string.deck_wizard_format_desc_modern
+    DeckFormat.LEGACY -> R.string.deck_wizard_format_desc_legacy
+    DeckFormat.VINTAGE -> R.string.deck_wizard_format_desc_vintage
+    DeckFormat.PAUPER -> R.string.deck_wizard_format_desc_pauper
+    else -> null
+}
+
+/**
+ * A [DeckFormat] pick, one full-width row per format -- deliberately built to the EXACT visual
+ * shape of `StrategyOptionRow` (DeckWizardEntryFlows.kt, the "Pick a strategy" step's row: label +
+ * 2-line description in a weighted Column, trailing 24dp circular selected-checkmark, same
+ * selected fill/border/typography). `StrategyOptionRow` itself is `private` in a different file
+ * with no other cross-file consumer -- this codebase's existing convention for a wizard-only row
+ * shape shared only in spirit (not code) across files is a short per-file duplicate rather than
+ * promoting it to `internal` and creating cross-file coupling for a single extra call site.
+ */
 @Composable
 private fun FormatCard(format: DeckFormat, selected: Boolean, comingSoon: Boolean, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val descriptionRes = formatRulesDescriptionRes(format)
+
     Surface(
         onClick = onClick,
         enabled = !comingSoon,
         shape = CardShape,
-        color = if (selected) mc.primaryAccent.copy(alpha = 0.14f) else mc.surface,
-        border = if (selected) androidx.compose.foundation.BorderStroke(1.5.dp, mc.primaryAccent) else null,
-        modifier = Modifier.fillMaxWidth().aspectRatio(1.6f),
+        color = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
+        border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent) else null,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Box(Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(spacing.md),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    if (selected) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(18.dp))
-                    }
-                }
-                Column {
+        Row(
+            modifier = Modifier.padding(spacing.md).heightIn(min = 48.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.md),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
                     Text(
                         text = format.displayName,
                         style = ty.titleMedium,
@@ -406,9 +442,10 @@ private fun FormatCard(format: DeckFormat, selected: Boolean, comingSoon: Boolea
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (comingSoon) {
-                        // C2 (design review): surfaceVariant would double up with the already-dim
-                        // textDisabled label into a near-invisible badge on HallowedPrint.
-                        Surface(shape = ChipShape, color = mc.textDisabled.copy(alpha = 0.25f), modifier = Modifier.padding(top = spacing.xxs)) {
+                        // C2 (design review, kept from the old grid tile): surfaceVariant would
+                        // double up with the already-dim textDisabled label into a near-invisible
+                        // badge on HallowedPrint.
+                        Surface(shape = ChipShape, color = mc.textDisabled.copy(alpha = 0.25f)) {
                             Text(
                                 text = stringResource(R.string.deck_wizard_coming_soon),
                                 style = ty.labelSmall,
@@ -418,9 +455,27 @@ private fun FormatCard(format: DeckFormat, selected: Boolean, comingSoon: Boolea
                         }
                     }
                 }
+                if (descriptionRes != null) {
+                    Text(
+                        text = stringResource(descriptionRes),
+                        style = ty.bodySmall,
+                        color = if (comingSoon) mc.textDisabled else mc.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = spacing.xxs),
+                    )
+                }
             }
-            if (comingSoon) {
-                Box(Modifier.fillMaxSize().background(mc.background.copy(alpha = 0.35f)))
+            Surface(
+                shape = CircleShape,
+                color = if (selected) mc.primaryAccent else mc.surfaceVariant,
+                modifier = Modifier.size(24.dp),
+            ) {
+                if (selected) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = mc.onAccent, modifier = Modifier.size(16.dp))
+                    }
+                }
             }
         }
     }
@@ -450,30 +505,46 @@ private fun ReviewStepContent(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.md),
+            verticalArrangement = Arrangement.spacedBy(spacing.lg),
         ) {
             Spacer(Modifier.height(spacing.md))
             Text(stringResource(R.string.deck_wizard_review_title), style = ty.titleLarge, color = mc.textPrimary)
 
+            uiState.selectedCommander?.let { commander ->
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_commander_section))
+                    CommanderBanner(commander = commander, modifier = Modifier.fillMaxWidth())
+                }
+            }
+
+            if (uiState.seedCards.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                    ReviewSectionLabel(stringResource(R.string.deck_wizard_review_seeds))
+                    // A nested-scroll horizontal LazyRow inside the outer verticalScroll Column is
+                    // safe here (different axis) -- same reasoning as the task's guidance for this
+                    // screen; each tile keyed by scryfallId (unique, no duplicate-copy collision
+                    // since seed cards are deduped by id upstream in the ViewModel).
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                        items(uiState.seedCards, key = { it.scryfallId }) { card -> ReviewSeedCardTile(card) }
+                    }
+                }
+            }
+
             Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                     ReviewRow(stringResource(R.string.deck_wizard_review_format), uiState.selectedFormat?.displayName ?: "—")
-                    ReviewRow(
-                        stringResource(R.string.deck_wizard_review_direction),
-                        uiState.selectedCommander?.name
-                            ?: uiState.selectedArchetype?.takeIf { it != com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.GENERIC }?.displayName
+                    ReviewChipRow(
+                        label = stringResource(R.string.deck_wizard_review_direction),
+                        chipText = uiState.selectedCommander?.name
+                            ?: uiState.selectedArchetype?.takeIf { it != ArchetypeId.GENERIC }?.displayName
                             ?: uiState.selectedDirectionTheme?.displayName
                             ?: uiState.selectedTribeLabel
                             ?: stringResource(R.string.deck_wizard_review_direction_none),
                     )
-                    ReviewRow(
-                        stringResource(R.string.deck_wizard_review_colors),
-                        if (uiState.colorIdentity.isEmpty()) stringResource(R.string.deck_seeds_identity_colorless)
-                        else uiState.colorIdentity.joinToString(" ") { it.symbol },
+                    ReviewColorsRow(
+                        label = stringResource(R.string.deck_wizard_review_colors),
+                        colors = uiState.colorIdentity,
                     )
-                    if (uiState.seedCards.isNotEmpty()) {
-                        ReviewRow(stringResource(R.string.deck_wizard_review_seeds), uiState.seedCards.size.toString())
-                    }
                 }
             }
 
@@ -564,5 +635,75 @@ private fun ReviewRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, style = ty.bodyMedium, color = mc.textSecondary)
         Text(value, style = ty.bodyMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Small uppercase-weight section header above a Review-step block (Commander / Seed cards). */
+@Composable
+private fun ReviewSectionLabel(text: String) {
+    Text(text = text, style = MaterialTheme.magicTypography.labelLarge, color = MaterialTheme.magicColors.textSecondary)
+}
+
+/** One seed card as a compact image tile for the Review step's horizontal seed-cards strip. */
+@Composable
+private fun ReviewSeedCardTile(card: Card) {
+    val mc = MaterialTheme.magicColors
+    AsyncImage(
+        model = card.imageNormal,
+        contentDescription = card.name,
+        placeholder = painterResource(Res.drawable.mtg_card_back),
+        error = painterResource(Res.drawable.mtg_card_back),
+        fallback = painterResource(Res.drawable.mtg_card_back),
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .size(width = 72.dp, height = 100.dp)
+            .clip(CardShape)
+            .background(mc.surfaceVariant),
+    )
+}
+
+/** A [ReviewRow] variant that renders its value as a tonal chip -- used for the Direction/
+ * archetype pick, which is a single discrete choice rather than free-form text. */
+@Composable
+private fun ReviewChipRow(label: String, chipText: String) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = ty.bodyMedium, color = mc.textSecondary)
+        Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.14f)) {
+            Text(
+                text = chipText,
+                style = ty.labelMedium,
+                color = mc.primaryAccent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = spacing.sm, vertical = spacing.xxs),
+            )
+        }
+    }
+}
+
+/** Renders the deck's color identity as real WUBRG mana-symbol icons ([ManaCostImages]) instead of
+ * the plain `.symbol` letters -- falls back to the existing "Colorless" copy when empty. */
+@Composable
+private fun ReviewColorsRow(label: String, colors: Set<ManaColor>) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = ty.bodyMedium, color = mc.textSecondary)
+        if (colors.isEmpty()) {
+            Text(stringResource(R.string.deck_seeds_identity_colorless), style = ty.bodyMedium, color = mc.textPrimary)
+        } else {
+            // ManaColor.symbol is already a bare WUBRG letter ("W"/"U"/...), the exact token shape
+            // ManaSymbolImage/ManaCostImages expects (it maps token -> scryfalls's card-symbols
+            // SVG) -- wrapped in "{}" only to satisfy ManaCostImages' cost-string parser.
+            ManaCostImages(
+                manaCost = colors.sortedBy { it.ordinal }.joinToString(separator = "") { "{${it.symbol}}" },
+                symbolSize = 20.dp,
+                spacing = spacing.xxs,
+            )
+        }
     }
 }

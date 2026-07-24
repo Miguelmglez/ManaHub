@@ -25,6 +25,11 @@ class CollectionProfileUseCaseTest {
         val profile = useCase(collection)
         assertEquals(ManaColor.W, profile.colorShares.first().color)
         assertTrue(profile.colorShares.first().share > profile.colorShares.last().share)
+        // pipCount is the RAW pip count (3 W pips: {1}{W}{W} + {W}), never a share rescaled to an
+        // int -- CircularDistribution's centered "Total" must show a real quantity (see
+        // feedback_circulardistribution_wizard_pipcount_not_scaled_share.md).
+        assertEquals(3, profile.colorShares.first().pipCount)
+        assertEquals(1, profile.colorShares.last().pipCount)
     }
 
     @Test
@@ -97,6 +102,7 @@ class CollectionProfileUseCaseTest {
         // colorShares: exactly ONE W pip counted (not two) -> a single 100% share entry.
         assertEquals(1, profile.colorShares.size)
         assertEquals(1f, profile.colorShares.first().share)
+        assertEquals(1, profile.colorShares.first().pipCount)
 
         // dominantStrategies: ONE distinct card carrying TOKENS, not two.
         assertEquals(1, profile.dominantStrategies.first().copies)

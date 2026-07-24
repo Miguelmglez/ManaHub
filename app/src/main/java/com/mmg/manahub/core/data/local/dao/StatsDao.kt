@@ -6,12 +6,18 @@ import com.mmg.manahub.core.data.local.entity.projection.ArtistCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.CardValueProjection
 import com.mmg.manahub.core.data.local.entity.projection.CmcCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.ColorCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.DecadeCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.DuplicateCardProjection
+import com.mmg.manahub.core.data.local.entity.projection.FormatCoverageProjection
+import com.mmg.manahub.core.data.local.entity.projection.KeywordsProjection
 import com.mmg.manahub.core.data.local.entity.projection.RarityCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.SetCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.SetValueProjection
 import com.mmg.manahub.core.data.local.entity.projection.TagProjection
 import com.mmg.manahub.core.data.local.entity.projection.TotalsProjection
 import com.mmg.manahub.core.data.local.entity.projection.TypeCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.UniqueCardPriceProjection
+import com.mmg.manahub.core.data.local.entity.projection.VariantCardProjection
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -60,7 +66,7 @@ interface StatsDao {
 
     @Query("""
         SELECT c.scryfall_id AS scryfallId, c.name AS name,
-               c.image_art_crop AS imageArtCrop, uc.is_foil AS isFoil,
+               c.image_art_crop AS imageArtCrop, c.image_normal AS imageNormal, uc.is_foil AS isFoil,
                c.color_identity AS colorIdentity, c.set_code AS setCode,
                c.set_name AS setName, c.rarity AS rarity,
                CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
@@ -311,6 +317,7 @@ interface StatsDao {
                OR (:colorFilter = '[]' AND c.color_identity = '[]')
                OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
           AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY c.scryfall_id
     """)
     fun observeAllCollectionTags(colorFilter: String?, setFilter: String?, userId: String?): Flow<List<TagProjection>>
 
@@ -322,4 +329,197 @@ interface StatsDao {
           AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
     """)
     fun observeCollectionSetCodes(userId: String?): Flow<List<String>>
+
+    // --- Phase 2 (2026-07 stats expansion) ---
+
+    /**
+     * One row per distinct owned card (by scryfall_id) with its base (non-foil) price in both
+     * currencies. Used to compute average/median card value — deliberately uses the card's
+     * canonical price rather than per-copy foil pricing to keep "unique card value" well-defined
+     * when a scryfall_id has both foil and non-foil collection rows.
+     */
+    @Query("""
+        SELECT DISTINCT c.scryfall_id AS scryfallId,
+               COALESCE(c.price_usd, 0) AS priceUsd,
+               COALESCE(c.price_eur, 0) AS priceEur
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+    """)
+    fun observeUniqueCardPrices(colorFilter: String?, setFilter: String?, userId: String?): Flow<List<UniqueCardPriceProjection>>
+
+    @Query("""
+        SELECT COALESCE(SUM(uc.quantity * CASE
+            WHEN c.price_usd_foil IS NOT NULL THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END), 0)
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND uc.is_foil = 1
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+    """)
+    fun observeTotalFoilValueUsd(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double>
+
+    @Query("""
+        SELECT COALESCE(SUM(uc.quantity * CASE
+            WHEN c.price_eur_foil IS NOT NULL THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END), 0)
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND uc.is_foil = 1
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+    """)
+    fun observeTotalFoilValueEur(colorFilter: String?, setFilter: String?, userId: String?): Flow<Double>
+
+    @Query("""
+        SELECT c.scryfall_id AS scryfallId, c.name AS name, c.image_art_crop AS imageArtCrop,
+               MAX(uc.is_foil) AS isFoil, c.color_identity AS colorIdentity, c.set_code AS setCode,
+               c.set_name AS setName, c.rarity AS rarity,
+               CASE WHEN MAX(uc.is_foil) = 1 AND c.price_usd_foil IS NOT NULL
+                    THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
+               CASE WHEN MAX(uc.is_foil) = 1 AND c.price_eur_foil IS NOT NULL
+                    THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur,
+               SUM(uc.quantity) AS totalQuantity
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY c.scryfall_id
+        ORDER BY totalQuantity DESC
+        LIMIT 1
+    """)
+    fun observeMostDuplicatedCard(colorFilter: String?, setFilter: String?, userId: String?): Flow<DuplicateCardProjection?>
+
+    @Query("""
+        SELECT
+            COUNT(DISTINCT CASE WHEN c.legality_commander = 'legal' THEN c.scryfall_id END) AS commanderCount,
+            COUNT(DISTINCT CASE WHEN c.legality_modern = 'legal' THEN c.scryfall_id END) AS modernCount,
+            COUNT(DISTINCT CASE WHEN c.legality_standard = 'legal' THEN c.scryfall_id END) AS standardCount
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+    """)
+    fun observeFormatCoverage(colorFilter: String?, setFilter: String?, userId: String?): Flow<FormatCoverageProjection>
+
+    @Query("""
+        SELECT c.keywords FROM cards c
+        INNER JOIN user_card_collection uc ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY c.scryfall_id
+    """)
+    fun observeAllCollectionKeywords(colorFilter: String?, setFilter: String?, userId: String?): Flow<List<KeywordsProjection>>
+
+    /**
+     * Distinct owned card count per set, GLOBAL (no color/set filter — set completion is
+     * inherently per-set and independent of the active Stats filters).
+     */
+    @Query("""
+        SELECT c.set_code AS setCode, COUNT(DISTINCT uc.scryfall_id) AS count
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+        GROUP BY c.set_code
+    """)
+    fun observeDistinctOwnedCountBySet(userId: String?): Flow<List<SetCountProjection>>
+
+    // --- Hall of Fame enrichment (2026-07 stats expansion) ---
+
+    /**
+     * The card (by `oracle_id`) owned in the most distinct (set_code, lang) printings — see
+     * [VariantCardProjection] for the determinism technique. `oracle_id != ''` guards against
+     * blank-oracle-id rows (backfill-pending, per `project_card_versions_languages`) collapsing
+     * into one bogus group.
+     */
+    @Query("""
+        SELECT c.scryfall_id AS scryfallId, c.name AS name, c.image_art_crop AS imageArtCrop,
+               uc.is_foil AS isFoil, c.color_identity AS colorIdentity, c.set_code AS setCode,
+               c.set_name AS setName, c.rarity AS rarity,
+               CASE WHEN uc.is_foil = 1 AND c.price_usd_foil IS NOT NULL
+                    THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
+               CASE WHEN uc.is_foil = 1 AND c.price_eur_foil IS NOT NULL
+                    THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur,
+               COUNT(DISTINCT c.set_code || '|' || c.lang) AS variantCount,
+               MAX(c.released_at) AS releasedAt
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND c.oracle_id != ''
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY c.oracle_id
+        ORDER BY variantCount DESC
+        LIMIT 1
+    """)
+    fun observeMostVariantsCard(colorFilter: String?, setFilter: String?, userId: String?): Flow<VariantCardProjection?>
+
+    /**
+     * Up to [limit] distinct owned cards illustrated by [artist], for the Top Artist gallery row.
+     * Grouped by `scryfall_id` (same `MAX(uc.is_foil)` representative-row technique as
+     * [observeMostDuplicatedCard]) so a card owned as both foil and non-foil renders once.
+     */
+    @Query("""
+        SELECT c.scryfall_id AS scryfallId, c.name AS name, c.image_art_crop AS imageArtCrop,
+               c.image_normal AS imageNormal, MAX(uc.is_foil) AS isFoil,
+               c.color_identity AS colorIdentity, c.set_code AS setCode,
+               c.set_name AS setName, c.rarity AS rarity,
+               CASE WHEN MAX(uc.is_foil) = 1 AND c.price_usd_foil IS NOT NULL
+                    THEN c.price_usd_foil ELSE COALESCE(c.price_usd, 0) END AS priceUsd,
+               CASE WHEN MAX(uc.is_foil) = 1 AND c.price_eur_foil IS NOT NULL
+                    THEN c.price_eur_foil ELSE COALESCE(c.price_eur, 0) END AS priceEur
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND c.artist = :artist
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY c.scryfall_id
+        ORDER BY c.name ASC
+        LIMIT :limit
+    """)
+    fun observeCardsByArtist(artist: String?, colorFilter: String?, setFilter: String?, userId: String?, limit: Int): Flow<List<CardValueProjection>>
+
+    /**
+     * Owned card quantity grouped by release decade (e.g. `decade` = 1990 for the 1990s), derived
+     * from `released_at` ("YYYY-MM-DD"). Replaces the retired monthly-additions collection-growth
+     * chart (2026-07 stats expansion).
+     */
+    @Query("""
+        SELECT (CAST(SUBSTR(c.released_at, 1, 4) AS INTEGER) / 10) * 10 AS decade,
+               COALESCE(SUM(uc.quantity), 0) AS count
+        FROM user_card_collection uc INNER JOIN cards c ON uc.scryfall_id = c.scryfall_id
+        WHERE uc.is_deleted = 0
+          AND (:userId IS NULL OR uc.user_id = :userId OR uc.user_id IS NULL)
+          AND (:colorFilter IS NULL
+               OR (:colorFilter = '[]' AND c.color_identity = '[]')
+               OR (:colorFilter != '[]' AND c.color_identity LIKE '%' || :colorFilter || '%'))
+          AND (:setFilter IS NULL OR c.set_code = :setFilter)
+        GROUP BY decade
+        ORDER BY decade ASC
+    """)
+    fun observeCountByDecade(colorFilter: String?, setFilter: String?, userId: String?): Flow<List<DecadeCountProjection>>
 }

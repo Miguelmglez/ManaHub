@@ -106,6 +106,9 @@ import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
@@ -540,16 +543,12 @@ private fun CardsTabContent(
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.primaryAccent,
                     )
-                    TextButton(
+                    MagicCtaButton(
                         onClick = onClearFilters,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.collection_clear_filters),
-                            style = MaterialTheme.magicTypography.labelSmall,
-                            color = mc.lifeNegative,
-                        )
-                    }
+                        text = stringResource(R.string.collection_clear_filters),
+                        style = MagicCtaStyle.Ghost,
+                        color = MagicCtaColor.Error,
+                    )
                 }
             }
 

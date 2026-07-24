@@ -62,6 +62,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -351,22 +354,11 @@ fun WidgetGallerySheet(
             }
 
             // Footer
-            Button(
+            MagicCtaButton(
                 onClick = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp),
-                shape = ButtonShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.background
-                )
-            ) {
-                Text(
-                    text = stringResource(R.string.home_widget_gallery_done).uppercase(),
-                    style = ty.labelLarge
-                )
-            }
+                text = stringResource(R.string.home_widget_gallery_done),
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

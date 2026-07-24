@@ -63,8 +63,6 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -72,13 +70,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +87,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -101,6 +98,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -118,6 +116,10 @@ import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.LanguageBadge
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
@@ -137,6 +139,15 @@ import kotlinx.coroutines.cancel
 import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
+
+// ── Private helpers for copy ambiguity ──────────────────────────────────────
+
+private fun Color.withAlpha(alpha: Float): Color = this.copy(alpha = alpha)
+
+private fun TextStyle.withFontSize(size: TextUnit): TextStyle = this.copy(fontSize = size)
+private fun TextStyle.withWeight(weight: FontWeight): TextStyle = this.copy(fontWeight = weight)
+private fun TextStyle.withColor(color: Color): TextStyle = this.copy(color = color)
+private fun TextStyle.withLetterSpacing(spacing: TextUnit): TextStyle = this.copy(letterSpacing = spacing)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Root screen — entry point from navigation
@@ -558,9 +569,9 @@ private fun NameZoneIndicator(modifier: Modifier = Modifier) {
             val bracketH    = 14.dp.toPx()
 
             // Top border line
-            drawLine(accentColor.copy(alpha = 0.55f), androidx.compose.ui.geometry.Offset(left, top), androidx.compose.ui.geometry.Offset(right, top), stroke)
+            drawLine(accentColor.withAlpha(0.55f), androidx.compose.ui.geometry.Offset(left, top), androidx.compose.ui.geometry.Offset(right, top), stroke)
             // Bottom border line
-            drawLine(accentColor.copy(alpha = 0.55f), androidx.compose.ui.geometry.Offset(left, bottom), androidx.compose.ui.geometry.Offset(right, bottom), stroke)
+            drawLine(accentColor.withAlpha(0.55f), androidx.compose.ui.geometry.Offset(left, bottom), androidx.compose.ui.geometry.Offset(right, bottom), stroke)
 
             // Left bracket — top arm and bottom arm
             drawLine(accentColor, androidx.compose.ui.geometry.Offset(left, top), androidx.compose.ui.geometry.Offset(left, top + bracketH), strokeBold)
@@ -573,7 +584,7 @@ private fun NameZoneIndicator(modifier: Modifier = Modifier) {
             /*// Centre scan line (dashed)
             val mid = (top + bottom) / 2f
             drawLine(
-                color       = accentColor.copy(alpha = 0.18f),
+                color       = accentColor.withAlpha(0.18f),
                 start       = androidx.compose.ui.geometry.Offset(left + 28.dp.toPx(), mid),
                 end         = androidx.compose.ui.geometry.Offset(right - 28.dp.toPx(), mid),
                 strokeWidth = stroke * 0.6f,
@@ -584,12 +595,8 @@ private fun NameZoneIndicator(modifier: Modifier = Modifier) {
         // Label — "CARD NAME" aligned to zone left edge, just above the top line
         Text(
             text = stringResource(R.string.scanner_name_zone_label),
-            style = ty.labelSmall.copy(
-                fontSize = 9.sp,
-                letterSpacing = 1.5.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            ),
-            color = accentColor.copy(alpha = 0.75f),
+            style = ty.labelSmall.withFontSize(9.sp).withLetterSpacing(1.5.sp).withWeight(FontWeight.Bold),
+            color = accentColor.withAlpha(0.75f),
             modifier = Modifier
                 .padding(top = zoneTop - 18.dp, start = zoneLeftStart + 2.dp),
         )
@@ -672,8 +679,8 @@ private fun TopScannerControls(
             onClick = onBack,
             modifier = Modifier
                 .size(40.dp)
-                .background(mc.background.copy(0.6f), CircleShape)
-                .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                .background(mc.background.withAlpha(0.6f), CircleShape)
+                .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
         ) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = mc.textPrimary)
         }
@@ -685,10 +692,10 @@ private fun TopScannerControls(
                 modifier = Modifier
                     .size(40.dp)
                     .background(
-                        if (isRecognitionPausedByUser) mc.goldMtg.copy(0.9f) else mc.background.copy(0.6f),
+                        if (isRecognitionPausedByUser) mc.goldMtg.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
                         CircleShape
                     )
-                    .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                    .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
             ) {
                 Icon(
                     imageVector = if (isRecognitionPausedByUser) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
@@ -703,8 +710,8 @@ private fun TopScannerControls(
                     onClick = onOpenQueue,
                     modifier = Modifier
                         .size(40.dp)
-                        .background(mc.background.copy(0.6f), CircleShape)
-                        .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                        .background(mc.background.withAlpha(0.6f), CircleShape)
+                        .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
                 ) {
                     Icon(Icons.Rounded.Style, contentDescription = null, tint = mc.textPrimary)
                 }
@@ -722,10 +729,7 @@ private fun TopScannerControls(
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 4.dp)) {
                             Text(
                                 text = if (queueCount > 99) "+99" else queueCount.toString(),
-                                style = MaterialTheme.magicTypography.labelSmall.copy(
-                                    fontSize = 10.sp,
-                                    letterSpacing = 0.sp
-                                ),
+                                style = ty.labelSmall.withFontSize(10.sp).withLetterSpacing(0.sp),
                                 color = mc.background,
                                 fontWeight = FontWeight.Bold
                             )
@@ -739,8 +743,8 @@ private fun TopScannerControls(
                 onClick = { showLanguageSelector = true },
                 modifier = Modifier
                     .size(40.dp)
-                    .background(mc.background.copy(0.6f), CircleShape)
-                    .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                    .background(mc.background.withAlpha(0.6f), CircleShape)
+                    .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
             ) {
                 Text(text = CardConstants.getFlag(selectedLanguage), style = ty.titleLarge)
             }
@@ -756,10 +760,10 @@ private fun TopScannerControls(
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            if (isSettingsExpanded) mc.primaryAccent.copy(0.9f) else mc.background.copy(0.6f),
+                            if (isSettingsExpanded) mc.primaryAccent.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
                             CircleShape
                         )
-                        .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                        .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
                         .zIndex(1f) // Keep gear on top during animation
                 ) {
                     Icon(
@@ -781,10 +785,10 @@ private fun TopScannerControls(
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(
-                                    if (isSoundEnabled) mc.goldMtg.copy(0.9f) else mc.background.copy(0.6f),
+                                    if (isSoundEnabled) mc.goldMtg.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
                                     CircleShape
                                 )
-                                .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                                .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
                         ) {
                             Icon(
                                 imageVector = if (isSoundEnabled) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff,
@@ -800,10 +804,10 @@ private fun TopScannerControls(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .background(
-                                        if (isFlashOn) mc.goldMtg.copy(0.9f) else mc.background.copy(0.6f),
+                                        if (isFlashOn) mc.goldMtg.withAlpha(0.9f) else mc.background.withAlpha(0.6f),
                                         CircleShape
                                     )
-                                    .border(1.dp, mc.textPrimary.copy(0.12f), CircleShape)
+                                    .border(1.dp, mc.textPrimary.withAlpha(0.12f), CircleShape)
                             ) {
                                 Icon(
                                     imageVector = if (isFlashOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff,
@@ -885,7 +889,7 @@ private fun LanguageSelectorSheet(
                             .heightIn(min = 48.dp)
                             .clickable { onSelectLanguage(code) }
                             .then(
-                                if (isSelected) Modifier.background(mc.primaryAccent.copy(alpha = 0.08f))
+                                if (isSelected) Modifier.background(mc.primaryAccent.withAlpha(0.08f))
                                 else Modifier
                             )
                             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -932,7 +936,7 @@ private fun DetectedCardOverlay(
     val ty = MaterialTheme.magicTypography
 
     Surface(
-        color = mc.background.copy(alpha = 0.85f),
+        color = mc.background.withAlpha(0.85f),
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -991,7 +995,7 @@ private fun DetectedCardOverlay(
                                     if (isFoil) card.priceEurFoil else card.priceEur,
                                     preferredCurrency,
                                 ),
-                                style = ty.labelSmall.copy(letterSpacing = 0.sp),
+                                style = ty.labelSmall.withLetterSpacing(0.sp),
                                 color = mc.primaryAccent
                             )
                         }
@@ -999,7 +1003,7 @@ private fun DetectedCardOverlay(
 
                     // Attribute Pill (Normal, Set, Lang, Qty)
                     Surface(
-                        color = mc.textPrimary.copy(alpha = 0.1f),
+                        color = mc.textPrimary.withAlpha(0.1f),
                         shape = CircleShape,
                         modifier = Modifier.fillMaxWidth().height(32.dp)
                     ) {
@@ -1025,7 +1029,7 @@ private fun DetectedCardOverlay(
                                     color = mc.textPrimary
                                 )
                             }
-                            Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(mc.textPrimary.copy(alpha = 0.2f)))
+                            Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(mc.textPrimary.withAlpha(0.2f)))
                             Text(
                                 text = card.lang.uppercase(),
                                 style = ty.labelSmall,
@@ -1165,8 +1169,8 @@ private fun ScanQueueSheet(
                     leadingIcon = { Icon(Icons.Rounded.Search, null, tint = mc.textDisabled) },
                     shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = mc.textPrimary.copy(0.05f),
-                        focusedContainerColor = mc.textPrimary.copy(0.05f),
+                        unfocusedContainerColor = mc.textPrimary.withAlpha(0.05f),
+                        focusedContainerColor = mc.textPrimary.withAlpha(0.05f),
                         unfocusedBorderColor = Color.Transparent,
                         focusedBorderColor = Color.Transparent,
                         focusedTextColor = mc.textPrimary,
@@ -1201,28 +1205,20 @@ private fun ScanQueueSheet(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
+                    MagicCtaButton(
                         onClick = onAddAllToCollection,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent, contentColor = mc.background)
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.scanner_queue_add_all), style = ty.bodyLarge)
-                    }
+                        text = stringResource(R.string.scanner_queue_add_all),
+                        icon = @Composable { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                    OutlinedButton(
+                    MagicCtaButton(
                         onClick = onAddAllToWishlist,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = CircleShape,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.textPrimary),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, mc.textPrimary.copy(0.2f))
-                    ) {
-                        Icon(Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.scanner_queue_add_all_wishlist), style = ty.bodyLarge)
-                    }
+                        text = stringResource(R.string.scanner_queue_add_all_wishlist),
+                        icon = @Composable { Icon(Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(18.dp)) },
+                        style = MagicCtaStyle.Outlined,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
@@ -1278,7 +1274,7 @@ private fun QueueCardItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${entry.quantity}x ${entry.card.name}",
-                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp),
+                    style = ty.titleMedium.withWeight(FontWeight.Bold).withFontSize(18.sp),
                     color = mc.textPrimary
                 )
                 
@@ -1333,7 +1329,7 @@ private fun QueueCardItem(
                         if (entry.isFoil) entry.card.priceEurFoil else entry.card.priceEur,
                         preferredCurrency,
                     ),
-                    style = ty.labelLarge.copy(fontWeight = FontWeight.Bold, color = mc.goldMtg),
+                    style = ty.labelLarge.withWeight(FontWeight.Bold).withColor(mc.goldMtg),
                 )
             }
         }
@@ -1397,7 +1393,7 @@ private fun QueueCardItem(
 
         HorizontalDivider(
             modifier = Modifier.padding(top = 8.dp),
-            color = mc.textPrimary.copy(alpha = 0.05f)
+            color = mc.textPrimary.withAlpha(0.05f)
         )
     }
 }
@@ -1406,13 +1402,13 @@ private fun QueueCardItem(
 private fun AttrTag(text: String) {
     val mc = MaterialTheme.magicColors
     Surface(
-        color = mc.textPrimary.copy(0.1f),
+        color = mc.textPrimary.withAlpha(0.1f),
         shape = RoundedCornerShape(4.dp),
         modifier = Modifier.padding(vertical = 2.dp)
     ) {
         Text(
             text = text,
-            style = MaterialTheme.magicTypography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.sp),
+            style = MaterialTheme.magicTypography.labelSmall.withFontSize(10.sp).withLetterSpacing(0.sp),
             color = mc.textPrimary,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
         )
@@ -1481,53 +1477,23 @@ private fun CameraPermissionRequest(isPermanentlyDenied: Boolean, onRequest: () 
     Box(modifier = Modifier.fillMaxSize().background(mc.background), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.scanner_permission_camera_required), style = ty.bodyMedium, color = mc.textPrimary)
-            Button(
+            MagicCtaButton(
                 onClick = onRequest,
-                colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent, contentColor = mc.background)
-            ) {
-                Text(stringResource(R.string.scanner_permission_grant), style = ty.labelLarge)
-            }
+                text = stringResource(R.string.scanner_permission_grant),
+            )
         }
     }
 }
 
 @Composable
 private fun AmbiguityDropdown(cardName: String, onConfirm: () -> Unit, onSkip: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    androidx.compose.material3.AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onSkip,
-        title = {
-            Text(
-                text = stringResource(R.string.scanner_ambiguous_match),
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
-            Text(
-                text = cardName,
-                style = ty.bodyMedium,
-                color = mc.textSecondary,
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.background,
-                ),
-            ) {
-                Text(stringResource(R.string.scanner_confirm), style = ty.labelLarge)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onSkip) {
-                Text(stringResource(R.string.scanner_skip), style = ty.labelLarge, color = mc.textDisabled)
-            }
-        },
-        containerColor = mc.backgroundSecondary,
+        title = stringResource(R.string.scanner_ambiguous_match),
+        text = cardName,
+        confirmLabel = stringResource(R.string.scanner_confirm),
+        onConfirm = onConfirm,
+        dismissLabel = stringResource(R.string.scanner_skip),
+        onDismiss = onSkip,
     )
 }
-

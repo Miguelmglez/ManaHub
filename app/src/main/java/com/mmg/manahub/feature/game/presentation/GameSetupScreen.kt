@@ -95,6 +95,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.GameModeSelector
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.PlayerEditSheet
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -313,7 +317,7 @@ private fun GameSetupScreenContent(
                             label = "buttonScale",
                         )
 
-                        Button(
+                        MagicCtaButton(
                             onClick = {
                                 onStartGame(
                                     uiState.selectedMode,
@@ -322,27 +326,14 @@ private fun GameSetupScreenContent(
                                     uiState.gameSettings,
                                 )
                             },
+                            text = stringResource(R.string.gamesetup_begin_button),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(60.dp)
                                 .graphicsLayer {
                                     scaleX = buttonScale
                                     scaleY = buttonScale
-                                    shadowElevation = 8f
-                                    shape = RoundedCornerShape(12.dp)
-                                },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = mc.primaryAccent,
-                                contentColor = mc.background,
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.gamesetup_begin_button).uppercase(),
-                                style = MaterialTheme.magicTypography.titleLarge,
-                                color = mc.background,
-                            )
-                        }
+                                }
+                        )
 
                         // ── Play with friends button ──────────────────────────────────────
                         // Hidden entirely (not just disabled) while online sessions are
@@ -352,18 +343,12 @@ private fun GameSetupScreenContent(
                         // button would otherwise expose. Local same-device play stays reachable via
                         // the "Begin Game" button above, unaffected by this flag.
                         if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
-                            OutlinedButton(
+                            MagicCtaButton(
                                 onClick = { showFriendsSheet = true },
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.gamesetup_play_with_friends),
-                                    style = MaterialTheme.magicTypography.labelLarge,
-                                    color = mc.primaryAccent,
-                                )
-                            }
+                                text = stringResource(R.string.gamesetup_play_with_friends),
+                                style = MagicCtaStyle.Outlined,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }
@@ -1354,10 +1339,12 @@ private fun VoicePhrasesInfoDialog(
     val phrases = CommandGrammar.allEntries
         .filter { it.command == command && it.language in enabledLanguages }
 
-    AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, color = mc.textPrimary) },
-        text = {
+        title = title,
+        confirmLabel = stringResource(R.string.action_ok),
+        onConfirm = onDismiss,
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (phrases.isEmpty()) {
                     Text(
@@ -1398,12 +1385,6 @@ private fun VoicePhrasesInfoDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_ok), color = mc.primaryAccent)
-            }
-        },
-        containerColor = mc.surface,
+        }
     )
 }

@@ -10,8 +10,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.ln
 
-/** One color's share of the collection's colored mana-cost pips (0f..1f). */
-data class CollectionColorShare(val color: ManaColor, val share: Float)
+/** One color's share of the collection's colored mana-cost pips. [share] is the normalized
+ * fraction (0f..1f, sums to 1f across the returned list) consumed by ranking logic
+ * ([com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel.recomputeColorComboSuggestions]);
+ * [pipCount] is the RAW, un-normalized pip count -- callers feeding a UI element that displays an
+ * actual total (e.g. [com.mmg.manahub.core.ui.components.CircularDistribution]'s centered sum) must
+ * use [pipCount], never a share rescaled to an arbitrary int (see
+ * `feedback_circulardistribution_wizard_pipcount_not_scaled_share.md`). */
+data class CollectionColorShare(val color: ManaColor, val share: Float, val pipCount: Int)
 
 /** A STRATEGY tag the collection leans into, with how many distinct owned cards carry it. */
 data class CollectionStrategySignal(val tag: CardTag, val copies: Int)
@@ -84,7 +90,7 @@ class CollectionProfileUseCase(
         val total = counts.values.sum()
         if (total <= 0) return emptyList()
         return counts.entries
-            .map { (color, count) -> CollectionColorShare(color, count.toFloat() / total) }
+            .map { (color, count) -> CollectionColorShare(color, count.toFloat() / total, count) }
             .sortedWith(compareByDescending<CollectionColorShare> { it.share }.thenBy { it.color.name })
     }
 

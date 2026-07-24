@@ -17,6 +17,7 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.SuggestedTag
 import com.mmg.manahub.core.di.ApplicationScope
+import com.mmg.manahub.core.domain.repository.CardPriceUpdate
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.usecase.card.ResolveCardStrategyTagsUseCase
 import com.mmg.manahub.core.util.recordSafeNonFatal
@@ -481,6 +482,13 @@ class CardRepositoryImpl @Inject constructor(
             priceEurFoil = priceEurFoil,
             updatedAt = updatedAt,
         )
+    }
+
+    override suspend fun updatePricesBatch(updates: List<CardPriceUpdate>) {
+        if (updates.isEmpty()) return
+        withContext(ioDispatcher) {
+            cardDao.updatePricesBatch(updates)
+        }
     }
 
     override suspend fun warmCacheForIds(scryfallIds: List<String>) = withContext(ioDispatcher) {

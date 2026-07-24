@@ -648,7 +648,7 @@ private fun CardDetailContent(
 
     // High-quality curve for the shared element bounds
     val sharedBoundsTransform: BoundsTransform = BoundsTransform { _, _ ->
-        tween(durationMillis = 500, easing = FastOutSlowInEasing)
+        tween(durationMillis = 400, easing = FastOutSlowInEasing)
     }
 
     Column(
@@ -1763,13 +1763,13 @@ private fun PriceSection(card: Card) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             PricePill(
-                label = stringResource(R.string.carddetail_price_foil),
-                price = if (preferredCurrency == PreferredCurrency.EUR) card.priceEurFoil else card.priceUsdFoil,
+                label = stringResource(R.string.carddetail_price_normal),
+                price = if (preferredCurrency == PreferredCurrency.EUR) card.priceEur else card.priceUsd,
                 currency = preferredCurrency
             )
             PricePill(
-                label = stringResource(R.string.carddetail_price_normal),
-                price = if (preferredCurrency == PreferredCurrency.EUR) card.priceEur else card.priceUsd,
+                label = stringResource(R.string.carddetail_price_foil),
+                price = if (preferredCurrency == PreferredCurrency.EUR) card.priceEurFoil else card.priceUsdFoil,
                 currency = preferredCurrency
             )
         }
