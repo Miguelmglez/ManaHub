@@ -243,10 +243,10 @@ fun AppNavGraph(
                     navController = navController,
                     startDestination = Screen.Home.route,
                     modifier = Modifier,
-                    enterTransition = { fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 } },
-                    exitTransition = { fadeOut(tween(200)) },
-                    popEnterTransition = { fadeIn(tween(300)) },
-                    popExitTransition = { fadeOut(tween(200)) + slideOutHorizontally(tween(300)) { it / 5 } },
+                    enterTransition = { fadeIn(tween(400)) + slideInHorizontally(tween(400)) { it / 5 } },
+                    exitTransition = { fadeOut(tween(500)) },
+                    popEnterTransition = { fadeIn(tween(400)) },
+                    popExitTransition = { fadeOut(tween(500)) + slideOutHorizontally(tween(500)) { it / 5 } },
                 ) {
 
                     // ── Home (free-first dashboard) ───────────────────────────────────
@@ -467,7 +467,7 @@ fun AppNavGraph(
                         enterTransition = { 
                             fadeIn(tween(400)) + scaleIn(initialScale = 0.92f, animationSpec = tween(450))
                         },
-                        exitTransition = { fadeOut(tween(300)) }
+                        exitTransition = { fadeOut(tween(500)) }
                     ) { backStackEntry ->
                         val sharedTransitionKey = backStackEntry.arguments?.getString("sharedTransitionKey")
                         CardDetailScreen(
@@ -576,6 +576,8 @@ fun AppNavGraph(
                     onCardClick = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable,
                     onPlaytest = { deckId ->
                         navController.navigate(Screen.PlaytestSetup.createRoute(deckId))
                     },
@@ -621,9 +623,9 @@ fun AppNavGraph(
             // ── Stats ─────────────────────────────────────────────────────────
             composable(Screen.Stats.route) {
                 StatsScreen(
-                    onCardClick = { id ->
+                    onCardClick = { id, key ->
                         navController.navigate(
-                            Screen.CollectionCardDetail.createRoute(id)
+                            Screen.CollectionCardDetail.createRoute(id, key)
                         )
                     },
                     onBackClick = navController::popBackStack,
@@ -633,6 +635,8 @@ fun AppNavGraph(
                     onDeckClick = { deckId ->
                         navController.navigate(Screen.DeckStudio.createRoute(deckId))
                     },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable,
                 )
             }
 

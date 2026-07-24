@@ -127,6 +127,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.PlayerTheme
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
@@ -358,50 +362,30 @@ private fun GamePlayContent(
         }
 
         if (showExitDialog) {
-            AlertDialog(
+            MagicAlertDialog(
                 onDismissRequest = { showExitDialog = false },
-                title = { Text(stringResource(R.string.game_exit_title), color = mc.textPrimary) },
-                text = {
-                    Text(
-                        stringResource(R.string.game_exit_message),
-                        color = mc.textSecondary
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { onResetGame(); onBackHome() }) {
-                        Text(stringResource(R.string.game_exit_confirm), color = mc.lifeNegative)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showExitDialog = false }) {
-                        Text(stringResource(R.string.game_exit_cancel), color = mc.primaryAccent)
-                    }
-                },
-                containerColor = mc.surface,
+                title = stringResource(R.string.game_exit_title),
+                text = stringResource(R.string.game_exit_message),
+                confirmLabel = stringResource(R.string.game_exit_confirm),
+                onConfirm = { onResetGame(); onBackHome() },
+                confirmColor = MagicCtaColor.Error,
+                dismissLabel = stringResource(R.string.game_exit_cancel),
+                onDismiss = { showExitDialog = false },
+                dismissStyle = MagicCtaStyle.Ghost
             )
         }
 
         if (showResetDialog) {
-            AlertDialog(
+            MagicAlertDialog(
                 onDismissRequest = { showResetDialog = false },
-                title = { Text(stringResource(R.string.game_reset_title), color = mc.textPrimary) },
-                text = {
-                    Text(
-                        stringResource(R.string.game_reset_message),
-                        color = mc.textSecondary
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { onResetGame(); showResetDialog = false }) {
-                        Text(stringResource(R.string.game_reset_confirm), color = mc.lifeNegative)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showResetDialog = false }) {
-                        Text(stringResource(R.string.action_cancel), color = mc.primaryAccent)
-                    }
-                },
-                containerColor = mc.surface,
+                title = stringResource(R.string.game_reset_title),
+                text = stringResource(R.string.game_reset_message),
+                confirmLabel = stringResource(R.string.game_reset_confirm),
+                onConfirm = { onResetGame(); showResetDialog = false },
+                confirmColor = MagicCtaColor.Error,
+                dismissLabel = stringResource(R.string.action_cancel),
+                onDismiss = { showResetDialog = false },
+                dismissStyle = MagicCtaStyle.Ghost
             )
         }
 
@@ -1070,20 +1054,15 @@ private fun PlayerCard(
                             (gameMode == GameMode.COMMANDER && player.commanderDamage.values.any { it >= 21 })
 
                     if (player.isSurviving && meetsDefeat) {
-                        OutlinedButton(
-                            onClick  = onConfirmDefeat,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        MagicCtaButton(
+                            onClick = onConfirmDefeat,
+                            text = stringResource(R.string.game_pending_defeat_confirm),
+                            style = MagicCtaStyle.Outlined,
+                            color = MagicCtaColor.Accent,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .offset(y = if (tier == CardTier.LARGE) 48.dp else 36.dp),
-                            border   = BorderStroke(1.dp, theme.accent),
-                        ) {
-                            Text(
-                                stringResource(R.string.game_pending_defeat_confirm),
-                                style = MaterialTheme.magicTypography.labelMedium,
-                                color = theme.accent
-                            )
-                        }
+                        )
                     }
                 }
                 // ── Footer: actions + active-player controls (Bottom) ─────────
@@ -1151,33 +1130,25 @@ private fun PlayerCard(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.padding(12.dp),
                     ) {
                         Text(text = stringResource(R.string.game_skull_symbol), style = mt.titleMedium, textAlign = TextAlign.Center)
 
-                        Button(
+                        MagicCtaButton(
                             onClick = onConfirmDefeat,
-                            colors = ButtonDefaults.buttonColors(containerColor = mc.lifeNegative),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.game_pending_defeat_confirm),
-                                style = mt.labelMedium
-                            )
-                        }
-                        OutlinedButton(
-                            onClick  = onRevokeDefeat,
-                            colors   = ButtonDefaults.outlinedButtonColors(
-                                contentColor = mc.lifePositive,
-                            ),
-                            border   = BorderStroke(1.dp, mc.lifePositive),
-                        ) {
-                            Text(
-                                stringResource(R.string.game_pending_defeat_revoke),
-                                style = MaterialTheme.magicTypography.labelMedium,
-                            )
-                        }
+                            text = stringResource(R.string.game_pending_defeat_confirm),
+                            color = MagicCtaColor.Error,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        MagicCtaButton(
+                            onClick = onRevokeDefeat,
+                            text = stringResource(R.string.game_pending_defeat_revoke),
+                            style = MagicCtaStyle.Outlined,
+                            color = MagicCtaColor.Success,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -2164,32 +2135,20 @@ private fun ConfirmDefeatSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedButton(
+                    MagicCtaButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = mc.lifePositive
-                        ),
-                        border = BorderStroke(1.dp, mc.lifePositive.copy(alpha = 0.5f))
-                    ) {
-                        Text(
-                            stringResource(R.string.game_confirm_defeat_alive),
-                            style = ty.labelLarge
-                        )
-                    }
+                        text = stringResource(R.string.game_confirm_defeat_alive),
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Success,
+                        modifier = Modifier.weight(1f)
+                    )
 
-                    Button(
+                    MagicCtaButton(
                         onClick = onConfirm,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = mc.lifeNegative
-                        )
-                    ) {
-                        Text(
-                            stringResource(R.string.game_confirm_defeat_defeat),
-                            style = ty.labelLarge
-                        )
-                    }
+                        text = stringResource(R.string.game_confirm_defeat_defeat),
+                        color = MagicCtaColor.Error,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 Spacer(Modifier.height(16.dp))
             }

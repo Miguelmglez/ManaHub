@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
 import com.mmg.manahub.feature.decks.domain.engine.card
 import kotlin.test.Test
@@ -51,5 +52,38 @@ class RankOwnedCardsForProfileUseCaseTest {
     fun `an empty collection yields an empty list, never a crash`() {
         val result = useCase(StrategyProfile(archetype = ArchetypeId.RAMP), emptyList())
         assertTrue(result.isEmpty())
+    }
+
+    // ── Color-identity filter (bug fix -- Deck Wizard entry-flow audit) ──────────
+    // StrategyProfile.colors was captured on every Flow B/C pick but never actually consulted here,
+    // so an off-color owned card could surface as a suggested seed for a deck whose colors the user
+    // had already chosen in the SAME flow. See RankOwnedCardsForProfileUseCase's KDoc on the filter.
+
+    @Test
+    fun `once colors are picked, a strategy-matching but off-color card is excluded`() {
+        val offColor = card(id = "c1", name = "Ramp Spell", tags = listOf(CardTag.RAMP), colorIdentity = listOf("U"))
+        val result = useCase(StrategyProfile(archetype = ArchetypeId.RAMP, colors = setOf(ManaColor.R)), listOf(offColor))
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `once colors are picked, a strategy-matching card within those colors is still included`() {
+        val onColor = card(id = "c1", name = "Ramp Spell", tags = listOf(CardTag.RAMP), colorIdentity = listOf("R"))
+        val result = useCase(StrategyProfile(archetype = ArchetypeId.RAMP, colors = setOf(ManaColor.R)), listOf(onColor))
+        assertEquals(listOf("c1"), result.map { it.scryfallId })
+    }
+
+    @Test
+    fun `a card whose color identity is a strict subset of the picked colors is included`() {
+        val partial = card(id = "c1", name = "Ramp Spell", tags = listOf(CardTag.RAMP), colorIdentity = listOf("R"))
+        val result = useCase(StrategyProfile(archetype = ArchetypeId.RAMP, colors = setOf(ManaColor.R, ManaColor.G)), listOf(partial))
+        assertEquals(listOf("c1"), result.map { it.scryfallId })
+    }
+
+    @Test
+    fun `with no colors picked yet, ranking falls back to strategy fit alone -- unchanged behavior`() {
+        val anyColor = card(id = "c1", name = "Ramp Spell", tags = listOf(CardTag.RAMP), colorIdentity = listOf("U"))
+        val result = useCase(StrategyProfile(archetype = ArchetypeId.RAMP), listOf(anyColor))
+        assertEquals(listOf("c1"), result.map { it.scryfallId })
     }
 }

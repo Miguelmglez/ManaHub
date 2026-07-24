@@ -22,8 +22,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.RssFeed
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -33,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,6 +52,9 @@ import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -148,17 +148,16 @@ fun NewsFilterSheet(
                     color = mc.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = {
-                    selectedTypes = setOf(SourceType.ARTICLE, SourceType.VIDEO)
-                    selectedLanguages = NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES.toSet()
-                    selectedSourceIds = allEnabledSourceIds
-                }) {
-                    Text(
-                        text = stringResource(R.string.action_reset),
-                        color = mc.lifeNegative,
-                        style = ty.labelMedium
-                    )
-                }
+                MagicCtaButton(
+                    onClick = {
+                        selectedTypes = setOf(SourceType.ARTICLE, SourceType.VIDEO)
+                        selectedLanguages = NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES.toSet()
+                        selectedSourceIds = allEnabledSourceIds
+                    },
+                    text = stringResource(R.string.action_reset),
+                    style = MagicCtaStyle.Ghost,
+                    color = MagicCtaColor.Error,
+                )
             }
 
             // ── Scrollable Content ──────────────────────────────────────────────
@@ -225,20 +224,19 @@ fun NewsFilterSheet(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            TextButton(
+                            MagicCtaButton(
                                 onClick = { selectedSourceIds = allEnabledSourceIds },
+                                text = stringResource(R.string.news_filter_select_all),
+                                style = MagicCtaStyle.Ghost,
                                 modifier = Modifier.height(32.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                Text(stringResource(R.string.news_filter_select_all), style = ty.labelSmall, color = mc.primaryAccent)
-                            }
-                            TextButton(
+                            )
+                            MagicCtaButton(
                                 onClick = { selectedSourceIds = emptySet() },
+                                text = stringResource(R.string.news_filter_deselect_all),
+                                style = MagicCtaStyle.Ghost,
+                                color = MagicCtaColor.Neutral,
                                 modifier = Modifier.height(32.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                Text(stringResource(R.string.news_filter_deselect_all), style = ty.labelSmall, color = mc.textDisabled)
-                            }
+                            )
                         }
                         
                         FlowRow(
@@ -258,29 +256,18 @@ fun NewsFilterSheet(
             }
 
             // ── Apply Button ──
-            Button(
+            MagicCtaButton(
                 onClick = {
                     val resolvedSourceIds = if (selectedSourceIds == allEnabledSourceIds) null
                     else selectedSourceIds
                     onApply(selectedTypes, selectedLanguages, resolvedSourceIds)
                     handleDismiss()
                 },
+                text = stringResource(R.string.news_filter_apply),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.background,
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.news_filter_apply),
-                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
-            }
+                    .padding(16.dp),
+            )
         }
     }
 }

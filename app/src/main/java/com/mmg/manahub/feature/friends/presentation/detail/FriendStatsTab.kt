@@ -18,8 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Update
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -90,18 +89,10 @@ fun FriendStatsTab(
                         modifier = Modifier.padding(horizontal = 32.dp),
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(
+                    MagicCtaButton(
                         onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = mc.primaryAccent,
-                            contentColor = mc.background,
-                        ),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.action_retry),
-                            style = MaterialTheme.magicTypography.labelLarge,
-                        )
-                    }
+                        text = stringResource(R.string.action_retry),
+                    )
                 }
             }
 

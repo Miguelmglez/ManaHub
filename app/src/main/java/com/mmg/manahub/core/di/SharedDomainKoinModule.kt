@@ -16,8 +16,10 @@ import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.domain.usecase.collection.UpdateCollectionEntryUseCase
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
+import com.mmg.manahub.core.data.usecase.stats.GetTradeStatsUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
+import com.mmg.manahub.core.domain.usecase.stats.GetSetCompletionCountsUseCase
 import com.mmg.manahub.core.tagging.createStrategyAnalyzer
 import com.mmg.manahub.feature.draft.domain.usecase.AutoPickUseCase
 import com.mmg.manahub.feature.draft.domain.usecase.CompleteDraftUseCase
@@ -93,6 +95,12 @@ fun sharedDomainKoinModule(
     single { BuildScryfallQueryUseCase() }
     single { GetCollectionSetCodesUseCase(repository = get()) }
     single { GetCollectionStatsUseCase(repository = get()) }
+    // Phase 2 (2026-07 stats expansion) — set completion.
+    single { GetSetCompletionCountsUseCase(repository = get()) }
+    // Phase 4 (2026-07 stats expansion) — trade stats. Lives in :shared:core-data (not
+    // core-domain) because it depends on TradesRepository, which is a core-data interface
+    // (see TradesRepository's own KDoc) — core-domain has no Gradle dependency on core-data.
+    single { GetTradeStatsUseCase(tradesRepository = get(), friendRepository = get()) }
     single { GetCollectionUseCase(repository = get()) }
     single {
         RefreshCollectionPricesUseCase(

@@ -11,6 +11,21 @@ data class DeckStats(
 /** Domain equivalent of [com.mmg.manahub.core.data.local.dao.ModeCount]. */
 data class GameModeCount(val mode: String, val count: Int)
 
+/**
+ * Win-rate aggregate grouped by game mode, resolved against the local seat (`is_local = 1`,
+ * ADR-001) — every recorded game, not capped to a recent-history window (Phase 3, 2026-07 stats
+ * expansion). Domain equivalent of [com.mmg.manahub.core.data.local.dao.ModeWinrateRow].
+ */
+data class ModeWinrate(val mode: String, val totalGames: Int, val wins: Int)
+
+/**
+ * Win-rate aggregate keyed by the exact persisted session player count, resolved against the
+ * local seat (`is_local = 1`, ADR-001). Bucketing into "2 / 3 / 4+" is a presentation concern
+ * handled by the caller (Phase 3, 2026-07 stats expansion). Domain equivalent of
+ * [com.mmg.manahub.core.data.local.dao.PlayerCountWinrateRow].
+ */
+data class PlayerCountWinrate(val playerCount: Int, val totalGames: Int, val wins: Int)
+
 /** Domain equivalent of [com.mmg.manahub.core.data.local.dao.EliminationCount]. */
 data class EliminationStats(val eliminationReason: String, val count: Int)
 

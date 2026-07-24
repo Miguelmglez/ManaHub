@@ -69,6 +69,7 @@ import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
@@ -104,17 +105,32 @@ import org.jetbrains.compose.resources.painterResource
  * @param onRemove invoked when the close button is tapped (removes the slot).
  */
 @Composable
-internal fun CardRow(
+fun CardRow(
     entry: DeckSlotEntry,
     isInCollection: Boolean,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val card = entry.card
+    if (card != null) {
+        // Delegates to the [Card]-based overload -- the single visual source of truth for a
+        // resolved slot. Only an unresolved slot (card == null) keeps its own minimal fallback
+        // below, since the [Card]-based overload requires a non-null card.
+        CardRow(
+            card = card,
+            isInCollection = isInCollection,
+            onClick = onClick,
+            onRemove = onRemove,
+            modifier = modifier,
+            quantity = entry.quantity,
+        )
+        return
+    }
+
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-
     Surface(
         onClick = onClick,
         shape = ChipShape,
@@ -127,7 +143,81 @@ internal fun CardRow(
             horizontalArrangement = Arrangement.spacedBy(spacing.sm)
         ) {
             AsyncImage(
-                model = entry.card?.imageNormal,
+                model = null,
+                contentDescription = null,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
+                fallback = painterResource(Res.drawable.mtg_card_back),
+                modifier = Modifier.size(width = 44.dp, height = 60.dp),
+                contentScale = ContentScale.Crop
+            )
+            CardName(
+                name = stringResource(R.string.deck_default_name),
+                showFrontOnly = true,
+                style = ty.bodyMedium,
+                color = mc.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (entry.quantity > 1) {
+                Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.2f)) {
+                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs))
+                }
+            }
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+/**
+ * The [Card]-based sibling of the [DeckSlotEntry] overload above -- renders the identical visual
+ * (image thumbnail, name, type line, mana cost, quantity badge, owned indicator, remove
+ * affordance) but takes a raw [Card] instead of a deck-specific [DeckSlotEntry], so any caller
+ * with only a `List<Card>` (e.g. the Deck Wizard's seed-picking flow, which has no
+ * [DeckSlotEntry]) can reuse the exact same row instead of duplicating this markup.
+ *
+ * @param card the card to render.
+ * @param isInCollection whether the user owns this card (shows a bookmark icon).
+ * @param onClick invoked when the row body is tapped.
+ * @param onRemove invoked when the trailing close button is tapped; the button is hidden
+ *   entirely when null (e.g. a picker preview with no remove affordance).
+ * @param modifier optional [Modifier].
+ * @param quantity shown as a "×N" badge when greater than 1.
+ * @param selected when true, tints the row's container with the same primaryAccent selected
+ *   convention used elsewhere in the app (e.g. the Deck Wizard's `StrategyOptionRow`/
+ *   `DirectionChip`) -- defaults to `false` so every pre-existing call site of this overload
+ *   (DeckStudioScreen.kt, the Deck Wizard's seed-picker section) stays visually unchanged.
+ */
+@Composable
+fun CardRow(
+    card: Card,
+    isInCollection: Boolean,
+    onClick: () -> Unit,
+    onRemove: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    quantity: Int = 1,
+    selected: Boolean = false,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Surface(
+        onClick = onClick,
+        shape = ChipShape,
+        color = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
+        modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) {}
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+        ) {
+            AsyncImage(
+                model = card.imageNormal,
                 contentDescription = null,
                 placeholder = painterResource(Res.drawable.mtg_card_back),
                 error = painterResource(Res.drawable.mtg_card_back),
@@ -137,7 +227,7 @@ internal fun CardRow(
             )
             Box(Modifier.weight(1f).height(60.dp)) {
                 CardName(
-                    name          = entry.card?.name ?: stringResource(R.string.deck_default_name),
+                    name          = card.name,
                     showFrontOnly = true,
                     style         = ty.bodyMedium,
                     color         = mc.textPrimary,
@@ -145,18 +235,16 @@ internal fun CardRow(
                     overflow      = TextOverflow.Ellipsis,
                     modifier      = Modifier.align(Alignment.TopStart)
                 )
-                entry.card?.typeLine?.let {
-                    Text(
-                        it,
-                        style = ty.bodySmall,
-                        color = mc.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.align(Alignment.CenterStart)
-                    )
-                }
+                Text(
+                    card.typeLine,
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                )
 
-                val manaCost = entry.card?.manaCost
+                val manaCost = card.manaCost
                 if (manaCost != null) {
                     ManaCostImages(
                         manaCost = manaCost,
@@ -165,16 +253,18 @@ internal fun CardRow(
                     )
                 }
             }
-            if (entry.quantity > 1) {
+            if (quantity > 1) {
                 Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.2f)) {
-                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs))
+                    Text("×$quantity", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs))
                 }
             }
             if (isInCollection) {
                 Icon(Icons.Rounded.CollectionsBookmark, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(14.dp))
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+            if (onRemove != null) {
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+                }
             }
         }
     }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -131,6 +132,9 @@ import com.mmg.manahub.core.ui.components.DraftSetCard
 import com.mmg.manahub.core.ui.components.NewsItemCard
 import com.mmg.manahub.core.ui.components.NewsItemOrientation
 import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.search.SetPickerSheet
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -208,8 +212,8 @@ private fun WidgetShell(
         modifier = modifier
             .fillMaxWidth()
             .then(clickModifier)
-            .padding(vertical = spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            .padding(vertical = spacing.xxs),
+        verticalArrangement = Arrangement.spacedBy(spacing.xxs),
     ) {
         ColumnScopeMarker.content()
     }
@@ -248,8 +252,8 @@ private fun WidgetSectionHeader(
     val spacing = MaterialTheme.spacing
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        modifier = modifier.fillMaxWidth().padding(bottom = spacing.xs)
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -380,7 +384,7 @@ fun HomeBoardSkeleton(modifier: Modifier = Modifier) {
     val spacing = MaterialTheme.spacing
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         repeat(HOME_BOARD_SKELETON_BLOCK_COUNT) {
             HomeBoardSkeletonBlock()
@@ -462,62 +466,64 @@ fun HomeWidgetHost(
             )
         }
 
-        when (widget.type) {
-            HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
-            HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
-                actions = uiState.quickStartActions,
-                onAction = onAction,
-            )
-            HomeWidgetType.PROGRESSION_HUB -> ProgressionHubWidget(uiState.gamification, onAction)
-            HomeWidgetType.QUESTS_HUB -> QuestsHubWidget(uiState.gamification, onAction)
-            HomeWidgetType.GAME_STATS_HUB -> GameStatsHubWidget(uiState, onAction)
-            HomeWidgetType.COLLECTION_STATS_HUB -> CollectionStatsHubWidget(uiState, onAction)
-            HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
-            HomeWidgetType.RECENTLY_ADDED -> RecentlyAddedWidget(
-                entries = uiState.recentlyAdded,
-                onAction = onAction,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-            HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(
-                stats = uiState.wishlistStats,
-                isAuthenticated = uiState.isAuthenticated,
-                authResolved = uiState.authResolved,
-                onAction = onAction,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-            HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(
-                cards = uiState.discoverCards,
-                loadState = uiState.discoverLoadState,
-                onAction = onAction,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-            HomeWidgetType.CARD_OF_THE_DAY -> RandomCardWidget(
-                card = uiState.cardOfTheDay,
-                loadState = uiState.randomCardLoadState,
-                onAction = onAction,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-            HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
-            HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
-            HomeWidgetType.RULES_TIP -> RulesTipWidget()
-            HomeWidgetType.FRIENDS -> FriendsWidget(
-                friends = uiState.friends,
-                friendCount = uiState.friendCount,
-                latestFriendRequestName = uiState.latestFriendRequestName,
-                isAuthenticated = uiState.isAuthenticated,
-                authResolved = uiState.authResolved,
-                onAction = onAction,
-            )
-            HomeWidgetType.COMMUNITY_DECKS -> CommunityDecksWidget(
-                decks = communityDecks,
-                onAction = onAction,
-            )
-            HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
-            HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
+        Box {
+            when (widget.type) {
+                HomeWidgetType.CONTEXT_HERO -> ContextHeroWidget(uiState.hero, onAction)
+                HomeWidgetType.QUICK_ACTIONS -> QuickActionsWidget(
+                    actions = uiState.quickStartActions,
+                    onAction = onAction,
+                )
+                HomeWidgetType.PROGRESSION_HUB -> ProgressionHubWidget(uiState.gamification, onAction)
+                HomeWidgetType.QUESTS_HUB -> QuestsHubWidget(uiState.gamification, onAction)
+                HomeWidgetType.GAME_STATS_HUB -> GameStatsHubWidget(uiState, onAction)
+                HomeWidgetType.COLLECTION_STATS_HUB -> CollectionStatsHubWidget(uiState, onAction)
+                HomeWidgetType.YOUR_DECKS_SHELF -> DecksShelfWidget(uiState.decks, onAction)
+                HomeWidgetType.RECENTLY_ADDED -> RecentlyAddedWidget(
+                    entries = uiState.recentlyAdded,
+                    onAction = onAction,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+                HomeWidgetType.WISHLIST_PROGRESS -> WishlistWidget(
+                    stats = uiState.wishlistStats,
+                    isAuthenticated = uiState.isAuthenticated,
+                    authResolved = uiState.authResolved,
+                    onAction = onAction,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+                HomeWidgetType.DISCOVER_CARDS -> DiscoverCardsWidget(
+                    cards = uiState.discoverCards,
+                    loadState = uiState.discoverLoadState,
+                    onAction = onAction,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+                HomeWidgetType.CARD_OF_THE_DAY -> RandomCardWidget(
+                    card = uiState.cardOfTheDay,
+                    loadState = uiState.randomCardLoadState,
+                    onAction = onAction,
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+                HomeWidgetType.LATEST_SETS -> LatestSetsWidget(uiState.latestSets, onAction)
+                HomeWidgetType.MTG_NEWS -> NewsWidget(uiState.recentNews, uiState.newsFiltersActive, onAction)
+                HomeWidgetType.RULES_TIP -> RulesTipWidget()
+                HomeWidgetType.FRIENDS -> FriendsWidget(
+                    friends = uiState.friends,
+                    friendCount = uiState.friendCount,
+                    latestFriendRequestName = uiState.latestFriendRequestName,
+                    isAuthenticated = uiState.isAuthenticated,
+                    authResolved = uiState.authResolved,
+                    onAction = onAction,
+                )
+                HomeWidgetType.COMMUNITY_DECKS -> CommunityDecksWidget(
+                    decks = communityDecks,
+                    onAction = onAction,
+                )
+                HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
+                HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
+            }
         }
     }
 }
@@ -571,7 +577,10 @@ private fun TrendingCommandersWidget(
     val topCommanders = trending?.topCommanders.orEmpty()
     if (topCommanders.isEmpty()) return
 
-    WidgetShell(onClick = { onAction(HomeAction.OpenCommunityDecks) }, onClickLabel = stringResourceSafe(R.string.widget_title_trending_commanders)) {
+    WidgetShell(
+        onClick = { onAction(HomeAction.OpenCommunityDecks) },
+        onClickLabel = stringResourceSafe(R.string.widget_title_trending_commanders),
+    ) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             items(topCommanders.take(5)) { commander ->
                 DeckItem(
@@ -949,14 +958,14 @@ internal fun FirstStepsCarousel(
     WidgetShell {
         WidgetSectionHeader(
             title = stringResourceSafe(R.string.first_steps_section_label),
-            icon = Icons.Default.AutoAwesome
+            icon = Icons.Default.AutoAwesome,
         )
 
         Box(contentAlignment = Alignment.Center) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = spacing.xl)
+                contentPadding = PaddingValues(horizontal = spacing.lg)
             ) { page ->
                 val step = steps.getOrNull(page) ?: steps.first()
                 val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
@@ -1069,18 +1078,17 @@ internal fun FirstStepsCarousel(
 
             if (steps.size > 1) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 2.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.ChevronLeft,
                         contentDescription = stringResourceSafe(R.string.home_carousel_previous),
-                        tint = mc.primaryAccent.copy(alpha = 0.5f),
+                        tint = mc.primaryAccent.copy(alpha = 0.4f),
                         modifier = Modifier
-                            .size(28.dp)
+                            .offset(x = (-12).dp)
+                            .size(24.dp)
                             .alpha(if (pagerState.currentPage > 0) 1f else 0.1f)
                             .clip(CircleShape)
                             .clickable(enabled = pagerState.currentPage > 0) {
@@ -1092,9 +1100,10 @@ internal fun FirstStepsCarousel(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = stringResourceSafe(R.string.home_carousel_next),
-                        tint = mc.primaryAccent.copy(alpha = 0.5f),
+                        tint = mc.primaryAccent.copy(alpha = 0.4f),
                         modifier = Modifier
-                            .size(28.dp)
+                            .offset(x = 12.dp)
+                            .size(24.dp)
                             .alpha(if (pagerState.currentPage < steps.size - 1) 1f else 0.1f)
                             .clip(CircleShape)
                             .clickable(enabled = pagerState.currentPage < steps.size - 1) {
@@ -1498,7 +1507,7 @@ private fun QuickActionTile(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(spacing.md),
+                .padding(horizontal = spacing.md , vertical = spacing.xs),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -1569,7 +1578,7 @@ private fun <T> AutoSlideHub(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = spacing.xl)
+                contentPadding = PaddingValues(horizontal = spacing.lg)
             ) { page ->
                 val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
                 val alphaValue = (1f - kotlin.math.abs(pageOffset)).coerceIn(0f, 1f)
@@ -1609,16 +1618,17 @@ private fun <T> AutoSlideHub(
 
         if (showNavigationIcons && slides.size > 1) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = Icons.Default.ChevronLeft,
                     contentDescription = stringResourceSafe(R.string.home_carousel_previous),
-                    tint = mc.primaryAccent.copy(alpha = 0.25f),
+                    tint = mc.primaryAccent.copy(alpha = 0.4f),
                     modifier = Modifier
-                        .size(28.dp)
+                        .offset(x = (-12).dp)
+                        .size(24.dp)
                         .alpha(if (pagerState.currentPage > 0) 1f else 0.1f)
                         .clip(CircleShape)
                         .clickable(enabled = pagerState.currentPage > 0) {
@@ -1630,9 +1640,10 @@ private fun <T> AutoSlideHub(
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = stringResourceSafe(R.string.home_carousel_next),
-                    tint = mc.primaryAccent.copy(alpha = 0.25f),
+                    tint = mc.primaryAccent.copy(alpha = 0.4f),
                     modifier = Modifier
-                        .size(28.dp)
+                        .offset(x = 12.dp)
+                        .size(24.dp)
                         .alpha(if (pagerState.currentPage < slides.size - 1) 1f else 0.1f)
                         .clip(CircleShape)
                         .clickable(enabled = pagerState.currentPage < slides.size - 1) {
@@ -3463,12 +3474,13 @@ private fun ColorIdentityDots(colors: Set<String>) {
     val spacing = MaterialTheme.spacing
     if (colors.isEmpty()) return
     Row(horizontalArrangement = Arrangement.spacedBy(spacing.xxs)) {
-        listOf("W", "U", "B", "R", "G").filter { it in colors }.forEach { code ->
+        listOf("W", "U", "B", "R", "G", "C").filter { it in colors }.forEach { code ->
             val color = when (code) {
                 "W" -> mc.manaW
                 "U" -> mc.manaU
                 "B" -> mc.manaB
                 "R" -> mc.manaR
+                "C" -> mc.manaC
                 else -> mc.manaG
             }
             Box(
@@ -3589,23 +3601,14 @@ private fun FriendAvatarRow(friends: List<Friend>) {
 
 @Composable
 private fun PillButton(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Surface(
-        color = mc.primaryAccent,
-        shape = ButtonShape,
-        modifier = modifier.heightIn(min = 48.dp).clip(ButtonShape).clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.xs, Alignment.CenterHorizontally),
-        ) {
-            Icon(icon, contentDescription = null, tint = mc.background, modifier = Modifier.size(18.dp))
-            Text(label, style = ty.labelMedium, color = mc.background, maxLines = 1)
-        }
-    }
+    MagicCtaButton(
+        onClick = onClick,
+        text = label,
+        icon = {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        },
+        modifier = modifier
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
