@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.usecase.collection
 
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.domain.repository.CardPriceUpdate
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import kotlinx.coroutines.flow.Flow
@@ -52,27 +53,39 @@ class RefreshCollectionPricesUseCase(
             val totalChunks = chunks.size
             var updatedCount = 0
             var notFoundCount = 0
+            // Accumulated across ALL chunks and written in a SINGLE call after the fetch loop
+            // finishes. CardDao.updatePricesBatch is already @Transaction, so one call here means
+            // Room fires exactly ONE table-level invalidation for the whole refresh, instead of one
+            // per 75-card chunk — a large collection previously invalidated (and forced every Stats
+            // Flow to recombine + re-parse) dozens of times in quick succession, which was a
+            // contributing factor to a production OOM (see feedback_stats_room_invalidation_oom memory).
+            val allUpdates = mutableListOf<CardPriceUpdate>()
 
             chunks.forEachIndexed { index, chunk ->
                 emit(Result.Progress(current = index + 1, total = totalChunks))
 
                 val response = scryfallDataSource.getCardCollection(chunk)
+                val now = Clock.System.now().toEpochMilliseconds()
 
                 response.data.forEach { cardDto ->
                     val prices = cardDto.prices
-                    cardRepository.updatePrices(
-                        scryfallId = cardDto.id,
-                        priceUsd = prices.usd?.toDoubleOrNull(),
-                        priceUsdFoil = prices.usdFoil?.toDoubleOrNull(),
-                        priceEur = prices.eur?.toDoubleOrNull(),
-                        priceEurFoil = prices.eurFoil?.toDoubleOrNull(),
-                        updatedAt = Clock.System.now().toEpochMilliseconds(),
+                    allUpdates.add(
+                        CardPriceUpdate(
+                            scryfallId = cardDto.id,
+                            priceUsd = prices.usd?.toDoubleOrNull(),
+                            priceUsdFoil = prices.usdFoil?.toDoubleOrNull(),
+                            priceEur = prices.eur?.toDoubleOrNull(),
+                            priceEurFoil = prices.eurFoil?.toDoubleOrNull(),
+                            updatedAt = now,
+                        )
                     )
                     updatedCount++
                 }
 
                 notFoundCount += response.notFound.size
             }
+
+            cardRepository.updatePricesBatch(allUpdates)
 
             emit(Result.Success(
                 updatedCount = updatedCount,

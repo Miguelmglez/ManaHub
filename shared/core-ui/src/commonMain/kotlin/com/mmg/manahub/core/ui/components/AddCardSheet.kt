@@ -72,7 +72,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.ui.theme.BottomSheetShape
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardCornerRadius
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.coloredShadow
@@ -427,7 +426,7 @@ fun AddCardSheet(
                 modifier = Modifier.fillMaxWidth().padding(top = spacing.sm),
                 verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
-                Button(
+                MagicCtaButton(
                     onClick = {
                         if (!confirmed) {
                             confirmed = true
@@ -440,37 +439,16 @@ fun AddCardSheet(
                         }
                     },
                     enabled = !confirmed,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = ButtonShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor = mc.onAccent
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Text(
-                        confirmButtonText.uppercase(),
-                        style = ty.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                    text = confirmButtonText,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-                TextButton(
+                MagicCtaButton(
                     onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = ButtonShape,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = mc.textSecondary
-                    )
-                ) {
-                    Text(
-                        "Cancel".uppercase(),
-                        style = ty.labelMedium,
-                    )
-                }
+                    text = "Cancel",
+                    style = MagicCtaStyle.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             Spacer(Modifier.height(spacing.xl))

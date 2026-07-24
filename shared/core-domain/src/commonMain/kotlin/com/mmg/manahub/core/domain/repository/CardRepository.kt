@@ -126,6 +126,9 @@ interface CardRepository {
         priceEurFoil: Double?,
         updatedAt:    Long,
     )
+
+    /** Batch sibling of [updatePrices] to reduce database/observer churn. */
+    suspend fun updatePricesBatch(updates: List<CardPriceUpdate>)
     suspend fun evictStaleCache()
 
     /**
@@ -168,3 +171,13 @@ interface CardRepository {
      */
     suspend fun warmCacheForIds(scryfallIds: List<String>)
 }
+
+/** Carrier for a single card's price update. */
+data class CardPriceUpdate(
+    val scryfallId:   String,
+    val priceUsd:     Double?,
+    val priceUsdFoil: Double?,
+    val priceEur:     Double?,
+    val priceEurFoil: Double?,
+    val updatedAt:    Long,
+)

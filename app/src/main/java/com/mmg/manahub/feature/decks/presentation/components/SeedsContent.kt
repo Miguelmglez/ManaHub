@@ -344,39 +344,24 @@ private fun SeedResultRow(card: Card, onAdd: () -> Unit) {
     }
 }
 
-/** A picked-seed hero row with art and a remove button. */
+/**
+ * A picked-seed hero row. Delegates to the shared [CardRow] ([Card]-based overload) -- the same
+ * visual (full [Card.imageNormal] thumbnail, name, type line, mana cost, remove affordance) used
+ * for every other card row in the app, rather than this sheet's own bespoke art-crop row.
+ */
 @Composable
 private fun SeedHeroRow(card: Card, onRemove: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(
-        shape = CardShape,
-        color = mc.surface,
+    CardRow(
+        card = card,
+        isInCollection = false,
+        // No detail-open destination from this sheet -- the row body is a no-op tap target,
+        // only the trailing close button removes the seed (mirrors the L2 fix documented on
+        // the original SeedResultRow: never let a body tap silently duplicate a trailing
+        // icon's action).
+        onClick = {},
+        onRemove = onRemove,
         modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(MaterialTheme.spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
-        ) {
-            AsyncImage(
-                model = card.imageArtCrop,
-                contentDescription = null,
-                placeholder = painterResource(Res.drawable.mtg_card_back),
-                error = painterResource(Res.drawable.mtg_card_back),
-                fallback = painterResource(Res.drawable.mtg_card_back),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(width = 64.dp, height = 46.dp).clip(ChipShape),
-            )
-            Column(Modifier.weight(1f)) {
-                CardName(name = card.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(card.typeLine, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.deck_seeds_remove_seed), tint = mc.textSecondary)
-            }
-        }
-    }
+    )
 }
 
 /** Inferred identity card: mana pips + detected strategy. */

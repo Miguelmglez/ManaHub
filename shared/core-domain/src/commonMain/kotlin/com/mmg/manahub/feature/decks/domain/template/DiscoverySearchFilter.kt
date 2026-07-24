@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.decks.domain.template
 
+import com.mmg.manahub.core.model.Card
+
 /**
  * Deck Engine Unification plan D7 (Phase 4.2) -- pure, client-side filtering over an
  * already-computed [DeckDiscoveryV2] list. No network, no recomputation of the clusters
@@ -42,4 +44,31 @@ object DiscoverySearchFilter {
      */
     fun pickableCardNames(discoveries: List<DeckDiscoveryV2>): List<String> =
         discoveries.flatMap { it.members }.map { it.name }.distinct().sorted()
+
+    /**
+     * Every distinct member [Card] across [discoveries] that matches the SAME [query]/
+     * [selectedCardNames] filter [apply] uses for clusters (ANDed, same semantics) — this is the
+     * flat "matching cards" preview shown directly under the search bar, so the search query
+     * narrows both WHICH strategy clusters show (via [apply]) and WHICH individual cards show in
+     * that preview, instead of the query only ever affecting the cluster list. Blank query and
+     * empty [selectedCardNames] -- empty result (the preview is search-triggered only, never a
+     * full unfiltered card dump).
+     */
+    fun matchingCards(
+        discoveries: List<DeckDiscoveryV2>,
+        query: String,
+        selectedCardNames: Set<String>,
+    ): List<Card> {
+        val trimmedQuery = query.trim()
+        if (trimmedQuery.isEmpty() && selectedCardNames.isEmpty()) return emptyList()
+
+        val lowerNames = selectedCardNames.map { it.lowercase() }.toSet()
+        return discoveries.flatMap { it.members }
+            .distinctBy { it.scryfallId }
+            .filter { card ->
+                val matchesQuery = trimmedQuery.isEmpty() || card.name.contains(trimmedQuery, ignoreCase = true)
+                val matchesCards = lowerNames.isEmpty() || card.name.lowercase() in lowerNames
+                matchesQuery && matchesCards
+            }
+    }
 }

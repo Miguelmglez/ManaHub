@@ -3,15 +3,13 @@ package com.mmg.manahub.feature.decks.presentation.wizard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,12 +25,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,12 +40,18 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -59,9 +63,11 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
-import com.mmg.manahub.core.ui.components.CardName
-import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.Res
+import com.mmg.manahub.core.ui.components.CircularDistribution
+import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -75,7 +81,9 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
 import com.mmg.manahub.feature.decks.domain.template.OwnedCommanderCandidate
 import com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate
-import kotlin.math.roundToInt
+import com.mmg.manahub.feature.decks.presentation.components.CardRow
+import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
+import org.jetbrains.compose.resources.painterResource
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Step 2 — Direction
@@ -167,124 +175,179 @@ private fun CardsFlowDirectionContent(
     val isCommanderFormat = uiState.selectedFormat == DeckFormat.COMMANDER
     val canProceed = !isCommanderFormat || uiState.selectedCommander != null
 
+    // Visual-overhaul pass: every card tile in this step (seed search results, commander
+    // candidates/search results) can be tap-zoomed in place via MagicCardInspectionOverlay,
+    // mirroring DeckStudioScreen's Strategies-tab inline inspection pattern (`inspectionCard`/
+    // `inspectionRect`/`isDismissingInspection`) -- rootCoordinates anchors every tile's captured
+    // Rect to THIS Box so the flight animation lines up regardless of scroll position.
+    var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var inspectionCard by remember { mutableStateOf<Card?>(null) }
+    var inspectionRect by remember { mutableStateOf(Rect.Zero) }
+    var isDismissingInspection by remember { mutableStateOf(false) }
+    val onZoomCard: (Card, Rect) -> Unit = { card, rect ->
+        isDismissingInspection = false
+        inspectionCard = card
+        inspectionRect = rect
+    }
+
     // C1 (design review): the sticky CTA is a real Column sibling, not a Box overlay with a
     // guessed bottom-padding reservation (see FormatStepContent for the full rationale).
-    Column(Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(start = spacing.lg, end = spacing.lg, top = spacing.md, bottom = spacing.md),
-            verticalArrangement = Arrangement.spacedBy(spacing.lg),
-        ) {
-            item(key = "header") {
-                Column {
-                    Text(stringResource(R.string.deck_wizard_direction_title), style = ty.titleLarge, color = mc.textPrimary)
-                    Text(
-                        stringResource(R.string.deck_wizard_direction_subtitle),
-                        style = ty.bodyMedium,
-                        color = mc.textSecondary,
-                        modifier = Modifier.padding(top = spacing.xxs),
-                    )
-                }
-            }
-
-            if (isCommanderFormat) {
-                item(key = "commander_section") {
-                    CommanderPickerSection(
-                        uiState = uiState,
-                        onQueryChange = onCommanderQueryChange,
-                        onSelect = onSelectCommander,
-                        onClear = onClearCommander,
-                    )
-                }
-            }
-
-            item(key = "collection_leans") {
-                CollectionLeanSection(
-                    uiState = uiState,
-                    onSelectDirectionTag = onSelectDirectionTag,
-                    onSelectTribe = onSelectTribe,
-                )
-            }
-
-            item(key = "seed_toggle") {
-                SeedPickerToggleRow(expanded = uiState.showSeedPicker, onToggle = onToggleSeedPicker)
-            }
-            if (uiState.showSeedPicker) {
-                item(key = "seed_search") {
-                    SeedSearchInline(query = uiState.seedQuery, isSearching = uiState.isSearchingSeeds, onQueryChange = onSeedQueryChange)
-                }
-                if (uiState.seedQuery.trim().length >= 2 && uiState.seedSearchResults.isNotEmpty()) {
-                    items(uiState.seedSearchResults, key = { "seedres_${it.scryfallId}" }) { card ->
-                        WizardCardPickRow(card = card, onAdd = { onAddSeed(card) })
+    Box(Modifier.fillMaxSize().onGloballyPositioned { rootCoordinates = it }) {
+        Column(Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(start = spacing.lg, end = spacing.lg, top = spacing.md, bottom = spacing.md),
+                verticalArrangement = Arrangement.spacedBy(spacing.lg),
+            ) {
+                item(key = "header") {
+                    Column {
+                        Text(stringResource(R.string.deck_wizard_direction_title), style = ty.titleLarge, color = mc.textPrimary)
+                        Text(
+                            stringResource(R.string.deck_wizard_direction_subtitle),
+                            style = ty.bodyMedium,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(top = spacing.xxs),
+                        )
                     }
                 }
-                if (uiState.seedCards.isNotEmpty()) {
-                    item(key = "seed_picked_header") {
+
+                // Seed cards moved to the TOP of the step (visual-overhaul pass): picking a few
+                // seed cards is the most common entry point for Flow A and should not be buried
+                // below the commander picker / collection leans.
+                item(key = "seed_toggle") {
+                    SeedPickerToggleRow(expanded = uiState.showSeedPicker, onToggle = onToggleSeedPicker)
+                }
+                if (uiState.showSeedPicker) {
+                    item(key = "seed_search") {
+                        SeedSearchInline(query = uiState.seedQuery, isSearching = uiState.isSearchingSeeds, onQueryChange = onSeedQueryChange)
+                    }
+                    if (uiState.seedQuery.trim().length >= 2 && uiState.seedSearchResults.isNotEmpty()) {
+                        item(key = "seed_search_results") {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                                items(uiState.seedSearchResults, key = { "seedres_${it.scryfallId}" }) { card ->
+                                    WizardCardImageTile(
+                                        card = card,
+                                        rootCoordinates = rootCoordinates,
+                                        onSelect = { onAddSeed(card) },
+                                        onZoom = onZoomCard,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (uiState.seedCards.isNotEmpty()) {
+                        item(key = "seed_picked_header") {
+                            Text(
+                                stringResource(R.string.deck_seeds_picked_title),
+                                style = ty.labelMedium,
+                                color = mc.textSecondary,
+                                modifier = Modifier.padding(top = spacing.xs),
+                            )
+                        }
+                        items(uiState.seedCards, key = { "seedpick_${it.scryfallId}" }) { card ->
+                            // Global CardRow (image-based) replaces the old text-only
+                            // WizardCardPickedRow -- onClick opens the same inline zoom (no
+                            // on-screen rect is tracked for this full-width row, so it flies in
+                            // from Rect.Zero, same fallback SynergyCardTile uses when its
+                            // rootCoordinates is null).
+                            CardRow(
+                                card = card,
+                                isInCollection = true,
+                                onClick = { onZoomCard(card, Rect.Zero) },
+                                onRemove = { onRemoveSeed(card) },
+                            )
+                        }
+                    }
+                }
+
+                if (isCommanderFormat) {
+                    item(key = "commander_section") {
+                        CommanderPickerSection(
+                            uiState = uiState,
+                            rootCoordinates = rootCoordinates,
+                            onQueryChange = onCommanderQueryChange,
+                            onSelect = onSelectCommander,
+                            onClear = onClearCommander,
+                            onZoom = onZoomCard,
+                        )
+                    }
+                }
+
+                item(key = "collection_leans") {
+                    CollectionLeanSection(
+                        uiState = uiState,
+                        onSelectDirectionTag = onSelectDirectionTag,
+                        onSelectTribe = onSelectTribe,
+                    )
+                }
+
+                // Deck Engine Unification plan (§5 Phase 3.2, RC5) — once at least one seed (or the
+                // commander) is picked, rank viable strategies FROM the seeds themselves instead of
+                // leaving the user to guess a Direction chip that may not even fit what they just picked.
+                val suggestion = uiState.seedStrategySuggestion
+                if (suggestion != null) {
+                    item(key = "seed_strategy_header") {
                         Text(
-                            stringResource(R.string.deck_seeds_picked_title),
-                            style = ty.labelMedium,
-                            color = mc.textSecondary,
+                            stringResource(R.string.deck_wizard_suggested_strategies_title),
+                            style = ty.labelLarge,
+                            color = mc.primaryAccent,
                             modifier = Modifier.padding(top = spacing.xs),
                         )
                     }
-                    items(uiState.seedCards, key = { "seedpick_${it.scryfallId}" }) { card ->
-                        WizardCardPickedRow(card = card, onRemove = { onRemoveSeed(card) })
+                    if (!suggestion.isCoherent) {
+                        item(key = "seed_coherence_warning") {
+                            SeedCoherenceWarning()
+                        }
                     }
-                }
-            }
-
-            // Deck Engine Unification plan (§5 Phase 3.2, RC5) — once at least one seed (or the
-            // commander) is picked, rank viable strategies FROM the seeds themselves instead of
-            // leaving the user to guess a Direction chip that may not even fit what they just picked.
-            val suggestion = uiState.seedStrategySuggestion
-            if (suggestion != null) {
-                item(key = "seed_strategy_header") {
-                    Text(
-                        stringResource(R.string.deck_wizard_suggested_strategies_title),
-                        style = ty.labelLarge,
-                        color = mc.primaryAccent,
-                        modifier = Modifier.padding(top = spacing.xs),
-                    )
-                }
-                if (!suggestion.isCoherent) {
-                    item(key = "seed_coherence_warning") {
-                        SeedCoherenceWarning()
-                    }
-                }
-                if (suggestion.candidates.isEmpty()) {
-                    item(key = "seed_strategy_empty") {
-                        Text(
-                            stringResource(R.string.deck_wizard_suggested_strategies_empty),
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                        )
-                    }
-                } else {
-                    item(key = "seed_strategy_chips") {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                        ) {
-                            suggestion.candidates.forEach { candidate ->
-                                val selected = candidate.profile.archetype == uiState.selectedArchetype &&
-                                    candidate.profile.themes.firstOrNull() == uiState.selectedDirectionTheme &&
-                                    candidate.profile.tribe == uiState.selectedTribeKey
-                                DirectionChip(
-                                    label = candidate.label,
-                                    selected = selected,
-                                    onClick = { onSelectSeedStrategyCandidate(candidate) },
-                                )
+                    if (suggestion.candidates.isEmpty()) {
+                        item(key = "seed_strategy_empty") {
+                            Text(
+                                stringResource(R.string.deck_wizard_suggested_strategies_empty),
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                            )
+                        }
+                    } else {
+                        item(key = "seed_strategy_chips") {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                            ) {
+                                suggestion.candidates.forEach { candidate ->
+                                    val selected = candidate.profile.archetype == uiState.selectedArchetype &&
+                                        candidate.profile.themes.firstOrNull() == uiState.selectedDirectionTheme &&
+                                        candidate.profile.tribe == uiState.selectedTribeKey
+                                    DirectionChip(
+                                        label = candidate.label,
+                                        selected = selected,
+                                        onClick = { onSelectSeedStrategyCandidate(candidate) },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+            WizardStickyButton(
+                label = stringResource(R.string.deck_wizard_next),
+                enabled = canProceed,
+                onClick = onNext,
+            )
         }
-        WizardStickyButton(
-            label = stringResource(R.string.deck_wizard_next),
-            enabled = canProceed,
-            onClick = onNext,
-        )
+
+        inspectionCard?.let { card ->
+            MagicCardInspectionOverlay(
+                card = card,
+                initialRect = inspectionRect,
+                isVisible = true,
+                isDismissing = isDismissingInspection,
+                onDismissRequest = { isDismissingInspection = true },
+                onDismiss = {
+                    inspectionCard = null
+                    isDismissingInspection = false
+                },
+            )
+        }
     }
 }
 
@@ -309,9 +372,11 @@ private fun SeedCoherenceWarning() {
 @Composable
 private fun CommanderPickerSection(
     uiState: DeckWizardUiState,
+    rootCoordinates: LayoutCoordinates?,
     onQueryChange: (String) -> Unit,
     onSelect: (Card) -> Unit,
     onClear: () -> Unit,
+    onZoom: (Card, Rect) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -322,7 +387,23 @@ private fun CommanderPickerSection(
 
         val commander = uiState.selectedCommander
         if (commander != null) {
-            WizardHeroRow(card = commander, onRemove = onClear)
+            // Global CommanderBanner replaces the old bespoke WizardHeroRow -- an explicit
+            // "Change commander" affordance sits below it since the banner itself has no clear
+            // action (unlike the old row's trailing close icon).
+            CommanderBanner(commander = commander, modifier = Modifier.fillMaxWidth())
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(onClick = onClear),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.deck_wizard_change_commander),
+                    style = ty.labelMedium,
+                    color = mc.textSecondary,
+                )
+            }
             return@Column
         }
 
@@ -330,7 +411,12 @@ private fun CommanderPickerSection(
         if (candidates.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
                 items(candidates, key = { "cand_${it.card.scryfallId}" }) { candidate: OwnedCommanderCandidate ->
-                    CommanderCandidateCard(candidate = candidate, onClick = { onSelect(candidate.card) })
+                    WizardCardImageTile(
+                        card = candidate.card,
+                        rootCoordinates = rootCoordinates,
+                        onSelect = { onSelect(candidate.card) },
+                        onZoom = onZoom,
+                    )
                 }
             }
         }
@@ -363,32 +449,102 @@ private fun CommanderPickerSection(
             ),
         )
         if (uiState.commanderQuery.trim().length >= 2 && uiState.commanderSearchResults.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                // L2 (design review): explicit key for stability across recomposition, matching
-                // the sibling seed-search-results list's LazyColumn `key = {...}` convention.
-                uiState.commanderSearchResults.take(8).forEach { card ->
-                    key(card.scryfallId) {
-                        WizardCardPickRow(card = card, onAdd = { onSelect(card) })
-                    }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                items(uiState.commanderSearchResults.take(8), key = { "candres_${it.scryfallId}" }) { card ->
+                    WizardCardImageTile(
+                        card = card,
+                        rootCoordinates = rootCoordinates,
+                        onSelect = { onSelect(card) },
+                        onZoom = onZoom,
+                    )
                 }
             }
         }
     }
 }
 
+/** Tile width matching the 63:88 standard MTG card aspect (mirrors `DiscoveryRow.kt`'s
+ * `SynergyCardTile` proportions so every card-image tile in the app looks consistent). */
+private val WizardTileWidth = 88.dp
+private const val WIZARD_CARD_ASPECT_RATIO = 63f / 88f
+
+/**
+ * The shared image+magnifier tile for every card-picking surface in the Direction step (commander
+ * candidates/search results, seed search results). Unlike `DiscoveryRow.kt`'s `SynergyCardTile`
+ * (a single tap = zoom), this tile needs TWO independent actions on one thumbnail: tapping the
+ * card image itself SELECTS it (adds as a seed / picks as commander), while the small magnifier
+ * badge in the bottom-end corner opens [MagicCardInspectionOverlay] instead -- the badge is a
+ * sibling `Box` layered on top with its own `clickable`, so a tap within its bounds is consumed by
+ * the badge and never reaches the image's `clickable` underneath. Visual precedent:
+ * [com.mmg.manahub.core.ui.components.VariantSelectorSheet]'s `VariantCardItem` magnifier badge
+ * and `DiscoveryRow.kt`'s `SynergyCardTile` (`Icons.Default.ZoomIn`, translucent circular scrim).
+ *
+ * @param rootCoordinates the step's root `Box` coordinates (see [CardsFlowDirectionContent]) the
+ *   captured [Rect] is relative to; `null` skips rect tracking (zoom still opens, from [Rect.Zero]).
+ * @param onSelect invoked when the card image itself is tapped.
+ * @param onZoom invoked with the card and its on-screen [Rect] when the magnifier badge is tapped.
+ */
 @Composable
-private fun CommanderCandidateCard(candidate: OwnedCommanderCandidate, onClick: () -> Unit) {
+private fun WizardCardImageTile(
+    card: Card,
+    rootCoordinates: LayoutCoordinates?,
+    onSelect: () -> Unit,
+    onZoom: (Card, Rect) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(onClick = onClick, shape = CardShape, color = mc.surface, modifier = Modifier.width(120.dp)) {
-        Column(Modifier.padding(MaterialTheme.spacing.sm), verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
-            AsyncImage(
-                model = candidate.card.imageArtCrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(72.dp).clip(ChipShape),
-            )
-            CardName(name = candidate.card.name, style = ty.labelMedium, color = mc.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    val spacing = MaterialTheme.spacing
+    var tileRect by remember { mutableStateOf(Rect.Zero) }
+    val zoomDescription = stringResource(R.string.deck_wizard_zoom_card, card.name)
+
+    Box(
+        modifier = modifier
+            .width(WizardTileWidth)
+            .aspectRatio(WIZARD_CARD_ASPECT_RATIO)
+            .clip(CardShape)
+            .background(mc.surfaceVariant)
+            .onGloballyPositioned { coords ->
+                val root = rootCoordinates
+                if (root != null && root.isAttached && coords.isAttached) {
+                    tileRect = root.localBoundingBoxOf(coords)
+                }
+            },
+    ) {
+        AsyncImage(
+            model = card.imageNormal,
+            contentDescription = card.name,
+            placeholder = painterResource(Res.drawable.mtg_card_back),
+            error = painterResource(Res.drawable.mtg_card_back),
+            fallback = painterResource(Res.drawable.mtg_card_back),
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CardShape)
+                .clickable(onClick = onSelect),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(48.dp)
+                .clickable { onZoom(card, tileRect) }
+                .semantics { contentDescription = zoomDescription },
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(spacing.xxs)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ZoomIn,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
     }
 }
@@ -406,6 +562,10 @@ private fun CommanderCandidateCard(candidate: OwnedCommanderCandidate, onClick: 
  * "arbitrary tag" pin anywhere left to carry it). See [DeckIdentitySeedTags]'s `THEME_TAGS` KDoc
  * for how the 4 originally-called-out dead tags (`plus_counters`/`death_triggers`/`spellslinger`/
  * `etb`) all resolve under the new mapping.
+ *
+ * Visual-overhaul pass: the per-color bar rows (`ColorLeanRow`) were replaced by the shared
+ * [CircularDistribution] ring chart (same component `StatsScreen` uses for its color-distribution
+ * ring), fed the collection's FULL colored-pip share breakdown instead of just the top 3.
  */
 @Composable
 private fun CollectionLeanSection(
@@ -437,12 +597,31 @@ private fun CollectionLeanSection(
             return@Column
         }
 
-        profile.colorShares.take(3).forEach { share ->
-            ColorLeanRow(color = share.color, sharePercent = (share.share * 100).roundToInt())
+        if (profile.colorShares.isNotEmpty()) {
+            // CircularDistribution expects the exact English color names as map keys
+            // ("White"/"Blue"/.../"Colorless", which is exactly ManaColor.displayName) and
+            // computes BOTH the legend percentages AND its centered "Total" number from the map's
+            // raw values -- it must be fed a genuine count, not a normalized share rescaled to an
+            // arbitrary int. The previous `(share * 1000f).roundToInt()` fed synthetic weights that
+            // always summed to ~1000, so the ring's centered "Total" showed a meaningless number
+            // instead of the collection's real colored-pip count (StatsScreen's own
+            // CircularDistribution calls always feed real counts -- this call site was the only one
+            // that didn't). [CollectionColorShare.pipCount] is the raw pip count; see
+            // feedback_circulardistribution_wizard_pipcount_not_scaled_share.md for the full root
+            // cause (colorShares() never contains a zero-share entry, so the previously-suspected
+            // coerceAtLeast(1)-hides-zero-share bug does not actually occur).
+            val colorData = remember(profile.colorShares) {
+                profile.colorShares.associate { it.color.displayName to it.pipCount }
+            }
+            CircularDistribution(
+                data = colorData,
+                colorMapper = { label -> manaPipColor(label, mc.primaryAccent) },
+                isColor = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
 
         if (profile.dominantStrategies.isNotEmpty() || profile.dominantTribes.isNotEmpty()) {
-            Spacer(Modifier.height(spacing.xxs))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(spacing.xs),
@@ -481,20 +660,26 @@ private fun CollectionLeanSection(
     }
 }
 
-@Composable
-private fun ColorLeanRow(color: ManaColor, sharePercent: Int) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-        ManaSymbolImage(token = color.symbol, size = 20.dp)
-        Text(
-            text = stringResource(R.string.deck_wizard_direction_color_lean, color.displayName, sharePercent),
-            style = ty.bodySmall,
-            color = mc.textSecondary,
-        )
-    }
+/** Official MTG pip colors for [CollectionLeanSection]'s ring chart, mirroring `StatsScreen`'s own
+ * color-distribution hex values so the same color always represents White/Blue/Black/Red/Green
+ * across the app (a fixed real-world MTG color identity, not a themed value -- same justified
+ * raw-[Color] precedent as `StatsScreen.DistributionsSection`). */
+private fun manaPipColor(label: String, fallback: Color): Color = when (label) {
+    "White" -> Color(0xFFF9FAFA)
+    "Blue" -> Color(0xFF0E68AB)
+    "Black" -> Color(0xFF150B00)
+    "Red" -> Color(0xFFD3202A)
+    "Green" -> Color(0xFF00733E)
+    "Colorless" -> Color(0xFF90ADBB)
+    else -> fallback
 }
 
+/** Same color language as `DeckStudioScreen`'s `StrategiesTabContent` search chips (a plain M3
+ * `FilterChip` with `selectedContainerColor = primaryAccent @ 0.2f` / `selectedLabelColor =
+ * primaryAccent`, no border) -- direction-tag chips and strategy-search chips must read as the
+ * same visual language across the app. Kept as a custom [Surface] (not swapped for a real M3
+ * `FilterChip`) so the explicit `heightIn(min = 48.dp)` touch-target floor survives; a bare
+ * `FilterChip` at its default M3 sizing does not guarantee that. */
 @Composable
 internal fun DirectionChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
@@ -502,8 +687,7 @@ internal fun DirectionChip(label: String, selected: Boolean, onClick: () -> Unit
     Surface(
         onClick = onClick,
         shape = ChipShape,
-        color = if (selected) mc.primaryAccent.copy(alpha = 0.18f) else mc.surface,
-        border = if (selected) BorderStroke(1.dp, mc.primaryAccent) else BorderStroke(0.5.dp, mc.surfaceVariant),
+        color = if (selected) mc.primaryAccent.copy(alpha = 0.2f) else mc.surface,
     ) {
         Text(
             text = label,
@@ -564,87 +748,6 @@ private fun SeedSearchInline(query: String, isSearching: Boolean, onQueryChange:
     )
 }
 
-@Composable
-private fun WizardCardPickRow(card: Card, onAdd: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(shape = CardShape, color = mc.surface, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(MaterialTheme.spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
-        ) {
-            AsyncImage(
-                model = card.imageArtCrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(ChipShape),
-            )
-            Column(Modifier.weight(1f)) {
-                CardName(name = card.name, style = ty.bodyMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(card.setName, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(onClick = onAdd, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.deck_seeds_add_seed), tint = mc.primaryAccent)
-            }
-        }
-    }
-}
-
-@Composable
-private fun WizardCardPickedRow(card: Card, onRemove: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(shape = CardShape, color = mc.surface, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(MaterialTheme.spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
-        ) {
-            AsyncImage(
-                model = card.imageArtCrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(width = 52.dp, height = 38.dp).clip(ChipShape),
-            )
-            CardName(
-                name = card.name, style = ty.bodyMedium, color = mc.textPrimary,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.deck_seeds_remove_seed), tint = mc.textSecondary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun WizardHeroRow(card: Card, onRemove: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(MaterialTheme.spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.md),
-        ) {
-            AsyncImage(
-                model = card.imageArtCrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(width = 64.dp, height = 46.dp).clip(ChipShape),
-            )
-            Column(Modifier.weight(1f)) {
-                CardName(name = card.name, style = ty.titleMedium, color = mc.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(card.typeLine, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.deck_wizard_change_commander), tint = mc.textSecondary)
-            }
-        }
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Step 3 — Identity
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -661,82 +764,90 @@ internal fun IdentityStepContent(
     val spacing = MaterialTheme.spacing
     val isCommanderFormat = uiState.selectedFormat == DeckFormat.COMMANDER
 
-    // C1 (design review): the sticky CTA is a real Column sibling, weight(1f) + verticalScroll on
-    // the content above it -- no guessed bottom-padding reservation (see FormatStepContent).
+    // D2: only offer EDHREC theme strings that resolve onto a real ThemeId -- an unresolvable
+    // free-form aggregate tag has nowhere to bind under the unified taxonomy (mirrors
+    // CollectionLeanSection's own dead-chip filter).
+    val resolvableThemeTags = remember(uiState.availableThemeTags) {
+        uiState.availableThemeTags.filter { ThemeId.fromDisplayName(it) != null }
+    }
+
+    // Visual-overhaul pass: the theme picker now needs one full row PER theme (name +
+    // description), which no longer fits a wrapping FlowRow of chips -- the whole step moved from
+    // Column+verticalScroll to a real LazyColumn (mirrors CardsFlowDirectionContent's own
+    // container) so the theme list gets genuine LazyColumn semantics/keys instead of nesting an
+    // unbounded LazyColumn inside a scrollable Column.
     Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = spacing.lg),
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = spacing.lg, vertical = spacing.md),
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
         ) {
-            Spacer(Modifier.height(spacing.md))
-            Column {
-                Text(stringResource(R.string.deck_wizard_identity_title), style = ty.titleLarge, color = mc.textPrimary)
-                Text(
-                    if (isCommanderFormat) stringResource(R.string.deck_wizard_identity_subtitle_commander)
-                    else stringResource(R.string.deck_wizard_identity_subtitle_casual),
-                    style = ty.bodyMedium,
-                    color = mc.textSecondary,
-                    modifier = Modifier.padding(top = spacing.xxs),
-                )
+            item(key = "header") {
+                Column {
+                    Text(stringResource(R.string.deck_wizard_identity_title), style = ty.titleLarge, color = mc.textPrimary)
+                    Text(
+                        if (isCommanderFormat) stringResource(R.string.deck_wizard_identity_subtitle_commander)
+                        else stringResource(R.string.deck_wizard_identity_subtitle_casual),
+                        style = ty.bodyMedium,
+                        color = mc.textSecondary,
+                        modifier = Modifier.padding(top = spacing.xxs),
+                    )
+                }
             }
 
-            Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    Text(stringResource(R.string.deck_seeds_identity_colors).uppercase(), style = ty.labelMedium, color = mc.primaryAccent)
-                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                        ManaColor.entries.filter { it != ManaColor.C }.forEach { color ->
-                            ColorToggleChip(
-                                color = color,
-                                selected = color in uiState.colorIdentity,
-                                readOnly = isCommanderFormat,
-                                onClick = { onToggleColor(color) },
-                            )
+            item(key = "color_identity") {
+                Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                        Text(stringResource(R.string.deck_seeds_identity_colors).uppercase(), style = ty.labelMedium, color = mc.primaryAccent)
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                            ManaColor.entries.filter { it != ManaColor.C }.forEach { color ->
+                                ColorToggleChip(
+                                    color = color,
+                                    selected = color in uiState.colorIdentity,
+                                    readOnly = isCommanderFormat,
+                                    onClick = { onToggleColor(color) },
+                                )
+                            }
                         }
-                    }
-                    if (uiState.colorIdentity.isEmpty()) {
-                        Text(stringResource(R.string.deck_seeds_identity_colorless), style = ty.bodySmall, color = mc.textSecondary)
+                        if (uiState.colorIdentity.isEmpty()) {
+                            Text(stringResource(R.string.deck_seeds_identity_colorless), style = ty.bodySmall, color = mc.textSecondary)
+                        }
                     }
                 }
             }
 
             if (uiState.showColorDisciplineHint) {
-                Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = stringResource(R.string.deck_wizard_color_discipline_hint),
-                        style = ty.bodySmall,
-                        color = mc.textSecondary,
-                        modifier = Modifier.padding(spacing.md),
-                    )
+                item(key = "color_discipline_hint") {
+                    Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.12f), modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = stringResource(R.string.deck_wizard_color_discipline_hint),
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                            modifier = Modifier.padding(spacing.md),
+                        )
+                    }
                 }
             }
 
             if (uiState.isLoadingThemeTags) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(20.dp))
-                }
-            } else {
-                // D2: only offer EDHREC theme strings that resolve onto a real ThemeId -- an
-                // unresolvable free-form aggregate tag has nowhere to bind under the unified
-                // taxonomy (mirrors CollectionLeanSection's own dead-chip filter).
-                val resolvableThemeTags = remember(uiState.availableThemeTags) {
-                    uiState.availableThemeTags.filter { ThemeId.fromDisplayName(it) != null }
-                }
-                if (resolvableThemeTags.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                        Text(stringResource(R.string.deck_wizard_theme_picker_title), style = ty.labelLarge, color = mc.primaryAccent)
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                            verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                        ) {
-                            resolvableThemeTags.forEach { theme ->
-                                DirectionChip(label = theme, selected = theme == uiState.selectedThemeHint, onClick = { onSelectTheme(theme) })
-                            }
-                        }
+                item(key = "theme_loading") {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(20.dp))
                     }
+                }
+            } else if (resolvableThemeTags.isNotEmpty()) {
+                item(key = "theme_picker_header") {
+                    Text(stringResource(R.string.deck_wizard_theme_picker_title), style = ty.labelLarge, color = mc.primaryAccent)
+                }
+                items(resolvableThemeTags, key = { "theme_$it" }) { theme ->
+                    // Every entry in `resolvableThemeTags` already resolved to a real ThemeId
+                    // above -- the `!!` is safe (never actually null here).
+                    val themeId = ThemeId.fromDisplayName(theme)!!
+                    ThemeRow(
+                        themeId = themeId,
+                        selected = theme == uiState.selectedThemeHint,
+                        onClick = { onSelectTheme(theme) },
+                    )
                 }
             }
         }
@@ -746,6 +857,71 @@ internal fun IdentityStepContent(
             onClick = onNext,
         )
     }
+}
+
+/**
+ * One row in the Identity step's theme picker (visual-overhaul pass): replaces the old wrapping
+ * [DirectionChip] `FlowRow` with a full-width list row showing both the theme's name AND a short
+ * plain-English explanation of what it means in MTG deckbuilding terms -- a bare theme name
+ * ("Voltron", "Aristocrats") means little to a player unfamiliar with the term.
+ */
+@Composable
+private fun ThemeRow(themeId: ThemeId, selected: Boolean, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Surface(
+        onClick = onClick,
+        shape = CardShape,
+        color = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
+        border = if (selected) BorderStroke(1.dp, mc.primaryAccent) else BorderStroke(0.5.dp, mc.surfaceVariant),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(spacing.md)
+                .heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.xxs)) {
+                Text(themeId.displayName, style = ty.bodyLarge, color = if (selected) mc.primaryAccent else mc.textPrimary)
+                Text(themeDescription(themeId), style = ty.bodySmall, color = mc.textSecondary)
+            }
+            if (selected) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = mc.primaryAccent)
+            }
+        }
+    }
+}
+
+/** One 1-2 line plain-English explanation per [ThemeId] (the 22 themes from Appendix A.2 --
+ * see `ArchetypeModels.kt`). A bare theme name means little to a player unfamiliar with the term,
+ * so the Identity step's theme list (see [ThemeRow]) always pairs the name with this description. */
+@Composable
+private fun themeDescription(themeId: ThemeId): String = when (themeId) {
+    ThemeId.REANIMATOR -> stringResource(R.string.deck_wizard_theme_desc_reanimator)
+    ThemeId.SELF_MILL -> stringResource(R.string.deck_wizard_theme_desc_self_mill)
+    ThemeId.ARISTOCRATS -> stringResource(R.string.deck_wizard_theme_desc_aristocrats)
+    ThemeId.TOKENS -> stringResource(R.string.deck_wizard_theme_desc_tokens)
+    ThemeId.SPELLSLINGER -> stringResource(R.string.deck_wizard_theme_desc_spellslinger)
+    ThemeId.VOLTRON -> stringResource(R.string.deck_wizard_theme_desc_voltron)
+    ThemeId.STAX -> stringResource(R.string.deck_wizard_theme_desc_stax)
+    ThemeId.LANDFALL -> stringResource(R.string.deck_wizard_theme_desc_landfall)
+    ThemeId.LIFEGAIN -> stringResource(R.string.deck_wizard_theme_desc_lifegain)
+    ThemeId.PLUS1_COUNTERS -> stringResource(R.string.deck_wizard_theme_desc_plus1_counters)
+    ThemeId.TRIBAL -> stringResource(R.string.deck_wizard_theme_desc_tribal)
+    ThemeId.ARTIFACTS -> stringResource(R.string.deck_wizard_theme_desc_artifacts)
+    ThemeId.ENCHANTRESS -> stringResource(R.string.deck_wizard_theme_desc_enchantress)
+    ThemeId.WHEELS -> stringResource(R.string.deck_wizard_theme_desc_wheels)
+    ThemeId.MILL -> stringResource(R.string.deck_wizard_theme_desc_mill)
+    ThemeId.GROUP_HUG -> stringResource(R.string.deck_wizard_theme_desc_group_hug)
+    ThemeId.GROUP_SLUG -> stringResource(R.string.deck_wizard_theme_desc_group_slug)
+    ThemeId.BLINK -> stringResource(R.string.deck_wizard_theme_desc_blink)
+    ThemeId.SUPERFRIENDS -> stringResource(R.string.deck_wizard_theme_desc_superfriends)
+    ThemeId.VEHICLES -> stringResource(R.string.deck_wizard_theme_desc_vehicles)
+    ThemeId.TOOLBOX -> stringResource(R.string.deck_wizard_theme_desc_toolbox)
+    ThemeId.CLONES_THEFT -> stringResource(R.string.deck_wizard_theme_desc_clones_theft)
 }
 
 @Composable

@@ -36,8 +36,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -78,11 +76,12 @@ import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.InlineErrorState
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaHubSelector
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -477,7 +476,6 @@ private fun LoadMoreFooter(
     onLoadMore: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
     Box(
@@ -492,20 +490,12 @@ private fun LoadMoreFooter(
                 modifier = Modifier.size(32.dp),
             )
         } else {
-            Button(
+            MagicCtaButton(
                 onClick = onLoadMore,
-                shape = ButtonShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.surface,
-                    contentColor = mc.textPrimary,
-                ),
+                color = MagicCtaColor.Surface,
+                text = stringResource(R.string.community_deck_load_more),
                 modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.community_deck_load_more),
-                    style = ty.labelLarge,
-                )
-            }
+            )
         }
     }
 }

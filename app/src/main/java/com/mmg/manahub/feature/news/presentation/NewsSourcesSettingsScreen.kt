@@ -25,8 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -54,7 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
-import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -392,29 +390,12 @@ private fun AddCustomSourceSection(
             )
         }
 
-        Button(
+        MagicCtaButton(
             onClick = onValidateAndAdd,
             enabled = state.name.isNotBlank() && state.feedUrl.isNotBlank() && !state.isValidating,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = mc.primaryAccent,
-                disabledContainerColor = mc.primaryAccent.copy(alpha = 0.3f)
-            ),
-            shape = ButtonShape,
+            isLoading = state.isValidating,
+            text = stringResource(R.string.news_sources_validate_add),
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (state.isValidating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = mc.background,
-                    strokeWidth = 2.dp,
-                )
-                Spacer(Modifier.width(spacing.sm))
-            }
-            Text(
-                text = stringResource(R.string.news_sources_validate_add),
-                style = mt.labelLarge,
-                color = mc.background,
-            )
-        }
+        )
     }
 }

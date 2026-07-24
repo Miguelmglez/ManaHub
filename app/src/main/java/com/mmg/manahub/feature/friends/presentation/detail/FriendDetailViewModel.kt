@@ -307,10 +307,10 @@ class FriendDetailViewModel(
             }
         }
         if (tab == FriendTab.HISTORY) {
-            val current = _uiState.value
-            if (current.gameHistory == null && !current.isLoadingGameHistory && !current.gameHistoryError) {
-                loadGameHistory()
-            }
+            // val current = _uiState.value
+            // if (current.gameHistory == null && !current.isLoadingGameHistory && !current.gameHistoryError) {
+            //    loadGameHistory()
+            // }
         }
     }
 

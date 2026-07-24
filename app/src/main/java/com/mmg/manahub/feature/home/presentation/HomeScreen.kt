@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,12 +44,14 @@ import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -77,6 +80,9 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -278,7 +284,7 @@ fun HomeScreen(
                     onAction = onAction,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
-                    modifier = Modifier.animateItem(),
+                    modifier = Modifier,
                     trending = trending,
                     communityDecks = communityDecks,
                     communityDecksCategory = communityDecksCategory,
@@ -315,41 +321,23 @@ fun HomeScreen(
 }
 
 @Composable
-private fun EditWidgetsButton(onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
+private fun EditWidgetsButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     // Prominent tonal pill (full width, ≥48dp) using the primary accent so the entry point
     // to the widget gallery reads as a clear, tappable action rather than plain text.
-    Surface(
-        color = mc.primaryAccent.copy(alpha = 0.12f),
-        shape = ButtonShape,
-        border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.35f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clip(ButtonShape)
-            .clickable(onClickLabel = stringResource(R.string.home_edit_widgets), onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.lg, vertical = spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
+    MagicCtaButton(
+        onClick = onClick,
+        text = stringResource(R.string.home_edit_widgets),
+        style = MagicCtaStyle.Outlined,
+        color = MagicCtaColor.Primary,
+        icon = {
             Icon(
                 Icons.Default.Widgets,
                 contentDescription = null,
-                tint = mc.primaryAccent,
                 modifier = Modifier.size(20.dp),
             )
-            Spacer(Modifier.width(spacing.sm))
-            Text(
-                text = stringResource(R.string.home_edit_widgets),
-                style = ty.labelLarge,
-                color = mc.primaryAccent,
-            )
-        }
-    }
+        },
+        modifier = modifier.fillMaxWidth()
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -592,12 +580,15 @@ fun QuickStartCustomizeSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = mc.backgroundSecondary,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = mc.textDisabled.copy(alpha = 0.4f)) },
+        contentWindowInsets = { WindowInsets(0) },
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = spacing.lg)
-                .padding(bottom = spacing.xl),
+                .padding(bottom = spacing.xl)
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
         ) {
             Text(text = stringResource(R.string.quick_start_sheet_title), style = ty.titleLarge, color = mc.textPrimary)
@@ -645,23 +636,13 @@ fun QuickStartCustomizeSheet(
             }
 
             Spacer(Modifier.height(spacing.sm))
-            Surface(
-                color = if (canSave) mc.primaryAccent else mc.surfaceVariant,
-                shape = ButtonShape,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .clip(ButtonShape)
-                    .clickable(enabled = canSave) { onSave(selection.toList()) },
-            ) {
-                Box(modifier = Modifier.padding(vertical = spacing.md), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.quick_start_sheet_save),
-                        style = ty.labelLarge,
-                        color = if (canSave) mc.background else mc.textDisabled,
-                    )
-                }
-            }
+            
+            MagicCtaButton(
+                onClick = { onSave(selection.toList()) },
+                text = stringResource(R.string.quick_start_sheet_save),
+                enabled = canSave,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

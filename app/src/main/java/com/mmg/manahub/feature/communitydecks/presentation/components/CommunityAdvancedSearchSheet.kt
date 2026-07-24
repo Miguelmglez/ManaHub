@@ -33,15 +33,12 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetValue
@@ -72,8 +69,12 @@ import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.CardPickerField
-import com.mmg.manahub.core.ui.components.ManaColorPicker
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -423,24 +424,16 @@ fun CommunityAdvancedSearchSheet(
                 }
 
                 // ── Search button ────────────────────────────────────────────────
-                Button(
+                MagicCtaButton(
                     onClick = {
                         onSearch()
                         handleDismiss()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                ) {
-                    Text(
-                        stringResource(R.string.community_advsearch_search_button),
-                        style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = mc.onAccent,
-                    )
-                }
+                        .padding(16.dp),
+                    text = stringResource(R.string.community_advsearch_search_button),
+                )
             }
 
             // ── Card inspection overlay (shared by the Commander and Card pickers) ──────────
@@ -455,32 +448,21 @@ fun CommunityAdvancedSearchSheet(
                     onDismiss = { inspecting = null; isDismissingInspection = false },
                     cardExtractor = { it },
                     actions = { card ->
-                        Button(
+                        MagicCtaButton(
                             onClick = {
                                 session.onSelect(card)
                                 isDismissingInspection = true
                             },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
+                            text = stringResource(R.string.community_advsearch_select),
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                stringResource(R.string.community_advsearch_select),
-                                color = mc.onAccent,
-                                style = ty.labelLarge,
-                            )
-                        }
+                        )
                         Spacer(Modifier.height(sp.xs))
-                        OutlinedButton(
+                        MagicCtaButton(
                             onClick = { isDismissingInspection = true },
-                            shape = RoundedCornerShape(16.dp),
+                            style = MagicCtaStyle.Outlined,
+                            text = stringResource(R.string.community_advsearch_cancel),
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                stringResource(R.string.community_advsearch_cancel),
-                                style = ty.labelLarge,
-                            )
-                        }
+                        )
                     },
                 )
             }

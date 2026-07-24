@@ -245,6 +245,7 @@ fun coreBridgeKoinModule(
             statsDao = get(),
             deckDao = get(),
             authRepository = get(),
+            dispatcherProvider = get(),
         )
     }
 

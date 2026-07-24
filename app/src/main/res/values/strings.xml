@@ -404,6 +404,24 @@
     <string name="stats_tab_games">Games</string>
     <string name="stats_tab_trades">Trades</string>
 
+    <!-- Stats Screen - Phase 2/5 additions (2026-07 stats expansion) -->
+    <string name="stats_label_avg_card_value">Avg Card Value</string>
+    <string name="stats_label_median_card_value">Median Card Value</string>
+    <string name="stats_label_value_concentration">Top 10 Value Share</string>
+    <string name="stats_value_concentration_supporting">Share of total value held by your 10 most valuable cards</string>
+    <string name="stats_label_foil_value_share">Foil Value Share</string>
+    <string name="stats_label_most_duplicated_card">Most Duplicated Card</string>
+    <string name="stats_label_owned">owned</string>
+    <string name="stats_dist_format_coverage">Format Legality</string>
+    <string name="stats_dist_keywords">Keyword Distribution</string>
+    <string name="stats_section_set_completion">Set Completion</string>
+    <string name="stats_section_collection_growth">Collection Growth</string>
+
+    <!-- Stats Screen - Hall of Fame enrichment (2026-07 stats expansion) -->
+    <string name="stats_label_most_variants_card">Most Different Variants</string>
+    <string name="stats_variants_count">%1$d variants</string>
+    <string name="stats_label_collection_era">Collection Era</string>
+
     <!-- Games tab KPIs -->
     <string name="stats_kpi_total_games">Total Games</string>
     <string name="stats_kpi_winrate">Win Rate</string>
@@ -418,6 +436,29 @@
     <string name="stats_empty_decks_subtitle">Associate games with decks via the post-game survey to see deck stats here</string>
     <string name="stats_empty_history_subtitle">Recorded game sessions will appear here</string>
 
+    <!-- Games tab — Phase 3 additions (2026-07 stats expansion) -->
+    <string name="stats_kpi_most_common_defeat">Most Common Defeat</string>
+    <string name="stats_kpi_current_streak">Current Streak</string>
+    <string name="stats_kpi_best_streak">Best Streak</string>
+    <string name="stats_section_winrate_by_mode">Win Rate by Mode</string>
+    <string name="stats_section_winrate_by_player_count">Win Rate by Player Count</string>
+    <string name="stats_player_count_n">%1$d Players</string>
+    <string name="stats_player_count_four_plus">4+ Players</string>
+    <string name="stats_section_recent_form">Recent Form</string>
+
+    <!-- Trades tab — Phase 4 additions (2026-07 stats expansion) -->
+    <string name="stats_kpi_completed_trades">Completed Trades</string>
+    <string name="stats_kpi_cards_sent">Cards Sent</string>
+    <string name="stats_kpi_cards_received">Cards Received</string>
+    <string name="stats_kpi_net_value">Net Value (Est.)</string>
+    <string name="stats_trades_net_value_note">Estimated from card prices captured when each trade completed.</string>
+    <string name="stats_section_top_partner">Top Trade Partner</string>
+    <string name="stats_trade_count">%1$d trades</string>
+    <string name="stats_trades_loading">Loading trade stats…</string>
+    <string name="stats_trades_empty_title">No completed trades yet</string>
+    <string name="stats_trades_empty_subtitle">Your completed trade history will appear here</string>
+    <string name="stats_trades_error">Couldn\'t load trade stats</string>
+
     <!-- Survey status chips -->
     <string name="survey_pending">Pending survey</string>
     <string name="survey_partial">Survey in progress</string>
@@ -430,6 +471,7 @@
     <string name="delete_game_final_title">Are you absolutely sure?</string>
     <string name="delete_game_final_message">This action cannot be undone.</string>
     <string name="delete_game_toast">Game deleted</string>
+    <string name="delete_game_error">Couldn\'t delete game. Please try again.</string>
 
     <!-- Game actions -->
     <string name="action_review_survey">Review survey</string>
@@ -826,12 +868,15 @@
     <string name="deck_studio_unlock_strategy_confirm_body">The Deck Doctor will be able to suggest cutting cards the wizard placed, and you\'ll be able to change the deck plan again. This can\'t be undone automatically.</string>
     <string name="deck_studio_unlock_strategy_confirm_action">Unlock</string>
     <string name="deck_studio_empty_title">Your deck is empty</string>
-    <string name="deck_studio_empty_subtitle">Add cards with the + button, or import an existing list.</string>
+    <string name="deck_studio_empty_subtitle">Add cards with the + button, or pick one of the options below.</string>
     <string name="deck_studio_build_from_seed">Build from Seed</string>
+    <string name="deck_studio_build_from_seed_desc">Pick a few cards you love and we\'ll build a full deck around them.</string>
     <string name="deck_studio_more_options">More options</string>
     <string name="deck_studio_browse_inspirations">Browse Inspirations</string>
+    <string name="deck_studio_browse_inspirations_desc">Discover strategies and combos hiding in your own collection.</string>
     <string name="deck_studio_format_section">Format</string>
     <string name="deck_studio_import_deck">Import deck list</string>
+    <string name="deck_studio_import_deck_desc">Paste a decklist from another app and we\'ll match every card.</string>
     <string name="deck_studio_import_failed">Couldn\'t import the deck list. Check the format and try again.</string>
     <string name="deck_studio_import_in_progress">Import in progress…</string>
     <string name="deck_studio_suggestions_coming_soon_title">Suggestions coming soon</string>
@@ -861,6 +906,7 @@
     <string name="deck_studio_inspirations_search_clear">Clear search</string>
     <string name="deck_studio_inspirations_search_empty_title">No matches</string>
     <string name="deck_studio_inspirations_search_empty_subtitle">Try a different search term or card.</string>
+    <string name="deck_studio_inspirations_matching_cards">Matching cards (%1$d)</string>
     <string name="deck_studio_combos_empty_title">No combos found</string>
     <string name="deck_studio_combos_empty_subtitle">We didn\'t find any known combos in your collection yet.</string>
     <string name="deck_studio_combos_complete_header">Ready to build (%1$d)</string>
@@ -876,6 +922,14 @@
     <!-- Step 1 — Format -->
     <string name="deck_wizard_format_title">Choose a format</string>
     <string name="deck_wizard_format_subtitle">Commander and Casual have the deepest deck templates today.</string>
+    <string name="deck_wizard_format_desc_commander">100-card singleton deck: 99 cards plus a legendary commander that sets your color identity. Starts at 40 life — 21+ combat damage from one commander is also a loss.</string>
+    <string name="deck_wizard_format_desc_casual">60-card minimum deck with up to 4 copies of any card (basic lands excluded). Starts at 20 life under standard 2-player rules.</string>
+    <string name="deck_wizard_format_desc_standard">Rotating format — legal sets are roughly the last two years.</string>
+    <string name="deck_wizard_format_desc_pioneer">Non-rotating — legal sets from Return to Ravnica (2012) onward.</string>
+    <string name="deck_wizard_format_desc_modern">Non-rotating — legal sets from 8th Edition / Mirrodin (2003) onward.</string>
+    <string name="deck_wizard_format_desc_legacy">Nearly every card ever printed is legal, with a small banned list.</string>
+    <string name="deck_wizard_format_desc_vintage">Every card is legal except a very short banned and restricted list.</string>
+    <string name="deck_wizard_format_desc_pauper">Commons only — the budget-friendly eternal format.</string>
     <!-- Entry chooser (Deck Engine Unification plan §5 Phase 3.1) -->
     <string name="deck_wizard_entry_title">How do you want to start?</string>
     <string name="deck_wizard_entry_subtitle">Pick the way that fits how you\'re thinking about this deck.</string>
@@ -896,11 +950,11 @@
     <string name="deck_wizard_direction_leans_empty">Add more cards to your collection to see suggested directions.</string>
     <string name="deck_wizard_direction_chip_strategy">%1$s · %2$d</string>
     <string name="deck_wizard_direction_chip_tribe">%1$d %2$s</string>
-    <string name="deck_wizard_direction_color_lean">%1$s %2$d%%</string>
     <string name="deck_wizard_seed_picker_toggle">Add seed cards (optional)</string>
     <string name="deck_wizard_suggested_strategies_title">Suggested strategies</string>
     <string name="deck_wizard_suggested_strategies_empty">None of your seeds line up with a known strategy yet — you can still continue without one.</string>
     <string name="deck_wizard_seed_coherence_warning">These seed cards don\'t share much in common — the build may end up unfocused. Consider trimming to cards with a clearer shared theme.</string>
+    <string name="deck_wizard_zoom_card">Zoom %1$s</string>
     <!-- Flow B — colors-first (Deck Engine Unification plan §5 Phase 3.3) -->
     <string name="deck_wizard_colors_flow_title">Pick your colors</string>
     <string name="deck_wizard_colors_flow_subtitle">We\'ll show the strategies that work best in these colors.</string>
@@ -928,8 +982,40 @@
     <string name="deck_wizard_color_discipline_hint">3+ colors can hurt consistency unless your collection has strong fixing. Consider narrowing to 2.</string>
     <string name="deck_wizard_theme_picker_title">Theme (optional)</string>
     <string name="deck_wizard_color_fixed_by_commander">%1$s, fixed by commander</string>
+    <!-- Entry flows (colors-first / strategy-first) — archetype descriptions (one per non-GENERIC ArchetypeId, ArchetypeModels.kt) -->
+    <string name="deck_wizard_archetype_desc_aggro">Fast, cheap creatures that race to close the game before your opponent stabilizes.</string>
+    <string name="deck_wizard_archetype_desc_midrange">Efficient creatures and removal with a flexible plan — apply pressure now, out-value them later.</string>
+    <string name="deck_wizard_archetype_desc_control">Removal and card draw to survive the early game, then win late with a single big finisher.</string>
+    <string name="deck_wizard_archetype_desc_tempo">Efficient threats backed by protection and disruption — keep the initiative and never let go.</string>
+    <string name="deck_wizard_archetype_desc_combo">Assemble a specific set of cards to generate an overwhelming or game-ending effect.</string>
+    <string name="deck_wizard_archetype_desc_ramp">Accelerate your mana ahead of schedule to cast big, powerful spells early.</string>
+    <string name="deck_wizard_archetype_desc_generic">A flexible, balanced approach with no single dominant strategy.</string>
+    <!-- Step 3 — Identity — theme descriptions (one per ThemeId, ArchetypeModels.kt) -->
+    <string name="deck_wizard_theme_desc_reanimator">Discard or mill big threats early, then bring them back from the graveyard for a fraction of their mana cost.</string>
+    <string name="deck_wizard_theme_desc_self_mill">Deliberately put cards from your library into the graveyard to fuel graveyard-matters payoffs.</string>
+    <string name="deck_wizard_theme_desc_aristocrats">Sacrifice your own creatures for value — death triggers, drain effects, and token engines reward every loss.</string>
+    <string name="deck_wizard_theme_desc_tokens">Generate armies of token creatures and go wide, then push damage or value with anthem effects.</string>
+    <string name="deck_wizard_theme_desc_spellslinger">Build around instants and sorceries — payoffs trigger off casting noncreature spells.</string>
+    <string name="deck_wizard_theme_desc_voltron">Stack auras, equipment, and buffs onto a single evasive threat and win through commander damage or raw power.</string>
+    <string name="deck_wizard_theme_desc_stax">Slow the whole table down with resource-denial lock pieces — taxes, resets, and asymmetric restrictions.</string>
+    <string name="deck_wizard_theme_desc_landfall">Reward playing lands — extra ramp, tokens, or damage every time a land enters the battlefield.</string>
+    <string name="deck_wizard_theme_desc_lifegain">Gain large amounts of life and turn it into card draw, damage, or other payoffs.</string>
+    <string name="deck_wizard_theme_desc_plus1_counters">Stack +1/+1 counters onto your creatures and proliferate them for a growing, resilient board.</string>
+    <string name="deck_wizard_theme_desc_tribal">Lean into a single creature type — lords and type-specific payoffs reward playing more of that tribe.</string>
+    <string name="deck_wizard_theme_desc_artifacts">Build around artifact synergies — cost reducers, artifact payoffs, and combo pieces.</string>
+    <string name="deck_wizard_theme_desc_enchantress">Draw cards off enchantments and stack auras/sagas for incremental value every turn.</string>
+    <string name="deck_wizard_theme_desc_wheels">Empty your hand and refill it — wheel effects punish opponents while restocking your own cards.</string>
+    <string name="deck_wizard_theme_desc_mill">Put cards from opponents\' libraries into their graveyard to win by decking them out.</string>
+    <string name="deck_wizard_theme_desc_group_hug">Give every player extra resources — mana, cards, or turns — to keep the table peaceful and open-ended.</string>
+    <string name="deck_wizard_theme_desc_group_slug">Deal damage to every opponent equally with symmetrical effects that punish the whole table.</string>
+    <string name="deck_wizard_theme_desc_blink">Repeatedly exile and return your own creatures to re-trigger their enter-the-battlefield abilities.</string>
+    <string name="deck_wizard_theme_desc_superfriends">Build around planeswalkers — protect them and stack their loyalty abilities for inevitable value.</string>
+    <string name="deck_wizard_theme_desc_vehicles">Crew vehicles with your creatures to attack as resilient, removal-resistant threats.</string>
+    <string name="deck_wizard_theme_desc_toolbox">Tutor for the exact answer or piece you need out of a wide toolbox of one-of effects.</string>
+    <string name="deck_wizard_theme_desc_clones_theft">Copy or steal your opponents\' best creatures and permanents instead of building your own.</string>
     <!-- Step 4 — Review -->
     <string name="deck_wizard_review_title">Review &amp; generate</string>
+    <string name="deck_wizard_review_commander_section">Commander</string>
     <string name="deck_wizard_review_format">Format</string>
     <string name="deck_wizard_review_direction">Direction</string>
     <string name="deck_wizard_review_direction_none">Not set</string>

@@ -101,6 +101,11 @@ class CardDetailViewModel(
     // Tracks the in-flight language-prints-load coroutine so it can be cancelled on dismiss.
     private var languageJob: Job? = null
 
+    // One-shot guard for the entry-only English-first redirect (see loadCard()) — runs at most
+    // once per ViewModel instance, on the FIRST id this VM ever loads. Every subsequent id change
+    // (explicit language/variant picks) is a user choice and must never be redirected.
+    private var appliedInitialEnglishRedirect = false
+
     init {
         loadCard()
         observeUserCards()
@@ -128,7 +133,36 @@ class CardDetailViewModel(
     private fun loadCard() {
         viewModelScope.launch {
             scryfallIdFlow.collectLatest { id ->
-                when (val result = cardRepo.getCardById(id)) {
+                // Entry-only English-first redirect (2026-07-23): a collection entry saved in a
+                // non-English language still shows its ENGLISH artwork in the list thumbnail the
+                // user tapped (Collection/Deck Studio images fall back to the English sibling —
+                // see feedback_collection_english_sibling_image_fallback), so the shared-element
+                // transition into this screen must land on the English printing too, or it
+                // visibly flashes into a different-language image for one frame. This block runs
+                // AT MOST ONCE per ViewModel instance, on the very first id this VM ever loads —
+                // every subsequent id change (onSelectLanguagePrint / onSelectVariant /
+                // onSelectFallbackLanguage, i.e. an explicit user pick) must display exactly what
+                // was chosen, so the flag is set FIRST, unconditionally, before any suspending
+                // work — the non-English card is never painted here, not even for one frame.
+                val result: DataResult<Card> = if (!appliedInitialEnglishRedirect) {
+                    appliedInitialEnglishRedirect = true
+                    val initialResult = cardRepo.getCardById(id)
+                    val initialCard = (initialResult as? DataResult.Success)?.data
+                    if (initialCard != null && initialCard.lang != "en") {
+                        val languageResult = cardRepo.getLanguagePrints(initialCard.setCode, initialCard.collectorNumber)
+                        val englishId = (languageResult as? DataResult.Success)?.data
+                            ?.firstOrNull { it.lang == "en" }
+                            ?.scryfallId
+                        if (englishId != null && englishId != id) {
+                            scryfallIdFlow.value = englishId
+                            return@collectLatest
+                        }
+                    }
+                    initialResult
+                } else {
+                    cardRepo.getCardById(id)
+                }
+                when (result) {
                     is DataResult.Success -> {
                         val card = result.data
                         // The opened print displays as-is, in its own language — no forced

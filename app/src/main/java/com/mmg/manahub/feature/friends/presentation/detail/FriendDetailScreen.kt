@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -32,7 +31,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,6 +54,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -110,42 +110,18 @@ fun FriendDetailScreen(
     // ── Remove friend confirmation dialog ──────────────────────────────────────
     if (showRemoveConfirm) {
         val friendName = uiState.friend?.nickname ?: ""
-        AlertDialog(
+        MagicAlertDialog(
             onDismissRequest = { showRemoveConfirm = false },
-            title = {
-                Text(
-                    stringResource(R.string.friends_detail_remove_confirm_title),
-                    color = mc.textPrimary,
-                    style = MaterialTheme.magicTypography.titleMedium,
-                )
+            title = stringResource(R.string.friends_detail_remove_confirm_title),
+            text = stringResource(R.string.friends_detail_remove_confirm_body, friendName),
+            confirmLabel = stringResource(R.string.friends_detail_remove_confirm_ok),
+            onConfirm = {
+                showRemoveConfirm = false
+                viewModel.removeFriend(removeErrorMsg)
             },
-            text = {
-                Text(
-                    stringResource(R.string.friends_detail_remove_confirm_body, friendName),
-                    color = mc.textSecondary,
-                    style = MaterialTheme.magicTypography.bodySmall,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showRemoveConfirm = false
-                    viewModel.removeFriend(removeErrorMsg)
-                }) {
-                    Text(
-                        stringResource(R.string.friends_detail_remove_confirm_ok),
-                        color = mc.lifeNegative,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRemoveConfirm = false }) {
-                    Text(
-                        stringResource(R.string.friends_remove_confirm_cancel),
-                        color = mc.textSecondary,
-                    )
-                }
-            },
-            containerColor = mc.backgroundSecondary,
+            confirmColor = MagicCtaColor.Error,
+            dismissLabel = stringResource(R.string.friends_remove_confirm_cancel),
+            onDismiss = { showRemoveConfirm = false },
         )
     }
 

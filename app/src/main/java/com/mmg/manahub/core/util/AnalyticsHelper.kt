@@ -29,15 +29,31 @@ class AnalyticsHelper @Inject constructor(
         val bundle = params?.let {
             Bundle().apply {
                 it.forEach { (key, value) ->
-                    when (value) {
-                        is String -> putString(key, value)
-                        is Int -> putInt(key, value)
-                        is Long -> putLong(key, value)
-                        is Double -> putDouble(key, value)
-                        is Boolean -> putBoolean(key, value)
-                        is Enum<*> -> putString(key, value.name)
-                        null -> putString(key, "null")
-                        else -> putString(key, value.toString())
+                    val finalValue = when (value) {
+                        is String -> value
+                        is Int -> value
+                        is Long -> value
+                        is Double -> value
+                        is Boolean -> value
+                        is Enum<*> -> value.name
+                        null -> "null"
+                        else -> value.toString()
+                    }
+
+                    // Truncate strings to prevent extreme memory usage if accidental massive
+                    // strings (e.g. entire JSON blobs) are logged.
+                    val safeValue = if (finalValue is String && finalValue.length > 500) {
+                        finalValue.take(500) + "..."
+                    } else {
+                        finalValue
+                    }
+
+                    when (safeValue) {
+                        is String -> putString(key, safeValue)
+                        is Int -> putInt(key, safeValue)
+                        is Long -> putLong(key, safeValue)
+                        is Double -> putDouble(key, safeValue)
+                        is Boolean -> putBoolean(key, safeValue)
                     }
                 }
             }

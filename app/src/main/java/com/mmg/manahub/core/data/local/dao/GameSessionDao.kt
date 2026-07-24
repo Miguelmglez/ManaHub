@@ -70,6 +70,20 @@ data class ArchetypeMatchupRow(
     val wins: Int,
 )
 
+/**
+ * Win-rate aggregate grouped by game mode, resolved against the local seat (`is_local = 1`,
+ * ADR-001) — every recorded game (Phase 3, 2026-07 stats expansion).
+ */
+data class ModeWinrateRow(val mode: String, val totalGames: Int, val wins: Int)
+
+/**
+ * Win-rate aggregate keyed by the exact persisted [GameSessionEntity.playerCount], resolved
+ * against the local seat (`is_local = 1`, ADR-001). Bucketing into "2 / 3 / 4+" is a presentation
+ * concern handled by the caller — this projection stays a faithful GROUP BY of the raw column
+ * (Phase 3, 2026-07 stats expansion).
+ */
+data class PlayerCountWinrateRow(val playerCount: Int, val totalGames: Int, val wins: Int)
+
 @Dao
 abstract class GameSessionDao {
 
@@ -313,4 +327,36 @@ abstract class GameSessionDao {
 
     @Query("SELECT id, playedAt, mode, durationMs, winnerName, surveyStatus, surveyCompletedAt, deckId FROM game_sessions WHERE deckId = :deckId ORDER BY playedAt DESC")
     abstract fun observeSessionsForDeck(deckId: String): Flow<List<SessionSummary>>
+
+    // ── Phase 3 (2026-07 stats expansion) ──────────────────────────────────────
+
+    /**
+     * Win-rate breakdown by game mode, resolved against the local seat (`is_local = 1`) — unlike
+     * [observeLocalSessionHistory] this covers EVERY recorded game, not a capped recent window.
+     */
+    @Query("""
+        SELECT gs.mode AS mode,
+               COUNT(*) AS totalGames,
+               COALESCE(SUM(CASE WHEN ps.isWinner = 1 THEN 1 ELSE 0 END), 0) AS wins
+        FROM game_sessions gs
+        INNER JOIN player_sessions ps ON ps.sessionId = gs.id AND ps.is_local = 1
+        GROUP BY gs.mode
+        ORDER BY totalGames DESC
+    """)
+    abstract fun observeWinrateByMode(): Flow<List<ModeWinrateRow>>
+
+    /**
+     * Win-rate breakdown by the session's persisted [GameSessionEntity.playerCount], resolved
+     * against the local seat (`is_local = 1`); every recorded game.
+     */
+    @Query("""
+        SELECT gs.playerCount AS playerCount,
+               COUNT(*) AS totalGames,
+               COALESCE(SUM(CASE WHEN ps.isWinner = 1 THEN 1 ELSE 0 END), 0) AS wins
+        FROM game_sessions gs
+        INNER JOIN player_sessions ps ON ps.sessionId = gs.id AND ps.is_local = 1
+        GROUP BY gs.playerCount
+        ORDER BY gs.playerCount ASC
+    """)
+    abstract fun observeWinrateByPlayerCount(): Flow<List<PlayerCountWinrateRow>>
 }

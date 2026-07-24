@@ -16,8 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -195,21 +193,11 @@ fun TradeSelectionSheet(
                 Spacer(Modifier.height(12.dp))
 
                 // Save button
-                Button(
+                MagicCtaButton(
                     onClick = { onConfirm(editQty.toMap()) },
+                    text = "Save",
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor = mc.background,
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text(
-                        text = "Save",
-                        style = ty.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                )
             }
         }
     }

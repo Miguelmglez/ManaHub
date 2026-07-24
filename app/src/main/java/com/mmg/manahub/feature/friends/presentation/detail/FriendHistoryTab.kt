@@ -18,17 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +31,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -73,85 +70,12 @@ fun FriendHistoryTab(
     gameHistoryError: Boolean = false,
     onRetryGameHistory: () -> Unit = {},
 ) {
-    var selectedIndex by remember { mutableIntStateOf(0) }
-    val mc = MaterialTheme.magicColors
-
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Trades Tab
-            FilterChip(
-                modifier = Modifier.weight(1f),
-                selected = selectedIndex == 0,
-                onClick = { selectedIndex = 0 },
-                label = {
-                    Text(
-                        stringResource(R.string.friend_history_tab_trades),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-                    selectedLabelColor = mc.primaryAccent,
-                    containerColor = mc.surface,
-                    labelColor = mc.textSecondary,
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = selectedIndex == 0,
-                    borderColor = mc.surfaceVariant,
-                    selectedBorderColor = mc.primaryAccent
-                )
-            )
-
-            // Games Tab
-            FilterChip(
-                modifier = Modifier.weight(1f),
-                selected = selectedIndex == 1,
-                onClick = { selectedIndex = 1 },
-                label = {
-                    Text(
-                        stringResource(R.string.friend_history_tab_games),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-                    selectedLabelColor = mc.primaryAccent,
-                    containerColor = mc.surface,
-                    labelColor = mc.textSecondary,
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = selectedIndex == 1,
-                    borderColor = mc.surfaceVariant,
-                    selectedBorderColor = mc.primaryAccent
-                )
-            )
-        }
-
-        when (selectedIndex) {
-            0 -> TradesHistoryContent(
-                friend = friend,
-                tradeHistory = tradeHistory,
-                onTradeClick = onTradeClick,
-            )
-            else -> GamesHistoryContent(
-                friend = friend,
-                gameHistory = gameHistory,
-                isLoading = isLoadingGameHistory,
-                hasError = gameHistoryError,
-                onRetry = onRetryGameHistory,
-            )
-        }
+        TradesHistoryContent(
+            friend = friend,
+            tradeHistory = tradeHistory,
+            onTradeClick = onTradeClick,
+        )
     }
 }
 
@@ -247,13 +171,11 @@ private fun GamesHistoryContent(
                         modifier = Modifier.padding(horizontal = 32.dp),
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(onClick = onRetry) {
-                        Text(
-                            text = stringResource(R.string.retry),
-                            color = mc.primaryAccent,
-                            style = mt.labelMedium,
-                        )
-                    }
+                    MagicCtaButton(
+                        onClick = onRetry,
+                        text = stringResource(R.string.retry),
+                        style = MagicCtaStyle.Ghost,
+                    )
                 }
             }
 

@@ -8,12 +8,18 @@ import com.mmg.manahub.core.data.local.entity.projection.ArtistCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.CardValueProjection
 import com.mmg.manahub.core.data.local.entity.projection.CmcCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.ColorCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.DecadeCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.DuplicateCardProjection
+import com.mmg.manahub.core.data.local.entity.projection.FormatCoverageProjection
+import com.mmg.manahub.core.data.local.entity.projection.KeywordsProjection
 import com.mmg.manahub.core.data.local.entity.projection.RarityCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.SetCountProjection
 import com.mmg.manahub.core.data.local.entity.projection.SetValueProjection
 import com.mmg.manahub.core.data.local.entity.projection.TagProjection
 import com.mmg.manahub.core.data.local.entity.projection.TotalsProjection
 import com.mmg.manahub.core.data.local.entity.projection.TypeCountProjection
+import com.mmg.manahub.core.data.local.entity.projection.UniqueCardPriceProjection
+import com.mmg.manahub.core.data.local.entity.projection.VariantCardProjection
 import com.mmg.manahub.core.model.CardType
 import com.mmg.manahub.core.model.CardValue
 import com.mmg.manahub.core.model.CollectionStats
@@ -23,20 +29,27 @@ import com.mmg.manahub.core.model.Rarity
 import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.common.DispatcherProvider
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
 class StatsRepositoryImpl(
     private val statsDao: StatsDao,
     private val deckDao: DeckDao,
     private val authRepository: AuthRepository,
+    private val dispatcherProvider: DispatcherProvider,
 ) : StatsRepository {
 
     private val gson = Gson()
     private val tagListType = object : TypeToken<List<TagRecord>>() {}.type
+    private val keywordListType = object : TypeToken<List<String>>() {}.type
     private data class TagRecord(val key: String, val category: String)
 
     /**
@@ -63,6 +76,17 @@ class StatsRepositoryImpl(
         val useEur = preferredCurrency == PreferredCurrency.EUR
 
         return currentUserIdFlow.flatMapLatest { userId ->
+            // Hall of Fame enrichment — cards illustrated by the CURRENT top artist. Chained off
+            // observeTopArtist via its own flatMapLatest (a second, independent subscription is
+            // cheap for a Room live query) rather than re-deriving inside the big combine() below,
+            // since it needs its own nested re-subscription whenever the top artist changes.
+            val artistCardsFlow = statsDao.observeTopArtist(colorCode, setFilter, userId)
+                .flatMapLatest { artistProj ->
+                    val artist = artistProj?.artist
+                    if (artist.isNullOrBlank()) flowOf(emptyList())
+                    else statsDao.observeCardsByArtist(artist, colorCode, setFilter, userId, limit = ARTIST_GALLERY_LIMIT)
+                }
+
             combine(
                 statsDao.observeTotals(colorCode, setFilter, userId),
                 statsDao.observeTotalValueUsd(colorCode, setFilter, userId),
@@ -86,7 +110,18 @@ class StatsRepositoryImpl(
                 // New set and tag stats
                 statsDao.observeTopSetByCount(colorCode, setFilter, userId),
                 statsDao.observeTopSetByValue(colorCode, setFilter, useEur, userId),
-                statsDao.observeAllCollectionTags(colorCode, setFilter, userId)
+                statsDao.observeAllCollectionTags(colorCode, setFilter, userId),
+                // Phase 2 (2026-07 stats expansion)
+                statsDao.observeUniqueCardPrices(colorCode, setFilter, userId),
+                statsDao.observeTotalFoilValueUsd(colorCode, setFilter, userId),
+                statsDao.observeTotalFoilValueEur(colorCode, setFilter, userId),
+                statsDao.observeMostDuplicatedCard(colorCode, setFilter, userId),
+                statsDao.observeFormatCoverage(colorCode, setFilter, userId),
+                statsDao.observeAllCollectionKeywords(colorCode, setFilter, userId),
+                // Hall of Fame enrichment (2026-07 stats expansion)
+                statsDao.observeMostVariantsCard(colorCode, setFilter, userId),
+                artistCardsFlow,
+                statsDao.observeCountByDecade(colorCode, setFilter, userId),
             ) { args: Array<Any?> ->
                 val totals    = args[0] as TotalsProjection
                 val valueUsd  = args[1] as Double
@@ -112,20 +147,86 @@ class StatsRepositoryImpl(
                 val topSetValue  = args[19] as SetValueProjection?
                 val allTags      = args[20] as List<TagProjection>
 
+                val uniqueCardPrices  = args[21] as List<UniqueCardPriceProjection>
+                val foilValueUsd      = args[22] as Double
+                val foilValueEur      = args[23] as Double
+                val duplicateProj     = args[24] as DuplicateCardProjection?
+                val formatCoverageProj = args[25] as FormatCoverageProjection
+                val keywordProjs      = args[26] as List<KeywordsProjection>
+
+                val variantsProj      = args[27] as VariantCardProjection?
+                val artistCards       = args[28] as List<CardValueProjection>
+                val decadeRows        = args[29] as List<DecadeCountProjection>
+
                 // Process tags to find strategy distribution
                 val tagMap = mutableMapOf<String, Int>()
+                var tagParseFailures = 0
                 allTags.forEach { tagProj ->
-                    runCatching {
-                        val rawTags = tagProj.tags ?: return@runCatching
+                    val rawTags = tagProj.tags ?: return@forEach
+                    try {
                         val records: List<TagRecord> = gson.fromJson(rawTags, tagListType)
                         records.forEach { record ->
                             // Only count "strategy" or "synergy" tags for innovation
-                            if (record.category.lowercase() in listOf("strategy", "synergy", "archetype")) {
+                            val cat = record.category.lowercase()
+                            if (cat == "strategy" || cat == "synergy" || cat == "archetype") {
                                 tagMap[record.key] = (tagMap[record.key] ?: 0) + 1
                             }
                         }
+                    } catch (e: Exception) {
+                        tagParseFailures++
                     }
                 }
+                if (tagParseFailures > 0) {
+                    recordSafeNonFatal("stats_tag_parse_batch", RuntimeException("Failed to parse tags for $tagParseFailures cards"))
+                }
+
+                // Distinct-card avg/median value (active currency), unique cards priced > 0.
+                val activePrices = uniqueCardPrices
+                    .map { if (useEur) it.priceEur else it.priceUsd }
+                    .filter { it > 0.0 }
+                    .sorted()
+                val avgCardValue = if (activePrices.isNotEmpty()) activePrices.average() else 0.0
+                val medianCardValue = if (activePrices.isNotEmpty()) {
+                    val n = activePrices.size
+                    if (n % 2 == 1) activePrices[n / 2] else (activePrices[n / 2 - 1] + activePrices[n / 2]) / 2.0
+                } else 0.0
+
+                val activeTotalValue = if (useEur) valueEur else valueUsd
+                val activeFoilValue  = if (useEur) foilValueEur else foilValueUsd
+                // Ratios come from separate Room Flows combined via combine(...), which can emit
+                // out of sync during a refreshPrices() call — coerce to guard against a transient
+                // >100% reading (see CLAUDE.md-linked review findings, 2026-07-23 Stats expansion).
+                val foilValueSharePercent = if (activeTotalValue > 0.0)
+                    (activeFoilValue / activeTotalValue).toFloat().coerceIn(0f, 1f) else 0f
+
+                val top10Sum = topCards.take(10).sumOf { if (useEur) it.priceEur else it.priceUsd }
+                val valueConcentrationTop10Percent = if (activeTotalValue > 0.0)
+                    (top10Sum / activeTotalValue).toFloat().coerceIn(0f, 1f) else 0f
+
+                val formatCoverage = mapOf(
+                    "Commander" to formatCoverageProj.commanderCount,
+                    "Modern"    to formatCoverageProj.modernCount,
+                    "Standard"  to formatCoverageProj.standardCount,
+                )
+
+                val keywordMap = mutableMapOf<String, Int>()
+                var keywordParseFailures = 0
+                keywordProjs.forEach { proj ->
+                    val raw = proj.keywords ?: return@forEach
+                    try {
+                        val keywords: List<String> = gson.fromJson(raw, keywordListType)
+                        keywords.forEach { kw ->
+                            if (kw.isNotBlank()) keywordMap[kw] = (keywordMap[kw] ?: 0) + 1
+                        }
+                    } catch (e: Exception) {
+                        keywordParseFailures++
+                    }
+                }
+                if (keywordParseFailures > 0) {
+                    recordSafeNonFatal("stats_keyword_parse_batch", RuntimeException("Failed to parse keywords for $keywordParseFailures cards"))
+                }
+                val keywordDistribution = keywordMap.entries
+                    .sortedByDescending { it.value }.take(10).associate { it.key to it.value }
 
                 CollectionStats(
                     totalCards = totals.totalCards,
@@ -153,10 +254,32 @@ class StatsRepositoryImpl(
                     topSetByCount  = topSetCount?.let { it.setCode to it.count },
                     topSetByValue  = topSetValue?.let { it.setCode to it.totalValue },
                     // AutoTags Stats
-                    autoTagDistribution = tagMap.entries.sortedByDescending { it.value }.take(10).associate { it.key to it.value }
+                    autoTagDistribution = tagMap.entries.sortedByDescending { it.value }.take(10).associate { it.key to it.value },
+                    // Phase 2 (2026-07 stats expansion)
+                    valueConcentrationTop10Percent = valueConcentrationTop10Percent,
+                    avgCardValue          = avgCardValue,
+                    medianCardValue       = medianCardValue,
+                    foilValueSharePercent = foilValueSharePercent,
+                    mostDuplicatedCard      = duplicateProj?.toDomain(),
+                    mostDuplicatedCardCount = duplicateProj?.totalQuantity ?: 0,
+                    formatCoverage      = formatCoverage,
+                    keywordDistribution = keywordDistribution,
+                    // Hall of Fame enrichment (2026-07 stats expansion)
+                    mostVariantsCard  = variantsProj?.toDomain(),
+                    mostVariantsCount = variantsProj?.variantCount ?: 0,
+                    topArtistCards    = artistCards.map { it.toDomain() },
+                    decadeDistribution = decadeRows.associate { "${it.decade}s" to it.count },
                 )
             }
         }
+            // The 30-way combine() above runs Gson parsing + list processing over the whole
+            // filtered collection on every emission — move it off the caller's (previously Main)
+            // dispatcher, and drop re-emissions where nothing actually changed (CollectionStats is
+            // an all-value-type data class, so structural equality is cheap and correct here).
+            // Contributing factor to a production OOM alongside the DAO GROUP BY fix above and the
+            // RefreshCollectionPricesUseCase batching fix (see feedback_stats_room_invalidation_oom).
+            .flowOn(dispatcherProvider.io)
+            .distinctUntilChanged()
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -166,7 +289,47 @@ class StatsRepositoryImpl(
         }
     }
 
+    /**
+     * Distinct owned card count per set, global (no color/set filter — see [StatsDao
+     * .observeDistinctOwnedCountBySet]). Joined by the ViewModel against Scryfall set metadata
+     * (card_count) — this repository has no Scryfall dependency.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeDistinctOwnedCountBySet(): Flow<Map<String, Int>> {
+        return currentUserIdFlow.flatMapLatest { userId ->
+            statsDao.observeDistinctOwnedCountBySet(userId)
+                .map { rows -> rows.associate { it.setCode to it.count } }
+        }
+    }
+
+    private fun DuplicateCardProjection.toDomain() = CardValue(
+        scryfallId    = scryfallId,
+        name          = name,
+        priceUsd      = priceUsd,
+        priceEur      = priceEur,
+        isFoil        = isFoil,
+        imageArtCrop  = imageArtCrop,
+        colorIdentity = colorIdentity,
+        setCode       = setCode,
+        setName       = setName,
+        rarity        = rarity,
+    )
+
     private fun CardValueProjection.toDomain() = CardValue(
+        scryfallId    = scryfallId,
+        name          = name,
+        priceUsd      = priceUsd,
+        priceEur      = priceEur,
+        isFoil        = isFoil,
+        imageArtCrop  = imageArtCrop,
+        colorIdentity = colorIdentity,
+        setCode       = setCode,
+        setName       = setName,
+        rarity        = rarity,
+        imageNormal   = imageNormal,
+    )
+
+    private fun VariantCardProjection.toDomain() = CardValue(
         scryfallId    = scryfallId,
         name          = name,
         priceUsd      = priceUsd,
@@ -229,5 +392,10 @@ class StatsRepositoryImpl(
             result[t] = (result[t] ?: 0) + row.count
         }
         return result
+    }
+
+    private companion object {
+        /** Cap on the Top Artist gallery row (Hall of Fame enrichment, 2026-07 stats expansion). */
+        const val ARTIST_GALLERY_LIMIT = 15
     }
 }

@@ -9,6 +9,7 @@ import androidx.room.Update
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.local.mapper.toTagList
 import com.mmg.manahub.core.data.local.mapper.toTagsJson
+import com.mmg.manahub.core.domain.repository.CardPriceUpdate
 import com.mmg.manahub.core.model.CardTag
 import kotlinx.coroutines.flow.Flow
 
@@ -185,4 +186,22 @@ abstract class CardDao {
         priceEurFoil: Double?,
         updatedAt:    Long,
     )
+
+    /**
+     * Batch price update to reduce Room invalidation noise during large refreshes
+     * (e.g. RefreshCollectionPricesUseCase).
+     */
+    @Transaction
+    open suspend fun updatePricesBatch(updates: List<CardPriceUpdate>) {
+        updates.forEach { update ->
+            updatePrices(
+                scryfallId = update.scryfallId,
+                priceUsd = update.priceUsd,
+                priceUsdFoil = update.priceUsdFoil,
+                priceEur = update.priceEur,
+                priceEurFoil = update.priceEurFoil,
+                updatedAt = update.updatedAt,
+            )
+        }
+    }
 }
