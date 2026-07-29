@@ -37,6 +37,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -46,6 +47,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -81,6 +83,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksSearchUiState
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter
+import com.mmg.manahub.feature.communitydecks.presentation.MAX_COMMUNITY_CARD_FILTERS
 import kotlinx.coroutines.launch
 
 /** One in-progress card inspection triggered from either the Commander or Card picker. */
@@ -117,7 +120,7 @@ fun CommunityAdvancedSearchSheet(
     onCommanderCleared: () -> Unit,
     onCardQueryChange: (String) -> Unit,
     onCardSelected: (Card) -> Unit,
-    onCardCleared: () -> Unit,
+    onCardRemoved: (Card) -> Unit,
     onUsernameChanged: (String) -> Unit,
     onDeckSizeChanged: (String) -> Unit,
     onPrimersOnlyToggled: (Boolean) -> Unit,
@@ -310,33 +313,81 @@ fun CommunityAdvancedSearchSheet(
                         }
                     }
 
-                    // ── Card ──
+                    // ── Cards (Archidekt multi-card search expansion, 2026-07-24) ──
                     item {
                         SearchSection(
                             title = stringResource(R.string.community_advsearch_section_card),
                             icon = Icons.Default.Style
                         ) {
-                            CardPickerField(
-                                query = state.cardQuery,
-                                onQueryChange = onCardQueryChange,
-                                results = state.cardResults,
-                                isSearching = state.isCardSearching,
-                                selectedCard = filters.card,
-                                onClearSelection = onCardCleared,
-                                onCardTapped = { index, rect ->
-                                    isDismissingInspection = false
-                                    inspecting = InspectingSession(
-                                        items = state.cardResults,
-                                        initialIndex = index,
-                                        initialRect = rect,
-                                        onSelect = onCardSelected,
-                                    )
-                                },
-                                rootCoordinates = rootCoordinates,
-                                modifier = Modifier.fillMaxWidth(),
-                                searchHint = stringResource(R.string.community_advsearch_card_hint),
-                                clearContentDescription = stringResource(R.string.community_advsearch_clear_selection),
-                            )
+                            if (filters.cards.isNotEmpty()) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    filters.cards.forEach { card ->
+                                        InputChip(
+                                            selected = true,
+                                            onClick = { onCardRemoved(card) },
+                                            label = { Text(card.name, style = ty.labelMedium, maxLines = 1) },
+                                            trailingIcon = {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = stringResource(
+                                                        R.string.community_advsearch_card_remove,
+                                                        card.name,
+                                                    ),
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                            },
+                                            // The whole chip is the tap target (onClick removes the
+                                            // card, same "tap to remove" pattern as the reference
+                                            // AdvancedSearchSheet's set chips) — pad it to the
+                                            // mandatory 48dp minimum without inflating the visual
+                                            // chip size.
+                                            modifier = Modifier.minimumInteractiveComponentSize(),
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (filters.cards.size < MAX_COMMUNITY_CARD_FILTERS) {
+                                CardPickerField(
+                                    query = state.cardQuery,
+                                    onQueryChange = onCardQueryChange,
+                                    results = state.cardResults,
+                                    isSearching = state.isCardSearching,
+                                    // Pure "add" affordance — selection is now shown exclusively via
+                                    // the chip row above, never inline in the picker itself.
+                                    selectedCard = null,
+                                    onClearSelection = {},
+                                    onCardTapped = { index, rect ->
+                                        isDismissingInspection = false
+                                        inspecting = InspectingSession(
+                                            items = state.cardResults,
+                                            initialIndex = index,
+                                            initialRect = rect,
+                                            onSelect = onCardSelected,
+                                        )
+                                    },
+                                    rootCoordinates = rootCoordinates,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    searchHint = stringResource(R.string.community_advsearch_card_hint),
+                                    clearContentDescription = stringResource(R.string.community_advsearch_clear_selection),
+                                )
+                                Text(
+                                    stringResource(R.string.community_advsearch_cards_caption),
+                                    style = ty.labelSmall,
+                                    color = mc.textDisabled,
+                                )
+                            }
+
+                            if (filters.cards.size >= 2) {
+                                Text(
+                                    stringResource(R.string.community_advsearch_cards_caption_multicard),
+                                    style = ty.labelSmall,
+                                    color = mc.textDisabled,
+                                )
+                            }
                         }
                     }
 

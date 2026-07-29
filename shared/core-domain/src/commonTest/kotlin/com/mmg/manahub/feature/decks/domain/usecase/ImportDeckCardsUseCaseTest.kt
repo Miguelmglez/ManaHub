@@ -56,12 +56,12 @@ private class FakeImportCardRepository(
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardByExactName(name: String): Result<Card> = error("unused")
-    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> = error("unused")
+    override suspend fun searchWithRawQuery(query: String, order: String?, page: Int): List<Card> = error("unused")
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> =
         scryfallIds.mapNotNull { byId[it] }
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
-    override suspend fun refreshCollectionPrices() = error("unused")
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
+    override suspend fun updatePricesBatch(updates: List<com.mmg.manahub.core.domain.repository.CardPriceUpdate>) = error("unused")
     override suspend fun evictStaleCache() = error("unused")
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
     override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")

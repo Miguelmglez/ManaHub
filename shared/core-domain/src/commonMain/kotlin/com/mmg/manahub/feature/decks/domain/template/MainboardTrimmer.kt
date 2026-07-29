@@ -4,14 +4,15 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 
 /**
- * Wizard Quality Campaign Wave 2 (trim-excess): [BuildDeckFromTemplateUseCase.computeLandTarget] is
- * called with a DIFFERENT mainboard snapshot at each of its two call sites — the pre-top-up planning
- * estimate vs. `fillLands`'s own real materialization — so the two are not guaranteed monotonic and
- * the REAL total (nonland + lands) can land a card or two OVER the format target with nothing
- * upstream to pull it back down (the "61/60" bug, ~4/30 Casual harness specs). This is the safety-net
- * trim: a pure, standalone function so it is directly unit-testable without needing a full build
- * pipeline (no [com.mmg.manahub.feature.decks.domain.engine.DeckScorer]/`DeckTemplate`/coroutine
- * dependency — the caller supplies the fit score as a plain lambda).
+ * Wizard Quality Campaign Wave 2 (trim-excess): [BuildDeckFromTemplateUseCase]'s land target is
+ * computed twice — a provisional seeds-only estimate before the Motor A/B fill loop, and the final
+ * [com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver] recompute over the finished
+ * nonland mainboard (Deck Wizard & Engine Rework plan, Workstream 6) — so the two are not guaranteed
+ * monotonic and the REAL total (nonland + lands) can land a card or two OVER the format target with
+ * nothing upstream to pull it back down (the "61/60" bug, ~4/30 Casual harness specs). This is the
+ * safety-net trim: a pure, standalone function so it is directly unit-testable without needing a
+ * full build pipeline (no [com.mmg.manahub.feature.decks.domain.engine.DeckScorer]/`DeckTemplate`/
+ * coroutine dependency — the caller supplies the fit score as a plain lambda).
  *
  * Extracted as a top-level `internal` object (rather than a private method) specifically so
  * `commonTest` can exercise the trim math directly with a small synthetic fixture, independent of

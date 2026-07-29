@@ -63,6 +63,17 @@ data class DeckDiscoveryV2(
 )
 
 /**
+ * Deck Wizard & Engine Rework plan (`docs/plans/deck-wizard-rework-plan.md`), Workstream 1.3 --
+ * splits a mixed discovery list into its two axes (plan §0 F1: "Strategy" and "Tribe" are disjoint
+ * taxonomy axes and must never render as one mixed labeled list). Pure partition, no scoring
+ * change -- the Strategies tab renders [Pair.first] under a "Strategies" section and
+ * [Pair.second] under a "Tribes" section, each keeping [DiscoverSynergiesV2UseCase]'s own
+ * best-fit-first ordering within its half.
+ */
+fun List<DeckDiscoveryV2>.partitionByAxis(): Pair<List<DeckDiscoveryV2>, List<DeckDiscoveryV2>> =
+    partition { it.key is DiscoveryClusterKey.Strategy }
+
+/**
  * Deck Builder v2 (plan §3.5): clusters the user's OWN collection on identity signals only
  * (STRATEGY/ARCHETYPE tags + derived `tribe:<x>` keys — NEVER TYPE/KEYWORD, fixing root-cause
  * 1.2.7's "clusters read as card types" complaint), ranks each cluster's members by

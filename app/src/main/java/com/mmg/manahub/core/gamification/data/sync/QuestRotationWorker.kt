@@ -6,7 +6,10 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.flow.first
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -31,15 +34,27 @@ class QuestRotationWorker(
     appContext: Context,
     workerParams: WorkerParameters,
     private val questReconciler: QuestReconciler,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : CoroutineWorker(appContext, workerParams) {
 
-    override suspend fun doWork(): Result =
-        runCatching { questReconciler.reconcile() }.fold(
+    override suspend fun doWork(): Result {
+        // Defense in depth (WS1+WS3 Part A item 3, backend-performance-optimization-plan.md §1):
+        // see GamificationSyncWorker.doWork's matching guard KDoc — an already-enqueued periodic
+        // request can fire before ManaHubApp's reactive cancel lands.
+        if (!userPreferencesDataStore.gamificationEnabledFlow.first()) {
+            // WS7 telemetry (2026-07-29) — see GamificationSyncWorker.doWork's matching guard for why
+            // this is a non-fatal, not a log: it's the field proof that the gate holds.
+            recordNonFatal("quest_rotation_worker_self_aborted_flag_off")
+            return Result.success()
+        }
+
+        return runCatching { questReconciler.reconcile() }.fold(
             onSuccess = { Result.success() },
             // Transient failure (DB locked, etc.) — retry up to 3 attempts, then give up so we don't
             // spin forever on a persistent error.
             onFailure = { if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure() },
         )
+    }
 
     companion object {
 

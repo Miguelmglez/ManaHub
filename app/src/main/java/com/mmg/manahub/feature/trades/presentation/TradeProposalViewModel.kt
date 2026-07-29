@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -322,12 +323,14 @@ class TradeProposalViewModel(
             .filter { !it.isReviewCollectionPlaceholder }
             .map { it.cardId }
             .distinct()
-        val imageMap = buildMap<String, Card?> {
-            allCardIds.forEach { id ->
-                val r = cardRepository.getCardById(id)
-                if (r is DataResult.Success) put(id, r.data)
-            }
+        // WS4a finding 5 (Backend & Performance Optimization plan, 2026-07-28): this used to call
+        // cardRepository.getCardById(id) sequentially per card -- an N+1 (network fallback on every
+        // miss), the same shape already fixed in FriendRepositoryImpl.getFriendCollection. One
+        // batched warm + one batched Room-only read instead.
+        if (allCardIds.isNotEmpty()) {
+            cardRepository.warmCacheForIds(allCardIds)
         }
+        val imageMap: Map<String, Card> = cardRepository.getCardsByIds(allCardIds).associateBy { it.scryfallId }
 
         val myItems = proposal.items
             .filter { it.fromUserId != receiverId && !it.isReviewCollectionPlaceholder }
@@ -395,6 +398,7 @@ class TradeProposalViewModel(
     private fun observeCollection() {
         viewModelScope.launch {
             userCardRepository.observeCollection()
+                .distinctUntilChanged()
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_collection_failed", e) }
                 .collect { collection ->
                     collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
@@ -408,6 +412,7 @@ class TradeProposalViewModel(
     private fun observeWishlist() {
         viewModelScope.launch {
             wishlistRepository.observeLocal()
+                .distinctUntilChanged()
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_wishlist_failed", e) }
                 .collect { wishlist ->
                     wishlistEntries = wishlist.filter { it.card != null }.sortedBy { it.card?.name }
@@ -419,6 +424,7 @@ class TradeProposalViewModel(
     private fun observeOffers() {
         viewModelScope.launch {
             openForTradeRepository.observeLocal()
+                .distinctUntilChanged()
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_offers_failed", e) }
                 .collect { offers ->
                     offerEntries = offers.filter { it.card != null }.sortedBy { it.card?.name }
@@ -430,6 +436,7 @@ class TradeProposalViewModel(
     private fun observeFriends() {
         viewModelScope.launch {
             friendRepository.observeFriends()
+                .distinctUntilChanged()
                 .catch { e -> recordSafeNonFatal("trade_proposal_observe_friends_failed", e) }
                 .collect { friends ->
                     _uiState.update { it.copy(friends = friends) }

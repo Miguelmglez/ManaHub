@@ -82,6 +82,10 @@ fun InlineErrorState(
  * @param retryLabel Label for the optional retry button.
  * @param onRetry Click callback for the retry button.
  * @param modifier Modifier applied to the root [Box].
+ * @param enabled Whether the retry button responds to taps. Defaults to `true` (existing behavior
+ *  unchanged for every pre-existing call site). Pass `false` while a retry triggered by this same
+ *  action is already in flight, or while a rate-limit cooldown is still counting down (see
+ *  [rememberRateLimitCountdownSeconds]) — the button dims to [MagicCtaButton]'s disabled styling.
  */
 @Composable
 fun FullErrorState(
@@ -89,6 +93,7 @@ fun FullErrorState(
     retryLabel: String? = null,
     onRetry: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -113,6 +118,7 @@ fun FullErrorState(
                 MagicCtaButton(
                     onClick = onRetry,
                     text = retryLabel,
+                    enabled = enabled,
                 )
             }
         }

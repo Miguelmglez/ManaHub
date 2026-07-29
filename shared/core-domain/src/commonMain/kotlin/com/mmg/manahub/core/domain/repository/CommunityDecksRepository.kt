@@ -33,6 +33,20 @@ interface CommunityDecksRepository {
      * Surfaces a [DataResult.Error] on a server timeout (Archidekt returns
      * `count = -1` with empty results when a query on a popular card/commander exceeds its
      * statement timeout) so the UI can suggest a narrower query.
+     *
+     * ## Multi-card contract (Archidekt multi-card search expansion, 2026-07-24)
+     * When [CommunityDeckSearchFilters.cardNames] carries more than one card, the implementation
+     * decomposes the request into one Archidekt search per card (Archidekt's `cardName` filter
+     * accepts only a single value — repeated params reliably statement-timeout server-side, see
+     * `docs/adr/ADR-004-community-api-contracts.md` §1/§1b) and intersects the resulting deck ids
+     * client-side. In that mode: [CommunityDeckSearchResult.hasMore] is always `false` (no
+     * deepening pagination on an intersected result — it would both break sort order and multiply
+     * requests), `totalCount` is the honest intersected deck count (not any single card's
+     * Archidekt `count`), and a per-card server-side timeout fails the WHOLE search with an
+     * actionable error naming the offending card rather than silently dropping that constraint.
+     * `[CommunityDeckSearchFilters.page]`/`pageSize` are ignored in this mode — see
+     * `com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl.searchDecksMultiCard` for
+     * the full algorithm and its known top-~180-per-card approximation.
      */
     suspend fun searchDecks(filters: CommunityDeckSearchFilters): DataResult<CommunityDeckSearchResult>
 }

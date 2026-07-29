@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Icon
@@ -47,6 +49,7 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.StrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.presentation.components.CardRow
 
@@ -255,36 +258,6 @@ internal fun StrategyFlowDirectionContent(
             contentPadding = PaddingValues(start = spacing.lg, end = spacing.lg, top = spacing.md, bottom = spacing.md),
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
         ) {
-            // Visual-overhaul pass: "Best color combos for this strategy" moved to the very TOP of
-            // this step (previously last, below the full archetype/theme lists + suggested seeds --
-            // users had to scroll past everything to find it). Suggestions only exist once an
-            // archetype/theme is picked (recomputeColorComboSuggestions is pick-driven, see
-            // DeckWizardViewModel), so "always visible" is realized as "the first thing shown the
-            // instant there IS something to show" rather than a permanent empty placeholder above
-            // the page title with nothing behind it.
-            if (hasPick) {
-                item(key = "combo_header") {
-                    Text(stringResource(R.string.deck_wizard_color_combos_title), style = ty.labelLarge, color = mc.primaryAccent)
-                }
-                if (uiState.colorComboSuggestions.isEmpty()) {
-                    item(key = "combo_empty") {
-                        Text(stringResource(R.string.deck_wizard_color_combos_empty), style = ty.bodySmall, color = mc.textSecondary)
-                    }
-                } else {
-                    item(key = "combo_chips") {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                            uiState.colorComboSuggestions.forEach { combo ->
-                                ColorComboChip(
-                                    colors = combo.colors,
-                                    selected = combo.colors == uiState.colorIdentity,
-                                    onClick = { onSelectCombo(combo) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             item(key = "header") {
                 Column {
                     Text(stringResource(R.string.deck_wizard_strategy_flow_title), style = ty.titleLarge, color = mc.textPrimary)
@@ -314,17 +287,35 @@ internal fun StrategyFlowDirectionContent(
                 )
             }
 
+            // Deck Wizard & Engine Rework plan, Workstream 3.3 -- each row's color-combo picker now
+            // expands INLINE directly below IT (not in a separate section at the top of the list, the
+            // old two-phase pick "B1's dead-chip fix papered over" per the plan). Picking strategy +
+            // combo is one continuous interaction: tap the row to select the strategy, its own combo
+            // chips appear right there, tap one to finish. uiState.colorComboSuggestions is already
+            // scoped to whichever single archetype/theme is currently selected (recomputed by
+            // DeckWizardViewModel.recomputeColorComboSuggestions on every pick), so the SAME data
+            // renders wherever the currently-selected row happens to be.
             if (filteredArchetypes.isNotEmpty()) {
                 item(key = "archetype_header") {
                     Text(stringResource(R.string.deck_wizard_archetypes_title), style = ty.labelLarge, color = mc.primaryAccent)
                 }
                 items(filteredArchetypes, key = { "archetype_${it.name}" }) { archetype ->
-                    StrategyOptionRow(
-                        label = archetype.displayName,
-                        description = archetype.description(),
-                        selected = archetype == uiState.selectedArchetype,
-                        onClick = { onSelectArchetype(archetype) },
-                    )
+                    val selected = archetype == uiState.selectedArchetype
+                    Column {
+                        StrategyOptionRow(
+                            label = archetype.displayName,
+                            description = archetype.description(),
+                            selected = selected,
+                            onClick = { onSelectArchetype(archetype) },
+                        )
+                        if (selected) {
+                            InlineColorComboSection(
+                                suggestions = uiState.colorComboSuggestions,
+                                selectedColors = uiState.colorIdentity,
+                                onSelectCombo = onSelectCombo,
+                            )
+                        }
+                    }
                 }
             }
             if (filteredThemes.isNotEmpty()) {
@@ -332,12 +323,22 @@ internal fun StrategyFlowDirectionContent(
                     Text(stringResource(R.string.deck_wizard_themes_title), style = ty.labelLarge, color = mc.primaryAccent)
                 }
                 items(filteredThemes, key = { "theme_${it.name}" }) { theme ->
-                    StrategyOptionRow(
-                        label = theme.displayName,
-                        description = theme.description(),
-                        selected = theme == uiState.selectedDirectionTheme,
-                        onClick = { onSelectTheme(theme) },
-                    )
+                    val selected = theme == uiState.selectedDirectionTheme
+                    Column {
+                        StrategyOptionRow(
+                            label = theme.displayName,
+                            description = theme.description(),
+                            selected = selected,
+                            onClick = { onSelectTheme(theme) },
+                        )
+                        if (selected) {
+                            InlineColorComboSection(
+                                suggestions = uiState.colorComboSuggestions,
+                                selectedColors = uiState.colorIdentity,
+                                onSelectCombo = onSelectCombo,
+                            )
+                        }
+                    }
                 }
             }
             if (filteredArchetypes.isEmpty() && filteredThemes.isEmpty()) {
@@ -353,6 +354,41 @@ internal fun StrategyFlowDirectionContent(
             enabled = hasPick,
             onClick = onNext,
         )
+    }
+}
+
+/** Workstream 3.3 -- the inline color-combo picker rendered directly below whichever
+ * [StrategyOptionRow] is currently selected in [StrategyFlowDirectionContent]. Reuses the exact
+ * [ColorComboChip] visual [ColorsFlowDirectionContent]/the pre-WS3 top-of-list section already used. */
+@Composable
+private fun InlineColorComboSection(
+    suggestions: List<ColorComboSuggestion>,
+    selectedColors: Set<ManaColor>,
+    onSelectCombo: (ColorComboSuggestion) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Column(modifier = Modifier.padding(start = spacing.md, top = spacing.xs)) {
+        Text(stringResource(R.string.deck_wizard_color_combos_title), style = ty.labelMedium, color = mc.primaryAccent)
+        if (suggestions.isEmpty()) {
+            Text(
+                stringResource(R.string.deck_wizard_color_combos_empty),
+                style = ty.bodySmall,
+                color = mc.textSecondary,
+                modifier = Modifier.padding(top = spacing.xxs),
+            )
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                modifier = Modifier.padding(top = spacing.xxs),
+            ) {
+                suggestions.forEach { combo ->
+                    ColorComboChip(colors = combo.colors, selected = combo.colors == selectedColors, onClick = { onSelectCombo(combo) })
+                }
+            }
+        }
     }
 }
 
@@ -439,15 +475,22 @@ private fun ColorComboChip(colors: Set<ManaColor>, selected: Boolean, onClick: (
 /**
  * A richer, one-row-per-strategy replacement for the old bare [DirectionChip] grid: label + a short
  * plain-English explanation of what the strategy means in deckbuilding terms, plus the same
- * check-circle selected indicator [CardRow]-adjacent rows in this file use. Used by both Flow B's
- * "Viable strategies" list and Flow C's "Archetypes"/"Themes" lists -- one row shape, three call sites.
+ * check-circle selected indicator [CardRow]-adjacent rows in this file use. Used by Flow B's
+ * "Viable strategies" list, Flow C's "Archetypes"/"Themes" lists, and (Workstream 3.1) Flow A's
+ * seed-ranked strategy list -- one row shape, four call sites. Internal (not `private`) so
+ * [CardsFlowDirectionContent] in `DeckWizardDirectionIdentity.kt` can reuse it.
+ *
+ * @param misfitContent Workstream 3.1 coherence hints -- optional trailing content rendered below
+ *   the description (a "Better without: …" chip row); `null` (every pre-WS3 call site) renders
+ *   nothing extra.
  */
 @Composable
-private fun StrategyOptionRow(
+internal fun StrategyOptionRow(
     label: String,
     description: String,
     selected: Boolean,
     onClick: () -> Unit,
+    misfitContent: (@Composable () -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -474,6 +517,7 @@ private fun StrategyOptionRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = spacing.xxs),
                 )
+                misfitContent?.invoke()
             }
             Surface(
                 shape = CircleShape,
@@ -490,64 +534,80 @@ private fun StrategyOptionRow(
     }
 }
 
-/** Plain-English explanation of a macro [ArchetypeId] in deckbuilding terms (Entry-flow enrichment --
- * mirrors the pre-existing per-[ThemeId] `deck_wizard_theme_desc_*` strings' convention/placement in
- * `strings.xml`). [ArchetypeId.GENERIC] is filtered out of every picker this feeds, but the branch is
- * kept for `when` exhaustiveness. */
+/**
+ * Deck Wizard & Engine Rework plan, Workstream 3.1 -- the "Better without: …" coherence hint row,
+ * rendered inline inside a [StrategyOptionRow] (via its `misfitContent` slot) whenever a
+ * [com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate] carries `misfitSeeds` and/or
+ * `misfitColors`. Tapping a seed chip removes that seed ([onRemoveSeed]); tapping a color chip
+ * deselects that color ([onDeselectColor], a no-op if it happens to be locked -- see
+ * [DeckWizardViewModel.onToggleCardsFlowColor]'s own guard). Either action re-ranks the strategy
+ * list automatically (both handlers already trigger `recomputeSeedStrategySuggestion` in the VM).
+ * Never hides the candidate itself -- this is purely an additive hint below its description.
+ */
 @Composable
-private fun ArchetypeId.description(): String = stringResource(
-    when (this) {
-        ArchetypeId.GENERIC -> R.string.deck_wizard_archetype_desc_generic
-        ArchetypeId.AGGRO -> R.string.deck_wizard_archetype_desc_aggro
-        ArchetypeId.MIDRANGE -> R.string.deck_wizard_archetype_desc_midrange
-        ArchetypeId.CONTROL -> R.string.deck_wizard_archetype_desc_control
-        ArchetypeId.TEMPO -> R.string.deck_wizard_archetype_desc_tempo
-        ArchetypeId.COMBO -> R.string.deck_wizard_archetype_desc_combo
-        ArchetypeId.RAMP -> R.string.deck_wizard_archetype_desc_ramp
-    },
-)
+internal fun MisfitHintRow(
+    seeds: List<Card>,
+    colors: Set<ManaColor>,
+    onRemoveSeed: (Card) -> Unit,
+    onDeselectColor: (ManaColor) -> Unit,
+) {
+    if (seeds.isEmpty() && colors.isEmpty()) return
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Column(modifier = Modifier.padding(top = spacing.xs)) {
+        Text(stringResource(R.string.deck_wizard_misfit_hint_title), style = ty.labelSmall, color = mc.textSecondary)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+            modifier = Modifier.padding(top = spacing.xxs),
+        ) {
+            seeds.forEach { seed -> MisfitChip(label = seed.name, onClick = { onRemoveSeed(seed) }) }
+            colors.forEach { color -> MisfitChip(label = color.displayName, onClick = { onDeselectColor(color) }) }
+        }
+    }
+}
 
-/** Plain-English explanation of a [ThemeId] in deckbuilding terms -- the pre-existing
- * `deck_wizard_theme_desc_*` strings (added for the Step-3 Identity theme picker) had no consumer
- * anywhere in the app until this pass; reused verbatim rather than duplicated. */
 @Composable
-private fun ThemeId.description(): String = stringResource(
-    when (this) {
-        ThemeId.REANIMATOR -> R.string.deck_wizard_theme_desc_reanimator
-        ThemeId.SELF_MILL -> R.string.deck_wizard_theme_desc_self_mill
-        ThemeId.ARISTOCRATS -> R.string.deck_wizard_theme_desc_aristocrats
-        ThemeId.TOKENS -> R.string.deck_wizard_theme_desc_tokens
-        ThemeId.SPELLSLINGER -> R.string.deck_wizard_theme_desc_spellslinger
-        ThemeId.VOLTRON -> R.string.deck_wizard_theme_desc_voltron
-        ThemeId.STAX -> R.string.deck_wizard_theme_desc_stax
-        ThemeId.LANDFALL -> R.string.deck_wizard_theme_desc_landfall
-        ThemeId.LIFEGAIN -> R.string.deck_wizard_theme_desc_lifegain
-        ThemeId.PLUS1_COUNTERS -> R.string.deck_wizard_theme_desc_plus1_counters
-        ThemeId.TRIBAL -> R.string.deck_wizard_theme_desc_tribal
-        ThemeId.ARTIFACTS -> R.string.deck_wizard_theme_desc_artifacts
-        ThemeId.ENCHANTRESS -> R.string.deck_wizard_theme_desc_enchantress
-        ThemeId.WHEELS -> R.string.deck_wizard_theme_desc_wheels
-        ThemeId.MILL -> R.string.deck_wizard_theme_desc_mill
-        ThemeId.GROUP_HUG -> R.string.deck_wizard_theme_desc_group_hug
-        ThemeId.GROUP_SLUG -> R.string.deck_wizard_theme_desc_group_slug
-        ThemeId.BLINK -> R.string.deck_wizard_theme_desc_blink
-        ThemeId.SUPERFRIENDS -> R.string.deck_wizard_theme_desc_superfriends
-        ThemeId.VEHICLES -> R.string.deck_wizard_theme_desc_vehicles
-        ThemeId.TOOLBOX -> R.string.deck_wizard_theme_desc_toolbox
-        ThemeId.CLONES_THEFT -> R.string.deck_wizard_theme_desc_clones_theft
-    },
-)
+private fun MisfitChip(label: String, onClick: () -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Surface(onClick = onClick, shape = ChipShape, color = mc.surfaceVariant) {
+        Row(
+            modifier = Modifier.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
+        ) {
+            Text(label, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Icon(Icons.Default.Clear, contentDescription = null, tint = mc.textSecondary, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+/**
+ * Deck Wizard & Engine Rework plan, Workstream 1.1/3 -- delegates to the single shared
+ * [StrategyCatalog] (`commonMain`) instead of this file's own `R.string`-mapping duplicate (retired
+ * by this workstream per WS1's own memory note: "once WS2/3 wire the wizard onto StrategyCatalog,
+ * retire the private description mapping ... don't let both copies drift independently"). Text is
+ * unchanged (StrategyCatalog mirrors these exact strings verbatim) -- this is a pure de-duplication,
+ * not a copy change. Kept as a thin extension (not inlined at every call site) so `archetype
+ * .description()` reads the same as before at every existing call site in this file.
+ */
+private fun ArchetypeId.description(): String = StrategyCatalog.description(this)
+
+/** See [ArchetypeId.description]'s KDoc -- same de-duplication, [ThemeId] side. */
+private fun ThemeId.description(): String = StrategyCatalog.description(this)
 
 /** [ColorStrategyEntry.description] -- same fallback order as [ColorStrategyEntry.label]'s own KDoc:
  * a non-GENERIC archetype's description first, else the first theme's, else the GENERIC/"Balanced"
  * fallback (a [ColorStrategyEntry] with neither is never actually curated in [ColorStrategyAffinity]'s
  * table today, but the fallback keeps this total rather than crashing if one ever is). */
-@Composable
 private fun ColorStrategyEntry.description(): String {
     val nonGenericArchetype = archetype?.takeIf { it != ArchetypeId.GENERIC }
     return when {
         nonGenericArchetype != null -> nonGenericArchetype.description()
         themes.isNotEmpty() -> themes.first().description()
-        else -> stringResource(R.string.deck_wizard_archetype_desc_generic)
+        else -> StrategyCatalog.description(ArchetypeId.GENERIC)
     }
 }

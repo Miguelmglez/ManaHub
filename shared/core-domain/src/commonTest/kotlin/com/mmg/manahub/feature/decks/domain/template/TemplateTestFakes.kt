@@ -49,15 +49,15 @@ class FakeCardRepository(
 
     /** MUST stay unreachable in Deck Builder v2 tests -- asserting `searchWithRawQueryCallCount ==
      * 0` after a build is how the "zero alphabetical Scryfall searches" invariant is verified. */
-    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> {
+    override suspend fun searchWithRawQuery(query: String, order: String?, page: Int): List<Card> {
         searchWithRawQueryCallCount++
         return emptyList()
     }
 
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = error("unused")
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
-    override suspend fun refreshCollectionPrices() = error("unused")
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
+    override suspend fun updatePricesBatch(updates: List<com.mmg.manahub.core.domain.repository.CardPriceUpdate>) = error("unused")
     override suspend fun evictStaleCache() = error("unused")
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
     override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")

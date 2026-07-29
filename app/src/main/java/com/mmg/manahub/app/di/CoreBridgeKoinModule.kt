@@ -20,6 +20,7 @@ import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.repository.DraftRepository
 import com.mmg.manahub.core.domain.repository.DraftSimRepository
@@ -40,6 +41,7 @@ import com.mmg.manahub.feature.trades.data.repository.WishlistRepositoryImpl
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
@@ -101,6 +103,16 @@ import org.koin.dsl.module
  * eager Hilt injection of this repository triggered Koin's reverse bridge (and thus
  * `GlobalContext.get()`) before `startKoin()` had run. [StatsDao] is newly forward-bridged to build it.
  *
+ * ## Backend & Performance Optimization plan, WS1+WS3 (2026-07-28) — [SyncManager] promoted here
+ * [SyncManager] was a Collection-only bridged `single` in `feature.collection.di.collectionKoinModule`
+ * (it still keeps its Hilt `@Inject constructor` — `ManaHubApp` forward-bridges the same instance, see
+ * that module's KDoc). It is promoted to this shared module because `HomeViewModel` now also needs its
+ * `syncState` (to defer non-essential Scryfall fetches — Home Discover/trending/community-decks — while
+ * a collection sync is in progress, per the "serialize the login window" fix). Per the coreBridge
+ * promotion rule (`feedback_kmp_koin_island_cutover_pattern` memory, gotcha 4): the Collection island's
+ * OWN `single { syncManager }` was REMOVED to avoid a `DefinitionOverrideException` — it now resolves
+ * the promoted single via `get()`.
+ *
  * @param userPreferencesRepo the Hilt-owned [UserPreferencesRepository] singleton (Settings + Stats).
  * @param userPrefsDataStore the Hilt-owned [UserPreferencesDataStore] singleton (Settings + Profile + Home).
  * @param scryfallRemoteDataSource the Hilt-owned [ScryfallRemoteDataSource] singleton (Stats + Home).
@@ -121,6 +133,12 @@ import org.koin.dsl.module
  *   the five trades remote data sources (`tradesKoinModule`) and the Trades/Wishlist/OpenForTrade
  *   repositories below.
  * @param userCardRepository the Hilt-owned [UserCardRepository] provider (CardDetail + Trades).
+ * @param syncManager the Hilt-owned [SyncManager] singleton (promoted from Collection — now also
+ *   consumed by Home; see the WS1+WS3 KDoc note above).
+ * @param appScope the app's ONE canonical [CoroutineScope] — `ManaHubApp`'s own `appScope` field
+ *   (`SupervisorJob() + Dispatchers.IO`), registered here unqualified (see the KDoc directly above
+ *   its `single<CoroutineScope>` registration below for why this bridge module, and not a feature
+ *   module, is the correct owner).
  * @return a Koin [Module] exposing the cross-island bridged singletons plus the natively-Koin-constructed
  *   [TournamentRepository]/[DeckRepository]/[DraftRepository]/[DraftSimRepository]/[TradesRepository]/
  *   [WishlistRepository]/[OpenForTradeRepository]/[FriendRepository]/[GameSessionRepository]/[StatsRepository].
@@ -138,6 +156,8 @@ fun coreBridgeKoinModule(
     okHttpClient: OkHttpClient,
     supabaseClient: SupabaseClient,
     userCardRepository: () -> UserCardRepository,
+    syncManager: SyncManager,
+    appScope: CoroutineScope,
 ): Module = module {
     // ── KMP platform abstractions (not Hilt-owned — instantiated directly). ──
     single<CrashReporter> { provideCrashReporter() }
@@ -152,12 +172,27 @@ fun coreBridgeKoinModule(
     //    separate follow-up, out of this fix's scope). ──
     single<CoroutineDispatcher>(named("io")) { Dispatchers.IO }
 
+    // ── App-wide CoroutineScope (production crash fix, 2026-07-29). This is the app's ONE canonical
+    //    `CoroutineScope` — the SAME instance `ManaHubApp` uses directly for its own `appScope.launch{}`
+    //    calls and for the gamification engine. It is registered HERE, in the shared cross-island
+    //    bridge module, specifically because a cross-cutting singleton must never be owned by a single
+    //    feature module: this exact registration used to live in `decksKoinModule` (as a leftover from
+    //    the legacy `DeckMagicDetailViewModel`) and silently vanished — crashing the app at launch for
+    //    every `AuthRepository` consumer, not just Decks — when the Deck Wizard & Engine Rework plan's
+    //    WS7.1 retired that legacy screen and cleaned up what looked like a Decks-only dependency. Any
+    //    future feature-module owner of a cross-cutting singleton should promote it here instead, per
+    //    the promote-then-shrink ritual (`feedback_kmp_koin_island_cutover_pattern` memory). Unqualified
+    //    (no `named(...)`) — both current consumers (`AuthRepositoryImpl.applicationScope`,
+    //    `CommunityDeckImportCoordinator.appScope`) declare a plain `CoroutineScope` param. ──
+    single<CoroutineScope> { appScope }
+
     // ── AuthRepository: natively Koin-constructed (KMP migration batch 5; Hilt `AuthModule` deleted).
     //    Shared across nearly every island — registered exactly once here. `Auth` is derived directly
     //    from the already-bridged SupabaseClient single (no separate bridge/single needed); the
     //    `@Named("supabase")` OkHttpClient and UserProfileClient/UserProfileDataSource are natively
-    //    Koin-built in `authKoinModule` — resolved cross-module via `get()`. `applicationScope` reuses
-    //    the CoroutineScope single already registered by `decksKoinModule`. ──
+    //    Koin-built in `authKoinModule` — resolved cross-module via `get()`. `applicationScope` resolves
+    //    the unqualified CoroutineScope single registered below (this module owns it — see that
+    //    single's own KDoc for why). ──
     single<AuthRepository> {
         AuthRepositoryImpl(
             supabaseAuth = get<SupabaseClient>().auth,
@@ -184,6 +219,7 @@ fun coreBridgeKoinModule(
     single { okHttpClient }
     single { supabaseClient }
     single { userCardRepository() }
+    single { syncManager }
 
     // Natively constructed (batch 4) — the SAME instance the whole gamification engine graph
     // (gamificationEngineKoinModule) and ManaHubApp's own direct emission share.

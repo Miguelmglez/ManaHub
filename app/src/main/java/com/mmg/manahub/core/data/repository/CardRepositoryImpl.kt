@@ -2,7 +2,6 @@ package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
-import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.mapper.toDomainCard
 import com.mmg.manahub.core.data.local.mapper.toEntityCard
 import com.mmg.manahub.core.data.local.mapper.toSuggestedTagList
@@ -39,7 +38,6 @@ import javax.inject.Singleton
 @Singleton
 class CardRepositoryImpl @Inject constructor(
     private val cardDao:               CardDao,
-    private val userCardCollectionDao: UserCardCollectionDao,
     private val remote:                ScryfallRemoteDataSource,
     private val resolveCardStrategyTags: ResolveCardStrategyTagsUseCase,
     private val userPrefs:             UserPreferencesDataStore,
@@ -306,8 +304,8 @@ class CardRepositoryImpl @Inject constructor(
                 .associateBy { it.setCode to it.collectorNumber }
         }
 
-    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> =
-        withContext(ioDispatcher) { remote.searchWithRawQuery(query, order) }
+    override suspend fun searchWithRawQuery(query: String, order: String?, page: Int): List<Card> =
+        withContext(ioDispatcher) { remote.searchWithRawQuery(query, order, page) }
 
     override suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>> =
         withContext(ioDispatcher) {
@@ -424,47 +422,14 @@ class CardRepositoryImpl @Inject constructor(
     override fun observeCard(scryfallId: String): Flow<Card?> =
         cardDao.observeById(scryfallId).map { it?.toDomainCard() }
 
-    override suspend fun refreshCollectionPrices() = withContext(ioDispatcher) {
-        val allIds = userCardCollectionDao.getAllScryfallIds()
-        if (allIds.isEmpty()) return@withContext
-
-        // Batch-load all cached entries in a single query instead of N getById() calls.
-        val cachedMap = cardDao.getByIds(allIds).associateBy { it.scryfallId }
-        val staleIds  = allIds.filter { id ->
-            val c = cachedMap[id]
-            c == null || !CachePolicy.isFresh(c.cachedAt)
-        }
-        if (staleIds.isEmpty()) return@withContext
-
-        val result = remote.getCardsBatch(staleIds)
-        if (result.isSuccess) {
-            val cards = result.getOrThrow()
-
-            // Build all entities first (reads only), then write in a single upsertAll
-            // transaction instead of N individual upsert() calls. Tag resolution is deferred to a
-            // background job (see scheduleTagResolutionBatch).
-            val entities = entitiesPreservingTagsBatch(cards, cachedMap)
-            cardDao.upsertAll(entities)
-            scheduleTagResolutionBatch(cards, cachedMap)
-
-            // Clear stale flag for every card we successfully refreshed.
-            val refreshed = cards.map { it.scryfallId }.toSet()
-            refreshed.forEach { cardDao.clearStale(it) }
-
-            // Mark cards that Scryfall did not return in the batch.
-            (staleIds.toSet() - refreshed).forEach { id ->
-                val c = cachedMap[id] ?: return@forEach
-                if (CachePolicy.isStale(c.cachedAt))
-                    cardDao.markStale(id, "Not found in Scryfall batch response")
-            }
-        } else {
-            val reason = buildStaleReason(result.exceptionOrNull())
-            staleIds.forEach { id ->
-                val c = cachedMap[id] ?: return@forEach
-                if (CachePolicy.isStale(c.cachedAt)) cardDao.markStale(id, reason)
-            }
-        }
-    }
+    // Backend & Performance Optimization plan, WS1+WS3 Part B item 7a (2026-07-28): this used to
+    // hold `refreshCollectionPrices()`, an unguarded, whole-collection duplicate of
+    // `RefreshCollectionPricesUseCase` (`shared/core-data`) called on every Collection screen open.
+    // DELETED — `PriceRefreshWorker` -> `RefreshCollectionPricesUseCase` is now the SOLE price-
+    // refresh path (stale-only, sliced, watermark-guarded). See that use case's KDoc for the
+    // equivalent (and improved) logic. Zero remaining callers confirmed via repo-wide grep before
+    // deleting both this override and the `CardRepository.refreshCollectionPrices()` interface
+    // member.
 
     override suspend fun updatePrices(
         scryfallId:   String,

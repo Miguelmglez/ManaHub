@@ -4,14 +4,11 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.DeckstatsClient
 import com.mmg.manahub.core.data.remote.DeckstatsFetcherImpl
-import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.EdhrecPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.PowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
-import com.mmg.manahub.feature.decks.domain.usecase.BudgetOptimizer
-import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.DeckstatsFetcher
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
@@ -20,11 +17,11 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckArchetypeUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsWithBudgetUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
@@ -33,14 +30,12 @@ import com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver
 import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
 import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
 import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardViewModel
-import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel
 import com.mmg.manahub.feature.decks.presentation.DeckViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import okhttp3.logging.HttpLoggingInterceptor
@@ -53,9 +48,12 @@ import java.util.concurrent.TimeUnit
  * KMP migration — Hilt→Koin cutover batch 3. The **Decks** Koin island.
  *
  * This is a multi-ViewModel island: it resolves ALL ViewModels under the `feature/decks`
- * tree via Koin — [DeckViewModel] (deck list), [DeckStudioViewModel] (the unified create+edit
- * surface, including its inline Deck Doctor Suggestions tab), and the legacy fallback
- * [DeckMagicDetailViewModel].
+ * tree via Koin — [DeckViewModel] (deck list) and [DeckStudioViewModel] (the unified create+edit
+ * surface, including its inline Deck Doctor Suggestions tab). The legacy fallback
+ * `DeckMagicDetailViewModel` (and its `Screen.DeckDetail` route) was RETIRED in the Deck Wizard &
+ * Engine Rework plan, Workstream 7.1 (2026-07-28) — parity with Deck Studio was confirmed first
+ * (commander flow, land suggestions, grouping, sideboard movement, playtest button, share/export
+ * all live in `DeckStudioScreen`/`DeckStudioViewModel`). Do not re-add it.
  *
  * `DeckImprovementViewModel`/`DeckImprovementScreen` (the standalone Deck Doctor surface) were
  * RETIRED in Phase 0.5 of `docs/claude-code-prompt-deck-doctor-community.md` (D10) — Deck Studio's
@@ -63,7 +61,7 @@ import java.util.concurrent.TimeUnit
  *
  * ## The Deck Doctor scoring engine is now natively Koin-built (the Hilt `DeckDoctorModule` was DELETED)
  * Every class in the engine graph ([DeckScorer], [RoleClassifier], [ManaBaseAnalyzer], [EdhrecPowerResolver],
- * [DeckMagicEngine], [BudgetOptimizer], [CandidatePoolGenerator], [InferDeckIdentityUseCase] and the six
+ * [CandidatePoolGenerator], [InferDeckIdentityUseCase] and the six
  * deck use cases) already lived in `:shared:core-domain` `commonMain` with NO `@Inject`/`@Singleton`
  * annotations (an earlier KMP-migration slice stripped them). The ONLY class that still had `@Inject`
  * was [com.mmg.manahub.feature.draft.data.engine.ScoringDraftDeckBuilder] (the still-Hilt Draft
@@ -83,16 +81,9 @@ import java.util.concurrent.TimeUnit
  * - `SearchCardsUseCase`, `SuggestTagsUseCase`, `GetDeckGameStatsUseCase` — already `single`s in
  *   `SharedDomainKoinModule`.
  *
- * @param applicationScope the Hilt-owned `@ApplicationScope` [CoroutineScope] (legacy
- *   [DeckMagicDetailViewModel] only — survives the ViewModel for fire-and-forget sync work).
- * @return a Koin [Module] exposing the three Decks ViewModels + the Deck Doctor engine graph.
+ * @return a Koin [Module] exposing the Decks ViewModels + the Deck Doctor engine graph.
  */
-fun decksKoinModule(
-    applicationScope: CoroutineScope,
-): Module = module {
-    // ── Hilt → Koin bridge: the one remaining Hilt-owned singleton this island still needs. ──
-    single { applicationScope }
-
+fun decksKoinModule(): Module = module {
     // ── Deck Doctor scoring engine (natively Koin-built; DeckDoctorModule's Hilt sibling was
     //    DELETED). Now `edhrec_rank` is persisted on Card, EdhrecPowerResolver derives the power
     //    signal from each card's EDHREC rank on a logarithmic scale. ──
@@ -106,10 +97,11 @@ fun decksKoinModule(
             manaBaseAnalyzer = get(),
         )
     }
-    single { DeckMagicEngine(deckScorer = get()) }
-
     // ── Candidate pool helpers. ──
-    single { BudgetOptimizer() }
+    // `BudgetOptimizer` was DELETED in WS7.3 (D-H, budget feature not coming back) alongside
+    // `SuggestAddsWithBudgetUseCase`. `CandidatePoolGenerator` SURVIVES -- it has a live caller
+    // (the wizard's Scryfall backstop, WS4) beyond the now-deleted dormant pipeline; see
+    // `feedback_candidatepoolgenerator_no_longer_dormant` memory.
     single { CandidatePoolGenerator(cardRepository = get()) }
 
     // ── Deck use cases. ──
@@ -119,28 +111,15 @@ fun decksKoinModule(
     single { InferDeckArchetypeUseCase() }
     single { EvaluateDeckUseCase(deckScorer = get(), progressionEventBus = get(), inferDeckArchetypeUseCase = get()) }
     single { SuggestAddsUseCase(deckScorer = get()) }
-    single { SuggestCutsUseCase(deckScorer = get()) }
+    // WS9.5 (Deck Wizard & Engine Rework plan): the manabase-aware cut penalty needs the SAME
+    // shared ManaBaseAnalyzer singleton SuggestAddsFromCollectionUseCase already uses below.
+    single { SuggestCutsUseCase(deckScorer = get(), manaBaseAnalyzer = get()) }
     // Deck Doctor Community/Archetype plan, Phase 2 (Motor A): the primary, always-available,
-    // offline adds source — see `project_deck_doctor_phase2_motor_a` memory. Still registered
-    // (DORMANT, D5): `SuggestAddsWithBudgetUseCase` + its `CandidatePoolGenerator`/`BudgetOptimizer`
-    // dependencies — kept for a possible future revival, no longer injected into any live surface.
+    // offline adds source — see `project_deck_doctor_phase2_motor_a` memory. The dormant
+    // `SuggestAddsWithBudgetUseCase` sibling (D5, no longer injected into any live surface) was
+    // DELETED in WS7.3 (D-H, budget feature not coming back) — Motor A is now the only adds path
+    // through this registration.
     single { SuggestAddsFromCollectionUseCase(deckScorer = get(), manaBaseAnalyzer = get()) }
-    single {
-        SuggestAddsWithBudgetUseCase(
-            deckScorer = get(),
-            candidatePoolGenerator = get(),
-            budgetOptimizer = get(),
-            cardRepository = get(),
-        )
-    }
-    single {
-        BuildDeckFromSeedsUseCase(
-            deckScorer = get(),
-            roleClassifier = get(),
-            candidatePoolGenerator = get(),
-            budgetOptimizer = get(),
-        )
-    }
     // Deck Doctor Community/Archetype plan, Phase 4 (Motor B). `CommunityAggregateRepository`
     // (communityAggregateKoinModule) and `CommunityDecksRepository` (communityDecksKoinModule) are
     // resolved via `get()` — both modules load in the same ManaHubApp `modules(...)` call, so
@@ -175,6 +154,9 @@ fun decksKoinModule(
     // always supplies a real instance; see each class's own KDoc).
     single { SuggestStrategiesForSeedsUseCase() }
     single { RankOwnedCardsForProfileUseCase() }
+    // Deck Wizard & Engine Rework plan, Workstream 2.2 — the STRATEGY step's pure candidate
+    // union/ranking. Pure/dependency-free, same registration convention as the two above.
+    single { DeriveCommanderStrategiesUseCase() }
     // Deck Engine Unification plan (D1, live-wired in §5 Phase 3.5): build = the Doctor's own Motor A
     // loop, so BuildDeckFromTemplateUseCase shares the SAME SuggestAddsFromCollectionUseCase
     // singleton DeckDoctorOrchestrator uses. Motor B (community) is NOW wired live -- the wizard's
@@ -194,6 +176,11 @@ fun decksKoinModule(
             communityAggregateRepository = get(),
             suggestAddsFromCommunityUseCase = get(),
             isCommunityEngineEnabled = { get<UserPreferencesDataStore>().communityEngineEnabledFlow.first() },
+            // Deck Wizard & Engine Rework plan, Workstream 4.1 (F4 fix): the Scryfall backstop fill
+            // phase, gated at runtime on DeckWizardSpec.includeOutsideCollection -- shares the SAME
+            // CandidatePoolGenerator singleton registered above (no longer purely dormant, see that
+            // class's KDoc).
+            candidatePoolGenerator = get(),
         )
     }
     // Deck Builder v2, Phase 5 (docs/plans/deck-builder-v2-plan.md §3.5) -- Discoveries v2. Flag
@@ -218,10 +205,8 @@ fun decksKoinModule(
             inferDeckIdentityUseCase = get(),
             suggestCutsUseCase = get(),
             suggestAddsFromCollectionUseCase = get(),
-            buildDeckFromSeedsUseCase = get(),
             getDeckGameStatsUseCase = get(),
             importDeckUseCase = get(),
-            deckMagicEngine = get(),
             wishlistRepository = get(),
             userPreferences = get(),
             crashReporter = get(),
@@ -233,6 +218,14 @@ fun decksKoinModule(
             importDeckCardsUseCase = get(),
             discoverSynergiesV2UseCase = get(),
             findCombosUseCase = get(),
+            // Deck Wizard & Engine Rework plan, Workstream 6 -- unifies calculateLandDeltas onto the
+            // SAME LandTargetResolver the wizard uses at build time (see DeckStudioViewModel's KDoc
+            // on resolveStudioLandTarget).
+            deckScorer = get(),
+            manaBaseAnalyzer = get(),
+            // Deck Wizard & Engine Rework plan, Workstream 8.2 -- the Suggestions tab's own Scryfall
+            // backstop toggle shares the SAME CandidatePoolGenerator singleton registered above.
+            candidatePoolGenerator = get(),
         )
     }
 
@@ -253,25 +246,10 @@ fun decksKoinModule(
             suggestStrategiesForSeedsUseCase = get(),
             rankOwnedCardsForProfileUseCase = get(),
             userPreferences = get(),
-        )
-    }
-
-    // DeckMagicDetailViewModel: the legacy (unused fallback) editor. `savedStateHandle = get()`
-    // carries "deckId".
-    viewModel {
-        DeckMagicDetailViewModel(
-            deckRepository = get(),
-            cardRepository = get(),
-            userCardRepository = get(),
-            authRepository = get(),
-            suggestTagsUseCase = get(),
-            userPreferencesRepo = get(),
-            userPrefsStore = get(),
-            syncManager = get(),
-            workManager = get(),
-            applicationScope = get(),
-            savedStateHandle = get(),
-            getDeckGameStatsUseCase = get(),
+            // Deck Wizard & Engine Rework plan, Workstream 2 -- STRATEGY step's source 1 +
+            // derivation ranking.
+            cardStrategyTagsRepository = get(),
+            deriveCommanderStrategiesUseCase = get(),
         )
     }
 }

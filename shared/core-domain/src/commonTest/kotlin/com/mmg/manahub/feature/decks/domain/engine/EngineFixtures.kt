@@ -31,6 +31,11 @@ fun card(
     suggestedTags: List<SuggestedTag> = emptyList(),
     manaCost: String? = null,
     rarity: String = "rare",
+    /** D14 -- WUBRG-subset production string (e.g. "WU" for a dual land). Deck Wizard & Engine
+     * Rework plan WS9.4 -- lets fixture lands exercise [ArchetypeRoleClassifier]'s
+     * `manaFixMatcher`/[BuildDeckFromTemplateUseCase]'s fixing-land filter without needing every
+     * existing call site to opt in (defaults to "" -- no production, matching [Card]'s own default). */
+    producedMana: String = "",
 ): Card = Card(
     scryfallId = id,
     name = name,
@@ -75,6 +80,7 @@ fun card(
     tags = tags,
     userTags = userTags,
     suggestedTags = suggestedTags,
+    producedMana = producedMana,
 )
 
 /** DeckEntry shortcut. */

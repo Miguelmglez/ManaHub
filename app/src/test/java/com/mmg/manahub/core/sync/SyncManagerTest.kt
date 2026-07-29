@@ -9,6 +9,7 @@ import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
+import com.mmg.manahub.core.data.local.mapper.toEntityCard
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
 import com.mmg.manahub.core.data.remote.collection.UserCardCollectionDto
@@ -687,4 +688,86 @@ class SyncManagerTest {
         // Assert: soft-delete propagated into Room
         assert(capturedEntity.captured.isDeleted) { "Local entity must be marked as deleted" }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — ensureCardsExist: chunked upsertAll (Backend & Performance
+    //  Optimization plan, WS1+WS3 Part B item 6, 2026-07-28)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given one card missing from Room during a collection pull when ensureCardsExist fetches it then upsertAll is called once and upsert is never called`() =
+        runTest(testDispatcher) {
+            // Arrange: override the default setUp() stub (which pretends every id is cached) so
+            // CARD_ID_A genuinely reports missing, forcing the Scryfall-fetch-and-persist path.
+            val remoteRow = buildCollectionDto(scryfallId = CARD_ID_A, updatedAt = 9_000L)
+            coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteRow))
+            coEvery { cardDao.getByIds(listOf(CARD_ID_A)) } returns emptyList()
+            every { collectionDao.getByIdIncludingDeleted(any()) } returns null
+            every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
+            val fetchedCard = com.mmg.manahub.util.TestFixtures.buildCard(scryfallId = CARD_ID_A)
+            coEvery { scryfallRemote.getCardsBatch(listOf(CARD_ID_A)) } returns Result.success(listOf(fetchedCard))
+
+            // Act
+            syncManager.sync(USER_ID)
+            advanceUntilIdle()
+
+            // Assert: ONE upsertAll call for the single (1-id) chunk; the old per-card upsert loop
+            // this replaced must never fire from this path.
+            coVerify(exactly = 1) { cardDao.upsertAll(listOf(fetchedCard.toEntityCard())) }
+            coVerify(exactly = 0) { cardDao.upsert(any()) }
+        }
+
+    @Test
+    fun `given more than 75 missing cards during a collection pull when ensureCardsExist fetches them then getCardsBatch and upsertAll are each called once per 75-id chunk`() =
+        runTest(testDispatcher) {
+            // Arrange: 80 distinct missing scryfallIds -> 2 chunks (75 + 5), per the Scryfall
+            // /cards/collection hard limit ensureCardsExist chunks against.
+            val missingIds = (1..80).map { "missing-card-$it" }
+            val remoteRows = missingIds.map { id -> buildCollectionDto(id = "col-$id", scryfallId = id, updatedAt = 9_000L) }
+            coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(remoteRows)
+            coEvery { cardDao.getByIds(missingIds) } returns emptyList()
+            every { collectionDao.getByIdIncludingDeleted(any()) } returns null
+            every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
+
+            val chunkCaptures = mutableListOf<List<String>>()
+            coEvery { scryfallRemote.getCardsBatch(capture(chunkCaptures)) } answers {
+                val ids = firstArg<List<String>>()
+                Result.success(ids.map { id -> com.mmg.manahub.util.TestFixtures.buildCard(scryfallId = id) })
+            }
+
+            // Act
+            syncManager.sync(USER_ID)
+            advanceUntilIdle()
+
+            // Assert: exactly 2 Scryfall batch calls (75 + 5) and exactly 2 upsertAll calls (one per
+            // chunk, never one per card and never a single 80-card write).
+            assertEquals(2, chunkCaptures.size)
+            assertEquals(setOf(75, 5), chunkCaptures.map { it.size }.toSet())
+            coVerify(exactly = 2) { cardDao.upsertAll(any()) }
+            coVerify(exactly = 0) { cardDao.upsert(any()) }
+        }
+
+    @Test
+    fun `given a Scryfall batch failure for one chunk when ensureCardsExist runs then the failure is isolated and does not throw`() =
+        runTest(testDispatcher) {
+            val remoteRow = buildCollectionDto(scryfallId = CARD_ID_A, updatedAt = 9_000L)
+            coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteRow))
+            coEvery { cardDao.getByIds(listOf(CARD_ID_A)) } returns emptyList()
+            every { collectionDao.getByIdIncludingDeleted(any()) } returns null
+            every { collectionDao.getByCompositeKey(any(), any(), any(), any(), any()) } returns null
+            coEvery { scryfallRemote.getCardsBatch(listOf(CARD_ID_A)) } returns
+                Result.failure(RuntimeException("Scryfall down"))
+
+            // Act: must not throw -- a chunk-level Scryfall failure is non-fatal, logged, and the
+            // id simply stays "missing" for retry on the next sync cycle (per the KDoc on
+            // ensureCardsExist / this method's onFailure branch).
+            val result = syncManager.sync(USER_ID)
+            advanceUntilIdle()
+
+            // Assert: sync itself still completes (the failure doesn't propagate as an exception),
+            // and upsertAll/upsert are never called for the unresolved chunk.
+            assertNotNull(result)
+            coVerify(exactly = 0) { cardDao.upsertAll(any()) }
+            coVerify(exactly = 0) { cardDao.upsert(any()) }
+        }
 }

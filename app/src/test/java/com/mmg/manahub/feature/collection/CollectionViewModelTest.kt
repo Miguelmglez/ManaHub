@@ -37,6 +37,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -150,7 +151,6 @@ class CollectionViewModelTest {
         overrideCollection: Boolean = true,
     ): CollectionViewModel {
         if (overrideCollection) every { getCollection() } returns flowOf(entries)
-        coEvery { cardRepository.refreshCollectionPrices() } returns Unit
         coEvery { authRepository.getCurrentUser() } returns null
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
@@ -225,7 +225,6 @@ class CollectionViewModelTest {
         // Arrange
         val staleCard = TestFixtures.buildStaleCard("id-001")
         val entry = TestFixtures.buildUserCardWithCard(card = staleCard)
-        coEvery { cardRepository.refreshCollectionPrices() } returns Unit
 
         viewModel = buildViewModel(emptyList())
         // Override after buildViewModel so init coroutine picks up the stale-card flow
@@ -237,33 +236,16 @@ class CollectionViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 2 — CASCADE BUG REGRESSION: refreshCollectionPrices is called on init
+    //  GROUP 2 — (RETIRED) CASCADE BUG REGRESSION: refreshCollectionPrices is called on init
+    //  Backend & Performance Optimization plan, WS1+WS3 Part B item 7a (2026-07-28):
+    //  CollectionViewModel no longer calls a price refresh on init at all — that call
+    //  (`cardRepository.refreshCollectionPrices()`) was deleted end-to-end (interface member +
+    //  CardRepositoryImpl override) since it duplicated PriceRefreshWorker's daily,
+    //  watermark-guarded, stale-only refresh with no guard of its own. This group's two tests
+    //  asserted the now-deleted call and were removed with it. WS6 (android-unit-test-writer) should
+    //  add equivalent coverage against RefreshCollectionPricesUseCase/PriceRefreshWorker instead —
+    //  see the WS1+WS3 task report for the exact behaviours to pin.
     // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given ViewModel initialized then refreshCollectionPrices is called once`() = runTest {
-        viewModel = buildViewModel()
-        advanceUntilIdle()
-
-        // This verifies that price refresh is triggered — the underlying repo
-        // call must use safe upsert (INSERT-IGNORE+UPDATE), not REPLACE
-        coVerify(exactly = 1) { cardRepository.refreshCollectionPrices() }
-    }
-
-    @Test
-    fun `given refreshCollectionPrices throws when ViewModel initializes then state remains stable`() = runTest {
-        // Arrange — even if the refresh crashes, the collection should still load
-        val entries = listOf(buildEntry())
-        every { getCollection() } returns flowOf(entries)
-        coEvery { cardRepository.refreshCollectionPrices() } throws RuntimeException("Network error")
-
-        viewModel = buildViewModel(entries)
-        advanceUntilIdle()
-
-        // Assert: cards are still present — refresh error is swallowed by runCatching
-        assertEquals(1, viewModel.uiState.value.cards.size)
-        assertNull(viewModel.uiState.value.error)
-    }
 
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 3 — Text search
@@ -327,6 +309,63 @@ class CollectionViewModelTest {
 
         assertEquals(1, viewModel.uiState.value.cards.size)
     }
+
+    // ── Search debounce (Backend & Performance Optimization plan, WS5c item 4, 2026-07-28) ──
+
+    @Test
+    fun `given rapid onSearchQueryChange keystrokes when less than the debounce window elapses then the filtered cards are not recomputed yet`() =
+        runTest {
+            val entries = listOf(
+                buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+                buildEntry(scryfallId = "id-002", name = "Counterspell"),
+            )
+            viewModel = buildViewModel(entries)
+            advanceUntilIdle()
+            assertEquals(2, viewModel.uiState.value.cards.size)
+
+            viewModel.onSearchQueryChange("l")
+            viewModel.onSearchQueryChange("li")
+            viewModel.onSearchQueryChange("lig")
+            // Well under the 300ms debounce window -- the expensive re-filter must not have run yet.
+            advanceTimeBy(100L)
+
+            assertEquals(
+                "the re-filter pass must not fire before the debounce window elapses",
+                2, viewModel.uiState.value.cards.size,
+            )
+        }
+
+    @Test
+    fun `given rapid onSearchQueryChange keystrokes when the debounce window elapses then exactly one recompute uses the final query`() =
+        runTest {
+            val entries = listOf(
+                buildEntry(scryfallId = "id-001", name = "Lightning Bolt"),
+                buildEntry(scryfallId = "id-002", name = "Counterspell"),
+            )
+            viewModel = buildViewModel(entries)
+            advanceUntilIdle()
+
+            // Rapid keystrokes spelling out "lightning" -- each call updates the visible TextField
+            // state immediately (no input lag), but only the FINAL value after the debounce window
+            // should ever drive a re-filter.
+            "lightning".indices.forEach { i -> viewModel.onSearchQueryChange("lightning".substring(0, i + 1)) }
+            advanceUntilIdle()
+
+            assertEquals(1, viewModel.uiState.value.cards.size)
+            assertEquals("Lightning Bolt", viewModel.uiState.value.cards.first().card.name)
+        }
+
+    @Test
+    fun `given a search keystroke when onSearchQueryChange is called then the visible searchQuery updates immediately without waiting for the debounce`() =
+        runTest {
+            viewModel = buildViewModel(emptyList())
+            advanceUntilIdle()
+
+            viewModel.onSearchQueryChange("lightning")
+            // Zero time advanced -- the debounce hasn't fired, but the TextField-visible state
+            // must already reflect the keystroke (no input lag for the user).
+            assertEquals("lightning", viewModel.uiState.value.searchQuery)
+        }
 
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 4 — Sort orders
@@ -796,7 +835,6 @@ class CollectionViewModelTest {
         every { getCollection() } returns kotlinx.coroutines.flow.flow {
             throw RuntimeException("DB error")
         }
-        coEvery { cardRepository.refreshCollectionPrices() } returns Unit
 
         viewModel = buildViewModel(overrideCollection = false)
         advanceUntilIdle()

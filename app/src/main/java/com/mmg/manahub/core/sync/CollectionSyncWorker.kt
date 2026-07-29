@@ -24,8 +24,9 @@ import java.util.concurrent.TimeUnit
  * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
  * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `feature.collection.di.collectionKoinModule`
  * (co-located with the [SyncManager] bridge single it needs — [SyncManager] itself KEEPS its Hilt
- * `@Inject constructor`, since the legacy `DeckBuilderViewModel` — still `@HiltViewModel` — also injects
- * it; [authRepository] is a native Koin single in `coreBridgeKoinModule`).
+ * `@Inject constructor` because `ManaHubApp` (`@AndroidEntryPoint`) still Hilt-injects it as a bridge
+ * field into `collectionKoinModule(syncManager = ...)`; [authRepository] is a native Koin single in
+ * `coreBridgeKoinModule`).
  */
 class CollectionSyncWorker(
     appContext: Context,

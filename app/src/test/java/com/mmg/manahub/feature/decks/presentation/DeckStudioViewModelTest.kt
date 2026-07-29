@@ -24,18 +24,12 @@ import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
-import com.mmg.manahub.feature.decks.domain.engine.MagicCard
-import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
-import com.mmg.manahub.feature.decks.domain.usecase.BudgetOptimizer
-import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SeedDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.core.domain.repository.WishlistRepository
@@ -45,8 +39,11 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.just
+import io.mockk.Runs
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -93,7 +90,6 @@ class DeckStudioViewModelTest {
     private val searchCardsUseCase = mockk<SearchCardsUseCase>()
     private val suggestTagsUseCase = mockk<SuggestTagsUseCase>(relaxed = true)
     private val wishlistRepository = mockk<WishlistRepository>()
-    private val deckMagicEngine = mockk<com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine>(relaxed = true)
     private val userPreferences = mockk<UserPreferencesDataStore>()
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
@@ -108,8 +104,6 @@ class DeckStudioViewModelTest {
     private val evaluateDeckUseCase = EvaluateDeckUseCase(scorer, eventBus, dispatcher)
     private val inferDeckIdentityUseCase = InferDeckIdentityUseCase()
     private val suggestCutsUseCase = SuggestCutsUseCase(scorer, dispatcher)
-    private val candidatePoolGenerator = CandidatePoolGenerator(cardRepository, dispatcher)
-    private val budgetOptimizer = BudgetOptimizer()
     // Deck Doctor Community/Archetype plan, Phase 2: Motor A is the primary (offline,
     // collection-only) adds source — see `project_deck_doctor_phase2_motor_a` memory.
     private val realSuggestAddsFromCollectionUseCase = SuggestAddsFromCollectionUseCase(
@@ -119,18 +113,6 @@ class DeckStudioViewModelTest {
 
     // ── Mocked suggestAddsFromCollectionUseCase for Phase 2 budget/incremental tests ──
     private val mockSuggestAddsFromCollectionUseCase = mockk<SuggestAddsFromCollectionUseCase>()
-
-    // ── Real BuildDeckFromSeedsUseCase for Phase 3 seed-build (reuses the engine instances) ──
-    private val buildDeckFromSeedsUseCase = BuildDeckFromSeedsUseCase(
-        deckScorer = scorer,
-        roleClassifier = RoleClassifier(),
-        candidatePoolGenerator = candidatePoolGenerator,
-        budgetOptimizer = budgetOptimizer,
-        ioDispatcher = dispatcher,
-    )
-
-    // ── Mocked BuildDeckFromSeedsUseCase for Phase 3 seed-build failure / double-tap tests ──
-    private val mockBuildDeckFromSeedsUseCase = mockk<BuildDeckFromSeedsUseCase>()
 
     // ── Group C / C2: per-deck game stats use case (relaxed; deckStatsFlow is lazy) ──
     private val getDeckGameStatsUseCase =
@@ -162,8 +144,17 @@ class DeckStudioViewModelTest {
         // deckStatsFlow (WhileSubscribed) is lazy and unsubscribed in these tests, so no explicit stub.
         // deckRepository.createDeck returns a stable id by default (overridden per test as needed).
         coEvery { deckRepository.createDeck(any(), any(), any()) } returns DECK_ID
-        // Inspirations (Phase 4): init loadDiscoveries() calls discoverSynergies — stub so init doesn't NPE.
-        coEvery { deckMagicEngine.discoverSynergies(any()) } returns emptyList()
+        // Backend & Performance Optimization plan, WS4a finding 4 (2026-07-28): observeDeck() now
+        // batch-resolves unresolved mainboard/sideboard ids via warmCacheForIds + getCardsByIds
+        // BEFORE falling back to resolveCard's per-slot getCardById. Default getCardsByIds to an
+        // empty list so every pre-existing test's per-card `coEvery { getCardById(...) }` stub
+        // keeps driving resolution through the unchanged fallback path -- only the new
+        // batch-resolve-specific tests below override getCardsByIds to return real cards.
+        coEvery { cardRepository.warmCacheForIds(any()) } just Runs
+        coEvery { cardRepository.getCardsByIds(any()) } returns emptyList()
+        // Inspirations (Phase 4): init loadDiscoveries() calls discoverSynergiesV2UseCase when
+        // wired (createVm()'s default is null -> loadDiscoveries takes its null-degrade branch,
+        // no stub needed).
     }
 
     @After
@@ -258,10 +249,8 @@ class DeckStudioViewModelTest {
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-            buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             getDeckGameStatsUseCase = getDeckGameStatsUseCase,
             importDeckUseCase = importDeckUseCase,
-            deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             crashReporter = crashReporter,
@@ -285,10 +274,8 @@ class DeckStudioViewModelTest {
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-            buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             getDeckGameStatsUseCase = getDeckGameStatsUseCase,
             importDeckUseCase = importDeckUseCase,
-            deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             crashReporter = crashReporter,
@@ -313,10 +300,8 @@ class DeckStudioViewModelTest {
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-            buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             getDeckGameStatsUseCase = getDeckGameStatsUseCase,
             importDeckUseCase = importDeckUseCase,
-            deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             crashReporter = crashReporter,
@@ -340,10 +325,8 @@ class DeckStudioViewModelTest {
             inferDeckIdentityUseCase = inferDeckIdentityUseCase,
             suggestCutsUseCase = suggestCutsUseCase,
             suggestAddsFromCollectionUseCase = mockSuggestAddsFromCollectionUseCase,
-            buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
             getDeckGameStatsUseCase = getDeckGameStatsUseCase,
             importDeckUseCase = importDeckUseCase,
-            deckMagicEngine = deckMagicEngine,
             wishlistRepository = wishlistRepository,
             userPreferences = userPreferences,
             crashReporter = crashReporter,
@@ -352,60 +335,6 @@ class DeckStudioViewModelTest {
                 if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
             ),
         )
-
-    /** Creates the ViewModel with a MOCKED BuildDeckFromSeedsUseCase (Phase 3 seed-build tests). */
-    private fun createVmWithMockedSeedBuild(deckId: String? = null): DeckStudioViewModel =
-        DeckStudioViewModel(
-            deckRepository = deckRepository,
-            cardRepository = cardRepository,
-            userCardRepository = userCardRepository,
-            searchCardsUseCase = searchCardsUseCase,
-            suggestTagsUseCase = suggestTagsUseCase,
-            evaluateDeckUseCase = evaluateDeckUseCase,
-            inferDeckIdentityUseCase = inferDeckIdentityUseCase,
-            suggestCutsUseCase = suggestCutsUseCase,
-            suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-            buildDeckFromSeedsUseCase = mockBuildDeckFromSeedsUseCase,
-            getDeckGameStatsUseCase = getDeckGameStatsUseCase,
-            importDeckUseCase = importDeckUseCase,
-            deckMagicEngine = deckMagicEngine,
-            wishlistRepository = wishlistRepository,
-            userPreferences = userPreferences,
-            crashReporter = crashReporter,
-            appContext = appContext,
-            savedStateHandle = SavedStateHandle(
-                if (deckId != null) mapOf("deckId" to deckId) else emptyMap()
-            ),
-        )
-
-    // ── Discovery fixtures (Phase 4) ─────────────────────────────────────────
-
-    private val discoveryCard1 = card(
-        id = "disc-1", name = "Elf Scout",
-        typeLine = "Creature — Elf Scout",
-        colorIdentity = listOf("G"), colors = listOf("G"),
-        tags = listOf(CardTag.TRIBAL),
-    )
-    private val discoveryCard2 = card(
-        id = "disc-2", name = "Elf Warrior",
-        typeLine = "Creature — Elf Warrior",
-        colorIdentity = listOf("G"), colors = listOf("G"),
-        tags = listOf(CardTag.TRIBAL),
-    )
-    private val discoveryCard3 = card(
-        id = "disc-3", name = "Elf Shaman",
-        typeLine = "Creature — Elf Shaman",
-        colorIdentity = listOf("G"), colors = listOf("G"),
-        tags = listOf(CardTag.TRIBAL),
-    )
-
-    private fun makeDiscovery(vararg cards: Card) = MagicDiscovery(
-        label = "Elf Synergy",
-        cards = cards.map { MagicCard(card = it, isOwned = true, quantity = 1) },
-        description = "You own many Elves",
-        primaryTag = CardTag.TRIBAL,
-    )
-
 
     // ─────────────────────────────────────────────────────────────────────────
     //  Group 1 — Init: draft creation vs. existing deck
@@ -430,10 +359,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = importDeckUseCase,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,
@@ -507,6 +434,79 @@ class DeckStudioViewModelTest {
             assertFalse("isLoading must be false after deck loaded", state.isLoading)
             assertEquals("Standard Blue", state.deck?.name)
             assertEquals(2, state.totalCards)
+        }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Group 1b — observeDeck() batch card resolution (Backend & Performance
+    //  Optimization plan, WS4a finding 4, 2026-07-28)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `given a cold cardCache when observeDeck emits then warmCacheForIds and getCardsByIds are each called exactly once covering every distinct mainboard and sideboard id`() =
+        runTest(dispatcher) {
+            // Arrange — a deck with 2 distinct mainboard ids + 1 sideboard id, none pre-cached.
+            val existingId = "existing-deck-batch"
+            every { deckRepository.observeDeckWithCards(existingId) } returns flowOf(
+                DeckWithCards(
+                    deck = Deck(id = existingId, name = "Batch Deck", format = "standard"),
+                    mainboard = listOf(DeckSlot(removalCard.scryfallId, 2), DeckSlot(elfCard.scryfallId, 1)),
+                    sideboard = listOf(DeckSlot(commander.scryfallId, 1)),
+                )
+            )
+            coEvery { cardRepository.getCardsByIds(any()) } returns listOf(removalCard, elfCard, commander)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            // Act
+            val vm = createVm(deckId = existingId)
+            advanceUntilIdle()
+
+            // Assert — exactly ONE batch warm + ONE batch fetch covering all 3 distinct ids, and
+            // the per-slot fallback (getCardById) is never reached since the batch resolved everything.
+            coVerify(exactly = 1) {
+                cardRepository.warmCacheForIds(
+                    match { it.toSet() == setOf(removalCard.scryfallId, elfCard.scryfallId, commander.scryfallId) },
+                )
+            }
+            coVerify(exactly = 1) { cardRepository.getCardsByIds(any()) }
+            coVerify(exactly = 0) { cardRepository.getCardById(any()) }
+
+            val state = vm.uiState.value
+            assertEquals(3, state.totalCards)
+        }
+
+    @Test
+    fun `given an id already resolved in the in-memory cardCache when observeDeck re-emits then that id is excluded from the batch`() =
+        runTest(dispatcher) {
+            // Arrange — first emission resolves both ids via the batch path.
+            val deckFlow = MutableStateFlow(
+                DeckWithCards(
+                    deck = Deck(id = DECK_ID, name = "Batch Deck", format = "standard"),
+                    mainboard = listOf(DeckSlot(removalCard.scryfallId, 1), DeckSlot(elfCard.scryfallId, 1)),
+                    sideboard = emptyList(),
+                ),
+            )
+            every { deckRepository.observeDeckWithCards(DECK_ID) } returns deckFlow
+            coEvery { cardRepository.getCardsByIds(any()) } returns listOf(removalCard, elfCard)
+            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
+
+            val vm = createVm()
+            advanceUntilIdle()
+            coVerify(exactly = 1) { cardRepository.getCardsByIds(any()) }
+
+            // A second emission adds a brand-new id alongside the two already-cached ones.
+            deckFlow.value = deckFlow.value.copy(
+                mainboard = deckFlow.value.mainboard + DeckSlot(commander.scryfallId, 1),
+            )
+            coEvery { cardRepository.getCardsByIds(match { it.toSet() == setOf(commander.scryfallId) }) } returns
+                listOf(commander)
+            advanceUntilIdle()
+
+            // The second batch call must cover ONLY the new id -- removalCard/elfCard are already
+            // in cardCache from the first resolution and must be excluded.
+            coVerify(exactly = 1) {
+                cardRepository.getCardsByIds(match { it.toSet() == setOf(commander.scryfallId) })
+            }
+            assertEquals(3, vm.uiState.value.totalCards)
         }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1994,610 +1994,22 @@ class DeckStudioViewModelTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Group 16 — openSeedSheet / closeSeedSheet toggles (Phase 3)
+    //  Group 16 — loadDiscoveries on init (Phase 4). Groups 16-20's original seed-build
+    //  (openSeedSheet/closeSeedSheet, addSeed/removeSeed, onSeedQueryChange, generateFromSeeds,
+    //  startFromDiscovery) and the legacy discoverSynergies-specific tests were REMOVED in the
+    //  Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28) along with the production code they
+    //  exercised (`SeedsContent`/`BuildDeckFromSeedsUseCase`/`DeckMagicEngine.discoverSynergies`).
+    //  See Group 21b below for the surviving v2 synergy-browser coverage.
     // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `given closed seed sheet when openSeedSheet then showSeedSheet becomes true`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            assertFalse("showSeedSheet must start false", vm.uiState.value.showSeedSheet)
-
-            // Act
-            vm.openSeedSheet()
-
-            // Assert
-            assertTrue("showSeedSheet must be true after openSeedSheet", vm.uiState.value.showSeedSheet)
-        }
-
-    @Test
-    fun `given open seed sheet when closeSeedSheet then showSeedSheet becomes false`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            vm.openSeedSheet()
-            assertTrue(vm.uiState.value.showSeedSheet)
-
-            // Act
-            vm.closeSeedSheet()
-
-            // Assert
-            assertFalse("showSeedSheet must be false after closeSeedSheet", vm.uiState.value.showSeedSheet)
-        }
-
-    @Test
-    fun `given open seed sheet with query and results when closeSeedSheet then seedQuery and seedSearchResults and isSearchingSeeds are reset`() =
-        runTest(dispatcher) {
-            // Arrange — prime the sheet with a live search state.
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
-            val vm = createVm()
-            advanceUntilIdle()
-            vm.openSeedSheet()
-            vm.onSeedQueryChange("elf")
-            advanceTimeBy(500L) // past the 400 ms debounce
-            advanceUntilIdle()
-            // Verify the search actually populated results before we close.
-            assertEquals("elf", vm.uiState.value.seedQuery)
-            assertTrue("seedSearchResults must be populated before close",
-                vm.uiState.value.seedSearchResults.isNotEmpty())
-
-            // Act
-            vm.closeSeedSheet()
-
-            // Assert — all seed-search state is wiped.
-            val state = vm.uiState.value
-            assertEquals("seedQuery must be empty after close", "", state.seedQuery)
-            assertEquals("seedSearchResults must be empty after close", emptyList<Card>(), state.seedSearchResults)
-            assertFalse("isSearchingSeeds must be false after close", state.isSearchingSeeds)
-        }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Group 17 — addSeed / removeSeed (Phase 3)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `given empty seeds when addSeed then seedCards contains the card and inferredIdentity is non-null`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            assertTrue("seedCards must start empty", vm.uiState.value.seedCards.isEmpty())
-            assertNull("inferredIdentity must start null", vm.uiState.value.inferredIdentity)
-
-            // Act
-            vm.addSeed(elfCard)
-
-            // Assert
-            val state = vm.uiState.value
-            assertEquals(1, state.seedCards.size)
-            assertEquals(elfCard.scryfallId, state.seedCards.first().scryfallId)
-            assertNotNull("inferredIdentity must be non-null after first seed added", state.inferredIdentity)
-        }
-
-    @Test
-    fun `given seed already added when addSeed with same scryfallId then seedCards size is unchanged (de-dup)`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-            assertEquals(1, vm.uiState.value.seedCards.size)
-
-            // Act — add the same card again.
-            vm.addSeed(elfCard)
-
-            // Assert — size must still be 1.
-            assertEquals("duplicate seed must be ignored", 1, vm.uiState.value.seedCards.size)
-        }
-
-    @Test
-    fun `given two seeds when removeSeed for one card then seedCards contains the remaining card and identity is re-inferred`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-            vm.addSeed(removalCard)
-            assertEquals(2, vm.uiState.value.seedCards.size)
-
-            // Act
-            vm.removeSeed(elfCard)
-
-            // Assert
-            val state = vm.uiState.value
-            assertEquals(1, state.seedCards.size)
-            assertEquals(removalCard.scryfallId, state.seedCards.first().scryfallId)
-            assertNotNull("inferredIdentity must be re-inferred from remaining seed", state.inferredIdentity)
-        }
-
-    @Test
-    fun `given single seed when removeSeed then seedCards is empty and inferredIdentity becomes null`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-            assertEquals(1, vm.uiState.value.seedCards.size)
-
-            // Act
-            vm.removeSeed(elfCard)
-
-            // Assert
-            val state = vm.uiState.value
-            assertTrue("seedCards must be empty after removing last seed", state.seedCards.isEmpty())
-            assertNull("inferredIdentity must be null when no seeds remain", state.inferredIdentity)
-        }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Group 18 — onSeedQueryChange debounced search (Phase 3)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `given query below min length (1 char) when onSeedQueryChange then seedSearchResults is immediately cleared`() =
-        runTest(dispatcher) {
-            // Arrange — first populate results so we can verify they get cleared.
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("el") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
-            val vm = createVm()
-            advanceUntilIdle()
-            // Prime with a 2-char query that fires.
-            vm.onSeedQueryChange("el")
-            advanceTimeBy(500L)
-            advanceUntilIdle()
-            assertTrue(vm.uiState.value.seedSearchResults.isNotEmpty())
-
-            // Act — backspace to 1 char (below SEED_QUERY_MIN_LENGTH = 2).
-            vm.onSeedQueryChange("e")
-
-            // Assert — results cleared immediately, no search fired.
-            assertEquals("seedSearchResults must be cleared for short query",
-                emptyList<Card>(), vm.uiState.value.seedSearchResults)
-            assertFalse("isSearchingSeeds must be false for short query",
-                vm.uiState.value.isSearchingSeeds)
-        }
-
-    @Test
-    fun `given query of 2 or more chars when onSeedQueryChange after debounce then seedSearchResults is populated`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
-            val vm = createVm()
-            advanceUntilIdle()
-
-            // Act
-            vm.onSeedQueryChange("elf")
-            advanceTimeBy(500L) // past the 400 ms debounce
-            advanceUntilIdle()
-
-            // Assert
-            val results = vm.uiState.value.seedSearchResults
-            assertTrue("seedSearchResults must be non-empty after debounce", results.isNotEmpty())
-            assertEquals(elfCard.scryfallId, results.first().scryfallId)
-            assertFalse("isSearchingSeeds must be false after search completes",
-                vm.uiState.value.isSearchingSeeds)
-        }
-
-    @Test
-    fun `given DataResult Error from searchCardsUseCase when seed search fires then seedSearchResults becomes empty (no crash)`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase(any()) } returns DataResult.Error("Network error")
-            val vm = createVm()
-            advanceUntilIdle()
-
-            // Act
-            vm.onSeedQueryChange("elf")
-            advanceTimeBy(500L)
-            advanceUntilIdle()
-
-            // Assert — error is swallowed, results are empty, VM is still operational.
-            assertEquals("DataResult.Error must produce empty seedSearchResults",
-                emptyList<Card>(), vm.uiState.value.seedSearchResults)
-            assertFalse("isSearchingSeeds must be false after error", vm.uiState.value.isSearchingSeeds)
-            // VM is still alive: can still open the seed sheet.
-            vm.openSeedSheet()
-            assertTrue(vm.uiState.value.showSeedSheet)
-        }
-
-    @Test
-    fun `given rapid keystrokes before debounce when onSeedQueryChange then only the latest query fires search`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { searchCardsUseCase("el") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard, commander), false))
-            val vm = createVm()
-            advanceUntilIdle()
-
-            // Act — type "el", then "elf" before the debounce fires.
-            vm.onSeedQueryChange("el")
-            advanceTimeBy(100L) // within debounce window — job is cancelled by next call
-            vm.onSeedQueryChange("elf")
-            advanceTimeBy(500L) // now past the debounce for "elf"
-            advanceUntilIdle()
-
-            // Assert — only the "elf" results are present (the "el" job was cancelled).
-            val results = vm.uiState.value.seedSearchResults
-            assertEquals("Only the last debounced query result must appear", 2, results.size)
-            // "el" would have returned 1 result; "elf" returns 2 — confirms only the last fired.
-            coVerify(exactly = 0) { searchCardsUseCase("el") }
-            coVerify(exactly = 1) { searchCardsUseCase("elf") }
-        }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Group 19 — generateFromSeeds (Phase 3)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `given seeds and successful build when generateFromSeeds then addCardToDeck is called once per mainboard card`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
-            coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
-            val seedResult = SeedDeckResult(
-                mainboard = listOf(
-                    MagicCard(card = elfCard, isOwned = true),
-                    MagicCard(card = removalCard, isOwned = false),
-                ),
-                reservedLandSlots = 10,
-                usedExternalCandidates = true,
-            )
-            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } returns seedResult
-            val vm = createVmWithMockedSeedBuild()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-
-            // Act
-            vm.generateFromSeeds {}
-            advanceUntilIdle()
-
-            // Assert — one addCardToDeck call per card in the mainboard.
-            coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 1, false) }
-            coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, removalCard.scryfallId, 1, false) }
-        }
-
-    @Test
-    fun `given a multi-copy mainboard card when generateFromSeeds then it is written with its engine quantity (H1)`() =
-        runTest(dispatcher) {
-            // Arrange — the engine recommends 4 copies of elfCard (a 60-card-format multiple).
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
-            coEvery { cardRepository.getCardById(removalCard.scryfallId) } returns DataResult.Success(removalCard)
-            val seedResult = SeedDeckResult(
-                mainboard = listOf(
-                    MagicCard(card = elfCard, isOwned = true, quantity = 4),
-                    MagicCard(card = removalCard, isOwned = false, quantity = 1),
-                ),
-                reservedLandSlots = 10,
-                usedExternalCandidates = true,
-            )
-            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } returns seedResult
-            val vm = createVmWithMockedSeedBuild()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-
-            val completedWith = mutableListOf<Int>()
-
-            // Act
-            vm.generateFromSeeds { count -> completedWith += count }
-            advanceUntilIdle()
-
-            // Assert — each card written with its own quantity, and writtenCount sums the copies.
-            coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, elfCard.scryfallId, 4, false) }
-            coVerify(exactly = 1) { deckRepository.addCardToDeck(DECK_ID, removalCard.scryfallId, 1, false) }
-            assertEquals("writtenCount must sum the per-card copies", 5, completedWith.first())
-        }
-
-    @Test
-    fun `given seeds and successful build when generateFromSeeds then showSeedSheet is false and seedCards cleared and selectedTab is BUILD`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { cardRepository.getCardById(any()) } returns DataResult.Success(elfCard)
-            val seedResult = SeedDeckResult(
-                mainboard = listOf(MagicCard(card = elfCard, isOwned = true)),
-                reservedLandSlots = 10,
-                usedExternalCandidates = false,
-            )
-            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } returns seedResult
-            val vm = createVmWithMockedSeedBuild()
-            advanceUntilIdle()
-            vm.openSeedSheet()
-            vm.addSeed(elfCard)
-
-            // Act
-            vm.generateFromSeeds {}
-            advanceUntilIdle()
-
-            // Assert
-            val state = vm.uiState.value
-            assertFalse("showSeedSheet must be false after successful generation", state.showSeedSheet)
-            assertTrue("seedCards must be cleared after generation", state.seedCards.isEmpty())
-            assertEquals("selectedTab must be BUILD after generation", DeckStudioTab.BUILD, state.selectedTab)
-        }
-
-    @Test
-    fun `given seeds and successful build when generateFromSeeds then suggestionsLoaded is invalidated`() =
-        runTest(dispatcher) {
-            // Arrange — prime suggestions first so we can detect invalidation.
-            stubResolvableDeck()
-            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } returns
-                SeedDeckResult(mainboard = emptyList(), reservedLandSlots = 10, usedExternalCandidates = false)
-            val vm = createVmWithMockedSeedBuild(deckId = DECK_ID)
-            advanceUntilIdle()
-            vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
-            advanceUntilIdle()
-            assertTrue("suggestionsLoaded must be true before seed-build", vm.uiState.value.suggestionsLoaded)
-            vm.addSeed(elfCard)
-
-            // Act
-            vm.generateFromSeeds {}
-            advanceUntilIdle()
-
-            // Assert — suggestions invalidated so next open of SUGGESTIONS tab re-runs analysis.
-            assertFalse("generateFromSeeds must invalidate suggestions",
-                vm.uiState.value.suggestionsLoaded)
-        }
-
-    @Test
-    fun `given seeds and successful build when generateFromSeeds then onComplete is invoked with writtenCount equal to mainboard size`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { cardRepository.getCardById(any()) } returns DataResult.Success(elfCard)
-            val mainboardCards = listOf(
-                MagicCard(card = elfCard, isOwned = true),
-                MagicCard(card = removalCard, isOwned = false),
-                MagicCard(card = discoveryCard1, isOwned = true),
-            )
-            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } returns
-                SeedDeckResult(mainboard = mainboardCards, reservedLandSlots = 10, usedExternalCandidates = true)
-            val vm = createVmWithMockedSeedBuild()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-
-            val completedWith = mutableListOf<Int>()
-
-            // Act
-            vm.generateFromSeeds { count -> completedWith += count }
-            advanceUntilIdle()
-
-            // Assert
-            assertEquals("onComplete must be called exactly once", 1, completedWith.size)
-            assertEquals("writtenCount must equal mainboard.size", 3, completedWith.first())
-        }
-
-    @Test
-    fun `given buildDeckFromSeedsUseCase throws when generateFromSeeds then isGenerating reset to false and ShowToast event emitted`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } throws
-                RuntimeException("Seed build failed")
-            val vm = createVmWithMockedSeedBuild()
-            advanceUntilIdle()
-            vm.openSeedSheet()
-            vm.addSeed(elfCard)
-
-            // Act + Assert — use Turbine to capture the ShowToast event.
-            vm.events.test {
-                vm.generateFromSeeds {}
-                advanceUntilIdle()
-                val event = awaitItem()
-                assertTrue("ShowToast event must be emitted on seed-build failure",
-                    event is DeckStudioEvent.ShowToast)
-                cancelAndIgnoreRemainingEvents()
-            }
-
-            // The sheet stays open so the user can retry.
-            val state = vm.uiState.value
-            assertFalse("isGenerating must be reset to false after failure", state.isGenerating)
-            assertTrue("showSeedSheet must remain open after failure so user can retry",
-                state.showSeedSheet)
-        }
-
-    @Test
-    fun `given generateFromSeeds already running when second call arrives then use case is invoked exactly once (double-tap guard)`() =
-        runTest(dispatcher) {
-            // Arrange — use a slow mock so the first invocation is still in-flight when the
-            // second tap fires.
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            coEvery { cardRepository.getCardById(any()) } returns DataResult.Success(elfCard)
-            coEvery { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) } returns
-                SeedDeckResult(mainboard = emptyList(), reservedLandSlots = 10, usedExternalCandidates = false)
-            val vm = createVmWithMockedSeedBuild()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-
-            // Act — fire two calls before the first completes.
-            // The atomic _uiState.update guard: captured = null on the second call when
-            // isGenerating = true, so the function returns immediately.
-            vm.generateFromSeeds {}
-            vm.generateFromSeeds {} // second tap — must be a no-op
-            advanceUntilIdle()
-
-            // Assert — the use case was invoked exactly once despite two taps.
-            coVerify(exactly = 1) { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) }
-        }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Group 20 — startFromDiscovery (Phase 4)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `given open inspirations when startFromDiscovery then showInspirations false and showSeedSheet true and seedCards populated and inferredIdentity non-null`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            vm.openInspirations()
-            assertTrue(vm.uiState.value.showInspirations)
-            val discovery = makeDiscovery(discoveryCard1, discoveryCard2, discoveryCard3)
-
-            // Act
-            vm.startFromDiscovery(discovery)
-
-            // Assert
-            val state = vm.uiState.value
-            assertFalse("showInspirations must be false after startFromDiscovery", state.showInspirations)
-            assertTrue("showSeedSheet must be true after startFromDiscovery", state.showSeedSheet)
-            assertEquals("seedCards must contain all 3 discovery cards", 3, state.seedCards.size)
-            assertNotNull("inferredIdentity must be non-null after startFromDiscovery", state.inferredIdentity)
-        }
-
-    @Test
-    fun `given manually picked seeds when startFromDiscovery then discovery cards are MERGED (H2)`() =
-        runTest(dispatcher) {
-            // Arrange — the user has already picked elfCard as a seed manually.
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            vm.addSeed(elfCard)
-            assertEquals(1, vm.uiState.value.seedCards.size)
-
-            // Act — open a discovery whose cards do NOT include elfCard.
-            vm.startFromDiscovery(makeDiscovery(discoveryCard1, discoveryCard2))
-
-            // Assert — the manual pick is preserved and the discovery cards are added (3 total),
-            // not overwritten (the old behavior silently dropped elfCard).
-            val ids = vm.uiState.value.seedCards.map { it.scryfallId }.toSet()
-            assertEquals("manual seed + 2 discovery cards must be merged", 3, ids.size)
-            assertTrue("manually picked seed must be preserved", elfCard.scryfallId in ids)
-            assertTrue(discoveryCard1.scryfallId in ids)
-            assertTrue(discoveryCard2.scryfallId in ids)
-        }
-
-    @Test
-    fun `given discovery when startFromDiscovery then generateFromSeeds is NOT auto-invoked (user still taps Generate)`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVmWithMockedSeedBuild()
-            advanceUntilIdle()
-            val discovery = makeDiscovery(discoveryCard1, discoveryCard2)
-
-            // Act
-            vm.startFromDiscovery(discovery)
-            advanceUntilIdle()
-
-            // Assert — the build use case was never called.
-            coVerify(exactly = 0) { mockBuildDeckFromSeedsUseCase(any(), any(), any(), any(), any(), any()) }
-        }
-
-    @Test
-    fun `given discovery with more than MAX_SEED_CARDS cards when startFromDiscovery then seedCards is capped at 8`() =
-        runTest(dispatcher) {
-            // Arrange — build a discovery with 10 distinct cards (above MAX_SEED_CARDS = 8).
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            val vm = createVm()
-            advanceUntilIdle()
-            val tenCards = (1..10).map { i ->
-                card(id = "disc-cap-$i", name = "Card $i",
-                    typeLine = "Creature — Elf",
-                    colorIdentity = listOf("G"), colors = listOf("G"),
-                    tags = listOf(CardTag.TRIBAL))
-            }
-            val largDiscovery = MagicDiscovery(
-                label = "Large Discovery",
-                cards = tenCards.map { MagicCard(card = it, isOwned = true) },
-                description = "Ten cards",
-                primaryTag = CardTag.TRIBAL,
-            )
-
-            // Act
-            vm.startFromDiscovery(largDiscovery)
-
-            // Assert — capped at MAX_SEED_CARDS = 8.
-            assertEquals("seedCards must be capped at 8 (MAX_SEED_CARDS)",
-                8, vm.uiState.value.seedCards.size)
-        }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Group 21 — loadDiscoveries on init (Phase 4)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `given collection with cards when VM initialises then discoveries are populated from discoverSynergies`() =
-        runTest(dispatcher) {
-            // Arrange — provide a non-empty collection and a non-empty discovery list.
-            val userCardWithCard = userCardWith(elfCard)
-            every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWithCard))
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            val expectedDiscovery = makeDiscovery(discoveryCard1, discoveryCard2)
-            coEvery { deckMagicEngine.discoverSynergies(any()) } returns listOf(expectedDiscovery)
-
-            // Act
-            val vm = createVm()
-            advanceUntilIdle()
-
-            // Assert
-            val discoveries = vm.uiState.value.discoveries
-            assertEquals("discoveries must be populated from discoverSynergies", 1, discoveries.size)
-            assertEquals(expectedDiscovery.label, discoveries.first().label)
-        }
-
-    @Test
-    fun `given discoverSynergies throws when VM initialises then discoveries stays empty and VM does not crash`() =
-        runTest(dispatcher) {
-            // Arrange
-            every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-            every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { deckMagicEngine.discoverSynergies(any()) } throws RuntimeException("Engine failed")
-
-            // Act
-            val vm = createVm()
-            advanceUntilIdle()
-
-            // Assert — failure is swallowed; discoveries is empty; VM remains operational.
-            assertTrue("discoveries must be empty when discoverSynergies throws",
-                vm.uiState.value.discoveries.isEmpty())
-            // VM is still alive — basic state mutation works.
-            vm.openSeedSheet()
-            assertTrue(vm.uiState.value.showSeedSheet)
-        }
 
     @Test
     fun `given any init outcome when VM initialises then isLoadingDiscoveries is false after completion`() =
         runTest(dispatcher) {
-            // Arrange — test the success path (isLoadingDiscoveries transitions to false).
+            // Arrange — test the success path (isLoadingDiscoveries transitions to false). No
+            // discoverSynergiesV2UseCase wired (createVm() defaults it to null), so loadDiscoveries
+            // takes its null-degrade branch -- isLoadingDiscoveries still flips false.
             every { userCardRepository.observeCollection() } returns flowOf(emptyList())
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
-            coEvery { deckMagicEngine.discoverSynergies(any()) } returns listOf(makeDiscovery(discoveryCard1))
 
             // Act
             val vm = createVm()
@@ -2936,10 +2348,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,
@@ -2978,10 +2388,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,
@@ -3028,10 +2436,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,
@@ -3068,10 +2474,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,
@@ -3110,10 +2514,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = mockImport,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,
@@ -3161,10 +2563,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = blockingImport,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,
@@ -3212,10 +2612,8 @@ class DeckStudioViewModelTest {
                 inferDeckIdentityUseCase = inferDeckIdentityUseCase,
                 suggestCutsUseCase = suggestCutsUseCase,
                 suggestAddsFromCollectionUseCase = realSuggestAddsFromCollectionUseCase,
-                buildDeckFromSeedsUseCase = buildDeckFromSeedsUseCase,
                 getDeckGameStatsUseCase = getDeckGameStatsUseCase,
                 importDeckUseCase = blockingImport,
-                deckMagicEngine = deckMagicEngine,
                 wishlistRepository = wishlistRepository,
                 userPreferences = userPreferences,
                 crashReporter = crashReporter,

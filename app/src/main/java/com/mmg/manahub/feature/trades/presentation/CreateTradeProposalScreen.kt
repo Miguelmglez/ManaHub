@@ -23,9 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -757,61 +755,71 @@ private fun FriendSelector(
                         )
                     }
                 }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
+                // Backend & Performance Optimization plan, WS5b (2026-07-28): was a
+                // Column + verticalScroll rendering every friend eagerly — an unbounded list per
+                // CLAUDE.md's Compose rules. Converted to a LazyColumn keyed by `friend.userId`
+                // (never by index — the CLAUDE.md rule against a key value that can repeat).
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
                 ) {
-                    Text(
-                        text = stringResource(R.string.trades_friend_selector_sheet_title),
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = mc.textPrimary
-                    )
+                    item(key = "friend_selector_title") {
+                        Text(
+                            text = stringResource(R.string.trades_friend_selector_sheet_title),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textPrimary
+                        )
+                    }
 
                     when {
                         sessionState is SessionState.Unauthenticated -> {
-                            EmptyState(
-                                title = stringResource(R.string.trades_friend_sheet_login_title),
-                                actionLabel = stringResource(R.string.trades_friend_sheet_login_action),
-                                onAction = {
-                                    showSheet = false
-                                    onNavigateToLogin()
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            item(key = "friend_selector_login_empty_state") {
+                                EmptyState(
+                                    title = stringResource(R.string.trades_friend_sheet_login_title),
+                                    actionLabel = stringResource(R.string.trades_friend_sheet_login_action),
+                                    onAction = {
+                                        showSheet = false
+                                        onNavigateToLogin()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                         friends.isEmpty() -> {
-                            EmptyState(
-                                title = stringResource(R.string.trades_friend_sheet_no_friends_title),
-                                actionLabel = stringResource(R.string.trades_friend_sheet_no_friends_action),
-                                onAction = {
-                                    showSheet = false
-                                    onNavigateToAddFriends()
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            item(key = "friend_selector_no_friends_empty_state") {
+                                EmptyState(
+                                    title = stringResource(R.string.trades_friend_sheet_no_friends_title),
+                                    actionLabel = stringResource(R.string.trades_friend_sheet_no_friends_action),
+                                    onAction = {
+                                        showSheet = false
+                                        onNavigateToAddFriends()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                         else -> {
                             // "None" option
-                            Surface(
-                                onClick = {
-                                    onFriendSelected(null)
-                                    showSheet = false
-                                },
-                                shape = CardShape,
-                                color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    stringResource(R.string.trades_friend_none_option),
-                                    modifier = Modifier.padding(MaterialTheme.spacing.lg),
-                                    style = MaterialTheme.magicTypography.bodyMedium,
-                                    color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
-                                )
+                            item(key = "friend_selector_none_option") {
+                                Surface(
+                                    onClick = {
+                                        onFriendSelected(null)
+                                        showSheet = false
+                                    },
+                                    shape = CardShape,
+                                    color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        stringResource(R.string.trades_friend_none_option),
+                                        modifier = Modifier.padding(MaterialTheme.spacing.lg),
+                                        style = MaterialTheme.magicTypography.bodyMedium,
+                                        color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
+                                    )
+                                }
                             }
 
-                            friends.forEach { friend ->
+                            items(friends, key = { it.userId }) { friend ->
                                 Surface(
                                     onClick = {
                                         onFriendSelected(friend)

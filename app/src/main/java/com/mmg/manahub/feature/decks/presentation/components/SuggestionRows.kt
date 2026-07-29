@@ -176,6 +176,12 @@ fun AddSuggestionRow(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val fit = suggestion.fit
+    // WS8.2: prefer the archetype-aware gap (more specific — names the resolved plan's own band)
+    // over the legacy GENERIC-skeleton gap when both are present; a card can only ever carry one
+    // or the other in practice (FillsArchetypeGap only fires when a non-GENERIC/themed skeleton
+    // resolved, at which point the base engine's own FillsGap reason becomes the less-specific
+    // signal for the same underlying gap).
+    val archetypeGap = fit.fillsArchetypeGapReason()
     val gapRole = fit.fillsGapRole()
 
     Surface(
@@ -205,7 +211,17 @@ fun AddSuggestionRow(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
                 ) {
-                    if (gapRole != null) {
+                    if (archetypeGap != null) {
+                        SuggestionTagChip(
+                            text = stringResource(
+                                R.string.deck_reason_fills_archetype_gap_chip,
+                                archetypeGap.roleKey.archetypeRoleLabel(),
+                                archetypeGap.current,
+                                archetypeGap.ideal,
+                            ),
+                            tone = SuggestionTagTone.GAP,
+                        )
+                    } else if (gapRole != null) {
                         SuggestionTagChip(
                             text = stringResource(R.string.deck_reason_fills_gap, gapRole.label()),
                             tone = SuggestionTagTone.GAP,

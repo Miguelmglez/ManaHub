@@ -138,7 +138,9 @@ class CommunityDecksSearchViewModel(
 
             _uiState.update {
                 if (resolved != null) {
-                    it.copy(advancedFilters = it.advancedFilters.copy(card = resolved))
+                    // Deep-link REPLACES the CARD filter (never appends) — this is the entry
+                    // point's own single-card intent, not an addition to a pre-existing selection.
+                    it.copy(advancedFilters = it.advancedFilters.copy(cards = listOf(resolved)))
                 } else {
                     it.copy(query = name)
                 }
@@ -252,11 +254,15 @@ class CommunityDecksSearchViewModel(
         search()
     }
 
-    /** A trending card tile tapped in Discover — switches to Search with the CARD filter set. */
+    /**
+     * A trending card tile tapped in Discover — switches to Search with the CARD filter set to
+     * ONLY this card (replaces, never appends — mirrors the ByCard deep-link's replace semantics;
+     * a Discover tap is a fresh single-card intent, not an addition to a stale selection).
+     */
     fun onTrendingCardClick(card: Card) {
         crashlytics.log("community_discover_term_click")
         _uiState.update {
-            it.copy(hubTab = CommunityHubTab.SEARCH, advancedFilters = it.advancedFilters.copy(card = card))
+            it.copy(hubTab = CommunityHubTab.SEARCH, advancedFilters = it.advancedFilters.copy(cards = listOf(card)))
         }
         search()
     }
@@ -341,18 +347,31 @@ class CommunityDecksSearchViewModel(
         _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(commander = null)) }
     }
 
+    /**
+     * Appends [card] to the CARD advanced filter (Archidekt multi-card search expansion,
+     * 2026-07-24), capped at [MAX_COMMUNITY_CARD_FILTERS] and deduped by name. Selecting a card
+     * already in the list, or attempting to add past the cap, is a silent no-op — the sheet hides
+     * the picker once the cap is reached (see `CommunityAdvancedSearchSheet`), so this is
+     * defense-in-depth, not the primary UX gate.
+     */
     fun onCardFilterSelected(card: Card) {
         _uiState.update {
+            val current = it.advancedFilters.cards
+            val alreadySelected = current.any { existing -> existing.name == card.name }
+            val next = if (alreadySelected || current.size >= MAX_COMMUNITY_CARD_FILTERS) current else current + card
             it.copy(
-                advancedFilters = it.advancedFilters.copy(card = card),
+                advancedFilters = it.advancedFilters.copy(cards = next),
                 cardQuery = "",
                 cardResults = emptyList(),
             )
         }
     }
 
-    fun onCardFilterCleared() {
-        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(card = null)) }
+    /** Removes one [card] from the CARD advanced filter (replaces the old single-card clear). */
+    fun onCardFilterRemoved(card: Card) {
+        _uiState.update {
+            it.copy(advancedFilters = it.advancedFilters.copy(cards = it.advancedFilters.cards - card))
+        }
     }
 
     fun onClearAdvancedFilters() {
@@ -394,7 +413,14 @@ class CommunityDecksSearchViewModel(
             crashlytics.setCustomKey("community_search_format", filters.format.name)
             crashlytics.setCustomKey("community_search_sort", state.selectedSort.name)
             crashlytics.setCustomKey("community_search_query_len", deckName.length)
+            // NOTE (Archidekt multi-card search expansion, 2026-07-24): the semantics of
+            // `activeCount` shifted here — each selected card now counts individually (see
+            // CommunityAdvancedFilters.activeCount KDoc), so this key's value can jump by more
+            // than 1 per user action. `community_search_card_filter_count` below is the
+            // card-selection-only signal for anyone reading the dashboard who needs to
+            // disambiguate the two.
             crashlytics.setCustomKey("community_search_active_filters", filters.activeCount)
+            crashlytics.setCustomKey("community_search_card_filter_count", filters.cards.size)
 
             val dataFilters = filters.toSearchFilters(
                 deckName = deckName,

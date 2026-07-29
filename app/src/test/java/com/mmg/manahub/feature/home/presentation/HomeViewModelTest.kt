@@ -139,6 +139,9 @@ class HomeViewModelTest {
     private val scryfallRemoteDataSource: com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource = mockk(relaxed = true)
     private val wishlistRepository: WishlistRepository = mockk(relaxed = true)
     private val gamificationRepository: GamificationRepository = mockk(relaxed = true)
+    // Backend & Performance Optimization plan, WS1+WS3 Part B item 9 (2026-07-28) — gates the
+    // Discover-row cold-start fetch behind an in-progress collection sync.
+    private val syncManager: com.mmg.manahub.core.sync.SyncManager = mockk(relaxed = true)
 
     // Home feature overhaul (2026-07-13) — new real data sources.
     private val userCardRepository: com.mmg.manahub.core.domain.repository.UserCardRepository = mockk(relaxed = true)
@@ -204,6 +207,12 @@ class HomeViewModelTest {
         coEvery { cardRepository.searchCards(any(), any(), any()) } returns DataResult.Success(emptyList())
         // Default-random-set seeding: no sets available (falls back to the global random query).
         coEvery { scryfallRemoteDataSource.getAllSets() } returns emptyList()
+        // CRITICAL (same "relaxed mock's unstubbed Flow never emits" gotcha noted below for
+        // friendRepository.observeFriends): the init block's Discover-row fetch waits on
+        // `syncManager.syncState.first { it != SyncState.SYNCING }` before running — an unstubbed
+        // relaxed mock would hang that `first{}` forever. Default to IDLE (no sync in progress).
+        every { syncManager.syncState } returns
+            MutableStateFlow(com.mmg.manahub.core.sync.SyncState.IDLE)
 
         // Wishlist default: empty.
         every { wishlistRepository.observeLocal() } returns flowOf(emptyList())
@@ -226,6 +235,11 @@ class HomeViewModelTest {
         every { playtestRepository.observeTotalTestCount() } returns flowOf(0)
         every { tradesRepository.observeAllProposals() } returns flowOf(emptyList())
         coEvery { tradesRepository.refreshProposalThread(any(), any()) } returns Result.success(Unit)
+        // Backend & Performance Optimization plan, WS4a finding 2 (2026-07-28): Home's item-count
+        // hydration now calls the item-only refreshItemsForThread (see below), not
+        // refreshProposalThread — same "relaxed mock can't synthesize an inline value class"
+        // reasoning as the stub above.
+        coEvery { tradesRepository.refreshItemsForThread(any()) } returns Result.success(Unit)
 
         // Home widget board overhaul (TASK 3/5b) — CRITICAL for the same reason as above:
         // firstStepsCompletionSeenFlow is one of coreFlow's 8 combined flows. Default is a STATIC
@@ -296,6 +310,7 @@ class HomeViewModelTest {
         tradeSuggestionsRepository = tradeSuggestionsRepository,
         friendRepository = friendRepository,
         playtestRepository = playtestRepository,
+        syncManager = syncManager,
         searchCommunityDecksUseCase = searchCommunityDecksUseCase,
     )
 
@@ -1920,11 +1935,17 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `Home warm-up hydrates real item counts via refreshProposalThread after refreshProposals succeeds`() =
+    fun `Home warm-up hydrates real item counts via refreshItemsForThread after refreshProposals succeeds`() =
         runTest(testDispatcher) {
             // Home widget board overhaul, TASK 4a regression test: refreshProposals alone only
-            // fetches proposal METADATA (no items); a bounded refreshProposalThread fan-out must
-            // follow so the Inbox/RecentActivity sections never render a known-wrong "0 items".
+            // fetches proposal METADATA (no items); a bounded item-only fan-out must follow so the
+            // Inbox/RecentActivity sections never render a known-wrong "0 items".
+            //
+            // Backend & Performance Optimization plan, WS4a finding 2 (2026-07-28): the fan-out
+            // target changed from refreshProposalThread(rootId, userId) — which ALSO re-fetches the
+            // full proposal table, duplicating the refreshProposals() call right above it — to the
+            // item-only refreshItemsForThread(rootId), which skips that redundant metadata re-fetch
+            // (safe here specifically because metadata was just refreshed).
             sessionStateFlow.value = SessionState.Authenticated(authUser())
             val proposal = tradeProposal(id = "p1", status = TradeStatus.PROPOSED, receiverId = "uid-1")
             every { tradesRepository.observeAllProposals() } returns flowOf(listOf(proposal))
@@ -1933,7 +1954,8 @@ class HomeViewModelTest {
             backgroundScope.launch { vm.state.collect {} }
             advanceUntilIdle()
 
-            coVerify(atLeast = 1) { tradesRepository.refreshProposalThread("p1", "uid-1") }
+            coVerify(atLeast = 1) { tradesRepository.refreshItemsForThread("p1") }
+            coVerify(exactly = 0) { tradesRepository.refreshProposalThread(any(), any()) }
         }
 
     @Test
@@ -1945,7 +1967,7 @@ class HomeViewModelTest {
         backgroundScope.launch { vm.state.collect {} }
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { tradesRepository.refreshProposalThread(any(), any()) }
+        coVerify(exactly = 0) { tradesRepository.refreshItemsForThread(any()) }
     }
 
     // ── FRIENDS: friend list + pending-request headline (Home widget board overhaul, TASK 5a) ──
@@ -2687,5 +2709,60 @@ class HomeViewModelTest {
                 listOf(HomeWidgetType.CONTEXT_HERO, HomeWidgetType.RULES_TIP),
                 vm.state.value.layout.map { it.type },
             )
+        }
+
+    // ── Sync-window deferral (Backend & Performance Optimization plan, WS1+WS3 Part B item 9,
+    // 2026-07-28) — the cold-start Discover-row/Random-card Scryfall fetch waits for any in-progress
+    // collection sync to leave SYNCING before firing, so it never competes with the login-window
+    // burst for the same rate-limit budget. ──────────────────────────────────────────────────────
+
+    @Test
+    fun `discover row and random card fetch wait for an in-progress sync to leave SYNCING before fetching`() =
+        runTest(testDispatcher) {
+            val syncStateFlow = MutableStateFlow(com.mmg.manahub.core.sync.SyncState.SYNCING)
+            every { syncManager.syncState } returns syncStateFlow
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            // While sync is still in progress, the non-essential Discover/Random-card fetches must
+            // NOT have fired -- they would compete with the sync's own Scryfall calls for the same
+            // rate-limit budget.
+            coVerify(exactly = 0) { scryfallRemoteDataSource.getAllSets() }
+            coVerify(exactly = 0) { cardRepository.searchCards(any(), any(), any()) }
+
+            // Once the sync leaves SYNCING, the deferred fetches proceed.
+            syncStateFlow.value = com.mmg.manahub.core.sync.SyncState.SUCCESS
+            advanceUntilIdle()
+            // seedRandomDiscoverSet() wraps its getAllSets() call in `withContext(Dispatchers.IO)`
+            // — a REAL dispatcher, not the virtual-time `testDispatcher` this test otherwise runs
+            // on. advanceUntilIdle() only drains testDispatcher's scheduler, so it can return while
+            // the IO-dispatched hop is still completing on a real thread. Yielding onto a real
+            // dispatcher briefly lets that hop finish and re-post its continuation back onto
+            // Dispatchers.Main (== testDispatcher here), then a second advanceUntilIdle() drains it.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.delay(50)
+            }
+            advanceUntilIdle()
+
+            coVerify(atLeast = 1) { scryfallRemoteDataSource.getAllSets() }
+            coVerify(atLeast = 1) { cardRepository.searchCards(any(), any(), any()) }
+        }
+
+    @Test
+    fun `discover row and random card fetch resolve immediately when sync is already IDLE`() =
+        runTest(testDispatcher) {
+            // stubDefaultDependencies() already defaults syncManager.syncState to IDLE -- this test
+            // pins that expectation explicitly so a future change to the default doesn't silently
+            // stop covering the "no sync in progress" common case.
+            every { syncManager.syncState } returns MutableStateFlow(com.mmg.manahub.core.sync.SyncState.IDLE)
+
+            val vm = buildViewModel()
+            backgroundScope.launch { vm.state.collect {} }
+            advanceUntilIdle()
+
+            coVerify(atLeast = 1) { scryfallRemoteDataSource.getAllSets() }
+            coVerify(atLeast = 1) { cardRepository.searchCards(any(), any(), any()) }
         }
 }

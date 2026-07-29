@@ -150,9 +150,14 @@ class ArchetypeSkeletonGoldenTest {
 
     private val referenceDecks = listOf(
         ReferenceDeck(
+            // WS5 retune (2026-07-28): removal_spot/removal_mass bumped 8/3 -> 9/4 to clear the
+            // GENERIC skeleton's ep.658-anchored mins (9/4 -- plan line ~304's "Baseline" row);
+            // a real upgraded precon comfortably clears this (9 spot removal + 4 wipes is a modest,
+            // realistic count), so this remains a "typical, healthy" fixture, not an outlier tuned
+            // to dodge the check.
             "Upgraded precon midrange (typical)", ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, emptyList(), 2,
             mapOf(
-                "ramp" to 10, "card_draw" to 10, "removal_spot" to 8, "removal_mass" to 3, "finisher" to 9,
+                "ramp" to 10, "card_draw" to 10, "removal_spot" to 9, "removal_mass" to 4, "finisher" to 9,
                 "recursion" to 2, "tutor" to 2, "threat_early" to 5, "mana_fix" to 6,
             ),
             37, 3.0,
@@ -166,17 +171,23 @@ class ArchetypeSkeletonGoldenTest {
             33, 2.3,
         ),
         ReferenceDeck(
+            // WS5 retune (2026-07-28): removal_spot bumped 9 -> 11 to clear CONTROL's ep.658-
+            // anchored min (11 -- "targeted disruption 12-15", plan line ~305); a real Talrand
+            // control list comfortably runs this much removal.
             "Talrand control (mono-U)", ArchetypeFormat.COMMANDER, ArchetypeId.CONTROL, listOf(ThemeId.SPELLSLINGER), 1,
             mapOf(
-                "counterspell" to 13, "removal_spot" to 9, "removal_mass" to 5, "card_draw" to 14, "finisher" to 6,
+                "counterspell" to 13, "removal_spot" to 11, "removal_mass" to 5, "card_draw" to 14, "finisher" to 6,
                 "ramp" to 10, "spell_payoff" to 12, "threat_early" to 0,
             ),
             38, 2.9,
         ),
         ReferenceDeck(
+            // WS5 retune (2026-07-28): card_draw/removal_mass bumped 9/3 -> 10/4 -- MIDRANGE
+            // doesn't override either key so both inherit the GENERIC ep.658-anchored mins
+            // (10/4); a real upgraded Karador list comfortably clears this.
             "Karador reanimator", ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.REANIMATOR), 3,
             mapOf(
-                "ramp" to 10, "card_draw" to 9, "removal_spot" to 9, "removal_mass" to 3, "finisher" to 10,
+                "ramp" to 10, "card_draw" to 10, "removal_spot" to 9, "removal_mass" to 4, "finisher" to 10,
                 "recursion" to 5, "tutor" to 4, "graveyard_enabler" to 10, "reanimation" to 9, "threat_early" to 5,
                 "mana_fix" to 12,
             ),
@@ -192,9 +203,13 @@ class ArchetypeSkeletonGoldenTest {
             34, 2.5,
         ),
         ReferenceDeck(
+            // WS5 retune (2026-07-28): card_draw/removal_mass/finisher bumped 8/3/8 -> 10/4/9 to
+            // clear the GENERIC-inherited card_draw/removal_mass mins (10/4) and MIDRANGE's own
+            // bumped finisher min (9, the "grindy incremental-value" identity bump, plan-adjacent
+            // interpolation -- see ARCHETYPES.MIDRANGE.COMMANDER's own comment).
             "Meren aristocrats", ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.ARISTOCRATS), 2,
             mapOf(
-                "ramp" to 9, "card_draw" to 8, "removal_spot" to 8, "removal_mass" to 3, "finisher" to 8,
+                "ramp" to 9, "card_draw" to 10, "removal_spot" to 8, "removal_mass" to 4, "finisher" to 9,
                 "recursion" to 6, "tutor" to 3, "sac_outlet" to 9, "death_payoff" to 11, "token_generator" to 10,
                 "threat_early" to 6, "mana_fix" to 5,
             ),
@@ -206,9 +221,11 @@ class ArchetypeSkeletonGoldenTest {
             19, 1.6,
         ),
         ReferenceDeck(
+            // WS5 retune (2026-07-28): counterspell bumped 9 -> 10 to clear CONTROL/60's
+            // ep.658-anchored min (10 -- "12-14 cheap counterspells", plan line ~320).
             "Azorius control (Pioneer-like)", ArchetypeFormat.SIXTY, ArchetypeId.CONTROL, emptyList(), 2,
             mapOf(
-                "counterspell" to 9, "removal_spot" to 8, "removal_mass" to 4, "card_draw" to 9, "finisher" to 4,
+                "counterspell" to 10, "removal_spot" to 8, "removal_mass" to 4, "card_draw" to 9, "finisher" to 4,
                 "threat_early" to 0, "mana_fix" to 10,
             ),
             26, 3.0,
@@ -269,16 +286,34 @@ class ArchetypeSkeletonGoldenTest {
         }
     }
 
-    /** Pins the exact discrimination counts printed in Appendix B's final validation run. */
+    /**
+     * Pins the discrimination counts against the GENERIC skeleton for each reference deck.
+     *
+     * WS5 retune (2026-07-28): these counts were originally "the exact discrimination counts
+     * printed in Appendix B's final validation run" (D15-locked). That original annex run is now
+     * SUPERSEDED by the WS5.3 retune (docs/plans/deck-wizard-rework-plan.md) -- re-derived here
+     * from the retuned GENERIC bands, updated deliberately alongside the data per the plan's own
+     * instruction ("archetype-layer golden tests get updated deliberately alongside the data, not
+     * silently"). Krenko's count moved 4 -> 5 (a NEW `removal_spot` gap surfaces once GENERIC's
+     * removal_spot min was bumped 6->9 per ep.658's "targeted disruption 12" baseline, plan
+     * line ~304 -- 6 was exactly satisfied by Krenko's own removal_spot=6 pre-retune).
+     */
     @Test
     fun genericWarningCountsMatchTheAnnexsRecordedValidationRun() {
         val expectedGenericWarningCounts = mapOf(
             "Upgraded precon midrange (typical)" to 0,
-            "Krenko goblins (aggro tribal)" to 4,
+            "Krenko goblins (aggro tribal)" to 5,
             "Talrand control (mono-U)" to 0,
             "Karador reanimator" to 0,
-            "Sram voltron (equipment)" to 2,
-            "Meren aristocrats" to 0,
+            // WS5 retune (2026-07-28): 2 -> 4. NEW removal_spot/removal_mass gaps surface once
+            // GENERIC's mins were bumped (9/4, ep.658 "Baseline" row, plan line ~304); the
+            // pre-existing finisher/curve gaps (Sram's own VOLTRON relax intentionally drops
+            // finisher/curve well below GENERIC) are unchanged.
+            "Sram voltron (equipment)" to 4,
+            // WS5 retune (2026-07-28): 0 -> 1. Meren's removal_spot=8 clears MIDRANGE's own min
+            // (8) but not GENERIC's bumped min (9, ep.658 "Baseline" row) -- expected, since this
+            // check compares against the GENERIC skeleton specifically, not Meren's correct one.
+            "Meren aristocrats" to 1,
             "Modern Burn" to 3,
             "Azorius control (Pioneer-like)" to 2,
             "Golgari midrange (Standard-like)" to 0,
@@ -291,6 +326,59 @@ class ArchetypeSkeletonGoldenTest {
                 genericWarnings.size == expected,
                 "${deck.name}: expected $expected generic-skeleton warnings, got ${genericWarnings.size} ($genericWarnings)",
             )
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  E. Dedupe audit (Deck Wizard & Engine Rework plan, Workstream 8.5 item 1)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * [ArchetypeEvaluator.evaluate] must never emit more than one role-band warning
+     * ([DeckWarning.ArchetypeRoleGap] OR [DeckWarning.ArchetypeAntiRolePresent], never both) for
+     * the SAME [RoleKey]. This is structurally guaranteed by the implementation (a single
+     * `skeleton.roleTargets.forEach` loop with an if/else-if branch, iterating a `Map` that can
+     * only ever hold one entry per key) -- this test empirically proves it across the full
+     * archetype x format matrix under a WORST-CASE role-count vector designed to maximize the
+     * chance of a double-emission bug surfacing, rather than relying on code-reading alone.
+     */
+    @Test
+    fun noRoleKeyEverProducesMoreThanOneRoleBandWarning() {
+        ArchetypeFormat.entries.forEach { format ->
+            ArchetypeId.entries.forEach { archetype ->
+                val skeleton = ArchetypeSkeletonResolver.resolve(format, archetype)
+                // Every anti-role is pushed WAY above its tolerance (should trigger
+                // ArchetypeAntiRolePresent); every other role is pushed to 0 (should trigger
+                // ArchetypeRoleGap whenever band.min > 0). land/curve checks are deliberately kept
+                // out of this audit's way (ideal land count, ideal avg CMC) since this test only
+                // cares about role-band warnings.
+                val roleCounts = skeleton.roleTargets.keys.associateWith { key ->
+                    if (key in skeleton.antiRoles) skeleton.roleTargets.getValue(key).max + 100 else 0
+                }
+                val warnings = ArchetypeEvaluator.evaluate(
+                    roleCounts = roleCounts,
+                    lands = skeleton.lands.ideal,
+                    avgMv = skeleton.curve.ideal,
+                    skeleton = skeleton,
+                    colorModulation = null,
+                )
+                val roleBandWarnings = warnings.filter {
+                    it is DeckWarning.ArchetypeRoleGap || it is DeckWarning.ArchetypeAntiRolePresent
+                }
+                val countsByRoleKey = roleBandWarnings.groupingBy { warning ->
+                    when (warning) {
+                        is DeckWarning.ArchetypeRoleGap -> warning.roleKey
+                        is DeckWarning.ArchetypeAntiRolePresent -> warning.roleKey
+                        else -> error("unreachable -- filtered above")
+                    }
+                }.eachCount()
+                countsByRoleKey.forEach { (roleKey, count) ->
+                    assertTrue(
+                        count == 1,
+                        "$archetype.$format.$roleKey: expected exactly 1 role-band warning, got $count ($roleBandWarnings)",
+                    )
+                }
+            }
         }
     }
 }

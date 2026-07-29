@@ -386,7 +386,7 @@ class CommunityDecksRepositoryImplTest {
         coEvery { api.searchDecks(any()) } returns buildSearchResultDto()
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring"), page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Success)
@@ -413,7 +413,7 @@ class CommunityDecksRepositoryImplTest {
         )
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20)) as DataResult.Success
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring"), page = 1, pageSize = 20)) as DataResult.Success
 
         // Assert
         assertFalse(result.data.hasMore)
@@ -426,7 +426,7 @@ class CommunityDecksRepositoryImplTest {
         // Arrange
         coEvery { api.searchDecks(any()) } returns buildSearchResultDto()
         val filters = CommunityDeckSearchFilters(
-            cardName = "Sol Ring",
+            cardNames = listOf("Sol Ring"),
             deckFormatId = 3,
             orderBy = "-viewCount",
             page = 1,
@@ -453,7 +453,7 @@ class CommunityDecksRepositoryImplTest {
         )
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Lightning Bolt", page = 1, pageSize = 20))
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Lightning Bolt"), page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -469,7 +469,7 @@ class CommunityDecksRepositoryImplTest {
         coEvery { api.searchDecks(any()) } throws buildResponseException(500)
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring"), page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -483,7 +483,7 @@ class CommunityDecksRepositoryImplTest {
         coEvery { api.searchDecks(any()) } throws buildResponseException(429)
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring"), page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -498,7 +498,7 @@ class CommunityDecksRepositoryImplTest {
         coEvery { api.searchDecks(any()) } throws RuntimeException("Parse failed")
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring"), page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -511,7 +511,7 @@ class CommunityDecksRepositoryImplTest {
         coEvery { api.searchDecks(any()) } throws RuntimeException()
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Sol Ring", page = 1, pageSize = 20))
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring"), page = 1, pageSize = 20))
 
         // Assert
         assertTrue(result is DataResult.Error)
@@ -541,7 +541,7 @@ class CommunityDecksRepositoryImplTest {
         )
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Test", page = 1, pageSize = 20)) as DataResult.Success
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Test"), page = 1, pageSize = 20)) as DataResult.Success
 
         // Assert
         assertEquals("Unknown", result.data.decks.first().owner.username)
@@ -569,9 +569,140 @@ class CommunityDecksRepositoryImplTest {
         )
 
         // Act
-        val result = repository.searchDecks(CommunityDeckSearchFilters(cardName = "Test", page = 1, pageSize = 20)) as DataResult.Success
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Test"), page = 1, pageSize = 20)) as DataResult.Success
 
         // Assert
         assertTrue(result.data.decks.first().colorIdentity.isEmpty())
+    }
+
+    // ── Group 14: searchDecks — multi-card fan-out (Archidekt multi-card search expansion, 2026-07-24) ──
+
+    private fun summaryDto(id: Int, name: String = "Deck $id") = ArchidektDeckSummaryDto(
+        id = id,
+        name = name,
+        size = 100,
+        deckFormat = 3,
+        owner = ArchidektOwnerDto(id = 1, username = "user", avatar = ""),
+        viewCount = 10,
+        createdAt = "2024-01-01",
+        updatedAt = "2024-01-01",
+        colors = emptyMap(),
+    )
+
+    @Test
+    fun `given two cards when searchDecks then each card is queried with a single cardName and pageSize 60`() = runTest {
+        coEvery { api.searchDecks(any()) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(1)))
+
+        repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring", "Lightning Bolt")))
+
+        coVerify { api.searchDecks(match { it.cardNames == listOf("Sol Ring") && it.pageSize == 60 && it.page == 1 }) }
+        coVerify { api.searchDecks(match { it.cardNames == listOf("Lightning Bolt") && it.pageSize == 60 && it.page == 1 }) }
+    }
+
+    @Test
+    fun `given two cards with overlapping decks when searchDecks then result is the intersection in anchor order`() = runTest {
+        // Anchor (first) card returns decks 1,2,3 in that order; second card returns 2,3,4 —
+        // intersection is {2,3}, and MUST come back in the anchor's original order.
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card A") }) } returns
+            ArchidektSearchResultDto(count = 3, next = null, results = listOf(summaryDto(1), summaryDto(2), summaryDto(3)))
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card B") }) } returns
+            ArchidektSearchResultDto(count = 3, next = null, results = listOf(summaryDto(2), summaryDto(3), summaryDto(4)))
+
+        val result = repository.searchDecks(
+            CommunityDeckSearchFilters(cardNames = listOf("Card A", "Card B")),
+        ) as DataResult.Success
+
+        assertEquals(listOf(2, 3), result.data.decks.map { it.archidektId })
+        assertEquals(2, result.data.totalCount)
+        assertFalse(result.data.hasMore)
+    }
+
+    @Test
+    fun `given a card whose first page has a null next when searchDecks then paging for that card stops`() = runTest {
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card A") && it.page == 1 }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(1)))
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card B") }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(1)))
+
+        repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Card A", "Card B")))
+
+        coVerify(exactly = 0) { api.searchDecks(match { it.cardNames == listOf("Card A") && it.page == 2 }) }
+    }
+
+    @Test
+    fun `given an empty intersection after the second card when searchDecks then the third card is never queried`() = runTest {
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card A") }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(1)))
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card B") }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(2)))
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card C") }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(3)))
+
+        val result = repository.searchDecks(
+            CommunityDeckSearchFilters(cardNames = listOf("Card A", "Card B", "Card C")),
+        ) as DataResult.Success
+
+        assertTrue(result.data.decks.isEmpty())
+        assertEquals(0, result.data.totalCount)
+        assertFalse(result.data.hasMore)
+        coVerify(exactly = 0) { api.searchDecks(match { it.cardNames == listOf("Card C") }) }
+    }
+
+    @Test
+    fun `given a per-card server timeout mid-flow when searchDecks then the error names the offending card`() = runTest {
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card A") }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(1)))
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Sol Ring") }) } returns
+            ArchidektSearchResultDto(count = -1, next = null, results = emptyList())
+
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Card A", "Sol Ring")))
+
+        assertTrue(result is DataResult.Error)
+        assertTrue((result as DataResult.Error).message.contains("Sol Ring"))
+    }
+
+    @Test
+    fun `given duplicate decks across pages for the same card when searchDecks then results are deduped by id`() = runTest {
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card A") && it.page == 1 }) } returns
+            ArchidektSearchResultDto(
+                count = 2,
+                next = "https://archidekt.com/api/decks/v3/?page=2",
+                results = listOf(summaryDto(1)),
+            )
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card A") && it.page == 2 }) } returns
+            ArchidektSearchResultDto(count = 2, next = null, results = listOf(summaryDto(1))) // same deck reappears
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card B") }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(1)))
+
+        val result = repository.searchDecks(
+            CommunityDeckSearchFilters(cardNames = listOf("Card A", "Card B")),
+        ) as DataResult.Success
+
+        assertEquals(1, result.data.decks.size)
+        assertEquals(1, result.data.decks.first().archidektId)
+    }
+
+    @Test
+    fun `given a single card in cardNames when searchDecks then the legacy single-card path is used with the caller's own paging`() = runTest {
+        coEvery { api.searchDecks(any()) } returns buildSearchResultDto()
+
+        repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Sol Ring"), page = 1, pageSize = 20))
+
+        // Single-card path passes the CALLER's page/pageSize through untouched — never overridden
+        // by the multi-card fan-out's internal page=1..3/pageSize=60.
+        coVerify(exactly = 1) { api.searchDecks(match { it.page == 1 && it.pageSize == 20 }) }
+    }
+
+    @Test
+    fun `given a 429 mid-flow when searchDecks then the whole multi-card search fails as a rate-limit error`() = runTest {
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card A") }) } returns
+            ArchidektSearchResultDto(count = 1, next = null, results = listOf(summaryDto(1)))
+        coEvery { api.searchDecks(match { it.cardNames == listOf("Card B") }) } throws buildResponseException(429)
+
+        val result = repository.searchDecks(CommunityDeckSearchFilters(cardNames = listOf("Card A", "Card B")))
+
+        assertTrue(result is DataResult.Error)
+        assertEquals("Too many requests. Please try again later.", (result as DataResult.Error).message)
     }
 }

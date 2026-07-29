@@ -5,6 +5,7 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.NeutralPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
+import com.mmg.manahub.feature.decks.domain.engine.ScoreReason
 import com.mmg.manahub.feature.decks.domain.engine.card
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -241,6 +242,67 @@ class SuggestAddsFromCollectionUseCaseTest {
         assertEquals(baseFit.score, result.first().fit.score, 0.0001f)
     }
 
+    // ── Workstream 9.5 (Deck Wizard & Engine Rework plan) -- colour-aware adds ──────────
+
+    @Test
+    fun aGrixisDeckShortOnBoardWipesRanksASecondaryColourCandidateAboveASubstituteColourCandidate() = runTest {
+        // Grixis (U/B/R) is short on board wipes (empty mainboard, CONTROL wants several).
+        // removal_mass affinity: W=PRIMARY, U=SUBSTITUTE (mass bounce), B=SECONDARY, R=SECONDARY,
+        // G=ABSENT (ColorRoleAffinityTest's own table). Both candidates share the EXACT SAME oracle
+        // pattern/confidence (DESTROY_OR_EXILE_ALL, 0.95) so the ONLY scoring difference is colour.
+        val redWipe = card(
+            id = "red-wipe", name = "Red Wipe", typeLine = "Sorcery", cmc = 4.0,
+            colors = listOf("R"), colorIdentity = listOf("R"), oracleText = "Destroy all creatures.",
+        )
+        val blueWipe = card(
+            id = "blue-wipe", name = "Blue Wipe", typeLine = "Sorcery", cmc = 4.0,
+            colors = listOf("U"), colorIdentity = listOf("U"), oracleText = "Destroy all creatures.",
+        )
+        val identity = setOf(ManaColor.U, ManaColor.B, ManaColor.R)
+        val profile = scorer.profile(mainboard = emptyList(), format = DeckFormat.COMMANDER, colorIdentity = identity, seedTags = emptyList())
+        val resolvedSkeleton = com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver.resolveWithColor(
+            format = com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat.COMMANDER,
+            archetype = com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.CONTROL,
+            themes = emptyList(),
+            identity = identity,
+        )
+
+        val result = useCase(
+            collection = listOf(redWipe, blueWipe), mainboard = emptyList(),
+            profile = profile, resolvedSkeleton = resolvedSkeleton,
+        )
+
+        val redScore = result.first { it.fit.card.scryfallId == "red-wipe" }.fit.score
+        val blueScore = result.first { it.fit.card.scryfallId == "blue-wipe" }.fit.score
+        assertTrue(
+            redScore > blueScore,
+            "a Red (SECONDARY) board-wipe candidate ($redScore) must rank above an otherwise-identical " +
+                "Blue (SUBSTITUTE) one ($blueScore) for the SAME gapped removal_mass role in a Grixis identity",
+        )
+    }
+
+    @Test
+    fun colorAffinityScalingNeverAppliesToTheGenericUnpinnedPath() = runTest {
+        // No resolvedSkeleton (GENERIC/no themes) -- themeRoleBonus (and therefore colorAffinityScale)
+        // must never fire, so an otherwise-identical Red vs Blue "board wipe" candidate score IDENTICALLY.
+        val redWipe = card(
+            id = "red-wipe-generic", name = "Red Wipe Generic", typeLine = "Sorcery", cmc = 4.0,
+            colors = listOf("R"), colorIdentity = listOf("R"), oracleText = "Destroy all creatures.",
+        )
+        val blueWipe = card(
+            id = "blue-wipe-generic", name = "Blue Wipe Generic", typeLine = "Sorcery", cmc = 4.0,
+            colors = listOf("U"), colorIdentity = listOf("U"), oracleText = "Destroy all creatures.",
+        )
+        val identity = setOf(ManaColor.U, ManaColor.B, ManaColor.R)
+        val profile = scorer.profile(mainboard = emptyList(), format = DeckFormat.COMMANDER, colorIdentity = identity, seedTags = emptyList())
+
+        val result = useCase(collection = listOf(redWipe, blueWipe), mainboard = emptyList(), profile = profile, resolvedSkeleton = null)
+
+        val redScore = result.first { it.fit.card.scryfallId == "red-wipe-generic" }.fit.score
+        val blueScore = result.first { it.fit.card.scryfallId == "blue-wipe-generic" }.fit.score
+        assertEquals(redScore, blueScore, 0.0001f, "the GENERIC/unpinned path must stay byte-identical regardless of colour affinity")
+    }
+
     // ── Performance guard (smoke test, not a rigorous benchmark) ───────────────────────
 
     @OptIn(kotlin.time.ExperimentalTime::class)
@@ -266,5 +328,60 @@ class SuggestAddsFromCollectionUseCaseTest {
         // a generous bound to absorb CI variance while still catching an O(n^2) regression.
         assertTrue(elapsed < 3.seconds, "scoring 5000 collection cards took $elapsed, expected < 3s")
         assertTrue(result.size <= 50)
+    }
+
+    // ── Workstream 8.2 (Deck Wizard & Engine Rework plan) -- gap-driven adds, named reasons ──
+
+    @Test
+    fun aCandidateFillingAResolvedArchetypeGapCarriesFillsArchetypeGapNamingTheBand() = runTest {
+        // CONTROL Commander wants removal_mass 5-7-9 (ArchetypeData.kt). An empty mainboard is
+        // maximally short (current=0), so a board-wipe candidate should earn the theme-role bonus
+        // AND carry ScoreReason.FillsArchetypeGap naming the exact band it fills.
+        val wipe = card(
+            id = "wipe", name = "Board Wipe", typeLine = "Sorcery", cmc = 4.0,
+            colors = listOf("U"), colorIdentity = listOf("U"), oracleText = "Destroy all creatures.",
+        )
+        val identity = setOf(ManaColor.U, ManaColor.G)
+        val profile = scorer.profile(mainboard = emptyList(), format = DeckFormat.COMMANDER, colorIdentity = identity, seedTags = emptyList())
+        val resolvedSkeleton = com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver.resolveWithColor(
+            format = com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat.COMMANDER,
+            archetype = com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.CONTROL,
+            themes = emptyList(),
+            identity = identity,
+        )
+
+        val result = useCase(collection = listOf(wipe), mainboard = emptyList(), profile = profile, resolvedSkeleton = resolvedSkeleton)
+
+        val fit = result.first { it.fit.card.scryfallId == "wipe" }.fit
+        val reason = fit.reasons.firstOrNull { it is ScoreReason.FillsArchetypeGap } as? ScoreReason.FillsArchetypeGap
+        assertTrue(reason != null, "the wipe candidate must carry a ScoreReason.FillsArchetypeGap")
+        assertEquals("removal_mass", reason!!.roleKey)
+        assertEquals(0, reason.current)
+        // WS9's color-count modulation can adjust the raw ArchetypeData ideal for a 2-color
+        // identity -- assert the SHAPE of the reason (a positive, still-unmet ideal), not a
+        // hardcoded number that would silently drift whenever the modulation table is retuned.
+        assertTrue(reason.ideal > reason.current, "ideal (${reason.ideal}) must exceed current (${reason.current}) for a gapped role")
+        assertEquals("Control", reason.planLabel)
+    }
+
+    @Test
+    fun aCandidateMatchingNoGappedRoleNeverCarriesFillsArchetypeGap() = runTest {
+        // A vanilla creature with no role signal at all must never get a FillsArchetypeGap reason
+        // attached, even when a resolvedSkeleton is present (the bonus/reason pair only fires when
+        // the candidate actually matches a gapped role -- see themeRoleBonus's own gating).
+        val vanilla = card(id = "vanilla", name = "Vanilla Bear", typeLine = "Creature — Bear", power = "2", toughness = "2")
+        val identity = setOf(ManaColor.U, ManaColor.G)
+        val profile = scorer.profile(mainboard = emptyList(), format = DeckFormat.COMMANDER, colorIdentity = identity, seedTags = emptyList())
+        val resolvedSkeleton = com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver.resolveWithColor(
+            format = com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat.COMMANDER,
+            archetype = com.mmg.manahub.feature.decks.domain.engine.ArchetypeId.CONTROL,
+            themes = emptyList(),
+            identity = identity,
+        )
+
+        val result = useCase(collection = listOf(vanilla), mainboard = emptyList(), profile = profile, resolvedSkeleton = resolvedSkeleton)
+
+        val fit = result.first { it.fit.card.scryfallId == "vanilla" }.fit
+        assertFalse(fit.reasons.any { it is ScoreReason.FillsArchetypeGap }, "a card matching no gapped role must never carry FillsArchetypeGap")
     }
 }

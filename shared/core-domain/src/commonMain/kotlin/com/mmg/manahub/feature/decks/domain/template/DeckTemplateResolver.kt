@@ -217,7 +217,7 @@ class DeckTemplateResolver(
             format = archetypeFormat,
             archetype = archetypeId,
             themes = themes,
-            colorCount = colorIdentity.count { it != ManaColor.C },
+            identity = colorIdentity,
         )
         val categories = resolved.roleTargets
             .filterKeys { it != ArchetypeData.MANA_FIX_KEY }

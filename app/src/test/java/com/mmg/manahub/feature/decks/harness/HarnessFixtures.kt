@@ -6,6 +6,7 @@ import com.mmg.manahub.core.model.CardFace
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.tagging.createStrategyAnalyzer
+import com.mmg.manahub.feature.decks.domain.engine.CommanderEligibility
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -207,12 +208,10 @@ data class HarnessFixtures(
      * wizard's Direction step would see. */
     val ownedCardsByName: List<Card> get() = cardsByName.values.toList()
 
-    /** Legendary creatures in the owned pool -- the wizard's commander-candidate pool. */
-    val commanderCandidates: List<Card> get() = ownedCardsByName.filter { isCommanderEligible(it) }
+    /** Commander-eligible cards in the owned pool (D-G, [CommanderEligibility]) -- the wizard's
+     * commander-candidate pool. */
+    val commanderCandidates: List<Card> get() = ownedCardsByName.filter(CommanderEligibility::isCommanderEligible)
 }
-
-private fun isCommanderEligible(card: Card): Boolean =
-    card.typeLine.contains("Legendary", ignoreCase = true) && card.typeLine.contains("Creature", ignoreCase = true)
 
 /** Loads + tags the Wizard Quality Campaign fixtures. Pure, deterministic, no network -- every
  * lookup is a local file read + the offline tagging engine. */

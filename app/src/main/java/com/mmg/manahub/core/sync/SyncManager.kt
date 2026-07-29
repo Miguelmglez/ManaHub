@@ -530,14 +530,34 @@ class SyncManager @Inject constructor(
         val missingIds = scryfallIds.filterNot { it in existingIds }
         if (missingIds.isEmpty()) return existingIds
 
-        // Fetch in chunks of 75 (Scryfall /cards/collection hard limit).
+        // Fetch in chunks of 75 (Scryfall /cards/collection hard limit). This `forEach` is
+        // sequential (not `async`/`awaitAll`), so chunks are never fired concurrently from this
+        // loop; each chunk's single `getCardsBatch` call is itself routed through
+        // `ScryfallRequestQueue.execute` (shared cooldown + bounded concurrency + escalating
+        // back-off, WS2) — no additional explicit pacing is needed here on top of that.
         missingIds.chunked(75).forEach { chunk ->
             scryfallRemote.getCardsBatch(chunk)
                 .onSuccess { cards ->
-                    cards.forEach { card ->
-                        runCatching { cardDao.upsert(card.toEntityCard()) }
-                            .onSuccess { existingIds.add(card.scryfallId) }
-                    }
+                    // Backend & Performance Optimization plan, WS1+WS3 Part B item 6: ONE
+                    // `upsertAll` per chunk instead of a per-card `upsert` loop (each call was its
+                    // own Room transaction + table invalidation). `upsertAll` is itself
+                    // `@Transaction`-wrapped (INSERT-OR-IGNORE + `@Update`, never
+                    // `OnConflictStrategy.REPLACE` — see the CardDao class KDoc for why REPLACE
+                    // would CASCADE-delete UserCardEntity rows), so this stays exactly as safe as
+                    // the per-card path, just one Room write instead of up to 75.
+                    runCatching { cardDao.upsertAll(cards.map { it.toEntityCard() }) }
+                        .onSuccess { existingIds.addAll(cards.map { it.scryfallId }) }
+                        .onFailure { e ->
+                            // Non-fatal: a Room-level failure across the whole chunk is exceedingly
+                            // rare (malformed data would already have failed to parse upstream) —
+                            // the chunk's ids simply stay "missing" and are retried on the next sync
+                            // cycle, same data-safety guarantee documented on this method's KDoc.
+                            crashReporter.apply {
+                                setCustomKey("scryfall_batch_chunk_size", chunk.size.toString())
+                                setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
+                                recordException(RuntimeException("[ensureCardsExist] Room upsertAll failed", e))
+                            }
+                        }
                 }
                 .onFailure { e ->
                     // Non-fatal: entries for this chunk are skipped and retried on the next sync cycle.

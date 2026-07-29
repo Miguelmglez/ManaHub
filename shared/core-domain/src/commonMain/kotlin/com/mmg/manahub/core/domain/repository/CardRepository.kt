@@ -108,8 +108,12 @@ interface CardRepository {
      *   default (name-ASC) so existing callers (e.g. `AdvancedSearchViewModel`) stay byte-identical.
      *   Deck Builder v2 (Phase 0, root cause 1.2.1) passes `"edhrec"` so a candidate pool's first
      *   page is already popularity-ranked instead of alphabetical before any `take(n)` truncation.
+     * @param page the Scryfall results page (1-based). Deck Wizard & Engine Rework plan, Workstream
+     *   4.1: the Scryfall backstop fill phase pages past page 1 when a query's first page doesn't
+     *   clear enough candidates above the placement fit floor. Defaults to `1` so every existing
+     *   caller stays byte-identical.
      */
-    suspend fun searchWithRawQuery(query: String, order: String? = null): List<Card>
+    suspend fun searchWithRawQuery(query: String, order: String? = null, page: Int = 1): List<Card>
 
     /** Fetches a list of playable Magic sets sorted by release date descending. */
     suspend fun getPlayableSets(): DataResult<List<com.mmg.manahub.core.model.MagicSet>>
@@ -117,7 +121,15 @@ interface CardRepository {
     /** Batch-resolves [scryfallIds] to [Card]s from the local cache. IDs not found locally are silently skipped (no network fetch). */
     suspend fun getCardsByIds(scryfallIds: List<String>): List<Card>
     fun observeCard(scryfallId: String): Flow<Card?>
-    suspend fun refreshCollectionPrices()
+
+    /**
+     * Batch price update (single-scryfall-id sibling: [updatePrices]).
+     *
+     * Note: the whole-collection, unguarded `refreshCollectionPrices()` that used to live on this
+     * interface was DELETED (Backend & Performance Optimization plan, WS1+WS3 Part B item 7a,
+     * 2026-07-28) — `PriceRefreshWorker` -> `RefreshCollectionPricesUseCase`
+     * (`shared/core-data/.../usecase/collection/`) is now the SOLE price-refresh path.
+     */
     suspend fun updatePrices(
         scryfallId:   String,
         priceUsd:     Double?,
