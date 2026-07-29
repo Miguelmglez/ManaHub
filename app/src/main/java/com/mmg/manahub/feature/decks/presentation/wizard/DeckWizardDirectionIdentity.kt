@@ -77,6 +77,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.StrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
 import com.mmg.manahub.feature.decks.domain.template.OwnedCommanderCandidate
@@ -107,10 +108,12 @@ internal fun DirectionStepContent(
     onSelectCommander: (Card) -> Unit,
     onClearCommander: () -> Unit,
     onToggleSeedPicker: () -> Unit,
+    onToggleIncludeOutsideCollection: () -> Unit,
     onSeedQueryChange: (String) -> Unit,
     onAddSeed: (Card) -> Unit,
     onRemoveSeed: (Card) -> Unit,
     onSelectSeedStrategyCandidate: (SeedStrategyCandidate) -> Unit,
+    onToggleCardsFlowColor: (ManaColor) -> Unit,
     onToggleColorFlowColor: (ManaColor) -> Unit,
     onSelectColorAffinityEntry: (ColorStrategyEntry) -> Unit,
     onTaxonomyQueryChange: (String) -> Unit,
@@ -129,10 +132,12 @@ internal fun DirectionStepContent(
             onSelectCommander = onSelectCommander,
             onClearCommander = onClearCommander,
             onToggleSeedPicker = onToggleSeedPicker,
+            onToggleIncludeOutsideCollection = onToggleIncludeOutsideCollection,
             onSeedQueryChange = onSeedQueryChange,
             onAddSeed = onAddSeed,
             onRemoveSeed = onRemoveSeed,
             onSelectSeedStrategyCandidate = onSelectSeedStrategyCandidate,
+            onToggleCardsFlowColor = onToggleCardsFlowColor,
             onNext = onNext,
         )
         WizardEntryFlow.COLORS -> ColorsFlowDirectionContent(
@@ -163,17 +168,47 @@ private fun CardsFlowDirectionContent(
     onSelectCommander: (Card) -> Unit,
     onClearCommander: () -> Unit,
     onToggleSeedPicker: () -> Unit,
+    onToggleIncludeOutsideCollection: () -> Unit,
     onSeedQueryChange: (String) -> Unit,
     onAddSeed: (Card) -> Unit,
     onRemoveSeed: (Card) -> Unit,
     onSelectSeedStrategyCandidate: (SeedStrategyCandidate) -> Unit,
+    onToggleCardsFlowColor: (ManaColor) -> Unit,
     onNext: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     val isCommanderFormat = uiState.selectedFormat == DeckFormat.COMMANDER
-    val canProceed = !isCommanderFormat || uiState.selectedCommander != null
+    // Workstream 3 -- Commander never reaches this composable anymore (it routes through
+    // COMMANDER_PICK/STRATEGY/MANUAL_ADDS, see WizardPhase's KDoc); every Casual flow now requires a
+    // real strategy pick + a color set before advancing (D-B, generalized -- see
+    // DeckWizardViewModel.onNextFromDirection's KDoc), so this button's `enabled` mirrors that gate
+    // (the VM guard is still the actual source of truth, same "never trust the UI-only disabled
+    // state" precedent as every other sticky button in this screen).
+    val canProceed = if (isCommanderFormat) {
+        uiState.selectedCommander != null
+    } else {
+        val hasStrategyPick = uiState.selectedArchetype != null || uiState.selectedDirectionTheme != null || uiState.selectedTribeKey != null
+        hasStrategyPick && uiState.colorIdentity.isNotEmpty()
+    }
+
+    // Workstream 3.1 -- D-A dual-source seed search (collection + outside-collection behind the
+    // SAME includeOutsideCollection toggle COMMANDER_PICK/MANUAL_ADDS use, WS2.1's pattern reused
+    // rather than reinvented). Computed OUTSIDE the LazyColumn content block for the same
+    // LazyListScope-is-not-@Composable reason ManualAddsStepContent/CommanderPickStepContent hoist
+    // their own local candidate lists.
+    val seedQuery = uiState.seedQuery.trim()
+    val seededIds = remember(uiState.seedCards) { uiState.seedCards.map { it.scryfallId }.toSet() }
+    val localSeedCandidates = remember(uiState.ownedCards, seededIds, seedQuery) {
+        if (seedQuery.length < 2) emptyList()
+        else uiState.ownedCards
+            .filterNot { it.scryfallId in seededIds }
+            .filter { it.name.contains(seedQuery, ignoreCase = true) }
+            .take(SEED_SEARCH_RESULT_CAP)
+    }
+    val showOutsideSeedResults = uiState.includeOutsideCollection && seedQuery.length >= 2
+    val seedCandidatesToShow = if (showOutsideSeedResults) uiState.seedSearchResults else localSeedCandidates
 
     // Visual-overhaul pass: every card tile in this step (seed search results, commander
     // candidates/search results) can be tap-zoomed in place via MagicCardInspectionOverlay,
@@ -213,18 +248,24 @@ private fun CardsFlowDirectionContent(
 
                 // Seed cards moved to the TOP of the step (visual-overhaul pass): picking a few
                 // seed cards is the most common entry point for Flow A and should not be buried
-                // below the commander picker / collection leans.
+                // below the commander picker / color+strategy section.
                 item(key = "seed_toggle") {
                     SeedPickerToggleRow(expanded = uiState.showSeedPicker, onToggle = onToggleSeedPicker)
                 }
                 if (uiState.showSeedPicker) {
+                    // Deck Wizard & Engine Rework plan, Workstream 3.1 (D-A) -- same dual-source
+                    // toggle/pattern as COMMANDER_PICK (2.1), reused rather than reinvented: default
+                    // collection-only (no network call), opt-in to a live Scryfall search.
+                    item(key = "seed_outside_toggle") {
+                        OutsideCollectionToggleRow(checked = uiState.includeOutsideCollection, onToggle = onToggleIncludeOutsideCollection)
+                    }
                     item(key = "seed_search") {
                         SeedSearchInline(query = uiState.seedQuery, isSearching = uiState.isSearchingSeeds, onQueryChange = onSeedQueryChange)
                     }
-                    if (uiState.seedQuery.trim().length >= 2 && uiState.seedSearchResults.isNotEmpty()) {
+                    if (seedCandidatesToShow.isNotEmpty()) {
                         item(key = "seed_search_results") {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                                items(uiState.seedSearchResults, key = { "seedres_${it.scryfallId}" }) { card ->
+                                items(seedCandidatesToShow, key = { "seedres_${it.scryfallId}" }) { card ->
                                     WizardCardImageTile(
                                         card = card,
                                         rootCoordinates = rootCoordinates,
@@ -273,19 +314,42 @@ private fun CardsFlowDirectionContent(
                     }
                 }
 
-                item(key = "collection_leans") {
-                    CollectionLeanSection(
-                        uiState = uiState,
-                        onSelectDirectionTag = onSelectDirectionTag,
-                        onSelectTribe = onSelectTribe,
-                    )
-                }
+                // Deck Wizard & Engine Rework plan, Workstream 3.1 -- replaces the old
+                // collection-wide CollectionLeanSection + small-chip "suggested strategies" FlowRow
+                // with a single color selector (pre-selected + LOCKED for colors the picked seeds'
+                // own identities already carry, DeckWizardUiState.lockedColors) followed by a full
+                // strategy list (SuggestStrategiesForSeedsUseCase candidates, one full-description
+                // row per candidate, coherence hints inline). Never gated for Commander -- Commander
+                // no longer reaches this composable at all (see WizardPhase's KDoc) -- kept behind
+                // `!isCommanderFormat` purely to document that intent for a future reader.
+                if (!isCommanderFormat) {
+                    item(key = "seed_colors_header") {
+                        Text(
+                            stringResource(R.string.deck_wizard_seed_colors_title),
+                            style = ty.labelLarge,
+                            color = mc.primaryAccent,
+                            modifier = Modifier.padding(top = spacing.xs),
+                        )
+                    }
+                    item(key = "seed_colors_row") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                            ManaColor.entries.filter { it != ManaColor.C }.forEach { color ->
+                                ColorToggleChip(
+                                    color = color,
+                                    selected = color in uiState.colorIdentity,
+                                    readOnly = color in uiState.lockedColors,
+                                    lockedDescriptionRes = R.string.deck_wizard_color_locked_by_seeds,
+                                    onClick = { onToggleCardsFlowColor(color) },
+                                )
+                            }
+                        }
+                    }
+                    if (uiState.colorIdentity.isEmpty()) {
+                        item(key = "seed_colors_empty") {
+                            Text(stringResource(R.string.deck_seeds_identity_colorless), style = ty.bodySmall, color = mc.textSecondary)
+                        }
+                    }
 
-                // Deck Engine Unification plan (§5 Phase 3.2, RC5) — once at least one seed (or the
-                // commander) is picked, rank viable strategies FROM the seeds themselves instead of
-                // leaving the user to guess a Direction chip that may not even fit what they just picked.
-                val suggestion = uiState.seedStrategySuggestion
-                if (suggestion != null) {
                     item(key = "seed_strategy_header") {
                         Text(
                             stringResource(R.string.deck_wizard_suggested_strategies_title),
@@ -294,35 +358,49 @@ private fun CardsFlowDirectionContent(
                             modifier = Modifier.padding(top = spacing.xs),
                         )
                     }
-                    if (!suggestion.isCoherent) {
-                        item(key = "seed_coherence_warning") {
-                            SeedCoherenceWarning()
-                        }
-                    }
-                    if (suggestion.candidates.isEmpty()) {
-                        item(key = "seed_strategy_empty") {
-                            Text(
-                                stringResource(R.string.deck_wizard_suggested_strategies_empty),
-                                style = ty.bodySmall,
-                                color = mc.textSecondary,
-                            )
+                    val suggestion = uiState.seedStrategySuggestion
+                    if (suggestion == null) {
+                        item(key = "seed_strategy_hint") {
+                            Text(stringResource(R.string.deck_wizard_suggested_strategies_hint), style = ty.bodySmall, color = mc.textSecondary)
                         }
                     } else {
-                        item(key = "seed_strategy_chips") {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
-                                verticalArrangement = Arrangement.spacedBy(spacing.xs),
-                            ) {
-                                suggestion.candidates.forEach { candidate ->
-                                    val selected = candidate.profile.archetype == uiState.selectedArchetype &&
-                                        candidate.profile.themes.firstOrNull() == uiState.selectedDirectionTheme &&
-                                        candidate.profile.tribe == uiState.selectedTribeKey
-                                    DirectionChip(
-                                        label = candidate.label,
-                                        selected = selected,
-                                        onClick = { onSelectSeedStrategyCandidate(candidate) },
-                                    )
-                                }
+                        if (!suggestion.isCoherent) {
+                            item(key = "seed_coherence_warning") {
+                                SeedCoherenceWarning()
+                            }
+                        }
+                        if (suggestion.candidates.isEmpty()) {
+                            item(key = "seed_strategy_empty") {
+                                Text(
+                                    stringResource(R.string.deck_wizard_suggested_strategies_empty),
+                                    style = ty.bodySmall,
+                                    color = mc.textSecondary,
+                                )
+                            }
+                        } else {
+                            items(
+                                suggestion.candidates,
+                                key = { "seedcand_${it.profile.archetype?.name}_${it.profile.themes.joinToString { t -> t.name }}_${it.profile.tribe}" },
+                            ) { candidate ->
+                                val selected = candidate.profile.archetype == uiState.selectedArchetype &&
+                                    candidate.profile.themes.firstOrNull() == uiState.selectedDirectionTheme &&
+                                    candidate.profile.tribe == uiState.selectedTribeKey
+                                StrategyOptionRow(
+                                    label = candidate.label,
+                                    description = candidate.description(),
+                                    selected = selected,
+                                    onClick = { onSelectSeedStrategyCandidate(candidate) },
+                                    misfitContent = if (candidate.misfitSeeds.isNotEmpty() || candidate.misfitColors.isNotEmpty()) {
+                                        {
+                                            MisfitHintRow(
+                                                seeds = candidate.misfitSeeds,
+                                                colors = candidate.misfitColors,
+                                                onRemoveSeed = onRemoveSeed,
+                                                onDeselectColor = onToggleCardsFlowColor,
+                                            )
+                                        }
+                                    } else null,
+                                )
                             }
                         }
                     }
@@ -924,8 +1002,21 @@ private fun themeDescription(themeId: ThemeId): String = when (themeId) {
     ThemeId.CLONES_THEFT -> stringResource(R.string.deck_wizard_theme_desc_clones_theft)
 }
 
+/**
+ * @param lockedDescriptionRes Deck Wizard & Engine Rework plan, Workstream 3.1 — the accessibility
+ *   copy for the [readOnly] (locked) state differs by WHY the color is locked: Commander's Identity
+ *   step ("fixed by commander") vs. Flow A's Direction step ("locked by a seed card", WS3.1's
+ *   [DeckWizardUiState.lockedColors]). Defaults to the original Commander string so every pre-WS3
+ *   call site is unaffected.
+ */
 @Composable
-internal fun ColorToggleChip(color: ManaColor, selected: Boolean, readOnly: Boolean, onClick: () -> Unit) {
+internal fun ColorToggleChip(
+    color: ManaColor,
+    selected: Boolean,
+    readOnly: Boolean,
+    onClick: () -> Unit,
+    lockedDescriptionRes: Int = R.string.deck_wizard_color_fixed_by_commander,
+) {
     val mc = MaterialTheme.magicColors
     val border = if (selected) BorderStroke(1.5.dp, mc.primaryAccent) else BorderStroke(0.5.dp, mc.surfaceVariant)
     val background = if (selected) mc.primaryAccent.copy(alpha = 0.18f) else mc.surface
@@ -934,12 +1025,13 @@ internal fun ColorToggleChip(color: ManaColor, selected: Boolean, readOnly: Bool
             ManaSymbolImage(token = color.symbol, size = 24.dp)
         }
     }
-    // Read-only (Commander -- colors are derived from the commander, not user-editable): a plain
+    // Read-only (Commander -- colors are derived from the commander, not user-editable; OR
+    // Workstream 3.1 Flow A -- a color a currently-picked seed's identity requires): a plain
     // Surface with no `onClick` overload so it never shows an interactive ripple. M3 (design
     // review): a screen reader gets no other signal these are fixed, not toggleable -- an explicit
     // contentDescription distinguishes the two variants for TalkBack users.
     if (readOnly) {
-        val fixedColorDescription = stringResource(R.string.deck_wizard_color_fixed_by_commander, color.displayName)
+        val fixedColorDescription = stringResource(lockedDescriptionRes, color.displayName)
         Surface(
             shape = CircleShape,
             color = background,
@@ -953,3 +1045,23 @@ internal fun ColorToggleChip(color: ManaColor, selected: Boolean, readOnly: Bool
         Surface(onClick = onClick, shape = CircleShape, color = background, border = border, modifier = Modifier.size(48.dp), content = content)
     }
 }
+
+/** Deck Wizard & Engine Rework plan, Workstream 3.1 -- Flow A's strategy-list description resolver:
+ * an archetype-only candidate uses [StrategyCatalog]'s archetype description, a theme-only (or
+ * tribe, which always carries `themes = [ThemeId.TRIBAL]` per this workstream's use-case fix)
+ * candidate uses the theme description. Direct [StrategyCatalog] calls (not the file-private
+ * `.description()` wrappers in `DeckWizardEntryFlows.kt`) since those are file-scoped there. */
+private fun com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate.description(): String {
+    val archetype = profile.archetype
+    val theme = profile.themes.firstOrNull()
+    return when {
+        archetype != null -> StrategyCatalog.description(archetype)
+        theme != null -> StrategyCatalog.description(theme)
+        else -> StrategyCatalog.description(ArchetypeId.GENERIC)
+    }
+}
+
+/** Local-collection seed-search result cap (Workstream 3.1) -- mirrors
+ * [ManualAddsStepContent]'s own `MANUAL_ADDS_RESULT_CAP`, same rationale (never render an
+ * unbounded slice of a large collection). */
+private const val SEED_SEARCH_RESULT_CAP = 20

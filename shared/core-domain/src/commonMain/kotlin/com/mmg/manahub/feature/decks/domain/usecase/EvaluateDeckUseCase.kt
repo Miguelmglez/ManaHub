@@ -207,7 +207,7 @@ class EvaluateDeckUseCase(
             format = format,
             archetype = resolution.macro,
             themes = resolution.themes,
-            colorCount = colorCount,
+            identity = colorIdentity,
         )
         val roleCounts = ArchetypeRoleClassifier.deckRoleCounts(mainboard)
         // Lands are not a RoleSpec key; count them directly from the mainboard (mirrors

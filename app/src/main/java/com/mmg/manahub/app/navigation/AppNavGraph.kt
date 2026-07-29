@@ -55,7 +55,6 @@ import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionTab
-import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
@@ -487,28 +486,6 @@ fun AppNavGraph(
                             sharedTransitionKey = sharedTransitionKey
                         )
                     }
-
-            // ── Decks ─────────────────────────────────────────────────────────
-            composable(
-                route = Screen.DeckDetail.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
-            ) {
-                DeckMagicDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    // D10 (Phase 0.5): the standalone Deck Improvement screen was retired —
-                    // Deck Studio's Suggestions tab is now the sole Deck Doctor UI. "Improve
-                    // deck" re-points here instead of Screen.DeckImprovement (deleted).
-                    onImproveDeck = { id ->
-                        navController.navigate(Screen.DeckStudio.createRoute(id))
-                    },
-                    onReviewSurvey = { sessionId ->
-                        navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
-                    },
-                    onPlaytest = { id ->
-                        navController.navigate(Screen.PlaytestSetup.createRoute(id))
-                    },
-                )
-            }
 
             // ── Community Decks (Archidekt browse + import) ───────────────────
             composable(

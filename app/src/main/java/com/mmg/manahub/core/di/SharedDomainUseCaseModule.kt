@@ -93,7 +93,9 @@ object SharedDomainUseCaseModule {
         api: ScryfallClient,
         requestQueue: ScryfallRequestQueue,
         cache: ScryfallCache,
-    ): ScryfallRemoteDataSource = ScryfallRemoteDataSource(api, requestQueue, cache, DispatcherProvider())
+        crashReporter: CrashReporter,
+    ): ScryfallRemoteDataSource =
+        ScryfallRemoteDataSource(api, requestQueue, cache, DispatcherProvider(), crashReporter)
 
     /**
      * Self-contained: builds its own [SuggestTagsUseCase]/`StrategyAnalyzer` instance rather than

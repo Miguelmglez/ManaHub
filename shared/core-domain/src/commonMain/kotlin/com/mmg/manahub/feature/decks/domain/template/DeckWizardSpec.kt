@@ -33,6 +33,16 @@ import com.mmg.manahub.feature.decks.domain.engine.StrategyProfile
  *   flag check — both must be true for Motor B to run. Motor B only ever re-ranks/prioritizes cards
  *   the user already OWNS (see [BuildDeckFromTemplateUseCase]'s Motor B KDoc); there is no "community
  *   only" build mode, so this is a plain on/off rather than a 3-way source selector.
+ * @param includeOutsideCollection Deck Wizard & Engine Rework plan (D-A / Workstream 4.1) — the SAME
+ *   session-level "include cards outside your collection" toggle
+ *   (`DeckWizardUiState.includeOutsideCollection`) the wizard's search screens already gate 4 search
+ *   call sites (commander picker, MANUAL_ADDS, Flow A seed search) with, now ALSO gating
+ *   [BuildDeckFromTemplateUseCase]'s build-time Scryfall backstop fill phase (F4): when a category
+ *   still has unfilled slots after the owned-collection Motor A/B loop and the community-template
+ *   list resolution both run dry, this toggle decides whether the build queries Scryfall directly
+ *   (via the revived [com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator]) as a
+ *   last-resort fill source before declaring a [DeckGap]. Defaults to `false` (collection-only,
+ *   byte-identical to pre-Workstream-4 behavior).
  */
 data class DeckWizardSpec(
     val format: DeckFormat,
@@ -42,4 +52,5 @@ data class DeckWizardSpec(
     val seeds: List<Card> = emptyList(),
     val fillLands: Boolean = true,
     val useCommunityData: Boolean = false,
+    val includeOutsideCollection: Boolean = false,
 )

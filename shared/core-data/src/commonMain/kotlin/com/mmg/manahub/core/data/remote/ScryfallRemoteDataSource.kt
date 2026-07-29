@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.data.remote
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.data.network.ScryfallCache
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
@@ -25,13 +26,26 @@ import kotlinx.coroutines.withContext
  * @param requestQueue   Rate-limiting queue (max 10 req/s, 100 ms min between requests).
  * @param cache          In-memory LRU cache with per-resource TTL.
  * @param dispatcherProvider Platform dispatcher abstraction.
+ * @param crashReporter  Optional platform-neutral crash/log reporter (see [CrashReporter]). `null`
+ *   (the default) keeps every telemetry hook a silent no-op -- safe for tests and any construction
+ *   site that doesn't need the WS7 cache-ratio signal. The sole prod DI site is
+ *   `SharedDomainUseCaseModule.provideScryfallRemoteDataSource`.
  */
 class ScryfallRemoteDataSource(
     private val api: ScryfallClient,
     private val requestQueue: ScryfallRequestQueue,
     private val cache: ScryfallCache,
     private val dispatcherProvider: DispatcherProvider,
+    private val crashReporter: CrashReporter? = null,
 ) {
+    /**
+     * WS7 telemetry (backend-performance-optimization-plan.md, 2026-07-29): approximate, non-atomic
+     * (by design -- see the WS7 audit's "approximate counters are fine for telemetry" note) session
+     * hit/miss counters for [searchCardsPaginated]'s cache, the hottest fix in the WS4a batch (feeds
+     * every debounced Add Card keystroke and the Home spotlight feed's page-walk).
+     */
+    private var paginatedCacheHits = 0L
+    private var paginatedCacheMisses = 0L
 
     suspend fun searchCardByName(query: String, set: String? = null): Result<Card> =
         safeCall {
@@ -98,6 +112,19 @@ class ScryfallRemoteDataSource(
             }
         }
 
+    /**
+     * Same shape as [searchCards], but also surfaces Scryfall's `has_more` flag via
+     * [com.mmg.manahub.core.model.PaginatedCards] -- used by [query]-paged/paginating callers
+     * (Add Card search, [com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase]'s
+     * page-walk over an entire set).
+     *
+     * WS4a finding 1 (Backend & Performance Optimization plan, 2026-07-28): this used to bypass
+     * caching entirely on the non-[bypassCache] path (it needed a `TimedLruCache<String,
+     * PaginatedCards>`, which didn't exist -- [cache.searches] is `List<Card>`-typed and doesn't fit
+     * the `hasMore` flag). Now routes through [ScryfallCache.paginatedSearches], mirroring
+     * [searchCards]'s [cache.searches] usage exactly. Individual results are still additionally
+     * cached in [cache.cards].
+     */
     suspend fun searchCardsPaginated(
         query: String,
         page: Int = 1,
@@ -120,13 +147,17 @@ class ScryfallRemoteDataSource(
                 loader()
             } else {
                 val cacheKey = "paginated:${query.lowercase().trim()}:$page"
-                // Using a temporary cache in Searches for PaginatedCards isn't safe due to type mismatch
-                // Wait, cache.searches is TimedLruCache<String, List<Card>>.
-                // If we don't want to add a new cache property just for this, we can just use the loader directly without searches caching for the pagination metadata, but we DO want caching to avoid hitting Scryfall repeatedly for pagination.
-                // Let's just bypass the searches cache for now, or fetch from searches cache and assume hasMore=true if not last page?
-                // Actually, let's just do loader() directly, individual cards are still cached in cache.cards.
-                // F-10 says: surface has_more.
-                loader()
+                // WS7 telemetry: peek before getOrFetch's own (internal, also-a-hit-check) lookup to
+                // classify this call as a hit/miss for the session ratio. The extra lookup is cheap
+                // (same Mutex-guarded map) and an approximate/racy count here is an accepted
+                // telemetry trade-off -- see the class KDoc.
+                val wasCached = cache.paginatedSearches.get(cacheKey) != null
+                if (wasCached) paginatedCacheHits++ else paginatedCacheMisses++
+                crashReporter?.setCustomKey(
+                    "scryfall_paginated_cache_ratio_session",
+                    "$paginatedCacheHits/$paginatedCacheMisses",
+                )
+                cache.paginatedSearches.getOrFetch(cacheKey, loader)
             }
         }
 
@@ -164,12 +195,15 @@ class ScryfallRemoteDataSource(
      * @param order optional Scryfall `order` param. Null preserves the historic default (name-ASC).
      *   MUST be part of the cache key (see below) -- otherwise a cached alphabetical result for a
      *   query would silently be served back for a later `order = "edhrec"` request on the same query.
+     * @param page the Scryfall results page (1-based, plan Workstream 4.1). MUST also be part of the
+     *   cache key -- otherwise a cached page-1 result would silently be served back for a later
+     *   page-2+ request on the same query/order.
      */
-    suspend fun searchWithRawQuery(query: String, order: String? = null): List<Card> =
+    suspend fun searchWithRawQuery(query: String, order: String? = null, page: Int = 1): List<Card> =
         safeCall {
-            val cacheKey = "raw:${query.lowercase().trim()}:${order ?: "name"}"
+            val cacheKey = "raw:${query.lowercase().trim()}:${order ?: "name"}:page$page"
             cache.searches.getOrFetch(cacheKey) {
-                val cards = requestQueue.execute { api.searchCards(query, order = order ?: "name", page = 1) }
+                val cards = requestQueue.execute { api.searchCards(query, order = order ?: "name", page = page) }
                     .data.toDomain()
                 cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
                 cards
@@ -211,6 +245,17 @@ class ScryfallRemoteDataSource(
 
             cached + fetched
         }
+
+    /**
+     * Invalidates the in-memory [ScryfallCache.cards] entry for each of [scryfallIds] (Backend &
+     * Performance Optimization plan, WS1+WS3 Part B item 7g). Call after writing fresh data for
+     * these ids through a path that bypasses [cache] (e.g. [getCardCollection], used by price
+     * refresh) so a subsequent [getCardById]/[getCardsBatch] re-reads the fresh Room row instead of
+     * serving a stale-but-not-yet-expired cached [Card].
+     */
+    suspend fun invalidateCachedCards(scryfallIds: Collection<String>) {
+        cache.invalidateCards(scryfallIds)
+    }
 
     suspend fun getAllSets(): List<MagicSet> =
         cache.sets.getOrFetch("all") {

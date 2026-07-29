@@ -72,6 +72,7 @@ class WizardQualityMatrixTest {
                 "shortfall=${gapSpec?.shortfall}",
             gapSpec?.sizeOk == true,
         )
+        assertRoundTripInvariant(metrics)
     }
 
     @Test
@@ -94,6 +95,7 @@ class WizardQualityMatrixTest {
             "BUG-1 regression: commander missing/duplicated in the built deck for: $missingCommander",
             missingCommander.isEmpty(),
         )
+        assertRoundTripInvariant(metrics)
     }
 
     @Test
@@ -104,6 +106,7 @@ class WizardQualityMatrixTest {
         val metrics = MatrixRunner.run(specs, fixtures)
         HarnessReportWriter.write(dir, runId("seeds"), runLabel, metrics)
         reportSummaryOnFailure(metrics)
+        assertRoundTripInvariant(metrics)
     }
 
     /** Deck Engine Unification RUN 7a (plan §5 Phase 6.1 -- "3-flow coverage"): drives the ACTUAL
@@ -121,9 +124,30 @@ class WizardQualityMatrixTest {
         reportSummaryOnFailure(metrics)
 
         assertTrue("expected exactly 3 entry-flow specs (Flow A/B/C)", metrics.size == 3)
+        assertRoundTripInvariant(metrics)
     }
 
     private fun runId(segment: String): String = "${System.currentTimeMillis()}-$runLabel-$segment"
+
+    /**
+     * Deck Wizard & Engine Rework plan Workstream 8.1 -- the single most important assertion in
+     * this whole campaign. Named and explicit (not just folded into [BuildMetrics
+     * .allHardMetricsPass]'s aggregate count) so a regression here fails loudly and names the
+     * offending specs + cards, exactly like the BUG-1 commander check above: a wizard-placed card
+     * ranking as a top UNLOCKED cut under its own build-time profile is a BASIS DIVERGENCE bug by
+     * definition (pin folding / cached seedTags / trim reordering — see the plan's own triage
+     * rule), never a "the wizard's choice just wasn't optimal" case to shrug off.
+     */
+    private fun assertRoundTripInvariant(metrics: List<BuildMetrics>) {
+        val violations = metrics.filter { !it.buildFailed && !it.roundTripUnlockedOk }
+        assertTrue(
+            "WS8.1 round-trip invariant (UNLOCKED): a wizard-placed card cleared the fit floor at " +
+                "build time yet ranks as a top cut under the SAME profile with no structural " +
+                "protection -- this is a basis-divergence bug, fix the mechanism, never the ranking. " +
+                "Offending specs: ${violations.map { it.label to it.roundTripUnlockedViolationNames }}",
+            violations.isEmpty(),
+        )
+    }
 
     /** Prints (never fails the run -- Wave 1 is EXPECTED to still show failures) a one-line summary
      * to stdout so `--tests` output is legible without opening the JSON. */
@@ -134,7 +158,8 @@ class WizardQualityMatrixTest {
             println(
                 "[wizard-harness]   FAIL ${m.label}: failed=${m.buildFailed} size=${m.sizeOk} legal=${m.legalityOk} " +
                     "determinism=${m.determinismOk} lands=${m.landsOk} cutsV2=${m.coherenceCutsV2Ok} " +
-                    "swaps=${m.coherenceSwapsOk} adds=${m.coherenceAddsOk} commander=${m.commanderPresentOk}"
+                    "roundTripUnlocked=${m.roundTripUnlockedOk} swaps=${m.coherenceSwapsOk} " +
+                    "adds=${m.coherenceAddsOk} commander=${m.commanderPresentOk}"
             )
         }
     }

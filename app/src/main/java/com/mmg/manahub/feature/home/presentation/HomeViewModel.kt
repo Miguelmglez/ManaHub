@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.feature.game.domain.model.DeckStats
 import com.mmg.manahub.feature.game.domain.model.EliminationStats
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
@@ -128,6 +130,9 @@ class HomeViewModel(
     private val tradeSuggestionsRepository: TradeSuggestionsRepository,
     private val friendRepository: FriendRepository,
     private val playtestRepository: PlaytestRepository,
+    // Backend & Performance Optimization plan, WS1+WS3 Part B item 9 (2026-07-28) — see the
+    // `syncManager.syncState` gate in `init` below.
+    private val syncManager: SyncManager,
     // Home widget board overhaul, TASK 5b — reused as-is from the Community Decks island
     // (communityDecksKoinModule), no parallel data path.
     private val searchCommunityDecksUseCase: SearchCommunityDecksUseCase,
@@ -997,6 +1002,8 @@ class HomeViewModel(
                 emit(null)
                 return@flow
             }
+            // WS1+WS3 Part B item 9 (2026-07-28) — see the Discover-row `init` gate above for why.
+            awaitSyncWindow("trending")
             val result = runCatching { repo.getTrending() }.getOrElse {
                 crashlytics.log("home_trending_widget_failed")
                 null
@@ -1036,6 +1043,8 @@ class HomeViewModel(
         communityDecksCategoryFlow.flatMapLatest { category ->
             flow {
                 emit(null)
+                // WS1+WS3 Part B item 9 (2026-07-28) — see the Discover-row `init` gate above for why.
+                awaitSyncWindow("community_decks")
                 val filters = CommunityDeckSearchFilters(
                     orderBy = category.orderBy,
                     primersOnly = category.primersOnly,
@@ -1054,6 +1063,31 @@ class HomeViewModel(
             crashlytics.log("home_community_decks_load_failed")
             emit(emptyList())
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Waits for [syncManager]'s sync state to leave [SyncState.SYNCING] before the caller proceeds
+     * (WS1+WS3 Part B item 9's "serialize the login window" gate), logging a `home_sync_window_deferred`
+     * breadcrumb ONLY when the wait was real (elapsed strictly greater than
+     * [SYNC_WINDOW_LOG_THRESHOLD_MS]) — the common case (sync already IDLE/SUCCESS/ERROR) resolves
+     * `first{}` immediately and would just be noise.
+     *
+     * WS7 telemetry (backend-performance-optimization-plan.md, 2026-07-29): this is the empirical
+     * proof that the gate is actually deferring real work in the field, not just theoretically
+     * present in code — a source-tagged breadcrumb + duration, not a per-call event flood.
+     *
+     * @param source one of `"trending"` / `"community_decks"` / `"discover_seed"` — identifies which
+     *   of the 3 call sites deferred, without embedding any free text.
+     */
+    private suspend fun awaitSyncWindow(source: String) {
+        val start = System.currentTimeMillis()
+        syncManager.syncState.first { it != SyncState.SYNCING }
+        val elapsed = System.currentTimeMillis() - start
+        if (elapsed > SYNC_WINDOW_LOG_THRESHOLD_MS) {
+            crashlytics.log("home_sync_window_deferred")
+            crashlytics.setCustomKey("home_sync_window_deferred_ms", elapsed)
+            crashlytics.setCustomKey("home_sync_window_deferred_source", source)
+        }
+    }
 
     init {
         authRepository.sessionState
@@ -1093,7 +1127,7 @@ class HomeViewModel(
                 // small set of proposals actually surfaced on Home so the Inbox/RecentActivity
                 // sections never render a known-wrong "0 items" for a real pending trade.
                 if (refreshResult.isSuccess) {
-                    hydrateTradeItemCounts(userId)
+                    hydrateTradeItemCounts()
                 }
             }
         }
@@ -1101,6 +1135,13 @@ class HomeViewModel(
         // then populate the Discover row (lazy once-guard) and the independent Random card widget.
         // On failure/empty the set stays null and the fetch falls back to the global random query.
         viewModelScope.launch {
+            // Backend & Performance Optimization plan, WS1+WS3 Part B item 9 (2026-07-28):
+            // "serialize the login window" — defer this non-essential Discover/Random-card Scryfall
+            // fetch until any in-progress collection sync (`ensureCardsExist`, deck cards) finishes,
+            // so it never competes with the login-window burst for the same rate-limit budget. A
+            // `StateFlow.first{}` on a sync that is already IDLE/SUCCESS/ERROR resolves immediately
+            // (no delay in the common case — sync only runs right after sign-in/app-open, briefly).
+            awaitSyncWindow("discover_seed")
             seedRandomDiscoverSet()
             fetchDiscoverCards(forceRefresh = false)
             fetchRandomCard()
@@ -1119,12 +1160,19 @@ class HomeViewModel(
      * `TradeProposal.items.size` read) silently reported 0 even for a real pending trade with
      * items.
      *
-     * Fix: after the metadata refresh lands, fan out [TradesRepository.refreshProposalThread] over
+     * Fix: after the metadata refresh lands, fan out [TradesRepository.refreshItemsForThread] over
      * the newest few distinct root-proposal threads (bounded by [HOME_TRADE_THREAD_HYDRATE_LIMIT])
      * — the same threads the Inbox/RecentActivity sections actually render — concurrently. No
      * backend/RPC change is required; this stays entirely within the existing repository contract.
+     *
+     * Backend & Performance Optimization plan, WS4a finding 2 (2026-07-28): this used to call
+     * [TradesRepository.refreshProposalThread], which ALSO re-fetches the caller's full proposal
+     * table before hydrating items — up to [HOME_TRADE_THREAD_HYDRATE_LIMIT] duplicate full-table
+     * reads within milliseconds of the [refreshProposals] call right above this function's only
+     * call site. [TradesRepository.refreshItemsForThread] skips that redundant metadata re-fetch;
+     * it is safe here specifically because metadata was just refreshed by [refreshProposals].
      */
-    private suspend fun hydrateTradeItemCounts(userId: String) {
+    private suspend fun hydrateTradeItemCounts() {
         val cached =
             runCatching { tradesRepository.observeAllProposals().first() }.getOrElse { emptyList() }
         val rootIds = cached
@@ -1136,7 +1184,7 @@ class HomeViewModel(
         coroutineScope {
             rootIds.map { rootId ->
                 async {
-                    runCatching { tradesRepository.refreshProposalThread(rootId, userId) }
+                    runCatching { tradesRepository.refreshItemsForThread(rootId) }
                         .exceptionOrNull()?.let { error ->
                             recordSafeNonFatal("home_trades_hydrate_items", error)
                         }
@@ -1946,6 +1994,13 @@ class HomeViewModel(
         private const val MIN_DISCOVER_SET_CARDS = 10
 
         private const val WISHLIST_PREVIEW_LIMIT = 10
+
+        /**
+         * [awaitSyncWindow] only logs `home_sync_window_deferred` when the wait exceeded this many
+         * ms — filters out the common already-IDLE case (a `StateFlow.first{}` resolving on an
+         * uncontended flow still costs a few ms of coroutine dispatch, which isn't a "real" defer).
+         */
+        private const val SYNC_WINDOW_LOG_THRESHOLD_MS = 100L
 
         /** Max rows shown by the RECENTLY_ADDED widget (Home feature overhaul Phase 2.1). */
         private const val RECENTLY_ADDED_LIMIT = 10

@@ -30,11 +30,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
@@ -43,7 +42,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
@@ -145,19 +143,6 @@ fun StatsScreen(
     val mc          = MaterialTheme.magicColors
     val toastState  = rememberMagicToastState()
 
-    LaunchedEffect(uiState.refreshResult) {
-        uiState.refreshResult?.let {
-            toastState.show(it, MagicToastType.SUCCESS)
-            viewModel.clearRefreshMessage()
-        }
-    }
-    LaunchedEffect(uiState.refreshError) {
-        uiState.refreshError?.let {
-            toastState.show("Error: $it", MagicToastType.ERROR)
-            viewModel.clearRefreshMessage()
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets.statusBars,
@@ -243,7 +228,6 @@ fun StatsScreen(
                             uiState          = uiState,
                             onColorSelected  = viewModel::onColorSelected,
                             onSetSelected    = viewModel::onSetSelected,
-                            onRefreshPrices  = viewModel::refreshPrices,
                             onCardClick      = onCardClick,
                             sharedTransitionScope   = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
@@ -256,13 +240,23 @@ fun StatsScreen(
     }
 }
 
+/**
+ * Root composable for the Collection tab content.
+ *
+ * Backend perf plan (2026-07-28, WS5a): the root scroll container is a [LazyColumn], not
+ * `Column + verticalScroll` — each section is its own `item {}` so a section far from the current
+ * scroll position is decomposed instead of staying permanently composed/retained. [SetPickerSheet]
+ * is hoisted to a [Box] SIBLING of the [LazyColumn] (not an item inside it): it is a
+ * `ModalBottomSheet`, which renders in its own overlay layer, so nesting it inside a lazily
+ * composed item would risk the sheet being dismissed out from under the user if its host item
+ * scrolled far enough to be decomposed.
+ */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CollectionStatsContent(
     uiState: StatsUiState,
     onColorSelected: (MtgColor?) -> Unit,
     onSetSelected: (MagicSet?) -> Unit,
-    onRefreshPrices: () -> Unit,
     onCardClick: (String, String?) -> Unit,
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
@@ -273,158 +267,146 @@ private fun CollectionStatsContent(
     val stats = uiState.stats
     var showSetPicker by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(sp.xl),
-    ) {
-        // Refresh-prices affordance (Phase 1 audit fix: previously wired but never rendered).
-        /*Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = sp.xl).padding(top = sp.lg),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(sp.xl),
         ) {
-            val statusText = when {
-                uiState.isRefreshingPrices && uiState.refreshProgress != null ->
-                    stringResource(R.string.stats_refresh_progress, uiState.refreshProgress.first, uiState.refreshProgress.second)
-                uiState.isRefreshingPrices -> stringResource(R.string.stats_refreshing)
-                uiState.lastRefreshedAt != null -> "Updated ${TimeAgoFormatter.format(uiState.lastRefreshedAt)}"
-                else -> null
-            }
-            Text(
-                text = statusText ?: "",
-                style = MaterialTheme.magicTypography.labelSmall,
-                color = mc.textDisabled,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = onRefreshPrices,
-                enabled = !uiState.isRefreshingPrices,
-                modifier = Modifier.size(48.dp),
-            ) {
-                if (uiState.isRefreshingPrices) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = mc.primaryAccent)
-                } else {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.stats_refresh_prices), tint = mc.primaryAccent)
+            item(key = "collection_filters") {
+                // Color Filter Row
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = sp.xl, vertical = sp.sm),
+                    verticalArrangement = Arrangement.spacedBy(sp.lg)
+                ) {
+                    ManaColorPicker(
+                        selectedColors = uiState.selectedColor?.let { setOf(it.name.take(1)) } ?: emptySet(),
+                        onToggleColor = { colorCode ->
+                            val color = when (colorCode) {
+                                "W" -> MtgColor.W
+                                "U" -> MtgColor.U
+                                "B" -> MtgColor.B
+                                "R" -> MtgColor.R
+                                "G" -> MtgColor.G
+                                "C" -> MtgColor.COLORLESS
+                                else -> null
+                            }
+                            onColorSelected(color)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        spacing = sp.sm,
+                        itemSize = 48.dp,
+                        symbolSize = 32.dp,
+                    )
+
+                    SetFilterRow(
+                        selectedSet = uiState.selectedSet,
+                        onClick = { showSetPicker = true },
+                        onClear = { onSetSelected(null) },
+                        mc = mc
+                    )
+
+                    // Read-only price-freshness label (2026-07-28 backend perf plan — prices
+                    // refresh automatically once a day via PriceRefreshWorker; Stats only ever
+                    // displays the last-refreshed timestamp, it never triggers a refresh itself).
+                    uiState.lastRefreshedAt?.let { lastRefreshedAt ->
+                        // NOTE: TimeAgoFormatter.format() already appends "ago" (e.g. "3h ago") —
+                        // do not wrap it in a "…%1$s ago" string resource (stats_updated_ago has
+                        // that exact shape and would read "Updated 3h ago ago"); "Unlocked %1$s"
+                        // (achievement_unlocked_ago) is the correct established pattern.
+                        Text(
+                            text = "Updated ${TimeAgoFormatter.format(lastRefreshedAt)}",
+                            style = MaterialTheme.magicTypography.labelSmall,
+                            color = mc.textDisabled,
+                        )
+                    }
                 }
             }
-        }*/
 
-        // Color Filter Row
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = sp.xl, vertical = sp.sm),
-            verticalArrangement = Arrangement.spacedBy(sp.lg)
-        ) {
-            ManaColorPicker(
-                selectedColors = uiState.selectedColor?.let { setOf(it.name.take(1)) } ?: emptySet(),
-                onToggleColor = { colorCode ->
-                    val color = when (colorCode) {
-                        "W" -> MtgColor.W
-                        "U" -> MtgColor.U
-                        "B" -> MtgColor.B
-                        "R" -> MtgColor.R
-                        "G" -> MtgColor.G
-                        "C" -> MtgColor.COLORLESS
-                        else -> null
+            if (uiState.isLoading) {
+                item(key = "collection_loading") {
+                    Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = mc.primaryAccent)
                     }
-                    onColorSelected(color)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                spacing = sp.sm,
-                itemSize = 48.dp,
-                symbolSize = 32.dp,
-            )
-
-            SetFilterRow(
-                selectedSet = uiState.selectedSet,
-                onClick = { showSetPicker = true },
-                onClear = { onSetSelected(null) },
-                mc = mc
-            )
-        }
-
-        if (showSetPicker) {
-            SetPickerSheet(
-                selectedSetCodes = uiState.selectedSet?.let { setOf(it.code) } ?: emptySet(),
-                onToggleSet = { set -> 
-                    onSetSelected(if (uiState.selectedSet?.code == set.code) null else set)
-                    showSetPicker = false
-                },
-                onDismiss = { showSetPicker = false },
-                availableSets = uiState.availableSets,
-                singleSelection = true
-            )
-        }
-
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = mc.primaryAccent)
-            }
-        } else if (stats != null) {
-            Column(
-                modifier = Modifier.padding(horizontal = sp.lg),
-                verticalArrangement = Arrangement.spacedBy(sp.xxl)
-            ) {
+                }
+            } else if (stats != null) {
                 // 1. Inventory & Value
-                StatsSection(
-                    title = stringResource(R.string.stats_section_inventory_value),
-                    icon = Icons.Default.Star
-                ) {
-                    InventoryValueGrid(stats = stats, currency = uiState.currency)
+                item(key = "collection_section_inventory_value") {
+                    StatsSection(
+                        modifier = Modifier.padding(horizontal = sp.lg),
+                        title = stringResource(R.string.stats_section_inventory_value),
+                        icon = Icons.Default.Star
+                    ) {
+                        InventoryValueGrid(stats = stats, currency = uiState.currency)
+                    }
                 }
 
                 // 2. Combat & Mechanics
-                StatsSection(
-                    title = stringResource(R.string.stats_section_combat_mechanics),
-                    icon = painterResource(R.drawable.ic_battle)
-                ) {
-                    CombatMechanicsSection(stats = stats)
+                item(key = "collection_section_combat_mechanics") {
+                    StatsSection(
+                        modifier = Modifier.padding(horizontal = sp.lg),
+                        title = stringResource(R.string.stats_section_combat_mechanics),
+                        icon = painterResource(R.drawable.ic_battle)
+                    ) {
+                        CombatMechanicsSection(stats = stats)
+                    }
                 }
 
                 // 3. Aesthetics & Art
-                StatsSection(
-                    title = stringResource(R.string.stats_section_aesthetics_art),
-                    icon = Icons.Default.Star
-                ) {
-                    AestheticsArtSection(
-                        stats = stats,
-                        onCardClick = onCardClick,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                    )
+                item(key = "collection_section_aesthetics_art") {
+                    StatsSection(
+                        modifier = Modifier.padding(horizontal = sp.lg),
+                        title = stringResource(R.string.stats_section_aesthetics_art),
+                        icon = Icons.Default.Star
+                    ) {
+                        AestheticsArtSection(
+                            stats = stats,
+                            onCardClick = onCardClick,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
                 }
 
                 // 4. Distributions
-                StatsSection(
-                    title = stringResource(R.string.stats_section_distributions),
-                    icon = Icons.Default.BarChart
-                ) {
-                    DistributionsSection(stats = stats, mc = mc)
+                item(key = "collection_section_distributions") {
+                    StatsSection(
+                        modifier = Modifier.padding(horizontal = sp.lg),
+                        title = stringResource(R.string.stats_section_distributions),
+                        icon = Icons.Default.BarChart
+                    ) {
+                        DistributionsSection(stats = stats, mc = mc)
+                    }
                 }
 
                 // 5. Hall of Fame
-                StatsSection(
-                    title = stringResource(R.string.stats_section_hall_of_fame),
-                    icon = Icons.Default.Star
-                ) {
-                    HallOfFameSection(
-                        stats = stats,
-                        currency = uiState.currency,
-                        onCardClick = onCardClick,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                    )
+                item(key = "collection_section_hall_of_fame") {
+                    StatsSection(
+                        modifier = Modifier.padding(horizontal = sp.lg),
+                        title = stringResource(R.string.stats_section_hall_of_fame),
+                        icon = Icons.Default.Star
+                    ) {
+                        HallOfFameSection(
+                            stats = stats,
+                            currency = uiState.currency,
+                            onCardClick = onCardClick,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
                 }
 
                 // 6. Set Completion (Phase 2) — global/unfiltered, top sets by completion ratio.
                 if (uiState.setCompletions.isNotEmpty()) {
-                    StatsSection(
-                        title = stringResource(R.string.stats_section_set_completion),
-                        icon = Icons.Default.Layers
-                    ) {
-                        SetCompletionSection(completions = uiState.setCompletions)
+                    item(key = "collection_section_set_completion") {
+                        StatsSection(
+                            modifier = Modifier.padding(horizontal = sp.lg),
+                            title = stringResource(R.string.stats_section_set_completion),
+                            icon = Icons.Default.Layers
+                        ) {
+                            SetCompletionSection(completions = uiState.setCompletions)
+                        }
                     }
                 }
 
@@ -433,24 +415,42 @@ private fun CollectionStatsContent(
                 // CircularDistributionSection is self-titled/self-carded, so it is placed directly
                 // rather than nested inside another StatsSection header.
                 if (stats.decadeDistribution.isNotEmpty()) {
-                    val decadeOrder = remember(stats.decadeDistribution) { stats.decadeDistribution.keys.sorted() }
-                    CircularDistributionSection(
-                        title = stringResource(R.string.stats_label_collection_era),
-                        data = stats.decadeDistribution,
-                        colorMapper = { label ->
-                            val index = decadeOrder.indexOf(label).coerceAtLeast(0)
-                            val palette = listOf(
-                                mc.primaryAccent, mc.secondaryAccent, mc.goldMtg,
-                                mc.lifePositive, mc.lifeNegative, mc.manaU,
-                                mc.manaR, mc.manaG, mc.manaW,
-                            )
-                            palette[index % palette.size]
-                        }
-                    )
+                    item(key = "collection_section_era") {
+                        val decadeOrder = remember(stats.decadeDistribution) { stats.decadeDistribution.keys.sorted() }
+                        CircularDistributionSection(
+                            modifier = Modifier.padding(horizontal = sp.lg),
+                            title = stringResource(R.string.stats_label_collection_era),
+                            data = stats.decadeDistribution,
+                            colorMapper = { label ->
+                                val index = decadeOrder.indexOf(label).coerceAtLeast(0)
+                                val palette = listOf(
+                                    mc.primaryAccent, mc.secondaryAccent, mc.goldMtg,
+                                    mc.lifePositive, mc.lifeNegative, mc.manaU,
+                                    mc.manaR, mc.manaG, mc.manaW,
+                                )
+                                palette[index % palette.size]
+                            }
+                        )
+                    }
                 }
 
-                Spacer(Modifier.height(sp.xxl))
+                item(key = "collection_bottom_spacer") {
+                    Spacer(Modifier.height(sp.xxl))
+                }
             }
+        }
+
+        if (showSetPicker) {
+            SetPickerSheet(
+                selectedSetCodes = uiState.selectedSet?.let { setOf(it.code) } ?: emptySet(),
+                onToggleSet = { set ->
+                    onSetSelected(if (uiState.selectedSet?.code == set.code) null else set)
+                    showSetPicker = false
+                },
+                onDismiss = { showSetPicker = false },
+                availableSets = uiState.availableSets,
+                singleSelection = true
+            )
         }
     }
 }
@@ -528,11 +528,12 @@ private fun SetFilterRow(
 private fun StatsSection(
     title: String,
     icon: Any, // ImageVector or Painter
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
-    Column(verticalArrangement = Arrangement.spacedBy(sp.lg)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(sp.lg)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(sp.md),
@@ -1541,12 +1542,13 @@ private fun CircularDistributionSection(
     data: Map<String, Int>,
     colorMapper: (String) -> Color,
     isColor: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     if (data.isEmpty()) return
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
 
-    Column(verticalArrangement = Arrangement.spacedBy(sp.lg)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(sp.lg)) {
         Text(title, style = MaterialTheme.magicTypography.titleMedium, color = mc.textPrimary)
         
         Card(
@@ -1727,18 +1729,18 @@ private fun GameStatsContent(
         }
     }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
             .padding(horizontal = sp.lg),
         verticalArrangement = Arrangement.spacedBy(sp.xl),
     ) {
-        Spacer(Modifier.height(sp.sm))
+        item(key = "games_top_spacer") { Spacer(Modifier.height(sp.sm)) }
 
         // ── KPI grid ─────────────────────────────────────────────────────────
         uiState.gameStats?.let { gs ->
+          item(key = "games_kpi_grid") {
             Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
                     StatCard(
@@ -1798,10 +1800,12 @@ private fun GameStatsContent(
 //                    }
 //                }
             }
+          }
         }
 
         // ── Win rate by mode ─────────────────────────────────────────────────
         if (uiState.modeWinrates.isNotEmpty()) {
+          item(key = "games_winrate_by_mode") {
             Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
                 Text(
                     text   = stringResource(R.string.stats_section_winrate_by_mode).uppercase(),
@@ -1821,10 +1825,12 @@ private fun GameStatsContent(
                     }
                 }
             }
+          }
         }
 
         // ── Win rate by player count ─────────────────────────────────────────
         if (uiState.playerCountWinrates.isNotEmpty()) {
+          item(key = "games_winrate_by_player_count") {
             Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
                 Text(
                     text   = stringResource(R.string.stats_section_winrate_by_player_count).uppercase(),
@@ -1844,10 +1850,12 @@ private fun GameStatsContent(
                     }
                 }
             }
+          }
         }
 
         // ── Deck performance ─────────────────────────────────────────────────
-        Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
+        item(key = "games_deck_performance") {
+          Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
             Text(
                 text   = stringResource(R.string.stats_section_deck_performance).uppercase(),
                 style  = ty.labelLarge,
@@ -1880,10 +1888,12 @@ private fun GameStatsContent(
                     }
                 }
             }
+          }
         }
 
         // ── Matchup win rates (by opponent archetype) ─────────────────────────
         if (uiState.archetypeMatchups.isNotEmpty()) {
+          item(key = "games_archetype_matchups") {
             Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
                 Text(
                     text   = stringResource(R.string.stats_section_matchups).uppercase(),
@@ -1905,10 +1915,12 @@ private fun GameStatsContent(
                     }
                 }
             }
+          }
         }
 
         // ── Recent form ──────────────────────────────────────────────────────
         if (uiState.recentForm.isNotEmpty()) {
+          item(key = "games_recent_form") {
             Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
                 Text(
                     text   = stringResource(R.string.stats_section_recent_form).uppercase(),
@@ -1924,10 +1936,12 @@ private fun GameStatsContent(
                     }
                 }
             }
+          }
         }
 
         // ── Session history ───────────────────────────────────────────────────
-        Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
+        item(key = "games_session_history") {
+          Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
             Text(
                 text   = stringResource(R.string.stats_section_history).uppercase(),
                 style  = ty.labelLarge,
@@ -1964,9 +1978,12 @@ private fun GameStatsContent(
                     }
                 }
             }
+          }
         }
 
-        Spacer(Modifier.height(sp.xxl))
+        item(key = "games_bottom_spacer") {
+            Spacer(Modifier.height(sp.xxl))
+        }
     }
 
     // ── Delete dialogs ────────────────────────────────────────────────────────
@@ -2232,88 +2249,95 @@ private fun TradeStatsContent(
                     modifier = Modifier.fillMaxWidth().height(200.dp),
                 )
             } else {
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
                         .navigationBarsPadding()
                         .padding(horizontal = sp.lg),
                     verticalArrangement = Arrangement.spacedBy(sp.xl),
                 ) {
-                    Spacer(Modifier.height(sp.sm))
+                    item(key = "trades_top_spacer") { Spacer(Modifier.height(sp.sm)) }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
-                            StatCard(
-                                label    = stringResource(R.string.stats_kpi_completed_trades),
-                                value    = stats.completedTradesCount.toString(),
-                                modifier = Modifier.weight(1f).height(90.dp),
-                            )
-                            StatCard(
-                                label    = stringResource(R.string.stats_kpi_cards_sent),
-                                value    = stats.cardsSent.toString(),
-                                modifier = Modifier.weight(1f).height(90.dp),
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
-                            StatCard(
-                                label    = stringResource(R.string.stats_kpi_cards_received),
-                                value    = stats.cardsReceived.toString(),
-                                modifier = Modifier.weight(1f).height(90.dp),
-                            )
-                            val deltaSign = if (stats.netValueDelta >= 0) "+" else "−"
-                            val deltaMagnitude = PriceFormatter.format(kotlin.math.abs(stats.netValueDelta), currency)
-                            StatCard(
-                                label      = stringResource(R.string.stats_kpi_net_value),
-                                value      = "$deltaSign$deltaMagnitude",
-                                valueColor = if (stats.netValueDelta >= 0) mc.lifePositive else mc.lifeNegative,
-                                modifier   = Modifier.weight(1f).height(90.dp),
-                            )
+                    item(key = "trades_kpi_grid") {
+                        Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
+                                StatCard(
+                                    label    = stringResource(R.string.stats_kpi_completed_trades),
+                                    value    = stats.completedTradesCount.toString(),
+                                    modifier = Modifier.weight(1f).height(90.dp),
+                                )
+                                StatCard(
+                                    label    = stringResource(R.string.stats_kpi_cards_sent),
+                                    value    = stats.cardsSent.toString(),
+                                    modifier = Modifier.weight(1f).height(90.dp),
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(sp.md)) {
+                                StatCard(
+                                    label    = stringResource(R.string.stats_kpi_cards_received),
+                                    value    = stats.cardsReceived.toString(),
+                                    modifier = Modifier.weight(1f).height(90.dp),
+                                )
+                                val deltaSign = if (stats.netValueDelta >= 0) "+" else "−"
+                                val deltaMagnitude = PriceFormatter.format(kotlin.math.abs(stats.netValueDelta), currency)
+                                StatCard(
+                                    label      = stringResource(R.string.stats_kpi_net_value),
+                                    value      = "$deltaSign$deltaMagnitude",
+                                    valueColor = if (stats.netValueDelta >= 0) mc.lifePositive else mc.lifeNegative,
+                                    modifier   = Modifier.weight(1f).height(90.dp),
+                                )
+                            }
                         }
                     }
 
-                    Text(
-                        text  = stringResource(R.string.stats_trades_net_value_note),
-                        style = ty.labelSmall,
-                        color = mc.textDisabled,
-                    )
+                    item(key = "trades_net_value_note") {
+                        Text(
+                            text  = stringResource(R.string.stats_trades_net_value_note),
+                            style = ty.labelSmall,
+                            color = mc.textDisabled,
+                        )
+                    }
 
                     stats.topPartner?.let { partner ->
-                        Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
-                            Text(
-                                text   = stringResource(R.string.stats_section_top_partner).uppercase(),
-                                style  = ty.labelLarge,
-                                color  = mc.textPrimary,
-                                letterSpacing = 2.sp,
-                            )
-                            Card(
-                                shape  = CardShape,
-                                colors = CardDefaults.cardColors(containerColor = mc.surface),
-                            ) {
-                                Row(
-                                    modifier              = Modifier.fillMaxWidth().padding(sp.lg),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment     = Alignment.CenterVertically,
+                        item(key = "trades_top_partner") {
+                            Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
+                                Text(
+                                    text   = stringResource(R.string.stats_section_top_partner).uppercase(),
+                                    style  = ty.labelLarge,
+                                    color  = mc.textPrimary,
+                                    letterSpacing = 2.sp,
+                                )
+                                Card(
+                                    shape  = CardShape,
+                                    colors = CardDefaults.cardColors(containerColor = mc.surface),
                                 ) {
-                                    Text(
-                                        text     = partner.displayName,
-                                        style    = ty.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                        color    = mc.textPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    Text(
-                                        text  = stringResource(R.string.stats_trade_count, partner.completedTradesCount),
-                                        style = ty.labelMedium,
-                                        color = mc.textSecondary,
-                                    )
+                                    Row(
+                                        modifier              = Modifier.fillMaxWidth().padding(sp.lg),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment     = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text     = partner.displayName,
+                                            style    = ty.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                            color    = mc.textPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        Text(
+                                            text  = stringResource(R.string.stats_trade_count, partner.completedTradesCount),
+                                            style = ty.labelMedium,
+                                            color = mc.textSecondary,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(sp.xxl))
+                    item(key = "trades_bottom_spacer") {
+                        Spacer(Modifier.height(sp.xxl))
+                    }
                 }
             }
         }

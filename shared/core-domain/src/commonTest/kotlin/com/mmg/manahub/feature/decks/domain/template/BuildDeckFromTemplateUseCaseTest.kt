@@ -1,14 +1,18 @@
 package com.mmg.manahub.feature.decks.domain.template
 
+import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.NeutralPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
@@ -249,7 +253,7 @@ class BuildDeckFromTemplateUseCaseTest {
     /** A cheap-bodied threat with zero identity tags and no legacy-[DeckRole] oracle/tag match --
      * resolves to the "threat_early" category (Appendix A vocabulary, no [DeckRole] mapping, see
      * [SuggestionCategoryResolver]'s step 2.5) via purely structural matching. Scores far below
-     * [BuildDeckFromTemplateUseCase.CATEGORY_FILL_FIT_FLOOR] once its own CMC-3 bucket is already
+     * [com.mmg.manahub.feature.decks.domain.engine.CATEGORY_FILL_FIT_FLOOR] once its own CMC-3 bucket is already
      * saturated: zero synergy (no identity tags), zero role-need/redundancy (THREAT has no slot in
      * the 60-card [com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons] skeleton, so `ideal` is
      * 0 and both terms short-circuit to 0), and a curve score floored to `FULL_BUCKET_FLOOR` (0.1) --
@@ -590,5 +594,252 @@ class BuildDeckFromTemplateUseCaseTest {
         val complete = events.filterIsInstance<TemplateBuildProgress.Complete>().singleOrNull()
         assertIs<TemplateBuildProgress.Complete>(complete ?: events.last(), "build did not complete: ${events.lastOrNull()}")
         return complete!!.result
+    }
+
+    // ── Workstream 6 ("One land engine") — the zero-delta acceptance test ────────────
+
+    /**
+     * The single most important assertion of WS6: a wizard-built deck reopened in Deck Studio must
+     * show ZERO land delta. Deck Studio has no access to the wizard's internal build-time state --
+     * only the deck's PERSISTED [TemplateBuildResult.archetypeOverride]/[TemplateBuildResult
+     * .themesOverride] pin and the finished nonland mainboard (see
+     * [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.resolveStudioLandTarget]'s
+     * KDoc). This test proves the two independently-computed land targets are identical by
+     * reproducing Studio's OWN computation (same public [ArchetypeSkeletonResolver]/[DeckScorer]/
+     * [LandTargetResolver] building blocks Studio calls) against the wizard's actual output, without
+     * requiring a full [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel] instance.
+     */
+    @Test
+    fun `opening a wizard-built deck in Studio yields zero land delta`() = runTest(dispatcher) {
+        val commander = card(id = "cmd", name = "Test Commander", typeLine = "Legendary Creature — Human", colorIdentity = listOf("R"))
+        val collection = (1..80).map { i ->
+            owned("Red Filler $i", 1) {
+                card(
+                    id = "filler-$i", name = "Red Filler $i", typeLine = "Sorcery",
+                    cmc = (i % 6 + 1).toDouble(), colors = listOf("R"), colorIdentity = listOf("R"), oracleText = null,
+                )
+            }
+        }
+        val result = runToCompletion(
+            useCase(),
+            DeckWizardSpec(format = DeckFormat.COMMANDER, commander = commander, strategyProfile = SeedStrategy.AGGRO.toStrategyProfile()),
+            collection,
+        )
+
+        val actualLandCount = result.deckCards.filter { it.card.typeLine.contains("Basic Land") }.sumOf { it.quantity }
+
+        // Reproduce Deck Studio's OWN independent computation (resolveStudioLandTarget) from the
+        // SAME finished deck: the persisted archetype/theme pin + the final nonland mainboard --
+        // never a wizard-internal snapshot.
+        val nonLandEntries = result.deckCards
+            .filterNot { it.card.typeLine.contains("Basic Land") }
+            .map { DeckEntry(card = it.card, quantity = it.quantity, isOwned = true, isSideboard = false) }
+        val archetype = ArchetypeId.entries.firstOrNull { it.name == result.archetypeOverride } ?: ArchetypeId.GENERIC
+        val themes = result.themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
+        val colorIdentity = commander.colorIdentity.mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()
+        val archetypeFormat = ArchetypeFormat.of(DeckFormat.COMMANDER)
+        val studioSkeleton = if (archetypeFormat == null || (archetype == ArchetypeId.GENERIC && themes.isEmpty())) {
+            null
+        } else {
+            ArchetypeSkeletonResolver.resolveWithColor(
+                format = archetypeFormat,
+                archetype = archetype,
+                themes = themes,
+                identity = colorIdentity,
+            )
+        }
+        val studioProfile = scorer.profile(mainboard = nonLandEntries, format = DeckFormat.COMMANDER, colorIdentity = colorIdentity, seedTags = emptyList())
+        val studioLandTarget = LandTargetResolver.resolve(
+            format = DeckFormat.COMMANDER,
+            archetypeSkeleton = studioSkeleton,
+            profile = studioProfile,
+        )
+
+        assertEquals(
+            studioLandTarget, actualLandCount,
+            "a wizard-built deck reopened in Studio must independently recompute the IDENTICAL land target " +
+                "(zero land delta) -- studio=$studioLandTarget wizard=$actualLandCount",
+        )
+    }
+
+    // ── Workstream 9.4 ("closes the basics-only gap") -- the zero-shortage acceptance test ────
+
+    /** A non-basic land producing exactly [colors] (WS9.4's "fixing land" definition, matching
+     * [com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier]'s `manaFixMatcher`). */
+    private fun dualLand(id: String, name: String, colors: List<String>) = card(
+        id = id, name = name, typeLine = "Land",
+        colors = emptyList(), colorIdentity = colors,
+        producedMana = colors.joinToString(separator = ""),
+    )
+
+    /**
+     * A single-pip, ROLE-LESS nonland spell in [color] -- deliberately no `oracleText`/tags (the
+     * SAME "Red Filler N" shape the WS6 zero-land-delta test above already proves clears
+     * [com.mmg.manahub.feature.decks.domain.engine.CATEGORY_FILL_FIT_FLOOR] via curve/power alone). A role-bearing
+     * filler (e.g. "Destroy target creature.") hits the GENERIC skeleton's `removal_spot`
+     * redundancy ceiling almost immediately when dozens of identical copies are offered, which
+     * stops the Motor A loop early and starves whichever color sorts last -- these tests need every
+     * color's nonland cards to actually be PLACED (so their pips are demanded and Karsten-checked),
+     * not a redundancy-driven early exit. `manaCost` (single pip) and `cmc` (varied, for curve
+     * diversity) are intentionally independent fixture inputs.
+     */
+    private fun singlePipFiller(id: String, name: String, color: String, cmc: Double) = card(
+        id = id, name = name, typeLine = "Sorcery", cmc = cmc,
+        colors = listOf(color), colorIdentity = listOf(color),
+        manaCost = "{1}{$color}",
+    )
+
+    /** Cycles [pairs] round-robin, zero-padded names so an alphabetical/name tie-break (the
+     * fixing-land picker's own determinism rule) never depletes one pair before another -- a
+     * partial selection (fewer placed than generated) still lands roughly evenly across every
+     * pair, which is what makes these fixtures robust to the EXACT fixing-land target number. */
+    private fun cyclingDuals(prefix: String, pairs: List<List<String>>, perPair: Int): List<com.mmg.manahub.core.model.Card> {
+        val total = pairs.size * perPair
+        return (1..total).map { i ->
+            val pair = pairs[(i - 1) % pairs.size]
+            val padded = i.toString().padStart(3, '0')
+            dualLand(id = "$prefix-$i", name = "$prefix Dual $padded ${pair.joinToString("")}", colors = pair)
+        }
+    }
+
+    private fun fillerCollection(colors: List<String>, perColor: Int): List<UserCardWithCard> =
+        colors.flatMap { color ->
+            (1..perColor).map { i ->
+                owned("Filler $color $i", 1) {
+                    singlePipFiller(id = "filler-$color-$i", name = "Filler $color $i", color = color, cmc = (i % 6 + 1).toDouble())
+                }
+            }
+        }
+
+    private fun landCollection(lands: List<com.mmg.manahub.core.model.Card>): List<UserCardWithCard> =
+        lands.map { owned(it.name, 1) { it } }
+
+    /** Reproduces [com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel]'s own read of a
+     * finished build's mana base (same building blocks the WS6 zero-land-delta test above already
+     * reproduces) so this test needs no [ManaBaseAnalyzer] wiring beyond a fresh instance. */
+    private fun manaBaseReportFor(result: TemplateBuildResult, format: DeckFormat, identity: Set<ManaColor>) =
+        com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer().analyze(
+            mainboard = result.deckCards.map { DeckEntry(card = it.card, quantity = it.quantity, isOwned = it.isOwned, isSideboard = false) },
+            profile = scorer.profile(
+                mainboard = result.deckCards.map { DeckEntry(card = it.card, quantity = it.quantity, isOwned = it.isOwned, isSideboard = false) },
+                format = format, colorIdentity = identity, seedTags = emptyList(),
+            ),
+        )
+
+    @Test
+    fun `a fresh 3-color wizard deck passes ManaBaseAnalyzer with zero color source shortage or unfixed splash warnings`() = runTest(dispatcher) {
+        val commander = card(id = "cmd-jund", name = "Jund Commander", typeLine = "Legendary Creature — Human", colorIdentity = listOf("B", "R", "G"))
+        val fixingLands = cyclingDuals("BRG", listOf(listOf("B", "G"), listOf("B", "R"), listOf("R", "G")), perPair = 15) +
+            (1..6).map { i -> dualLand(id = "brg-triome-$i", name = "BRG Triome $i", colors = listOf("B", "R", "G")) }
+        val collection = fillerCollection(listOf("B", "R", "G"), perColor = 25) + landCollection(fixingLands)
+
+        val result = runToCompletion(
+            useCase(),
+            DeckWizardSpec(format = DeckFormat.COMMANDER, commander = commander),
+            collection,
+        )
+
+        val identity = setOf(ManaColor.B, ManaColor.R, ManaColor.G)
+        val report = manaBaseReportFor(result, DeckFormat.COMMANDER, identity)
+        // Guards this test against a trivial pass: ManaBaseAnalyzer only checks a colour that is
+        // actually DEMANDED (>=1 nonland pip) -- if the Motor A loop starved a colour entirely
+        // (e.g. only ever placing the alphabetically-first colour's nonland fillers), that colour
+        // would silently drop out of `shortages` checking rather than fail it.
+        assertEquals(
+            identity, report.requiredByColor.keys,
+            "all 3 identity colours must actually be DEMANDED by the built nonland mainboard for " +
+                "the shortage check below to be meaningful -- got demanded colours: ${report.requiredByColor.keys}",
+        )
+        assertTrue(
+            report.shortages.isEmpty(),
+            "a fresh 3-color wizard deck with a real fixing-land pool available must ship zero " +
+                "ColorSourceShortage/UnfixedSplash warnings -- got: ${report.shortages}",
+        )
+        assertTrue(
+            result.deckCards.any { !BasicLandCalculator.isBasicLand(it.card) && BasicLandCalculator.isLand(it.card) },
+            "the wizard must have placed at least one NON-basic fixing land for a 3-color identity",
+        )
+    }
+
+    @Test
+    fun `a mono-color wizard deck passes ManaBaseAnalyzer with zero shortage warnings without needing any fixing lands`() = runTest(dispatcher) {
+        val commander = card(id = "cmd-mono", name = "Mono Red Commander", typeLine = "Legendary Creature — Human", colorIdentity = listOf("R"))
+        val collection = fillerCollection(listOf("R"), perColor = 40)
+
+        val result = runToCompletion(useCase(), DeckWizardSpec(format = DeckFormat.COMMANDER, commander = commander), collection)
+
+        val report = manaBaseReportFor(result, DeckFormat.COMMANDER, setOf(ManaColor.R))
+        assertTrue(report.shortages.isEmpty(), "a mono-color deck's basics alone must already clear the Karsten threshold -- got: ${report.shortages}")
+    }
+
+    @Test
+    fun `a 2-color wizard deck passes ManaBaseAnalyzer with zero shortage warnings once fixing lands are available`() = runTest(dispatcher) {
+        val commander = card(id = "cmd-izzet", name = "Izzet Commander", typeLine = "Legendary Creature — Human", colorIdentity = listOf("U", "R"))
+        val fixingLands = cyclingDuals("UR", listOf(listOf("U", "R")), perPair = 30)
+        val collection = fillerCollection(listOf("U", "R"), perColor = 30) + landCollection(fixingLands)
+
+        val result = runToCompletion(useCase(), DeckWizardSpec(format = DeckFormat.COMMANDER, commander = commander), collection)
+
+        val report = manaBaseReportFor(result, DeckFormat.COMMANDER, setOf(ManaColor.U, ManaColor.R))
+        assertEquals(setOf(ManaColor.U, ManaColor.R), report.requiredByColor.keys, "both identity colours must be demanded for this check to be meaningful")
+        assertTrue(report.shortages.isEmpty(), "a 2-color deck with a real dual-land pool must ship zero shortage warnings -- got: ${report.shortages}")
+    }
+
+    @Test
+    fun `a 5-color wizard deck passes ManaBaseAnalyzer with zero shortage warnings once a broad fixing pool is available`() = runTest(dispatcher) {
+        val commander = card(id = "cmd-5c", name = "Five Color Commander", typeLine = "Legendary Creature — Human", colorIdentity = listOf("W", "U", "B", "R", "G"))
+        val guildPairs = listOf(
+            listOf("W", "U"), listOf("W", "B"), listOf("W", "R"), listOf("W", "G"),
+            listOf("U", "B"), listOf("U", "R"), listOf("U", "G"),
+            listOf("B", "R"), listOf("B", "G"), listOf("R", "G"),
+        )
+        val fixingLands = cyclingDuals("WUBRG", guildPairs, perPair = 6) +
+            (1..14).map { i -> dualLand(id = "rainbow-$i", name = "Rainbow Land $i", colors = listOf("W", "U", "B", "R", "G")) }
+        val collection = fillerCollection(listOf("W", "U", "B", "R", "G"), perColor = 15) + landCollection(fixingLands)
+
+        val result = runToCompletion(useCase(), DeckWizardSpec(format = DeckFormat.COMMANDER, commander = commander), collection)
+
+        val identity = setOf(ManaColor.W, ManaColor.U, ManaColor.B, ManaColor.R, ManaColor.G)
+        val report = manaBaseReportFor(result, DeckFormat.COMMANDER, identity)
+        assertEquals(identity, report.requiredByColor.keys, "all 5 identity colours must be demanded for this check to be meaningful")
+        assertTrue(report.shortages.isEmpty(), "a 5-color deck with a broad fixing pool must ship zero shortage warnings -- got: ${report.shortages}")
+    }
+
+    @Test
+    fun `a splash color's few single-pip cards do not inflate its fixing-land demand to full-color levels`() = runTest(dispatcher) {
+        // A B/R "main" pair carries the bulk of the deck; G is a genuine SPLASH (few single-pip
+        // cards only) -- WS9.3's LAND_MIX stays deliberately COUNT-level (identity.count == 3
+        // drives the SAME bucket-3 fixing target regardless of how few cards actually want green),
+        // so this test's acceptance bar is the SAME zero-shortage invariant, applied to a
+        // splash-shaped identity -- proving the fill doesn't need a special-cased "main vs splash"
+        // split to still clear Karsten for the splash colour at its own (single-pip, low) tier.
+        val commander = card(id = "cmd-splash", name = "BR Splash G Commander", typeLine = "Legendary Creature — Human", colorIdentity = listOf("B", "R", "G"))
+        val fixingLands = cyclingDuals("BRsplash", listOf(listOf("B", "G"), listOf("B", "R"), listOf("R", "G")), perPair = 15) +
+            (1..6).map { i -> dualLand(id = "brg-splash-triome-$i", name = "BRG Splash Triome $i", colors = listOf("B", "R", "G")) }
+        val collection = fillerCollection(listOf("B", "R"), perColor = 30) +
+            fillerCollection(listOf("G"), perColor = 4) + // the splash: only 4 single-pip green cards exist
+            landCollection(fixingLands)
+
+        val result = runToCompletion(
+            useCase(),
+            DeckWizardSpec(format = DeckFormat.COMMANDER, commander = commander),
+            collection,
+        )
+
+        val identity = setOf(ManaColor.B, ManaColor.R, ManaColor.G)
+        val report = manaBaseReportFor(result, DeckFormat.COMMANDER, identity)
+        assertTrue(
+            report.shortages.isEmpty(),
+            "a splash colour must still clear its OWN (low, single-pip) Karsten requirement without " +
+                "the fill needing to treat it as a full third colour -- got: ${report.shortages}",
+        )
+        // Non-inflation check: green's own single-pip intensity keeps its Karsten requirement at
+        // the LOW tier (19 for Commander) -- never inflated toward the double/triple-pip tiers just
+        // because the identity carries 3 colors.
+        assertEquals(
+            19, report.requiredByColor[ManaColor.G],
+            "a splash colour's few single-pip cards must keep its OWN Karsten requirement at the " +
+                "single-pip tier, never inflated by the deck's overall color count",
+        )
     }
 }

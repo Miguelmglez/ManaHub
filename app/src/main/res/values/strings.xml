@@ -742,10 +742,11 @@
     <string name="deck_health_warning_color_source_shortage">Not enough %1$s sources: %2$d (aim for about %3$d to cast your %1$s spells reliably).</string>
     <string name="deck_health_warning_unfixed_splash">Your %1$s is unfixed: almost no lands make %1$s mana. Add fixing or cut the color.</string>
 
-    <!-- Archetype-aware warnings (Deck Doctor Community/Archetype plan, Phase 1.6) -->
-    <string name="deck_health_warning_archetype_role_gap">Missing %1$s for this plan — aim for about %2$d (have %3$d).</string>
-    <string name="deck_health_warning_archetype_anti_role">Too many %1$s for this plan: %2$d (aim for at most %3$d).</string>
-    <string name="deck_health_warning_curve_outside_archetype_band">Mana curve (avg %1$s) is outside this plan\'s expected %2$s-%3$s range.</string>
+    <!-- Archetype-aware warnings (Deck Doctor Community/Archetype plan, Phase 1.6; copy now names
+         the resolved plan explicitly, Deck Wizard & Engine Rework plan WS5.4) -->
+    <string name="deck_health_warning_archetype_role_gap">%1$s wants at least %3$d %2$s — you have %4$d.</string>
+    <string name="deck_health_warning_archetype_anti_role">%1$s wants at most %3$d %2$s — you have %4$d.</string>
+    <string name="deck_health_warning_curve_outside_archetype_band">%1$s\'s mana curve should average %3$s–%4$s — yours averages %2$s.</string>
 
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
@@ -787,57 +788,28 @@
     <string name="deck_doctor_community_unavailable">Community data unavailable</string>
     <string name="deck_doctor_community_empty">No community data for this deck yet.</string>
 
-    <!-- Budget filter bar (Phase 6) -->
-    <string name="deck_doctor_budget_title">Budget</string>
-    <string name="deck_doctor_budget_per_card">Max €/card</string>
-    <string name="deck_doctor_budget_total">Max total</string>
-    <string name="deck_doctor_budget_any">Any</string>
-    <string name="deck_doctor_budget_clear">Clear budget filters</string>
-    <string name="deck_doctor_budget_per_card_value">≤ %1$s €/card</string>
-    <string name="deck_doctor_budget_total_value">≤ %1$s € total</string>
-    <!-- "to buy: 12.50 € of 3 cards" -->
-    <string name="deck_doctor_budget_to_buy">To buy: %1$s € of %2$d cards</string>
-    <string name="deck_doctor_budget_all_owned">All suggestions are already in your collection — free to add.</string>
+    <!-- Budget-suggestions pipeline (BudgetFilterBar) was DELETED in the Deck Wizard & Engine
+         Rework plan, WS7.3 (2026-07-28, D-H). deck_doctor_price_eur/unknown stay: still used by
+         SuggestionRows.kt for per-card price display, independent of the budget filter UI. -->
     <string name="deck_doctor_price_eur">%1$s €</string>
     <string name="deck_doctor_price_unknown">No price</string>
-    <!-- Quick-pick caps shown as selectable chips, in euros -->
-    <string name="deck_doctor_budget_cap_label">%1$d €</string>
 
-    <!-- Deck Magic — build from seeds (Phase 7) -->
+    <!-- Deck Magic — build from seeds (Phase 7). Several of these are still used by the v2 wizard
+         (DeckWizardDirectionIdentity.kt/DeckWizardEntryFlows.kt/DeckWizardScreen.kt) even though
+         the legacy `SeedsContent` sheet that originally defined them was RETIRED in the Deck
+         Wizard & Engine Rework plan, WS7.2 (2026-07-28) — do not delete those. Rows below are the
+         ones that were ONLY used by the legacy sheet and are now genuinely orphaned. -->
     <string name="deck_seeds_search_hint">Search a card to seed your deck…</string>
-    <string name="deck_seeds_results_title">Search results</string>
     <string name="deck_seeds_picked_title">Seed cards</string>
-    <string name="deck_seeds_add_seed">Add seed card</string>
-    <string name="deck_seeds_remove_seed">Remove seed card</string>
-    <string name="deck_seeds_empty_title">No seeds yet</string>
-    <string name="deck_seeds_empty_message">Search for a card above and add it to seed your deck.</string>
-    <string name="deck_seeds_identity_title">Inferred identity</string>
     <string name="deck_seeds_identity_colors">Color identity</string>
     <string name="deck_seeds_identity_colorless">Colorless</string>
-    <string name="deck_seeds_identity_strategy">Strategy</string>
-    <string name="deck_seeds_identity_strategy_unknown">Not detected</string>
-    <string name="deck_seeds_skeleton_title">Deck skeleton</string>
-    <string name="deck_seeds_generate_cta">Generate deck →</string>
-    <string name="deck_seeds_generating">Generating…</string>
-    <string name="deck_seeds_use_community_data_title">Use community data</string>
-    <string name="deck_seeds_use_community_data_subtitle">Prioritize cards popular in decks like this one</string>
 
     <!-- Deck Studio — unified hybrid deck builder (manual + suggestions + seed auto-build) -->
     <string name="deck_studio_title">Deck Studio</string>
     <string name="deck_studio_default_name">New deck</string>
     <string name="deck_studio_playtest">Test deck</string>
-    <string name="deck_studio_budget_per_card_label">Max per card (€)</string>
-    <string name="deck_studio_budget_total_label">Total budget (€)</string>
-    <string name="deck_studio_budget_invalid_error">Enter a valid amount greater than 0.</string>
-    <string name="deck_studio_budget_title">Budget</string>
-    <string name="deck_studio_budget_owned_free">Owned cards are free</string>
-    <string name="deck_studio_budget_clear">Clear budget</string>
     <string name="deck_studio_discard_confirm_title">Discard this deck?</string>
     <string name="deck_studio_discard_confirm_body">This deck is empty and hasn\'t been named. It won\'t be saved.</string>
-    <string name="deck_studio_seed_sheet_title">Build from a seed</string>
-    <string name="deck_studio_seed_built">Deck built from seed — %1$d cards added</string>
-    <string name="deck_studio_seed_build_failed">Couldn\'t build the deck from your seeds. Please try again.</string>
-    <string name="deck_studio_seed_build_no_results">No cards matched your seeds within the budget. Try raising the budget or adding more seeds.</string>
     <string name="deck_studio_add_card_fab">Add card to deck</string>
     <string name="deck_studio_suggestions_tab_health">Health</string>
     <string name="deck_studio_suggestions_tab_cuts">Cuts</string>
@@ -847,6 +819,9 @@
     <string name="deck_studio_card_added">Added %1$s</string>
     <string name="deck_studio_card_cut">Removed %1$s</string>
     <string name="deck_studio_external_pool_failed">Couldn\'t load suggestions. Please try again.</string>
+    <!-- Deck Wizard & Engine Rework plan WS8.2: the Scryfall backstop toggle (3rd adds source). -->
+    <string name="deck_studio_include_outside_collection_toggle">Include cards outside my collection</string>
+    <string name="deck_studio_outside_collection_unavailable">Couldn\'t search outside your collection right now — showing what we found in it.</string>
     <string name="deck_studio_tab_build">Build</string>
     <string name="deck_studio_tab_suggestions">Suggestions</string>
 
@@ -895,13 +870,17 @@
     <string name="deck_studio_inspirations_subtitle">Synergies found in your collection. Tap one to seed a new deck.</string>
     <string name="deck_studio_inspirations_empty_title">No inspirations yet</string>
     <string name="deck_studio_inspirations_empty_subtitle">Add more cards to your collection and we\'ll surface synergies you can build around.</string>
-    <string name="deck_studio_inspiration_seed_studio">Seed Studio</string>
     <string name="deck_studio_inspiration_fit">%1$d cards</string>
     <string name="deck_studio_inspiration_card_art">View card</string>
 
     <!-- Synergy browser — Strategies/Combos tabs, search (Deck Engine Unification plan D7, Phase 4) -->
     <string name="deck_studio_inspirations_tab_strategies">Strategies</string>
     <string name="deck_studio_inspirations_tab_combos">Combos</string>
+    <!-- Deck Wizard & Engine Rework plan, WS 1.3: the Strategies tab splits into two sections:
+         Strategy clusters and Tribe (creature-type) clusters are disjoint taxonomy axes and must
+         never render as one mixed labeled list. -->
+    <string name="deck_studio_inspirations_section_strategies">Strategies</string>
+    <string name="deck_studio_inspirations_section_tribes">Tribes (creature types)</string>
     <string name="deck_studio_inspirations_search_hint">Search strategies or pick a card…</string>
     <string name="deck_studio_inspirations_search_clear">Clear search</string>
     <string name="deck_studio_inspirations_search_empty_title">No matches</string>
@@ -952,9 +931,14 @@
     <string name="deck_wizard_direction_chip_tribe">%1$d %2$s</string>
     <string name="deck_wizard_seed_picker_toggle">Add seed cards (optional)</string>
     <string name="deck_wizard_suggested_strategies_title">Suggested strategies</string>
+    <string name="deck_wizard_suggested_strategies_hint">Add a seed card above to see strategy suggestions.</string>
     <string name="deck_wizard_suggested_strategies_empty">None of your seeds line up with a known strategy yet — you can still continue without one.</string>
     <string name="deck_wizard_seed_coherence_warning">These seed cards don\'t share much in common — the build may end up unfocused. Consider trimming to cards with a clearer shared theme.</string>
     <string name="deck_wizard_zoom_card">Zoom %1$s</string>
+    <!-- Flow A — Workstream 3.1 color selector (locked-by-seed colors + coherence hints) -->
+    <string name="deck_wizard_seed_colors_title">Colors</string>
+    <string name="deck_wizard_color_locked_by_seeds">%1$s, locked by a seed card</string>
+    <string name="deck_wizard_misfit_hint_title">Better without:</string>
     <!-- Flow B — colors-first (Deck Engine Unification plan §5 Phase 3.3) -->
     <string name="deck_wizard_colors_flow_title">Pick your colors</string>
     <string name="deck_wizard_colors_flow_subtitle">We\'ll show the strategies that work best in these colors.</string>
@@ -1013,6 +997,31 @@
     <string name="deck_wizard_theme_desc_vehicles">Crew vehicles with your creatures to attack as resilient, removal-resistant threats.</string>
     <string name="deck_wizard_theme_desc_toolbox">Tutor for the exact answer or piece you need out of a wide toolbox of one-of effects.</string>
     <string name="deck_wizard_theme_desc_clones_theft">Copy or steal your opponents\' best creatures and permanents instead of building your own.</string>
+
+    <!-- Deck Wizard & Engine Rework plan (WS 1.2) — shared StrategyPickerSheet component -->
+    <string name="deck_strategy_picker_game_plan_title">Game plan</string>
+    <string name="deck_strategy_picker_strategy_title">Strategy</string>
+    <string name="deck_strategy_picker_strategy_subtitle">Pick up to 2</string>
+    <string name="deck_strategy_picker_tribe_title">Tribe</string>
+    <string name="deck_strategy_picker_tribe_subtitle">Choose the creature type this deck leans into</string>
+    <string name="deck_strategy_picker_incompatible_reason">Not a fit for %1$s</string>
+    <string name="deck_strategy_picker_tribe_empty">No tribe candidates detected yet.</string>
+    <string name="deck_strategy_picker_max_themes_reason">Remove one of your picks to choose this instead</string>
+
+    <!-- Deck Wizard & Engine Rework plan (WS 2) — Commander-only COMMANDER_PICK / STRATEGY / MANUAL_ADDS steps -->
+    <string name="deck_wizard_commander_pick_title">Pick your commander</string>
+    <string name="deck_wizard_commander_pick_subtitle">Filter by color, then search your collection or beyond.</string>
+    <string name="deck_wizard_commander_pick_empty">No commander candidates match this filter yet.</string>
+    <string name="deck_wizard_include_outside_collection_title">Include cards outside your collection</string>
+    <string name="deck_wizard_include_outside_collection_subtitle">Search Scryfall too, not just what you own</string>
+    <string name="deck_wizard_strategy_step_title">Pick a strategy</string>
+    <string name="deck_wizard_strategy_step_subtitle">These are the game plans your commander supports best.</string>
+    <string name="deck_wizard_manual_adds_title">Add specific cards (optional)</string>
+    <string name="deck_wizard_manual_adds_subtitle">We\'ll fill everything else automatically — this step is fully skippable.</string>
+    <string name="deck_wizard_manual_adds_role_progress">%1$d / %2$d</string>
+    <string name="deck_wizard_manual_adds_search_hint">Search cards…</string>
+    <string name="deck_wizard_manual_adds_empty">No cards match this search yet.</string>
+    <string name="deck_wizard_manual_adds_added_title">Added</string>
     <!-- Step 4 — Review -->
     <string name="deck_wizard_review_title">Review &amp; generate</string>
     <string name="deck_wizard_review_commander_section">Commander</string>
@@ -1040,6 +1049,14 @@
     <string name="deck_wizard_build_error_title">Something went wrong</string>
     <string name="deck_wizard_build_error">We couldn\'t build the deck. Please try again.</string>
     <string name="deck_wizard_retry">Try again</string>
+    <!-- Deck Doctor staged progress (Deck Wizard & Engine Rework plan, Workstream 8.4): mirrors
+         the wizard's own "Generating" stage copy above; same visual language, separate strings
+         since this is the Suggestions tab's full-analysis pass, not a deck build. -->
+    <string name="deck_doctor_stage_reading_deck_plan">Reading your deck plan…</string>
+    <string name="deck_doctor_stage_evaluating_collection">Evaluating your collection…</string>
+    <string name="deck_doctor_stage_searching_community">Searching similar community decks…</string>
+    <string name="deck_doctor_stage_searching_card_pool">Searching card pool (exhaustive)…</string>
+    <string name="deck_doctor_stage_ranking_suggestions">Ranking suggestions…</string>
     <!-- Result -->
     <string name="deck_wizard_gaps_title">Couldn\'t fill from your collection</string>
     <string name="deck_wizard_gap_row_with_colors">Missing %1$d %2$s in %3$s</string>
@@ -1059,6 +1076,8 @@
     <!-- Score reasons -->
     <string name="deck_reason_synergy">Synergy</string>
     <string name="deck_reason_fills_gap">Fills: %1$s</string>
+    <!-- WS8.2: compact chip variant of deck_reason_fills_archetype_gap, args: role label, current, ideal. -->
+    <string name="deck_reason_fills_archetype_gap_chip">Fills: %1$s (%2$d/%3$d)</string>
     <string name="deck_reason_overcovered">%1$s overcovered %2$d/%3$d</string>
     <string name="deck_reason_on_curve">On curve</string>
     <string name="deck_reason_curve_gap">Curve gap</string>
@@ -1069,6 +1088,12 @@
     <string name="deck_reason_off_color">Off-color</string>
     <string name="deck_reason_colorless">Colorless</string>
     <string name="deck_reason_in_collection">In collection</string>
+    <string name="deck_reason_unsupported_pip">Hard to cast: %1$d %2$s pips your manabase can\'t support</string>
+    <!-- Deck Wizard & Engine Rework plan WS8.2/8.3: mirrors deck_health_warning_archetype_role_gap
+         and _archetype_anti_role's "wants at (least|most) N X — you have M" copy exactly,
+         args: plan label, role label, ideal/max, current. -->
+    <string name="deck_reason_fills_archetype_gap">%1$s wants at least %3$d %2$s — you have %4$d</string>
+    <string name="deck_reason_over_archetype_band">%1$s wants at most %3$d %2$s — you have %4$d</string>
 
     <!-- ══════════════════════════════════════════
          GAME SETUP SCREEN
@@ -1953,6 +1978,11 @@
     <string name="error_card_not_found">Card not found</string>
     <string name="error_save_failed">Could not save. Try again.</string>
     <string name="error_unknown">An unexpected error occurred</string>
+    <!-- WS2 (Backend & Performance Optimization plan): shown instead of a raw error when a
+         RateLimitExhaustedException sentinel is detected, so the retry CTA can be disabled with a
+         countdown instead of letting the user re-trigger a 429 storm. -->
+    <string name="error_rate_limited_message">Too many requests right now — retrying automatically shortly.</string>
+    <string name="error_rate_limited_retry_countdown">Retry in %1$ds</string>
 
     <!-- ══════════════════════════════════════════
          CARD TYPES
@@ -3388,6 +3418,11 @@
     <string name="community_advsearch_clear_selection">Clear selection</string>
     <string name="community_advsearch_select">Select</string>
     <string name="community_advsearch_cancel">Cancel</string>
+
+    <!-- Community Hub — multi-card search (Archidekt multi-card search expansion, 2026-07-24) -->
+    <string name="community_advsearch_cards_caption">Add up to 3 cards — decks must contain all of them</string>
+    <string name="community_advsearch_cards_caption_multicard">Multi-card results are matched against each card\'s most popular decks</string>
+    <string name="community_advsearch_card_remove">Remove %1$s</string>
 
     <!-- ══════════════════════════════════════════
          COLLECTION — dynamic grouping (Cards tab, "Group by")

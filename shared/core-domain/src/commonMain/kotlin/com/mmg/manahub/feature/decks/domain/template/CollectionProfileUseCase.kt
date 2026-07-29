@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.decks.domain.template
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.TagCategory
+import com.mmg.manahub.feature.decks.domain.engine.CommanderEligibility
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import kotlinx.coroutines.CoroutineDispatcher
@@ -123,7 +124,7 @@ class CollectionProfileUseCase(
     }
 
     private fun commanderCandidates(cards: List<Card>, limit: Int): List<OwnedCommanderCandidate> {
-        val candidates = cards.filter(::isCommanderEligible)
+        val candidates = cards.filter(CommanderEligibility::isCommanderEligible)
         if (candidates.isEmpty()) return emptyList()
         return candidates
             .map { commander ->
@@ -137,10 +138,6 @@ class CollectionProfileUseCase(
             .sortedWith(compareByDescending<OwnedCommanderCandidate> { it.supportScore }.thenBy { it.card.name })
             .take(limit)
     }
-
-    private fun isCommanderEligible(card: Card): Boolean =
-        card.typeLine.contains("Legendary", ignoreCase = true) &&
-            card.typeLine.contains("Creature", ignoreCase = true)
 
     /** Lightweight logarithmic rank->popularity falloff (rank 1 -> ~1f, decaying toward 0 for
      * obscure ranks). A standalone heuristic, NOT a reuse of

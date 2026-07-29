@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
@@ -128,6 +129,7 @@ class TradesViewModel(
     private fun observeWishlist() {
         viewModelScope.launch {
             getLocalWishlist()
+                .distinctUntilChanged()
                 .catch { e -> _events.trySend(TradesEvent.ShowMessage(e.toUserFacingMessage())) }
                 .collect { entries -> _uiState.update { it.copy(wishlist = entries) } }
         }
@@ -136,6 +138,7 @@ class TradesViewModel(
     private fun observeOpenForTrade() {
         viewModelScope.launch {
             getLocalOpenForTrade()
+                .distinctUntilChanged()
                 .catch { e -> _events.trySend(TradesEvent.ShowMessage(e.toUserFacingMessage())) }
                 .collect { entries -> _uiState.update { it.copy(openForTrade = entries) } }
         }
@@ -144,6 +147,7 @@ class TradesViewModel(
     private fun observeFriends() {
         viewModelScope.launch {
             getFriends()
+                .distinctUntilChanged()
                 .catch { /* friends are optional; silently ignore */ }
                 .collect { friends -> _uiState.update { it.copy(friends = friends) } }
         }

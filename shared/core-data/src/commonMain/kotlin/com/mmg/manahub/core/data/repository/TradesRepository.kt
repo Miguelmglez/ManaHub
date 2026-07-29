@@ -20,6 +20,17 @@ interface TradesRepository {
     suspend fun refreshProposals(userId: String): Result<Unit>
     /** Refreshes full proposals + items for a specific thread. Used by the detail view. */
     suspend fun refreshProposalThread(rootProposalId: String, userId: String): Result<Unit>
+    /**
+     * Refreshes ONLY the trade items (never proposal metadata) for the proposals already present
+     * in the in-memory cache for [rootProposalId]. Backend & Performance Optimization plan, WS4a
+     * finding 2 (2026-07-28): [refreshProposalThread] always re-fetches the caller's FULL proposal
+     * table before hydrating items, which is redundant when the metadata is already fresh (e.g.
+     * immediately after [refreshProposals]). Callers MUST ensure proposal metadata is already
+     * current before calling this -- it reads whatever proposals are currently cached for the
+     * thread, it does not fetch metadata itself. If no cached proposal belongs to [rootProposalId]
+     * yet, this is a no-op success (nothing to hydrate).
+     */
+    suspend fun refreshItemsForThread(rootProposalId: String): Result<Unit>
     suspend fun createProposal(
         receiverId: String,
         items: List<TradeItemRequestDto>,

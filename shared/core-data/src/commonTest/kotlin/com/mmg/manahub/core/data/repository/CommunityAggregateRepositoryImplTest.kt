@@ -10,6 +10,7 @@ import com.mmg.manahub.core.data.remote.dto.AggregateCardEntryDto
 import com.mmg.manahub.core.data.remote.dto.AvgTypeDistributionDto
 import com.mmg.manahub.core.data.remote.dto.BuildProgressDto
 import com.mmg.manahub.core.data.remote.dto.CommanderAggregateResponseDto
+import com.mmg.manahub.core.data.remote.dto.NamedCountDto
 import com.mmg.manahub.core.data.remote.dto.SimilarDecksResponseDto
 import com.mmg.manahub.core.data.remote.dto.SixtyAggregateResponseDto
 import com.mmg.manahub.core.data.remote.dto.TrendingResponseDto
@@ -58,6 +59,7 @@ class CommunityAggregateRepositoryImplTest {
     ) : CommunityAggregateApiContract {
         var commanderCallCount = 0
         var sixtyCallCount = 0
+        var trendingCallCount = 0
 
         override suspend fun getCommanderAggregate(commanderName: String): CommanderAggregateResponseDto {
             commanderCallCount++
@@ -72,8 +74,10 @@ class CommunityAggregateRepositoryImplTest {
         override suspend fun getSimilar(commanderName: String, limit: Int): SimilarDecksResponseDto =
             similarResult?.invoke() ?: throw IllegalStateException("Worker down")
 
-        override suspend fun getTrending(week: String?): TrendingResponseDto =
-            trendingResult?.invoke() ?: throw IllegalStateException("Worker down")
+        override suspend fun getTrending(week: String?): TrendingResponseDto {
+            trendingCallCount++
+            return trendingResult?.invoke() ?: throw IllegalStateException("Worker down")
+        }
     }
 
     private val defaultCommanderDto = CommanderAggregateResponseDto(
@@ -317,5 +321,107 @@ class CommunityAggregateRepositoryImplTest {
         val repo = repository(api)
 
         assertIs<DataResult.Error>(repo.getTrending("2026-W28"))
+    }
+
+    private val defaultTrendingDto = TrendingResponseDto(
+        status = "ok",
+        week = "2026-W28",
+        topCommanders = listOf(NamedCountDto("Atraxa, Praetors' Voice", 42)),
+        topCards = listOf(NamedCountDto("Sol Ring", 99)),
+    )
+
+    // ---- Trending cache-first (Backend & Performance Optimization plan, WS4a finding 3,
+    // 2026-07-28) — getTrending previously skipped the cache-first pattern its siblings
+    // (getCommanderAggregate/getSixtyAggregate) both use, hitting the Worker unconditionally. ----
+
+    @Test
+    fun `trending - cache miss fetches from Worker and caches the result`() = runTest {
+        val api = FakeApi(trendingResult = { defaultTrendingDto })
+        val cache = FakeCache()
+        val repo = repository(api, cache)
+
+        val result = repo.getTrending("2026-W28")
+
+        val success = assertIs<DataResult.Success<com.mmg.manahub.core.model.TrendingSnapshot>>(result)
+        assertEquals(1, api.trendingCallCount)
+        assertTrue(cache.store.containsKey("agg:trending:2026-W28"))
+        assertEquals("Atraxa, Praetors' Voice", success.data.topCommanders.first().name)
+    }
+
+    @Test
+    fun `trending - fresh cache short-circuits the Worker call`() = runTest {
+        val api = FakeApi(trendingResult = { defaultTrendingDto })
+        val cache = FakeCache()
+        val now = 5_000_000L
+        cache.store["agg:trending:2026-W28"] = CachedAggregateEntry(
+            "agg:trending:2026-W28",
+            kotlinx.serialization.json.Json.encodeToString(TrendingResponseDto.serializer(), defaultTrendingDto),
+            now - 1000, // 1s old, well within the freshness window
+        )
+        val repo = repository(api, cache, clock = { now })
+
+        val result = repo.getTrending("2026-W28")
+
+        val success = assertIs<DataResult.Success<com.mmg.manahub.core.model.TrendingSnapshot>>(result)
+        assertTrue(!success.isStale)
+        assertEquals(0, api.trendingCallCount, "a fresh cache hit must never call the Worker")
+    }
+
+    @Test
+    fun `trending - worker down with a stale cache serves the stale entry flagged isStale`() = runTest {
+        val api = FakeApi() // throws — Worker down
+        val cache = FakeCache()
+        val sevenDaysMs = 7L * 24 * 60 * 60 * 1000
+        val now = 20_000_000L
+        cache.store["agg:trending:2026-W28"] = CachedAggregateEntry(
+            "agg:trending:2026-W28",
+            kotlinx.serialization.json.Json.encodeToString(TrendingResponseDto.serializer(), defaultTrendingDto),
+            now - sevenDaysMs - 1000, // past the freshness window
+        )
+        val repo = repository(api, cache, clock = { now })
+
+        val result = repo.getTrending("2026-W28")
+
+        val success = assertIs<DataResult.Success<com.mmg.manahub.core.model.TrendingSnapshot>>(result)
+        assertTrue(success.isStale, "a Worker failure with a stale cache present must degrade to a flagged stale snapshot, not an Error")
+    }
+
+    @Test
+    fun `trending - worker down with no cache at all returns an Error, never a synthetic snapshot`() = runTest {
+        val api = FakeApi()
+        val repo = repository(api, FakeCache())
+
+        assertIs<DataResult.Error>(repo.getTrending("2026-W28"))
+    }
+
+    @Test
+    fun `trending - null and blank week both normalise to the same cache key`() = runTest {
+        val api = FakeApi(trendingResult = { defaultTrendingDto })
+        val cache = FakeCache()
+        val repo = repository(api, cache)
+
+        repo.getTrending(null)
+        assertTrue(cache.store.containsKey("agg:trending:current"))
+        assertEquals(1, api.trendingCallCount)
+
+        // A second call with a BLANK (not null) week must hit the SAME cache entry -- if it
+        // fresh-hits, the Worker call count stays at 1.
+        val result = repo.getTrending("")
+        assertEquals(1, api.trendingCallCount, "null and blank week must resolve to the same \"current\" cache key")
+        assertIs<DataResult.Success<com.mmg.manahub.core.model.TrendingSnapshot>>(result)
+    }
+
+    @Test
+    fun `trending - distinct weeks use distinct cache keys`() = runTest {
+        val api = FakeApi(trendingResult = { defaultTrendingDto })
+        val cache = FakeCache()
+        val repo = repository(api, cache)
+
+        repo.getTrending("2026-W28")
+        repo.getTrending("2026-W29")
+
+        assertTrue(cache.store.containsKey("agg:trending:2026-W28"))
+        assertTrue(cache.store.containsKey("agg:trending:2026-W29"))
+        assertEquals(2, api.trendingCallCount, "distinct weeks must not share a cache entry")
     }
 }

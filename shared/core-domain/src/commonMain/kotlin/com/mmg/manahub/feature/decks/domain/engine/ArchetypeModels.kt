@@ -236,6 +236,25 @@ data class ResolvedArchetypeSkeleton(
 ) {
     /** Convenience: does this skeleton apply any color-source-fixing requirement? */
     fun manaFixTarget(): RoleTarget? = roleTargets[ArchetypeData.MANA_FIX_KEY]
+
+    /**
+     * Deck Wizard & Engine Rework plan, WS5.4 -- a player-facing label for this resolved plan
+     * (e.g. `"Aggro"`, `"Tokens"`, `"Aggro + Tokens"`), used by [ArchetypeEvaluator] to name the
+     * plan inside archetype-aware [DeckWarning] copy ("Aggro wants..." instead of a generic
+     * "this plan wants..."). [ArchetypeId.GENERIC] contributes nothing (a bare GENERIC skeleton
+     * with no themes never reaches this -- see [ArchetypeEvaluator]'s file header -- but a
+     * GENERIC-archetype-with-theme-only pin is valid, hence the theme-only fallback below).
+     */
+    fun planLabel(): String {
+        val archetypePart = archetype.takeIf { it != ArchetypeId.GENERIC }?.displayName
+        val themePart = themes.takeIf { it.isNotEmpty() }?.joinToString(" + ") { it.displayName }
+        return when {
+            archetypePart != null && themePart != null -> "$archetypePart ($themePart)"
+            archetypePart != null -> archetypePart
+            themePart != null -> themePart
+            else -> "This plan" // defensive -- GENERIC + no themes never reaches ArchetypeEvaluator
+        }
+    }
 }
 
 /**

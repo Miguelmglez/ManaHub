@@ -64,6 +64,13 @@ paging-runtime   = { group = "androidx.paging", name = "paging-runtime-ktx",  ve
 paging-compose   = { group = "androidx.paging", name = "paging-compose",       version.ref = "paging" }
 room-paging      = { group = "androidx.room",   name = "room-paging",          version.ref = "room" }
 work-runtime     = { group = "androidx.work",   name = "work-runtime-ktx",     version.ref = "work" }
+# work-testing — Backend & Performance Optimization plan, WS7 Part 2 (2026-07-29): pins to the SAME
+# `work` version as work-runtime-ktx above to avoid a runtime/test classpath skew. testImplementation
+# only (app/build.gradle.kts) — provides androidx.work.testing.WorkManagerTestInitHelper + a
+# synchronous TestDriver, needed to pin the gamification gate / PriceRefreshWorker / CardBackfillWorker
+# worker behaviours a plain JVM unit test can't otherwise exercise (WorkManager's real Configuration/
+# WorkDatabase wiring).
+work-testing     = { group = "androidx.work",   name = "work-testing",         version.ref = "work" }
 hilt-work        = { group = "androidx.hilt",   name = "hilt-work",            version.ref = "hilt-work" }
 hilt-work-compiler = { group = "androidx.hilt", name = "hilt-compiler",        version.ref = "hilt-work" }
 compose-bom             = { group = "androidx.compose", name = "compose-bom",              version.ref = "compose-bom" }

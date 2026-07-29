@@ -345,12 +345,43 @@ class DeckScorerTest {
     }
 
     @Test
-    fun `given empty deck color identity when fit then colorSoft is 1_0 for any card`() {
-        // Empty identity = colorless commander or unfiltered
+    fun `given empty deck color identity for a meaningful format when fit then a colored card is rejected as colorless required`() {
+        // Edge-case audit Fix 2: for COMMANDER (minimalProfile's default format) and every 60-card
+        // constructed format, an EMPTY deck identity is a REAL "colorless required" constraint (the
+        // Colorless wizard pick / a colorless commander), never "no restriction". The old universal
+        // pass here let a colored card slip into an explicitly Colorless build.
         val profile = minimalProfile(colorIdentity = emptySet())
-        val c = card(id = "any1", colorIdentity = listOf("R", "G"))
+        val coloredCard = card(id = "any1", colorIdentity = listOf("R", "G"))
 
-        val fit = scorer.fit(c, profile, isOwned = false)
+        val fit = scorer.fit(coloredCard, profile, isOwned = false)
+
+        assertFalse(fit.withinColorIdentity)
+        assertEquals(0.0f, fit.components.color, 0.001f)
+        assertTrue(fit.reasons.any { it is ScoreReason.OutOfColorIdentity })
+    }
+
+    @Test
+    fun `given empty deck color identity for a meaningful format when fit then a colorless card still scores 1_0`() {
+        val profile = minimalProfile(colorIdentity = emptySet())
+        val colorlessCard = card(id = "colorless-any", colorIdentity = emptyList())
+
+        val fit = scorer.fit(colorlessCard, profile, isOwned = false)
+
+        assertTrue(fit.withinColorIdentity)
+        assertEquals(1.0f, fit.components.color, 0.001f)
+        assertTrue(fit.reasons.any { it is ScoreReason.Colorless })
+    }
+
+    @Test
+    fun `given empty deck color identity for DRAFT when fit then any card is still permitted -- no identity concept`() {
+        // DRAFT has no color-identity concept at all (mirrors BuildDeckFromTemplateUseCase
+        // .analyzeCollection's own `else -> true` branch for non-constructed, non-Commander
+        // formats) -- this is the one case where an empty identity legitimately means "no
+        // restriction", and Fix 2 must not touch it.
+        val profile = minimalProfile(format = DeckFormat.DRAFT, colorIdentity = emptySet())
+        val coloredCard = card(id = "draft-any", colorIdentity = listOf("R", "G"))
+
+        val fit = scorer.fit(coloredCard, profile, isOwned = false)
 
         assertTrue(fit.withinColorIdentity)
         assertEquals(1.0f, fit.components.color, 0.001f)

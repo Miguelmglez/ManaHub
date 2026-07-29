@@ -5,6 +5,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
+import com.mmg.manahub.feature.decks.domain.engine.CATEGORY_FILL_FIT_FLOOR
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
@@ -65,6 +66,19 @@ data class BuildMetrics(
     val coherenceCutsV2ViolationNames: List<String> = emptyList(),
     val coherenceCutsV2Ok: Boolean = true,
 
+    // ── HARD: round-trip alignment invariant, UNLOCKED (Deck Wizard & Engine Rework plan WS8.1 —
+    //    ZERO TOLERANCE, the single most important metric in this whole campaign). Coherence-cuts-v2
+    //    above only proves the LOCKED structural exclusion holds; THIS metric is the real test: with
+    //    NO structural protection (only the commander is protected — every wizard-placed card is an
+    //    ordinary cut candidate again), a card the wizard placed with fit >= CATEGORY_FILL_FIT_FLOOR
+    //    under the deck's own profile P must still not rank among the worst
+    //    [HarnessMetricsCalculator.ROUND_TRIP_TOP_CUT_WINDOW] cuts under that SAME P. A failure here
+    //    means a BASIS DIVERGENCE (pin folding / cached seedTags / trim reordering) between build
+    //    time and evaluate time, per the plan's own triage rule — the fix is the mechanism, never a
+    //    cut-ranking special case. ──────────────────────────────────────────────────────────────
+    val roundTripUnlockedViolationNames: List<String> = emptyList(),
+    val roundTripUnlockedOk: Boolean = true,
+
     // ── HARD: coherence-swaps (Wave 2 — replaces the now-vacuous shortfall-only coherence-adds
     //    as the PRIMARY "did the wizard miss a strictly-better owned card" signal) ─────────────
     /** Names of OWNED, wizard-eligible cards in the Doctor's top-10 Motor-A adds whose category
@@ -99,7 +113,7 @@ data class BuildMetrics(
     /** A build "passes" when every HARD field is satisfied. A failed build always fails. */
     val allHardMetricsPass: Boolean
         get() = !buildFailed && sizeOk && legalityOk && determinismOk && landsOk &&
-            coherenceCutsV2Ok && coherenceSwapsOk && coherenceAddsOk && commanderPresentOk
+            coherenceCutsV2Ok && roundTripUnlockedOk && coherenceSwapsOk && coherenceAddsOk && commanderPresentOk
 }
 
 object HarnessMetricsCalculator {
@@ -112,6 +126,25 @@ object HarnessMetricsCalculator {
      * tunable; kept small so an honest near-tie between two reasonable picks never fails the
      * build (this is a "the wizard clearly missed something" bar, not a "not identical" bar). */
     const val COHERENCE_SWAP_MARGIN = 0.10f
+
+    /** WS8.1 round-trip invariant (UNLOCKED): how many of the worst-ranked cuts count as "the top
+     * of the list" for the purpose of this check -- mirrors the existing coherence-swaps
+     * convention of a top-10 window (`adds.take(10)`, above) rather than inventing a new number. A
+     * wizard-placed card that clears [ROUND_TRIP_GOOD_FIT_THRESHOLD] must not land inside this
+     * window of the UNLOCKED cuts ranking (which, unlike LOCKED, has no structural exclusion at
+     * all -- only the commander is protected). */
+    const val ROUND_TRIP_TOP_CUT_WINDOW = 10
+
+    /**
+     * WS8.1 round-trip invariant (UNLOCKED) -- deliberately HIGHER than [CATEGORY_FILL_FIT_FLOOR]
+     * (0.25). That floor only proves "acceptable to place instead of leaving a gap"; this
+     * threshold instead matches [CATEGORY_FILL_FIT_FLOOR]'s OWN documented "genuinely decent fit
+     * (mid-0.4s+ in practice)" language -- the bar a card must clear before "it ranks as a top
+     * cut" is even worth calling a bug. See the round-trip block in [compute] for the empirical
+     * finding that motivated this (a healthy, fully-built, zero-warning deck's own worst-10 cluster
+     * straddles 0.25, which produced false positives, not real basis-divergence bugs).
+     */
+    const val ROUND_TRIP_GOOD_FIT_THRESHOLD = 0.40f
 
     private val deckScorer = DeckScorer(RoleClassifier(), NeutralPowerResolver)
     private val manaBaseAnalyzer = ManaBaseAnalyzer()
@@ -161,6 +194,11 @@ object HarnessMetricsCalculator {
         commanderEntryOk: Boolean = true,
         doctorProfile: DeckProfile,
         cuts: List<CardFit>,
+        // WS8.1: the SAME cuts ranking, over the SAME doctorProfile, but with ONLY the commander
+        // protected (no structural wizardSourcedIds exclusion) -- see
+        // HarnessDoctorPipeline.cutsWithProtection's KDoc for why this is a cheap re-rank rather
+        // than a second full evaluate.
+        cutsUnlocked: List<CardFit>,
         adds: List<AddSuggestion>,
         warnings: List<DeckWarning>,
         overallScore: Float,
@@ -226,7 +264,7 @@ object HarnessMetricsCalculator {
                     format = ArchetypeFormat.COMMANDER,
                     archetype = result.archetypeInfo.archetype,
                     themes = result.archetypeInfo.themes,
-                    colorCount = commanderIdentity.size,
+                    identity = commanderIdentity.mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet(),
                 )
                 // Hard absolute floor, kept explicit even though a sane band should already imply it.
                 landCount > 0 && landCount in resolvedSkeleton.lands.min..resolvedSkeleton.lands.max
@@ -253,6 +291,35 @@ object HarnessMetricsCalculator {
             .map { it.card.name }
             .distinct()
         val coherenceCutsV2Ok = cutsV2Violations.isEmpty()
+
+        // ── round-trip alignment invariant, UNLOCKED (Deck Wizard & Engine Rework plan WS8.1) ──
+        // The real test: with NO structural protection (cutsUnlocked only excludes the commander),
+        // a wizard-placed card that cleared CATEGORY_FILL_FIT_FLOOR at BUILD time (the same floor
+        // that let it be placed at all) must not rank among the worst ROUND_TRIP_TOP_CUT_WINDOW
+        // cuts under the identical profile P the build itself produced. A miss in the lookup (a
+        // combo-core card rankCuts itself excludes) is simply not a rankable cut -- vacuously fine,
+        // never counted as a violation.
+        // Calibration note (found empirically against the real-collection harness 2026-07-28):
+        // CATEGORY_FILL_FIT_FLOOR (0.25) is a PLACEMENT floor -- "good enough that the build
+        // should not report a gap instead" -- not a GOOD-FIT floor. A healthy, fully-built deck's
+        // worst 10-of-N nonland cards naturally cluster in the 0.18-0.37 range even when nothing
+        // is wrong (e.g. commander_haliya_guided_by_light: 62 nonland cards, zero warnings, overall
+        // score 80/100, yet its own worst 10 span 0.18-0.28 -- straddling 0.25 by construction,
+        // since "worst of a large healthy pool" and "barely cleared the placement floor" describe
+        // the same score band). Using the placement floor here produced false positives on
+        // otherwise-perfect decks, not real basis-divergence bugs (confirmed: none of the observed
+        // violations reached DeckScoreModel's own documented "genuinely decent fit (mid-0.4s+)"
+        // language). ROUND_TRIP_GOOD_FIT_THRESHOLD uses that SAME "mid-0.4s+" bar instead, so the
+        // invariant only fires for a card the build considered a genuinely GOOD fit, not merely an
+        // acceptable-to-place one -- the actual "wizard adds a good card, Doctor cuts it" pattern.
+        val unlockedScoreById = cutsUnlocked.associate { it.card.scryfallId to it.score }
+        val topUnlockedCutIds = cutsUnlocked.take(ROUND_TRIP_TOP_CUT_WINDOW).map { it.card.scryfallId }.toSet()
+        val roundTripViolations = nonLand
+            .filter { entry -> entry.card.scryfallId in topUnlockedCutIds }
+            .filter { entry -> (unlockedScoreById[entry.card.scryfallId] ?: -1f) >= ROUND_TRIP_GOOD_FIT_THRESHOLD }
+            .map { it.card.name }
+            .distinct()
+        val roundTripUnlockedOk = roundTripViolations.isEmpty()
 
         // ── coherence-swaps ──────────────────────────────────────────────────
         // Wave 2: the direct test of the user's complaint -- "the Doctor must not ... suggest
@@ -323,6 +390,8 @@ object HarnessMetricsCalculator {
             landsOk = landsOk,
             coherenceCutsV2ViolationNames = cutsV2Violations,
             coherenceCutsV2Ok = coherenceCutsV2Ok,
+            roundTripUnlockedViolationNames = roundTripViolations,
+            roundTripUnlockedOk = roundTripUnlockedOk,
             coherenceSwapsViolationNames = swapsViolations,
             coherenceSwapsOk = coherenceSwapsOk,
             addsViolationNames = addsViolations,

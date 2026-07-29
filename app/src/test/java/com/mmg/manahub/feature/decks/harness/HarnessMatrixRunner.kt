@@ -272,6 +272,18 @@ object MatrixRunner {
             wizardSourcedIds = wizardSourcedIds,
         )
 
+        // WS8.1 round-trip invariant: re-rank cuts against the SAME doctor.health.profile with NO
+        // structural protection (only the commander) -- the real, non-structurally-guaranteed test.
+        // Reuses doctor's own profile rather than a second full evaluate (see
+        // HarnessDoctorPipeline.cutsWithProtection's KDoc for why).
+        val unlockedProtectedIds = setOfNotNull(commanderEntry?.card?.scryfallId)
+        val cutsUnlocked = HarnessDoctorPipeline.cutsWithProtection(
+            mainboard = persistedMainboard,
+            profile = doctor.health.profile,
+            protectedIds = unlockedProtectedIds,
+            resolvedSkeleton = HarnessDoctorPipeline.resolveArchetypeSkeleton(doctor.health),
+        )
+
         return HarnessMetricsCalculator.compute(
             label = spec.label,
             format = spec.wizardSpec.format,
@@ -285,6 +297,7 @@ object MatrixRunner {
             commanderEntryOk = commanderEntryOk,
             doctorProfile = doctor.health.profile,
             cuts = doctor.cuts,
+            cutsUnlocked = cutsUnlocked,
             adds = doctor.adds,
             warnings = doctor.health.evaluation.warnings,
             overallScore = doctor.health.evaluation.healthScore.toFloat(),

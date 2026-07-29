@@ -72,6 +72,7 @@ import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
@@ -82,6 +83,7 @@ import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaHubSelector
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -207,7 +209,7 @@ fun CommunityDecksScreen(
             onCommanderCleared = viewModel::onCommanderCleared,
             onCardQueryChange = viewModel::onCardQueryChange,
             onCardSelected = viewModel::onCardFilterSelected,
-            onCardCleared = viewModel::onCardFilterCleared,
+            onCardRemoved = viewModel::onCardFilterRemoved,
             onUsernameChanged = viewModel::onUsernameChanged,
             onDeckSizeChanged = viewModel::onDeckSizeChanged,
             onPrimersOnlyToggled = viewModel::onPrimersOnlyToggled,
@@ -382,12 +384,30 @@ private fun CommunityDeckResultsContent(
         }
 
         state.error != null -> {
-            FullErrorState(
-                message = state.error,
-                retryLabel = stringResource(R.string.retry),
-                onRetry = onRetry,
-                modifier = modifier,
-            )
+            // WS2: Archidekt rate-limit exhausted -- disable retry with a live countdown instead of
+            // letting a rapid re-tap re-trigger the storm the queue is already recovering from.
+            val rateLimitRetryAfterMs = RateLimitExhaustedException.retryAfterMsOrNull(state.error)
+            if (rateLimitRetryAfterMs != null) {
+                val remainingSeconds = rememberRateLimitCountdownSeconds(rateLimitRetryAfterMs)
+                FullErrorState(
+                    message = stringResource(R.string.error_rate_limited_message),
+                    retryLabel = if (remainingSeconds > 0) {
+                        stringResource(R.string.error_rate_limited_retry_countdown, remainingSeconds)
+                    } else {
+                        stringResource(R.string.retry)
+                    },
+                    onRetry = onRetry,
+                    enabled = remainingSeconds <= 0,
+                    modifier = modifier,
+                )
+            } else {
+                FullErrorState(
+                    message = state.error,
+                    retryLabel = stringResource(R.string.retry),
+                    onRetry = onRetry,
+                    modifier = modifier,
+                )
+            }
         }
 
         !state.hasSearched -> {

@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.network
 
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.model.PaginatedCards
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CompletableDeferred
@@ -158,6 +159,16 @@ class ScryfallCache {
     /** Search result lists keyed by "$query:$page". */
     val searches = TimedLruCache<String, List<Card>>(MAX_SEARCHES, TTL_SEARCHES_MS)
 
+    /**
+     * Paginated search result pages (cards + `hasMore`) keyed by "paginated:$query:$page".
+     * Backend & Performance Optimization plan, WS4a finding 1 -- [searchCardsPaginated] used to
+     * bypass caching entirely because [PaginatedCards] doesn't fit [searches]' `List<Card>` shape.
+     * Kept as its own [TimedLruCache] rather than folding into [searches] so the `hasMore` flag
+     * survives the cache round-trip. Same TTL/size envelope as [searches] -- it serves the same
+     * hot paths (Add Card search, Home spotlight feed).
+     */
+    val paginatedSearches = TimedLruCache<String, PaginatedCards>(MAX_SEARCHES, TTL_SEARCHES_MS)
+
     /** The full set list (single entry, key = "all"). */
     val sets = TimedLruCache<String, List<MagicSet>>(1, TTL_SETS_MS)
 
@@ -169,7 +180,35 @@ class ScryfallCache {
         cards.clear()
         cardNames.clear()
         searches.clear()
+        paginatedSearches.clear()
         sets.clear()
+        artVariants.clear()
+    }
+
+    /**
+     * Invalidates [cards] entries for [scryfallIds] (Backend & Performance Optimization plan,
+     * WS1+WS3 Part B item 7g — cache coherence). [getCardCollection] intentionally bypasses [cards]
+     * so price refresh always reads live data and writes fresh prices straight to Room, but that
+     * means an entry already sitting in [cards] for one of these ids is now stale-but-live for the
+     * rest of its TTL: a later [com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource.getCardById]/
+     * `getCardsBatch` would otherwise silently serve the pre-refresh price instead of the fresh Room
+     * row. Called once per price-refresh slice, not per id.
+     *
+     * ALSO wholesale-clears [cardNames] and [artVariants] (WS4a finding 6, 2026-07-28): both caches
+     * hold full [Card] objects (including prices) as a side effect of every by-name/exact-name/
+     * set-and-number/art-variant lookup ([com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource]
+     * writes to [cards] AND [cardNames]/[artVariants] on those paths). A card looked up by name
+     * before a price-refresh slice kept serving its stale price through the name-cache path for the
+     * rest of its 24h TTL, even after this method purged [cards] by id -- same coherence-gap shape,
+     * different cache. [cardNames]/[artVariants] are keyed by name/fuzzy-query, not scryfallId, so a
+     * targeted per-id invalidation isn't possible without a name->id reverse index; both caches are
+     * small (200/50 entries) and cheap to fully repopulate on the next lookup, so a wholesale
+     * `clear()` is the simplest correct fix -- preferred here over building and maintaining a
+     * reverse index for a rarely-hot path.
+     */
+    suspend fun invalidateCards(scryfallIds: Collection<String>) {
+        scryfallIds.forEach { cards.invalidate(it) }
+        cardNames.clear()
         artVariants.clear()
     }
 

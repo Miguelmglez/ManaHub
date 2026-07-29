@@ -29,15 +29,17 @@ data class AddSuggestion(
     /**
      * How many copies to add (plan D3). For 60-card constructed formats this is up to
      * `4 − copies-already-in-deck` (a playset top-up); Commander/singleton formats keep it at 1.
-     * Defaults to 1 so callers that do not compute multi-copy adds are unaffected. The
-     * [BudgetOptimizer] charges `suggestedCopies × price`. Always ≥1.
+     * Defaults to 1 so callers that do not compute multi-copy adds are unaffected. Consumed by the
+     * wizard build (`BuildDeckFromTemplateUseCase`) to write the right quantity per card; the
+     * retired `BudgetOptimizer` used to charge `suggestedCopies × price`. Always ≥1.
      */
     val suggestedCopies: Int = 1,
 ) {
     /**
      * True when the card carries NO EUR price on Scryfall (plan E8). We never invent a price, so an
-     * unknown-price card cannot be costed against a budget cap. [BudgetOptimizer] uses this to EXCLUDE
-     * a NEW unknown-price card under an active total cap (it could secretly be expensive) while still
+     * unknown-price card cannot be costed against a budget cap. The retired `BudgetOptimizer` used
+     * this to EXCLUDE a NEW unknown-price card under an active total cap (it could secretly be
+     * expensive) while still
      * keeping an owned/wishlist unknown-price card (the user already has / wants it — adding it to the
      * deck costs nothing they have not already decided to spend). With no cap, the flag is inert.
      */

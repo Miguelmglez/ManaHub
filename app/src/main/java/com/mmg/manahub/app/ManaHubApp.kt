@@ -44,7 +44,6 @@ import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.PushTokenRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.di.ApplicationScope
 import com.mmg.manahub.core.di.sharedDomainKoinModule
 import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
@@ -61,6 +60,7 @@ import com.mmg.manahub.core.gamification.engine.AchievementBackfill
 import com.mmg.manahub.core.gamification.engine.EntitlementGranter
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
 import com.mmg.manahub.core.push.di.pushKoinModule
+import com.mmg.manahub.core.sync.CardBackfillWorker
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
@@ -121,6 +121,8 @@ import org.koin.core.logger.Level
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
@@ -351,9 +353,17 @@ class ManaHubApp : Application(), KoinComponent {
     // bridged in coreBridgeKoinModule; UserCardRepository is a single in cardDetailKoinModule;
     // SyncManager is a single in collectionKoinModule; SearchCardsUseCase/SuggestTagsUseCase/
     // GetDeckGameStatsUseCase are singles in SharedDomainKoinModule — all resolved via get(), never
-    // re-registered. Only the Hilt `@ApplicationScope` CoroutineScope (legacy DeckMagicDetailViewModel
-    // only) is still bridged here.
-    @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
+    // re-registered. The Hilt `@ApplicationScope` CoroutineScope bridge was REMOVED (Deck Wizard &
+    // Engine Rework plan, WS7.1) along with the legacy `DeckMagicDetailViewModel` it existed
+    // solely for — decksKoinModule() now takes no bridge deps.
+    //
+    // Production crash fix (2026-07-29): removing that registration orphaned every OTHER Koin
+    // consumer of a bare CoroutineScope (AuthRepositoryImpl, CommunityDeckImportCoordinator) —
+    // decksKoinModule happened to be the only place registering it, so nothing else could resolve
+    // it once Decks stopped needing it. The CoroutineScope itself is now bridged into Koin via
+    // `coreBridgeKoinModule`'s own `appScope` param below (this class's existing `appScope` field,
+    // see line ~393), NOT decksKoinModule — a shared cross-island singleton, owned by the shared
+    // bridge module, so it can never again be silently orphaned by a single feature's retirement.
 
     // Game island (Phase 1, the LAST non-excluded island) bridge deps. The shared deps are NOT
     // re-declared here — GameSessionRepository, TournamentRepository, AnalyticsHelper and
@@ -417,6 +427,8 @@ class ManaHubApp : Application(), KoinComponent {
                     okHttpClient = okHttpClient,
                     supabaseClient = supabaseClient,
                     userCardRepository = { userCardRepository.get() },
+                    syncManager = syncManager,
+                    appScope = appScope,
                 ),
                 // The gamification engine graph (ADR-002), natively Koin-built (batch 4; Hilt
                 // `core.gamification.di.GamificationModule` deleted). Must load alongside coreBridgeKoinModule
@@ -489,7 +501,6 @@ class ManaHubApp : Application(), KoinComponent {
                     localOpenForTradeDao = localOpenForTradeDao,
                 ),
                 collectionKoinModule(
-                    syncManager = syncManager,
                     workManager = workManager,
                 ),
                 // KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem): the two remaining
@@ -503,9 +514,7 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 searchWidgetsKoinModule(),
                 gamificationKoinModule(),
-                decksKoinModule(
-                    applicationScope = applicationScope,
-                ),
+                decksKoinModule(),
                 gameKoinModule(
                     observeSession = observeSessionUseCase,
                     updateLife = updateLifeUseCase,
@@ -549,61 +558,110 @@ class ManaHubApp : Application(), KoinComponent {
         appScope.launch {
             runCatching { syncManaSymbols() }
             runCatching { tagDictionaryRepo.loadAndApply() }
-            // Edge-case audit A3 (2026-07-15): opportunistic startup backfill for cached cards
-            // referenced by a live collection/wishlist row whose oracle_id predates that column
-            // (oracle_id = ''). Small batch (20), sequential, failure-silent — never blocks app
-            // start.
-            runCatching { cardRepository.backfillMissingOracleIds(20) }
-            // Strategy-tags backfill (2026-07-22): must run AFTER the oracle_id backfill above —
-            // a blank oracle_id card can never have a precomputed Supabase row, so this call only
-            // finds real candidates once oracle_id is populated. Small batch (40), sequential,
-            // self-terminating (see CardRepository.backfillMissingStrategyTags KDoc), failure-silent.
-            runCatching { cardRepository.backfillMissingStrategyTags(40) }
         }
+        // Backend & Performance Optimization plan, WS1+WS3 Part B item 8 (2026-07-28): the
+        // oracle-id + strategy-tags opportunistic backfills that used to run inline here (Edge-case
+        // audit A3, 2026-07-15 / 2026-07-22) moved to a daily WorkManager job — see
+        // CardBackfillWorker's KDoc for the ordering invariant + sync-window deferral it preserves.
+        CardBackfillWorker.scheduleDaily(workManager)
 
-        // Start the gamification engine collecting the progression bus (idempotent), then
-        // emit the daily-open event. The engine's ledger (key app_open:{localDate}) dedupes
-        // multiple cold starts the same day, so a plain emit on every launch is correct.
-        gamificationEngine.start(appScope)
-
-        // One-shot Family-A achievement backfill (ADR-002 §4): retroactively unlock achievements the
-        // user already qualifies for, suppressing celebrations. Guarded by a DataStore flag so it runs
-        // exactly once after the v39 migration. Failures are swallowed — never block app start.
+        // ── Gamification backend gate (WS1+WS3 Part A, backend-performance-optimization-plan.md §1,
+        //    F1) ────────────────────────────────────────────────────────────────────────────────
+        // `gamificationEnabledFlow` defaults to false (the UI is hidden for this release) but
+        // previously gated ONLY the UI: the engine's permanent event-bus collector, the retroactive
+        // backfill/reconcile passes, the daily AppOpenedToday ledger write and the quest reconciler
+        // + its daily worker all ran unconditionally on every cold start regardless of the flag — a
+        // feature nobody can see was still doing Room aggregate scans + a standing collector on
+        // every device. Gated here on the SAME flag, REACTIVELY (`collect`, not `.first()`) so a
+        // future flag flip (e.g. from Settings, once its currently-commented-out switch is
+        // re-enabled) starts this work without an app restart.
+        //
+        // DELIBERATE ADR-002 OVERRIDE: ADR-002 says the engine should keep recording silently while
+        // the UI is hidden. That is overridden here by explicit user decision (2026-07-28): every
+        // write path this gate skips is idempotent and RETROACTIVE (the XP ledger's UNIQUE key,
+        // AchievementBackfill/EntitlementGranter's own idempotent-insert guards, `reconcileAll`'s
+        // full re-derivation from current level + unlocked achievements) — enabling the flag later
+        // recomputes the user's true state from scratch, so nothing is lost by not recording while
+        // it is off. See ADR-002 §12 + memory `project_gamification_backend_gate_2026-07-28` so a
+        // future agent does not "fix" this back to always-on.
+        //
+        // `gamificationEngine.start()` is documented idempotent (an internal AtomicBoolean guard —
+        // see GamificationEngineImpl), so re-observing `enabled=true` after a hypothetical
+        // OFF→ON→OFF→ON flip sequence is a harmless no-op re-call. The one-shot-per-process tasks
+        // below (backfill/reconcileAll/AppOpenedToday/quest reconcile) are additionally guarded by
+        // `gamificationOneShotStartupTasksRun` so a flag flip mid-session cannot re-run them
+        // repeatedly — they fire on the FIRST observed `enabled=true` only, exactly once per process
+        // lifetime (their own idempotency guards, e.g. the backfill's DataStore flag, are a SEPARATE
+        // cross-launch concern and are kept unchanged).
+        var gamificationOneShotStartupTasksRun = false
         appScope.launch {
-            runCatching {
-                if (!userPreferencesDataStore.isGamificationBackfillDone()) {
-                    achievementBackfill.run()
-                    userPreferencesDataStore.setGamificationBackfillDone()
+            userPreferencesDataStore.gamificationEnabledFlow
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    FirebaseCrashlytics.getInstance()
+                        .log(if (enabled) "gamification_gate_enabled" else "gamification_gate_disabled")
+                    if (enabled) {
+                        gamificationEngine.start(appScope)
+                        QuestRotationWorker.scheduleDaily(workManager)
+
+                        if (!gamificationOneShotStartupTasksRun) {
+                            gamificationOneShotStartupTasksRun = true
+
+                            // One-shot Family-A achievement backfill (ADR-002 §4): retroactively
+                            // unlock achievements the user already qualifies for, suppressing
+                            // celebrations. Guarded by a DataStore flag so it runs exactly once
+                            // after the v39 migration. Failures are swallowed — never block app
+                            // start.
+                            appScope.launch {
+                                runCatching {
+                                    if (!userPreferencesDataStore.isGamificationBackfillDone()) {
+                                        achievementBackfill.run()
+                                        userPreferencesDataStore.setGamificationBackfillDone()
+                                    }
+                                }
+                                // Retroactive cosmetic catch-up (ADR-002 §10): grant entitlements
+                                // the player already qualifies for (current level + all unlocked
+                                // achievements, incl. any just backfilled). Idempotent — only
+                                // inserts missing rows — so it is safe on every launch. Runs AFTER
+                                // the backfill block above so backfilled unlocks are visible to it.
+                                // Failures swallowed; never block app start.
+                                runCatching { entitlementGranter.reconcileAll() }
+                            }
+
+                            appScope.launch {
+                                runCatching {
+                                    progressionEventBus.emit(
+                                        ProgressionEvent.AppOpenedToday(
+                                            localDate = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString(),
+                                            occurredAt = Clock.System.now(),
+                                        )
+                                    )
+                                }
+                            }
+
+                            // Roll quests over on app start (local-first: runs regardless of auth).
+                            // Idempotent — settles any stale instances and generates the current
+                            // period if missing. Failures swallowed.
+                            appScope.launch {
+                                runCatching { questReconciler.reconcile() }
+                            }
+                        }
+                    } else {
+                        // The engine's event-bus collector has no `stop()` (see GamificationEngine's
+                        // KDoc) — not a gap in practice today: the flag is not currently reachable
+                        // from any UI (SettingsScreen's switch is commented out,
+                        // SettingsScreen.kt:289-290), so an ON→OFF flip mid-session cannot happen in
+                        // production yet. If that switch is ever re-enabled, revisit this branch to
+                        // also stop event processing. Cancelling the daily quest worker IS reachable
+                        // today (a user with a stale enqueue from a previous install) and is cheap
+                        // regardless of whether it was ever scheduled.
+                        workManager.cancelUniqueWork(QuestRotationWorker.WORK_NAME)
+                    }
                 }
-            }
-            // Retroactive cosmetic catch-up (ADR-002 §10): grant entitlements the player already
-            // qualifies for (current level + all unlocked achievements, incl. any just backfilled).
-            // Idempotent — only inserts missing rows — so it is safe on every launch. Runs AFTER the
-            // backfill block above so backfilled achievement unlocks are visible to it. Failures
-            // swallowed; never block app start.
-            runCatching { entitlementGranter.reconcileAll() }
-        }
-
-        appScope.launch {
-            runCatching {
-                progressionEventBus.emit(
-                    ProgressionEvent.AppOpenedToday(
-                        localDate = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString(),
-                        occurredAt = Clock.System.now(),
-                    )
-                )
-            }
-        }
-
-        // Roll quests over on app start (local-first: runs regardless of auth). Idempotent — settles
-        // any stale instances and generates the current period if missing. Failures swallowed.
-        appScope.launch {
-            runCatching { questReconciler.reconcile() }
         }
 
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
         CollectionStatsSyncWorker.scheduleDailySync(workManager)
-        QuestRotationWorker.scheduleDaily(workManager)
 
         // COMMENTED OUT — Cloudflare R2 embedding DB download replaced by ML Kit OCR
         // embeddingDatabaseUpdater.scheduleUpdateCheck()
@@ -616,14 +674,6 @@ class ManaHubApp : Application(), KoinComponent {
                 when (state) {
                     is SessionState.Authenticated -> {
                         CollectionSyncWorker.schedulePeriodicSync(workManager)
-                        // Gamification Phase 4 sync (ADR-002 §11): schedule the periodic worker AND run a
-                        // one-time guest→account reconcile so an anonymous/guest's local progress merges
-                        // into the account exactly once on sign-in. Monotonic merges make the reconcile
-                        // idempotent, so a harmless re-run on a later session re-emission is safe.
-                        GamificationSyncWorker.schedulePeriodicSync(workManager)
-                        appScope.launch {
-                            runCatching { gamificationSyncManager.reconcileOnSignIn(state.user.id) }
-                        }
                         appScope.launch {
                             runCatching {
                                 val token = FirebaseMessaging.getInstance().token.await()
@@ -634,8 +684,6 @@ class ManaHubApp : Application(), KoinComponent {
                     is SessionState.Unauthenticated -> {
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
-                        workManager.cancelUniqueWork(GamificationSyncWorker.WORK_NAME_PERIODIC)
-                        workManager.cancelUniqueWork(GamificationSyncWorker.WORK_NAME_ONE_TIME)
                         appScope.launch {
                             runCatching {
                                 val token = FirebaseMessaging.getInstance().token.await()
@@ -646,6 +694,36 @@ class ManaHubApp : Application(), KoinComponent {
                     else -> {}
                 }
             }
+        }
+
+        // Gamification Phase 4 sync (ADR-002 §11), now ALSO gated on the backend master flag
+        // (WS1+WS3 Part A item 2, backend-performance-optimization-plan.md §1): schedule the
+        // periodic worker AND run a one-time guest→account reconcile ONLY when the user is BOTH
+        // authenticated AND gamification is enabled; ALWAYS cancel both work names otherwise — this
+        // covers a user who already has the periodic worker enqueued from a previous install, or
+        // who disables the flag while signed in. A separate `combine` collector (not folded into the
+        // auth branch above) so an unrelated flag flip never re-triggers the push-token register/
+        // unregister calls, which must stay auth-only. Monotonic merges make `reconcileOnSignIn`
+        // idempotent, so re-observing the same (Authenticated, true) pair — e.g. an unrelated
+        // session-state re-emission — is a harmless re-run, same tolerance the single collector this
+        // replaced already had.
+        appScope.launch {
+            combine(
+                authRepository.sessionState,
+                userPreferencesDataStore.gamificationEnabledFlow,
+            ) { state, enabled -> state to enabled }
+                .distinctUntilChanged()
+                .collect { (state, enabled) ->
+                    if (state is SessionState.Authenticated && enabled) {
+                        GamificationSyncWorker.schedulePeriodicSync(workManager)
+                        appScope.launch {
+                            runCatching { gamificationSyncManager.reconcileOnSignIn(state.user.id) }
+                        }
+                    } else {
+                        workManager.cancelUniqueWork(GamificationSyncWorker.WORK_NAME_PERIODIC)
+                        workManager.cancelUniqueWork(GamificationSyncWorker.WORK_NAME_ONE_TIME)
+                    }
+                }
         }
     }
 

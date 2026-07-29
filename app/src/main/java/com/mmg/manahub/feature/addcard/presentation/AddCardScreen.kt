@@ -95,12 +95,14 @@ import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.SetSymbol
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -412,6 +414,7 @@ private fun SearchSurface(
                     }
                 }
                 uiState.error != null && uiState.results.isEmpty() -> {
+                    val rateLimitRetryAfterMs = RateLimitExhaustedException.retryAfterMsOrNull(uiState.error)
                     if (uiState.error == "SCRYFALL_404") {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             EmptyState(
@@ -421,9 +424,27 @@ private fun SearchSurface(
                                 onAction = onClearAll
                             )
                         }
+                    } else if (rateLimitRetryAfterMs != null) {
+                        // WS2: Scryfall rate-limit exhausted -- disable retry with a live countdown
+                        // instead of letting a rapid re-tap re-trigger the storm the queue is already
+                        // recovering from (RateLimitedQueue's shared cooldown gates the actual network
+                        // call regardless, but disabling the CTA gives clearer, immediate feedback).
+                        val remainingSeconds = rememberRateLimitCountdownSeconds(rateLimitRetryAfterMs)
+                        InlineErrorState(
+                            message = stringResource(R.string.error_rate_limited_message),
+                            retryLabel = if (remainingSeconds > 0) {
+                                stringResource(R.string.error_rate_limited_retry_countdown, remainingSeconds)
+                            } else {
+                                stringResource(R.string.retry)
+                            },
+                            onRetry = onForceSearch,
+                            enabled = remainingSeconds <= 0,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     } else {
                         InlineErrorState(
                             message = uiState.error,
+                            retryLabel = stringResource(R.string.retry),
                             onRetry = onForceSearch,
                             modifier = Modifier.fillMaxSize()
                         )

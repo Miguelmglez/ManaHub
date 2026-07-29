@@ -77,6 +77,33 @@ plus response-field cross-checks:
 | `orderBy` | `-viewCount`, `-createdAt`, `-updatedAt` verified. `-viewsThisWeek`/`-trending`/`-points` return *something* but the ordering is not credible (non-monotonic viewCounts) — do not use. |
 | `pageSize` | Unreliable at BOTH ends: values ≤3 returned MORE rows than requested (4–5), values >60 are capped at 60. Always slice client-side (`.take(n)`). |
 
+### 1c. Addendum (verified live 2026-07-24, TCGPlayer-decks evaluation → Archidekt multi-card/format expansion)
+
+Evaluated a TCGPlayer decks integration on user request. **Verdict: not legally viable** — TCGPlayer
+ToS prohibits scraping, its developer API has been closed to new applicants since late 2024 (eBay
+acquisition), and the decks section runs on an internal undocumented SPA API. Decision: expand the
+existing legal Archidekt integration instead, adding the two capabilities the user wanted from
+TCGPlayer (multi-card search, more formats).
+
+- Re-confirmed §1's repeated-`cardName`-AND-and-timeout finding still holds — multi-card search
+  fans out to one search per card (max 3), intersecting deck-id sets client-side in
+  `CommunityDecksRepositoryImpl` (same pattern as the Worker's own approach, kept client-side here
+  since this path serves the Android app directly, not the Worker).
+- New verified `deckFormat` ids beyond the `3`=Commander confirmed in §1: `10` Penny Dreadful, `11`
+  1v1 Commander, `12` Duel Commander, `17` Pauper EDH, `18` Alchemy, `19` Explorer, `20` Historic
+  Brawl, `21` Gladiator, `22` Premodern, `23` PreDH, `24` Timeless, `25` Canadian Highlander. (`26`
+  is a new ambiguous "Brawl" variant — left unmapped/out of scope; `ArchidektFormat.fromApiId`
+  degrades gracefully to `null` on an unmapped id, never crashes.)
+- `pageSize` cap (~60/page, confirmed §1) and `count` cap (1000, confirmed §1) directly bound the
+  multi-card fan-out budget: 3 pages × 60 rows per card × ≤3 cards = ≤9 requests per search.
+
+Implemented in `CommunityDeckSearchFilters.cardNames: List<String>` (renamed from `cardName: String?`),
+`ArchidektClient` (`require(cardNames.size <= 1)` guard — the combined-param request is never sent),
+and `CommunityDecksRepositoryImpl.searchDecksMultiCard` (anchor-order intersection, per-card timeout
+surfaces which card via a `DataResult.Error` naming it, empty intersection short-circuits remaining
+cards, `hasMore` always reported `false` since deepening would multiply requests and break sort
+order).
+
 ## 2. Archidekt `GET https://archidekt.com/api/decks/{id}/` (deck detail)
 
 Confirmed present at the top level: `deckFormat`, `edhBracket`, `private`, `theorycrafted`,

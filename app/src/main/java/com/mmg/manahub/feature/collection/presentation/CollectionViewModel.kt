@@ -35,6 +35,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -96,6 +99,15 @@ class CollectionViewModel(
     private var wishlistUnsyncedCount = 0
     private var openForTradeUnsyncedCount = 0
 
+    // Backend & Performance Optimization plan, WS5c item 4 (2026-07-28): the search box used to
+    // call applyFilters() synchronously on every keystroke — a filter+group+sort pass over the
+    // whole collection running on Compose's Main thread per character typed. Raw keystrokes are
+    // pushed here instead; the TextField's visible value still updates immediately via
+    // `_uiState.searchQuery` in [onSearchQueryChange] (no input lag), but the expensive re-filter
+    // is debounced (mirrors TradeProposalViewModel's `searchQueryFlow` §6.3 fix — same anti-pattern,
+    // same established remedy in this codebase).
+    private val searchQueryFlow = MutableStateFlow("")
+
     init {
         // Initialize tab from SavedStateHandle ("tab" nav arg)
         val tabArg = savedStateHandle.get<String>("tab")?.lowercase()
@@ -109,10 +121,27 @@ class CollectionViewModel(
         observeCollection()
         observeWishlistIds()
         observeTradeListUnsyncedCounts()
-        refreshPrices()
+        // Backend & Performance Optimization plan, WS1+WS3 Part B item 7a (2026-07-28): the
+        // per-screen-entry price refresh that used to run here was removed — it duplicated
+        // `PriceRefreshWorker`'s daily, watermark-guarded, stale-only refresh with NO guard of its
+        // own (every Collection open re-fetched the whole collection's prices unconditionally,
+        // stacking on top of the login-window Scryfall burst). `PriceRefreshWorker` is now the
+        // SOLE price-refresh path.
         observeSyncState()
         observeSessionChanges()
         observeUserPreferences()
+
+        viewModelScope.launch {
+            searchQueryFlow
+                .debounce(SEARCH_DEBOUNCE_MS)
+                .distinctUntilChanged()
+                .collectLatest { applyFilters() }
+        }
+    }
+
+    private companion object {
+        /** Matches TradeProposalViewModel's SEARCH_DEBOUNCE_MS — one shared convention. */
+        const val SEARCH_DEBOUNCE_MS = 300L
     }
 
     private fun observeUserPreferences() {
@@ -131,7 +160,7 @@ class CollectionViewModel(
 
     private fun observeWishlistIds() {
         viewModelScope.launch {
-            getLocalWishlist().collect { entries ->
+            getLocalWishlist().distinctUntilChanged().collect { entries ->
                 _wishlistCardIds.value = entries.map { it.cardId }.toSet()
                 applyFilters()
             }
@@ -140,13 +169,13 @@ class CollectionViewModel(
 
     private fun observeTradeListUnsyncedCounts() {
         viewModelScope.launch {
-            wishlistRepository.observeUnsyncedCount().collect { count ->
+            wishlistRepository.observeUnsyncedCount().distinctUntilChanged().collect { count ->
                 wishlistUnsyncedCount = count
                 recomputeUnsyncedBanner()
             }
         }
         viewModelScope.launch {
-            openForTradeRepository.observeUnsyncedCount().collect { count ->
+            openForTradeRepository.observeUnsyncedCount().distinctUntilChanged().collect { count ->
                 openForTradeUnsyncedCount = count
                 recomputeUnsyncedBanner()
             }
@@ -170,6 +199,7 @@ class CollectionViewModel(
     private fun observeCollection() {
         viewModelScope.launch {
             getCollection()
+                .distinctUntilChanged()
                 .catch { e ->
                     FirebaseCrashlytics.getInstance().apply {
                         log("collection_observe_failed")
@@ -249,19 +279,6 @@ class CollectionViewModel(
                 )
             )
         }
-
-    private fun refreshPrices() {
-        viewModelScope.launch {
-            runCatching { cardRepository.refreshCollectionPrices() }
-                .onFailure { e ->
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("collection_price_refresh_failed")
-                        setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                        recordException(RuntimeException("[CollectionViewModel] Price refresh failed", e))
-                    }
-                }
-        }
-    }
 
     /** Forwards [SyncManager.syncState] into the UI state and clears the banner on success. */
     private fun observeSyncState() {
@@ -374,7 +391,7 @@ class CollectionViewModel(
 
     fun onSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
-        applyFilters()
+        searchQueryFlow.value = query
     }
 
     fun onSortChange(sort: SortOrder) {
