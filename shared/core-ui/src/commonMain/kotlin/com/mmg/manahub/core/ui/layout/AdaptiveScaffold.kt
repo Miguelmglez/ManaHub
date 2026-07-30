@@ -23,11 +23,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -52,7 +56,16 @@ data class AdaptiveNavItem(
  * Screen-level horizontal content padding scales by breakpoint (`spacing.lg` compact /
  * `spacing.xl` medium / `spacing.xxl` expanded+) INSIDE this component — callers receive
  * already-padded content bounds and must never add their own outer horizontal padding on top of
- * this (that would double the gutter).
+ * this (that would double the gutter). The clamp/center at `LARGE` and the full-width fill below it
+ * are likewise STRUCTURAL guarantees of this component, not something [content] needs to opt into
+ * with its own `fillMaxWidth()` — a screen that fills its own root layout (as any normal screen
+ * would) gets the correct clamp/gutter behavior automatically, with no silent collapse-to-intrinsic-
+ * width failure mode if it forgets to.
+ *
+ * [content] does NOT receive scrolling — this shell only clamps/pads, it never wraps [content] in a
+ * scroll container (a screen with more content than the viewport, or a short-but-wide viewport like
+ * mobile landscape, needs its OWN `Modifier.verticalScroll(rememberScrollState())` on its root
+ * layout; see `ThemeShowcaseScreen` for the reference pattern).
  *
  * NOTE: this deliberately does NOT reuse [com.mmg.manahub.core.ui.components.MagicBottomBar] —
  * that component is a hardcoded 3-slot phone bar wired to the game/life-counter FAB (out of web v1
@@ -80,32 +93,39 @@ fun AdaptiveScaffold(
     BoxWithConstraints(modifier = modifier.fillMaxSize().background(colors.background)) {
         val sizeClass = rememberWindowSizeClass()
 
-        when (sizeClass) {
-            ManaWindowSizeClass.COMPACT -> {
-                Column(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f)) {
-                        AdaptiveContentArea(sizeClass) { content(sizeClass) }
-                    }
-                    if (navItems.isNotEmpty()) {
-                        CompactBottomBar(navItems)
-                    }
+        // `content` is invoked through a SINGLE movableContentOf-wrapped reference, remembered once
+        // (no key), so Compose can RELOCATE its composition subtree between the COMPACT (Column)
+        // and MEDIUM/EXPANDED/LARGE (Row) structural parents on a live breakpoint crossing instead
+        // of disposing and recreating it. Compose keys composition state by call-site position in
+        // the slot table -- calling `content(sizeClass)` directly from the two different `when`
+        // branches below would destroy/recreate the whole subtree every time a live resize crosses
+        // COMPACT<->MEDIUM. Harmless today (ThemeShowcaseScreen holds no local `remember` state --
+        // everything lives in its Koin-provided ViewModel or is hoisted in App()), but the next
+        // screen with an ephemeral `remember { mutableStateOf(...) }` (a search draft, a scroll
+        // position, an expanded/collapsed flag) would silently lose it on every resize without this.
+        val movableContent = remember {
+            movableContentOf<ManaWindowSizeClass> { sc -> content(sc) }
+        }
+
+        if (sizeClass == ManaWindowSizeClass.COMPACT) {
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f)) {
+                    AdaptiveContentArea(sizeClass) { movableContent(sizeClass) }
+                }
+                if (navItems.isNotEmpty()) {
+                    CompactBottomBar(navItems)
                 }
             }
-
-            ManaWindowSizeClass.MEDIUM,
-            ManaWindowSizeClass.EXPANDED,
-            ManaWindowSizeClass.LARGE,
-            -> {
-                Row(Modifier.fillMaxSize()) {
-                    if (navItems.isNotEmpty()) {
-                        NavigationRailShell(
-                            navItems = navItems,
-                            expanded = sizeClass != ManaWindowSizeClass.MEDIUM,
-                        )
-                    }
-                    Box(Modifier.weight(1f)) {
-                        AdaptiveContentArea(sizeClass) { content(sizeClass) }
-                    }
+        } else {
+            Row(Modifier.fillMaxSize()) {
+                if (navItems.isNotEmpty()) {
+                    NavigationRailShell(
+                        navItems = navItems,
+                        expanded = sizeClass != ManaWindowSizeClass.MEDIUM,
+                    )
+                }
+                Box(Modifier.weight(1f)) {
+                    AdaptiveContentArea(sizeClass) { movableContent(sizeClass) }
                 }
             }
         }
@@ -116,6 +136,13 @@ fun AdaptiveScaffold(
 //  Content area — breakpoint-scaled padding + LARGE clamp/center
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Applies breakpoint-scaled horizontal padding and, at [ManaWindowSizeClass.LARGE], clamps+centers
+ * the content column to 1200.dp. The clamp box structurally fills its available width (up to the
+ * 1200.dp cap) itself via [Modifier.fillMaxWidth] — [content] does NOT need to (and must not) apply
+ * its own outer `fillMaxWidth()`/min-width for the clamp/center to take effect; that guarantee lives
+ * here, not as an incidental side effect of what a given screen happens to declare.
+ */
 @Composable
 private fun AdaptiveContentArea(
     sizeClass: ManaWindowSizeClass,
@@ -129,11 +156,16 @@ private fun AdaptiveContentArea(
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Box(
-            modifier = if (sizeClass == ManaWindowSizeClass.LARGE) {
-                Modifier.widthIn(max = 1200.dp).fillMaxHeight()
-            } else {
-                Modifier.fillMaxWidth().fillMaxHeight()
-            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (sizeClass == ManaWindowSizeClass.LARGE) {
+                        Modifier.widthIn(max = 1200.dp)
+                    } else {
+                        Modifier
+                    },
+                )
+                .fillMaxHeight(),
         ) {
             Box(Modifier.padding(horizontal = horizontalPadding)) {
                 content()
@@ -146,6 +178,13 @@ private fun AdaptiveContentArea(
 //  COMPACT — bottom bar
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Bar height is 64.dp, deliberately leaner than Android's [com.mmg.manahub.core.ui.components.MagicBottomBar]
+ * (`barHeight = 80.dp`) — this is an intentional web-density choice, not a copy/paste drift: web
+ * `NavChromeItem`s already guarantee an independent >= 48dp touch target via `defaultMinSize`
+ * regardless of the bar's own height, so 64.dp (still on the 8dp grid) keeps the chrome comfortable
+ * without carrying over Android's larger touch-first sizing, which this bar doesn't need to match.
+ */
 @Composable
 private fun CompactBottomBar(items: List<AdaptiveNavItem>) {
     val colors = MaterialTheme.magicColors
@@ -209,7 +248,16 @@ private fun NavChromeItem(
 ) {
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
-    val contentColor = if (item.selected) colors.primaryAccent else colors.textDisabled
+    // `textDisabled` is semantically for disabled/border content, not "enabled but not the current
+    // selection" -- using it here for the unselected nav state fails WCAG contrast against
+    // `backgroundSecondary` (measured ~2.2-2.3:1 across themes, well under the 3:1 minimum for
+    // UI/icon content), and it's the DEFAULT state for 2 of every 3 nav items. `textSecondary`
+    // carries real contrast margin while still reading as visually subordinate to the selected
+    // `primaryAccent` item. NOTE: `MagicBottomBar.BottomBarTab` (Android,
+    // core/ui/components/MagicBottomBar.kt) has this exact same `selected ? primaryAccent :
+    // textDisabled` pattern and the same contrast failure -- pre-existing Android debt, out of
+    // scope for this web-only branch; do not fix it here, but do not copy this mistake again either.
+    val contentColor = if (item.selected) colors.primaryAccent else colors.textSecondary
     val interactionSource = remember { MutableInteractionSource() }
 
     // Every nav chrome item stays >= 48dp on its shortest side regardless of icon/label size
@@ -221,7 +269,11 @@ private fun NavChromeItem(
             indication = ripple(bounded = true),
             onClick = item.onClick,
         )
-        .semantics(mergeDescendants = true) { contentDescription = item.label }
+        .semantics(mergeDescendants = true) {
+            contentDescription = item.label
+            selected = item.selected
+            role = Role.Tab
+        }
         .padding(MaterialTheme.spacing.sm)
 
     if (vertical) {
