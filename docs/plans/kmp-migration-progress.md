@@ -38,7 +38,46 @@ without the user.
 
 ## STATUS (2026-07-30)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a DONE.**
+
+- ✅ **Web W2a — DONE** (2026-07-30, branch `kmp-migration-web`, commits `6481a7f6` + `930d56c3`).
+  Guest-only auth on web, in two checkpoints:
+  1. **Shared `SupabaseClient` factory** — extracted `createManaHubSupabaseClient(...)` to
+     `shared/core-data` commonMain (new file `remote/SupabaseClientFactory.kt`), parameterized by
+     `sessionManager`/`httpEngine`/`oauthScheme`/`crashReporter`. Installs Auth
+     (`alwaysAutoRefresh`/`autoLoadFromStorage`/the passed `SessionManager`, `scheme`/`host` only
+     when `oauthScheme != null`), Postgrest, Realtime, and the WS7 call-counter plugin — byte-
+     identical to what `SupabaseModule.kt` used to build inline. `app/.../SupabaseModule.kt`
+     rewritten to delegate to it (Android behavior unchanged: same `SecureSessionManager`, same
+     `Android.create()` engine, same `"manahub"` scheme). Added `libs.supabase.realtime` to
+     `shared/core-data/build.gradle.kts` commonMain (was missing). Verified:
+     `:app:assembleDebug` BUILD SUCCESSFUL; `AuthRepositoryImplTest` isolated run green (worked
+     around the same pre-existing community-decks WIP test-compile break as W0/W1, per project
+     convention — moved the two broken files aside, ran, restored).
+  2. **Web auth screen** — new `WebSessionManager` (wasmJsMain) implementing supabase-kt's own
+     `SessionManager` contract (NOT a hand-rolled token store, per the W0 audit follow-up),
+     persisting `UserSession` JSON to `window.localStorage` under `manahub_web_session`, no
+     encryption layer (documented: no browser equivalent of Android Keystore — same trust
+     boundary as a cookie-based session). New `AuthViewModel`/`AuthScreen` (guest sign-in only —
+     `Auth.signInAnonymously()`; Google OAuth deliberately deferred to a follow-up). `AuthUiState`
+     exposes only resolved fields (`userId`, `isAnonymous`) — never the raw `SessionStatus`/
+     `UserSession`, per the W0 spike's JWT-leak finding. Wired into `App.kt` as a 4th "Account"
+     nav tab inside the existing `AdaptiveScaffold`. `:webApp` gained a `:shared:core-data`
+     dependency (was missing). **Verified live in Chromium (Playwright)**: guest sign-in resolved
+     a real anonymous session against the project's Supabase instance (real JWT, real user id);
+     `localStorage` payload was byte-identical before and after a full page reload (proves the new
+     `SessionManager` persists, not just the generic KeyValueStore toggle W1 already proved); zero
+     horizontal overflow at 375px/768px/1280px, screen renders cleanly inside the reused shell at
+     all three. **Notable finding (not fixed, out of scope):** the real anonymous JWT's
+     `app_metadata` is empty — `is_anonymous: true` is a top-level JWT/user-object claim, not
+     nested under `app_metadata` — so Android's existing `userInfo.appMetadata?.get("is_anonymous")`
+     convention (documented in this file's CLAUDE.md-adjacent notes) likely mis-resolves too for a
+     freshly-minted anonymous session; the web `AuthViewModel` mirrors that same convention for
+     parity rather than silently diverging. Worth a follow-up audit on the Android side — see
+     memory `project_kmp_spike_findings` addendum.
+  Security gate: both checkpoints passed `android-security-auditor` review (checkpoint 2 had one
+  non-blocking LOW finding — raw Supabase error message surfaced to `AuthUiState.Error`, not
+  sanitized — deferred, not urgent).
 
 - ✅ **Web W1 — DONE** (2026-07-30, branch `kmp-migration-web`). Replaced W0's throwaway `main()`
   with the real entry point: `startKoin` (no `androidContext()`/`androidLogger()`) + `webAppKoinModule`
@@ -124,11 +163,14 @@ without the user.
    `:app:testDebugUnitTest` from producing a clean pass/fail/skip count across BOTH the W0 and W1
    sessions. Needs resolving (by whoever owns that WIP) before the 1967/118/2 floor can be
    reconfirmed on this branch.
-2. **Web W2 — Auth on web** (owner `kmp-web-fullstack-dev`): shared `SupabaseClient` factory,
-   Ktor-level auth-header injection in `commonMain` (replacing the Android-only OkHttp interceptor),
-   Supabase session persistence on web, OAuth redirect/PKCE + anonymous guest sign-in;
-   `backend-supabase-expert` verifies CORS + redirect URLs. Same 375/768/1280px responsive gate as
-   W1. Full detail: `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6 (W2 row), and
+2. **Web W2b — Google OAuth + Action 2 auth-header migration** (owner `kmp-web-fullstack-dev`):
+   W2a covered the shared `SupabaseClient` factory + guest-only sign-in with a real localStorage
+   `SessionManager`. Still open: Google OAuth redirect/PKCE flow on web (`backend-supabase-expert`
+   verifies CORS + redirect URLs for the web origin), and master plan §2.2 Action 2 — the
+   Ktor-level auth-header injection in `commonMain` (replacing the Android-only OkHttp interceptor
+   that `UserProfileClient`/`FriendshipClient` currently rely on for `apikey`/Bearer injection).
+   Same 375/768/1280px responsive gate as W1/W2a. Full detail:
+   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6 (W2 row), and
    `kmp-migration-plan.md` §5.
 3. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
    Deck Doctor (last open Android hardening item; fixes → architect).
@@ -160,3 +202,13 @@ without the user.
   wasmJs has no DOM/ARIA tree (Playwright locators need raw coordinate clicks). Discovered (not
   caused): the pre-existing uncommitted community-decks test files are still compile-broken,
   blocking a clean `testDebugUnitTest` floor reading on this branch (now NEXT STEP #1).
+- 2026-07-30: **Web W2a done** (same day, commits `6481a7f6` + `930d56c3`): shared
+  `createManaHubSupabaseClient` factory (`shared/core-data` commonMain) consumed by both
+  `SupabaseModule.kt` (Android, behavior unchanged) and a new `:webApp` guest-only auth screen
+  (`WebSessionManager` implementing supabase-kt's real `SessionManager` contract over
+  `localStorage`, `AuthViewModel`/`AuthScreen`, wired as a 4th "Account" tab in `App.kt`). Verified
+  live in Chromium: real anonymous session against the Supabase project, session survives a full
+  page reload (byte-identical stored payload), zero overflow at 375/768/1280px. Found (not fixed):
+  the real anonymous JWT's `is_anonymous` claim lives at the top level, not under `app_metadata` —
+  Android's existing `isAnonymous` derivation likely has the same latent miss; flagged for a
+  follow-up audit, not touched in this slice.
