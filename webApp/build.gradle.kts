@@ -91,6 +91,9 @@ kotlin {
                 // exposed transitively — webApp's own code (ThemeShowcaseScreen's placeholder
                 // Card instances) needs it declared directly.
                 implementation(project(":shared:core-model"))
+                // W2a: WebAppKoinModule calls createManaHubSupabaseClient(...) from core-data's
+                // commonMain — same transitive-exposure reasoning as core-model above.
+                implementation(project(":shared:core-data"))
 
                 implementation(compose.runtime)
                 implementation(compose.foundation)

@@ -1,6 +1,7 @@
 package com.mmg.manahub.web
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
@@ -14,13 +15,15 @@ import com.mmg.manahub.core.ui.layout.AdaptiveNavItem
 import com.mmg.manahub.core.ui.layout.AdaptiveScaffold
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.MagicTheme
+import com.mmg.manahub.web.auth.AuthScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
 
 /**
- * Root composable for `:webApp` (web roadmap W1). Real navigation destinations land in W4 — the
- * three [AdaptiveNavItem]s here are DEMO placeholders purely to exercise [AdaptiveScaffold]'s
- * responsive nav chrome (bottom bar / collapsed rail / expanded rail) end-to-end; they are not
- * wired to real screens yet, so selecting one just switches local highlight state.
+ * Root composable for `:webApp` (web roadmap W1, extended in W2a). Real navigation destinations
+ * land in W4 — the [AdaptiveNavItem]s here are still DEMO placeholders exercising
+ * [AdaptiveScaffold]'s responsive nav chrome (bottom bar / collapsed rail / expanded rail)
+ * end-to-end, EXCEPT "Account", which is now wired to the real [AuthScreen] (web roadmap W2a) so
+ * guest sign-in can be exercised end-to-end inside the existing responsive shell.
  */
 @Composable
 fun App() {
@@ -48,13 +51,22 @@ fun App() {
                     selected = selectedNavIndex == 2,
                     onClick = { selectedNavIndex = 2 },
                 ),
+                AdaptiveNavItem(
+                    label = "Account",
+                    icon = Icons.Default.AccountCircle,
+                    selected = selectedNavIndex == 3,
+                    onClick = { selectedNavIndex = 3 },
+                ),
             ),
         ) { windowSizeClass ->
-            ThemeShowcaseScreen(
-                windowSizeClass = windowSizeClass,
-                selectedTheme = selectedTheme,
-                onThemeSelected = { selectedTheme = it },
-            )
+            when (selectedNavIndex) {
+                3 -> AuthScreen()
+                else -> ThemeShowcaseScreen(
+                    windowSizeClass = windowSizeClass,
+                    selectedTheme = selectedTheme,
+                    onThemeSelected = { selectedTheme = it },
+                )
+            }
         }
     }
 }
