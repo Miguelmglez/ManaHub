@@ -1,12 +1,15 @@
 import java.util.Properties
 
 /*
- * :webApp — Compose Multiplatform / wasmJs web application (KMP web roadmap W0, see
+ * :webApp — Compose Multiplatform / wasmJs web application (KMP web roadmap, see
  * docs/plans/kmp-migration-plan.md §5 and docs/plans/kmp-migration-progress.md).
  *
  * Web-only KMP module: `wasmJs` is the ONLY target (no `androidLibrary`/`jvm`, unlike the
- * `:shared:core-*` modules which are Android+Web+JVM). This module is kept permanently going
- * forward; only W0's `main()` body is throwaway (replaced by the real Koin/nav/theme scaffold in W1).
+ * `:shared:core-*` modules which are Android+Web+JVM).
+ *
+ * Status: W0 (runtime smoke spike — supabase-kt/Ktor/Coil3/localStorage proven live on wasmJs) and
+ * W1 (real Koin startup + responsive shell + `ThemeShowcaseScreen`, replacing W0's throwaway
+ * `main()`) are both done. Auth (W2) is next.
  *
  * HARD RULE (same as :shared:core-*): commonMain/wasmJsMain must never import the Android
  * `SupabaseModule`/`SecureSessionManager` (Hilt+Android-only) — this module builds its own
@@ -84,11 +87,18 @@ kotlin {
             dependencies {
                 implementation(project(":shared:core-ui"))
                 implementation(project(":shared:core-common"))
+                // core-ui/core-common depend on core-model via `implementation`, so it is NOT
+                // exposed transitively — webApp's own code (ThemeShowcaseScreen's placeholder
+                // Card instances) needs it declared directly.
+                implementation(project(":shared:core-model"))
 
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
                 implementation(compose.ui)
+                // Same transitive-exposure reasoning as core-model above: core-ui declares this as
+                // `implementation`, so App.kt's own `Icons.Default.*` usage needs it directly too.
+                implementation(compose.materialIconsExtended)
 
                 // `platform()` inside a KMP sourceSet's `KotlinDependencyHandler` is deprecated
                 // (KT-58759) in favor of calling the project's own Gradle DependencyHandler directly.
@@ -107,6 +117,12 @@ kotlin {
                 implementation(libs.kotlinx.browser)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.coroutines.core)
+
+                // Web roadmap W1: Koin DI + the pure-CMP koinViewModel() (koin-androidx-compose is
+                // Android-only). Supabase/Ktor above are kept even though W1's own screen doesn't use
+                // them -- W2 (auth on web, the very next slice) needs them back immediately.
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose.viewmodel)
             }
         }
     }
