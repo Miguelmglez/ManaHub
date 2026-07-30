@@ -4,7 +4,8 @@
 `kmp-migration-plan.md` (master plan: decisions §2, rules §3, Android debt §4, web roadmap §5)
 and resumes automatically.
 
-Branch: `feature/kmp-migration` · All Android/shared `.kt` → `android-kotlin-architect` ·
+Branch: `feature/kmp-migration` (Android-on-KMP phase, merged) → **`kmp-migration-web`** (current, web
+phase, since 2026-07-30) · All Android/shared `.kt` → `android-kotlin-architect` ·
 all web-target `.kt` → `kmp-web-fullstack-dev` · wasm/library gotchas → memory
 `project_kmp_spike_findings`.
 
@@ -35,9 +36,33 @@ without the user.
 
 ---
 
-## STATUS (2026-07-04)
+## STATUS (2026-07-30)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: not started (greenfield by design).**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 (runtime smoke spike) DONE.**
+
+- ✅ **Web W0 — DONE** (2026-07-30, branch `kmp-migration-web`). `:webApp` module created for real
+  (wasmJs-only target, kept permanently — only the throwaway `main()` body gets replaced in W1).
+  All 4 target libraries CONFIRMED WORKING at wasmJs RUNTIME in an actual browser (Chromium via
+  Playwright, not just compile): `kotlinx.browser.localStorage` (real round-trip, survives reload),
+  standalone Ktor `Js`-engine `HttpClient` (Scryfall fetch+parse), Coil3 via `coil-network-ktor3` +
+  explicit `KtorNetworkFetcherFactory` wiring (rendered a real card image), and supabase-kt
+  (`auth-kt`+`postgrest-kt`, own from-scratch client) — `signInAnonymously()` resolved against the
+  real project Supabase instance, session persisted across reload. supabase-kt fallback (hand-rolled
+  Ktor client) was **NOT** triggered. One real runtime bug found+fixed: supabase-kt 3.1.4's wasmJs
+  klib needs kotlinx-datetime 0.6.x (forced via `resolutionStrategy` in `webApp/build.gradle.kts` —
+  Gradle's default resolution otherwise bumps it to 0.7.x via CMP/Coil3, causing an `IrLinkageError`
+  at runtime only). Getting `wasmJsBrowserDistribution` to build at all on this Windows dev box also
+  required disabling the Kotlin/Wasm toolchain's own Node.js/Yarn/Binaryen repo auto-registration
+  (conflicts with `FAIL_ON_PROJECT_REPOS`) in favor of system-installed tools, a KT-58759 DSL fix,
+  and a real npm/cli#9133 workaround (kept Yarn as the wasm package manager). Full findings + every
+  toolchain gotcha: memory `project_kmp_spike_findings`. Android verify: `:app:assembleDebug` BUILD
+  SUCCESSFUL (no cross-module graph breakage); `:app:testDebugUnitTest` could **not** be verified
+  cleanly on this machine (Gradle Test Executor crashed after a cascade of OOMs in unrelated test
+  classes, following a "1768 tests completed, 67 failed, 3 skipped" summary line — consistent with
+  resource contention from the heavy build/browser work in this session, not a regression from this
+  change, since it touches no `androidMain`/`:app` source at all). **Re-run
+  `:app:testDebugUnitTest` on an idle machine before relying on this branch further** to reconfirm
+  the 1967/118/2 floor.
 
 - ✅ **Phase 0 / 0.5 / 1 / 2 / 3 / 4 / 5-Slice-1 — DONE** (2026-06-20 → 2026-07-01). Highlights:
   5 `:shared:core-*` modules, **357 commonMain files**; Retrofit+Gson fully removed (6 Ktor
@@ -65,12 +90,18 @@ without the user.
 
 ## NEXT STEP
 
-1. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
+1. **Re-run `:app:testDebugUnitTest` on an idle machine** to reconfirm the 1967/118/2 floor before
+   further web work (the last run on this branch didn't complete cleanly — see STATUS above; not
+   believed to be a real regression, but unconfirmed).
+2. **Web W1 — `:webApp` scaffold + responsive shell + real persistence** (owner
+   `kmp-web-fullstack-dev`): real `kotlinx-browser`-backed `LocalStorageKeyValueStore` (replacing the
+   in-memory stub), `ManaWindowSizeClass`/`AdaptiveScaffold`/`AdaptiveCardGrid` in
+   `shared/core-ui/.../layout/` (commonMain, validated at 375/768/1280px), Koin startup + a real
+   `App.kt`/`ThemeShowcaseScreen.kt` replacing W0's throwaway `main()`. Full detail:
+   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §4, and `kmp-migration-plan.md` §5.
+3. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
    Deck Doctor (last open Android hardening item; fixes → architect).
-2. **A1 — on-device WorkerFactory validation** (first time a device/emulator is available).
-3. **Web phase start (user greenlight):** hand to `kmp-web-fullstack-dev` at plan §5 **W0**
-   (wasmJs runtime smoke spike: supabase-kt + Ktor + Coil3 + localStorage) → W1 `:webApp` scaffold.
-   Confirm the web-MVP feature set (plan §5 proposal) with the user before W4.
+4. **A1 — on-device WorkerFactory validation** (first time a device/emulator is available).
 
 ## LOG (compact; full detail in git history of this file)
 
@@ -85,3 +116,8 @@ without the user.
   `KoinToHiltBridgeModule`; minor debt closed (P2.1, NudgeTrigger/GetAccountNudge).
 - 2026-07-04: docs consolidated — master plan rewritten, audit/map/next-session-prompt deleted,
   this tracker compacted.
+- 2026-07-30: branch `kmp-migration-web` created for the web phase. **Web W0 done**: `:webApp`
+  module created for real; supabase-kt/Ktor-Js/Coil3/kotlinx-browser localStorage all confirmed
+  working at wasmJs runtime in an actual browser; kotlinx-datetime forced to 0.6.2 (supabase-kt klib
+  compat); wasmJs toolchain (Node/Yarn/Binaryen repo conflicts with FAIL_ON_PROJECT_REPOS) fixed for
+  this dev machine. Full findings: memory `project_kmp_spike_findings`.
