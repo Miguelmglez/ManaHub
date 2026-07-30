@@ -66,7 +66,10 @@ kotlin {
             }
         }
         wasmJsMain {
-            dependencies {}
+            dependencies {
+                // KeyValueStore wasmJs actual — real window.localStorage (web roadmap W1).
+                implementation(libs.kotlinx.browser)
+            }
         }
         // jvmMain intentionally has no code — no jvm-specific actual is needed by the pipeline
         // (it only consumes pure commonMain types: Card, CardTag, TagDictionaryEntry, etc.).

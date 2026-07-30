@@ -165,6 +165,11 @@ kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.re
 koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
 koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = "koin" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
+# Web roadmap W1: the pure-CMP koinViewModel() equivalent for :webApp (koin-androidx-compose above
+# is Android-only — depends on androidx.activity/androidx.compose Android artifacts). Same version
+# as the rest of the koin.* aliases (4.2.2) — koin-compose-viewmodel is published in lockstep with
+# koin-core.
+koin-compose-viewmodel = { group = "io.insert-koin", name = "koin-compose-viewmodel", version.ref = "koin" }
 # koin-androidx-workmanager — KMP migration Hilt→Koin cutover batch 6: `worker { }` DSL +
 # `KoinWorkerFactory` so the 7 non-excluded @HiltWorkers can be resolved by Koin, coexisting with the
 # still-Hilt-owned (currently dormant) scanner worker via a DelegatingWorkerFactory (core.di.SyncModule).
