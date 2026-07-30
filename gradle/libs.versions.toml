@@ -57,6 +57,12 @@ koin = "4.2.2"
 # kotlinx-datetime — KMP date/time library replacing java.time in shared code (Phase 4).
 kotlinx-datetime = "0.6.2"
 
+# kotlinx-browser — Web roadmap W0 spike: real `window.localStorage`/DOM access on wasmJs, replacing
+# the in-memory LocalStorageKeyValueStore stub. 0.5.0 requires kotlin-stdlib >= 2.2.20-Beta2, which
+# this project's pinned Kotlin 2.3.20 satisfies. NOT the same as the `browser` alias above
+# (androidx.browser Custom Tabs, Android-only).
+kotlinx-browser = "0.5.0"
+
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 # opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
@@ -144,6 +150,11 @@ vosk-android         = { group = "com.alphacephei", name = "vosk-android", versi
 kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.7.3" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinx-datetime" }
+# Web roadmap W0/W1 — real window.localStorage on wasmJs.
+kotlinx-browser = { group = "org.jetbrains.kotlinx", name = "kotlinx-browser", version.ref = "kotlinx-browser" }
+# coil3 KMP network fetcher backed by Ktor — needed on wasmJs/JS where coil-network-okhttp (Android/JVM
+# only) is unavailable. Pinned to the same `coil` version as coil-compose to avoid a KMP artifact skew.
+coil-network-ktor3 = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil" }
 
 # KMP commonTest assertions (multiplatform-safe; replaces JUnit/MockK in commonMain test source sets).
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
