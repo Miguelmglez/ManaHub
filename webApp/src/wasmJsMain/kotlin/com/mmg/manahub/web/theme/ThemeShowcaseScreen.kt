@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -107,8 +109,17 @@ fun ThemeShowcaseScreen(
     val viewModel = koinViewModel<ThemeShowcaseViewModel>()
     val prefEnabled by viewModel.prefEnabled.collectAsState()
 
+    // Root column scrolls -- AdaptiveScaffold/AdaptiveContentArea never provide scrolling
+    // themselves (they only clamp/pad), so a short-but-wide viewport (mobile landscape, or a short
+    // desktop window at MEDIUM) would otherwise clip content with no way to reach it. Safe to
+    // combine with the bounded-height LazyVerticalGrid below (AdaptiveCardGrid has a fixed
+    // `.height(360.dp)` here, not `fillMaxHeight()`/wrap-unbounded, so there's no nested
+    // unbounded-scroll measurement conflict).
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.lg),
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = spacing.lg),
         verticalArrangement = Arrangement.spacedBy(spacing.xl),
     ) {
         Text(
