@@ -38,7 +38,33 @@ without the user.
 
 ## STATUS (2026-07-30)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 (runtime smoke spike) DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 DONE.**
+
+- ✅ **Web W1 — DONE** (2026-07-30, branch `kmp-migration-web`). Replaced W0's throwaway `main()`
+  with the real entry point: `startKoin` (no `androidContext()`/`androidLogger()`) + `webAppKoinModule`
+  + `App.kt` (`MagicTheme { AdaptiveScaffold { ThemeShowcaseScreen() } }`). New shared
+  `shared/core-ui/.../layout/` package (commonMain, Android+wasmJs green): `ManaWindowSizeClass`
+  (COMPACT/MEDIUM/EXPANDED/LARGE, hand-rolled — CMP has no `androidx.window` equivalent),
+  `AdaptiveScaffold` (bottom bar / collapsed rail / expanded rail per breakpoint, built fresh rather
+  than adapting `MagicBottomBar`; 1200.dp content clamp+center at LARGE; breakpoint-scaled screen
+  padding), `AdaptiveCardGrid` (breakpoint-scaled `GridCells.Adaptive`). `LocalStorageKeyValueStore`
+  (core-common wasmJs) now backed by REAL `window.localStorage` (kotlinx-browser), replacing the
+  in-memory stub. Added `koin-compose-viewmodel` (4.2.2) for the pure-CMP `koinViewModel()`.
+  **Validated live in a real browser** (Playwright/Chromium) at 375px (COMPACT, bottom bar), 768px
+  (MEDIUM, collapsed icon-only rail), 1280px (LARGE, expanded icon+label rail) — zero horizontal
+  overflow at any width; the 1200dp clamp+gutters confirmed at 1600px (not visible at 1280px, where
+  the 200dp rail leaves only ~1080dp of content width — under the clamp threshold, expected). Live
+  theme switching confirmed across multiple palettes incl. `HallowedPrint`. Persistence confirmed:
+  `localStorage` value `null` → `"true"` after toggling → still `"true"` after a full page reload.
+  One notable testing gotcha (memory `project_kmp_spike_findings`): Compose Multiplatform for wasmJs
+  renders to a single `<canvas>` with no exposed DOM/ARIA tree, so Playwright's `getByRole()`/
+  `getByText()` find nothing — verification needs raw `page.mouse.click(x, y)` coordinates read off
+  a screenshot. Android verify: `:app:assembleDebug` BUILD SUCCESSFUL (this slice touches no
+  `androidMain`/`:app` source at all). `:app:testDebugUnitTest` run once (no retry loop) — failed at
+  the COMPILE step, but the errors are 100% inside two pre-existing, uncommitted community-decks test
+  files already on this branch before this session (unrelated in-progress work, left untouched per
+  instruction) — identical errors to the W0 run, confirming a standing unrelated blocker, not a
+  regression.
 
 - ✅ **Web W0 — DONE** (2026-07-30, branch `kmp-migration-web`). `:webApp` module created for real
   (wasmJs-only target, kept permanently — only the throwaway `main()` body gets replaced in W1).
@@ -90,15 +116,20 @@ without the user.
 
 ## NEXT STEP
 
-1. **Re-run `:app:testDebugUnitTest` on an idle machine** to reconfirm the 1967/118/2 floor before
-   further web work (the last run on this branch didn't complete cleanly — see STATUS above; not
-   believed to be a real regression, but unconfirmed).
-2. **Web W1 — `:webApp` scaffold + responsive shell + real persistence** (owner
-   `kmp-web-fullstack-dev`): real `kotlinx-browser`-backed `LocalStorageKeyValueStore` (replacing the
-   in-memory stub), `ManaWindowSizeClass`/`AdaptiveScaffold`/`AdaptiveCardGrid` in
-   `shared/core-ui/.../layout/` (commonMain, validated at 375/768/1280px), Koin startup + a real
-   `App.kt`/`ThemeShowcaseScreen.kt` replacing W0's throwaway `main()`. Full detail:
-   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §4, and `kmp-migration-plan.md` §5.
+1. **Fix (or hand off) the pre-existing community-decks test compile break** — two uncommitted test
+   files (`CommunityDecksRepositoryImplTest.kt`, `CommunityDecksSearchViewModelTest.kt`) reference
+   `deckFormatId`/`format`/`ALL`/`featuredFormatDecks` symbols that don't exist on the currently
+   uncommitted community-decks production WIP on this branch. This is the user's own in-progress
+   work (not touched by the web agent, per explicit instruction) and has now blocked
+   `:app:testDebugUnitTest` from producing a clean pass/fail/skip count across BOTH the W0 and W1
+   sessions. Needs resolving (by whoever owns that WIP) before the 1967/118/2 floor can be
+   reconfirmed on this branch.
+2. **Web W2 — Auth on web** (owner `kmp-web-fullstack-dev`): shared `SupabaseClient` factory,
+   Ktor-level auth-header injection in `commonMain` (replacing the Android-only OkHttp interceptor),
+   Supabase session persistence on web, OAuth redirect/PKCE + anonymous guest sign-in;
+   `backend-supabase-expert` verifies CORS + redirect URLs. Same 375/768/1280px responsive gate as
+   W1. Full detail: `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6 (W2 row), and
+   `kmp-migration-plan.md` §5.
 3. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
    Deck Doctor (last open Android hardening item; fixes → architect).
 4. **A1 — on-device WorkerFactory validation** (first time a device/emulator is available).
@@ -121,3 +152,11 @@ without the user.
   working at wasmJs runtime in an actual browser; kotlinx-datetime forced to 0.6.2 (supabase-kt klib
   compat); wasmJs toolchain (Node/Yarn/Binaryen repo conflicts with FAIL_ON_PROJECT_REPOS) fixed for
   this dev machine. Full findings: memory `project_kmp_spike_findings`.
+- 2026-07-30: **Web W1 done** (same day): real Koin-started `main()`/`App.kt`/`ThemeShowcaseScreen`
+  replacing W0's throwaway entry point; new `shared/core-ui/.../layout/` responsive package
+  (`ManaWindowSizeClass`/`AdaptiveScaffold`/`AdaptiveCardGrid`); real `localStorage`-backed
+  `LocalStorageKeyValueStore`. Validated live at 375/768/1280(+1600 for the clamp)px — zero
+  horizontal overflow, correct nav-chrome switching, persisted toggle survives reload. Found: CMP
+  wasmJs has no DOM/ARIA tree (Playwright locators need raw coordinate clicks). Discovered (not
+  caused): the pre-existing uncommitted community-decks test files are still compile-broken,
+  blocking a clean `testDebugUnitTest` floor reading on this branch (now NEXT STEP #1).
