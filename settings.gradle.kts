@@ -45,3 +45,7 @@ include(":shared:core-ui")
 // tags/tribes/theme+archetype affinities by reusing the shared modules' jvm() targets (never :app —
 // Gradle disallows depending on an Android application project).
 include(":tools:tag-pipeline")
+// Web roadmap W0: the Compose Multiplatform / wasmJs web application. wasmJs-only (no
+// androidLibrary/jvm target, unlike the :shared:core-* modules) — hosts the browser entry point and,
+// from W1 onward, the ported screens/navigation/DI. See docs/plans/kmp-migration-plan.md §5.
+include(":webApp")
