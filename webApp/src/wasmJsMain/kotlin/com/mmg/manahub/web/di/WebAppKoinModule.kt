@@ -11,18 +11,23 @@ import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.remote.UserProfileClient
+import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
+import com.mmg.manahub.core.data.remote.collection.SupabaseCollectionDataSource
 import com.mmg.manahub.core.data.remote.createManaHubSupabaseClient
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.core.data.repository.WebCardRepository
 import com.mmg.manahub.core.data.repository.WebDeckRepository
+import com.mmg.manahub.core.data.repository.WebUserCardRepository
 import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.web.auth.AuthViewModel
 import com.mmg.manahub.web.auth.WebSessionManager
+import com.mmg.manahub.web.collection.CollectionViewModel
 import com.mmg.manahub.web.config.WebAppConfig
 import com.mmg.manahub.web.decks.DeckListViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
@@ -77,6 +82,15 @@ import org.koin.dsl.module
  * moved out of `:app` this same slice) is bound to its Supabase impl, [SupabaseDeckDataSource] --
  * the SAME class Android's `SyncManager` now uses (moved rather than duplicated). Bound against the
  * INTERFACE type for the same reason as [CardRepository]/[UserPreferencesRepository] above.
+ *
+ * W3d adds the [UserCardRepository] binding, backed by [WebUserCardRepository] (`shared/core-data`
+ * wasmJsMain) -- the fourth web data-layer repository slice (collection), backing
+ * [com.mmg.manahub.web.collection.CollectionScreen]. [CollectionRemoteDataSource] (`shared/core-data`
+ * commonMain, moved out of `:app` this same slice) is bound to its Supabase impl,
+ * [SupabaseCollectionDataSource] -- the SAME class Android's `SyncManager` now uses. Also injects
+ * the existing [CardRepository] singleton so [WebUserCardRepository] can resolve joined
+ * [com.mmg.manahub.core.model.Card] data for its `UserCardWithCard` reads. Bound against the
+ * INTERFACE type for the same reason as every other repository above.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -148,8 +162,15 @@ val webAppKoinModule = module {
     single<DeckRemoteDataSource> { SupabaseDeckDataSource(supabaseClient = get()) }
     single<DeckRepository> { WebDeckRepository(remote = get(), supabaseClient = get()) }
 
+    // ── Collection stack (W3d) ────────────────────────────────────────────────────────────────
+    single<CollectionRemoteDataSource> { SupabaseCollectionDataSource(supabaseClient = get()) }
+    single<UserCardRepository> {
+        WebUserCardRepository(remote = get(), cardRepository = get(), supabaseClient = get())
+    }
+
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel { AuthViewModel(get(), get()) }
-    viewModel { CardSearchViewModel(cardRepository = get()) }
+    viewModel { CardSearchViewModel(cardRepository = get(), userCardRepository = get()) }
     viewModel { DeckListViewModel(deckRepository = get()) }
+    viewModel { CollectionViewModel(userCardRepository = get()) }
 }
