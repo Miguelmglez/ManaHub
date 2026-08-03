@@ -38,7 +38,48 @@ without the user.
 
 ## STATUS (2026-08-03)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a DONE.**
+
+- ✅ **Web W3a — DONE** (2026-08-03, branch `kmp-migration-web`, commits `b9aba6ad` + `49772075`).
+  First W3 "web data layer, one repo per slice" task — deliberately the narrowest repo in the W3
+  order (`UserPreferencesRepository`: 6 flows + 9 setters, 37 lines), chosen to validate the
+  "wasmJs impl behind the shared `commonMain` interface" pattern before the bigger repos
+  (`CardRepository`, `DeckRepository`, etc. — still NOT started).
+  1. **`WebUserPreferencesRepository`** (new file, `shared/core-data` wasmJsMain,
+     `repository/WebUserPreferencesRepository.kt`) — a FRESH implementation, deliberately NOT a
+     port of Android's 1008-line `UserPreferencesDataStore` god-object (which serves dozens of
+     unrelated preference flows well beyond this interface) — that file was correctly left
+     completely untouched. Backed by the existing wasmJs `KeyValueStore` actual
+     (`LocalStorageKeyValueStore`, real `window.localStorage`, built in W1). **Reactivity
+     pattern** (reusable for future repo slices): `KeyValueStore` has no native reactive-flow
+     support (no Room/DataStore `Flow`, and `localStorage`'s own `storage` DOM event only fires in
+     OTHER tabs) — every exposed `Flow` is backed by an in-memory `MutableStateFlow` cache,
+     hydrated once at construction via a `Dispatchers.Unconfined` coroutine (runs to completion
+     eagerly/synchronously since `LocalStorageKeyValueStore`'s suspend calls never actually
+     suspend) and kept in sync on every write through the same Koin-`single` instance. Encoding
+     mirrors Android's conceptual scheme (enum `.code`/`.name`, JSON via `kotlinx.serialization`
+     for the `List<UserDefinedTag>` and `Set<NewsLanguage>` collections) without being a
+     cross-platform wire-format port — each platform persists to its own local store. Compiled
+     clean via `:shared:core-data:compileKotlinWasmJs` with zero `.gradle.kts` changes needed
+     (core-data's commonMain already exposed `kotlinx-serialization-json` + `core-domain` as `api`
+     dependencies, both inherited by wasmJsMain automatically).
+  2. **`:webApp` wiring + live proof** — `WebAppKoinModule.kt` gains
+     `single<UserPreferencesRepository> { WebUserPreferencesRepository(...) }` (bound against the
+     interface, not the bare concrete class, per the project's documented Koin gotcha).
+     `ThemeShowcaseViewModel`/`ThemeShowcaseScreen` extended with a minimal real exercise: a
+     `collectionViewModeFlow`/`saveCollectionViewMode` GRID↔LIST toggle button, deliberately
+     distinct from W1's raw `KeyValueStore` toggle (this proves the REPOSITORY layer's own
+     hydration/serialization logic, not just the underlying KV store). **Verified live in
+     Chromium (Playwright)**: clicking Toggle writes `collection_view_mode=LIST` to real
+     `window.localStorage` and updates the UI immediately; a full page reload (fresh Koin graph,
+     fresh `WebUserPreferencesRepository` instance) still shows `Current: LIST` — proving the
+     repository's own read/hydration path works end-to-end, not merely that the raw key
+     survived. Zero console errors across both checks. No `.gradle.kts` changes needed here
+     either (`:shared:core-domain`'s `UserPreferencesRepository` type was already transitively
+     visible to `:webApp` via `core-data`'s `api` dependency on `core-domain`).
+  Both checkpoints passed the `android-security-auditor` pre-push gate clean (no secrets/PII —
+  only localStorage key names and non-sensitive user preference data). Full detail: memory
+  `project_kmp_spike_findings` (W3a addendum).
 
 - ✅ **Web W2b — DONE** (2026-08-03, branch `kmp-migration-web`, commits `f159d441` + `4629a484`).
   Master plan §2.2 Action 2 (Ktor-level auth-header injection in commonMain), in two checkpoints.
@@ -195,11 +236,14 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W3 — web data layer** (owner `kmp-web-fullstack-dev`): the shared Supabase client + Ktor
-   auth plumbing (W2a/W2b) is now in place on both platforms. W3 is the Supabase-remote-first +
-   IndexedDB/localStorage-cache data layer behind the existing `commonMain` repository interfaces
-   for the web target (Room stays Android-only, per the KMP migration rules). Full detail:
-   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6 (W3 row), and
+1. **Web W3 — next data-layer slice: `CardRepository`** (owner `kmp-web-fullstack-dev`). W3a
+   (`UserPreferencesRepository`, the narrowest slice, deliberately chosen to validate the pattern
+   first) is DONE — see STATUS above and memory `project_kmp_spike_findings` for the reusable
+   "MutableStateFlow cache hydrated from KeyValueStore" reactivity pattern. Per the W3 order in
+   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6, the next slice is
+   `CardRepository` (Supabase-remote-first + IndexedDB/localStorage-cache data layer, Room stays
+   Android-only per the KMP migration rules) — expect this to be substantially bigger than W3a
+   (search/cache/pricing surface vs. W3a's 6-flow/9-setter interface). Full detail:
    `kmp-migration-plan.md` §5. **Google OAuth remains explicitly deferred** (user decision,
    memory `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a blocking prerequisite
    to W3; it needs the user's mechanism choice + a Google Cloud web Client ID first, whenever that
@@ -272,3 +316,14 @@ without the user.
   user_profiles row" line. Google OAuth remains explicitly deferred per user decision (memory
   `project_kmp_web_google_oauth_deferred`) — W3 (web data layer) is the actual next step, not
   blocked on OAuth.
+- 2026-08-03: **Web W3a done** (commits `b9aba6ad` + `49772075`): first W3 data-layer slice,
+  `WebUserPreferencesRepository` (`shared/core-data` wasmJsMain) — fresh implementation, NOT a
+  port of Android's 1008-line `UserPreferencesDataStore` (left untouched). Reactivity via an
+  in-memory `MutableStateFlow` cache hydrated from the wasmJs `KeyValueStore` (real localStorage)
+  at construction, kept in sync on every write — a pattern future repo slices should reuse. Wired
+  into `:webApp`'s Koin module (bound against the interface type) and exercised via a
+  `ThemeShowcaseScreen` GRID/LIST toggle. Verified live in Chromium: toggle click writes to real
+  `localStorage` and updates the UI; a full page reload (fresh repository instance) still shows
+  the persisted value, proving the repository's own hydration path, not just the raw KV store.
+  Zero `.gradle.kts` changes needed (transitive `api` exposure already covered both
+  `kotlinx-serialization` and `core-domain`). Next slice: `CardRepository`.
