@@ -33,6 +33,7 @@ fun AuthScreen() {
     val viewModel = koinViewModel<AuthViewModel>()
     val uiState by viewModel.uiState.collectAsState()
     val isSigningIn by viewModel.isSigningIn.collectAsState()
+    val profileCheck by viewModel.profileCheck.collectAsState()
 
     Column(
         modifier = Modifier
@@ -75,6 +76,24 @@ fun AuthScreen() {
                 style = typography.bodyMedium,
                 color = colors.textSecondary,
             )
+        }
+
+        // W2b plumbing smoke check ONLY -- proves the web UserProfileClient (shared Ktor client +
+        // installSupabaseAuthHeaders) reaches the real backend with the live session's access
+        // token. Not a real profile feature; remove/replace once real web screens consume this.
+        profileCheck?.let { statusText ->
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                Text(
+                    text = "user_profiles check (W2b plumbing proof)",
+                    style = typography.titleMedium,
+                    color = colors.textPrimary,
+                )
+                Text(
+                    text = statusText,
+                    style = typography.bodyMedium,
+                    color = colors.textSecondary,
+                )
+            }
         }
     }
 }
