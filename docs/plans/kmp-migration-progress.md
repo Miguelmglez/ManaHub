@@ -38,7 +38,62 @@ without the user.
 
 ## STATUS (2026-08-03)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c DONE.**
+
+- ✅ **Web W3c — DONE** (2026-08-03, branch `kmp-migration-web`, commits `8a91b518` + `f0f6d0ee` +
+  `720a9cb0`). Third W3 "web data layer, one repo per slice" task — `DeckRepository`. Different
+  architecture note from W3a/W3b: `DeckRepository`'s own KDoc documents it as **local-CRUD-only by
+  design on Android** ("Sync is NOT part of this interface — `SyncManager` owns the push/pull
+  cycle"). Web has no Room and no separate sync engine, so `WebDeckRepository` had to implement the
+  CRUD contract by talking to Supabase directly and immediately, not by porting the Android
+  repository's semantics.
+  1. **Moved `DeckRemoteDataSource`/`DeckSyncDto`/`DeckCardSyncDto`/`SupabaseDeckDataSource` from
+     `:app` to `shared/core-data` commonMain** (commit `8a91b518`) — the prerequisite Android-side
+     move, since Android's `SyncManager` and the new web repository needed to share ONE Supabase-
+     calling implementation instead of duplicating it. The Room-entity mapping extensions
+     (`toEntity`/`toDto`/`toSyncDto`, which import `DeckEntity`/`DeckCardEntity`) stayed in `:app`
+     (renamed file `DeckEntityMappers.kt`, Room has no wasmJs target). `SupabaseDeckDataSource` lost
+     its Hilt `@Inject`/`@Singleton` (Hilt is androidMain-only) and now takes a commonMain
+     `DispatcherProvider` instead of the `@IoDispatcher` qualifier; `RepositoryModule`'s `@Binds` was
+     replaced by a manually-constructed `@Provides` in `SharedDomainUseCaseModule`, mirroring the
+     pre-existing `provideScryfallRemoteDataSource` pattern. `SyncManager`'s push/pull behavior is
+     byte-identical — verified via `:app:assembleDebug` green + `SyncManagerTest`/`CollectionSyncTest`
+     green (ran with the two pre-existing, unrelated community-decks WIP test files temporarily
+     moved aside, since the test source set compiles as one unit — restored after).
+  2. **`WebDeckRepository`** (new file, `shared/core-data` wasmJsMain, commit `f0f6d0ee`) — all 15
+     `DeckRepository` methods implemented against the shared `DeckRemoteDataSource`, remote-first
+     with NO local staging: every mutation calls a Supabase RPC directly and immediately. Reactivity
+     via in-memory `MutableStateFlow` caches (decks + per-deck card slots), but with ONE documented
+     divergence from the W3a/W3b caches: hydration is genuinely async (a real network round-trip,
+     not `LocalStorageKeyValueStore`'s zero-suspension-point synchronous path), so it's driven by
+     `SupabaseClient.auth.sessionStatus` transitioning to `Authenticated` rather than a one-shot
+     `init` fetch — avoids a race against the also-async session restore from `localStorage` on a
+     fresh page load. Card-slot mutations (add/remove/move/clear/replaceAllCards) all funnel through
+     one read-modify-write pair against the RPC's full-replacement semantics (there's no
+     single-card-add RPC). `updateDeckAttribution`/`updateArchetypeOverride`/`updateTribeOverride`
+     are documented loud stubs (`UnsupportedOperationException`) — NOT a web limitation:
+     `DeckSyncDto` carries no synced column for these fields on ANY platform (Android's own
+     `SyncManager` never pushes them either), and there's no web consumer yet either.
+     `updateStrategyLocked` is the one exception (real synced column, fully implemented).
+     `DeckSummary.colorIdentity`/`coverImageUrl` are documented Web v1 gaps (empty set/null — no
+     local card cache to join against, unlike Android's Room-backed `DeckSummaryRow`). Compiled
+     clean via `:shared:core-data:compileKotlinWasmJs` + `:compileAndroidMain` (hit the documented
+     stale-incremental-klib-cache `ArrayIndexOutOfBoundsException` on the first wasmJs attempt after
+     adding the file — fixed with `--rerun --no-build-cache`).
+  3. **`:webApp` wiring + minimal Deck List screen** (commit `720a9cb0`) — `WebAppKoinModule.kt`
+     registers `single<DeckRemoteDataSource> { SupabaseDeckDataSource(...) }` and
+     `single<DeckRepository> { WebDeckRepository(...) }` (interface-typed). New 5th `AdaptiveScaffold`
+     nav item "Decks" → `DeckListScreen`/`DeckListViewModel` — deliberately NOT Deck Studio (no card
+     editing, no format picker, no detail nav), sole purpose is proving the repository works
+     end-to-end. **Verified live in Chromium (Playwright)**: guest sign-in → Decks tab → "New deck" →
+     `batch_upsert_decks` RPC returns 204 → deck appears immediately ("New Deck / Casual · 0 cards")
+     → full page reload (fresh Koin graph, fresh `WebDeckRepository` instance) → `get_deck_changes_since`
+     + `get_deck_cards_for_deck` re-fire over the network → the SAME deck reappears — proving the
+     write landed in Supabase and the read-back is real, not an optimistic local-only illusion.
+     Spot-checked 375px (COMPACT bottom bar) and 1280px (LARGE expanded rail) for the Decks screen —
+     zero horizontal overflow at either width, empty state renders cleanly at both extremes.
+  Full detail: memory `project_kmp_spike_findings` (W3c addendum, pending) and
+  `.claude/agent-memory/kmp-web-fullstack-dev/project_w3_repo_slice_pattern.md`.
 
 - ✅ **Web W3b — DONE** (2026-08-03, branch `kmp-migration-web`, commits `ddcfa689` + `4e23d61a`).
   Second W3 "web data layer, one repo per slice" task, and the FIRST slice that backs a real
@@ -292,35 +347,40 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W3 — next data-layer slice: `DeckRepository`** (owner `kmp-web-fullstack-dev`). W3a
-   (`UserPreferencesRepository`) and W3b (`CardRepository`) are both DONE — see STATUS above.
-   Per the W3 order in `kmp-migration-plan.md` §5 (`UserPreferences` → `Auth/Profile` →
-   `CardRepository` → `DeckRepository` → `UserCardRepository`/collection → `NewsRepository` →
-   `CommunityDecks`), Auth/Profile was already substantially covered by W2a/W2b (guest sign-in +
-   `UserProfileClient`/`FriendshipClient`), so `DeckRepository` (Supabase-backed) is next in
-   sequence — no reason found during W3b to reorder. Reuse the W3a/W3b patterns where they fit:
-   the `MutableStateFlow` reactivity cache (memory `project_kmp_spike_findings`) and, if
-   `DeckRepository` turns out to have a similar "most methods aren't needed on an online-first web
-   client yet" shape, the same real-methods/loud-stub split W3b used (scoping decision recorded in
-   `CardRepository.kt`'s class KDoc) rather than a faithful full port. **Still outstanding, not
-   part of W3b's brief**: the paired A3 move of `CardRepositoryImpl` (Android) into
-   `shared/core-data/src/androidMain` — pick this up (via `android-kotlin-architect`) whenever
-   convenient, paired with a future repo slice or standalone, per plan §5's "paired A3 move" note.
-   **Google OAuth remains explicitly deferred** (user decision, memory
-   `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a blocking prerequisite to W3.
-2. **Follow-up finding to route to `backend-supabase-expert`** (surfaced during W2b, not fixed):
-   `public.handle_new_user()` creates a `user_profiles` row for every `auth.users` insert,
-   INCLUDING anonymous sign-ups — contradicting CLAUDE.md's documented "guests have no
-   user_profiles row" invariant. Needs a decision: is the trigger's behavior correct and the
-   CLAUDE.md line stale, or should the trigger skip anonymous users? See memory
-   `project_kmp_spike_findings` (W2b addendum) for the exact trigger/function definitions.
+1. **Web W3 — next data-layer slice: `UserCardRepository`/collection** (owner
+   `kmp-web-fullstack-dev`). W3a (`UserPreferencesRepository`), W3b (`CardRepository`), and W3c
+   (`DeckRepository`) are all DONE — see STATUS above. Per the W3 order in `kmp-migration-plan.md`
+   §5 (`UserPreferences` → `Auth/Profile` → `CardRepository` → `DeckRepository` →
+   `UserCardRepository`/collection → `NewsRepository` → `CommunityDecks`), collection is next.
+   **Scope-check before diving in**: the master plan explicitly calls for "a common pagination
+   model, no `androidx.paging.PagingData`" for this slice (CLAUDE.md: "No `androidx.paging
+   .PagingData`... in shared code — use a common pagination model") — verify whether that common
+   pagination model already exists in `shared/core-model`/`core-domain` or still needs to be
+   designed as part of this slice, since `UserCardRepository`'s collection-list methods are the
+   first W3 repo where paging is actually load-bearing (Card Search/Deck List so far were small
+   enough to page-less or the existing `PaginatedCards` shape sufficed). Reuse the established
+   patterns: grep `shared/core-data/.../remote/*RemoteDataSource.kt` for an existing commonMain
+   collection remote data source FIRST (the W3b/W3c lesson — Android's repo impl likely already
+   delegates to one), the `MutableStateFlow` reactivity cache pattern, and the real-methods/
+   loud-stub split if the interface mixes online-first concerns with Room-only ones. **Still
+   outstanding, not part of any W3 slice's brief**: the paired A3 move of `CardRepositoryImpl`
+   (Android) into `shared/core-data/src/androidMain` — pick this up (via
+   `android-kotlin-architect`) whenever convenient. **Google OAuth remains explicitly deferred**
+   (user decision, memory `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a
+   blocking prerequisite to W3.
+2. ✅ **RESOLVED (2026-08-03)** — the `handle_new_user()` anonymous-user finding from W2b. User
+   approved a DB-level fix: `public.handle_new_user()` now guards `is_anonymous` (migration
+   `fix_handle_new_user_skip_anonymous_users`) and the 10 pre-existing spurious `user_profiles`
+   rows were deleted. No `AFTER UPDATE` trigger needed (no code path converts an anonymous session
+   to permanent in place). CLAUDE.md's "Online sessions" invariant updated to reflect DB-level
+   enforcement. Memory: `feedback_handle_new_user_anonymous_guard`.
 3. **Fix (or hand off) the pre-existing community-decks test compile break** — two uncommitted test
    files (`CommunityDecksRepositoryImplTest.kt`, `CommunityDecksSearchViewModelTest.kt`) reference
    `deckFormatId`/`format`/`ALL`/`featuredFormatDecks` symbols that don't exist on the currently
    uncommitted community-decks production WIP on this branch. This is the user's own in-progress
    work (not touched by the web agent, per explicit instruction) and has now blocked
    `:app:testDebugUnitTest` from producing a clean pass/fail/skip count across every web session
-   so far (W0 through W2b). Needs resolving (by whoever owns that WIP) before the 1967/118/2 floor
+   so far (W0 through W3c). Needs resolving (by whoever owns that WIP) before the 1967/118/2 floor
    can be reconfirmed on this branch.
 4. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
    Deck Doctor (last open Android hardening item; fixes → architect).
