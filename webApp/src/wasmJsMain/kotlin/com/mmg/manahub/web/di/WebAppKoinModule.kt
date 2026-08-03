@@ -1,22 +1,33 @@
 package com.mmg.manahub.web.di
 
 import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.common.KeyValueStore
 import com.mmg.manahub.core.common.LocalStorageKeyValueStore
 import com.mmg.manahub.core.common.provideCrashReporter
+import com.mmg.manahub.core.data.network.ScryfallCache
+import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.FriendshipClient
+import com.mmg.manahub.core.data.remote.ScryfallClient
+import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.createManaHubSupabaseClient
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
+import com.mmg.manahub.core.data.repository.WebCardRepository
 import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.web.auth.AuthViewModel
 import com.mmg.manahub.web.auth.WebSessionManager
 import com.mmg.manahub.web.config.WebAppConfig
+import com.mmg.manahub.web.search.CardSearchViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -44,6 +55,16 @@ import org.koin.dsl.module
  * parameter as the interface, so a bare `single { WebUserPreferencesRepository(...) }` would
  * register under the concrete type and fail at runtime with `NoDefinitionFoundException` the first
  * time that graph path resolves.
+ *
+ * W3b adds the [CardRepository] binding, backed by [WebCardRepository] (`shared/core-data`
+ * wasmJsMain) — the second web data-layer repository slice, and the first one that backs a REAL
+ * product screen ([com.mmg.manahub.web.search.CardSearchScreen]), not a showcase. [WebCardRepository]
+ * delegates to [ScryfallRemoteDataSource], the SAME `commonMain` class Android's `CardRepositoryImpl`
+ * uses (shared `ScryfallRequestQueue` rate limiter + `ScryfallCache` TTL/dedup cache), so this block
+ * assembles that dependency chain fresh for the web target -- mirroring Android's
+ * `NetworkModule`/`SharedDomainUseCaseModule` (Hilt) construction shape one-for-one, just via Koin.
+ * Bound against the INTERFACE type for the same reason as [UserPreferencesRepository] above:
+ * [CardSearchViewModel] declares its constructor parameter as [CardRepository].
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -85,6 +106,33 @@ val webAppKoinModule = module {
         )
     }
 
+    // ── Scryfall stack (W3b) — mirrors Android's NetworkModule/SharedDomainUseCaseModule shape ──
+    single<HttpClient>(named("scryfall")) {
+        HttpClient(Js) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; coerceInputValues = true })
+            }
+            expectSuccess = true
+        }
+    }
+    single {
+        ScryfallClient(httpClient = get(named("scryfall")), baseUrl = "https://api.scryfall.com/")
+    }
+    single { ScryfallRequestQueue(crashReporter = get()) }
+    single { ScryfallCache() }
+    single { DispatcherProvider() }
+    single {
+        ScryfallRemoteDataSource(
+            api = get(),
+            requestQueue = get(),
+            cache = get(),
+            dispatcherProvider = get(),
+            crashReporter = get(),
+        )
+    }
+    single<CardRepository> { WebCardRepository(remote = get()) }
+
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel { AuthViewModel(get(), get()) }
+    viewModel { CardSearchViewModel(cardRepository = get()) }
 }
