@@ -12,14 +12,19 @@ import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.createManaHubSupabaseClient
+import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
+import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.core.data.repository.WebCardRepository
+import com.mmg.manahub.core.data.repository.WebDeckRepository
 import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.web.auth.AuthViewModel
 import com.mmg.manahub.web.auth.WebSessionManager
 import com.mmg.manahub.web.config.WebAppConfig
+import com.mmg.manahub.web.decks.DeckListViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
 import io.github.jan.supabase.SupabaseClient
@@ -65,6 +70,13 @@ import org.koin.dsl.module
  * `NetworkModule`/`SharedDomainUseCaseModule` (Hilt) construction shape one-for-one, just via Koin.
  * Bound against the INTERFACE type for the same reason as [UserPreferencesRepository] above:
  * [CardSearchViewModel] declares its constructor parameter as [CardRepository].
+ *
+ * W3c adds the [DeckRepository] binding, backed by [WebDeckRepository] (`shared/core-data`
+ * wasmJsMain) -- the third web data-layer repository slice, backing
+ * [com.mmg.manahub.web.decks.DeckListScreen]. [DeckRemoteDataSource] (`shared/core-data` commonMain,
+ * moved out of `:app` this same slice) is bound to its Supabase impl, [SupabaseDeckDataSource] --
+ * the SAME class Android's `SyncManager` now uses (moved rather than duplicated). Bound against the
+ * INTERFACE type for the same reason as [CardRepository]/[UserPreferencesRepository] above.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -132,7 +144,12 @@ val webAppKoinModule = module {
     }
     single<CardRepository> { WebCardRepository(remote = get()) }
 
+    // ── Decks stack (W3c) ─────────────────────────────────────────────────────────────────────
+    single<DeckRemoteDataSource> { SupabaseDeckDataSource(supabaseClient = get()) }
+    single<DeckRepository> { WebDeckRepository(remote = get(), supabaseClient = get()) }
+
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel { AuthViewModel(get(), get()) }
     viewModel { CardSearchViewModel(cardRepository = get()) }
+    viewModel { DeckListViewModel(deckRepository = get()) }
 }

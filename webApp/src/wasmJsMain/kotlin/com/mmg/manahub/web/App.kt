@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -16,16 +17,18 @@ import com.mmg.manahub.core.ui.layout.AdaptiveScaffold
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.MagicTheme
 import com.mmg.manahub.web.auth.AuthScreen
+import com.mmg.manahub.web.decks.DeckListScreen
 import com.mmg.manahub.web.search.CardSearchScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
 
 /**
- * Root composable for `:webApp` (web roadmap W1, extended in W2a/W3b). Real destination-level
+ * Root composable for `:webApp` (web roadmap W1, extended in W2a/W3b/W3c). Real destination-level
  * navigation (back stack, deep links) lands in W4 — the [AdaptiveNavItem]s here are still simple
  * index-switched placeholders exercising [AdaptiveScaffold]'s responsive nav chrome (bottom bar /
- * collapsed rail / expanded rail) end-to-end, EXCEPT "Account" (wired to [AuthScreen], W2a) and
+ * collapsed rail / expanded rail) end-to-end, EXCEPT "Account" (wired to [AuthScreen], W2a),
  * "Search" (wired to [CardSearchScreen], W3b — the first REAL MVP screen, backed by
- * `WebCardRepository`/live Scryfall data, not a showcase).
+ * `WebCardRepository`/live Scryfall data, not a showcase), and "Decks" (wired to [DeckListScreen],
+ * W3c — backed by `WebDeckRepository`, remote-first CRUD against real Supabase data).
  */
 @Composable
 fun App() {
@@ -48,22 +51,29 @@ fun App() {
                     onClick = { selectedNavIndex = 1 },
                 ),
                 AdaptiveNavItem(
-                    label = "Theme",
-                    icon = Icons.Default.Palette,
+                    label = "Decks",
+                    icon = Icons.Default.Style,
                     selected = selectedNavIndex == 2,
                     onClick = { selectedNavIndex = 2 },
                 ),
                 AdaptiveNavItem(
-                    label = "Account",
-                    icon = Icons.Default.AccountCircle,
+                    label = "Theme",
+                    icon = Icons.Default.Palette,
                     selected = selectedNavIndex == 3,
                     onClick = { selectedNavIndex = 3 },
+                ),
+                AdaptiveNavItem(
+                    label = "Account",
+                    icon = Icons.Default.AccountCircle,
+                    selected = selectedNavIndex == 4,
+                    onClick = { selectedNavIndex = 4 },
                 ),
             ),
         ) { windowSizeClass ->
             when (selectedNavIndex) {
                 1 -> CardSearchScreen(windowSizeClass = windowSizeClass)
-                3 -> AuthScreen()
+                2 -> DeckListScreen()
+                4 -> AuthScreen()
                 else -> ThemeShowcaseScreen(
                     windowSizeClass = windowSizeClass,
                     selectedTheme = selectedTheme,
