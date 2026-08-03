@@ -8,6 +8,8 @@ import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.createManaHubSupabaseClient
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
+import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.web.auth.AuthViewModel
 import com.mmg.manahub.web.auth.WebSessionManager
 import com.mmg.manahub.web.config.WebAppConfig
@@ -34,11 +36,21 @@ import org.koin.dsl.module
  * engine, so header injection and JSON (de)serialization behavior are byte-identical across
  * platforms; only the transport engine differs. The qualifier name matches Android's for
  * consistency, even though this is currently the only [HttpClient] registered here.
+ *
+ * W3a adds the [UserPreferencesRepository] binding, backed by [WebUserPreferencesRepository]
+ * (`shared/core-data` wasmJsMain) — the first web data-layer repository slice. Bound against the
+ * INTERFACE type (`single<UserPreferencesRepository> { ... }`), not the bare concrete class, per
+ * this project's documented Koin gotcha: [ThemeShowcaseViewModel] declares its constructor
+ * parameter as the interface, so a bare `single { WebUserPreferencesRepository(...) }` would
+ * register under the concrete type and fail at runtime with `NoDefinitionFoundException` the first
+ * time that graph path resolves.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
 
     single<CrashReporter> { provideCrashReporter() }
+
+    single<UserPreferencesRepository> { WebUserPreferencesRepository(keyValueStore = get()) }
 
     single<SupabaseClient> {
         createManaHubSupabaseClient(
@@ -73,6 +85,6 @@ val webAppKoinModule = module {
         )
     }
 
-    viewModel { ThemeShowcaseViewModel(get()) }
+    viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel { AuthViewModel(get(), get()) }
 }
