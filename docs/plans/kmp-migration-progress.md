@@ -38,7 +38,59 @@ without the user.
 
 ## STATUS (2026-08-03)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d DONE.**
+
+- ✅ **Web W3d — DONE** (2026-08-03, branch `kmp-migration-web`, commits `dbfc3b23` + `04a3468c` +
+  `56e6228c`). Fourth W3 "web data layer, one repo per slice" task — `UserCardRepository`
+  (collection). Same remote-first-no-local-staging shape as W3c (`UserCardRepository`'s own KDoc:
+  "local CRUD only, `SyncManager` owns push/pull"), not W3b's online-first-search shape.
+  1. **Moved `CollectionRemoteDataSource`/`SupabaseCollectionDataSource`/`UserCardCollectionDto`
+     from `:app` to `shared/core-data` commonMain** (commit `dbfc3b23`, same pattern as W3c's
+     `DeckRemoteDataSource` move) — Room-entity mapping extensions
+     (`toEntity`/`toDto`) stayed in `:app` (renamed `UserCardCollectionMappers.kt`). Also added a
+     NEW `mergeEntry(...)` method to the interface, backed by a NEW Supabase RPC,
+     `merge_collection_entry(p_entry_id uuid, p_new_scryfall_id text, p_is_foil boolean,
+     p_condition text, p_language text, p_quantity integer) RETURNS boolean` (added by
+     `backend-supabase-expert` this slice) — the existing `batch_upsert_collection` RPC looked like
+     it already did collision-merging but was solving a different problem (sync-push cross-device
+     races, not a single-entry re-point) and would have left a stale/duplicate row in two of the
+     four required branches; verified by reading its live SQL body before requesting a new RPC.
+     `merge_collection_entry` was verified against 7 scenarios inside a ROLLBACK transaction,
+     `get_advisors` clean, `GRANT EXECUTE` to `authenticated` only (an anonymous-signed-in guest
+     already has Postgrest role `authenticated`, not `anon` — corrected an initial
+     over-instruction to also grant `anon`, which would have been harmless but inconsistent with
+     the sibling collection RPCs). Verified `:app:assembleDebug` + `SyncManagerTest`/
+     `CollectionSyncTest` green (community-decks WIP test files moved aside/restored per
+     convention), `:shared:core-data:compileKotlinWasmJs`/`compileAndroidMain` green, commonMain
+     leak grep clean.
+  2. **`WebUserCardRepository`** (new file, `shared/core-data` wasmJsMain, commit `04a3468c`) — all
+     11 `UserCardRepository` methods implemented. Two in-memory caches: `entriesCache` (ALL
+     collection rows including soft-deleted — kept, not dropped, so `addOrIncrement`/
+     `decrementOrRemove` can revive a soft-deleted row at a target tuple instead of duplicating it)
+     and `cardsCache` (resolved `Card` data via the EXISTING `CardRepository` singleton —
+     `WebCardRepository` — reusing W3b's Scryfall stack rather than duplicating it). Hydration
+     driven by `SupabaseClient.auth.sessionStatus`, per the W3c async-hydration fix.
+     `updateEntryWithMerge` calls the new RPC then does a full re-pull rather than re-deriving the
+     merge branch client-side. Open-for-Trade re-pointing (part of Android's Room transaction) is a
+     documented Web v1 gap — no web Trades feature exists yet. Compiled clean via
+     `:shared:core-data:compileKotlinWasmJs` (hit + fixed the documented stale-incremental-klib-cache
+     `ArrayIndexOutOfBoundsException` with `--rerun --no-build-cache`).
+  3. **`:webApp` wiring + minimal Collection screen** (commit `56e6228c`) — `WebAppKoinModule.kt`
+     registers `single<CollectionRemoteDataSource>`/`single<UserCardRepository>` (interface-typed).
+     New 4th-of-6 `AdaptiveScaffold` nav item "Collection" → `CollectionScreen`/
+     `CollectionViewModel` (read-only, `observeCollection()` rendered via the existing
+     `AdaptiveCardGrid`, mirroring `DeckListScreen`'s scope discipline). Card Search's previously
+     no-op "tap a result" now calls `UserCardRepository.addOrIncrement(...)` via
+     `CardSearchViewModel.addToCollection`, proving the write path too. **Verified live in Chromium
+     (Playwright)**: guest sign-in → search "Lightning Bolt" → tap the result → `batch_upsert_collection`
+     RPC returns 204 → card appears in Collection ("Lightning Bolt x1") → full page reload (fresh
+     Koin graph, fresh `WebUserCardRepository` instance) → `get_collection_changes_since` re-fires →
+     the SAME card reappears — proving the write landed in Supabase, not an optimistic local-only
+     illusion. Zero horizontal overflow at 375px (COMPACT bottom bar) / 1280px (LARGE expanded
+     rail). Re-confirmed the "re-probe nav rail coordinates after adding a new `AdaptiveNavItem`"
+     lesson from prior slices.
+  Full detail: memory `project_kmp_spike_findings` (W3d addendum) and
+  `.claude/agent-memory/kmp-web-fullstack-dev/project_w3d_collection_repository.md`.
 
 - ✅ **Web W3c — DONE** (2026-08-03, branch `kmp-migration-web`, commits `8a91b518` + `f0f6d0ee` +
   `720a9cb0`). Third W3 "web data layer, one repo per slice" task — `DeckRepository`. Different
@@ -347,22 +399,21 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W3 — next data-layer slice: `UserCardRepository`/collection** (owner
-   `kmp-web-fullstack-dev`). W3a (`UserPreferencesRepository`), W3b (`CardRepository`), and W3c
-   (`DeckRepository`) are all DONE — see STATUS above. Per the W3 order in `kmp-migration-plan.md`
-   §5 (`UserPreferences` → `Auth/Profile` → `CardRepository` → `DeckRepository` →
-   `UserCardRepository`/collection → `NewsRepository` → `CommunityDecks`), collection is next.
-   **Scope-check before diving in**: the master plan explicitly calls for "a common pagination
-   model, no `androidx.paging.PagingData`" for this slice (CLAUDE.md: "No `androidx.paging
-   .PagingData`... in shared code — use a common pagination model") — verify whether that common
-   pagination model already exists in `shared/core-model`/`core-domain` or still needs to be
-   designed as part of this slice, since `UserCardRepository`'s collection-list methods are the
-   first W3 repo where paging is actually load-bearing (Card Search/Deck List so far were small
-   enough to page-less or the existing `PaginatedCards` shape sufficed). Reuse the established
-   patterns: grep `shared/core-data/.../remote/*RemoteDataSource.kt` for an existing commonMain
-   collection remote data source FIRST (the W3b/W3c lesson — Android's repo impl likely already
-   delegates to one), the `MutableStateFlow` reactivity cache pattern, and the real-methods/
-   loud-stub split if the interface mixes online-first concerns with Room-only ones. **Still
+1. **Web W3 — next data-layer slice: `NewsRepository`** (owner `kmp-web-fullstack-dev`). W3a
+   (`UserPreferencesRepository`), W3b (`CardRepository`), W3c (`DeckRepository`), and W3d
+   (`UserCardRepository`/collection) are all DONE — see STATUS above. Per the W3 order in
+   `kmp-migration-plan.md` §5 (`UserPreferences` → `Auth/Profile` → `CardRepository` →
+   `DeckRepository` → `UserCardRepository`/collection → `NewsRepository` → `CommunityDecks`), News
+   is next, then Community Decks. Reuse the established patterns: grep
+   `shared/core-data/.../remote/*RemoteDataSource.kt` for an existing commonMain News remote data
+   source FIRST (the W3b/W3c/W3d lesson — Android's repo impl likely already delegates to one), the
+   `MutableStateFlow` reactivity cache pattern (including the W3d finding: a repo whose read
+   methods need a JOIN against another repo's data should inject that repo, not duplicate its
+   networking stack), and the real-methods/loud-stub split if the interface mixes online-first
+   concerns with Room-only ones. Before adding any new Supabase RPC for a mutation-merge case,
+   READ the actual SQL body of any superficially-similar existing RPC first (W3d: a shared
+   "merge on unique_violation" idiom does not imply interchangeable RPCs — `batch_upsert_collection`
+   looked like it covered `updateEntryWithMerge` but was solving a different problem). **Still
    outstanding, not part of any W3 slice's brief**: the paired A3 move of `CardRepositoryImpl`
    (Android) into `shared/core-data/src/androidMain` — pick this up (via
    `android-kotlin-architect`) whenever convenient. **Google OAuth remains explicitly deferred**
@@ -447,6 +498,18 @@ without the user.
   the persisted value, proving the repository's own hydration path, not just the raw KV store.
   Zero `.gradle.kts` changes needed (transitive `api` exposure already covered both
   `kotlinx-serialization` and `core-domain`). Next slice: `CardRepository`.
+- 2026-08-03: **Web W3d done** (commits `dbfc3b23` + `04a3468c` + `56e6228c`): fourth W3 data-layer
+  slice, `WebUserCardRepository` (`shared/core-data` wasmJsMain) — collection. Same remote-first
+  shape as W3c (not W3b). Two caches: `entriesCache` (all rows incl. soft-deleted, so a revive
+  branch can find them) and `cardsCache` (joined `Card` data resolved via the existing
+  `CardRepository` singleton). Added a new `merge_collection_entry` Supabase RPC for
+  `updateEntryWithMerge` after confirming the existing `batch_upsert_collection` RPC — despite
+  looking similar — would leave a stale/duplicate row in two of the four required branches; caught
+  and corrected an over-broad `anon`-role grant instruction along the way (anonymous-signed-in
+  guests are Postgrest role `authenticated`, not `anon`). Wired into `:webApp`'s Koin module + a new
+  read-only Collection screen; Card Search's tap-a-result now writes through
+  `addOrIncrement`. Verified live in Chromium: a searched card, added, appears in Collection, and
+  survives a full page reload. Next slice: `NewsRepository`.
 - 2026-08-03: **Web W3b done** (commits `ddcfa689` + `4e23d61a`): second W3 data-layer slice,
   `WebCardRepository` (`shared/core-data` wasmJsMain) — the first slice backing a REAL screen
   (Card Search), not a showcase. Split the 27-method `CardRepository` interface: 13 real
