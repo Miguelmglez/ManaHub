@@ -38,7 +38,63 @@ without the user.
 
 ## STATUS (2026-08-03)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b DONE.**
+
+- ✅ **Web W3b — DONE** (2026-08-03, branch `kmp-migration-web`, commits `ddcfa689` + `4e23d61a`).
+  Second W3 "web data layer, one repo per slice" task, and the FIRST slice that backs a real
+  product screen (Card Search), not a showcase. `CardRepository` is a 27-method interface; per
+  the scoping decision recorded in the task brief (master plan §2.1: web is online-first, no
+  local card database, Collection/Deck Studio/tagging not yet on web), it was split rather than
+  faithfully ported.
+  1. **`WebCardRepository`** (new file, `shared/core-data` wasmJsMain,
+     `repository/WebCardRepository.kt`) implements the 13 real search/lookup methods
+     (`searchCardByName`/`searchCards`/`searchCardsPaginated`/`getCardById`/
+     `getCardBySetAndNumber`/`getCardPrints`/`getCardArtVariants`/`getLanguagePrints`/
+     `getCardByExactName`/`searchWithRawQuery`/`getPlayableSets`/`getCardsByIds`/`observeCard`/
+     `warmCacheForIds`) by delegating directly to **`ScryfallRemoteDataSource`** — already
+     `commonMain`, already wraps the shared `ScryfallRequestQueue` rate limiter +
+     `ScryfallCache` TTL/dedup cache Android uses, so this slice reuses it as-is rather than
+     re-implementing rate-limiting/caching against the raw `ScryfallClient` (a simpler shape
+     than the task brief anticipated, since it assumed a from-scratch client wrapper). On top,
+     a plain in-memory `MutableStateFlow<Map<String, Card>>` session cache backs `observeCard`'s
+     `Flow` and `getCardsByIds`'s "local, no network fetch" contract — the web analogue of a
+     Room read, cleared on reload, never persisted (a full card cache doesn't belong in
+     `localStorage`). The remaining 14 Room-cache-only / tag-write methods
+     (`refreshCardById`/`backfillMissingOracleIds`/`backfillMissingStrategyTags`/
+     `getCachedEnglishSiblings`/`updatePrices(Batch)`/`evictStaleCache`/`updateCardTags`/
+     `unionCardTags`/`updateUserTags`/`updateSuggestedTags`/`confirmSuggestedTag`/
+     `dismissSuggestedTag`) throw a loud, documented `UnsupportedOperationException` pointing
+     back at the scoping note — never a silent no-op, never faked Room semantics. Compiled clean
+     via `:shared:core-data:compileKotlinWasmJs` (hit the documented stale-incremental-klib-cache
+     `ArrayIndexOutOfBoundsException` on the first attempt — fixed with `--rerun --no-build-cache`
+     per memory, not a real code problem).
+  2. **`:webApp` wiring + Card Search MVP screen** — `WebAppKoinModule.kt` assembles the whole
+     Scryfall stack fresh for web (Ktor `Js` `HttpClient` + content negotiation, `ScryfallClient`,
+     `ScryfallRequestQueue`, `ScryfallCache`, `DispatcherProvider`, `ScryfallRemoteDataSource`),
+     mirroring Android's `NetworkModule`/`SharedDomainUseCaseModule` (Hilt) construction shape
+     one-for-one, then binds `single<CardRepository> { WebCardRepository(...) }` (interface-typed,
+     per the project's Koin gotcha). New `CardSearchScreen`/`CardSearchViewModel` replace the
+     "Search" nav placeholder in `App.kt` — the first REAL `:webApp` MVP screen, not a showcase.
+     A text field triggers `searchCardsPaginated`; results render in the existing `AdaptiveCardGrid`
+     via a new minimal `CardSearchResultTile` (`MagicCard` + `CardName`, NOT
+     `CardGridItem` — that component takes a `CollectionCardGroup`, a collection-only shape
+     with no fit for a raw search result with no ownership/quantity data; a fresh minimal tile
+     was the right call, confirming the plan's contingency). Handles idle/loading/error/content
+     states plus a "Load more" pagination footer. **Verified live in Chromium (Playwright)**:
+     typing "Lightning Bolt" and pressing Enter resolves two REAL Scryfall results (Emeritus of
+     Conflict / SOS, Lightning Bolt / MSC) with real card art rendering (`cards.scryfall.io` image
+     requests both 200), confirmed at 375px (COMPACT, bottom bar, 2-col reflow), 768px (MEDIUM,
+     collapsed rail, larger tiles/full names), and 1280px (LARGE, expanded rail) — zero horizontal
+     overflow at any width (`scrollWidth == clientWidth` at all three). Confirmed no code path in
+     the new screen/ViewModel reaches any of the 14 stub methods (only `searchCardsPaginated` is
+     called). Android's `CardRepositoryImpl` (`app/src/main/java/.../repository/`) was NOT touched.
+     `:app:assembleDebug` stays green. **Note**: the paired A3 move (Android's `CardRepositoryImpl`
+     into `shared/core-data/src/androidMain`) was intentionally NOT done in this slice per its own
+     brief (explicitly out of scope, Android-side work belongs to `android-kotlin-architect`) —
+     still outstanding, same as it was before this slice.
+  Full detail + the reusable "delegate to the existing commonMain remote data source instead of
+  rebuilding rate-limiting/caching" finding: memory `project_kmp_spike_findings` (W3b addendum,
+  pending) and `.claude/agent-memory/kmp-web-fullstack-dev/project_w3_repo_slice_pattern.md`.
 
 - ✅ **Web W3a — DONE** (2026-08-03, branch `kmp-migration-web`, commits `b9aba6ad` + `49772075`).
   First W3 "web data layer, one repo per slice" task — deliberately the narrowest repo in the W3
@@ -236,18 +292,22 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W3 — next data-layer slice: `CardRepository`** (owner `kmp-web-fullstack-dev`). W3a
-   (`UserPreferencesRepository`, the narrowest slice, deliberately chosen to validate the pattern
-   first) is DONE — see STATUS above and memory `project_kmp_spike_findings` for the reusable
-   "MutableStateFlow cache hydrated from KeyValueStore" reactivity pattern. Per the W3 order in
-   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6, the next slice is
-   `CardRepository` (Supabase-remote-first + IndexedDB/localStorage-cache data layer, Room stays
-   Android-only per the KMP migration rules) — expect this to be substantially bigger than W3a
-   (search/cache/pricing surface vs. W3a's 6-flow/9-setter interface). Full detail:
-   `kmp-migration-plan.md` §5. **Google OAuth remains explicitly deferred** (user decision,
-   memory `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a blocking prerequisite
-   to W3; it needs the user's mechanism choice + a Google Cloud web Client ID first, whenever that
-   lands it can proceed independently of W3.
+1. **Web W3 — next data-layer slice: `DeckRepository`** (owner `kmp-web-fullstack-dev`). W3a
+   (`UserPreferencesRepository`) and W3b (`CardRepository`) are both DONE — see STATUS above.
+   Per the W3 order in `kmp-migration-plan.md` §5 (`UserPreferences` → `Auth/Profile` →
+   `CardRepository` → `DeckRepository` → `UserCardRepository`/collection → `NewsRepository` →
+   `CommunityDecks`), Auth/Profile was already substantially covered by W2a/W2b (guest sign-in +
+   `UserProfileClient`/`FriendshipClient`), so `DeckRepository` (Supabase-backed) is next in
+   sequence — no reason found during W3b to reorder. Reuse the W3a/W3b patterns where they fit:
+   the `MutableStateFlow` reactivity cache (memory `project_kmp_spike_findings`) and, if
+   `DeckRepository` turns out to have a similar "most methods aren't needed on an online-first web
+   client yet" shape, the same real-methods/loud-stub split W3b used (scoping decision recorded in
+   `CardRepository.kt`'s class KDoc) rather than a faithful full port. **Still outstanding, not
+   part of W3b's brief**: the paired A3 move of `CardRepositoryImpl` (Android) into
+   `shared/core-data/src/androidMain` — pick this up (via `android-kotlin-architect`) whenever
+   convenient, paired with a future repo slice or standalone, per plan §5's "paired A3 move" note.
+   **Google OAuth remains explicitly deferred** (user decision, memory
+   `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a blocking prerequisite to W3.
 2. **Follow-up finding to route to `backend-supabase-expert`** (surfaced during W2b, not fixed):
    `public.handle_new_user()` creates a `user_profiles` row for every `auth.users` insert,
    INCLUDING anonymous sign-ups — contradicting CLAUDE.md's documented "guests have no
@@ -327,3 +387,20 @@ without the user.
   the persisted value, proving the repository's own hydration path, not just the raw KV store.
   Zero `.gradle.kts` changes needed (transitive `api` exposure already covered both
   `kotlinx-serialization` and `core-domain`). Next slice: `CardRepository`.
+- 2026-08-03: **Web W3b done** (commits `ddcfa689` + `4e23d61a`): second W3 data-layer slice,
+  `WebCardRepository` (`shared/core-data` wasmJsMain) — the first slice backing a REAL screen
+  (Card Search), not a showcase. Split the 27-method `CardRepository` interface: 13 real
+  search/lookup methods delegate to the already-`commonMain` `ScryfallRemoteDataSource` (shared
+  rate limiter + TTL cache, reused as-is rather than rebuilt), backed by an in-memory
+  `MutableStateFlow<Map<String, Card>>` session cache for `observeCard`/`getCardsByIds`; the
+  remaining 14 Room-cache-only/tag-write methods throw a documented `UnsupportedOperationException`
+  instead of a silent no-op or faked Room read. Wired into `:webApp`'s Koin module (full Scryfall
+  stack assembled fresh, mirroring Android's Hilt shape) and a new `CardSearchScreen`/
+  `CardSearchViewModel` — the first real `:webApp` MVP screen. Verified live in Chromium: "Lightning
+  Bolt" resolves two real Scryfall results with real card art, reflowing correctly at
+  375/768/1280px with zero overflow. `CardGridItem` was NOT reusable (it takes a collection-only
+  `CollectionCardGroup`) — built a minimal `CardSearchResultTile` from `MagicCard`+`CardName`
+  instead, confirming the plan's documented contingency. Android's `CardRepositoryImpl` untouched;
+  `:app:assembleDebug` green. Next slice: `DeckRepository` (Auth/Profile already covered by
+  W2a/W2b). Outstanding: the paired A3 Android-impl move to `androidMain` was not part of this
+  slice's brief and remains open.
