@@ -5,6 +5,13 @@ package com.mmg.manahub.core.data.remote.decks
  *
  * Sync is driven by [updatedAt] epoch millis (Last-Write-Wins).
  * All methods return [Result] so callers can handle failures without try/catch.
+ *
+ * KMP web roadmap W3c (master plan §5/§6): moved from `:app` (androidMain-equivalent) to
+ * `:shared:core-data` commonMain so both Android's [com.mmg.manahub.core.sync.SyncManager]
+ * (Room-facing push/pull) and the web target's `WebDeckRepository` (remote-first, no local
+ * database) can share ONE contract for talking to the `decks`/`deck_cards` Supabase RPCs. The
+ * Room-facing entity mapping extensions ([toEntity]-equivalent) stay in `:app` since Room has no
+ * wasmJs target — only the pure Supabase-calling contract and its DTOs moved here.
  */
 interface DeckRemoteDataSource {
 

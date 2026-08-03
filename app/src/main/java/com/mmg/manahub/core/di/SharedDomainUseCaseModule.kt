@@ -11,6 +11,8 @@ import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSource
 import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
+import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.data.remote.edhrec.EdhrecCardTagEnrichmentSource
 import com.mmg.manahub.core.data.remote.edhrec.EdhrecCardTagEnrichmentSourceContract
 import com.mmg.manahub.core.data.repository.CardStrategyTagsRepositoryImpl
@@ -52,14 +54,22 @@ import javax.inject.Singleton
  * `KoinToHiltBridgeModule`'s two use cases because their Hilt-only consumer (`ScannerViewModel`) is built
  * LAZILY, strictly after `ManaHubApp.onCreate()` has called `startKoin()`.
  *
- * The two providers below feed classes with NO such luxury: [ScryfallRemoteDataSource] and
- * [ComputeCardTagsUseCase] are `@Inject` constructor params of `CardRepositoryImpl` /
- * `core.sync.SyncManager` (both `@Singleton`, still-Hilt — "repos stay Hilt-bridged"). Both impls are
- * eagerly built the moment `ManaHubApp`'s own `@Inject lateinit var` fields (`cardRepository`, etc.)
- * are populated — which Hilt does BEFORE `ManaHubApp.onCreate()`'s body runs, i.e. before
- * `startKoin()`. A `@Provides` that called into Koin here would crash on cold start with
- * "KoinApplication has not been started". [ScryfallCache] only exists to build
+ * The providers below feed classes with NO such luxury: [ScryfallRemoteDataSource],
+ * [DeckRemoteDataSource], and [ComputeCardTagsUseCase] are `@Inject` constructor params of
+ * `CardRepositoryImpl` / `core.sync.SyncManager` (both `@Singleton`, still-Hilt — "repos stay
+ * Hilt-bridged"). Both impls are eagerly built the moment `ManaHubApp`'s own `@Inject lateinit var`
+ * fields (`cardRepository`, etc.) are populated — which Hilt does BEFORE `ManaHubApp.onCreate()`'s
+ * body runs, i.e. before `startKoin()`. A `@Provides` that called into Koin here would crash on
+ * cold start with "KoinApplication has not been started". [ScryfallCache] only exists to build
  * [ScryfallRemoteDataSource] and has no other consumer, so it stays alongside it.
+ *
+ * ## KMP web roadmap W3c (2026-08-03)
+ * [DeckRemoteDataSource]'s concrete impl ([SupabaseDeckDataSource]) moved to `:shared:core-data`
+ * commonMain (shared with the web target's `WebDeckRepository`) and lost its `@Inject`/`@Singleton`
+ * (Hilt is androidMain-only), so the old `RepositoryModule.bindDeckRemoteDataSource` `@Binds` no
+ * longer compiles — replaced by [provideDeckRemoteDataSource] below, constructed manually exactly
+ * like [provideScryfallRemoteDataSource] already was. `SyncManager`'s push/pull behavior is
+ * unchanged: same singleton shape, same RPC calls, just built via `@Provides` instead of `@Inject`.
  *
  * ## KMP migration — Hilt→Koin cutover batch 3
  * `GetDraftableSetsUseCase`/`GetSetTierListUseCase`/`GetSetCardsPageUseCase` providers were DELETED
@@ -96,6 +106,13 @@ object SharedDomainUseCaseModule {
         crashReporter: CrashReporter,
     ): ScryfallRemoteDataSource =
         ScryfallRemoteDataSource(api, requestQueue, cache, DispatcherProvider(), crashReporter)
+
+    @Provides
+    @Singleton
+    fun provideDeckRemoteDataSource(
+        supabaseClient: SupabaseClient,
+    ): DeckRemoteDataSource =
+        SupabaseDeckDataSource(supabaseClient, DispatcherProvider())
 
     /**
      * Self-contained: builds its own [SuggestTagsUseCase]/`StrategyAnalyzer` instance rather than
