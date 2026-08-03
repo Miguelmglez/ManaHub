@@ -11,6 +11,8 @@ import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSource
 import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
+import com.mmg.manahub.core.data.remote.collection.SupabaseCollectionDataSource
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.data.remote.edhrec.EdhrecCardTagEnrichmentSource
@@ -55,9 +57,10 @@ import javax.inject.Singleton
  * LAZILY, strictly after `ManaHubApp.onCreate()` has called `startKoin()`.
  *
  * The providers below feed classes with NO such luxury: [ScryfallRemoteDataSource],
- * [DeckRemoteDataSource], and [ComputeCardTagsUseCase] are `@Inject` constructor params of
- * `CardRepositoryImpl` / `core.sync.SyncManager` (both `@Singleton`, still-Hilt — "repos stay
- * Hilt-bridged"). Both impls are eagerly built the moment `ManaHubApp`'s own `@Inject lateinit var`
+ * [DeckRemoteDataSource], [CollectionRemoteDataSource], and [ComputeCardTagsUseCase] are `@Inject`
+ * constructor params of `CardRepositoryImpl` / `UserCardRepositoryImpl` / `core.sync.SyncManager`
+ * (all `@Singleton`, still-Hilt — "repos stay Hilt-bridged"). Both impls are eagerly built the
+ * moment `ManaHubApp`'s own `@Inject lateinit var`
  * fields (`cardRepository`, etc.) are populated — which Hilt does BEFORE `ManaHubApp.onCreate()`'s
  * body runs, i.e. before `startKoin()`. A `@Provides` that called into Koin here would crash on
  * cold start with "KoinApplication has not been started". [ScryfallCache] only exists to build
@@ -70,6 +73,13 @@ import javax.inject.Singleton
  * longer compiles — replaced by [provideDeckRemoteDataSource] below, constructed manually exactly
  * like [provideScryfallRemoteDataSource] already was. `SyncManager`'s push/pull behavior is
  * unchanged: same singleton shape, same RPC calls, just built via `@Provides` instead of `@Inject`.
+ *
+ * ## KMP web roadmap W3d (2026-08-03)
+ * [CollectionRemoteDataSource]'s concrete impl ([SupabaseCollectionDataSource]) moved to
+ * `:shared:core-data` commonMain (shared with the web target's `WebUserCardRepository`) and lost
+ * its `@Inject`/`@Singleton` — the old `RepositoryModule.bindCollectionRemoteDataSource` `@Binds`
+ * no longer compiles, replaced by [provideCollectionRemoteDataSource] below, constructed manually
+ * exactly like [provideDeckRemoteDataSource]. `SyncManager`'s push/pull behavior is unchanged.
  *
  * ## KMP migration — Hilt→Koin cutover batch 3
  * `GetDraftableSetsUseCase`/`GetSetTierListUseCase`/`GetSetCardsPageUseCase` providers were DELETED
@@ -113,6 +123,13 @@ object SharedDomainUseCaseModule {
         supabaseClient: SupabaseClient,
     ): DeckRemoteDataSource =
         SupabaseDeckDataSource(supabaseClient, DispatcherProvider())
+
+    @Provides
+    @Singleton
+    fun provideCollectionRemoteDataSource(
+        supabaseClient: SupabaseClient,
+    ): CollectionRemoteDataSource =
+        SupabaseCollectionDataSource(supabaseClient, DispatcherProvider())
 
     /**
      * Self-contained: builds its own [SuggestTagsUseCase]/`StrategyAnalyzer` instance rather than

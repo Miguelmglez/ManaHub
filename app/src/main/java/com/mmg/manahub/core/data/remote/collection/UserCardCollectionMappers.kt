@@ -1,29 +1,17 @@
 package com.mmg.manahub.core.data.remote.collection
 
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 /**
- * DTO mirroring the `user_card_collection` Supabase table.
+ * Room-entity mapping extensions for [UserCardCollectionDto] (KMP web roadmap W3d).
  *
- * All timestamps are epoch millis (BIGINT in Postgres = Long in Kotlin).
- * No Instant serialization needed — Supabase stores and returns them as plain integers.
+ * The DTO itself and the [CollectionRemoteDataSource] contract it serves moved to
+ * `:shared:core-data` commonMain — both are pure Supabase wire shapes with zero Room dependency.
+ * These two extension functions stay here (androidMain-equivalent) because Room has no wasmJs
+ * target: [UserCardCollectionEntity] only exists on Android. [UserCardCollectionDto] is resolved
+ * here via same-package visibility (no import needed — it's declared in `:shared:core-data`'s
+ * commonMain, which `:app` depends on).
  */
-@Serializable
-data class UserCardCollectionDto(
-    val id: String,
-    @SerialName("user_id") val userId: String,
-    @SerialName("scryfall_id") val scryfallId: String,
-    val quantity: Int,
-    @SerialName("is_foil") val isFoil: Boolean,
-    val condition: String,
-    val language: String,
-    @SerialName("is_for_trade") val isForTrade: Boolean,
-    @SerialName("is_deleted") val isDeleted: Boolean,
-    @SerialName("updated_at") val updatedAt: Long,
-    @SerialName("created_at") val createdAt: Long,
-)
 
 /** Maps a remote DTO to the local Room entity. */
 fun UserCardCollectionDto.toEntity(): UserCardCollectionEntity = UserCardCollectionEntity(
