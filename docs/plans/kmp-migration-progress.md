@@ -36,9 +36,49 @@ without the user.
 
 ---
 
-## STATUS (2026-07-30)
+## STATUS (2026-08-03)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b DONE.**
+
+- ✅ **Web W2b — DONE** (2026-08-03, branch `kmp-migration-web`, commits `f159d441` + `4629a484`).
+  Master plan §2.2 Action 2 (Ktor-level auth-header injection in commonMain), in two checkpoints.
+  **Google OAuth is explicitly OUT of scope / deliberately deferred** — the user chose to defer
+  rather than pick an implementation approach on the spot (memory
+  `project_kmp_web_google_oauth_deferred`); do not treat it as blocking.
+  1. **Shared Ktor auth-header plugin** — new `installSupabaseAuthHeaders(supabaseClient, anonKey)`
+     (`shared/core-data` commonMain, `remote/SupabaseAuthHeaderPlugin.kt`): a plain
+     `HttpClientConfig<*>` extension using `createClientPlugin` (same idiom already proven by
+     `SupabaseClientFactory.kt`'s call-counter plugin) that injects `apikey`/
+     `Authorization: Bearer <token or anonKey>`/`Content-Type`/`Accept` on every request (token read
+     fresh per-request via `Auth.currentSessionOrNull()`), plus the shared `ContentNegotiation`
+     (kotlinx-json, `ignoreUnknownKeys=true`, `encodeDefaults=true`) and `expectSuccess=true` — one
+     mechanism, installed identically on Android (`OkHttp` engine) and Web (`Js` engine).
+     `AuthKoinModule.kt`'s `"supabaseKtor"` single now builds on a bare (logging-only) OkHttp
+     engine + this plugin. **Important nuance found mid-task, not anticipated by the original
+     brief**: the separate `@Named("supabase")` OkHttpClient single was intentionally left
+     UNTOUCHED (still has its own interceptor) because `AuthRepositoryImpl` makes two RAW
+     (non-Ktor) OkHttp calls to Edge Functions (`delete-current-user`,
+     `set-google-account-password`) that bypass Ktor entirely and rely on that interceptor for
+     header injection — removing it would have silently broken both. Verified:
+     `:app:assembleDebug` green; `AuthRepositoryImplTest`'s one pre-existing failure (session
+     mapping, unrelated) reproduces identically on baseline via git-stash A/B, confirming no
+     regression from this change.
+  2. **Web wiring** — `WebAppKoinModule.kt` gains a `@Named("supabaseKtor")` `HttpClient(Js)` using
+     the same plugin, plus `UserProfileClient`/`FriendshipClient` construction (both already
+     commonMain, just needed a web construction site). `AuthViewModel` gained a one-time, clearly-
+     marked plumbing smoke check: after guest sign-in resolves, it calls
+     `UserProfileClient.fetchProfile()` and shows the outcome in `AuthScreen` — not a real feature,
+     exists only to prove the Bearer token is read correctly at wasmJs runtime. **Verified live in
+     Chromium (Playwright)**: guest sign-in → `POST .../auth/v1/signup` (200) → `GET
+     .../rest/v1/user_profiles?id=eq.<that session's own uid>&select=...` (200, 1 row) — getting
+     back exactly the caller's own row is strong proof the correct per-session token was injected
+     (a wrong/stale token 401/403s; a missing one falls back to the anon key and would RLS-deny).
+     **Finding for follow-up, NOT fixed here (out of scope)**: this result contradicts CLAUDE.md's
+     documented "guests have no user_profiles row" invariant — confirmed via Supabase MCP that
+     `public.handle_new_user()` (the `on_auth_user_created` trigger) inserts a `user_profiles` row
+     for EVERY `auth.users` insert unconditionally, anonymous sign-ups included. Needs a dedicated
+     `backend-supabase-expert` look. Both checkpoints passed the `android-security-auditor`
+     pre-push gate clean. Full detail: memory `project_kmp_spike_findings` (W2b addendum).
 
 - ✅ **Web W2a — DONE** (2026-07-30, branch `kmp-migration-web`, commits `6481a7f6` + `930d56c3`).
   Guest-only auth on web, in two checkpoints:
@@ -155,26 +195,32 @@ without the user.
 
 ## NEXT STEP
 
-1. **Fix (or hand off) the pre-existing community-decks test compile break** — two uncommitted test
+1. **Web W3 — web data layer** (owner `kmp-web-fullstack-dev`): the shared Supabase client + Ktor
+   auth plumbing (W2a/W2b) is now in place on both platforms. W3 is the Supabase-remote-first +
+   IndexedDB/localStorage-cache data layer behind the existing `commonMain` repository interfaces
+   for the web target (Room stays Android-only, per the KMP migration rules). Full detail:
+   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6 (W3 row), and
+   `kmp-migration-plan.md` §5. **Google OAuth remains explicitly deferred** (user decision,
+   memory `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a blocking prerequisite
+   to W3; it needs the user's mechanism choice + a Google Cloud web Client ID first, whenever that
+   lands it can proceed independently of W3.
+2. **Follow-up finding to route to `backend-supabase-expert`** (surfaced during W2b, not fixed):
+   `public.handle_new_user()` creates a `user_profiles` row for every `auth.users` insert,
+   INCLUDING anonymous sign-ups — contradicting CLAUDE.md's documented "guests have no
+   user_profiles row" invariant. Needs a decision: is the trigger's behavior correct and the
+   CLAUDE.md line stale, or should the trigger skip anonymous users? See memory
+   `project_kmp_spike_findings` (W2b addendum) for the exact trigger/function definitions.
+3. **Fix (or hand off) the pre-existing community-decks test compile break** — two uncommitted test
    files (`CommunityDecksRepositoryImplTest.kt`, `CommunityDecksSearchViewModelTest.kt`) reference
    `deckFormatId`/`format`/`ALL`/`featuredFormatDecks` symbols that don't exist on the currently
    uncommitted community-decks production WIP on this branch. This is the user's own in-progress
    work (not touched by the web agent, per explicit instruction) and has now blocked
-   `:app:testDebugUnitTest` from producing a clean pass/fail/skip count across BOTH the W0 and W1
-   sessions. Needs resolving (by whoever owns that WIP) before the 1967/118/2 floor can be
-   reconfirmed on this branch.
-2. **Web W2b — Google OAuth + Action 2 auth-header migration** (owner `kmp-web-fullstack-dev`):
-   W2a covered the shared `SupabaseClient` factory + guest-only sign-in with a real localStorage
-   `SessionManager`. Still open: Google OAuth redirect/PKCE flow on web (`backend-supabase-expert`
-   verifies CORS + redirect URLs for the web origin), and master plan §2.2 Action 2 — the
-   Ktor-level auth-header injection in `commonMain` (replacing the Android-only OkHttp interceptor
-   that `UserProfileClient`/`FriendshipClient` currently rely on for `apikey`/Bearer injection).
-   Same 375/768/1280px responsive gate as W1/W2a. Full detail:
-   `C:\Users\Miguel\.claude\plans\abundant-giggling-comet.md` §6 (W2 row), and
-   `kmp-migration-plan.md` §5.
-3. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
+   `:app:testDebugUnitTest` from producing a clean pass/fail/skip count across every web session
+   so far (W0 through W2b). Needs resolving (by whoever owns that WIP) before the 1967/118/2 floor
+   can be reconfirmed on this branch.
+4. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
    Deck Doctor (last open Android hardening item; fixes → architect).
-4. **A1 — on-device WorkerFactory validation** (first time a device/emulator is available).
+5. **A1 — on-device WorkerFactory validation** (first time a device/emulator is available).
 
 ## LOG (compact; full detail in git history of this file)
 
@@ -212,3 +258,17 @@ without the user.
   the real anonymous JWT's `is_anonymous` claim lives at the top level, not under `app_metadata` —
   Android's existing `isAnonymous` derivation likely has the same latent miss; flagged for a
   follow-up audit, not touched in this slice.
+- 2026-08-03: **Web W2b done** (commits `f159d441` + `4629a484`): shared
+  `installSupabaseAuthHeaders` Ktor plugin (`shared/core-data` commonMain) replacing the
+  Android-only OkHttp interceptor for `UserProfileClient`/`FriendshipClient` traffic — installed
+  identically on Android (`OkHttp`) and Web (`Js`). Kept `AuthRepositoryImpl`'s separate raw-OkHttp
+  Edge Function calls (`delete-current-user`/`set-google-account-password`) working unmodified via
+  their own untouched interceptor-bearing client. Wired the shared client +
+  `UserProfileClient`/`FriendshipClient` into `:webApp`'s `WebAppKoinModule.kt`. Verified live in
+  Chromium: guest sign-in → real authenticated `GET user_profiles` returned exactly the caller's
+  own row (200, 1 row) — strong proof of correct per-session Bearer-token injection on wasmJs.
+  Found (not fixed, routed to `backend-supabase-expert`): `handle_new_user()` creates a
+  `user_profiles` row for anonymous sign-ups too, contradicting CLAUDE.md's "guests have no
+  user_profiles row" line. Google OAuth remains explicitly deferred per user decision (memory
+  `project_kmp_web_google_oauth_deferred`) — W3 (web data layer) is the actual next step, not
+  blocked on OAuth.
