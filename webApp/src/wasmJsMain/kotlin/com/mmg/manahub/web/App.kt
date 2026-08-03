@@ -16,14 +16,16 @@ import com.mmg.manahub.core.ui.layout.AdaptiveScaffold
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.MagicTheme
 import com.mmg.manahub.web.auth.AuthScreen
+import com.mmg.manahub.web.search.CardSearchScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
 
 /**
- * Root composable for `:webApp` (web roadmap W1, extended in W2a). Real navigation destinations
- * land in W4 — the [AdaptiveNavItem]s here are still DEMO placeholders exercising
- * [AdaptiveScaffold]'s responsive nav chrome (bottom bar / collapsed rail / expanded rail)
- * end-to-end, EXCEPT "Account", which is now wired to the real [AuthScreen] (web roadmap W2a) so
- * guest sign-in can be exercised end-to-end inside the existing responsive shell.
+ * Root composable for `:webApp` (web roadmap W1, extended in W2a/W3b). Real destination-level
+ * navigation (back stack, deep links) lands in W4 — the [AdaptiveNavItem]s here are still simple
+ * index-switched placeholders exercising [AdaptiveScaffold]'s responsive nav chrome (bottom bar /
+ * collapsed rail / expanded rail) end-to-end, EXCEPT "Account" (wired to [AuthScreen], W2a) and
+ * "Search" (wired to [CardSearchScreen], W3b — the first REAL MVP screen, backed by
+ * `WebCardRepository`/live Scryfall data, not a showcase).
  */
 @Composable
 fun App() {
@@ -60,6 +62,7 @@ fun App() {
             ),
         ) { windowSizeClass ->
             when (selectedNavIndex) {
+                1 -> CardSearchScreen(windowSizeClass = windowSizeClass)
                 3 -> AuthScreen()
                 else -> ThemeShowcaseScreen(
                     windowSizeClass = windowSizeClass,
