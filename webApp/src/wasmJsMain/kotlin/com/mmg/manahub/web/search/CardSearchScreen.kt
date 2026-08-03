@@ -49,7 +49,9 @@ import org.koin.compose.viewmodel.koinViewModel
  * content -- via [CardSearchUiState].
  *
  * There is deliberately no per-card detail navigation yet (out of scope for this slice -- a future
- * web Card Detail screen is a separate task); tapping a result is a no-op placeholder.
+ * web Card Detail screen is a separate task); tapping a result adds it to the signed-in session's
+ * collection instead (web roadmap W3d — see [CardSearchViewModel.addToCollection]), surfacing a
+ * transient inline confirmation/error banner above the grid.
  */
 @Composable
 fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass) {
@@ -86,6 +88,14 @@ fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass) {
             },
         )
 
+        uiState.addToCollectionMessage?.let { message ->
+            Text(
+                text = message,
+                style = typography.bodySmall,
+                color = colors.textSecondary,
+            )
+        }
+
         Box(modifier = Modifier.fillMaxSize().padding(top = spacing.sm)) {
             when {
                 uiState.isLoading && uiState.cards.isEmpty() -> LoadingState(colors.primaryAccent)
@@ -110,7 +120,7 @@ fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass) {
                     items(uiState.cards, key = { it.scryfallId }) { card ->
                         CardSearchResultTile(
                             card = card,
-                            onClick = { /* Card detail navigation is a future slice. */ },
+                            onClick = { viewModel.addToCollection(card) },
                             modifier = Modifier.padding(spacing.xs),
                         )
                     }
