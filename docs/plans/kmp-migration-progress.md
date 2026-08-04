@@ -38,7 +38,42 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d DONE — this completes the master plan's originally-scoped MVP screen list.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean.**
+
+- ✅ **Web W5b (responsive regression sweep) — DONE** (2026-08-04, branch `kmp-migration-web`,
+  commits `b6ba4989` + `a42e12bf`). Master plan §5 W5, reframed by the session's approved plan as a
+  safety-net sweep (every screen was already gated at 375/768/1280px during its own W1-W4d slice) —
+  swept all 8 real screens (Theme, Home, Account, Card Search, Card Detail, Decks, Deck Editor,
+  Collection) at two edge widths never previously tested: 320px (iPhone-SE-class) and 1920px
+  (ultra-wide desktop).
+  1. **Cross-cutting fix (`b6ba4989`), affecting all 8 screens**: `AdaptiveScaffold`'s
+     LARGE-breakpoint 1200.dp content clamp was a structural Compose modifier-ordering no-op
+     (`.fillMaxWidth().then(widthIn(max=1200.dp))` — `fillMaxWidth` as the outer modifier locks the
+     width before `widthIn` can cap it). Verified via a new DOM-ruler-overlay technique (precise
+     pixel measurement, not eyeballing): at 1920px content spanned ~1656.dp instead of the
+     documented ~1136.dp. Fixed by reordering (`widthIn` outer, `fillMaxWidth` inner). Also fixed:
+     bottom-bar nav labels ("Collection", "Account") wrapped mid-WORD at 320px — added
+     `maxLines=1`+ellipsis+center-align.
+  2. **Deck Editor fixes (`a42e12bf`)**: the 3-chip Format row overflowed at 320px and
+     `FilterChip`'s "Draft" label wrapped one CHARACTER per line; the per-card board row's
+     price/quantity text wrapped MID-NUMBER (`"$1.4"`/`"4"`) since `CardListItem(weight(1f))` was
+     squeezed against three full-48.dp `IconButton`s. Both fixed with
+     `.horizontalScroll(rememberScrollState())` (touch targets kept at their full 48.dp — never
+     traded away for layout fit); `weight(1f)` had to become a fixed `220.dp` width since
+     `weight()` and `horizontalScroll` are mutually exclusive on the same Row (bounded vs. infinite
+     max-width constraint).
+  3. **Every other screen was clean at both widths**, verified with REAL populated-state data (a
+     created deck, an added card), not just empty states — a full guest-sign-in → search → add →
+     create-deck → deck-editor → home → card-detail loop run twice (320px, 1920px), zero
+     `scrollWidth` overflow at any step. `:app:assembleDebug` UP-TO-DATE both times (zero Android
+     source touched — pure `webApp/`/`shared/core-ui` commonMain layout code).
+  4. **Reusable finding for future sweeps**: the page-level `scrollWidth`/`clientWidth` overflow
+     check is necessary but NOT sufficient — both real bugs this slice were Compose-INTERNAL text
+     corruption inside an already-bounded Row (a squeezed child wrapping text mid-word/mid-number),
+     invisible to that DOM-level check. Only caught via visual screenshot inspection of every dense
+     multi-child Row.
+  Full detail: memory `project_kmp_spike_findings` (W5b addendum) and
+  `.claude/agent-memory/kmp-web-fullstack-dev/project_w5b_responsive_regression_sweep.md`.
 
 - ✅ **Web security-pass cleanup — DONE** (2026-08-04, branch `kmp-migration-web`, commits
   `0e5dc3bf`/`18ffd87d`/`2c888077`). Two MEDIUM findings from a full security pass on the web
@@ -626,20 +661,33 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W4 is now COMPLETE — W4a/W4b/W4c/W4d all DONE (see STATUS above).** W4d (Home screen)
-   closes out the master plan's originally-scoped MVP screen list (Auth → Search/CardDetail →
-   Collection → Decks/Deck Studio → News → reduced Home), modulo the two still-deferred W3 slices
-   (News/CommunityDecks, below) and the undecided Android-nav-unification question. The natural
-   next MASTER-PLAN phases are **W5 (parity/polish/security/telemetry regression sweep)** and
-   **W6 (release)** per the roadmap — but **this session scoped every single W4 screen down HARD
-   from the master plan's original per-screen assumptions** (e.g. Card Detail dropped tag
-   editing/print-switching/rulings; Deck Editor dropped Deck Doctor/wizard/playtest/import-export;
-   Home dropped the entire 17-widget board down to 2 static strips + 3 buttons). Given that pattern,
-   **a fresh look at what's actually left/valuable is warranted before blindly kicking off W5** —
-   don't assume the master plan's original W5 scope still matches reality; re-derive it against
-   what W4 actually shipped. Options to weigh with the user, none blocking each other:
+1. **Web W4 + W5b are now COMPLETE (see STATUS above).** W4d (Home screen) closed out the master
+   plan's originally-scoped MVP screen list; W5b (2026-08-04, commits `b6ba4989`/`a42e12bf`) swept
+   every screen at 320px/1920px+ and fixed the two real bugs it found (cross-cutting
+   `AdaptiveScaffold` clamp + Deck Editor text-wrap). **What remains open under the master plan's
+   W5 umbrella, and what's still deferred elsewhere:**
+   - **The telemetry framework choice is a REAL, OPEN USER DECISION — not something to pick
+     autonomously.** The master plan's W5 scope includes telemetry/analytics for the web target,
+     but Android's Firebase Crashlytics/Analytics stack has no ready wasmJs equivalent (Firebase
+     JS SDK vs. a hand-rolled web analytics client vs. deferring entirely are all live options with
+     real tradeoffs — cost, privacy/consent implications for an unauthenticated guest-first web
+     app, and effort). Do not implement any telemetry plumbing for `:webApp` until the user has
+     chosen a direction.
+   - **W3's two remaining data-layer slices stay deferred** — `NewsRepository` (needs a Cloudflare
+     Worker CORS proxy first, memory `project_kmp_web_news_cors_deferred`) and `CommunityDecks`
+     (blocked on the user's own active uncommitted WIP on this branch, memory
+     `project_kmp_web_communitydecks_deferred`). Re-check both before resuming either.
+   - **The Android-nav-artifact-unification question (androidx → JetBrains CMP navigation-compose
+     on Android too, sharing one `Screen.kt`) remains explicitly UNDECIDED and NOT started** — W4a
+     deliberately scoped around it (see STATUS). Raise it with the user before ever touching
+     `app/src/main/java/com/mmg/manahub/app/navigation/`.
+   - **A3 debt item still outstanding**: the paired move of Android's `CardRepositoryImpl` into
+     `shared/core-data/src/androidMain` (W3b intentionally left this out of its own brief) — pick
+     up via `android-kotlin-architect` whenever convenient, not blocking.
+   - **Google OAuth remains explicitly deferred** (user decision, memory
+     `project_kmp_web_google_oauth_deferred`) — not a blocking prerequisite to anything above.
    - **Deck Studio / Home richer-porting remain optional, additive future passes**, not required to
-     call the MVP "done" — W4c/W4d proved the repository layer needs zero further work for either
+     call the MVP "done" — the repository layer needs zero further work for either
      (`WebDeckRepository`/`WebCardRepository`/`DeckRepository`/`UserCardRepository` already cover
      every call a richer UI would make).
    - **The `PlatformCapabilities`-gated "not available on web" placeholder remains NOT
@@ -648,18 +696,9 @@ without the user.
      Theme/Account) — do this once a screen needs to link toward a genuinely non-MVP feature
      (game/life-counter, online, voice, scanner, playtest, push, gamification UI) and show a
      graceful message instead of a dead link.
-   - **The Android-nav-artifact-unification question (androidx → JetBrains CMP navigation-compose
-     on Android too, sharing one `Screen.kt`) remains explicitly UNDECIDED and NOT started** — W4a
-     deliberately scoped around it (see STATUS). Raise it with the user before ever touching
-     `app/src/main/java/com/mmg/manahub/app/navigation/`.
-   - **W3's two remaining slices stay deferred** — `NewsRepository` (needs a Cloudflare Worker CORS
-     proxy first, memory `project_kmp_web_news_cors_deferred`) and `CommunityDecks` (blocked on the
-     user's own active uncommitted WIP on this branch, memory
-     `project_kmp_web_communitydecks_deferred`). Re-check both before resuming either. **Still
-     outstanding, not part of any slice's brief**: the paired A3 move of `CardRepositoryImpl`
-     (Android) into `shared/core-data/src/androidMain` — pick up via `android-kotlin-architect`
-     whenever convenient. **Google OAuth remains explicitly deferred** (user decision, memory
-     `project_kmp_web_google_oauth_deferred`) — not a blocking prerequisite to anything above.
+   - **W6 (release: Cloudflare Pages deploy + CI + a real mobile-browser device check) is the
+     natural next phase once the telemetry decision lands**, per the master plan roadmap — not
+     started.
 2. ✅ **RESOLVED (2026-08-03)** — the `handle_new_user()` anonymous-user finding from W2b. User
    approved a DB-level fix: `public.handle_new_user()` now guards `is_anonymous` (migration
    `fix_handle_new_user_skip_anonymous_users`) and the 10 pre-existing spurious `user_profiles`
@@ -815,3 +854,20 @@ without the user.
   green (UP-TO-DATE); diff confirmed 4 files, all `:webApp`-only. This completes the master plan's
   originally-scoped MVP screen list — NEXT STEP flags that W5 should get a fresh scope pass rather
   than blindly starting, since every W4 screen was scoped WAY down from the plan's assumptions.
+- 2026-08-04: **Web W5b done** (commits `b6ba4989` + `a42e12bf`): responsive regression sweep of
+  all 8 real screens at 320px/1920px+ (edge widths never covered by the standard 375/768/1280px
+  per-screen gate). Found + fixed a cross-cutting `AdaptiveScaffold` bug (the LARGE-breakpoint
+  1200.dp clamp was a `fillMaxWidth()`-before-`widthIn(max=)` Compose modifier-ordering no-op,
+  confirmed via a new DOM-ruler-overlay measurement technique — content spanned ~1656.dp instead of
+  the documented ~1136.dp at 1920px; fixed by reordering) plus a bottom-bar nav-label mid-word-wrap
+  bug (added maxLines=1+ellipsis). Found + fixed two Deck-Editor-only bugs at 320px (the 3-chip
+  Format row overflowed and wrapped "Draft" one character per line; the board-row price/quantity
+  text wrapped mid-number since `CardListItem(weight(1f))` was squeezed against three 48.dp
+  `IconButton`s) — both fixed with `horizontalScroll` (touch targets never shrunk below 48.dp).
+  Every other screen (Theme, Home, Account, Card Search, Card Detail, Decks, Collection) was clean
+  at both widths, verified with real populated-state data via a full guest-sign-in → search → add →
+  create-deck → deck-editor → home → card-detail loop run at each width. `:app:assembleDebug`
+  UP-TO-DATE both times (zero Android source touched). This completes the master plan's W5
+  responsive-safety-net scope; the telemetry-framework choice remains a real, open user decision
+  (not implemented), and W3's News/CommunityDecks slices + the Android-nav-unification question stay
+  deferred/undecided per NEXT STEP.
