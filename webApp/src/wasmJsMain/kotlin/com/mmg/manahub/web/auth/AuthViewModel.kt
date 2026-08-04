@@ -2,6 +2,8 @@ package com.mmg.manahub.web.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.web.common.toUserFacingMessage
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -32,6 +34,7 @@ sealed interface AuthUiState {
  */
 class AuthViewModel(
     supabaseClient: SupabaseClient,
+    private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
     private val auth = supabaseClient.auth
@@ -59,8 +62,8 @@ class AuthViewModel(
                 auth.signInAnonymously()
                 // uiState updates via the sessionStatus collector above once the auth plugin
                 // publishes the new Authenticated status -- no need to set it here directly.
-            } catch (e: Exception) {
-                _uiState.value = AuthUiState.Error(e.message ?: "Guest sign-in failed")
+            } catch (e: Throwable) {
+                _uiState.value = AuthUiState.Error(e.toUserFacingMessage("sign in as guest", crashReporter))
             } finally {
                 _isSigningIn.value = false
             }

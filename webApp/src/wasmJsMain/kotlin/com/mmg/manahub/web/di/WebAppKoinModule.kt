@@ -191,13 +191,20 @@ val webAppKoinModule = module {
     }
 
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
-    viewModel { AuthViewModel(get()) }
-    viewModel { CardSearchViewModel(cardRepository = get(), userCardRepository = get()) }
-    viewModel { DeckListViewModel(deckRepository = get()) }
+    viewModel { AuthViewModel(supabaseClient = get(), crashReporter = get()) }
+    viewModel {
+        CardSearchViewModel(cardRepository = get(), userCardRepository = get(), crashReporter = get())
+    }
+    viewModel { DeckListViewModel(deckRepository = get(), crashReporter = get()) }
     viewModel { CollectionViewModel(userCardRepository = get()) }
     viewModel { params -> CardDetailViewModel(scryfallId = params.get(), cardRepository = get()) }
     viewModel { params ->
-        DeckEditorViewModel(deckId = params.get(), deckRepository = get(), cardRepository = get())
+        DeckEditorViewModel(
+            deckId = params.get(),
+            deckRepository = get(),
+            cardRepository = get(),
+            crashReporter = get(),
+        )
     }
     viewModel { HomeViewModel(deckRepository = get(), userCardRepository = get()) }
 }

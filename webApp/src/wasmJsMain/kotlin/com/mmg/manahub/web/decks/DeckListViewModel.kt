@@ -2,8 +2,10 @@ package com.mmg.manahub.web.decks
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.DeckSummary
+import com.mmg.manahub.web.common.toUserFacingMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,7 @@ data class DeckListUiState(
  */
 class DeckListViewModel(
     private val deckRepository: DeckRepository,
+    private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckListUiState())
@@ -60,8 +63,8 @@ class DeckListViewModel(
                 // No manual re-fetch needed here -- observeAllDeckSummaries() above already
                 // reflects WebDeckRepository's in-memory cache, which createDeck() updates
                 // synchronously before returning.
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Failed to create deck.") }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(error = e.toUserFacingMessage("create the deck", crashReporter)) }
             } finally {
                 _uiState.update { it.copy(isCreating = false) }
             }
