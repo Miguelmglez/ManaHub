@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.auth.data.repository
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.common.decodeIsAnonymousClaim
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.dto.UpdateAvatarUrlDto
@@ -41,7 +42,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -602,6 +602,16 @@ class AuthRepositoryImpl(
      * Fallback to email prefix ONLY for non-Google providers.
      * [AuthUser.avatarUrl] is ignored for Google provider to avoid using Google profile pic.
      *
+     * [AuthUser.isAnonymous] is always `false` here: GoTrue puts `is_anonymous` as a TOP-LEVEL
+     * claim on the session's JWT access token, not on [UserInfo] itself (verified via `auth-kt`
+     * sources — `UserInfo` has no `isAnonymous`/`is_anonymous` field anywhere, nested or not), so
+     * this mapper genuinely cannot answer it from a bare `UserInfo`. That default is correct for
+     * every call site of this function EXCEPT [toSessionState] (the sole path whose result feeds
+     * [AuthRepository.sessionState], which is where every consumer reads `.isAnonymous` from) —
+     * every other call site is an email/Google sign-in or profile-update flow that a guest session
+     * can never reach. [toSessionState] corrects the field via `.copy(isAnonymous = ...)` using
+     * [decodeIsAnonymousClaim] against the session's access token, which DOES carry the claim.
+     *
      * Internal to allow overriding in unit tests (MockK has trouble with UserInfo extension properties).
      */
     internal fun mapUserInfoToAuthUser(userInfo: UserInfo): AuthUser {
@@ -626,8 +636,6 @@ class AuthRepositoryImpl(
             avatarUrl
         }
 
-        val isAnonymous = userInfo.appMetadata?.get("is_anonymous")?.jsonPrimitive?.booleanOrNull == true
-
         return AuthUser(
             id = userInfo.id,
             email = userInfo.email,
@@ -639,7 +647,7 @@ class AuthRepositoryImpl(
             // It is only set to true after enrichment from the user_profiles row via
             // the get_profile_by_user_id RPC or the complete_user_profile RPC.
             profileCompleted = false,
-            isAnonymous = isAnonymous,
+            // isAnonymous is intentionally left as the default (false) here — see the KDoc above.
         )
     }
 
@@ -733,7 +741,12 @@ class AuthRepositoryImpl(
 
     private fun SessionStatus.toSessionState(): SessionState = when (this) {
         is SessionStatus.Authenticated -> session.user
-            ?.let { SessionState.Authenticated(mapUserInfoToAuthUser(it)) }
+            ?.let { mapUserInfoToAuthUser(it) }
+            // The JWT access token — not UserInfo — is where GoTrue's top-level `is_anonymous`
+            // claim actually lives. This is the ONE call site that corrects it, because this is
+            // the sole path that feeds `sessionState`, which every `.isAnonymous` consumer reads.
+            ?.copy(isAnonymous = decodeIsAnonymousClaim(session.accessToken))
+            ?.let { SessionState.Authenticated(it) }
             ?: SessionState.Unauthenticated
 
         is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
