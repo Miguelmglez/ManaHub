@@ -38,7 +38,63 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion (approved 2026-08-04): Settings DONE — Profile and Add Card are next, in that order.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion (approved 2026-08-04): Settings + Profile DONE — Add Card is next.**
+
+- ✅ **Web scope expansion, Profile screen — DONE** (2026-08-04, branch `kmp-migration-web`, commit
+  `12e6874b`). Second of the three approved slices (Settings → Profile → Add Card). Deliberately
+  MINIMAL per the task brief: nickname edit, avatar DISPLAY only (no upload — needs a Storage
+  bucket + file picker, out of scope), read-only game tag, sign out. Explicitly excludes every
+  gamification surface (achievements/stats/level/cosmetics/`?tab=` deep link) — that's Android's
+  `ProfileScreen.kt`/`ProfileViewModel.kt`'s scope, not web v1's.
+  1. **Pure UI slice — zero new repository work**, same pattern as Settings: `UserProfileClient`
+     (`shared/core-data`, already registered in `WebAppKoinModule.kt` since W2b) already had
+     `fetchProfile`/`updateNickname`. New `webApp/.../profile/{ProfileScreen,ProfileViewModel}.kt`,
+     reachable via a new "Profile" row on `AuthScreen` (shown only while `AuthUiState.SignedIn`),
+     same "hangs off Account, not a new nav-rail tab" precedent as Settings. New zero-arg
+     `ProfileRoute` in `WebNavGraph.kt`.
+  2. **Anonymous guest sessions get a distinct `ProfileUiState.Guest`** — per CLAUDE.md's Online
+     sessions invariant ("Never call `upsertUserProfile` for anonymous users — they have no
+     `user_profiles` row"), the ViewModel decodes the JWT's `is_anonymous` claim (same
+     `decodeIsAnonymousClaim` helper `AuthViewModel` uses) and skips the `fetchProfile` network call
+     entirely for a guest, showing an explanatory message + Sign Out instead of attempting a fetch
+     guaranteed to return nothing.
+  3. **Discovered and fixed a genuine backend bug, not a web-code bug**, via live round-trip testing
+     against a real (non-anonymous) Supabase account: `update_user_nickname`, `complete_user_profile`,
+     and `get_profile_by_user_id` are `SECURITY INVOKER` (correct) but used `RETURNING *`/`SELECT *`
+     against `public.user_profiles`, which has COLUMN-LEVEL (not table-level) grants — `email`/
+     `referral_code` are deliberately NOT granted to `authenticated`/`anon`. Under INVOKER, `*`
+     requires SELECT on every column for the calling role, so the statement failed with
+     `42501: permission denied for table user_profiles` for ANY real signed-in user (Android
+     included — same shared `UserProfileClient`) — invisible until now because guest-only sessions
+     never call these RPCs. Delegated to `backend-supabase-expert`, fixed by narrowing
+     `RETURNING */SELECT *` to an explicit column list matching `UserProfileDto`, verified live,
+     `get_advisors` clean. See `.claude/agent-memory/backend-supabase-expert/
+     feedback_invoker_star_vs_column_grants.md`.
+  4. **Verified live in Chromium (Playwright)**: seeded a REAL (non-anonymous) test Supabase Auth
+     user directly via SQL (`auth.users`/`auth.identities` + `crypt()`-hashed password, since Google
+     OAuth is still deferred and there's no other way to reach a non-guest session), signed in via
+     the real `/auth/v1/token?grant_type=password` endpoint to get a genuine GoTrue JWT, injected the
+     resulting `UserSession` into a Playwright `storageState` (pre-populated localStorage BEFORE the
+     WASM app boots — see the harness gotcha below). Confirmed: Loaded state shows the server-seeded
+     nickname/game tag; edited the nickname through the real `OutlinedTextField`, saved, got "Saved."
+     with the RPC-returned value; **independently re-read via raw SQL** (`select nickname from
+     user_profiles`) to confirm server truth, not optimistic UI; loaded a **brand-new browser context**
+     restored from the ORIGINAL (pre-edit) storageState and confirmed the new nickname still loads —
+     proves real persistence across a cold app boot, not in-memory state. Verified guest state (no
+     fetch, correct message). Verified sign-out: `auth.signOut()` cleared `localStorage`, navigated to
+     `AccountRoute`, "Profile" row correctly disappeared. Responsive 375/768/1280px: zero
+     `scrollWidth` overflow at any width. Test fixture (`auth.users` row) deleted afterward
+     (cascade-confirmed 0 remaining rows in `auth.users`/`user_profiles`). `:app:assembleDebug`
+     untouched (zero Android source touched this slice); leak grep on `shared/*/src/commonMain`
+     empty (zero shared-module change).
+  5. **Harness gotcha (testing-only, not a product bug)**: `page.goto(url + '#hash')` for a
+     FRAGMENT-ONLY URL change on an already-loaded page is a same-document navigation in Chromium —
+     it does NOT reboot the WASM module, so `page.evaluate(() => localStorage.setItem(...))` done
+     AFTER the first page load has no effect on session state (the Supabase client already resolved
+     its session before the injection). Always pre-populate `localStorage` via
+     `browser.newContext({ storageState })` BEFORE the first `page.goto()` for this app, never
+     `evaluate()` + a same-origin hash-only `goto()` after the fact.
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/project_w4e_profile_screen.md`.
 
 - ✅ **Web scope expansion, Settings screen — DONE** (2026-08-04, branch `kmp-migration-web`, commit
   `69b3e31a`). User approved expanding the web MVP beyond the original master-plan screen list to
@@ -711,18 +767,11 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web scope expansion — Settings is DONE (see STATUS above, commit `69b3e31a`). Profile is
-   next, then Add Card, per the user's approved priority order (2026-08-04).** Trades, Friends, and
-   Game/online sessions remain explicitly OUT of scope — `feature/online` is not yet KMP-migrated on
-   Android (still Hilt + Android-only), so building it for web first would be architecturally
-   backwards; do not touch anything online-session/game/life-counter-related.
-   - **Profile**: check Android's `feature/profile` (or wherever it actually lives — confirm the
-     real package before assuming) for scope precedent, same as this slice checked
-     `feature/settings/`. Likely candidates for a web v1: avatar/display name, account
-     stats/summary, sign-out, and a link back into this new Settings screen. Cross-check against
-     what `WebUserPreferencesRepository`/`UserProfileClient`/`FriendshipClient` (already registered
-     in `WebAppKoinModule.kt` since W2b) already support end-to-end before assuming new repository
-     work is needed — this Settings slice needed zero, Profile may not either.
+1. **Web scope expansion — Settings AND Profile are DONE (see STATUS above, commits `69b3e31a` /
+   `12e6874b`). Add Card is next and LAST**, per the user's approved priority order (2026-08-04).
+   Trades, Friends, and Game/online sessions remain explicitly OUT of scope — `feature/online` is
+   not yet KMP-migrated on Android (still Hilt + Android-only), so building it for web first would
+   be architecturally backwards; do not touch anything online-session/game/life-counter-related.
    - **Add Card**: CLAUDE.md's Add Card section describes a search-first spotlight-grid entry point
      with a language-flag selector and a camera-scanner FAB on Android — the camera scanner is
      EXCLUDED from the current KMP wave (CLAUDE.md's standing exclusion list), so the web version
