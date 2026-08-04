@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,6 +33,8 @@ import com.mmg.manahub.web.profile.ProfileScreen
 import com.mmg.manahub.web.search.CardSearchScreen
 import com.mmg.manahub.web.settings.SettingsScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
+import com.mmg.manahub.web.trades.TradeThreadScreen
+import com.mmg.manahub.web.trades.TradesScreen
 import kotlinx.browser.window
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerialName
@@ -118,6 +121,17 @@ private object ProfileRoute
 private object FriendsRoute
 
 /**
+ * Trades slice (web scope expansion, approved 2026-08-04, Friends + Trades wave) -- UNLIKE
+ * [SettingsRoute]/[ProfileRoute]/[FriendsRoute] above, Trades DOES get its own [AdaptiveNavItem]
+ * entry (a 7th top-level tab) -- it is a primary feature (real proposal negotiation, not an
+ * account-adjacent settings surface), per the task brief's explicit call for real nav-bar
+ * presence.
+ */
+@Serializable
+@SerialName("trades")
+private object TradesRoute
+
+/**
  * Web roadmap W4b — the FIRST parameterized route in this graph (every W4a route was a zero-arg
  * `object`). A destination you navigate INTO from a card tile ([SearchRoute]/[CollectionRoute]
  * results), never a top-level nav item, so it deliberately has no [AdaptiveNavItem] entry below.
@@ -138,6 +152,16 @@ private data class CardDetailRoute(val scryfallId: String)
 private data class DeckEditorRoute(val deckId: String)
 
 /**
+ * Trades slice (web scope expansion, approved 2026-08-04, Friends + Trades wave) -- the THIRD
+ * parameterized route (same shape as [CardDetailRoute]/[DeckEditorRoute]): a destination you
+ * navigate INTO from [TradesScreen]'s proposal rows, never a top-level nav item. Encodes as
+ * `#trade/<rootProposalId>`.
+ */
+@Serializable
+@SerialName("trade")
+private data class TradeThreadRoute(val rootProposalId: String)
+
+/**
  * The routes above, keyed by their [kotlinx.serialization] serial name (the exact string
  * [androidx.navigation.bindToBrowserNavigation]'s DEFAULT `getBackStackEntryRoute` writes into the
  * URL fragment for a no-argument object route — confirmed live: the fragment reads e.g.
@@ -156,6 +180,7 @@ private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
     "settings" to SettingsRoute,
     "profile" to ProfileRoute,
     "friends" to FriendsRoute,
+    "trades" to TradesRoute,
 )
 
 /**
@@ -212,10 +237,14 @@ private suspend fun NavHostController.bindWebBrowserNavigation() {
     val deckEditorId = initialFragment.takeIf { it.startsWith("deck/") }
         ?.removePrefix("deck/")
         ?.takeIf { it.isNotBlank() }
+    val tradeThreadId = initialFragment.takeIf { it.startsWith("trade/") }
+        ?.removePrefix("trade/")
+        ?.takeIf { it.isNotBlank() }
     val initialRoute = ROUTES_BY_SERIAL_NAME[initialFragment]
     when {
         cardDetailId != null -> navigate(CardDetailRoute(scryfallId = cardDetailId)) { launchSingleTop = true }
         deckEditorId != null -> navigate(DeckEditorRoute(deckId = deckEditorId)) { launchSingleTop = true }
+        tradeThreadId != null -> navigate(TradeThreadRoute(rootProposalId = tradeThreadId)) { launchSingleTop = true }
         initialRoute != null && initialRoute != HomeRoute -> navigate(initialRoute) { launchSingleTop = true }
     }
     bindToBrowserNavigation()
@@ -293,6 +322,12 @@ fun WebNavGraph(
                 onClick = { navigateToTopLevel(CollectionRoute) },
             ),
             AdaptiveNavItem(
+                label = "Trades",
+                icon = Icons.Default.SwapHoriz,
+                selected = currentDestination?.route == TradesRoute.serializer().descriptor.serialName,
+                onClick = { navigateToTopLevel(TradesRoute) },
+            ),
+            AdaptiveNavItem(
                 label = "Theme",
                 icon = Icons.Default.Palette,
                 selected = currentDestination?.route == ThemeRoute.serializer().descriptor.serialName,
@@ -360,6 +395,19 @@ fun WebNavGraph(
             }
             composable<FriendsRoute> {
                 FriendsScreen()
+            }
+            composable<TradesRoute> {
+                TradesScreen(onProposalClick = { rootProposalId -> navController.navigate(TradeThreadRoute(rootProposalId)) })
+            }
+            composable<TradeThreadRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<TradeThreadRoute>()
+                TradeThreadScreen(
+                    rootProposalId = route.rootProposalId,
+                    onCounter = { _, _ ->
+                        // Counter-offer item picker is a flagged follow-up (see TradesScreen's
+                        // KDoc) -- there is no destination to navigate to yet. no-op for now.
+                    },
+                )
             }
             composable<CardDetailRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<CardDetailRoute>()
