@@ -214,6 +214,17 @@ private fun AddFriendSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         Text(text = "Add a friend", style = typography.titleMedium, color = colors.textPrimary)
+        // NOTE: OutlinedTextField's `label` slot renders as a single-letter-per-line vertical
+        // stack on this CMP/wasmJs version (found live during Friends slice verification --
+        // nobody else in :webApp uses `label`; Profile's NicknameEditor uses this exact
+        // caption-above-plain-field pattern instead, which IS proven working on web). Follow
+        // that precedent for any future OutlinedTextField on web -- do not reach for `label`.
+        Text(text = "Game tag", style = typography.bodySmall, color = colors.textSecondary)
+        // MagicCtaButton has an internal `fillMaxWidth()` on its text content (CenteredButtonContent)
+        // that hogs the WHOLE row width when placed unweighted next to a weight(1f) sibling (same
+        // bug documented in project_w4d_home_screen.md) -- both children need an explicit weight so
+        // Compose bounds the button's share BEFORE its internal fillMaxWidth() applies. 2f/1f keeps
+        // the field dominant while still giving Search enough room at COMPACT widths.
         Row(
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
@@ -223,13 +234,12 @@ private fun AddFriendSection(
                 onValueChange = onInputChanged,
                 singleLine = true,
                 enabled = !isSearching,
-                label = { Text("Game tag") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = colors.textPrimary,
                     unfocusedTextColor = colors.textPrimary,
                     focusedBorderColor = colors.primaryAccent,
                 ),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(2f),
             )
             MagicCtaButton(
                 onClick = onSearch,
@@ -237,6 +247,7 @@ private fun AddFriendSection(
                 enabled = !isSearching && gameTagInput.isNotBlank(),
                 isLoading = isSearching,
                 style = MagicCtaStyle.Outlined,
+                modifier = Modifier.weight(1f),
             )
         }
 
@@ -249,13 +260,17 @@ private fun AddFriendSection(
         }
 
         if (searchResult != null) {
-            Row(
+            // Vertical stack (identity, then a full-width action button) -- NEVER a horizontal
+            // Row pairing raw identity content with an unweighted MagicCtaButton (see the
+            // fillMaxWidth() note above; a SpaceBetween Row here reproduces the exact same bug
+            // since MagicCtaButton would still request the Row's full incoming width even
+            // alongside a non-weighted sibling). Matches PendingRequestRow's proven layout.
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(colors.backgroundSecondary)
                     .padding(spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 FriendIdentity(
                     avatarUrl = searchResult.avatarUrl,
@@ -310,10 +325,10 @@ private fun PendingRequestRow(request: FriendRequest, isBusy: Boolean, onAccept:
 @Composable
 private fun OutgoingRequestRow(request: OutgoingFriendRequest, isBusy: Boolean, onCancel: () -> Unit) {
     val spacing = MaterialTheme.spacing
-    Row(
+    // Vertical stack, not a horizontal SpaceBetween Row -- see AddFriendSection's fillMaxWidth() note.
+    Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         FriendIdentity(avatarUrl = request.toAvatarUrl, nickname = request.toNickname, gameTag = request.toGameTag)
         MagicCtaButton(
@@ -330,10 +345,10 @@ private fun OutgoingRequestRow(request: OutgoingFriendRequest, isBusy: Boolean, 
 @Composable
 private fun FriendRow(friend: Friend, isBusy: Boolean, onRemove: () -> Unit) {
     val spacing = MaterialTheme.spacing
-    Row(
+    // Vertical stack, not a horizontal SpaceBetween Row -- see AddFriendSection's fillMaxWidth() note.
+    Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         FriendIdentity(avatarUrl = friend.avatarUrl, nickname = friend.nickname, gameTag = friend.gameTag)
         MagicCtaButton(
@@ -357,7 +372,11 @@ private fun FriendIdentity(avatarUrl: String?, nickname: String, gameTag: String
             val typography = MaterialTheme.magicTypography
             Text(text = nickname, style = typography.titleMedium, color = colors.textPrimary)
             if (gameTag.isNotBlank()) {
-                Text(text = "#$gameTag", style = typography.bodySmall, color = colors.textSecondary)
+                // gameTag already carries its own "#" prefix as stored (found live during
+                // verification -- a stored value of "#20FERA" rendered as "##20FERA" before this
+                // fix). Android's FriendsScreen.kt renders `friend.gameTag` verbatim with no
+                // prepended "#" for the same reason -- match that convention here.
+                Text(text = gameTag, style = typography.bodySmall, color = colors.textSecondary)
             }
         }
     }
