@@ -84,7 +84,14 @@ fun TradesScreen(onProposalClick: (String) -> Unit) {
                 Tab(
                     selected = uiState.selectedTab == tab,
                     onClick = { viewModel.onTabSelected(tab) },
-                    text = { Text(tab.label(), style = typography.labelMedium) },
+                    text = {
+                        Text(
+                            text = tab.label(),
+                            style = typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
                 )
             }
         }
