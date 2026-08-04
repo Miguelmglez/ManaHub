@@ -210,7 +210,7 @@ private fun ProposalRow(
 }
 
 @Composable
-private fun StatusBadge(status: TradeStatus) {
+internal fun StatusBadge(status: TradeStatus) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography

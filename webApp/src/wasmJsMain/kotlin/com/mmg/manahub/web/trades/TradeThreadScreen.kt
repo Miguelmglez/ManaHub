@@ -150,11 +150,21 @@ private fun ProposalVersionCard(
         shape = RoundedCornerShape(spacing.sm),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(spacing.md), verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-            Text(
-                text = "Version ${proposal.proposalVersion} · $proposerName → $receiverName",
-                style = typography.titleMedium,
-                color = colors.textPrimary,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    // A plain hyphen, not the "->" arrow glyph -- verified live (Playwright
+                    // screenshot) that the wasmJs font falls back to a tofu box for "->" on this
+                    // headless Chromium config.
+                    text = "Version ${proposal.proposalVersion} · $proposerName - $receiverName",
+                    style = typography.titleMedium,
+                    color = colors.textPrimary,
+                )
+                StatusBadge(status = proposal.status)
+            }
 
             ItemGroup(title = "You give", items = yourItems)
             ItemGroup(title = "You receive", items = theirItems)
