@@ -33,6 +33,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -155,9 +157,21 @@ private fun AdaptiveContentArea(
         ManaWindowSizeClass.EXPANDED, ManaWindowSizeClass.LARGE -> spacing.xxl
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        // CRITICAL ordering fix (W5b regression sweep, 2026-08-04): `widthIn(max = ...)` MUST be
+        // the OUTER modifier here, applied BEFORE `fillMaxWidth()`, not after. Compose modifiers
+        // apply constraints outer-to-inner: `fillMaxWidth()` (if placed first/outer) locks the
+        // width to the full incoming max as a TIGHT (min == max) constraint before a later
+        // `widthIn(max = 1200.dp)` ever sees it, so the cap becomes a structural no-op once the
+        // incoming max already exceeds 1200.dp -- the box silently fills the entire available
+        // width instead of clamping. Verified live: at a 1920px viewport (LARGE, rail-adjusted
+        // content area ~1720.dp), the old `.fillMaxWidth().then(widthIn(max=1200.dp))` ordering
+        // rendered content spanning ~1656.dp (edge-to-edge minus only the inner padding), not the
+        // documented ~1136.dp (1200.dp minus `spacing.xxl` gutters). Putting `widthIn(max=)`
+        // OUTER lets it cap the constraint passed down to `fillMaxWidth()`, which then correctly
+        // fills only up to that capped max -- reconfirmed via the same 1920px check afterward
+        // (content clamped and centered as designed). Do not reorder this back.
         Box(
             modifier = Modifier
-                .fillMaxWidth()
                 .then(
                     if (sizeClass == ManaWindowSizeClass.LARGE) {
                         Modifier.widthIn(max = 1200.dp)
@@ -165,6 +179,7 @@ private fun AdaptiveContentArea(
                         Modifier
                     },
                 )
+                .fillMaxWidth()
                 .fillMaxHeight(),
         ) {
             Box(Modifier.padding(horizontal = horizontalPadding)) {
@@ -290,7 +305,21 @@ private fun NavChromeItem(
             )
             if (showLabel) {
                 Spacer(Modifier.height(MaterialTheme.spacing.xs))
-                Text(text = item.label, style = typography.labelSmall, color = contentColor)
+                // maxLines=1 + ellipsis (W5b regression sweep, 2026-08-04): at 320px COMPACT, 6
+                // equal-weight bottom-bar items get ~53.dp each (~37.dp after this item's own
+                // padding) -- without a line cap, `Text` wraps a longer label like "Collection"/
+                // "Account" mid-WORD onto a second line ("Colle"/"ction", "Acco"/"unt", verified
+                // live via screenshot), inconsistent with the other, shorter labels that stayed on
+                // one line at the same width. Ellipsis reads as "this label is abbreviated" (a
+                // known, expected mobile-nav pattern); a mid-word wrap reads as broken.
+                Text(
+                    text = item.label,
+                    style = typography.labelSmall,
+                    color = contentColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     } else {
