@@ -30,6 +30,7 @@ import com.mmg.manahub.web.auth.WebSessionManager
 import com.mmg.manahub.web.carddetail.CardDetailViewModel
 import com.mmg.manahub.web.collection.CollectionViewModel
 import com.mmg.manahub.web.config.WebAppConfig
+import com.mmg.manahub.web.deckeditor.DeckEditorViewModel
 import com.mmg.manahub.web.decks.DeckListViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
@@ -99,6 +100,12 @@ import org.koin.dsl.module
  * `koinViewModel<CardDetailViewModel>(key = scryfallId) { parametersOf(scryfallId) }` from the
  * screen) rather than a `SavedStateHandle` -- `:webApp` has no `koin-androidx-compose` integration
  * (Android-only), and the CMP nav route object already carries the id directly.
+ *
+ * W4c adds the [DeckEditorViewModel] factory (same `params.get()` runtime-parameter shape as
+ * [CardDetailViewModel], for `deckId`), backing
+ * [com.mmg.manahub.web.deckeditor.DeckEditorScreen] -- the sixth REAL web MVP screen, a minimal
+ * deck editor. No new repository bindings were needed: [DeckEditorViewModel] reuses the existing
+ * [DeckRepository] and [CardRepository] singletons already registered above.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -182,4 +189,7 @@ val webAppKoinModule = module {
     viewModel { DeckListViewModel(deckRepository = get()) }
     viewModel { CollectionViewModel(userCardRepository = get()) }
     viewModel { params -> CardDetailViewModel(scryfallId = params.get(), cardRepository = get()) }
+    viewModel { params ->
+        DeckEditorViewModel(deckId = params.get(), deckRepository = get(), cardRepository = get())
+    }
 }

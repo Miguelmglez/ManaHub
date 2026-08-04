@@ -24,6 +24,7 @@ import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.web.auth.AuthScreen
 import com.mmg.manahub.web.carddetail.CardDetailScreen
 import com.mmg.manahub.web.collection.CollectionScreen
+import com.mmg.manahub.web.deckeditor.DeckEditorScreen
 import com.mmg.manahub.web.decks.DeckListScreen
 import com.mmg.manahub.web.search.CardSearchScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
@@ -84,13 +85,24 @@ private object AccountRoute
 private data class CardDetailRoute(val scryfallId: String)
 
 /**
+ * Web roadmap W4c — the SECOND parameterized route (same shape as [CardDetailRoute]: a
+ * destination you navigate INTO from [com.mmg.manahub.web.decks.DeckListScreen]'s deck rows, never
+ * a top-level nav item, so no [AdaptiveNavItem] entry either). Encodes identically to
+ * [CardDetailRoute] — a required `String` arg as a URL path segment (`#deck/<deckId>`), per the
+ * W4b finding — parsed with the SAME dedicated prefix-strip approach, not the exact-match table.
+ */
+@Serializable
+@SerialName("deck")
+private data class DeckEditorRoute(val deckId: String)
+
+/**
  * The routes above, keyed by their [kotlinx.serialization] serial name (the exact string
  * [androidx.navigation.bindToBrowserNavigation]'s DEFAULT `getBackStackEntryRoute` writes into the
  * URL fragment for a no-argument object route — confirmed live: the fragment reads e.g.
  * `#search`, not a percent-encoded path). Used only by [bindWebBrowserNavigation]'s one-time
- * initial-fragment lookup below. [CardDetailRoute] is NOT in this map (it carries an argument, so
- * its fragment is `#card/<scryfallId>`, not a bare serial name) — see the dedicated branch in
- * [bindWebBrowserNavigation] instead.
+ * initial-fragment lookup below. [CardDetailRoute]/[DeckEditorRoute] are NOT in this map (they
+ * carry an argument, so their fragments are `#card/<scryfallId>`/`#deck/<deckId>`, not a bare
+ * serial name) — see the dedicated branches in [bindWebBrowserNavigation] instead.
  */
 private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
     "home" to HomeRoute,
@@ -140,6 +152,9 @@ private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
  * `RouteEncoder`/`generateRouteWithArgs` internals) produces a fragment shaped `#card/<scryfallId>`,
  * not the bare `#card` a zero-arg route would get. Parsed with a simple prefix strip rather than a
  * lookup table entry, since the value portion is unbounded (unlike the six fixed top-level routes).
+ *
+ * **Web roadmap W4c addendum — [DeckEditorRoute] deep-link.** Same shape, same fix: a
+ * `"deck/"`-prefix branch alongside [CardDetailRoute]'s `"card/"` one.
  */
 @OptIn(ExperimentalBrowserHistoryApi::class)
 private suspend fun NavHostController.bindWebBrowserNavigation() {
@@ -149,9 +164,13 @@ private suspend fun NavHostController.bindWebBrowserNavigation() {
     val cardDetailId = initialFragment.takeIf { it.startsWith("card/") }
         ?.removePrefix("card/")
         ?.takeIf { it.isNotBlank() }
+    val deckEditorId = initialFragment.takeIf { it.startsWith("deck/") }
+        ?.removePrefix("deck/")
+        ?.takeIf { it.isNotBlank() }
     val initialRoute = ROUTES_BY_SERIAL_NAME[initialFragment]
     when {
         cardDetailId != null -> navigate(CardDetailRoute(scryfallId = cardDetailId)) { launchSingleTop = true }
+        deckEditorId != null -> navigate(DeckEditorRoute(deckId = deckEditorId)) { launchSingleTop = true }
         initialRoute != null && initialRoute != HomeRoute -> navigate(initialRoute) { launchSingleTop = true }
     }
     bindToBrowserNavigation()
@@ -257,7 +276,7 @@ fun WebNavGraph(
                 )
             }
             composable<DecksRoute> {
-                DeckListScreen()
+                DeckListScreen(onDeckClick = { deckId -> navController.navigate(DeckEditorRoute(deckId)) })
             }
             composable<CollectionRoute> {
                 CollectionScreen(
@@ -279,6 +298,14 @@ fun WebNavGraph(
                 val route = backStackEntry.toRoute<CardDetailRoute>()
                 CardDetailScreen(
                     scryfallId = route.scryfallId,
+                    windowSizeClass = windowSizeClass,
+                    onBack = { navController.navigateUp() },
+                )
+            }
+            composable<DeckEditorRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<DeckEditorRoute>()
+                DeckEditorScreen(
+                    deckId = route.deckId,
                     windowSizeClass = windowSizeClass,
                     onBack = { navController.navigateUp() },
                 )
