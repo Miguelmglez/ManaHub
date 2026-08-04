@@ -4,11 +4,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,7 +25,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicCard
@@ -44,6 +54,20 @@ import org.koin.compose.viewmodel.koinViewModel
  * slice (master plan §5/§6 W4+). Web roadmap W4b adds card detail navigation: tapping a tile's
  * image (no competing gesture existed here, unlike the search screen's tap-to-add) opens
  * [com.mmg.manahub.web.carddetail.CardDetailScreen] via [onCardClick].
+ *
+ * **Settings expansion slice**: [CollectionViewMode] is now fully respected, not just persisted --
+ * a header toggle (this screen) and the [com.mmg.manahub.web.settings.SettingsScreen] picker both
+ * write through [CollectionViewModel.setViewMode] to the SAME `uiState.viewMode`. `GRID`
+ * (default, unchanged) renders the original [AdaptiveCardGrid]/[CollectionCardTile] pair; `LIST`
+ * renders a [LazyColumn] of the general-purpose [CardListItem] overload (the same one
+ * [com.mmg.manahub.web.deckeditor.DeckEditorScreen] uses for its board rows) -- reused directly
+ * rather than building a new row component, per that screen's own documented "check `CardListItem`
+ * for a lower-level overload before building a new tile" lesson.
+ *
+ * [CollectionGroupingMode][com.mmg.manahub.core.model.CollectionGroupingMode] is DELIBERATELY NOT
+ * wired here yet -- see [com.mmg.manahub.web.settings.SettingsViewModel]'s KDoc for why (needs a
+ * `CollectionCardGroup`-shaped collapsing step this screen's raw `List<UserCardWithCard>` doesn't
+ * have).
  */
 @Composable
 fun CollectionScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String) -> Unit) {
@@ -59,11 +83,33 @@ fun CollectionScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String)
             .padding(vertical = spacing.lg),
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        Text(
-            text = "Your Collection",
-            style = typography.titleLarge,
-            color = colors.textPrimary,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "Your Collection",
+                style = typography.titleLarge,
+                color = colors.textPrimary,
+            )
+            Row {
+                IconButton(onClick = { viewModel.setViewMode(CollectionViewMode.GRID) }) {
+                    Icon(
+                        imageVector = Icons.Filled.GridView,
+                        contentDescription = "Grid view",
+                        tint = if (uiState.viewMode == CollectionViewMode.GRID) colors.primaryAccent else colors.textSecondary,
+                    )
+                }
+                IconButton(onClick = { viewModel.setViewMode(CollectionViewMode.LIST) }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ViewList,
+                        contentDescription = "List view",
+                        tint = if (uiState.viewMode == CollectionViewMode.LIST) colors.primaryAccent else colors.textSecondary,
+                    )
+                }
+            }
+        }
 
         Box(modifier = Modifier.fillMaxSize()) {
             when {
@@ -75,6 +121,19 @@ fun CollectionScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String)
                     title = "No cards yet",
                     subtitle = "Search for a card and add it to your collection to see it here.",
                 )
+
+                uiState.viewMode == CollectionViewMode.LIST -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                ) {
+                    items(uiState.cards, key = { it.userCard.id }) { entry ->
+                        CollectionCardListRow(
+                            entry = entry,
+                            onClick = { onCardClick(entry.card.scryfallId) },
+                        )
+                    }
+                }
 
                 else -> AdaptiveCardGrid(
                     windowSizeClass = windowSizeClass,
@@ -135,4 +194,32 @@ private fun CollectionCardTile(entry: UserCardWithCard, onClick: () -> Unit, mod
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+/**
+ * Owned-card row for [CollectionViewMode.LIST] -- the general-purpose [CardListItem] overload
+ * (name/imageUrl/priceUsd/priceEur + optional fields), the SAME one
+ * [com.mmg.manahub.web.deckeditor.DeckEditorScreen]'s board rows use. Foil-aware price selection
+ * (foil price when [UserCard.isFoil][com.mmg.manahub.core.model.UserCard.isFoil]) mirrors
+ * [CardListItem]'s own `CollectionCardGroup` overload logic by hand, since a raw
+ * [UserCardWithCard] isn't that shape.
+ */
+@Composable
+private fun CollectionCardListRow(entry: UserCardWithCard, onClick: () -> Unit) {
+    CardListItem(
+        name = entry.card.name,
+        imageUrl = entry.card.imageNormal,
+        priceUsd = if (entry.userCard.isFoil) entry.card.priceUsdFoil else entry.card.priceUsd,
+        priceEur = if (entry.userCard.isFoil) entry.card.priceEurFoil else entry.card.priceEur,
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        quantityText = "×${entry.userCard.quantity}",
+        hasFoil = entry.userCard.isFoil,
+        isStale = entry.card.isStale,
+        setCode = entry.card.setCode,
+        setName = entry.card.setName,
+        rarity = entry.card.rarity,
+        typeLine = entry.card.typeLine,
+        scryfallId = entry.card.scryfallId,
+    )
 }

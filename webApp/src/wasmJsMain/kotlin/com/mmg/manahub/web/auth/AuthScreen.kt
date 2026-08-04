@@ -1,16 +1,23 @@
 package com.mmg.manahub.web.auth
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -19,14 +26,18 @@ import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Web auth screen (web roadmap W2a) -- guest sign-in ONLY. Google OAuth is a deliberately
- * separate follow-up task, not started here.
+ * Web auth screen (web roadmap W2a, [onOpenSettings] added by the Settings expansion slice) --
+ * guest sign-in ONLY. Google OAuth is a deliberately separate follow-up task, not started here.
  *
  * Rendered as [AuthViewModel]'s [AuthUiState] -- never the raw `SessionStatus`/`UserSession`
  * object (see [AuthUiState]'s KDoc for why: a `toString()` render would leak the raw JWT).
+ *
+ * Hosts the entry point into [com.mmg.manahub.web.settings.SettingsScreen] -- see
+ * [com.mmg.manahub.web.navigation.SettingsRoute]'s KDoc for why Settings hangs off this screen
+ * instead of getting its own top-level nav tab.
  */
 @Composable
-fun AuthScreen() {
+fun AuthScreen(onOpenSettings: () -> Unit = {}) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -74,6 +85,34 @@ fun AuthScreen() {
                 text = uiState.toStatusLabel(),
                 style = typography.bodyMedium,
                 color = colors.textSecondary,
+            )
+        }
+
+        HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenSettings)
+                .padding(vertical = spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                Text(
+                    text = "Settings",
+                    style = typography.titleMedium,
+                    color = colors.textPrimary,
+                )
+                Text(
+                    text = "Card search language, currency, and collection display.",
+                    style = typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = colors.textSecondary,
             )
         }
     }
