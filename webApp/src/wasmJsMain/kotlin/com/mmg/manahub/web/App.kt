@@ -1,97 +1,42 @@
 package com.mmg.manahub.web
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.mmg.manahub.core.ui.layout.AdaptiveNavItem
-import com.mmg.manahub.core.ui.layout.AdaptiveScaffold
+import androidx.navigation.compose.rememberNavController
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.MagicTheme
-import com.mmg.manahub.web.auth.AuthScreen
-import com.mmg.manahub.web.collection.CollectionScreen
-import com.mmg.manahub.web.decks.DeckListScreen
-import com.mmg.manahub.web.search.CardSearchScreen
-import com.mmg.manahub.web.theme.ThemeShowcaseScreen
+import com.mmg.manahub.web.navigation.WebNavGraph
 
 /**
- * Root composable for `:webApp` (web roadmap W1, extended in W2a/W3b/W3c/W3d). Real
- * destination-level navigation (back stack, deep links) lands in W4 — the [AdaptiveNavItem]s here
- * are still simple index-switched placeholders exercising [AdaptiveScaffold]'s responsive nav
- * chrome (bottom bar / collapsed rail / expanded rail) end-to-end, EXCEPT "Account" (wired to
- * [AuthScreen], W2a), "Search" (wired to [CardSearchScreen], W3b — the first REAL MVP screen,
- * backed by `WebCardRepository`/live Scryfall data, not a showcase), "Decks" (wired to
- * [DeckListScreen], W3c — backed by `WebDeckRepository`, remote-first CRUD against real Supabase
- * data), and "Collection" (wired to [CollectionScreen], W3d — backed by `WebUserCardRepository`;
- * a card added via the Search tab's tap-to-add flow appears here immediately and survives a full
- * page reload).
+ * Root composable for `:webApp` (web roadmap W1, extended in W2a/W3b/W3c/W3d/W4a).
+ *
+ * **W4a note (scope boundary):** this module has its OWN, independent [WebNavGraph] built on the
+ * JetBrains CMP `navigation-compose-multiplatform` artifact (`org.jetbrains.androidx.navigation`)
+ * — real back stack + browser URL routing (see `WebNavGraph.kt`). This is entirely separate from,
+ * and does NOT touch, Android's live production navigation graph
+ * (`app/src/main/java/com/mmg/manahub/app/navigation/Screen.kt`/`AppNavGraph.kt`, still on the
+ * Android-only `androidx.navigation:navigation-compose` artifact). Unifying the two onto one
+ * shared 42-route table is an explicitly DEFERRED, separate, opt-in future task — do not start it
+ * as a side effect of touching this file.
+ *
+ * Only creates the [androidx.navigation.NavHostController] here (`rememberNavController()`) — the
+ * browser-history binding itself is owned by [WebNavGraph], co-located with its own [androidx.navigation.compose.NavHost]
+ * call (see that file's KDoc for why: an earlier version bound it here instead and hit a real
+ * `setGraph()`/`getGraph()` ordering race on a fresh deep-link page load).
  */
 @Composable
 fun App() {
     var selectedTheme by remember { mutableStateOf<AppTheme>(AppTheme.NeonVoid) }
-    var selectedNavIndex by remember { mutableIntStateOf(0) }
+    val navController = rememberNavController()
 
     MagicTheme(theme = selectedTheme) {
-        AdaptiveScaffold(
-            navItems = listOf(
-                AdaptiveNavItem(
-                    label = "Home",
-                    icon = Icons.Default.Home,
-                    selected = selectedNavIndex == 0,
-                    onClick = { selectedNavIndex = 0 },
-                ),
-                AdaptiveNavItem(
-                    label = "Search",
-                    icon = Icons.Default.Search,
-                    selected = selectedNavIndex == 1,
-                    onClick = { selectedNavIndex = 1 },
-                ),
-                AdaptiveNavItem(
-                    label = "Decks",
-                    icon = Icons.Default.Style,
-                    selected = selectedNavIndex == 2,
-                    onClick = { selectedNavIndex = 2 },
-                ),
-                AdaptiveNavItem(
-                    label = "Collection",
-                    icon = Icons.Default.ViewModule,
-                    selected = selectedNavIndex == 3,
-                    onClick = { selectedNavIndex = 3 },
-                ),
-                AdaptiveNavItem(
-                    label = "Theme",
-                    icon = Icons.Default.Palette,
-                    selected = selectedNavIndex == 4,
-                    onClick = { selectedNavIndex = 4 },
-                ),
-                AdaptiveNavItem(
-                    label = "Account",
-                    icon = Icons.Default.AccountCircle,
-                    selected = selectedNavIndex == 5,
-                    onClick = { selectedNavIndex = 5 },
-                ),
-            ),
-        ) { windowSizeClass ->
-            when (selectedNavIndex) {
-                1 -> CardSearchScreen(windowSizeClass = windowSizeClass)
-                2 -> DeckListScreen()
-                3 -> CollectionScreen(windowSizeClass = windowSizeClass)
-                5 -> AuthScreen()
-                else -> ThemeShowcaseScreen(
-                    windowSizeClass = windowSizeClass,
-                    selectedTheme = selectedTheme,
-                    onThemeSelected = { selectedTheme = it },
-                )
-            }
-        }
+        WebNavGraph(
+            navController = navController,
+            selectedTheme = selectedTheme,
+            onThemeSelected = { selectedTheme = it },
+        )
     }
 }

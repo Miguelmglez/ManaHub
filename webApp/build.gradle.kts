@@ -126,6 +126,14 @@ kotlin {
                 // them -- W2 (auth on web, the very next slice) needs them back immediately.
                 implementation(libs.koin.core)
                 implementation(libs.koin.compose.viewmodel)
+
+                // Web roadmap W4a: real NavHost + back stack + browser URL routing (window
+                // address bar / back-forward buttons), scoped entirely to :webApp -- this is the
+                // JetBrains CMP navigation-compose-multiplatform artifact (org.jetbrains.androidx.
+                // navigation), NOT the Android-only androidx.navigation:navigation-compose consumed
+                // by :app. Android's own 42-route Screen.kt/AppNavGraph.kt are untouched by this --
+                // see the module KDoc.
+                implementation(libs.navigation.compose.multiplatform)
             }
         }
     }
