@@ -3,6 +3,7 @@ package com.mmg.manahub.web.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.common.CrashReporter
+import com.mmg.manahub.core.common.decodeIsAnonymousClaim
 import com.mmg.manahub.web.common.toUserFacingMessage
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
@@ -11,8 +12,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Resolved authentication state for [AuthScreen] (web roadmap W2a). Deliberately does NOT expose
@@ -72,11 +71,10 @@ class AuthViewModel(
 
     private fun SessionStatus.toUiState(): AuthUiState = when (this) {
         is SessionStatus.Authenticated -> {
-            val isAnonymous = session.user
-                ?.appMetadata
-                ?.get("is_anonymous")
-                ?.jsonPrimitive
-                ?.booleanOrNull == true
+            // is_anonymous is a TOP-LEVEL JWT claim, never nested under app_metadata -- see
+            // decodeIsAnonymousClaim's KDoc (shared/core-common) for the full root cause. Reading
+            // appMetadata here always evaluated to false, mislabeling every guest as "account".
+            val isAnonymous = decodeIsAnonymousClaim(session.accessToken)
             AuthUiState.SignedIn(userId = session.user?.id.orEmpty(), isAnonymous = isAnonymous)
         }
         is SessionStatus.NotAuthenticated -> AuthUiState.SignedOut
