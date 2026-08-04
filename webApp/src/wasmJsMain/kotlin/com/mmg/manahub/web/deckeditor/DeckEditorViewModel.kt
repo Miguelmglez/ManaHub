@@ -2,12 +2,14 @@ package com.mmg.manahub.web.deckeditor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.web.common.toUserFacingMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,6 +97,7 @@ class DeckEditorViewModel(
     private val deckId: String,
     private val deckRepository: DeckRepository,
     private val cardRepository: CardRepository,
+    private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DeckEditorUiState())
@@ -165,8 +168,8 @@ class DeckEditorViewModel(
         viewModelScope.launch {
             try {
                 deckRepository.updateDeck(deck.copy(name = newName))
-            } catch (e: Exception) {
-                _uiState.update { it.copy(actionMessage = "Couldn't rename the deck: ${e.message ?: "unknown error"}") }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(actionMessage = e.toUserFacingMessage("rename the deck", crashReporter)) }
             }
         }
     }
@@ -178,8 +181,8 @@ class DeckEditorViewModel(
         viewModelScope.launch {
             try {
                 deckRepository.updateDeck(deck.copy(format = raw))
-            } catch (e: Exception) {
-                _uiState.update { it.copy(actionMessage = "Couldn't change the format: ${e.message ?: "unknown error"}") }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(actionMessage = e.toUserFacingMessage("change the format", crashReporter)) }
             }
         }
     }
@@ -222,8 +225,8 @@ class DeckEditorViewModel(
                     isSideboard = false,
                 )
                 _uiState.update { it.copy(actionMessage = "Added ${card.name} to the mainboard.") }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(actionMessage = "Couldn't add ${card.name}: ${e.message ?: "unknown error"}") }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(actionMessage = e.toUserFacingMessage("add ${card.name}", crashReporter)) }
             }
         }
     }
@@ -239,8 +242,8 @@ class DeckEditorViewModel(
                     quantity = row.quantity + 1,
                     isSideboard = isSideboard,
                 )
-            } catch (e: Exception) {
-                _uiState.update { it.copy(actionMessage = "Couldn't update the quantity: ${e.message ?: "unknown error"}") }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(actionMessage = e.toUserFacingMessage("update the quantity", crashReporter)) }
             }
         }
     }
@@ -259,8 +262,8 @@ class DeckEditorViewModel(
                         isSideboard = isSideboard,
                     )
                 }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(actionMessage = "Couldn't update the quantity: ${e.message ?: "unknown error"}") }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(actionMessage = e.toUserFacingMessage("update the quantity", crashReporter)) }
             }
         }
     }
@@ -269,8 +272,8 @@ class DeckEditorViewModel(
         viewModelScope.launch {
             try {
                 deckRepository.removeCardFromDeck(deckId, row.scryfallId, isSideboard)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(actionMessage = "Couldn't remove the card: ${e.message ?: "unknown error"}") }
+            } catch (e: Throwable) {
+                _uiState.update { it.copy(actionMessage = e.toUserFacingMessage("remove the card", crashReporter)) }
             }
         }
     }

@@ -2,10 +2,12 @@ package com.mmg.manahub.web.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.web.common.toUserFacingMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,6 +54,7 @@ data class CardSearchUiState(
 class CardSearchViewModel(
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
+    private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CardSearchUiState())
@@ -86,9 +89,9 @@ class CardSearchViewModel(
                     quantity = 1,
                 )
                 _uiState.update { it.copy(addToCollectionMessage = "Added ${card.name} to your collection.") }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 _uiState.update {
-                    it.copy(addToCollectionMessage = "Couldn't add ${card.name}: ${e.message ?: "unknown error"}")
+                    it.copy(addToCollectionMessage = e.toUserFacingMessage("add ${card.name}", crashReporter))
                 }
             }
         }
