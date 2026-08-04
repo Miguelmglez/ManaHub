@@ -36,9 +36,9 @@ without the user.
 
 ---
 
-## STATUS (2026-08-04)
+## STATUS (2026-08-05)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE. Trades is a separate, larger follow-up (repository-layer situation investigated separately, in progress on this same branch concurrently — not this slice's scope). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE, Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
 
 - ✅ **Web scope expansion round 2, Friends — DONE** (2026-08-05, branch `kmp-migration-web`,
   commits `ff64ade2` + `46b6b181`). First slice of the second scope-expansion wave (approved
@@ -118,6 +118,93 @@ without the user.
      (zero Android source touched — this slice is 100% `wasmJsMain`).
   Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (Friends slice findings recorded there
   this session) and memory `project_kmp_spike_findings`.
+
+- ✅ **Web scope expansion round 2, Trades — DONE (with explicit, flagged follow-ups)** (2026-08-05,
+  branch `kmp-migration-web`, commits `04df0ec9`/`3b7a0dad`/`8302468c`/`c48d7b64`/`39d680b4`/
+  `be3598c2`). Second slice of the second scope-expansion wave, built concurrently with the Friends
+  slice above (on the SAME branch/working tree, at the same time — see the concurrent-editing
+  hazards note below). Verified context going in: `TradesRepository` (unusually, lives in
+  `shared/core-data`, not `core-domain` like the other 4 trade repos — a pre-existing
+  inconsistency, left as-is) and its full negotiation use-case suite were ALREADY commonMain;
+  `TradeSuggestionsRepositoryImpl`/`SharedListsRepositoryImpl` were ALREADY commonMain and
+  Room-free too (confirmed, but not bound in Koin this slice — see deferred list below).
+  1. **`WebTradesRepository`** (`shared/core-data` wasmJsMain) — a near-direct port of Android's
+     `TradesRepositoryImpl`, which was ALREADY Room-free for its proposal cache (a plain in-memory
+     `MutableStateFlow<List<TradeProposal>>`); only swapped `CardDao` item-enrichment for
+     `CardRepository.getCardsByIds` (same join-through-another-repository pattern as
+     `WebUserCardRepository`/`WebFriendRepository`) and dropped the `TradeCompleted` gamification
+     event entirely (nothing wired to emit into on web).
+  2. **`WebWishlistRepository`/`WebOpenForTradeRepository`** — same in-memory-cache-instead-of-Room
+     shape as `WebUserCardRepository`, porting Android's merge/dedup logic
+     (`updateEntryWithMerge`'s branches, variant-tuple grouping) but dropping Crashlytics
+     instrumentation and the "unsynced, deferred" fallback branch (every web write is remote-first
+     with a real userId always available — guest sessions are real anonymous-auth sessions, never a
+     true offline mode).
+  3. **UI**: new `webApp/.../trades/{TradesScreen,TradesViewModel,TradeThreadScreen,
+     TradeThreadViewModel}.kt`. `TradesScreen` is a 4-tab hub (Active/History proposal lists +
+     minimal READ-ONLY Wishlist/Open-for-Trade lists) reachable via its OWN bottom-nav-rail tab
+     (unlike Settings/Profile/Friends, which hang off the Account row) — Trades is a primary
+     feature per the task brief's explicit call. `TradeThreadScreen` is the negotiation detail view:
+     every version in a proposal chain, Accept/Decline (receiver)/Cancel-with-confirm-dialog
+     (proposer)/Revoke acceptance, gated by `TradeStatus` + proposer-vs-receiver role — all reusing
+     the already-shared negotiation use cases directly (`AcceptProposalUseCase` etc.), zero
+     reimplemented business logic. Item counts on list rows are hydrated via a bounded fan-out of
+     `TradesRepository.refreshItemsForThread` per distinct active root proposal id (same
+     metadata-vs-items split CLAUDE.md's Home section documents for `hydrateTradeItemCounts`, more
+     generous cap here — 20, not Home's ≤5 — since this is the dedicated screen, not a widget).
+  4. **A dead Counter button was caught and removed, not left as a no-op** (commit `c48d7b64`):
+     Counter was originally wired end-to-end in the ViewModel down to a `NavigateToCounter` event,
+     but the actual navigation destination (the shared item-picker, needed by both Counter and
+     brand-new-proposal creation) doesn't exist yet — the nav callback was a silently-inert `{ }`.
+     Per CLAUDE.md's no-stub rule (Home widget board precedent), removed the button and the event
+     machinery entirely rather than shipping a dead control. Two more live-testing fixes (commits
+     `39d680b4`/`be3598c2`): the negotiation detail card had no visible status text for a terminal
+     proposal beyond "no buttons shown" (reused `TradesScreen`'s `StatusBadge`, made `internal`) and
+     an arrow glyph rendered as a tofu box on this headless-Chromium font config (swapped for a
+     plain hyphen); a 375px screenshot also caught the 4-tab `TabRow` mid-word-wrapping "Wishlist"
+     (same class of bug W5b's sweep found — DOM `scrollWidth` alone misses internal text-wrap
+     issues), fixed with `maxLines=1` + ellipsis.
+  5. **Deliberately DEFERRED, not half-built** (explicitly flagged, matching the task brief's own
+     "ship what's solid" permission): creating a brand-new proposal from scratch (friend picker +
+     own-collection item picker + counterparty's open-for-trade item picker — the single heaviest
+     remaining piece); Counter (needs the identical item-picker); Mark Completed + automatic
+     collection sync (`UpdateTradeCollectionUseCase` — needs a web analog of Android's
+     `TradeCollectionSyncDao`); the "gift trade" (review-collection-only) warning dialog; Trade
+     Suggestions UI (repository confirmed ready, just never wired); Wishlist/Open-for-Trade add/edit
+     UI (no "add to wishlist" affordance exists anywhere on web yet, Card Detail included).
+  6. **Verified live in Chromium (Playwright), TWO real (non-anonymous) Supabase accounts**: seeded
+     via the same direct-SQL `auth.users`/`auth.identities` + `crypt()` technique as the Profile/
+     Friends slices, plus 3 `trade_proposals`/`trade_items` rows inserted directly (proposal
+     CREATION isn't implemented on web yet, so a `create_proposal`-shaped direct insert stood in for
+     it — only the respond flow was under test). Bob (receiver on 2 proposals, proposer on the
+     third) drove the real UI end-to-end: **Accept → Revoke** on P1
+     (PROPOSED→ACCEPTED→REVOKED), **Decline** on P2 (PROPOSED→DECLINED), **Cancel-with-confirm-
+     dialog** on P3 (PROPOSED→CANCELLED) — every transition independently re-verified via a direct
+     `execute_sql` re-read of `trade_proposals.status`/`updated_at` afterward, never trusting only
+     the canvas render (Compose for Web still renders to one opaque `<canvas>` with no DOM/ARIA
+     tree — coordinate clicks read off screenshots + a server-truth SQL check remains the only
+     verification shape available on this target). Real card names/art resolved correctly in the
+     negotiation detail (Lightning Bolt / Llanowar Elves via a live Scryfall fetch). Responsive: zero
+     horizontal `scrollWidth` overflow at 375/768/1280px; screenshots confirmed COMPACT bottom bar,
+     MEDIUM collapsed rail, LARGE expanded rail all correct. Test accounts + proposals fully deleted
+     afterward (`auth.users`/`user_profiles`/`trade_proposals` confirmed 0 remaining rows).
+     `:app:compileDebugKotlin` untouched (zero Android source touched — 100% `wasmJsMain` +
+     `shared/core-data` wasmJsMain).
+  7. **Concurrent-editing hazard (same one Friends' own entry above documents, from this slice's
+     side)**: two Gradle builds targeting the same `:webApp` module from two simultaneous agent
+     sessions repeatedly corrupted the wasmJs incremental compiler cache
+     (`ArrayIndexOutOfBoundsException` in `WasmIrFileMetadata`, `NoSuchFileException` on a
+     dependency klib's `linkdata/module`). Recovered every time via `rm -rf
+     <module>/build/classes <module>/build/kotlin` (never the whole `build/` — `build/dist` can be
+     locked by a lingering static-file server from an earlier Playwright run) + retry with
+     `--no-daemon -Dkotlin.compiler.execution.strategy=in-process`. Separately, the entire
+     `web/trades/` directory (4 files, already committed) was physically deleted from disk mid-
+     session by the Friends stream's own recovery technique (moving a sibling stream's directory
+     aside to unblock its build) — recovered instantly via `git checkout HEAD -- <path>` since it
+     was already committed. Reinforces `feedback_session_limit_wip_safety` doubly hard in a
+     multi-agent shared-working-tree setup: the hazard isn't only an abrupt session cutoff, a
+     concurrent sibling agent's own recovery step can collide with your in-progress edit too.
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/project_trades_hub_negotiation.md`.
 
 - ✅ **Web scope expansion, Add Card (spotlight discovery) — DONE** (2026-08-04, branch
   `kmp-migration-web`, commits `6db47c9d` / `a28df9c4`). Third and LAST of the three approved
