@@ -27,6 +27,7 @@ import com.mmg.manahub.web.collection.CollectionScreen
 import com.mmg.manahub.web.deckeditor.DeckEditorScreen
 import com.mmg.manahub.web.decks.DeckListScreen
 import com.mmg.manahub.web.home.HomeScreen
+import com.mmg.manahub.web.profile.ProfileScreen
 import com.mmg.manahub.web.search.CardSearchScreen
 import com.mmg.manahub.web.settings.SettingsScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
@@ -92,6 +93,19 @@ private object AccountRoute
 private object SettingsRoute
 
 /**
+ * Web scope expansion (Settings -> Profile -> Add Card, approved 2026-08-04) -- same shape and
+ * same rationale as [SettingsRoute]: a zero-arg route reachable only from
+ * [com.mmg.manahub.web.auth.AuthScreen]'s "Profile" row, deliberately NOT given an
+ * [AdaptiveNavItem] entry (would be an 8th top-level tab counting Settings, well past what
+ * [ManaWindowSizeClass.COMPACT]'s bottom bar should carry). Matches Android's own
+ * `feature/profile/` UX precedent (Profile hangs off the account surface too, via
+ * `Screen.Profile`, not the primary bottom bar).
+ */
+@Serializable
+@SerialName("profile")
+private object ProfileRoute
+
+/**
  * Web roadmap W4b — the FIRST parameterized route in this graph (every W4a route was a zero-arg
  * `object`). A destination you navigate INTO from a card tile ([SearchRoute]/[CollectionRoute]
  * results), never a top-level nav item, so it deliberately has no [AdaptiveNavItem] entry below.
@@ -128,6 +142,7 @@ private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
     "theme" to ThemeRoute,
     "account" to AccountRoute,
     "settings" to SettingsRoute,
+    "profile" to ProfileRoute,
 )
 
 /**
@@ -312,10 +327,22 @@ fun WebNavGraph(
                 )
             }
             composable<AccountRoute> {
-                AuthScreen(onOpenSettings = { navController.navigate(SettingsRoute) })
+                AuthScreen(
+                    onOpenSettings = { navController.navigate(SettingsRoute) },
+                    onOpenProfile = { navController.navigate(ProfileRoute) },
+                )
             }
             composable<SettingsRoute> {
                 SettingsScreen()
+            }
+            composable<ProfileRoute> {
+                ProfileScreen(
+                    onSignedOut = {
+                        navController.navigate(AccountRoute) {
+                            popUpTo(AccountRoute) { inclusive = true }
+                        }
+                    },
+                )
             }
             composable<CardDetailRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<CardDetailRoute>()

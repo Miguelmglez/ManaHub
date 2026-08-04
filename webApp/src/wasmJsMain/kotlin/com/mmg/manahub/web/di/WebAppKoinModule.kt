@@ -33,6 +33,7 @@ import com.mmg.manahub.web.config.WebAppConfig
 import com.mmg.manahub.web.deckeditor.DeckEditorViewModel
 import com.mmg.manahub.web.decks.DeckListViewModel
 import com.mmg.manahub.web.home.HomeViewModel
+import com.mmg.manahub.web.profile.ProfileViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
 import com.mmg.manahub.web.settings.SettingsViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
@@ -121,6 +122,10 @@ import org.koin.dsl.module
  * [com.mmg.manahub.web.collection.CollectionViewModel]'s existing binding below now also takes
  * [UserPreferencesRepository] so [com.mmg.manahub.web.collection.CollectionScreen] can read/write
  * [CollectionViewMode][com.mmg.manahub.core.model.CollectionViewMode] directly.
+ *
+ * The Profile slice of that same expansion adds the [ProfileViewModel] factory, backing
+ * [com.mmg.manahub.web.profile.ProfileScreen] -- again no new repository/client binding, since
+ * [SupabaseClient] and [UserProfileClient] were already registered above in W2a/W2b.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -216,4 +221,7 @@ val webAppKoinModule = module {
     }
     viewModel { HomeViewModel(deckRepository = get(), userCardRepository = get()) }
     viewModel { SettingsViewModel(userPreferencesRepository = get()) }
+    viewModel {
+        ProfileViewModel(supabaseClient = get(), userProfileClient = get(), crashReporter = get())
+    }
 }

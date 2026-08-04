@@ -26,18 +26,23 @@ import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Web auth screen (web roadmap W2a, [onOpenSettings] added by the Settings expansion slice) --
- * guest sign-in ONLY. Google OAuth is a deliberately separate follow-up task, not started here.
+ * Web auth screen (web roadmap W2a, [onOpenSettings] added by the Settings expansion slice,
+ * [onOpenProfile] added by the Profile expansion slice) -- guest sign-in ONLY. Google OAuth is a
+ * deliberately separate follow-up task, not started here.
  *
  * Rendered as [AuthViewModel]'s [AuthUiState] -- never the raw `SessionStatus`/`UserSession`
  * object (see [AuthUiState]'s KDoc for why: a `toString()` render would leak the raw JWT).
  *
  * Hosts the entry point into [com.mmg.manahub.web.settings.SettingsScreen] -- see
  * [com.mmg.manahub.web.navigation.SettingsRoute]'s KDoc for why Settings hangs off this screen
- * instead of getting its own top-level nav tab.
+ * instead of getting its own top-level nav tab. The "Profile" row follows the identical pattern
+ * (see [com.mmg.manahub.web.navigation.ProfileRoute]'s KDoc) and is shown ONLY while
+ * [AuthUiState.SignedIn] -- there is nothing to view/edit while signed out, and
+ * [com.mmg.manahub.web.profile.ProfileScreen] itself handles the anonymous-guest sub-case (no
+ * `user_profiles` row) once inside.
  */
 @Composable
-fun AuthScreen(onOpenSettings: () -> Unit = {}) {
+fun AuthScreen(onOpenSettings: () -> Unit = {}, onOpenProfile: () -> Unit = {}) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -89,32 +94,45 @@ fun AuthScreen(onOpenSettings: () -> Unit = {}) {
         }
 
         HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpenSettings)
-                .padding(vertical = spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                Text(
-                    text = "Settings",
-                    style = typography.titleMedium,
-                    color = colors.textPrimary,
-                )
-                Text(
-                    text = "Card search language, currency, and collection display.",
-                    style = typography.bodySmall,
-                    color = colors.textSecondary,
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = colors.textSecondary,
+        if (uiState is AuthUiState.SignedIn) {
+            AccountNavRow(
+                title = "Profile",
+                subtitle = "Nickname, avatar, and sign out.",
+                onClick = onOpenProfile,
             )
+            HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
         }
+        AccountNavRow(
+            title = "Settings",
+            subtitle = "Card search language, currency, and collection display.",
+            onClick = onOpenSettings,
+        )
+    }
+}
+
+@Composable
+private fun AccountNavRow(title: String, subtitle: String, onClick: () -> Unit) {
+    val spacing = MaterialTheme.spacing
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            Text(text = title, style = typography.titleMedium, color = colors.textPrimary)
+            Text(text = subtitle, style = typography.bodySmall, color = colors.textSecondary)
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = colors.textSecondary,
+        )
     }
 }
 
