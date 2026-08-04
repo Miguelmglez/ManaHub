@@ -38,7 +38,86 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion (approved 2026-08-04): Settings + Profile + Add Card ALL DONE — the approved 3-slice expansion is complete.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE. Trades is a separate, larger follow-up (repository-layer situation investigated separately, in progress on this same branch concurrently — not this slice's scope). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
+
+- ✅ **Web scope expansion round 2, Friends — DONE** (2026-08-05, branch `kmp-migration-web`,
+  commits `ff64ade2` + `46b6b181`). First slice of the second scope-expansion wave (approved
+  2026-08-04); Trades remains a separate, larger follow-up (its repository-layer situation was
+  being investigated independently) and is NOT part of this slice — see the concurrent `web(trades):
+  *` commits on this branch from a different work stream. Game/online sessions stay out of scope.
+  1. **`WebFriendRepository`** (new file, `shared/core-data` wasmJsMain) implements all 19
+     `FriendRepository` methods remote-first against the already-shared `FriendRemoteDataSource`
+     (confirmed already commonMain before writing any code — no move needed, unlike prior slices).
+     Same in-memory-cache-per-list pattern as `WebDeckRepository`/`WebUserCardRepository`; hydration
+     driven by `SupabaseClient.auth.sessionStatus`. **Gamification event emission
+     (`ProgressionEventBus.emit(ProgressionEvent.FriendAdded(...))` on accept) is deliberately
+     skipped** — out of web v1 scope per the master plan, unlike Android's `FriendRepositoryImpl`.
+     `getFriendCollection`/`getFriendStats`/`getFriendMatchHistory` are fully implemented (repository
+     contract complete) even though nothing in the UI calls them yet — see the deferred scope below.
+  2. **Core UI**: new `webApp/.../friends/{FriendsScreen,FriendsViewModel}.kt` — friends list with a
+     Remove action, pending (incoming) requests with Accept/Reject, outgoing (sent) requests with
+     Cancel, and a search-by-exact-game-tag add-friend flow. Reachable via a new "Friends" row on
+     `AuthScreen` (same account-adjacent placement as Settings/Profile — the nav rail is already at 6
+     top-level tabs, a 7th account-adjacent surface would crowd COMPACT's bottom bar further). New
+     zero-arg `FriendsRoute` in `WebNavGraph.kt`.
+  3. **Deliberately DEFERRED, not half-built**: a friend-detail view (`getFriendCollection`/
+     `getFriendStats`/`getFriendMatchHistory` — a genuinely separate, bigger screen viewing another
+     user's server-RLS-gated data) and the referral-invite flow (`acceptInvite`/`getMyShareUrl` — no
+     natural UI home found this slice; Profile's own game-tag display was the most likely future
+     insertion point but wasn't touched). Both documented in `FriendsScreen.kt`'s own KDoc as explicit
+     follow-ups.
+  4. **Three real UI bugs found and fixed via live two-account testing** (commit `46b6b181`): (a)
+     `OutlinedTextField`'s `label` slot renders as a vertical single-letter stack on this CMP/wasmJs
+     version — nobody else in `:webApp` had used `label` before; switched to the caption-above-field
+     pattern Profile's `NicknameEditor` already proved working. (b) `MagicCtaButton`'s internal
+     `fillMaxWidth()` (same class of bug as `project_w4d_home_screen.md`) hogs the whole row when
+     placed unweighted next to ANY sibling, not just a weighted one — restructured 3 rows
+     (search-result card, outgoing-request row, friend row) from a horizontal `SpaceBetween` Row to
+     the vertical stack `PendingRequestRow` already used correctly, and weighted the search
+     field/button pair (2f/1f). (c) `Friend.gameTag` already carries its own `#` prefix as stored
+     (`#20FERA`) — displaying `"#$gameTag"` doubled it to `##20FERA`; fixed to render verbatim,
+     matching Android's `FriendsScreen.kt` convention.
+  5. **A real backend/test-fixture gap found, not a web-code bug**: every `friendships` RLS policy
+     (insert/select/update/delete) requires `is_profile_complete()` — a throwaway Supabase test
+     account seeded directly via SQL (the established `auth.users`/`auth.identities` + `crypt()`
+     technique from the Profile-slice memory) has `user_profiles.profile_completed = false` by
+     default, since the normal client-side "complete your profile" onboarding step never ran. First
+     `sendFriendRequest` attempt failed with a real `403`/`new row violates row-level security policy
+     for table "friendships"`, diagnosed via `get_logs` (service: postgres), fixed by setting
+     `profile_completed = true` directly on the two test rows (test-fixture correction, not a client
+     override of the invariant `feedback_auth_profile_completed_invariant` protects). **Any future
+     test account seeded this way for a Friends/social feature must also set
+     `profile_completed = true`, or every `friendships` RLS policy will reject it.**
+  6. **Also found (live, unrelated) another concurrent-editing hazard, not a code bug**: this branch
+     had a SECOND active work stream (Trades) landing commits during this same session
+     (`04df0ec9`/`3b7a0dad`/`8302468c`) — two Gradle builds targeting the exact same `:webApp` module
+     concurrently corrupted shared incremental-compilation caches (`ArrayIndexOutOfBoundsException`
+     in `WasmIrFileMetadata`, `NoSuchFileException` on a klib's `linkdata/module`, "Storage ... is
+     already registered"). Recovered each time via `./gradlew --stop` + clearing the AFFECTED
+     module's own `build/classes/kotlin/wasmJs`+`build/kotlin/compileKotlinWasmJs` (never the whole
+     repo's `build/`) + retry. When the OTHER stream's in-progress file had a genuine (non-
+     corruption) compile error mid-edit, temporarily moved its whole package directory aside,
+     built, then restored it immediately — same technique the testing conventions doc already
+     documents for a broken test file, generalized to a broken concurrent-editing source file.
+  7. **Verified live in Chromium (Playwright), TWO real (non-anonymous) Supabase accounts** — seeded
+     via the same direct-SQL technique as the Profile slice (`auth.users`/`auth.identities` +
+     `crypt()`-hashed password + `/auth/v1/token?grant_type=password`, both accounts' `game_tag`
+     auto-generated by `handle_new_user`): account 1 searched account 2's exact game tag (found, real
+     `user_profiles` row rendered) → sent a friend request (hit the RLS 403 above, diagnosed + fixed
+     live) → retried, succeeded, "Sent requests (1)" appeared on account 1's OWN screen → **switched
+     to a SEPARATE browser context for account 2** → "Pending requests (1)" showed account 1's real
+     profile independently → clicked Accept → account 2's screen reactively showed "Friends (1)" →
+     **brand-new browser context (fresh WASM boot, not a same-session reload) for account 2** →
+     still "Friends (1)" (real server state, not optimistic) → **brand-new browser context for
+     account 1** → also shows "Friends (1)" (bidirectional, confirmed independently on both sides) →
+     account 1 clicked Remove → fresh reload on BOTH accounts confirmed "No friends yet" on both
+     sides. Responsive: zero horizontal overflow at 375px/768px/1280px (375px screenshot confirmed
+     the COMPACT bottom bar + full-width reflow). Test accounts + their friendship row fully deleted
+     afterward (`auth.users` cascade confirmed 0 remaining rows in `auth.users`/`user_profiles`;
+     `friendships` confirmed 0 remaining rows for either id). `:app:compileDebugKotlin` UP-TO-DATE
+     (zero Android source touched — this slice is 100% `wasmJsMain`).
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (Friends slice findings recorded there
+  this session) and memory `project_kmp_spike_findings`.
 
 - ✅ **Web scope expansion, Add Card (spotlight discovery) — DONE** (2026-08-04, branch
   `kmp-migration-web`, commits `6db47c9d` / `a28df9c4`). Third and LAST of the three approved
@@ -812,16 +891,25 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web scope expansion is COMPLETE — Settings, Profile, AND Add Card are all DONE** (see STATUS
-   above, commits `69b3e31a` / `12e6874b` / `6db47c9d` + `a28df9c4`), closing out the user's
-   approved 3-slice priority order (2026-08-04). Add Card extended the existing `CardSearchScreen`
-   with an idle-state spotlight/discovery grid rather than adding a new nav destination — see the
-   STATUS entry for the full writeup. **Trades, Friends, and Game/online sessions remain explicitly
-   OUT of scope** — `feature/online` is not yet KMP-migrated on Android (still Hilt +
-   Android-only), so building it for web first would be architecturally backwards; do not touch
-   anything online-session/game/life-counter-related without the user first asking for it. No
-   further web scope expansion is approved at this time — raise it with the user before starting
-   a fourth slice.
+1. **Web scope expansion round 1 (Settings, Profile, Add Card) is COMPLETE** (see STATUS above,
+   commits `69b3e31a` / `12e6874b` / `6db47c9d` + `a28df9c4`), closing out the user's first
+   approved 3-slice priority order (2026-08-04). **Web scope expansion round 2 (approved
+   2026-08-04, second wave) has Friends DONE** (commits `ff64ade2` + `46b6b181`, see STATUS above)
+   — friends list + pending/outgoing requests + search-by-game-tag add-friend, verified live with
+   two real Supabase accounts. **Trades is a SEPARATE, LARGER follow-up** — its repository-layer
+   situation was flagged for independent investigation and is being built out concurrently on this
+   same branch by a different work stream (`web(trades): *` commits) — do not duplicate that work;
+   check its own commits/state before touching anything under `webApp/.../web/trades/` or
+   `WebTradesRepository`/`WebWishlistRepository`/`WebOpenForTradeRepository`. **Game/online sessions
+   remain explicitly OUT of scope** — `feature/online` is not yet KMP-migrated on Android (still
+   Hilt + Android-only), so building it for web first would be architecturally backwards; do not
+   touch anything online-session/game/life-counter-related without the user first asking for it.
+   **Deferred within Friends itself** (documented in `FriendsScreen.kt`'s KDoc, not started): a
+   friend-detail view (`getFriendCollection`/`getFriendStats`/`getFriendMatchHistory` — all three
+   repository methods are fully implemented, just no UI consumer yet) and the referral-invite flow
+   (`acceptInvite`/`getMyShareUrl` — Profile's own game-tag display is the most likely future home
+   for a "share my invite" control, not a new Friends-screen control). No further web scope
+   expansion beyond what's already approved — raise it with the user before starting anything new.
 2. **Web W4 + W5b are COMPLETE (see STATUS above).** W4d (Home screen) closed out the master
    plan's originally-scoped MVP screen list; W5b (2026-08-04, commits `b6ba4989`/`a42e12bf`) swept
    every screen at 320px/1920px+ and fixed the two real bugs it found (cross-cutting
