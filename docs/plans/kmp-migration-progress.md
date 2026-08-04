@@ -38,7 +38,59 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d DONE — this completes the master plan's originally-scoped MVP screen list.**
+
+- ✅ **Web W4d — DONE** (2026-08-04, branch `kmp-migration-web`, commit `aa2a8e0e`). Fourth and
+  LAST W4 slice from the master plan's originally-scoped MVP screen list (Auth → Search/CardDetail
+  → Collection → Decks/Deck Studio → News → reduced Home; News stays deferred, CORS blocker) — a
+  real Home screen replacing the `ThemeShowcaseScreen` fallthrough the "Home" nav tab had used
+  since W4a. Deliberately NOT a port of Android's 17-widget customizable Home board
+  (gamification/trades/community-decks/first-steps, its own Room schema + DataStore layout) — per
+  the same no-stub principle documented in CLAUDE.md's Home section, this screen ships only
+  real, wired content.
+  1. **New `webApp/src/wasmJsMain/kotlin/com/mmg/manahub/web/home/` (`HomeScreen.kt` +
+     `HomeViewModel.kt`)**: a static greeting header (no MTG-flavored greeting-pool system), three
+     quick-link buttons (Search/Decks/Collection), and two "recent" `LazyRow` strips (Recent Decks,
+     Recently Added) capped to 5 items each. `HomeViewModel` is nothing more than a client-side
+     `sortedByDescending{}.take(5)` over two ALREADY-real repository reads
+     (`DeckRepository.observeAllDeckSummaries` since W3c, `UserCardRepository.observeCollection`
+     since W3d, combined via `combine{}`) — zero new repository or backend work. `DeckSummary`/
+     `UserCard` both already carry a `createdAt: Long` field, so no model change was needed either.
+  2. **`WebNavGraph.kt`**: `HomeRoute`'s `composable<HomeRoute>{}` body now renders `HomeScreen`
+     (previously `ThemeShowcaseScreen`, matching the pre-W4a fallthrough); `ThemeRoute` keeps its
+     own `ThemeShowcaseScreen` untouched (the 12-palette picker stays a genuinely useful dedicated
+     tab). Quick-link buttons/recent-item taps reuse the existing `navigateToTopLevel`/
+     `navController.navigate(CardDetailRoute/DeckEditorRoute(...))` helpers already established in
+     W4a/W4b/W4c — no new navigation mechanism.
+  3. **Found + fixed a real `MagicCtaButton` (core-ui, commonMain) bug**, surfaced by this screen's
+     first-ever use of 3 `MagicCtaButton`s side-by-side in a `Row`: the component's internal
+     `CenteredButtonContent` applies its own `Modifier.fillMaxWidth()` to its content `Row`
+     whenever it has text, and since a plain (non-weighted) `Row` gives every child the SAME
+     unbounded max-width constraint, all 3 buttons independently tried to claim the full row width
+     — only the first was visible, the other two rendered off-screen (verified live via screenshot
+     before the fix: one giant "SEARCH CARDS" button, "My Decks"/"My Collection" nowhere on
+     screen). Fixed LOCALLY in `HomeScreen.kt` with `Modifier.weight(1f)` per button in the
+     MEDIUM+ branch (a `RowScope` extension, so the COMPACT-stack and MEDIUM+-row button lists are
+     written out explicitly per branch rather than shared through one cross-scope lambda) — no
+     `core-ui` component change, since this only surfaces under the specific "N buttons, unweighted
+     Row" usage shape this screen introduced.
+  4. **Verified live in Chromium (Playwright)**: fresh guest sign-in → created a deck ("New Deck",
+     `batch_upsert_decks` 204) → searched "Lightning Bolt" → tapped to add to collection
+     (`batch_upsert_collection` 204) → deep-linked reload at `#home` → both strips render REAL data
+     ("New Deck / Casual · 0 cards" in Recent Decks; the Lightning Bolt card art + name in Recently
+     Added, confirmed via `cards.scryfall.io` 200 + a full re-screenshot once the image settled) →
+     all 3 quick-link buttons navigate correctly (`#search`/`#decks`/`#collection`) → the recent
+     deck card navigates to `#deck/<id>` (DeckEditor renders) → the recent card tile navigates to
+     `#card/<id>` (CardDetail renders, full mana symbol + prices). Responsive: zero horizontal
+     overflow (`scrollWidth == clientWidth`, checked programmatically) at 375px (COMPACT: 3 buttons
+     stacked full-width, bottom nav bar), 768px (MEDIUM: buttons evenly split via `weight(1f)`,
+     collapsed icon rail), 1280px (LARGE: same split, expanded icon+label rail) — all visually
+     confirmed via screenshot too, not just the overflow check. `:app:assembleDebug` green
+     (UP-TO-DATE, confirming zero Android source touched); diff confirmed 4 files, all under
+     `webApp/src/wasmJsMain/**` — zero Android/commonMain leakage, no repository or shared-module
+     change needed this slice at all.
+  Full detail: memory `project_kmp_spike_findings` (W4d addendum) and
+  `.claude/agent-memory/kmp-web-fullstack-dev/project_w4d_home_screen.md`.
 
 - ✅ **Web W4c — DONE** (2026-08-04, branch `kmp-migration-web`, commit `17ddc8d0`). Third W4
   slice — a deliberately minimal Deck Editor, scoped WAY down from Android's Deck Studio (2320-line
@@ -541,21 +593,27 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W4 — next slice, owner `kmp-web-fullstack-dev`.** W4a (real `:webApp`-only NavHost +
-   browser URL routing), W4b (Card Detail screen), and W4c (minimal Deck Editor) are DONE — see
-   STATUS above. Remaining W4 options, none blocking each other, pick per the user's steer:
-   - **Deck Studio porting is now substantially de-risked but still not started.** W4c proved the
-     repository layer needs zero further work for deck editing (`WebDeckRepository`/
-     `WebCardRepository` already cover it) — a FUTURE richer Deck Studio pass (if ever wanted) would
-     be additive UI on top of W4c's `DeckEditorScreen`/`DeckEditorViewModel`, not a rebuild. Per the
-     task brief that produced W4c, Deck Doctor suggestions/wizard/playtest/import-export/warning
-     overlays remain explicitly OUT of scope for the web target until a dedicated future slice
-     decides otherwise — do not casually add any of them to `DeckEditorScreen`.
+1. **Web W4 is now COMPLETE — W4a/W4b/W4c/W4d all DONE (see STATUS above).** W4d (Home screen)
+   closes out the master plan's originally-scoped MVP screen list (Auth → Search/CardDetail →
+   Collection → Decks/Deck Studio → News → reduced Home), modulo the two still-deferred W3 slices
+   (News/CommunityDecks, below) and the undecided Android-nav-unification question. The natural
+   next MASTER-PLAN phases are **W5 (parity/polish/security/telemetry regression sweep)** and
+   **W6 (release)** per the roadmap — but **this session scoped every single W4 screen down HARD
+   from the master plan's original per-screen assumptions** (e.g. Card Detail dropped tag
+   editing/print-switching/rulings; Deck Editor dropped Deck Doctor/wizard/playtest/import-export;
+   Home dropped the entire 17-widget board down to 2 static strips + 3 buttons). Given that pattern,
+   **a fresh look at what's actually left/valuable is warranted before blindly kicking off W5** —
+   don't assume the master plan's original W5 scope still matches reality; re-derive it against
+   what W4 actually shipped. Options to weigh with the user, none blocking each other:
+   - **Deck Studio / Home richer-porting remain optional, additive future passes**, not required to
+     call the MVP "done" — W4c/W4d proved the repository layer needs zero further work for either
+     (`WebDeckRepository`/`WebCardRepository`/`DeckRepository`/`UserCardRepository` already cover
+     every call a richer UI would make).
    - **The `PlatformCapabilities`-gated "not available on web" placeholder remains NOT
      recommended right now**, same reasoning as before (no-stub-rule precedent): the web nav still
      only exposes real, working destinations (Home/Search/CardDetail/Decks/DeckEditor/Collection/
-     Theme/Account) — do this once a reduced Home screen needs to link toward a genuinely non-MVP
-     feature (game/life-counter, online, voice, scanner, playtest, push, gamification UI) and show a
+     Theme/Account) — do this once a screen needs to link toward a genuinely non-MVP feature
+     (game/life-counter, online, voice, scanner, playtest, push, gamification UI) and show a
      graceful message instead of a dead link.
    - **The Android-nav-artifact-unification question (androidx → JetBrains CMP navigation-compose
      on Android too, sharing one `Screen.kt`) remains explicitly UNDECIDED and NOT started** — W4a
@@ -708,3 +766,19 @@ without the user.
   side-by-side responsive split. `:app:assembleDebug` green; diff confirmed `:webApp`-only. Next:
   Deck Studio porting (bigger, own slice, now de-risked) or the W4-placeholder/nav-unification
   options, per NEXT STEP.
+- 2026-08-04: **Web W4d done** (commit `aa2a8e0e`): fourth and LAST W4 slice — a real Home screen
+  (`webApp/.../home/`) replacing the `ThemeShowcaseScreen` fallthrough the "Home" tab used since
+  W4a. Static greeting + 3 quick-link buttons (Search/Decks/Collection) + two capped-to-5 `LazyRow`
+  strips (Recent Decks, Recently Added), backed by `HomeViewModel` — a pure client-side sort+cap
+  over `DeckRepository.observeAllDeckSummaries`/`UserCardRepository.observeCollection` (both real
+  since W3c/W3d). Zero new repository/backend work. Found + fixed a real `MagicCtaButton` bug
+  (core-ui): its internal content `Row` applies its own `fillMaxWidth()`, so 3 buttons side-by-side
+  in a plain `Row` each claimed the full width and only the first rendered — fixed locally with
+  `Modifier.weight(1f)` per button in `HomeScreen.kt` (no core-ui change; RowScope-only fix).
+  Verified live in Chromium: guest sign-in → created a deck → searched+added a card → deep-linked
+  `#home` reload shows both real ("New Deck"/"Lightning Bolt" with real art) → all 3 quick-links +
+  both recent-item taps navigate correctly (`#search`/`#decks`/`#collection`/`#deck/<id>`/
+  `#card/<id>`) → zero overflow at 375/768/1280px (programmatic + visual). `:app:assembleDebug`
+  green (UP-TO-DATE); diff confirmed 4 files, all `:webApp`-only. This completes the master plan's
+  originally-scoped MVP screen list — NEXT STEP flags that W5 should get a fresh scope pass rather
+  than blindly starting, since every W4 screen was scoped WAY down from the plan's assumptions.
