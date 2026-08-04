@@ -38,7 +38,57 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion (approved 2026-08-04): Settings DONE — Profile and Add Card are next, in that order.**
+
+- ✅ **Web scope expansion, Settings screen — DONE** (2026-08-04, branch `kmp-migration-web`, commit
+  `69b3e31a`). User approved expanding the web MVP beyond the original master-plan screen list to
+  add Settings → Profile → Add Card, in that priority order (Trades/Friends/Game/online sessions
+  stay explicitly out of scope — `feature/online` isn't even KMP-migrated on Android yet). This
+  slice is Settings, the first and smallest of the three.
+  1. **Pure UI slice — zero new repository work.** `UserPreferencesRepository`
+     (`WebUserPreferencesRepository`, W3a) already implemented every flow/setter the screen needed.
+     New `webApp/.../settings/{SettingsScreen,SettingsViewModel}.kt`, reachable via a new "Settings"
+     row on `AuthScreen` (not a 7th bottom-nav tab — the rail already carries 6 items and Profile/Add
+     Card are still to come; matches Android's own `feature/settings/` UX precedent of hanging off
+     the account surface). New zero-arg `SettingsRoute` in `WebNavGraph.kt`.
+  2. **Exposes 4 of the interface's 9 setters as `FilterChip`/`FlowRow` pickers**: card search
+     language (11 options), preferred currency, collection view mode, collection grouping mode.
+     Deliberately did NOT build `setAppLanguage` (the enum has exactly ONE value, `ENGLISH` — the app
+     is English-only per CLAUDE.md, and Android's own equivalent row is commented out for the same
+     reason) or `setNewsLanguages` (News isn't built on web at all yet, CORS-deferred) — both would
+     be dead UI. `saveLastPriceRefresh`/user-defined-tag setters also excluded (not settings-screen
+     toggles per CLAUDE.md's backend-call-budget rule / not a web feature yet).
+  3. **Two previously-inert preferences made genuinely observable, not just persisted:**
+     - `CollectionViewMode` is now fully wired: `CollectionScreen` gained a header Grid/List toggle
+       and a real LIST layout (`LazyColumn` of the existing general-purpose `CardListItem`, reused
+       from the W4c Deck Editor precedent) — both the header toggle and the new Settings picker write
+       through the same `CollectionViewModel.setViewMode` → `UserPreferencesRepository
+       .saveCollectionViewMode`, so either surface reflects the other immediately.
+     - `PreferredCurrency` was a genuinely DEAD setting on web before this slice —
+       `CardListItem`/`CardGridItem` (`shared/core-ui`) already read `LocalPreferredCurrency`, but
+       nothing on `:webApp` ever provided a non-default value. `App.kt` now provides it at the root
+       from `preferredCurrencyFlow` via `koinInject`, mirroring Android's `MainActivity` pattern.
+       Verified live: switching the Settings currency chip flips a real card's displayed price from
+       `$1.44` to `1,78 €` instantly, on the already-rendered Collection list.
+     - `CollectionGroupingMode` is exposed and persists correctly (round-trips through a fresh
+       browser/context restore) but is DELIBERATELY NOT consumed by `CollectionScreen` yet — grouping
+       needs a `CollectionCardGroup`-shaped collapsing step the web repository's raw
+       `List<UserCardWithCard>` doesn't have; real but non-trivial future work, documented in-UI via
+       an explicit "not applied yet" caption so it never reads as broken.
+  4. **Verified live in Chromium (Playwright)**: guest sign-in → Account → Settings (all 4 sections
+     render, 11-language `FlowRow` wraps cleanly) → changed all 4 settings (Español / USD / List /
+     Rarity) → `storageState` captured → **fresh browser + fresh context restored from
+     `storageState`** deep-linked to `#settings` → all 4 selections pixel-identical (real reload
+     persistence, not a same-session illusion) → Search → added a real card → Collection LIST view
+     showed it with `$1.44` (USD-first, proving the currency wiring) → toggled header icon to GRID →
+     Settings → switched currency to EUR → back to Collection (GRID mode still active, confirming the
+     toggle round-trips) → toggled to LIST → price now `1,78 €`. Responsive: zero
+     `scrollWidth`/`clientWidth` overflow and clean chip-wrapping (no mid-word/mid-number text
+     corruption, the W5b lesson) at 375px/768px/1280px, visually confirmed via screenshot at each
+     width. `:app:assembleDebug` UP-TO-DATE (zero Android source touched); leak grep on
+     `shared/*/src/commonMain` empty (no shared-module change this slice at all).
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (this session's findings to be recorded
+  there) and memory `project_kmp_spike_findings`.
 
 - ✅ **Web W5b (responsive regression sweep) — DONE** (2026-08-04, branch `kmp-migration-web`,
   commits `b6ba4989` + `a42e12bf`). Master plan §5 W5, reframed by the session's approved plan as a
@@ -661,7 +711,26 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W4 + W5b are now COMPLETE (see STATUS above).** W4d (Home screen) closed out the master
+1. **Web scope expansion — Settings is DONE (see STATUS above, commit `69b3e31a`). Profile is
+   next, then Add Card, per the user's approved priority order (2026-08-04).** Trades, Friends, and
+   Game/online sessions remain explicitly OUT of scope — `feature/online` is not yet KMP-migrated on
+   Android (still Hilt + Android-only), so building it for web first would be architecturally
+   backwards; do not touch anything online-session/game/life-counter-related.
+   - **Profile**: check Android's `feature/profile` (or wherever it actually lives — confirm the
+     real package before assuming) for scope precedent, same as this slice checked
+     `feature/settings/`. Likely candidates for a web v1: avatar/display name, account
+     stats/summary, sign-out, and a link back into this new Settings screen. Cross-check against
+     what `WebUserPreferencesRepository`/`UserProfileClient`/`FriendshipClient` (already registered
+     in `WebAppKoinModule.kt` since W2b) already support end-to-end before assuming new repository
+     work is needed — this Settings slice needed zero, Profile may not either.
+   - **Add Card**: CLAUDE.md's Add Card section describes a search-first spotlight-grid entry point
+     with a language-flag selector and a camera-scanner FAB on Android — the camera scanner is
+     EXCLUDED from the current KMP wave (CLAUDE.md's standing exclusion list), so the web version
+     must scope it out (no FAB, or a disabled/hidden one) while keeping the rest. Web already has a
+     working `CardSearchScreen`/`CardSearchViewModel` (W3b) with "tap a result to add" — check how
+     much of Add Card's real value is "a second entry point to the same add flow" vs. genuinely new
+     UI (spotlight grid, language picker) before over-building.
+2. **Web W4 + W5b are COMPLETE (see STATUS above).** W4d (Home screen) closed out the master
    plan's originally-scoped MVP screen list; W5b (2026-08-04, commits `b6ba4989`/`a42e12bf`) swept
    every screen at 320px/1920px+ and fixed the two real bugs it found (cross-cutting
    `AdaptiveScaffold` clamp + Deck Editor text-wrap). **What remains open under the master plan's
@@ -711,13 +780,13 @@ without the user.
    - **W6 (release: Cloudflare Pages deploy + CI + a real mobile-browser device check) is the
      natural next phase once the telemetry decision lands**, per the master plan roadmap — not
      started.
-2. ✅ **RESOLVED (2026-08-03)** — the `handle_new_user()` anonymous-user finding from W2b. User
+3. ✅ **RESOLVED (2026-08-03)** — the `handle_new_user()` anonymous-user finding from W2b. User
    approved a DB-level fix: `public.handle_new_user()` now guards `is_anonymous` (migration
    `fix_handle_new_user_skip_anonymous_users`) and the 10 pre-existing spurious `user_profiles`
    rows were deleted. No `AFTER UPDATE` trigger needed (no code path converts an anonymous session
    to permanent in place). CLAUDE.md's "Online sessions" invariant updated to reflect DB-level
    enforcement. Memory: `feedback_handle_new_user_anonymous_guard`.
-3. **Fix (or hand off) the pre-existing community-decks test compile break** — two uncommitted test
+4. **Fix (or hand off) the pre-existing community-decks test compile break** — two uncommitted test
    files (`CommunityDecksRepositoryImplTest.kt`, `CommunityDecksSearchViewModelTest.kt`) reference
    `deckFormatId`/`format`/`ALL`/`featuredFormatDecks` symbols that don't exist on the currently
    uncommitted community-decks production WIP on this branch. This is the user's own in-progress
@@ -725,9 +794,9 @@ without the user.
    `:app:testDebugUnitTest` from producing a clean pass/fail/skip count across every web session
    so far (W0 through W3c). Needs resolving (by whoever owns that WIP) before the 1967/118/2 floor
    can be reconfirmed on this branch.
-4. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
+5. **A2 — `android-edge-case-tester` pass** on Tournament finish-and-advance, GameSession/Stats,
    Deck Doctor (last open Android hardening item; fixes → architect).
-5. **A1 — on-device WorkerFactory validation** (first time a device/emulator is available).
+6. **A1 — on-device WorkerFactory validation** (first time a device/emulator is available).
 
 ## LOG (compact; full detail in git history of this file)
 
