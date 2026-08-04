@@ -34,6 +34,7 @@ import com.mmg.manahub.web.deckeditor.DeckEditorViewModel
 import com.mmg.manahub.web.decks.DeckListViewModel
 import com.mmg.manahub.web.home.HomeViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
+import com.mmg.manahub.web.settings.SettingsViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.ktor.client.HttpClient
@@ -113,6 +114,13 @@ import org.koin.dsl.module
  * new repository bindings needed either: it reuses the existing [DeckRepository]/[CardRepository]
  * (indirectly, via [UserCardRepository]) singletons above -- a client-side sort+cap over two
  * already-real repository reads, not a new data source.
+ *
+ * The web scope expansion (Settings -> Profile -> Add Card, approved 2026-08-04) adds the
+ * [SettingsViewModel] factory, backing [com.mmg.manahub.web.settings.SettingsScreen] -- again no
+ * new repository binding, since [UserPreferencesRepository] was already registered above in W3a.
+ * [com.mmg.manahub.web.collection.CollectionViewModel]'s existing binding below now also takes
+ * [UserPreferencesRepository] so [com.mmg.manahub.web.collection.CollectionScreen] can read/write
+ * [CollectionViewMode][com.mmg.manahub.core.model.CollectionViewMode] directly.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -196,7 +204,7 @@ val webAppKoinModule = module {
         CardSearchViewModel(cardRepository = get(), userCardRepository = get(), crashReporter = get())
     }
     viewModel { DeckListViewModel(deckRepository = get(), crashReporter = get()) }
-    viewModel { CollectionViewModel(userCardRepository = get()) }
+    viewModel { CollectionViewModel(userCardRepository = get(), userPreferencesRepository = get()) }
     viewModel { params -> CardDetailViewModel(scryfallId = params.get(), cardRepository = get()) }
     viewModel { params ->
         DeckEditorViewModel(
@@ -207,4 +215,5 @@ val webAppKoinModule = module {
         )
     }
     viewModel { HomeViewModel(deckRepository = get(), userCardRepository = get()) }
+    viewModel { SettingsViewModel(userPreferencesRepository = get()) }
 }

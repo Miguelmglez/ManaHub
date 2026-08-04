@@ -28,6 +28,7 @@ import com.mmg.manahub.web.deckeditor.DeckEditorScreen
 import com.mmg.manahub.web.decks.DeckListScreen
 import com.mmg.manahub.web.home.HomeScreen
 import com.mmg.manahub.web.search.CardSearchScreen
+import com.mmg.manahub.web.settings.SettingsScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
 import kotlinx.browser.window
 import kotlinx.coroutines.flow.first
@@ -78,6 +79,19 @@ private object ThemeRoute
 private object AccountRoute
 
 /**
+ * Web scope expansion (Settings -> Profile -> Add Card, approved 2026-08-04) — a zero-arg route
+ * like [ThemeRoute]/[AccountRoute], but deliberately NOT given an [AdaptiveNavItem] entry below.
+ * The nav rail/bottom bar already carries 6 top-level tabs; adding Settings as a 7th (with Profile
+ * and Add Card still to come) would crowd [ManaWindowSizeClass.COMPACT]'s bottom bar further, so
+ * this is reachable only from [AuthScreen]'s "Settings" row instead — matching Android's own
+ * `feature/settings/` UX precedent (Settings hangs off the account surface, not the primary tab
+ * bar).
+ */
+@Serializable
+@SerialName("settings")
+private object SettingsRoute
+
+/**
  * Web roadmap W4b — the FIRST parameterized route in this graph (every W4a route was a zero-arg
  * `object`). A destination you navigate INTO from a card tile ([SearchRoute]/[CollectionRoute]
  * results), never a top-level nav item, so it deliberately has no [AdaptiveNavItem] entry below.
@@ -113,6 +127,7 @@ private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
     "collection" to CollectionRoute,
     "theme" to ThemeRoute,
     "account" to AccountRoute,
+    "settings" to SettingsRoute,
 )
 
 /**
@@ -297,7 +312,10 @@ fun WebNavGraph(
                 )
             }
             composable<AccountRoute> {
-                AuthScreen()
+                AuthScreen(onOpenSettings = { navController.navigate(SettingsRoute) })
+            }
+            composable<SettingsRoute> {
+                SettingsScreen()
             }
             composable<CardDetailRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<CardDetailRoute>()
