@@ -38,7 +38,50 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b DONE.**
+
+- ✅ **Web W4b — DONE** (2026-08-04, branch `kmp-migration-web`, commits `bff1b863` + `d93033b8`).
+  Second slice of W4 — a deliberately minimal, READ-ONLY Card Detail screen, scoped WAY down from
+  Android's 2713-line `CardDetailScreen.kt`: image/name/mana cost/type line/oracle text/prices ONLY.
+  No tag editing, no language/set/print switching, no art variants, no rulings, no
+  add-to-collection-from-detail (that stays on Search per W3d) — an explicit MVP boundary, not
+  incomplete work.
+  1. **New `webApp/src/wasmJsMain/kotlin/com/mmg/manahub/web/carddetail/` (`CardDetailScreen.kt` +
+     `CardDetailViewModel.kt`)**. `CardDetailViewModel` takes `scryfallId` as a Koin runtime
+     parameter (`params.get()`/`parametersOf(scryfallId)`, not a `SavedStateHandle` — `:webApp` has
+     no `koin-androidx-compose`) and calls `CardRepository.getCardById` (already real on
+     `WebCardRepository` since W3b — zero new repository work). Reused existing `commonMain`
+     `core-ui` components: `CardName`, `ManaCostImages`, `OracleText`, `MagicCard`. Responsive:
+     stacked column at COMPACT, fixed-width-image + scrollable-text-column side-by-side at
+     MEDIUM/EXPANDED/LARGE.
+  2. **First PARAMETERIZED nav route in `WebNavGraph.kt`** — every W4a route was zero-arg.
+     `CardDetailRoute(val scryfallId: String)` encodes as a URL PATH SEGMENT (`#card/<scryfallId>`,
+     confirmed live), not a query string. The W4a `ROUTES_BY_SERIAL_NAME` exact-match deep-link
+     parser doesn't generalize to this shape — added a dedicated `"card/"`-prefix branch alongside
+     it. `NavBackStackEntry.toRoute<T>()` resolves cleanly (unlike `hasRoute<T>()`, broken per W4a).
+  3. **Wired from both existing entry points, preserving prior gestures.** Search result tiles keep
+     their W3d tap-to-add-to-collection gesture on the card image unchanged; a NEW small overlay
+     "view details" icon button (distinct tap target, Material's default `IconButton` sizing already
+     clears the 48dp touch-target rule) opens detail instead. Collection tiles had no competing
+     gesture, so the tile image itself now opens detail directly.
+  4. **Found + fixed a real Coil3/wasmJs gap surfaced by this screen's mana-cost row**:
+     `ManaCostImages`/`OracleText` load Scryfall SVG mana symbols via Coil3, but the SVG bytes
+     fetched (200) and never rendered — `:webApp` was missing the `coil-svg` decoder artifact
+     (dependency-only fix, delegated to `android-kotlin-architect` per this agent's `.gradle.kts`
+     domain boundary, commit `d93033b8`). **No `.kt` wiring needed** — confirmed live that Coil3's
+     wasmJs `ServiceLoaderTarget` auto-registers the decoder once the artifact is a direct
+     dependency, narrowing the earlier W0 finding that explicit `setSingletonImageLoaderFactory`
+     wiring was required.
+  5. **Verified live in Chromium (Playwright)**: search "Lightning Bolt" → add-to-collection tap
+     unchanged (204) → info-icon tap → `#card/<id>`, full render (name/type/oracle text/`{R}` mana
+     symbol/all 4 USD-EUR-foil prices) → back → `#search` → Collection tab → tile tap → same card's
+     detail → `storageState` captured → fresh browser + fresh context deep-linked directly to the
+     captured `#card/<id>` URL → same card resolves, zero console errors. Zero horizontal overflow
+     at 375/768/1280px; visually confirmed the COMPACT-stacked vs. MEDIUM+-side-by-side split.
+     `:app:assembleDebug` green; diff confirmed to touch only `webApp/src/wasmJsMain/**` (+ the one
+     delegated `.gradle.kts` line) — zero Android/commonMain leakage.
+  Full detail: memory `project_kmp_spike_findings` (W4b addendum) and
+  `.claude/agent-memory/kmp-web-fullstack-dev/project_w4b_card_detail_screen.md`.
 
 - ✅ **Web W4a — DONE** (2026-08-04, branch `kmp-migration-web`, commit `9c79f7eb`). First slice of
   W4 (navigation + screens), **deliberately scoped down from the master plan's original W4
@@ -448,13 +491,13 @@ without the user.
 ## NEXT STEP
 
 1. **Web W4 — next slice, owner `kmp-web-fullstack-dev`.** W4a (real `:webApp`-only NavHost +
-   browser URL routing) is DONE — see STATUS above. Two independent directions, neither blocking
-   the other, pick either (or ask the user which they'd rather see next):
-   - **W4b — port another leaf-first MVP screen** (master plan §5 W4 order: Auth → Search/
-     CardDetail → Collection → Decks/Deck Studio → News → reduced Home). Auth/Search/Collection/
-     Decks-list already exist; `CardDetail` (tap a search result for a full card view, not just the
-     tap-to-add-to-collection shortcut W3b/W3d wired) is the next natural leaf. Deck Studio itself
-     is a much bigger screen — treat as its own future slice, not bundled here.
+   browser URL routing) and W4b (Card Detail screen) are DONE — see STATUS above. Remaining W4
+   options, none blocking each other, pick per the user's steer:
+   - **Deck Studio porting** — the next, much bigger leaf-first screen per master plan §5 W4 order
+     (Auth → Search/CardDetail → Collection → Decks/Deck Studio → News → reduced Home). Auth,
+     Search, CardDetail, Collection, and a bare Decks LIST already exist; a real Deck Studio (card
+     editing, format picker, Deck Doctor suggestions) is a substantially bigger screen and should be
+     scoped as its own dedicated slice (or several), not bundled casually into a "next leaf" pass.
    - **W4c — `PlatformCapabilities`-gated "not available on web" placeholder** for genuinely
      non-MVP destinations (game/life-counter, online sessions, voice, scanner, playtest, push,
      gamification UI — explicitly out of web v1 per the master plan's MVP scope). Not urgent since
@@ -581,3 +624,17 @@ without the user.
   `:app:assembleDebug` green. Next slice: `DeckRepository` (Auth/Profile already covered by
   W2a/W2b). Outstanding: the paired A3 Android-impl move to `androidMain` was not part of this
   slice's brief and remains open.
+- 2026-08-04: **Web W4b done** (commits `bff1b863` + `d93033b8`): second W4 slice, a deliberately
+  minimal read-only Card Detail screen (`webApp/.../carddetail/`) — image/name/mana cost/type
+  line/oracle text/prices only, explicitly excluding tag editing, print/language switching, and
+  add-to-collection-from-detail. First PARAMETERIZED CMP nav route (`#card/<scryfallId>`, a path
+  segment, confirmed live) — the W4a zero-arg deep-link lookup table needed a dedicated prefix-strip
+  branch alongside it. Wired from Search (new distinct overlay icon, preserving the W3d
+  tap-to-add gesture unchanged) and Collection (tile image now opens detail directly, no competing
+  gesture there). Found + fixed (via a delegated one-line `.gradle.kts` dependency, no `.kt` needed)
+  a real gap: `:webApp` was missing `coil-svg`, so Scryfall mana-symbol SVGs fetched but never
+  rendered — Coil3's wasmJs `ServiceLoaderTarget` auto-registered the decoder the moment the
+  dependency was added, narrowing the earlier W0 finding that explicit `ImageLoader` wiring was
+  required. Verified live in Chromium: full search→detail→back→collection→detail→deep-link-reload
+  loop, zero console errors, zero overflow at 375/768/1280px. `:app:assembleDebug` green; diff
+  confirmed `:webApp`-only. Next: Deck Studio porting (bigger, own slice) or W4c placeholder.
