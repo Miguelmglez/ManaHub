@@ -32,6 +32,7 @@ import com.mmg.manahub.web.collection.CollectionViewModel
 import com.mmg.manahub.web.config.WebAppConfig
 import com.mmg.manahub.web.deckeditor.DeckEditorViewModel
 import com.mmg.manahub.web.decks.DeckListViewModel
+import com.mmg.manahub.web.home.HomeViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
 import io.github.jan.supabase.SupabaseClient
@@ -106,6 +107,12 @@ import org.koin.dsl.module
  * [com.mmg.manahub.web.deckeditor.DeckEditorScreen] -- the sixth REAL web MVP screen, a minimal
  * deck editor. No new repository bindings were needed: [DeckEditorViewModel] reuses the existing
  * [DeckRepository] and [CardRepository] singletons already registered above.
+ *
+ * W4d adds the [HomeViewModel] factory, backing [com.mmg.manahub.web.home.HomeScreen] -- the
+ * seventh and last REAL web MVP screen from the master plan's originally-scoped screen list. No
+ * new repository bindings needed either: it reuses the existing [DeckRepository]/[CardRepository]
+ * (indirectly, via [UserCardRepository]) singletons above -- a client-side sort+cap over two
+ * already-real repository reads, not a new data source.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -192,4 +199,5 @@ val webAppKoinModule = module {
     viewModel { params ->
         DeckEditorViewModel(deckId = params.get(), deckRepository = get(), cardRepository = get())
     }
+    viewModel { HomeViewModel(deckRepository = get(), userCardRepository = get()) }
 }
