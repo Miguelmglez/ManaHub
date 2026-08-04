@@ -36,9 +36,57 @@ without the user.
 
 ---
 
-## STATUS (2026-08-03)
+## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a DONE.**
+
+- ✅ **Web W4a — DONE** (2026-08-04, branch `kmp-migration-web`, commit `9c79f7eb`). First slice of
+  W4 (navigation + screens), **deliberately scoped down from the master plan's original W4
+  description**: this slice gives `:webApp` its OWN real navigation (back stack + browser URL
+  routing) — it does NOT touch Android's live production nav graph
+  (`app/src/main/java/com/mmg/manahub/app/navigation/Screen.kt`/`AppNavGraph.kt`, still on the
+  Android-only `androidx.navigation:navigation-compose`) and does NOT attempt the
+  42-route-table-unification originally sketched in the master plan §5 W4 — that remains an
+  explicitly DEFERRED, separate, opt-in future task, not started, not scheduled.
+  1. **New catalog dependency**: `org.jetbrains.androidx.navigation:navigation-compose:2.9.2`
+     (catalog key `navigation-compose-multiplatform`, distinct from the pre-existing Android-only
+     `navigation-compose` alias — never wired into any Android-consumed module). Latest stable
+     (non-alpha) release at pin time.
+  2. **New file `webApp/src/wasmJsMain/kotlin/com/mmg/manahub/web/navigation/WebNavGraph.kt`**:
+     6 type-safe `@Serializable`/`@SerialName`-annotated route objects (`home`/`search`/`decks`/
+     `collection`/`theme`/`account`) mirroring the existing 6 `AdaptiveScaffold` nav items 1:1 (no
+     new/removed destinations — `Home` and `Theme` intentionally still render the same
+     `ThemeShowcaseScreen`, matching the pre-W4a fallthrough). `App.kt`'s old
+     `selectedNavIndex`-`when` placeholder is gone; nav selection state now derives from
+     `NavDestination.route` string-matched against each route's `serializer().descriptor.serialName`
+     (the reified `NavDestination.hasRoute<T>()` convenience did NOT resolve on this
+     artifact/version — see memory). Browser URL routing via
+     `NavController.bindToBrowserNavigation()` (`@ExperimentalBrowserHistoryApi`, stable since CMP
+     1.9.0 — supersedes the older deprecated `Window.bindToNavigation()`).
+  3. **Two real bugs found and fixed in the same slice** (both documented in memory, not just
+     patched silently): (a) the default `bindToBrowserNavigation()` does NOT replay the page's own
+     initial URL fragment into a matching destination on load — fixed by parsing
+     `window.location.hash` and pre-navigating before binding; (b) that pre-navigate step raced
+     `AdaptiveScaffold`'s `movableContentOf`-wrapped `NavHost` region and threw a
+     silently-swallowed (console.error only, no `pageerror`) `setGraph()`/`getGraph()`
+     `IllegalStateException` that permanently blanked the page on a fresh deep-link load — fixed by
+     gating on `currentBackStackEntryFlow.first()` before touching `navigate()`/`.graph`.
+  4. **Verified live in Chromium (Playwright)**: tab clicks update the URL fragment
+     (`#home`→`#search`→`#decks`→`#collection`); browser back×3/forward×1 walk the stack correctly
+     matching the click history; a full page reload at a deep URL (`.../#search`, fresh browser +
+     fresh context) renders the correct screen (Card Search, not Home) with zero console errors —
+     the actual NEW capability this task adds. Full checkpoint-3 regression: guest sign-in → search
+     "Lightning Bolt" → add to collection (`batch_upsert_collection` 204) → appears in Collection →
+     Decks tab → "New deck" (`batch_upsert_decks` 204) → **deep-linked reload at `.../#decks` from a
+     brand-new browser+context (restored via Playwright `storageState`, not a tab click)** →
+     `get_deck_changes_since`/`get_deck_cards_for_deck` re-fire for real → the SAME deck reappears.
+     Responsive: zero horizontal overflow (`scrollWidth == clientWidth`) and correct nav-chrome
+     switching (bottom bar / collapsed rail / expanded rail) confirmed unaffected at
+     375px/768px/1280px. `:app:assembleDebug` BUILD SUCCESSFUL (pre-existing warnings only);
+     commonMain leak grep clean (this slice touches no `commonMain`/Android source at all).
+  Full detail: memory `project_kmp_spike_findings` (W4a addendum) — includes the klib-inspection
+  technique used to confirm the exact `bindToBrowserNavigation` package/signature before writing any
+  import, since this is the first use of `navigation-compose-multiplatform` in the project.
 
 - ✅ **Web W3d — DONE** (2026-08-03, branch `kmp-migration-web`, commits `dbfc3b23` + `04a3468c` +
   `56e6228c`). Fourth W3 "web data layer, one repo per slice" task — `UserCardRepository`
@@ -399,32 +447,32 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W3 — the two remaining slices are BOTH deferred, for real (not scheduling) reasons —
-   W3 is effectively done for now.** W3a (`UserPreferencesRepository`), W3b (`CardRepository`), W3c
-   (`DeckRepository`), and W3d (`UserCardRepository`/collection) are all DONE — see STATUS above.
-   - **`NewsRepository` deferred (2026-08-04)**: verified directly (curl with an `Origin` header)
-     that 5 of the 6 default RSS sources (MTGGoldfish, Star City Games, Card Kingdom, MTG Arena
-     Zone, MTG Rocks) send NO `Access-Control-Allow-Origin` header — a hard browser CORS block no
-     client-side wasmJs code can work around. Only Draftsim allows it. Needs a Cloudflare Worker
-     proxy (precedent: `cloudflare/manahub-community/`, `manahub-draft-api`) before this slice can
-     even start. Memory: `project_kmp_web_news_cors_deferred`.
-   - **`CommunityDecks` deferred (2026-08-04)**: its exact interfaces
-     (`CommunityDecksRepositoryImpl.kt`, `ArchidektTrendingRepositoryImpl.kt`, `ArchidektClient.kt`,
-     `CommunityDeckSummary.kt`, etc.) are mid-edit in the user's own separate, uncommitted
-     multi-card-search WIP on this same branch — user confirmed and asked to defer. Memory:
-     `project_kmp_web_communitydecks_deferred`.
-   - When resuming either: reuse the established patterns (grep `shared/core-data/.../remote/
-     *RemoteDataSource.kt` for an existing commonMain data source FIRST — the W3b/W3c/W3d lesson;
-     the `MutableStateFlow` reactivity cache pattern; the real-methods/loud-stub split for
-     interfaces mixing online-first concerns with Room-only ones; READ the actual SQL body of any
-     superficially-similar existing RPC before assuming it's reusable for a new mutation case — W3d
-     finding). **Still outstanding, not part of any W3 slice's brief**: the paired A3 move of
-     `CardRepositoryImpl` (Android) into `shared/core-data/src/androidMain` — pick this up (via
-     `android-kotlin-architect`) whenever convenient. **Google OAuth remains explicitly deferred**
-     (user decision, memory `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a
-     blocking prerequisite. Once both remaining W3 slices unblock, W4 (navigation + screens,
-     unifying the standalone nav destinations built so far — Auth/Search/Collection/Decks — into
-     the real 42-route `Screen.kt` swap) is the natural next phase per the master plan §5.
+1. **Web W4 — next slice, owner `kmp-web-fullstack-dev`.** W4a (real `:webApp`-only NavHost +
+   browser URL routing) is DONE — see STATUS above. Two independent directions, neither blocking
+   the other, pick either (or ask the user which they'd rather see next):
+   - **W4b — port another leaf-first MVP screen** (master plan §5 W4 order: Auth → Search/
+     CardDetail → Collection → Decks/Deck Studio → News → reduced Home). Auth/Search/Collection/
+     Decks-list already exist; `CardDetail` (tap a search result for a full card view, not just the
+     tap-to-add-to-collection shortcut W3b/W3d wired) is the next natural leaf. Deck Studio itself
+     is a much bigger screen — treat as its own future slice, not bundled here.
+   - **W4c — `PlatformCapabilities`-gated "not available on web" placeholder** for genuinely
+     non-MVP destinations (game/life-counter, online sessions, voice, scanner, playtest, push,
+     gamification UI — explicitly out of web v1 per the master plan's MVP scope). Not urgent since
+     the web nav today only exposes the 6 real destinations that already work; do this once a
+     reduced Home screen needs to link toward a non-MVP feature and show a graceful message instead
+     of a dead link.
+   - **The Android-nav-artifact-unification question (androidx → JetBrains CMP navigation-compose
+     on Android too, sharing one `Screen.kt`) remains explicitly UNDECIDED and NOT started** — W4a
+     deliberately scoped around it (see STATUS). Raise it with the user before ever touching
+     `app/src/main/java/com/mmg/manahub/app/navigation/`.
+   - **W3's two remaining slices stay deferred** — `NewsRepository` (needs a Cloudflare Worker CORS
+     proxy first, memory `project_kmp_web_news_cors_deferred`) and `CommunityDecks` (blocked on the
+     user's own active uncommitted WIP on this branch, memory
+     `project_kmp_web_communitydecks_deferred`). Re-check both before resuming either. **Still
+     outstanding, not part of any slice's brief**: the paired A3 move of `CardRepositoryImpl`
+     (Android) into `shared/core-data/src/androidMain` — pick up via `android-kotlin-architect`
+     whenever convenient. **Google OAuth remains explicitly deferred** (user decision, memory
+     `project_kmp_web_google_oauth_deferred`) — not a blocking prerequisite to anything above.
 2. ✅ **RESOLVED (2026-08-03)** — the `handle_new_user()` anonymous-user finding from W2b. User
    approved a DB-level fix: `public.handle_new_user()` now guards `is_anonymous` (migration
    `fix_handle_new_user_skip_anonymous_users`) and the 10 pre-existing spurious `user_profiles`
