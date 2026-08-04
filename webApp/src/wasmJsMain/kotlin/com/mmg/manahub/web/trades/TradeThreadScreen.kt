@@ -17,7 +17,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -40,31 +39,22 @@ import org.koin.core.parameter.parametersOf
  * Negotiation thread detail -- the core "real trading" surface of the web Trades slice (approved
  * 2026-08-04). Shows every version of a proposal chain (rootProposalId) and the actions available
  * for the LATEST version based on its [TradeStatus] and whether the current user is proposer or
- * receiver: Accept / Decline / Counter (receiver, on a `PROPOSED` proposal), Cancel (proposer, on a
+ * receiver: Accept / Decline (receiver, on a `PROPOSED` proposal), Cancel (proposer, on a
  * `PROPOSED`/`DRAFT` proposal), Revoke acceptance (either party, on `ACCEPTED`). Terminal statuses
  * (`COMPLETED`/`CANCELLED`/`DECLINED`/`REVOKED`) and superseded (non-latest) versions render
  * read-only (no action row).
  *
- * **Deliberately deferred (flagged follow-up, not half-built)**: Mark Completed + automatic
- * collection sync, and the "gift trade" (review-collection-only) warning dialog -- see
- * [TradeThreadViewModel]'s KDoc. Counter navigates to the counter-offer item picker pre-filled with
- * the counterparty + parent proposal id (also a flagged follow-up -- see `TradesScreen`'s KDoc).
+ * **Deliberately deferred (flagged follow-up, not half-built, no dead UI -- see
+ * [TradeThreadViewModel]'s KDoc)**: Counter (no button at all, not a no-op one), Mark Completed +
+ * automatic collection sync, and the "gift trade" (review-collection-only) warning dialog.
  */
 @Composable
-fun TradeThreadScreen(rootProposalId: String, onCounter: (parentProposalId: String, counterpartyId: String) -> Unit) {
+fun TradeThreadScreen(rootProposalId: String) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
     val viewModel = koinViewModel<TradeThreadViewModel>(key = rootProposalId) { parametersOf(rootProposalId) }
     val uiState by viewModel.uiState.collectAsState()
-
-    LaunchedEffect(viewModel) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is NegotiationEvent.NavigateToCounter -> onCounter(event.parentProposalId, event.counterpartyId)
-            }
-        }
-    }
 
     Column(modifier = Modifier.fillMaxSize().padding(vertical = spacing.lg)) {
         Text(
@@ -109,7 +99,6 @@ fun TradeThreadScreen(rootProposalId: String, onCounter: (parentProposalId: Stri
                             showActions = isLatest,
                             onAccept = { viewModel.onAccept(proposal.id) },
                             onDecline = { viewModel.onDecline(proposal.id) },
-                            onCounter = { viewModel.onCounter(proposal.id) },
                             onCancelRequested = { viewModel.onCancelRequested(proposal.id) },
                             onRevoke = { viewModel.onRevoke(proposal.id) },
                         )
@@ -142,7 +131,6 @@ private fun ProposalVersionCard(
     showActions: Boolean,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
-    onCounter: () -> Unit,
     onCancelRequested: () -> Unit,
     onRevoke: () -> Unit,
 ) {
@@ -186,13 +174,6 @@ private fun ProposalVersionCard(
                                 style = MagicCtaStyle.Filled,
                                 color = MagicCtaColor.Success,
                                 isLoading = isProcessing,
-                                modifier = Modifier.weight(1f),
-                            )
-                            MagicCtaButton(
-                                onClick = onCounter,
-                                text = "Counter",
-                                style = MagicCtaStyle.Outlined,
-                                color = MagicCtaColor.Accent,
                                 modifier = Modifier.weight(1f),
                             )
                             MagicCtaButton(

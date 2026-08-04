@@ -401,13 +401,7 @@ fun WebNavGraph(
             }
             composable<TradeThreadRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<TradeThreadRoute>()
-                TradeThreadScreen(
-                    rootProposalId = route.rootProposalId,
-                    onCounter = { _, _ ->
-                        // Counter-offer item picker is a flagged follow-up (see TradesScreen's
-                        // KDoc) -- there is no destination to navigate to yet. no-op for now.
-                    },
-                )
+                TradeThreadScreen(rootProposalId = route.rootProposalId)
             }
             composable<CardDetailRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<CardDetailRoute>()

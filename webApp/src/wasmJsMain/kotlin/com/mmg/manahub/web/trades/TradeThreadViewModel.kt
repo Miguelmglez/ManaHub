@@ -15,14 +15,11 @@ import com.mmg.manahub.web.common.toUserFacingMessage
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -37,22 +34,20 @@ data class NegotiationUiState(
     val pendingCancelProposalId: String? = null,
 )
 
-/** One-shot [TradeThreadViewModel] events -- delivered via a buffered [Channel], never a nullable `StateFlow` field (CLAUDE.md standard). */
-sealed interface NegotiationEvent {
-    /** Navigate to the counter-proposal editor for [parentProposalId], offering to [counterpartyId]. */
-    data class NavigateToCounter(val parentProposalId: String, val counterpartyId: String) : NegotiationEvent
-}
-
 /**
  * Backs [TradeThreadScreen] -- the negotiation detail view for one root proposal chain: every
- * version in the thread, and Accept / Decline / Counter / Cancel / Revoke acceptance actions. A
- * deliberately-scoped-down web port of Android's `TradeNegotiationViewModel`: **Mark Completed +
- * automatic collection sync (`UpdateTradeCollectionUseCase`) and the "gift trade" warning dialog
- * are explicitly DEFERRED** (flagged follow-up, not half-built) -- both require a Room-specific
- * `TradeCollectionSyncDao` sync-tracking table that has no web equivalent yet, and are secondary
- * to the core respond-to-a-proposal flow this slice targets. `onCounter` only navigates (via
- * [NegotiationEvent.NavigateToCounter]) to the shared item-picker screen -- it does not build the
- * counter-items list itself.
+ * version in the thread, and Accept / Decline / Cancel / Revoke acceptance actions. A
+ * deliberately-scoped-down web port of Android's `TradeNegotiationViewModel`.
+ *
+ * **Deferred, per this project's no-stub rule (Home widget board precedent -- CLAUDE.md: "a
+ * widget/slide may only ship if its data path is real end-to-end ... anything that can't be wired
+ * must be deleted, never left as a placeholder"): Counter has NO UI here at all**, not a disabled/
+ * no-op button -- there is no counter-offer item-picker screen yet (would need the same friend +
+ * collection item-picker machinery as creating a brand-new proposal, itself an explicit follow-up),
+ * so rendering a "Counter" affordance with nowhere to navigate would be a dead control. Also
+ * deferred: Mark Completed + automatic collection sync (`UpdateTradeCollectionUseCase`, needs a
+ * Room-specific `TradeCollectionSyncDao` sync-tracking table with no web equivalent yet) and the
+ * "gift trade" warning dialog.
  */
 class TradeThreadViewModel(
     private val rootProposalId: String,
@@ -69,9 +64,6 @@ class TradeThreadViewModel(
 
     private val _uiState = MutableStateFlow(NegotiationUiState())
     val uiState: StateFlow<NegotiationUiState> = _uiState.asStateFlow()
-
-    private val _events = Channel<NegotiationEvent>(Channel.BUFFERED)
-    val events: Flow<NegotiationEvent> = _events.receiveAsFlow()
 
     private var refreshedForUserId: String? = null
 
@@ -161,13 +153,6 @@ class TradeThreadViewModel(
                 .onSuccess { refresh() }
                 .onFailure { e -> _uiState.update { it.copy(error = e.toUserFacingMessage("cancel this proposal", crashReporter)) } }
         }
-    }
-
-    fun onCounter(proposalId: String) {
-        val proposal = _uiState.value.thread.find { it.id == proposalId } ?: return
-        val currentUserId = _uiState.value.currentUserId
-        val counterpartyId = if (proposal.proposerId == currentUserId) proposal.receiverId else proposal.proposerId
-        _events.trySend(NegotiationEvent.NavigateToCounter(parentProposalId = proposalId, counterpartyId = counterpartyId))
     }
 
     fun onErrorDismissed() {
