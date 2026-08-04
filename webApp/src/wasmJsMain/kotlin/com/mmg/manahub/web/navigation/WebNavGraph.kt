@@ -26,6 +26,7 @@ import com.mmg.manahub.web.carddetail.CardDetailScreen
 import com.mmg.manahub.web.collection.CollectionScreen
 import com.mmg.manahub.web.deckeditor.DeckEditorScreen
 import com.mmg.manahub.web.decks.DeckListScreen
+import com.mmg.manahub.web.home.HomeScreen
 import com.mmg.manahub.web.search.CardSearchScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
 import kotlinx.browser.window
@@ -44,11 +45,12 @@ import kotlinx.serialization.Serializable
 //  JetBrains artifact too) is an explicitly DEFERRED, separate, opt-in future task — see the
 //  module KDoc on [App][com.mmg.manahub.web.App] and `docs/plans/kmp-migration-progress.md`.
 //
-//  `HomeRoute` and `ThemeRoute` intentionally render the SAME screen ([ThemeShowcaseScreen]) —
-//  this mirrors the pre-W4a index-switch's own `0, else -> ThemeShowcaseScreen(...)` fallthrough
-//  (both "Home" and "Theme" nav items already pointed at the same placeholder screen before this
-//  slice). A real Home dashboard port is out of scope for W4a; kept as two distinct routes so the
-//  URL/nav-selection state stays coherent per nav item rather than collapsing them into one tab.
+//  `HomeRoute` and `ThemeRoute` rendered the SAME screen ([ThemeShowcaseScreen]) from W4a through
+//  W4c — a placeholder fallthrough inherited from the pre-W4a index-switch (both "Home" and
+//  "Theme" nav items pointed at the same screen before real navigation existed). Web roadmap W4d
+//  replaces [HomeRoute]'s content with a real, distinct [HomeScreen] — see that screen's own KDoc
+//  for scope. [ThemeRoute] keeps [ThemeShowcaseScreen] as its own dedicated settings-like surface
+//  (the 12-palette picker is still genuinely useful on its own tab).
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Serializable
@@ -196,9 +198,9 @@ private suspend fun NavHostController.bindWebBrowserNavigation() {
  *
  * [selectedTheme]/[onThemeSelected] are hoisted one level up (in `App.kt`, alongside the
  * [com.mmg.manahub.core.ui.theme.MagicTheme] wrapper) rather than owned here, since the active
- * theme must be known BEFORE `MagicTheme` wraps this whole graph — both [HomeRoute] and
- * [ThemeRoute] read/write the SAME hoisted state, which also means switching between the two
- * "tabs" never resets the in-progress theme pick.
+ * theme must be known BEFORE `MagicTheme` wraps this whole graph. Since web roadmap W4d, only
+ * [ThemeRoute] reads/writes this state ([HomeRoute] renders the real [HomeScreen] instead) —
+ * still hoisted at this level so a future theme picker moved elsewhere would not need rewiring.
  */
 @Composable
 fun WebNavGraph(
@@ -263,10 +265,13 @@ fun WebNavGraph(
     ) { windowSizeClass ->
         NavHost(navController = navController, startDestination = HomeRoute) {
             composable<HomeRoute> {
-                ThemeShowcaseScreen(
+                HomeScreen(
                     windowSizeClass = windowSizeClass,
-                    selectedTheme = selectedTheme,
-                    onThemeSelected = onThemeSelected,
+                    onNavigateSearch = { navigateToTopLevel(SearchRoute) },
+                    onNavigateDecks = { navigateToTopLevel(DecksRoute) },
+                    onNavigateCollection = { navigateToTopLevel(CollectionRoute) },
+                    onDeckClick = { deckId -> navController.navigate(DeckEditorRoute(deckId)) },
+                    onCardClick = { scryfallId -> navController.navigate(CardDetailRoute(scryfallId)) },
                 )
             }
             composable<SearchRoute> {
