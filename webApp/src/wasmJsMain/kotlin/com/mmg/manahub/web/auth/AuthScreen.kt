@@ -39,10 +39,15 @@ import org.koin.compose.viewmodel.koinViewModel
  * (see [com.mmg.manahub.web.navigation.ProfileRoute]'s KDoc) and is shown ONLY while
  * [AuthUiState.SignedIn] -- there is nothing to view/edit while signed out, and
  * [com.mmg.manahub.web.profile.ProfileScreen] itself handles the anonymous-guest sub-case (no
- * `user_profiles` row) once inside.
+ * `user_profiles` row) once inside. The "Friends" row (web scope expansion, Friends slice, approved
+ * 2026-08-04) follows the SAME pattern -- see [com.mmg.manahub.web.navigation.FriendsRoute]'s KDoc.
  */
 @Composable
-fun AuthScreen(onOpenSettings: () -> Unit = {}, onOpenProfile: () -> Unit = {}) {
+fun AuthScreen(
+    onOpenSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
+    onOpenFriends: () -> Unit = {},
+) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -99,6 +104,12 @@ fun AuthScreen(onOpenSettings: () -> Unit = {}, onOpenProfile: () -> Unit = {}) 
                 title = "Profile",
                 subtitle = "Nickname, avatar, and sign out.",
                 onClick = onOpenProfile,
+            )
+            HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
+            AccountNavRow(
+                title = "Friends",
+                subtitle = "Manage friends and requests.",
+                onClick = onOpenFriends,
             )
             HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
         }

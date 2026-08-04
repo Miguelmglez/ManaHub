@@ -26,6 +26,7 @@ import com.mmg.manahub.web.carddetail.CardDetailScreen
 import com.mmg.manahub.web.collection.CollectionScreen
 import com.mmg.manahub.web.deckeditor.DeckEditorScreen
 import com.mmg.manahub.web.decks.DeckListScreen
+import com.mmg.manahub.web.friends.FriendsScreen
 import com.mmg.manahub.web.home.HomeScreen
 import com.mmg.manahub.web.profile.ProfileScreen
 import com.mmg.manahub.web.search.CardSearchScreen
@@ -106,6 +107,17 @@ private object SettingsRoute
 private object ProfileRoute
 
 /**
+ * Web scope expansion (Friends slice, approved 2026-08-04, second wave after Settings/Profile/Add
+ * Card) -- same shape and rationale as [SettingsRoute]/[ProfileRoute]: reachable only from
+ * [com.mmg.manahub.web.auth.AuthScreen]'s "Friends" row, deliberately NOT given an
+ * [AdaptiveNavItem] entry (a 9th account-adjacent surface would crowd
+ * [ManaWindowSizeClass.COMPACT]'s bottom bar further, same reasoning as Settings/Profile).
+ */
+@Serializable
+@SerialName("friends")
+private object FriendsRoute
+
+/**
  * Web roadmap W4b — the FIRST parameterized route in this graph (every W4a route was a zero-arg
  * `object`). A destination you navigate INTO from a card tile ([SearchRoute]/[CollectionRoute]
  * results), never a top-level nav item, so it deliberately has no [AdaptiveNavItem] entry below.
@@ -143,6 +155,7 @@ private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
     "account" to AccountRoute,
     "settings" to SettingsRoute,
     "profile" to ProfileRoute,
+    "friends" to FriendsRoute,
 )
 
 /**
@@ -330,6 +343,7 @@ fun WebNavGraph(
                 AuthScreen(
                     onOpenSettings = { navController.navigate(SettingsRoute) },
                     onOpenProfile = { navController.navigate(ProfileRoute) },
+                    onOpenFriends = { navController.navigate(FriendsRoute) },
                 )
             }
             composable<SettingsRoute> {
@@ -343,6 +357,9 @@ fun WebNavGraph(
                         }
                     },
                 )
+            }
+            composable<FriendsRoute> {
+                FriendsScreen()
             }
             composable<CardDetailRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<CardDetailRoute>()

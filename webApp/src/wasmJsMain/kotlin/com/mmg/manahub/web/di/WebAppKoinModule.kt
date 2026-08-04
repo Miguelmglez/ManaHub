@@ -7,6 +7,7 @@ import com.mmg.manahub.core.common.LocalStorageKeyValueStore
 import com.mmg.manahub.core.common.provideCrashReporter
 import com.mmg.manahub.core.data.network.ScryfallCache
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
+import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.core.data.remote.ScryfallClient
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
@@ -19,10 +20,12 @@ import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.core.data.repository.WebCardRepository
 import com.mmg.manahub.core.data.repository.WebDeckRepository
+import com.mmg.manahub.core.data.repository.WebFriendRepository
 import com.mmg.manahub.core.data.repository.WebUserCardRepository
 import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
@@ -33,6 +36,7 @@ import com.mmg.manahub.web.collection.CollectionViewModel
 import com.mmg.manahub.web.config.WebAppConfig
 import com.mmg.manahub.web.deckeditor.DeckEditorViewModel
 import com.mmg.manahub.web.decks.DeckListViewModel
+import com.mmg.manahub.web.friends.FriendsViewModel
 import com.mmg.manahub.web.home.HomeViewModel
 import com.mmg.manahub.web.profile.ProfileViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
@@ -132,6 +136,16 @@ import org.koin.dsl.module
  * into the existing [CardSearchViewModel] binding -- the first (and so far only) domain-layer use
  * case registered on web, rather than a ViewModel calling [CardRepository] methods directly. It
  * was already `commonMain` and depends only on [CardRepository], already registered above in W3b.
+ *
+ * The Friends slice (web scope expansion, approved 2026-08-04, second wave after Settings/Profile/
+ * Add Card) adds the [FriendRepository] binding, backed by [WebFriendRepository] (`shared/core-data`
+ * wasmJsMain) -- the fifth web data-layer repository slice, backing
+ * [com.mmg.manahub.web.friends.FriendsScreen]. [FriendRemoteDataSource] (`shared/core-data`
+ * commonMain, already shared -- confirmed by direct read before this slice, no move needed) is bound
+ * fresh here, on top of the [FriendshipClient] already registered in W2b. Also injects the existing
+ * [CardRepository] singleton so [WebFriendRepository] can resolve joined card metadata for
+ * `getFriendCollection` (same join-through-another-repository pattern as [WebUserCardRepository]).
+ * Bound against the INTERFACE type for the same reason as every other repository above.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -210,6 +224,12 @@ val webAppKoinModule = module {
         WebUserCardRepository(remote = get(), cardRepository = get(), supabaseClient = get())
     }
 
+    // ── Friends stack (web scope expansion, Friends slice) ───────────────────────────────────────
+    single { FriendRemoteDataSource(client = get()) }
+    single<FriendRepository> {
+        WebFriendRepository(remote = get(), cardRepository = get(), supabaseClient = get(), crashReporter = get())
+    }
+
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel { AuthViewModel(supabaseClient = get(), crashReporter = get()) }
     viewModel {
@@ -235,5 +255,8 @@ val webAppKoinModule = module {
     viewModel { SettingsViewModel(userPreferencesRepository = get()) }
     viewModel {
         ProfileViewModel(supabaseClient = get(), userProfileClient = get(), crashReporter = get())
+    }
+    viewModel {
+        FriendsViewModel(friendRepository = get(), supabaseClient = get(), crashReporter = get())
     }
 }
