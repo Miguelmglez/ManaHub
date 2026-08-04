@@ -1,5 +1,6 @@
 package com.mmg.manahub.web.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,9 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,13 +52,15 @@ import org.koin.compose.viewmodel.koinViewModel
  * Handles all four states (CLAUDE.md requirement): idle (no query yet), loading, error, and
  * content -- via [CardSearchUiState].
  *
- * There is deliberately no per-card detail navigation yet (out of scope for this slice -- a future
- * web Card Detail screen is a separate task); tapping a result adds it to the signed-in session's
- * collection instead (web roadmap W3d — see [CardSearchViewModel.addToCollection]), surfacing a
- * transient inline confirmation/error banner above the grid.
+ * Tapping a result's card image adds it to the signed-in session's collection (web roadmap W3d —
+ * see [CardSearchViewModel.addToCollection]), surfacing a transient inline confirmation/error
+ * banner above the grid -- this gesture is UNCHANGED from W3d. Web roadmap W4b adds a small
+ * overlay "view details" icon button on each tile (a distinct tap target from the card image, so
+ * the existing add-to-collection tap is preserved exactly) that navigates to
+ * [com.mmg.manahub.web.carddetail.CardDetailScreen] via [onCardClick].
  */
 @Composable
-fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass) {
+fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String) -> Unit) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -121,6 +127,7 @@ fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass) {
                         CardSearchResultTile(
                             card = card,
                             onClick = { viewModel.addToCollection(card) },
+                            onDetailClick = { onCardClick(card.scryfallId) },
                             modifier = Modifier.padding(spacing.xs),
                         )
                     }
@@ -193,11 +200,17 @@ private fun IdleState(textColor: Color) {
  * two already-`commonMain`, already-mandated components instead: [MagicCard] (the card image, with
  * the correct 63:88 MTG aspect ratio) and [CardName] (CLAUDE.md's mandatory card-name renderer --
  * handles the "A-" Alchemy prefix / DFC front-face truncation).
+ *
+ * Web roadmap W4b: the card image itself keeps its ORIGINAL [onClick] gesture (add to collection,
+ * unchanged from W3d) -- a small overlay icon button (top-end corner, its own >= 48dp touch target
+ * per CLAUDE.md's accessibility rule) is the distinct tap target for [onDetailClick], so the two
+ * actions never compete for the same gesture.
  */
 @Composable
 private fun CardSearchResultTile(
     card: Card,
     onClick: () -> Unit,
+    onDetailClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = MaterialTheme.spacing
@@ -208,11 +221,27 @@ private fun CardSearchResultTile(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
-        MagicCard(
-            card = card,
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            MagicCard(
+                card = card,
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            IconButton(
+                onClick = onDetailClick,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(spacing.xxs)
+                    .clip(CircleShape)
+                    .background(colors.background.copy(alpha = 0.75f)),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "View ${card.name} details",
+                    tint = colors.textPrimary,
+                )
+            }
+        }
         CardName(
             name = card.name,
             showFrontOnly = true,

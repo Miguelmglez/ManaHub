@@ -17,10 +17,12 @@ import androidx.navigation.bindToBrowserNavigation
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.toRoute
 import com.mmg.manahub.core.ui.layout.AdaptiveNavItem
 import com.mmg.manahub.core.ui.layout.AdaptiveScaffold
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.web.auth.AuthScreen
+import com.mmg.manahub.web.carddetail.CardDetailScreen
 import com.mmg.manahub.web.collection.CollectionScreen
 import com.mmg.manahub.web.decks.DeckListScreen
 import com.mmg.manahub.web.search.CardSearchScreen
@@ -73,11 +75,22 @@ private object ThemeRoute
 private object AccountRoute
 
 /**
+ * Web roadmap W4b — the FIRST parameterized route in this graph (every W4a route was a zero-arg
+ * `object`). A destination you navigate INTO from a card tile ([SearchRoute]/[CollectionRoute]
+ * results), never a top-level nav item, so it deliberately has no [AdaptiveNavItem] entry below.
+ */
+@Serializable
+@SerialName("card")
+private data class CardDetailRoute(val scryfallId: String)
+
+/**
  * The routes above, keyed by their [kotlinx.serialization] serial name (the exact string
  * [androidx.navigation.bindToBrowserNavigation]'s DEFAULT `getBackStackEntryRoute` writes into the
  * URL fragment for a no-argument object route — confirmed live: the fragment reads e.g.
  * `#search`, not a percent-encoded path). Used only by [bindWebBrowserNavigation]'s one-time
- * initial-fragment lookup below.
+ * initial-fragment lookup below. [CardDetailRoute] is NOT in this map (it carries an argument, so
+ * its fragment is `#card/<scryfallId>`, not a bare serial name) — see the dedicated branch in
+ * [bindWebBrowserNavigation] instead.
  */
 private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
     "home" to HomeRoute,
@@ -118,15 +131,28 @@ private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
  * emits once the graph is attached and the start destination's entry exists) instead of relying on
  * Compose's effect-vs-composition ordering, which [AdaptiveScaffold]'s `movableContentOf` usage
  * makes unsafe to assume here.
+ *
+ * **Web roadmap W4b addendum — [CardDetailRoute] deep-link.** [ROUTES_BY_SERIAL_NAME] only covers
+ * the zero-arg routes (their fragment IS their serial name, verbatim). [CardDetailRoute] carries a
+ * `scryfallId` arg, so `navigation-compose-multiplatform`'s default route encoding (the same
+ * required-arg-as-path-segment scheme stock AndroidX Navigation typed routes use — confirmed via
+ * the `navigation-common` klib decompile referenced in the W4a memory addendum, which surfaced
+ * `RouteEncoder`/`generateRouteWithArgs` internals) produces a fragment shaped `#card/<scryfallId>`,
+ * not the bare `#card` a zero-arg route would get. Parsed with a simple prefix strip rather than a
+ * lookup table entry, since the value portion is unbounded (unlike the six fixed top-level routes).
  */
 @OptIn(ExperimentalBrowserHistoryApi::class)
 private suspend fun NavHostController.bindWebBrowserNavigation() {
     currentBackStackEntryFlow.first()
 
     val initialFragment = window.location.hash.removePrefix("#")
+    val cardDetailId = initialFragment.takeIf { it.startsWith("card/") }
+        ?.removePrefix("card/")
+        ?.takeIf { it.isNotBlank() }
     val initialRoute = ROUTES_BY_SERIAL_NAME[initialFragment]
-    if (initialRoute != null && initialRoute != HomeRoute) {
-        navigate(initialRoute) { launchSingleTop = true }
+    when {
+        cardDetailId != null -> navigate(CardDetailRoute(scryfallId = cardDetailId)) { launchSingleTop = true }
+        initialRoute != null && initialRoute != HomeRoute -> navigate(initialRoute) { launchSingleTop = true }
     }
     bindToBrowserNavigation()
 }
@@ -225,13 +251,19 @@ fun WebNavGraph(
                 )
             }
             composable<SearchRoute> {
-                CardSearchScreen(windowSizeClass = windowSizeClass)
+                CardSearchScreen(
+                    windowSizeClass = windowSizeClass,
+                    onCardClick = { scryfallId -> navController.navigate(CardDetailRoute(scryfallId)) },
+                )
             }
             composable<DecksRoute> {
                 DeckListScreen()
             }
             composable<CollectionRoute> {
-                CollectionScreen(windowSizeClass = windowSizeClass)
+                CollectionScreen(
+                    windowSizeClass = windowSizeClass,
+                    onCardClick = { scryfallId -> navController.navigate(CardDetailRoute(scryfallId)) },
+                )
             }
             composable<ThemeRoute> {
                 ThemeShowcaseScreen(
@@ -242,6 +274,14 @@ fun WebNavGraph(
             }
             composable<AccountRoute> {
                 AuthScreen()
+            }
+            composable<CardDetailRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<CardDetailRoute>()
+                CardDetailScreen(
+                    scryfallId = route.scryfallId,
+                    windowSizeClass = windowSizeClass,
+                    onBack = { navController.navigateUp() },
+                )
             }
         }
     }

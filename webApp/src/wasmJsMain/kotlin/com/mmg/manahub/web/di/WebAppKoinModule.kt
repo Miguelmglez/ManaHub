@@ -27,6 +27,7 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.web.auth.AuthViewModel
 import com.mmg.manahub.web.auth.WebSessionManager
+import com.mmg.manahub.web.carddetail.CardDetailViewModel
 import com.mmg.manahub.web.collection.CollectionViewModel
 import com.mmg.manahub.web.config.WebAppConfig
 import com.mmg.manahub.web.decks.DeckListViewModel
@@ -91,6 +92,13 @@ import org.koin.dsl.module
  * the existing [CardRepository] singleton so [WebUserCardRepository] can resolve joined
  * [com.mmg.manahub.core.model.Card] data for its `UserCardWithCard` reads. Bound against the
  * INTERFACE type for the same reason as every other repository above.
+ *
+ * W4b adds the [CardDetailViewModel] factory, backing
+ * [com.mmg.manahub.web.carddetail.CardDetailScreen] -- the fifth REAL web MVP screen. Takes the
+ * `scryfallId` nav arg as a Koin runtime parameter (`params.get()`, resolved via
+ * `koinViewModel<CardDetailViewModel>(key = scryfallId) { parametersOf(scryfallId) }` from the
+ * screen) rather than a `SavedStateHandle` -- `:webApp` has no `koin-androidx-compose` integration
+ * (Android-only), and the CMP nav route object already carries the id directly.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -173,4 +181,5 @@ val webAppKoinModule = module {
     viewModel { CardSearchViewModel(cardRepository = get(), userCardRepository = get()) }
     viewModel { DeckListViewModel(deckRepository = get()) }
     viewModel { CollectionViewModel(userCardRepository = get()) }
+    viewModel { params -> CardDetailViewModel(scryfallId = params.get(), cardRepository = get()) }
 }
