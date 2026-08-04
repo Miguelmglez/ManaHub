@@ -191,7 +191,7 @@ val webAppKoinModule = module {
     }
 
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
-    viewModel { AuthViewModel(get(), get()) }
+    viewModel { AuthViewModel(get()) }
     viewModel { CardSearchViewModel(cardRepository = get(), userCardRepository = get()) }
     viewModel { DeckListViewModel(deckRepository = get()) }
     viewModel { CollectionViewModel(userCardRepository = get()) }

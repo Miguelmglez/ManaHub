@@ -2,11 +2,9 @@ package com.mmg.manahub.web.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.core.data.remote.UserProfileClient
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
-import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +32,6 @@ sealed interface AuthUiState {
  */
 class AuthViewModel(
     supabaseClient: SupabaseClient,
-    private val userProfileClient: UserProfileClient,
 ) : ViewModel() {
 
     private val auth = supabaseClient.auth
@@ -45,47 +42,10 @@ class AuthViewModel(
     private val _isSigningIn = MutableStateFlow(false)
     val isSigningIn: StateFlow<Boolean> = _isSigningIn.asStateFlow()
 
-    /**
-     * W2b plumbing smoke check ONLY -- not a real feature. Proves the web
-     * `@Named("supabaseKtor")` [HttpClient][io.ktor.client.HttpClient] (built via
-     * [com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders]) reads the LIVE session's
-     * access token and successfully round-trips a real Supabase PostgREST call, not just that
-     * everything compiles/constructs. An anonymous user has no `user_profiles` row (per CLAUDE.md
-     * -- guests use the `anon` role and are never upserted into that table), so an empty result
-     * is the EXPECTED clean outcome here, not a bug.
-     */
-    private val _profileCheck = MutableStateFlow<String?>(null)
-    val profileCheck: StateFlow<String?> = _profileCheck.asStateFlow()
-
     init {
         viewModelScope.launch {
             auth.sessionStatus.collect { status ->
-                val resolved = status.toUiState()
-                _uiState.value = resolved
-                if (resolved is AuthUiState.SignedIn) {
-                    runProfileCheck(resolved.userId)
-                }
-            }
-        }
-    }
-
-    private fun runProfileCheck(userId: String) {
-        viewModelScope.launch {
-            _profileCheck.value = "Checking user_profiles via the web Ktor client..."
-            _profileCheck.value = try {
-                val rows = userProfileClient.fetchProfile(idFilter = "eq.$userId")
-                if (rows.isEmpty()) {
-                    "OK -- 0 rows (expected for an anonymous session: guests have no " +
-                        "user_profiles row)."
-                } else {
-                    "OK -- ${rows.size} row(s) returned."
-                }
-            } catch (e: ResponseException) {
-                // A non-2xx (e.g. RLS-denied) is a clean, understood outcome for this smoke
-                // check -- it still proves the request reached the backend with a Bearer token.
-                "HTTP ${e.response.status.value} -- ${e.message ?: "no message"}"
-            } catch (e: Exception) {
-                "Client-side failure: ${e.message ?: e::class.simpleName}"
+                _uiState.value = status.toUiState()
             }
         }
     }
