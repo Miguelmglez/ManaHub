@@ -38,9 +38,10 @@ import org.koin.compose.viewmodel.koinViewModel
  * wave). Four tabs: Active / History (proposal negotiation lists) plus minimal read-only Wishlist /
  * Open-for-Trade lists. Tapping an Active/History row navigates into [TradeThreadScreen] via
  * [onProposalClick] (the rootProposalId). **Creating a brand-new proposal from scratch (picking a
- * friend + their open-for-trade items) is an explicit, flagged FOLLOW-UP** -- this slice ships the
- * respond-to-an-existing-proposal flow (accept/decline/counter/cancel/revoke, in
- * [TradeThreadScreen]) solidly first, per the same "ship what's solid, defer what's half-built"
+ * friend + their open-for-trade items) -- and Countering an existing one, which needs the same
+ * item-picker -- are both explicit, flagged FOLLOW-UPs** -- this slice ships the
+ * respond-to-an-existing-proposal flow (accept/decline/cancel/revoke, in [TradeThreadScreen])
+ * solidly first, per the same "ship what's solid, defer what's half-built"
  * discipline every prior web slice has followed. Wishlist/Open-for-Trade are read-only lists here
  * (no add/edit UI yet -- that hangs off a Card Detail "add to wishlist" affordance that doesn't
  * exist on web yet either).
