@@ -40,11 +40,13 @@ import org.koin.compose.viewmodel.koinViewModel
  * handling lives there.
  *
  * Deliberately minimal, mirroring [com.mmg.manahub.web.decks.DeckListScreen]'s scope discipline:
- * no quantity edit, no foil/condition/language edit, no card detail navigation -- those are a
- * separate, much bigger future slice (master plan §5/§6 W4+).
+ * no quantity edit, no foil/condition/language edit -- those remain a separate, much bigger future
+ * slice (master plan §5/§6 W4+). Web roadmap W4b adds card detail navigation: tapping a tile's
+ * image (no competing gesture existed here, unlike the search screen's tap-to-add) opens
+ * [com.mmg.manahub.web.carddetail.CardDetailScreen] via [onCardClick].
  */
 @Composable
-fun CollectionScreen(windowSizeClass: ManaWindowSizeClass) {
+fun CollectionScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String) -> Unit) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -80,7 +82,11 @@ fun CollectionScreen(windowSizeClass: ManaWindowSizeClass) {
                     contentPadding = PaddingValues(bottom = spacing.lg),
                 ) {
                     items(uiState.cards, key = { it.userCard.id }) { entry ->
-                        CollectionCardTile(entry = entry, modifier = Modifier.padding(spacing.xs))
+                        CollectionCardTile(
+                            entry = entry,
+                            onClick = { onCardClick(entry.card.scryfallId) },
+                            modifier = Modifier.padding(spacing.xs),
+                        )
                     }
                 }
             }
@@ -96,7 +102,7 @@ fun CollectionScreen(windowSizeClass: ManaWindowSizeClass) {
  * result never has.
  */
 @Composable
-private fun CollectionCardTile(entry: UserCardWithCard, modifier: Modifier = Modifier) {
+private fun CollectionCardTile(entry: UserCardWithCard, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -107,6 +113,7 @@ private fun CollectionCardTile(entry: UserCardWithCard, modifier: Modifier = Mod
     ) {
         MagicCard(
             card = entry.card,
+            onClick = onClick,
             modifier = Modifier.fillMaxWidth(),
         )
         CardName(
