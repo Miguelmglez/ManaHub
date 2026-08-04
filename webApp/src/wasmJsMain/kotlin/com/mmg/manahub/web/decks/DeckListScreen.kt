@@ -1,5 +1,6 @@
 package com.mmg.manahub.web.decks
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,9 +28,10 @@ import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Deck List -- the third REAL `:webApp` MVP screen (web roadmap W3c). Deliberately NOT Deck
- * Studio: no card editing, no format picker, no deck detail navigation -- those are a separate,
- * much bigger future slice (master plan §5/§6 W4+). The sole purpose of this screen is to prove
+ * Deck List -- the third REAL `:webApp` MVP screen (web roadmap W3c, extended W4c). Deliberately
+ * NOT Deck Studio: no card editing, no format picker inline here -- those now live one level
+ * deeper, in [com.mmg.manahub.web.deckeditor.DeckEditorScreen] (web roadmap W4c), reached by
+ * tapping a row via [onDeckClick]. The sole purpose of THIS screen is to prove
  * [com.mmg.manahub.core.data.repository.WebDeckRepository] works end-to-end against real Supabase
  * data: "New deck" writes through the repository immediately (no local staging), the list reflects
  * it right away via the repository's own [DeckSummary] flow, and a full page reload re-hydrates
@@ -43,7 +45,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * `requireUserId()` error message in the error banner rather than silently failing.
  */
 @Composable
-fun DeckListScreen() {
+fun DeckListScreen(onDeckClick: (String) -> Unit) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -95,7 +97,7 @@ fun DeckListScreen() {
                     verticalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
                     items(uiState.decks, key = { it.id }) { deck ->
-                        DeckRow(deck = deck)
+                        DeckRow(deck = deck, onClick = { onDeckClick(deck.id) })
                         HorizontalDivider(color = colors.backgroundSecondary)
                     }
                 }
@@ -105,7 +107,7 @@ fun DeckListScreen() {
 }
 
 @Composable
-private fun DeckRow(deck: DeckSummary) {
+private fun DeckRow(deck: DeckSummary, onClick: () -> Unit) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -113,6 +115,7 @@ private fun DeckRow(deck: DeckSummary) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(vertical = spacing.xs),
         verticalArrangement = Arrangement.spacedBy(spacing.xxs),
     ) {
