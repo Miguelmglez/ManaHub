@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,6 +59,16 @@ import org.koin.compose.viewmodel.koinViewModel
  * overlay "view details" icon button on each tile (a distinct tap target from the card image, so
  * the existing add-to-collection tap is preserved exactly) that navigates to
  * [com.mmg.manahub.web.carddetail.CardDetailScreen] via [onCardClick].
+ *
+ * Web scope expansion (Add Card, 2026-08-04): this screen IS the web's "Add Card" entry point --
+ * per CLAUDE.md, Android's `AddCardScreen` is search-first with an idle-state spotlight/discovery
+ * grid, not a separate destination. While [CardSearchUiState.query] is blank, [SpotlightGrid]
+ * replaces the old static "search to get started" text with a real, shuffled, addable grid of
+ * cards from one Scryfall set at a time (see [CardSearchViewModel.loadSpotlightFeed]), reusing the
+ * SAME [CardSearchResultTile] (and therefore the same add-to-collection/view-details gestures) as
+ * a real search result. The camera-scanner FAB and language-selector sheet from Android's
+ * `AddCardScreen` are deliberately NOT ported here (`feature/scanner` is excluded from the whole
+ * KMP migration; no web language-switcher exists yet) -- out of scope for this slice.
  */
 @Composable
 fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String) -> Unit) {
@@ -114,6 +125,16 @@ fun CardSearchScreen(windowSizeClass: ManaWindowSizeClass, onCardClick: (String)
                 uiState.hasSearched && uiState.cards.isEmpty() -> EmptyResultsState(
                     query = uiState.query,
                     textColor = colors.textSecondary,
+                )
+
+                uiState.query.isBlank() && uiState.cards.isEmpty() -> SpotlightGrid(
+                    windowSizeClass = windowSizeClass,
+                    cards = uiState.spotlightCards,
+                    isLoading = uiState.isSpotlightLoading,
+                    indicatorColor = colors.primaryAccent,
+                    onCardClick = viewModel::addToCollection,
+                    onDetailClick = onCardClick,
+                    onLoadMore = viewModel::loadSpotlightFeed,
                 )
 
                 uiState.cards.isEmpty() -> IdleState(textColor = colors.textSecondary)
@@ -190,6 +211,62 @@ private fun IdleState(textColor: Color) {
             style = MaterialTheme.magicTypography.bodyMedium,
             color = textColor,
         )
+    }
+}
+
+/**
+ * Web scope expansion (Add Card, 2026-08-04). The idle-state discovery grid — mirrors Android's
+ * `AddCardScreen.SpotlightGrid` exactly: a shuffled page of real, addable cards from one Scryfall
+ * set, with a footer item whose [LaunchedEffect] fires [onLoadMore] the moment it enters
+ * composition (i.e. the user has scrolled it into view) to page onto the next set. Reuses
+ * [CardSearchResultTile] so a spotlight card supports the identical add-to-collection (tap image)
+ * / view-details (overlay icon) gestures as a real search result — spotlight cards ARE real,
+ * addable [Card]s, not placeholders.
+ */
+@Composable
+private fun SpotlightGrid(
+    windowSizeClass: ManaWindowSizeClass,
+    cards: List<Card>,
+    isLoading: Boolean,
+    indicatorColor: Color,
+    onCardClick: (Card) -> Unit,
+    onDetailClick: (String) -> Unit,
+    onLoadMore: () -> Unit,
+) {
+    val spacing = MaterialTheme.spacing
+
+    if (cards.isEmpty() && isLoading) {
+        LoadingState(indicatorColor)
+        return
+    }
+
+    AdaptiveCardGrid(
+        windowSizeClass = windowSizeClass,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = spacing.lg),
+    ) {
+        items(cards, key = { it.scryfallId }) { card ->
+            CardSearchResultTile(
+                card = card,
+                onClick = { onCardClick(card) },
+                onDetailClick = { onDetailClick(card.scryfallId) },
+                modifier = Modifier.padding(spacing.xs),
+            )
+        }
+        if (isLoading) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(spacing.md),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = indicatorColor)
+                }
+            }
+        } else if (cards.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LaunchedEffect(Unit) { onLoadMore() }
+            }
+        }
     }
 }
 
