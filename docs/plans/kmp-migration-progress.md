@@ -38,7 +38,52 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion (approved 2026-08-04): Settings + Profile DONE — Add Card is next.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion (approved 2026-08-04): Settings + Profile + Add Card ALL DONE — the approved 3-slice expansion is complete.**
+
+- ✅ **Web scope expansion, Add Card (spotlight discovery) — DONE** (2026-08-04, branch
+  `kmp-migration-web`, commits `6db47c9d` / `a28df9c4`). Third and LAST of the three approved
+  slices (Settings → Profile → Add Card).
+  1. **Not a new screen — extended the existing `CardSearchScreen`/`CardSearchViewModel` (W3b)**,
+     per CLAUDE.md's own Add Card section: Android's `AddCardScreen` IS the search screen, with an
+     idle-state (no query) spotlight/discovery grid rather than a separate destination. Building a
+     second "Add Card" nav route would have duplicated Search and bloated an already 6-item nav
+     rail — confirmed this reading BEFORE writing any code.
+  2. **Zero new domain work** — `GetSpotlightFeedUseCase` (`shared/core-domain` commonMain) was
+     already fully shared and depends only on `CardRepository` (real on web since W3b:
+     `getPlayableSets`/`searchCardsPaginated`). Registered as a Koin `single` in
+     `webAppKoinModule` and constructor-injected into `CardSearchViewModel` — the first
+     domain-layer use case registered on web (every prior ViewModel called repository methods
+     directly).
+  3. **State/behavior**: `CardSearchUiState` gained `spotlightCards`/`isSpotlightLoading`.
+     `loadSpotlightFeed()` fires once from `init` and again from the grid's footer item (a
+     `LaunchedEffect(Unit)` that runs the moment the footer scrolls into composition — the same
+     footer-trigger pattern Android's `SpotlightGrid` uses), appending each call's page and
+     advancing `currentSpotlightSetIndex` via the use case's `nextSetIndex`. "Idle" is exactly
+     `query.isBlank()` (this ViewModel has no separate filter state, unlike Android's
+     `AddCardViewModel` which also gates on an advanced-search filter). `onQueryChange` now resets
+     search state immediately when the query is cleared back to blank, so the screen falls back to
+     the (already-cached) spotlight grid without requiring an explicit re-search.
+  4. **UI reuses `CardSearchResultTile` exactly** — a spotlight card supports the identical
+     add-to-collection (tap image) / view-details (overlay icon) gestures as a real search result,
+     since spotlight cards are real, addable `Card`s. Camera-scanner FAB and language-selector
+     sheet were deliberately NOT ported (`feature/scanner` is excluded from the whole KMP
+     migration; no web language-switcher exists yet).
+  5. **Verified live in Chromium (Playwright, real guest session via a saved `storageState`)**:
+     landed on `#search` with an empty query → real shuffled grid of cards from one Scryfall set
+     (`set:trc`) rendered with real card art (network-confirmed: `api.scryfall.com/cards/search?
+     q=set%3Atrc...` then `cards.scryfall.io/.../*.jpg` 200s) → scrolled → next set (`set:trk`)
+     fetched and appended → scrolled further → a THIRD set (`set:mbc`) fetched, confirming
+     multi-page accumulation works, not just a one-shot next-page → typed "Lightning Bolt" and hit
+     Enter → grid correctly REPLACED with 2 real fuzzy-matched search results (not appended
+     alongside spotlight cards) → cleared the query → grid reverted to the SAME cached spotlight
+     cards (TRC/TRK) with zero re-fetch (proves the in-memory `spotlightCards` accumulation
+     persists across a query round-trip, not just the initial load) → tapped a spotlight tile's
+     card art → "Added Kirk, Enterprising Captain to your collection." banner rendered +
+     `batch_upsert_collection` RPC returned 204 — same round-trip proof pattern as every prior
+     add-to-collection verification (W3d/W4d). Zero horizontal `scrollWidth` overflow at
+     375/768/1280px, spot-checked visually at 375px (3-column COMPACT reflow, bottom nav bar,
+     no clipping).
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/project_w4f_add_card_spotlight.md`.
 
 - ✅ **Web scope expansion, Profile screen — DONE** (2026-08-04, branch `kmp-migration-web`, commit
   `12e6874b`). Second of the three approved slices (Settings → Profile → Add Card). Deliberately
@@ -767,18 +812,16 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web scope expansion — Settings AND Profile are DONE (see STATUS above, commits `69b3e31a` /
-   `12e6874b`). Add Card is next and LAST**, per the user's approved priority order (2026-08-04).
-   Trades, Friends, and Game/online sessions remain explicitly OUT of scope — `feature/online` is
-   not yet KMP-migrated on Android (still Hilt + Android-only), so building it for web first would
-   be architecturally backwards; do not touch anything online-session/game/life-counter-related.
-   - **Add Card**: CLAUDE.md's Add Card section describes a search-first spotlight-grid entry point
-     with a language-flag selector and a camera-scanner FAB on Android — the camera scanner is
-     EXCLUDED from the current KMP wave (CLAUDE.md's standing exclusion list), so the web version
-     must scope it out (no FAB, or a disabled/hidden one) while keeping the rest. Web already has a
-     working `CardSearchScreen`/`CardSearchViewModel` (W3b) with "tap a result to add" — check how
-     much of Add Card's real value is "a second entry point to the same add flow" vs. genuinely new
-     UI (spotlight grid, language picker) before over-building.
+1. **Web scope expansion is COMPLETE — Settings, Profile, AND Add Card are all DONE** (see STATUS
+   above, commits `69b3e31a` / `12e6874b` / `6db47c9d` + `a28df9c4`), closing out the user's
+   approved 3-slice priority order (2026-08-04). Add Card extended the existing `CardSearchScreen`
+   with an idle-state spotlight/discovery grid rather than adding a new nav destination — see the
+   STATUS entry for the full writeup. **Trades, Friends, and Game/online sessions remain explicitly
+   OUT of scope** — `feature/online` is not yet KMP-migrated on Android (still Hilt +
+   Android-only), so building it for web first would be architecturally backwards; do not touch
+   anything online-session/game/life-counter-related without the user first asking for it. No
+   further web scope expansion is approved at this time — raise it with the user before starting
+   a fourth slice.
 2. **Web W4 + W5b are COMPLETE (see STATUS above).** W4d (Home screen) closed out the master
    plan's originally-scoped MVP screen list; W5b (2026-08-04, commits `b6ba4989`/`a42e12bf`) swept
    every screen at 320px/1920px+ and fixed the two real bugs it found (cross-cutting
