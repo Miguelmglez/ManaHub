@@ -38,7 +38,58 @@ without the user.
 
 ## STATUS (2026-08-04)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b DONE.**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c DONE.**
+
+- ✅ **Web W4c — DONE** (2026-08-04, branch `kmp-migration-web`, commit `17ddc8d0`). Third W4
+  slice — a deliberately minimal Deck Editor, scoped WAY down from Android's Deck Studio (2320-line
+  screen + 1774-line ViewModel): mainboard/sideboard lists with quantities, add a card via a compact
+  screen-local search, remove/decrement a card, rename the deck, change its format (curated 3-format
+  subset: Commander/Casual/Draft, mirroring Android's `STUDIO_FORMATS`). Explicitly OUT of scope,
+  not even a stub: Deck Doctor suggestions/analysis, the wizard/seed-build flow, playtest,
+  import/export, warning overlays, land-suggestion auto-fill.
+  1. **New `webApp/src/wasmJsMain/kotlin/com/mmg/manahub/web/deckeditor/` (`DeckEditorScreen.kt` +
+     `DeckEditorViewModel.kt`)**. No new repository work needed — `DeckRepository`
+     (`WebDeckRepository`, real since W3c) and `CardRepository` (`WebCardRepository`, real since
+     W3b) already implement every method this screen calls. `DeckEditorViewModel` combines
+     `observeDeckWithCards(deckId)` with its own local `Card` cache (warmed via
+     `cardRepository.warmCacheForIds` + `getCardsByIds`, the SAME two-cache-join pattern W3d's
+     `WebUserCardRepository` established, reused here one layer up at the ViewModel instead of a
+     repository). `DeckFormat` (`shared/core-model` commonMain) is directly reusable — no new
+     format enum needed. Card rows (both search results and mainboard/sideboard) reuse the
+     existing general-purpose `CardListItem` overload (`core-ui/components/CardListItem.kt`) rather
+     than a new tile type.
+  2. **Second parameterized nav route**, `DeckEditorRoute(deckId: String)` → `#deck/<deckId>`, same
+     path-segment encoding + dedicated deep-link prefix-strip branch pattern `CardDetailRoute`
+     established in W4b — confirms that recipe generalizes cleanly to a second route with zero new
+     surprises. `DeckListScreen`'s previously-dead deck rows now navigate into it via a new
+     `onDeckClick` callback.
+  3. **Responsive**: mainboard/sideboard stack vertically at COMPACT, render side-by-side at
+     MEDIUM/EXPANDED/LARGE — mirrors `CardDetailScreen`'s stacked-vs-side-by-side split.
+  4. **A genuinely new Playwright verification-methodology finding (not a code bug)**: synthetic
+     `page.keyboard.type()` at default (near-zero-delay) speed immediately followed by a click can
+     outrun Compose-for-wasmJs's TextField→state commit by one JS event-loop tick, producing a REAL
+     one-character-short write — caught by checking the actual Supabase row via MCP `execute_sql`
+     (not trusting a screenshot), root-caused, and confirmed fixed by adding either a typing delay
+     or a settle wait before the commit click. No `.kt` change was made — this pattern
+     (TextField + separate commit button reading `_uiState.value`) is the same one already used
+     unincidentally by every other web screen this session. Full write-up + the DB-verification
+     technique: memory `project_kmp_spike_findings` (W4c addendum).
+  5. **Verified live in Chromium (Playwright)**: guest sign-in → Decks → "New deck" → tap-to-open
+     the editor → format defaults to Casual (chip pre-selected, confirming the
+     `DeckFormat.entries.firstOrNull { ignoreCase }` resolution) → searched "Lightning Bolt" → added
+     a result to the mainboard (`upsert_deck_cards` + `batch_upsert_decks` both 204) → increment ×2
+     / decrement ×1 (net ×2) → renamed (byte-correct, confirmed via direct DB read) → changed format
+     to Commander (`batch_upsert_decks` 204) → removed the card entirely (`upsert_deck_cards` 204,
+     mainboard back to 0) → captured `storageState` + the `#deck/<id>` URL → fresh browser + fresh
+     context deep-linked directly to that URL (never clicked a tab) → real network re-fetch
+     (`get_deck_changes_since`/`get_deck_cards_for_deck`, both 200) → identical deck (name,
+     Commander format, 1-card mainboard) renders. Zero horizontal overflow confirmed
+     programmatically (`scrollWidth == clientWidth`) at 768px and 375px, plus visual confirmation of
+     the COMPACT-stacked vs. MEDIUM/LARGE-side-by-side split and correct nav-chrome switching at all
+     three breakpoints. `:app:assembleDebug` green; diff confirmed `:webApp`-only — zero
+     Android/commonMain leakage, no repository or shared-module change needed this slice at all.
+  Full detail: memory `project_kmp_spike_findings` (W4c addendum) and
+  `.claude/agent-memory/kmp-web-fullstack-dev/project_w4c_deck_editor.md`.
 
 - ✅ **Web W4b — DONE** (2026-08-04, branch `kmp-migration-web`, commits `bff1b863` + `d93033b8`).
   Second slice of W4 — a deliberately minimal, READ-ONLY Card Detail screen, scoped WAY down from
@@ -491,19 +542,21 @@ without the user.
 ## NEXT STEP
 
 1. **Web W4 — next slice, owner `kmp-web-fullstack-dev`.** W4a (real `:webApp`-only NavHost +
-   browser URL routing) and W4b (Card Detail screen) are DONE — see STATUS above. Remaining W4
-   options, none blocking each other, pick per the user's steer:
-   - **Deck Studio porting** — the next, much bigger leaf-first screen per master plan §5 W4 order
-     (Auth → Search/CardDetail → Collection → Decks/Deck Studio → News → reduced Home). Auth,
-     Search, CardDetail, Collection, and a bare Decks LIST already exist; a real Deck Studio (card
-     editing, format picker, Deck Doctor suggestions) is a substantially bigger screen and should be
-     scoped as its own dedicated slice (or several), not bundled casually into a "next leaf" pass.
-   - **W4c — `PlatformCapabilities`-gated "not available on web" placeholder** for genuinely
-     non-MVP destinations (game/life-counter, online sessions, voice, scanner, playtest, push,
-     gamification UI — explicitly out of web v1 per the master plan's MVP scope). Not urgent since
-     the web nav today only exposes the 6 real destinations that already work; do this once a
-     reduced Home screen needs to link toward a non-MVP feature and show a graceful message instead
-     of a dead link.
+   browser URL routing), W4b (Card Detail screen), and W4c (minimal Deck Editor) are DONE — see
+   STATUS above. Remaining W4 options, none blocking each other, pick per the user's steer:
+   - **Deck Studio porting is now substantially de-risked but still not started.** W4c proved the
+     repository layer needs zero further work for deck editing (`WebDeckRepository`/
+     `WebCardRepository` already cover it) — a FUTURE richer Deck Studio pass (if ever wanted) would
+     be additive UI on top of W4c's `DeckEditorScreen`/`DeckEditorViewModel`, not a rebuild. Per the
+     task brief that produced W4c, Deck Doctor suggestions/wizard/playtest/import-export/warning
+     overlays remain explicitly OUT of scope for the web target until a dedicated future slice
+     decides otherwise — do not casually add any of them to `DeckEditorScreen`.
+   - **The `PlatformCapabilities`-gated "not available on web" placeholder remains NOT
+     recommended right now**, same reasoning as before (no-stub-rule precedent): the web nav still
+     only exposes real, working destinations (Home/Search/CardDetail/Decks/DeckEditor/Collection/
+     Theme/Account) — do this once a reduced Home screen needs to link toward a genuinely non-MVP
+     feature (game/life-counter, online, voice, scanner, playtest, push, gamification UI) and show a
+     graceful message instead of a dead link.
    - **The Android-nav-artifact-unification question (androidx → JetBrains CMP navigation-compose
      on Android too, sharing one `Screen.kt`) remains explicitly UNDECIDED and NOT started** — W4a
      deliberately scoped around it (see STATUS). Raise it with the user before ever touching
@@ -637,4 +690,21 @@ without the user.
   dependency was added, narrowing the earlier W0 finding that explicit `ImageLoader` wiring was
   required. Verified live in Chromium: full search→detail→back→collection→detail→deep-link-reload
   loop, zero console errors, zero overflow at 375/768/1280px. `:app:assembleDebug` green; diff
-  confirmed `:webApp`-only. Next: Deck Studio porting (bigger, own slice) or W4c placeholder.
+  confirmed `:webApp`-only.
+- 2026-08-04: **Web W4c done** (commit `17ddc8d0`): third W4 slice, a deliberately minimal Deck
+  Editor (`webApp/.../deckeditor/`) — mainboard/sideboard with quantities, compact screen-local
+  add-card search, remove/decrement, rename, curated 3-format picker. Explicitly excludes Deck
+  Doctor suggestions, wizard/seed-build, playtest, import/export, and warning overlays. No new
+  repository work needed (`WebDeckRepository`/`WebCardRepository` already covered every call).
+  Second parameterized route (`#deck/<deckId>`, same recipe as W4b's `#card/<id>`). `DeckListScreen`
+  rows now navigate into it. Found a genuinely new Playwright-methodology gotcha (not a code bug):
+  synthetic fast-typing immediately followed by a click can outrun Compose-wasmJs's TextField→state
+  commit by one JS tick, producing a real 1-char-short write — caught via a direct Supabase
+  `execute_sql` check (not just a screenshot), confirmed fixed with a typing delay/settle wait, no
+  `.kt` change needed (same TextField+button pattern used unincidentally elsewhere in the app).
+  Verified live in Chromium: full add→increment→decrement→rename→format-change→remove loop, then a
+  fresh-browser deep-link reload from captured `storageState` reproducing the exact deck state.
+  Zero overflow at 768/375px (programmatic check), correct COMPACT-stacked vs. MEDIUM/LARGE-
+  side-by-side responsive split. `:app:assembleDebug` green; diff confirmed `:webApp`-only. Next:
+  Deck Studio porting (bigger, own slice, now de-risked) or the W4-placeholder/nav-unification
+  options, per NEXT STEP.
