@@ -25,6 +25,7 @@ import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
 import com.mmg.manahub.web.auth.AuthViewModel
 import com.mmg.manahub.web.auth.WebSessionManager
 import com.mmg.manahub.web.carddetail.CardDetailViewModel
@@ -126,6 +127,11 @@ import org.koin.dsl.module
  * The Profile slice of that same expansion adds the [ProfileViewModel] factory, backing
  * [com.mmg.manahub.web.profile.ProfileScreen] -- again no new repository/client binding, since
  * [SupabaseClient] and [UserProfileClient] were already registered above in W2a/W2b.
+ *
+ * The Add Card slice of that same expansion adds the [GetSpotlightFeedUseCase] single, injected
+ * into the existing [CardSearchViewModel] binding -- the first (and so far only) domain-layer use
+ * case registered on web, rather than a ViewModel calling [CardRepository] methods directly. It
+ * was already `commonMain` and depends only on [CardRepository], already registered above in W3b.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -192,6 +198,7 @@ val webAppKoinModule = module {
         )
     }
     single<CardRepository> { WebCardRepository(remote = get()) }
+    single { GetSpotlightFeedUseCase(cardRepository = get()) }
 
     // ── Decks stack (W3c) ─────────────────────────────────────────────────────────────────────
     single<DeckRemoteDataSource> { SupabaseDeckDataSource(supabaseClient = get()) }
@@ -206,7 +213,12 @@ val webAppKoinModule = module {
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel { AuthViewModel(supabaseClient = get(), crashReporter = get()) }
     viewModel {
-        CardSearchViewModel(cardRepository = get(), userCardRepository = get(), crashReporter = get())
+        CardSearchViewModel(
+            cardRepository = get(),
+            userCardRepository = get(),
+            getSpotlightFeed = get(),
+            crashReporter = get(),
+        )
     }
     viewModel { DeckListViewModel(deckRepository = get(), crashReporter = get()) }
     viewModel { CollectionViewModel(userCardRepository = get(), userPreferencesRepository = get()) }

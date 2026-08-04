@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.web.common.toUserFacingMessage
@@ -36,6 +37,16 @@ data class CardSearchUiState(
      * [addToCollection] call or [onQueryChange].
      */
     val addToCollectionMessage: String? = null,
+    /**
+     * Web scope expansion (Add Card, 2026-08-04). The idle-state discovery grid — a shuffled page
+     * of real, addable cards from one Scryfall set at a time, mirroring Android's `AddCardScreen`
+     * spotlight feed. Only rendered by `CardSearchScreen` while [query] is blank; accumulates
+     * across [CardSearchViewModel.loadSpotlightFeed] calls (each call appends the next set's
+     * cards, never replaces).
+     */
+    val spotlightCards: List<Card> = emptyList(),
+    /** True while a [CardSearchViewModel.loadSpotlightFeed] fetch is in flight. */
+    val isSpotlightLoading: Boolean = false,
 )
 
 /**
@@ -50,10 +61,20 @@ data class CardSearchUiState(
  * Web roadmap W3d: also exercises [UserCardRepository.addOrIncrement] via [addToCollection] --
  * a search result is genuinely add-able now, proving `WebUserCardRepository`'s write path end to
  * end (not just [com.mmg.manahub.web.collection.CollectionScreen]'s read path).
+ *
+ * Web scope expansion (Add Card, 2026-08-04): this screen already covers Android's `AddCardScreen`
+ * search half — what's added here is the idle-state discovery grid, via [GetSpotlightFeedUseCase]
+ * (already `commonMain`, zero new domain work). This ViewModel has no filter state distinct from
+ * [CardSearchUiState.query] (unlike Android's `AddCardViewModel`, which also gates idle-ness on an
+ * advanced-search filter), so "idle" here is exactly `query.isBlank()`. [loadSpotlightFeed] is
+ * called once from [init] and again from [CardSearchScreen]'s grid-footer trigger (same
+ * `LaunchedEffect`-on-compose pattern Android's `SpotlightGrid` footer uses) to page through sets
+ * as the user scrolls.
  */
 class CardSearchViewModel(
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
+    private val getSpotlightFeed: GetSpotlightFeedUseCase,
     private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
@@ -61,10 +82,26 @@ class CardSearchViewModel(
     val uiState: StateFlow<CardSearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var currentSpotlightSetIndex = 0
+    private var hasMoreSpotlightSets = true
 
-    /** Updates the draft query as the user types — does NOT trigger a search (see [search]). */
+    init {
+        loadSpotlightFeed()
+    }
+
+    /**
+     * Updates the draft query as the user types — does NOT trigger a search (see [search]).
+     * Clearing the query back to blank also resets any stale search results/state right away
+     * (same reset [search] performs on a blank query) so [CardSearchScreen] falls straight back
+     * to the spotlight grid without requiring the user to re-submit an empty search.
+     */
     fun onQueryChange(query: String) {
         _uiState.update { it.copy(query = query, addToCollectionMessage = null) }
+        if (query.isBlank()) {
+            _uiState.update {
+                it.copy(cards = emptyList(), error = null, hasMore = false, page = 1, hasSearched = false, isLoading = false)
+            }
+        }
     }
 
     /**
@@ -144,6 +181,38 @@ class CardSearchViewModel(
                     )
                 }
                 is DataResult.Error -> _uiState.update { it.copy(isLoadingMore = false, error = result.message) }
+            }
+        }
+    }
+
+    /**
+     * Loads the next page of the idle-state discovery/spotlight feed — a shuffled page of cards
+     * from ONE Scryfall set, then advances to the next set on the following call (see
+     * [GetSpotlightFeedUseCase]'s own KDoc for the pagination shape: `setIndex` in, `nextSetIndex`
+     * out). No-op while already loading or once every playable set has been exhausted. Mirrors
+     * Android's `AddCardViewModel.loadSpotlightFeed` exactly, minus the filter-state guard (this
+     * ViewModel has none — see the class KDoc).
+     */
+    fun loadSpotlightFeed() {
+        if (_uiState.value.isSpotlightLoading || !hasMoreSpotlightSets) return
+        _uiState.update { it.copy(isSpotlightLoading = true) }
+        viewModelScope.launch {
+            when (val result = getSpotlightFeed(currentSpotlightSetIndex)) {
+                is DataResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            spotlightCards = it.spotlightCards + result.data.cards,
+                            isSpotlightLoading = false,
+                        )
+                    }
+                    currentSpotlightSetIndex = result.data.nextSetIndex
+                }
+                is DataResult.Error -> {
+                    _uiState.update { it.copy(isSpotlightLoading = false) }
+                    if (result.message == "No more sets available") {
+                        hasMoreSpotlightSets = false
+                    }
+                }
             }
         }
     }
