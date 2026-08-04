@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.ui.components.CardListItem
@@ -228,8 +231,20 @@ private fun DeckMetadataSection(uiState: DeckEditorUiState, viewModel: DeckEdito
         }
 
         Text(text = "Format", style = typography.labelLarge, color = colors.textPrimary)
+        // W5b regression sweep (2026-08-04): this Row is NOT wrapped in horizontalScroll by
+        // accident -- at 320px COMPACT, 3 FilterChips + 2 `spacing.sm` gaps exceed the available
+        // ~288.dp (320.dp minus AdaptiveScaffold's spacing.lg gutters). Without a scroll container,
+        // Row compresses the last chip's measured width down to whatever remains, and FilterChip's
+        // label Text (no maxLines/overflow of its own) responds by wrapping "Draft" one CHARACTER
+        // per line ("D"/"r"/"a"/"f"/"t" stacked vertically) -- verified live via screenshot, a
+        // genuinely broken render, not a cosmetic nit. horizontalScroll lets every chip keep its
+        // natural size; a real device at this width scrolls the row instead of rendering broken
+        // text. Fixed-width EDITOR_FORMATS (currently 3) means normal-width viewports never notice
+        // the scroll at all.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             val selectedFormat = deck?.format?.let { raw -> DeckFormat.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } }
@@ -333,7 +348,24 @@ private fun DeckCardRow(row: DeckEditorCardRow, isSideboard: Boolean, viewModel:
     val colors = MaterialTheme.magicColors
     val displayName = row.card?.name ?: row.scryfallId
 
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // W5b regression sweep (2026-08-04): this Row is horizontally scrollable, and CardListItem
+    // gets a fixed min width instead of `weight(1f)`, for the same reason as the format-chip Row
+    // fix above -- at 320px COMPACT, CardListItem (56.dp leading image + text) squeezed against 3
+    // full 48.dp-touch-target IconButtons left almost no room, and CardListItem's price/quantity
+    // Text elements (no maxLines/overflow of their own) responded by wrapping MID-NUMBER onto a
+    // second line ("$1.4"/"4", "×"/"1") -- verified live via screenshot, a genuinely broken/glitchy
+    // render, not a cosmetic nit. `weight(1f)` cannot be combined with `horizontalScroll` (Compose
+    // throws -- a weighted child needs a bounded max width, which a scrollable Row's infinite-width
+    // constraint doesn't provide), hence the fixed 220.dp width instead (matches HomeScreen's
+    // RecentDeckCard width for consistency). The three IconButtons keep their full 48.dp touch
+    // targets unconditionally -- CLAUDE.md's accessibility floor is never traded away for layout
+    // fit; a narrow viewport scrolls the row instead.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         CardListItem(
             name = displayName,
             imageUrl = row.card?.imageNormal,
@@ -341,7 +373,7 @@ private fun DeckCardRow(row: DeckEditorCardRow, isSideboard: Boolean, viewModel:
             priceEur = row.card?.priceEur,
             quantityText = "×${row.quantity}",
             onClick = {},
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.width(220.dp),
         )
         IconButton(onClick = { viewModel.decrementQuantity(row, isSideboard) }) {
             Icon(imageVector = Icons.Default.Remove, contentDescription = "Decrease $displayName quantity", tint = colors.textSecondary)
