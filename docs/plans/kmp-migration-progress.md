@@ -681,9 +681,21 @@ without the user.
      on Android too, sharing one `Screen.kt`) remains explicitly UNDECIDED and NOT started** — W4a
      deliberately scoped around it (see STATUS). Raise it with the user before ever touching
      `app/src/main/java/com/mmg/manahub/app/navigation/`.
-   - **A3 debt item still outstanding**: the paired move of Android's `CardRepositoryImpl` into
-     `shared/core-data/src/androidMain` (W3b intentionally left this out of its own brief) — pick
-     up via `android-kotlin-architect` whenever convenient, not blocking.
+   - **A3 debt item for `CardRepositoryImpl` is now INVESTIGATED and BLOCKED, not just outstanding**
+     (2026-08-04, `android-kotlin-architect`, no code changed). It is NOT a mechanical single-file
+     relocation like W3c/W3d's remote-data-source moves: `CardRepositoryImpl` calls `CardDao`
+     directly in nearly every method, and `CardDao`/`CardEntity`/`CardEntityMapper.kt` all still live
+     in `:app`, which `shared/core-data` cannot depend on (one-directional Gradle module deps). The
+     move requires FIRST promoting the `CardDao`/`CardEntity`/mapper trio into
+     `shared/core-data/src/androidMain` (its own checkpoint, real Room-schema-adjacent work, not a
+     pure relocation) plus swapping the Hilt-qualified dispatcher/scope constructor params for the
+     KMP `DispatcherProvider` abstraction and rewiring the (still-Hilt, not Koin) `RepositoryModule`
+     binding to a `@Provides`. **This generalizes to essentially every one of A3's own "~15 impls"**
+     — spot-checked `DeckRepositoryImpl`, same unmoved Room-DAO-heavy shape (W3c only moved
+     `DeckRemoteDataSource`, a different, Room-free class). Needs a real sub-plan / explicit user
+     decision on sequencing before the next attempt, not "pick up whenever convenient." Full
+     investigation: memory `project_kmp_spike_findings` §"A3 debt item — CardRepositoryImpl move
+     BLOCKED, investigated not executed (2026-08-04)".
    - **Google OAuth remains explicitly deferred** (user decision, memory
      `project_kmp_web_google_oauth_deferred`) — not a blocking prerequisite to anything above.
    - **Deck Studio / Home richer-porting remain optional, additive future passes**, not required to
