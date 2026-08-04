@@ -7,6 +7,8 @@
  *   - KeyValueStore       → suspend key/value persistence (Android DataStore / web localStorage).
  *   - CrashReporter       → crash/log reporting (Firebase Crashlytics on Android, no-op on web).
  *   - Page / PaginatedResult → a platform-neutral pagination model (future PagingData replacement).
+ *   - SupabaseJwt         → pure-Kotlin JWT-claim decoding (e.g. GoTrue's top-level `is_anonymous`
+ *                           claim), shared by the Android AuthRepositoryImpl and the web AuthViewModel.
  *
  * Targets/source-set/plugin setup mirror :shared:core-model (the AGP-9 KMP-library path).
  *
@@ -16,6 +18,8 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
+    // SupabaseJwt.kt parses the decoded JWT payload as JSON (kotlinx.serialization.json).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -50,6 +54,8 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.coroutines.core)
+                // SupabaseJwt.kt: parses the base64url-decoded JWT payload segment as JSON.
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         commonTest {
