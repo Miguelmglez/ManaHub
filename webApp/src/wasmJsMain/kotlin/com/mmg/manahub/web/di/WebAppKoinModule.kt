@@ -18,17 +18,35 @@ import com.mmg.manahub.core.data.remote.createManaHubSupabaseClient
 import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
+import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
+import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.data.repository.WebCardRepository
 import com.mmg.manahub.core.data.repository.WebDeckRepository
 import com.mmg.manahub.core.data.repository.WebFriendRepository
+import com.mmg.manahub.core.data.repository.WebOpenForTradeRepository
+import com.mmg.manahub.core.data.repository.WebTradesRepository
 import com.mmg.manahub.core.data.repository.WebUserCardRepository
 import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
+import com.mmg.manahub.core.data.repository.WebWishlistRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.DeclineProposalUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.GetTradeThreadUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradeThreadUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.RevokeAcceptanceUseCase
 import com.mmg.manahub.web.auth.AuthViewModel
 import com.mmg.manahub.web.auth.WebSessionManager
 import com.mmg.manahub.web.carddetail.CardDetailViewModel
@@ -42,6 +60,8 @@ import com.mmg.manahub.web.profile.ProfileViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
 import com.mmg.manahub.web.settings.SettingsViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
+import com.mmg.manahub.web.trades.TradeThreadViewModel
+import com.mmg.manahub.web.trades.TradesViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
@@ -146,6 +166,24 @@ import org.koin.dsl.module
  * [CardRepository] singleton so [WebFriendRepository] can resolve joined card metadata for
  * `getFriendCollection` (same join-through-another-repository pattern as [WebUserCardRepository]).
  * Bound against the INTERFACE type for the same reason as every other repository above.
+ *
+ * The Trades slice (web scope expansion, approved 2026-08-04, Friends + Trades wave) adds three
+ * repository bindings: [TradesRepository] (backed by [WebTradesRepository], the near-Room-free
+ * port of Android's `TradesRepositoryImpl`), [WishlistRepository] (backed by
+ * [WebWishlistRepository]), and [OpenForTradeRepository] (backed by [WebOpenForTradeRepository]) --
+ * all `shared/core-data` wasmJsMain, all bound against their INTERFACE type for the same reason as
+ * every repository above. Also registers the negotiation use cases
+ * ([GetActiveTradesUseCase]/[GetTradeHistoryUseCase]/[RefreshTradesUseCase]/[GetTradeThreadUseCase]/
+ * [RefreshTradeThreadUseCase]/[AcceptProposalUseCase]/[DeclineProposalUseCase]/
+ * [CancelProposalUseCase]/[RevokeAcceptanceUseCase]) as thin singles over the shared, already-
+ * `commonMain` use-case classes (`shared/core-data/.../feature/trades/domain/usecase/`) -- the
+ * SAME classes Android's Trades feature uses, reused directly rather than reimplemented, per this
+ * project's KMP migration rule of never duplicating shared business logic. [TradesViewModel] backs
+ * [com.mmg.manahub.web.trades.TradesScreen] (list level); [TradeThreadViewModel] backs
+ * [com.mmg.manahub.web.trades.TradeThreadScreen] (negotiation detail, takes `rootProposalId` as a
+ * Koin runtime parameter -- same `params.get()` shape as [CardDetailViewModel]/[DeckEditorViewModel]
+ * above). Creating a brand-new proposal from scratch (friend + item picker) is an explicit, flagged
+ * follow-up -- see `TradesScreen`'s KDoc -- so no such ViewModel/screen is registered yet.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -230,6 +268,25 @@ val webAppKoinModule = module {
         WebFriendRepository(remote = get(), cardRepository = get(), supabaseClient = get(), crashReporter = get())
     }
 
+    // ── Trades stack (web scope expansion, Trades slice) ─────────────────────────────────────────
+    single { TradesRemoteDataSource(supabaseClient = get()) }
+    single<TradesRepository> { WebTradesRepository(remote = get(), cardRepository = get(), supabaseClient = get()) }
+    single { WishlistRemoteDataSource(supabaseClient = get()) }
+    single<WishlistRepository> { WebWishlistRepository(remote = get(), cardRepository = get(), supabaseClient = get()) }
+    single { OpenForTradeRemoteDataSource(supabaseClient = get()) }
+    single<OpenForTradeRepository> {
+        WebOpenForTradeRepository(remote = get(), cardRepository = get(), supabaseClient = get())
+    }
+    single { GetActiveTradesUseCase(repo = get()) }
+    single { GetTradeHistoryUseCase(repo = get()) }
+    single { RefreshTradesUseCase(repo = get()) }
+    single { GetTradeThreadUseCase(repo = get()) }
+    single { RefreshTradeThreadUseCase(repo = get()) }
+    single { AcceptProposalUseCase(repo = get()) }
+    single { DeclineProposalUseCase(repo = get()) }
+    single { CancelProposalUseCase(repo = get()) }
+    single { RevokeAcceptanceUseCase(repo = get()) }
+
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel { AuthViewModel(supabaseClient = get(), crashReporter = get()) }
     viewModel {
@@ -258,5 +315,32 @@ val webAppKoinModule = module {
     }
     viewModel {
         FriendsViewModel(friendRepository = get(), supabaseClient = get(), crashReporter = get())
+    }
+    viewModel {
+        TradesViewModel(
+            supabaseClient = get(),
+            getActiveTrades = get(),
+            getTradeHistory = get(),
+            refreshTrades = get(),
+            tradesRepository = get(),
+            wishlistRepository = get(),
+            openForTradeRepository = get(),
+            friendshipClient = get(),
+            crashReporter = get(),
+        )
+    }
+    viewModel { params ->
+        TradeThreadViewModel(
+            rootProposalId = params.get(),
+            supabaseClient = get(),
+            getThread = get(),
+            refreshTradeThread = get(),
+            acceptProposal = get(),
+            declineProposal = get(),
+            cancelProposal = get(),
+            revokeAcceptance = get(),
+            friendshipClient = get(),
+            crashReporter = get(),
+        )
     }
 }
