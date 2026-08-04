@@ -40,6 +40,39 @@ without the user.
 
 **Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d DONE — this completes the master plan's originally-scoped MVP screen list.**
 
+- ✅ **Web security-pass cleanup — DONE** (2026-08-04, branch `kmp-migration-web`, commits
+  `0e5dc3bf`/`18ffd87d`/`2c888077`). Two MEDIUM findings from a full security pass on the web
+  target, both in `kmp-web-fullstack-dev`'s domain, plus a related follow-up fix.
+  1. **Finding 1 — leftover debug panel** (`0e5dc3bf`): `AuthViewModel`'s `_profileCheck`/
+     `runProfileCheck()` (a W2b plumbing-proof smoke check) and its UI block in `AuthScreen.kt`
+     rendered raw HTTP status/exception text on the real production Account screen. Removed
+     entirely (not hidden) — 7+ real screens since (W3a-W4d) already prove the underlying
+     Ktor+auth-header plumbing end-to-end. `AuthViewModel` no longer takes a `UserProfileClient`
+     dependency.
+  2. **Finding 2 — raw exception text in 9 UI sites** (`18ffd87d`): every web ViewModel did
+     `_uiState.update { it.copy(error = e.message ?: "...") }`, leaking Ktor/Supabase SDK
+     implementation detail. Added `Throwable.toUserFacingMessage(action, crashReporter)`
+     (`:webApp`-local — Android has no established shared convention for this to match) at all 9
+     confirmed sites (`AuthViewModel.signInAsGuest`, `CardSearchViewModel.addToCollection`, 6
+     `DeckEditorViewModel` mutation methods, `DeckListViewModel.createDeck`). **Also fixed a real
+     bug this uncovered**: on wasmJs a failed `fetch()` surfaces through Ktor's `Js` engine as
+     `kotlin.Error`, not `kotlin.Exception` — the original `catch (e: Exception)` blocks never
+     fired on a genuine network failure, so the UI silently showed nothing. Widened all 9 sites to
+     `catch (e: Throwable)`. See memory `feedback_wasmjs_fetch_failure_is_kotlin_error`.
+  3. **Follow-up — `isAnonymous` wiring** (`2c888077`): once `android-kotlin-architect` landed
+     `decodeIsAnonymousClaim(accessToken)` in `shared/core-common` (commit `cac24add`, the shared
+     fix for the `is_anonymous`-is-a-top-level-JWT-claim bug), wired `AuthViewModel.toUiState()` to
+     use it instead of the always-empty `session.user.appMetadata` read. No new module dependency
+     (`:webApp` already depends on `:shared:core-common`).
+  All three verified live in Chromium (Playwright): Account screen clean with guest sign-in still
+  working end-to-end (real `/auth/v1/signup` 200); happy paths unaffected (search, add-to-collection,
+  deck create/rename/format-change/add-card, all via real Supabase network calls); a real forced
+  offline failure (`context.setOffline(true)` + increment quantity) now shows "Couldn't update the
+  quantity. Please try again." instead of failing silently; guest sign-in now correctly shows
+  "Signed in as guest." instead of "Signed in as account."
+  **Not this task** (being fixed in parallel, do not duplicate): the `user_profiles` RLS exposure
+  HIGH finding (`backend-supabase-expert`).
+
 - ✅ **Web W4d — DONE** (2026-08-04, branch `kmp-migration-web`, commit `aa2a8e0e`). Fourth and
   LAST W4 slice from the master plan's originally-scoped MVP screen list (Auth → Search/CardDetail
   → Collection → Decks/Deck Studio → News → reduced Home; News stays deferred, CORS blocker) — a
