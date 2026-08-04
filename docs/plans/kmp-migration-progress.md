@@ -399,26 +399,32 @@ without the user.
 
 ## NEXT STEP
 
-1. **Web W3 — next data-layer slice: `NewsRepository`** (owner `kmp-web-fullstack-dev`). W3a
-   (`UserPreferencesRepository`), W3b (`CardRepository`), W3c (`DeckRepository`), and W3d
-   (`UserCardRepository`/collection) are all DONE — see STATUS above. Per the W3 order in
-   `kmp-migration-plan.md` §5 (`UserPreferences` → `Auth/Profile` → `CardRepository` →
-   `DeckRepository` → `UserCardRepository`/collection → `NewsRepository` → `CommunityDecks`), News
-   is next, then Community Decks. Reuse the established patterns: grep
-   `shared/core-data/.../remote/*RemoteDataSource.kt` for an existing commonMain News remote data
-   source FIRST (the W3b/W3c/W3d lesson — Android's repo impl likely already delegates to one), the
-   `MutableStateFlow` reactivity cache pattern (including the W3d finding: a repo whose read
-   methods need a JOIN against another repo's data should inject that repo, not duplicate its
-   networking stack), and the real-methods/loud-stub split if the interface mixes online-first
-   concerns with Room-only ones. Before adding any new Supabase RPC for a mutation-merge case,
-   READ the actual SQL body of any superficially-similar existing RPC first (W3d: a shared
-   "merge on unique_violation" idiom does not imply interchangeable RPCs — `batch_upsert_collection`
-   looked like it covered `updateEntryWithMerge` but was solving a different problem). **Still
-   outstanding, not part of any W3 slice's brief**: the paired A3 move of `CardRepositoryImpl`
-   (Android) into `shared/core-data/src/androidMain` — pick this up (via
-   `android-kotlin-architect`) whenever convenient. **Google OAuth remains explicitly deferred**
-   (user decision, memory `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a
-   blocking prerequisite to W3.
+1. **Web W3 — the two remaining slices are BOTH deferred, for real (not scheduling) reasons —
+   W3 is effectively done for now.** W3a (`UserPreferencesRepository`), W3b (`CardRepository`), W3c
+   (`DeckRepository`), and W3d (`UserCardRepository`/collection) are all DONE — see STATUS above.
+   - **`NewsRepository` deferred (2026-08-04)**: verified directly (curl with an `Origin` header)
+     that 5 of the 6 default RSS sources (MTGGoldfish, Star City Games, Card Kingdom, MTG Arena
+     Zone, MTG Rocks) send NO `Access-Control-Allow-Origin` header — a hard browser CORS block no
+     client-side wasmJs code can work around. Only Draftsim allows it. Needs a Cloudflare Worker
+     proxy (precedent: `cloudflare/manahub-community/`, `manahub-draft-api`) before this slice can
+     even start. Memory: `project_kmp_web_news_cors_deferred`.
+   - **`CommunityDecks` deferred (2026-08-04)**: its exact interfaces
+     (`CommunityDecksRepositoryImpl.kt`, `ArchidektTrendingRepositoryImpl.kt`, `ArchidektClient.kt`,
+     `CommunityDeckSummary.kt`, etc.) are mid-edit in the user's own separate, uncommitted
+     multi-card-search WIP on this same branch — user confirmed and asked to defer. Memory:
+     `project_kmp_web_communitydecks_deferred`.
+   - When resuming either: reuse the established patterns (grep `shared/core-data/.../remote/
+     *RemoteDataSource.kt` for an existing commonMain data source FIRST — the W3b/W3c/W3d lesson;
+     the `MutableStateFlow` reactivity cache pattern; the real-methods/loud-stub split for
+     interfaces mixing online-first concerns with Room-only ones; READ the actual SQL body of any
+     superficially-similar existing RPC before assuming it's reusable for a new mutation case — W3d
+     finding). **Still outstanding, not part of any W3 slice's brief**: the paired A3 move of
+     `CardRepositoryImpl` (Android) into `shared/core-data/src/androidMain` — pick this up (via
+     `android-kotlin-architect`) whenever convenient. **Google OAuth remains explicitly deferred**
+     (user decision, memory `project_kmp_web_google_oauth_deferred`) — do NOT pick it up as a
+     blocking prerequisite. Once both remaining W3 slices unblock, W4 (navigation + screens,
+     unifying the standalone nav destinations built so far — Auth/Search/Collection/Decks — into
+     the real 42-route `Screen.kt` swap) is the natural next phase per the master plan §5.
 2. ✅ **RESOLVED (2026-08-03)** — the `handle_new_user()` anonymous-user finding from W2b. User
    approved a DB-level fix: `public.handle_new_user()` now guards `is_anonymous` (migration
    `fix_handle_new_user_skip_anonymous_users`) and the 10 pre-existing spurious `user_profiles`
