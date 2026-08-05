@@ -38,7 +38,7 @@ without the user.
 
 ## STATUS (2026-08-05)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE (core loop + friend-detail view + referral-invite flow, both now complete), Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI — a separate, larger follow-up, not part of the Friends completion slice). Email/password auth (sign-in, sign-up, password reset) DONE — real (non-guest, non-Google) accounts are now genuinely reachable via the web UI itself, not just SQL-seeded test fixtures. Card Detail completion (print/language switching, art variants, read-only tag display) DONE — tag EDITING explicitly deferred; confirmed there is NO rulings gap (Android has no rulings feature at all). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration). **Two real, pre-existing backend bugs found during the Friends completion slice remain OPEN, flagged for `backend-supabase-expert`: the `get_friend_match_history` RPC does not exist in the database, and `accept_invite` inserts duplicate directional friendship rows (friend shows twice in `getFriends()`).**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE (core loop + friend-detail view + referral-invite flow, both now complete), Trades DONE INCLUDING the completion slice (create proposal, counter, Mark Completed, Trade Suggestions, Wishlist/Open-for-Trade add+remove — see the new dated entry below; only automatic collection sync on Mark Completed and the gift-trade review-collection dialog remain deferred). Email/password auth (sign-in, sign-up, password reset) DONE — real (non-guest, non-Google) accounts are now genuinely reachable via the web UI itself, not just SQL-seeded test fixtures. Card Detail completion (print/language switching, art variants, read-only tag display) DONE — tag EDITING explicitly deferred; confirmed there is NO rulings gap (Android has no rulings feature at all). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration). **Two real, pre-existing backend bugs found during the Friends completion slice remain OPEN, flagged for `backend-supabase-expert`: the `get_friend_match_history` RPC does not exist in the database, and `accept_invite` inserts duplicate directional friendship rows (friend shows twice in `getFriends()`).**
 
 - ✅ **Web email/password auth (sign-in, sign-up, password reset) — DONE** (2026-08-05, branch
   `kmp-migration-web`, commit `7c7317db`). `:webApp` previously supported ONLY anonymous guest
@@ -1264,11 +1264,14 @@ without the user.
    `46b6b181`; friend-detail view + referral-invite flow: commit `c2897a0e`, see STATUS above) —
    friends list + pending/outgoing requests + search-by-game-tag add-friend + a friend-detail view
    (Collection/Stats/History tabs) + invite-code redeem/share, all verified live with real Supabase
-   accounts. **Trades-remainder is a SEPARATE, LARGER follow-up, NOT part of the Friends completion
-   slice** — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade
-   dialog, Trade Suggestions UI (see the Trades STATUS entry for the full list); check its own
-   commits/state before touching anything under `webApp/.../web/trades/` or
-   `WebTradesRepository`/`WebWishlistRepository`/`WebOpenForTradeRepository`. **Game/online sessions
+   accounts. **Trades is now FULLY COMPLETE too** (completion slice, 2026-08-05, commits
+   `fca75911`/`96adaddb`/`e00be884`/`3b1f568f` — see the dated LOG entry for the full breakdown):
+   create proposal, counter, Mark Completed, Trade Suggestions, and Wishlist/Open-for-Trade
+   add+remove all shipped and verified live with real two-account SQL-seeded data. **Only two
+   pieces remain deliberately deferred, unchanged from the original slice**: automatic collection
+   sync on Mark Completed (needs a `TradeCollectionSyncDao`-equivalent with no web analog yet) and
+   the "gift trade" (review-collection-only) warning dialog — neither is blocking, both are small
+   standalone follow-ups if ever requested. **Game/online sessions
    remain explicitly OUT of scope** — `feature/online` is not yet KMP-migrated on Android (still
    Hilt + Android-only), so building it for web first would be architecturally backwards; do not
    touch anything online-session/game/life-counter-related without the user first asking for it.
@@ -1514,3 +1517,75 @@ without the user.
   responsive-safety-net scope; the telemetry-framework choice remains a real, open user decision
   (not implemented), and W3's News/CommunityDecks slices + the Android-nav-unification question stay
   deferred/undecided per NEXT STEP.
+- 2026-08-05: **Web Trades completion slice DONE** (commits `fca75911` + `96adaddb` + `e00be884` +
+  `3b1f568f`): closes out four of the five pieces explicitly deferred from the original Trades
+  slice (`project_trades_hub_negotiation.md`) — creating a brand-new proposal, Counter, Mark
+  Completed, Trade Suggestions, and Wishlist/Open-for-Trade add+remove. Still deferred (unchanged
+  from before): automatic collection sync on Mark Completed (needs a `TradeCollectionSyncDao`-
+  equivalent with no web analog) and the "gift trade" (review-collection-only) warning dialog.
+  1. **Create Proposal** (`CreateProposalScreen`/`ViewModel`, new `webApp/.../trades/` files): a
+     two-step flow — pick a friend (`FriendRepository.observeFriends()`), then build both sides via
+     `MagicAlertDialog`-based item pickers (`ModalBottomSheet` still unverified on wasmJs, per the
+     established Card Detail precedent) over the caller's own collection
+     (`UserCardRepository.observeCollection()`, real `userCardIdRef`) and the selected friend's
+     collection (`FriendRepository.getFriendCollection`, `userCardIdRef = null` — the RPC doesn't
+     expose the friend's row ids, matching Android's own synthetic-offer-entry convention). Submits
+     via `CreateTradeProposalUseCase(autoSend = true)` — no draft/review-collection toggle, an
+     explicit MVP cut.
+  2. **Counter** (`CounterProposalScreen`/`ViewModel`) reuses the SAME item-picker machinery
+     (`CollectionPickerDialog`/`PickerRow`/etc. made `internal` for cross-file reuse), pre-filled
+     from the latest proposal version via `GetTradeThreadUseCase`, submits via
+     `CounterProposalUseCase`. Two-`String`-runtime-param Koin factory (`parentProposalId` then
+     `rootProposalId`) — confirmed via the `auth-kt`-style sources-jar-decompile technique that
+     Koin's `ParametersHolder.get<T>()` is index-cursored, so two sequential same-typed calls
+     resolve in `parametersOf(a, b)` order.
+  3. **Mark Completed**: a confirm dialog on `TradeThreadScreen` (ACCEPTED status, hidden once the
+     current user already marked it) calling `MarkCompletedUseCase` — honestly scoped to Android's
+     "Just complete" path only, no "update my collection too" option (that needs the deferred sync
+     mechanism above).
+  4. **Trade Suggestions**: a 5th `TradesScreen` tab wiring `TradeSuggestionsRepository`/
+     `TradeSuggestionsRemoteDataSource` (already `commonMain`/Room-free, confirmed unbound before
+     this slice) — deliberately READ-ONLY (no "propose from this" action button, which would need
+     `CreateProposalScreen` to accept an external friend+item prefill; a button with nowhere wired
+     would violate the no-stub rule).
+  5. **Wishlist/Open-for-Trade add+remove**: Wishlist gained a Scryfall-search add dialog (any
+     card); Open-for-Trade gained an add dialog scoped to the caller's OWN collection (you can only
+     offer what you own) reusing the Create Proposal item picker. Both lists gained a per-row
+     Remove button.
+  6. **Two real bugs found and fixed via live verification** (both are broadly-reusable KMP/Compose
+     gotchas, recorded in agent memory): (a) `CounterProposalViewModel` declared `latestThread`
+     TEXTUALLY AFTER its `init {}` block — `viewModelScope`'s `Main.immediate` dispatcher runs
+     `launch {}` eagerly when already on Main (true from a constructor), so `tryPrefill()` could
+     read `latestThread` before its own initializer ran, a genuine Kotlin/Wasm "dereferencing a
+     null pointer" trap reproduced live by clicking Counter — fixed by moving the property above
+     `init {}` (Kotlin property/init-block execution is strictly source-order). (b) `PickerRow`
+     (and the Wishlist/Open-for-Trade list rows, which had the same shape) placed `MagicCtaButton`
+     unweighted next to a `Column(weight(1f))` sibling — the ALREADY-DOCUMENTED
+     `MagicCtaButton`-internal-`fillMaxWidth()` bug (see the W4d/AddFriendSection precedents in
+     memory) recurred a third time in new code; fixed with the same `weight(2f)`/`weight(1f)` split.
+  7. **A concurrent, unrelated Daily Puzzle work stream shared this same working tree** and, mid-
+     session, its own `shared/core-common` `expect fun sha256Hex` (no wasmJs `actual` yet, blocking
+     the ENTIRE wasmJs compile graph) was resolved BY THAT STREAM ITSELF (rewritten as a pure
+     dependency-free `commonMain` SHA-256 implementation, no `expect`/`actual` split at all) partway
+     through this slice — this agent used a disposable, never-committed local wasmJs `actual` stub
+     to unblock its OWN verification builds in the interim (deleted before every commit, confirmed
+     via `git status` each time), then deleted it for good once the concurrent stream's real fix
+     landed. Never touched any `feature/puzzle/`/`PuzzleDao`/`PuzzleRepositoryImpl`/`Sha256`/
+     `ADR-006` file.
+  8. **Verified live in Chromium (Playwright) against the REAL Supabase project**
+     (`uimogilwuixgkgfcfmyb`) with two real (non-anonymous) SQL-seeded accounts, ACCEPTED-friends,
+     seeded starting collections: **a brand-new proposal created end-to-end** (Alice → Bob,
+     Lightning Bolt for Counterspell) — confirmed via independent `execute_sql` re-reads of
+     `trade_proposals`/`trade_items` (correct proposer/receiver, correct `userCardIdRef` per side)
+     — **then Bob countered** (added Sol Ring to his ask) — confirmed via SQL (`status=COUNTERED`
+     on v1, a new `PROPOSED` v2 row with the right `parent_proposal_id`/items) — **then Alice
+     accepted, both sides Marked Completed** — confirmed via SQL
+     (`status=COMPLETED`, both `*_marked_completed_at` timestamps set). Wishlist add (real Scryfall
+     search) → remove and Open-for-Trade add (real own-collection picker) → remove were both
+     independently confirmed via SQL row counts dropping to 0. Verified responsive at
+     375/768/1280px (5-tab `TradesScreen` row, the friend-picker, the build-items screen, and the
+     item-picker dialog all reflow with zero horizontal overflow at every width — the dialog's
+     `PickerRow` fix holds at 375px too). Every seeded row (2 `auth.users`, `auth.identities`,
+     `user_profiles`, 1 `friendships`, 4 `user_card_collection`, the trade proposal chain and its
+     items) was deleted afterward — confirmed 0 rows remaining across every table. `:app:assembleDebug`
+     BUILD SUCCESSFUL (fresh full run, not UP-TO-DATE) confirms Android stayed untouched.
