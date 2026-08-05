@@ -38,7 +38,7 @@ without the user.
 
 ## STATUS (2026-08-05)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE, Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI). Email/password auth (sign-in, sign-up, password reset) DONE — real (non-guest, non-Google) accounts are now genuinely reachable via the web UI itself, not just SQL-seeded test fixtures. Card Detail completion (print/language switching, art variants, read-only tag display) DONE — tag EDITING explicitly deferred; confirmed there is NO rulings gap (Android has no rulings feature at all). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE (core loop + friend-detail view + referral-invite flow, both now complete), Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI — a separate, larger follow-up, not part of the Friends completion slice). Email/password auth (sign-in, sign-up, password reset) DONE — real (non-guest, non-Google) accounts are now genuinely reachable via the web UI itself, not just SQL-seeded test fixtures. Card Detail completion (print/language switching, art variants, read-only tag display) DONE — tag EDITING explicitly deferred; confirmed there is NO rulings gap (Android has no rulings feature at all). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration). **Two real, pre-existing backend bugs found during the Friends completion slice remain OPEN, flagged for `backend-supabase-expert`: the `get_friend_match_history` RPC does not exist in the database, and `accept_invite` inserts duplicate directional friendship rows (friend shows twice in `getFriends()`).**
 
 - ✅ **Web email/password auth (sign-in, sign-up, password reset) — DONE** (2026-08-05, branch
   `kmp-migration-web`, commit `7c7317db`). `:webApp` previously supported ONLY anonymous guest
@@ -315,6 +315,88 @@ without the user.
      (zero Android source touched — this slice is 100% `wasmJsMain`).
   Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (Friends slice findings recorded there
   this session) and memory `project_kmp_spike_findings`.
+
+- ✅ **Web Friends completion (friend-detail view + referral-invite flow) — DONE** (2026-08-05,
+  branch `kmp-migration-web`, commit `c2897a0e`). Completes the two pieces deliberately deferred
+  from the Friends slice above. Trades-remainder (proposal creation/counter item-picker, Mark
+  Completed + collection sync, gift-trade dialog, Trade Suggestions UI — see the Trades entry
+  below) is a SEPARATE, larger follow-up, NOT part of this slice.
+  1. **`FriendDetailScreen`/`FriendDetailViewModel`** (new files, `webApp/.../friends/`) — a new
+     parameterized route (`FriendDetailRoute`, `#frienddetail/<friendUserId>`, same
+     path-segment-arg shape as `CardDetailRoute`/`DeckEditorRoute`/`TradeThreadRoute`) you navigate
+     into by tapping a friend row on `FriendsScreen`. Three tabs: Collection
+     (`getFriendCollection`, hard-coded to the `"collection"` list only — Wishlist/Trade sub-tabs
+     and rarity/color/condition filters deliberately cut, same MVP-scope precedent as
+     `DeckEditorScreen` vs. Deck Studio — with a text search field and a manual "Load more" button
+     instead of scroll-position pagination), Stats (`getFriendStats`), and History
+     (`getFriendMatchHistory`), each lazy-loaded on first tab selection and each distinguishing a
+     clean empty state (`Result.success(null)`, or an empty list) from a genuine error
+     (`Result.failure`) per the interface's own documented contract.
+  2. **`FriendsScreen`**: friend rows are now tappable (the `FriendIdentity` sub-row, NOT the
+     separate "Remove" button below it) into the new detail screen. New "Have an invite code?"
+     section (client-side 8-char Crockford base32 validation before any network call, matching
+     Android's `InviteDispatcherViewModel.isValidReferralCode`) calls
+     `FriendRepository.acceptInvite` then `refreshFriends` to reflect the new friend immediately
+     (`accept_invite` writes an ACCEPTED friendship directly — there is no separate pending-request
+     step to accept afterward).
+  3. **`ProfileScreen`**: new "Invite a friend" section (only for real signed-in `Loaded` state,
+     never `Guest` — anonymous sessions have no `user_profiles` row, so `getMyShareUrl` would
+     always fail) shows the caller's real share link (`FriendRepository.getMyShareUrl`, fetched
+     alongside the profile) in an always-visible `SelectionContainer`-wrapped `Text` (manually
+     copyable regardless of API success) plus a "Copy link" button using the new
+     `ClipboardUtil.copyToClipboardOrNull` (`webApp/.../common/`, real `kotlinx-browser` 0.5.0
+     `Navigator.clipboard.writeText` binding, confirmed via the sources jar before writing it —
+     fire-and-forget, no `Promise` await, since this codebase has no established pattern for
+     awaiting a raw JS Promise from a wasmJs coroutine). `ProfileViewModel` gained a
+     `FriendRepository` constructor dependency.
+  4. **Referral manual-entry UI is the web-native equivalent of Android's deep-link-only flow, not
+     an invented one.** Android's `InviteDispatcherScreen` only ever auto-processes an incoming
+     `manahub://` URI (confirmed zero manual-entry UI, zero share-button UI anywhere in Android's
+     Friends/Profile screens) — a browser has no OS-level deep-link interception for an external
+     landing-page URL, so a manual code field is the necessary web equivalent, matching the task
+     brief's own suggested fallback.
+  5. **Found + fixed a tab-wrap bug** (`FriendDetailScreen`'s 3-tab `TabRow` wrapped "Collection" to
+     "Collectio/n" at 375px) — same `maxLines = 1` + `TextOverflow.Ellipsis` fix already applied to
+     `TradesScreen`'s own 3-tab `TabRow`.
+  6. **Found TWO real, pre-existing backend bugs during live verification (NOT fixed here — out of
+     this agent's domain, flagged for `backend-supabase-expert`; NOT introduced by this slice, and
+     affect Android identically since both platforms share `FriendRemoteDataSource`)**:
+     (a) the `get_friend_match_history` RPC does not exist in the database at all (confirmed via
+     `pg_get_functiondef` + a `pg_proc` name search — only the WRITE-side trigger
+     `update_friend_match_history` exists) — the History tab correctly shows a clean retry-error
+     state given this real backend gap, so the interface-contract logic itself is proven sound
+     (verified against the OTHER two tabs' real null-vs-populated paths instead); (b)
+     `accept_invite` inserts TWO directional friendship rows for one relationship (confirmed via
+     `pg_get_functiondef`) where the normal `sendFriendRequest`/`acceptRequest` flow inserts/updates
+     ONE — `getFriends`'s `OR` filter then matches both rows for anyone who accepted via invite
+     code, permanently duplicating that friend in the list for both parties. Verified live: Carol
+     redeemed a real invite code through the actual UI, "Friends (2)" showing the same friend
+     twice, survived a full page reload (proves real server-side duplicate rows).
+  7. **Verified live in Chromium (Playwright), THREE real (non-anonymous) Supabase accounts**
+     (Alice/Bob/Carol, seeded via the established direct-SQL technique, `profile_completed = true`
+     from insert). Alice↔Bob friended (one row — see the correction below); Bob seeded with 3 real
+     collection cards (real Scryfall ids: Lightning Bolt/Sol Ring/Llanowar Elves) + a
+     `user_collection_stats` row via direct SQL (no web caller for `upsertMyStats` exists yet, so
+     this is the only way to populate that table for a web-only test account). Alice→Bob detail
+     view: real card thumbnails/prices/quantities/foil badge, real stats numbers (`12,50 €`/
+     `$13.75`/Red/Blue); Bob→Alice detail view (Alice unseeded): clean "No cards found... isn't
+     shared with you" and "No stats yet... hasn't synced" empty states — proves the
+     `Result.success(null)`-is-valid handling works, not just the populated path. Alice's Profile
+     showed her real share link + a working "Copied!" confirmation. Carol (fresh, unfriended)
+     redeemed Alice's real referral code (read from Supabase at seed time, not scraped off-screen —
+     Compose-for-Wasm renders to canvas with no real DOM text, `page.innerText()` returns empty;
+     `getByText`'s accessibility-layer matching + screenshots are the only reliable verification
+     method for this app) via the real "Have an invite code?" UI, got "Now you are friends with
+     AliceFD.", survived a full page reload. Responsive 375/768/1280 clean on all 3 detail tabs and
+     both invite UI sections. Test-seeding correction recorded in memory: hand-seeding a NORMAL
+     (non-invite) friendship must insert only ONE row, matching `sendFriendRequest`'s real shape —
+     this slice initially over-seeded Alice/Bob with two rows (mistakenly copying `accept_invite`'s
+     shape), which is now understood to be a seeding mistake, not evidence the normal flow also
+     duplicates (the Carol/Alice invite-path duplicate is the real, separately-confirmed bug).
+     `:app:assembleDebug` green (touched only `:webApp`, confirmed via `git status --porcelain`
+     scoped diff). All 3 test accounts + all seeded data (friendships/collection rows/stats row)
+     deleted afterward, confirmed 0 remaining rows across every table.
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/project_w_friends_completion.md`.
 
 - ✅ **Web scope expansion round 2, Trades — DONE (with explicit, flagged follow-ups)** (2026-08-05,
   branch `kmp-migration-web`, commits `04df0ec9`/`3b7a0dad`/`8302468c`/`c48d7b64`/`39d680b4`/
@@ -1178,22 +1260,24 @@ without the user.
 1. **Web scope expansion round 1 (Settings, Profile, Add Card) is COMPLETE** (see STATUS above,
    commits `69b3e31a` / `12e6874b` / `6db47c9d` + `a28df9c4`), closing out the user's first
    approved 3-slice priority order (2026-08-04). **Web scope expansion round 2 (approved
-   2026-08-04, second wave) has Friends DONE** (commits `ff64ade2` + `46b6b181`, see STATUS above)
-   — friends list + pending/outgoing requests + search-by-game-tag add-friend, verified live with
-   two real Supabase accounts. **Trades is a SEPARATE, LARGER follow-up** — its repository-layer
-   situation was flagged for independent investigation and is being built out concurrently on this
-   same branch by a different work stream (`web(trades): *` commits) — do not duplicate that work;
-   check its own commits/state before touching anything under `webApp/.../web/trades/` or
+   2026-08-04, second wave) has Friends FULLY COMPLETE** (core loop: commits `ff64ade2` +
+   `46b6b181`; friend-detail view + referral-invite flow: commit `c2897a0e`, see STATUS above) —
+   friends list + pending/outgoing requests + search-by-game-tag add-friend + a friend-detail view
+   (Collection/Stats/History tabs) + invite-code redeem/share, all verified live with real Supabase
+   accounts. **Trades-remainder is a SEPARATE, LARGER follow-up, NOT part of the Friends completion
+   slice** — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade
+   dialog, Trade Suggestions UI (see the Trades STATUS entry for the full list); check its own
+   commits/state before touching anything under `webApp/.../web/trades/` or
    `WebTradesRepository`/`WebWishlistRepository`/`WebOpenForTradeRepository`. **Game/online sessions
    remain explicitly OUT of scope** — `feature/online` is not yet KMP-migrated on Android (still
    Hilt + Android-only), so building it for web first would be architecturally backwards; do not
    touch anything online-session/game/life-counter-related without the user first asking for it.
-   **Deferred within Friends itself** (documented in `FriendsScreen.kt`'s KDoc, not started): a
-   friend-detail view (`getFriendCollection`/`getFriendStats`/`getFriendMatchHistory` — all three
-   repository methods are fully implemented, just no UI consumer yet) and the referral-invite flow
-   (`acceptInvite`/`getMyShareUrl` — Profile's own game-tag display is the most likely future home
-   for a "share my invite" control, not a new Friends-screen control). No further web scope
-   expansion beyond what's already approved — raise it with the user before starting anything new.
+   **Two real backend bugs found during the Friends completion slice remain OPEN** (not fixed by
+   this agent — out of its domain): `get_friend_match_history` RPC missing entirely, and
+   `accept_invite` inserting duplicate directional friendship rows (friend shows twice in
+   `getFriends()`) — both need `backend-supabase-expert`; see STATUS above for full repro detail.
+   No further web scope expansion beyond what's already approved — raise it with the user before
+   starting anything new.
 2. **Web W4 + W5b are COMPLETE (see STATUS above).** W4d (Home screen) closed out the master
    plan's originally-scoped MVP screen list; W5b (2026-08-04, commits `b6ba4989`/`a42e12bf`) swept
    every screen at 320px/1920px+ and fixed the two real bugs it found (cross-cutting
