@@ -1,5 +1,6 @@
 package com.mmg.manahub.web.trades
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
+import com.mmg.manahub.core.model.TradeSuggestion
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -53,7 +55,9 @@ import org.koin.compose.viewmodel.koinViewModel
  * dialog, any card), and "Add card" (Open-for-Trade -- a picker over the caller's OWN collection
  * via [com.mmg.manahub.core.domain.repository.UserCardRepository.observeCollection], since you can
  * only offer what you own -- reuses [CollectionPickerDialog]/[MyCollectionRow] from
- * [CreateProposalScreen]). Both lists also gained a Remove button per row.
+ * [CreateProposalScreen]). Both lists also gained a Remove button per row. A fifth
+ * [TradesTab.SUGGESTIONS] tab was also added -- a read-only, informational list (no add button;
+ * see [TradesViewModel.loadSuggestions]'s KDoc for why).
  */
 @Composable
 fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = {}) {
@@ -110,18 +114,23 @@ fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = 
             )
         }
 
-        val (topButtonLabel, topButtonAction) = when (uiState.selectedTab) {
+        // SUGGESTIONS is read-only (no add affordance) -- see TradesViewModel.loadSuggestions' KDoc.
+        val topButton = when (uiState.selectedTab) {
             TradesTab.ACTIVE, TradesTab.HISTORY -> "New proposal" to onNewProposal
             TradesTab.WISHLIST -> "Add to wishlist" to viewModel::openWishlistSheet
             TradesTab.OPEN_FOR_TRADE -> "Add card" to viewModel::openOpenForTradeSheet
+            TradesTab.SUGGESTIONS -> null
         }
-        MagicCtaButton(
-            onClick = topButtonAction,
-            text = topButtonLabel,
-            style = MagicCtaStyle.Filled,
-            color = MagicCtaColor.Primary,
-            modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
-        )
+        if (topButton != null) {
+            val (topButtonLabel, topButtonAction) = topButton
+            MagicCtaButton(
+                onClick = topButtonAction,
+                text = topButtonLabel,
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
+            )
+        }
 
         Box(modifier = Modifier.fillMaxSize().padding(top = spacing.md)) {
             when {
@@ -148,9 +157,16 @@ fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = 
                     entries = uiState.wishlist,
                     onRemove = viewModel::removeWishlistEntry,
                 )
-                else -> OpenForTradeList(
+                uiState.selectedTab == TradesTab.OPEN_FOR_TRADE -> OpenForTradeList(
                     entries = uiState.openForTrade,
                     onRemove = viewModel::removeOpenForTradeEntry,
+                )
+                else -> SuggestionsList(
+                    isLoading = uiState.isLoadingSuggestions,
+                    suggestions = uiState.suggestions,
+                    currentUserId = uiState.currentUserId,
+                    participantNames = uiState.participantNames,
+                    cards = uiState.suggestionCards,
                 )
             }
         }
@@ -188,6 +204,7 @@ private fun TradesTab.label(): String = when (this) {
     TradesTab.HISTORY -> "History"
     TradesTab.WISHLIST -> "Wishlist"
     TradesTab.OPEN_FOR_TRADE -> "For Trade"
+    TradesTab.SUGGESTIONS -> "Suggestions"
 }
 
 @Composable
@@ -392,4 +409,82 @@ private fun ScryfallSearchRow(card: Card, onAdd: () -> Unit) {
         detail = card.setName,
         onAdd = onAdd,
     )
+}
+
+/**
+ * Trade Suggestions -- a read-only, informational list (no action button; see
+ * [TradesViewModel.loadSuggestions]'s KDoc for why an unwired "propose from this" button would
+ * violate the no-stub rule). Each row states which direction the match runs relative to the
+ * current user: [TradeSuggestion.offeringUserId] == me means I have something a counterparty
+ * wants; [TradeSuggestion.wishingUserId] == me means a counterparty has something I want.
+ */
+@Composable
+private fun SuggestionsList(
+    isLoading: Boolean,
+    suggestions: List<TradeSuggestion>,
+    currentUserId: String,
+    participantNames: Map<String, String>,
+    cards: Map<String, Card>,
+) {
+    val spacing = MaterialTheme.spacing
+    val colors = MaterialTheme.magicColors
+
+    when {
+        isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = colors.primaryAccent)
+        }
+        suggestions.isEmpty() -> EmptyState(
+            title = "No suggestions yet",
+            subtitle = "Matches between your wishlist/offers and your friends' will show up here.",
+        )
+        else -> LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
+            items(
+                suggestions,
+                key = { "${it.wishingUserId}_${it.offeringUserId}_${it.cardId}_${it.isFoilKey()}" },
+            ) { suggestion ->
+                SuggestionRow(
+                    suggestion = suggestion,
+                    currentUserId = currentUserId,
+                    participantNames = participantNames,
+                    card = cards[suggestion.cardId],
+                )
+            }
+        }
+    }
+}
+
+private fun TradeSuggestion.isFoilKey() = "${offerFoil}_${offerCondition}_${offerLanguage}"
+
+@Composable
+private fun SuggestionRow(
+    suggestion: TradeSuggestion,
+    currentUserId: String,
+    participantNames: Map<String, String>,
+    card: Card?,
+) {
+    val spacing = MaterialTheme.spacing
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+
+    val cardName = card?.name ?: suggestion.cardId
+    val iAmOffering = suggestion.offeringUserId == currentUserId
+    val counterpartyId = if (iAmOffering) suggestion.wishingUserId else suggestion.offeringUserId
+    val counterpartyName = participantNames[counterpartyId] ?: counterpartyId.take(8)
+    val headline = if (iAmOffering) "You have $cardName -- $counterpartyName wants it" else "$counterpartyName has $cardName -- you want it"
+
+    Column(
+        modifier = Modifier.fillMaxWidth().background(colors.backgroundSecondary, RoundedCornerShape(spacing.xs)).padding(spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(spacing.xxs),
+    ) {
+        Text(text = headline, style = typography.bodyMedium, color = colors.textPrimary)
+        Text(
+            text = "${if (suggestion.offerFoil) "Foil · " else ""}${suggestion.offerCondition} · ${suggestion.offerLanguage}",
+            style = typography.bodySmall,
+            color = colors.textSecondary,
+        )
+    }
 }

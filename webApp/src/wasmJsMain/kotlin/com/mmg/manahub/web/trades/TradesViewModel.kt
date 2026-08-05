@@ -12,7 +12,9 @@ import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.OpenForTradeEntry
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
 import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeSuggestion
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
@@ -38,8 +40,8 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-/** Top-level tabs inside the web Trades feature (Android splits Active/History and the Wishlist/Open-for-Trade hub across two screens; this web MVP folds all four into one). */
-enum class TradesTab { ACTIVE, HISTORY, WISHLIST, OPEN_FOR_TRADE }
+/** Top-level tabs inside the web Trades feature (Android splits Active/History and the Wishlist/Open-for-Trade hub across two screens; this web MVP folds all four into one, plus a Suggestions tab added in the Trades completion slice). */
+enum class TradesTab { ACTIVE, HISTORY, WISHLIST, OPEN_FOR_TRADE, SUGGESTIONS }
 
 data class TradesUiState(
     val isLoading: Boolean = true,
@@ -62,6 +64,11 @@ data class TradesUiState(
     val isOpenForTradeSheetOpen: Boolean = false,
     val openForTradeQuery: String = "",
     val myCollection: List<UserCardWithCard> = emptyList(),
+    // ── Trade Suggestions (Trades completion slice, 2026-08-05) ─────────────────────────────────
+    val suggestions: List<TradeSuggestion> = emptyList(),
+    val suggestionCards: Map<String, Card> = emptyMap(),
+    val isLoadingSuggestions: Boolean = false,
+    val suggestionsLoaded: Boolean = false,
 )
 
 /**
@@ -87,6 +94,7 @@ class TradesViewModel(
     private val openForTradeRepository: OpenForTradeRepository,
     private val cardRepository: CardRepository,
     private val userCardRepository: UserCardRepository,
+    private val tradeSuggestionsRepository: TradeSuggestionsRepository,
     private val friendshipClient: FriendshipClient,
     private val crashReporter: CrashReporter,
 ) : ViewModel() {
@@ -194,6 +202,63 @@ class TradesViewModel(
 
     fun onTabSelected(tab: TradesTab) {
         _uiState.update { it.copy(selectedTab = tab) }
+        if (tab == TradesTab.SUGGESTIONS && !_uiState.value.suggestionsLoaded && !_uiState.value.isLoadingSuggestions) {
+            loadSuggestions()
+        }
+    }
+
+    /**
+     * Trade Suggestions (Trades completion slice, 2026-08-05, lowest-priority item per
+     * `project_trades_hub_negotiation.md`'s deferral note): a read-only, informational list --
+     * matches between the caller's wishlist/offers and a counterparty's. [TradeSuggestionsRepository]
+     * was already `commonMain` and Room-free (confirmed before this slice) but had zero UI
+     * consumers; wires it end-to-end (repo -> VM -> UI) without inventing a "propose from this
+     * suggestion" action -- that would need [CreateProposalScreen] to accept an external friend +
+     * item prefill, a separate, larger follow-up not attempted here (an informational list with no
+     * action button is honest under the no-stub rule; a button with nowhere wired would not be).
+     * Lazy-loaded on first tab selection (mirrors [com.mmg.manahub.web.friends.FriendDetailViewModel]'s
+     * Stats/History tabs); [suggestionsLoaded] distinguishes "loaded, none found" from "never
+     * fetched" so a genuinely-empty result doesn't re-trigger a fetch loop.
+     */
+    private fun loadSuggestions() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingSuggestions = true) }
+            tradeSuggestionsRepository.refreshSuggestions()
+            tradeSuggestionsRepository.getSuggestions().fold(
+                onSuccess = { list ->
+                    _uiState.update { it.copy(suggestions = list, isLoadingSuggestions = false, suggestionsLoaded = true) }
+                    hydrateSuggestionMetadata(list)
+                },
+                onFailure = { e ->
+                    crashReporter.recordException(e)
+                    _uiState.update { it.copy(isLoadingSuggestions = false, suggestionsLoaded = true) }
+                },
+            )
+        }
+    }
+
+    private suspend fun hydrateSuggestionMetadata(list: List<TradeSuggestion>) {
+        val cardIds = list.map { it.cardId }.distinct().filterNot { _uiState.value.suggestionCards.containsKey(it) }
+        if (cardIds.isNotEmpty()) {
+            cardRepository.warmCacheForIds(cardIds)
+            val cards = cardRepository.getCardsByIds(cardIds).associateBy { it.scryfallId }
+            _uiState.update { it.copy(suggestionCards = it.suggestionCards + cards) }
+        }
+
+        val currentUserId = _uiState.value.currentUserId
+        val known = _uiState.value.participantNames.keys
+        val missing = list.flatMap { listOf(it.wishingUserId, it.offeringUserId) }
+            .filter { it.isNotBlank() && it != currentUserId }
+            .distinct()
+            .filterNot { known.contains(it) }
+        if (missing.isEmpty()) return
+        try {
+            val names = friendshipClient.getProfilesByIds(idFilter = "in.(${missing.joinToString(",")})")
+                .associate { it.id to (it.nickname?.takeIf { n -> n.isNotBlank() } ?: it.gameTag ?: "Unknown") }
+            _uiState.update { it.copy(participantNames = it.participantNames + names) }
+        } catch (e: Throwable) {
+            crashReporter.recordException(e)
+        }
     }
 
     // ── Wishlist add/edit ─────────────────────────────────────────────────────────────────────
