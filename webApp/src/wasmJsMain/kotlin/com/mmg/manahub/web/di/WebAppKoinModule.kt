@@ -23,8 +23,10 @@ import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
 import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
+import com.mmg.manahub.core.data.remote.trades.TradeSuggestionsRemoteDataSource
 import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
+import com.mmg.manahub.core.data.repository.TradeSuggestionsRepositoryImpl
 import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.data.repository.WebAuthRepository
 import com.mmg.manahub.core.data.repository.WebCardRepository
@@ -42,6 +44,7 @@ import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
@@ -334,6 +337,10 @@ val webAppKoinModule = module {
     single<OpenForTradeRepository> {
         WebOpenForTradeRepository(remote = get(), cardRepository = get(), supabaseClient = get())
     }
+    // ── Trade Suggestions (Trades completion slice, 2026-08-05) -- already commonMain/Room-free,
+    // just never bound in Koin until this slice (see TradesViewModel.loadSuggestions' KDoc) ──────
+    single { TradeSuggestionsRemoteDataSource(supabaseClient = get()) }
+    single<TradeSuggestionsRepository> { TradeSuggestionsRepositoryImpl(remote = get()) }
     // ── Card strategy tags stack (Card Detail tag DISPLAY, web roadmap W4b follow-up) ──────────
     single<CardStrategyTagsCache> { WebCardStrategyTagsCache() }
     single<CardStrategyTagsRemoteDataSourceContract> {
@@ -422,6 +429,7 @@ val webAppKoinModule = module {
             openForTradeRepository = get(),
             cardRepository = get(),
             userCardRepository = get(),
+            tradeSuggestionsRepository = get(),
             friendshipClient = get(),
             crashReporter = get(),
         )
