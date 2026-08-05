@@ -42,10 +42,11 @@ import kotlinx.coroutines.launch
  *    tagging-engine feature not yet built on web at all).
  *
  * [collectionGroupingMode] is persisted and round-trips through a reload like every other setting
- * here, but is NOT YET consumed by [com.mmg.manahub.web.collection.CollectionScreen] -- see that
- * screen's own KDoc for why (grouping needs a `CollectionCardGroup`-shaped collapsing step the web
- * collection repository doesn't produce yet, deliberately deferred as non-trivial future work).
- * [CollectionViewMode] IS fully consumed -- see [setCollectionViewMode].
+ * here, and (grouping-wiring slice) is now fully consumed by
+ * [com.mmg.manahub.web.collection.CollectionScreen] -- this screen's picker and that screen's own
+ * inline [com.mmg.manahub.core.ui.components.ManaHubSelector] both write through
+ * [setCollectionGroupingMode] to the SAME `collectionGroupingModeFlow`, exactly like
+ * [CollectionViewMode]/[setCollectionViewMode] already did.
  */
 class SettingsViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
