@@ -132,6 +132,53 @@ without the user.
   Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (this session's findings to be
   recorded there) and memory `project_kmp_spike_findings`.
 
+- ✅ **Web Collection grouping — DONE** (2026-08-05, branch `kmp-migration-web`, commit
+  `cc44441a`). Closes the gap flagged since the W3d/Settings-expansion slices (see the
+  `CollectionGroupingMode` bullet above, now superseded): the mode was persisted and Settings-
+  editable since W3a/the Settings slice but silently ignored by `CollectionScreen`, which always
+  rendered a flat grid of raw `UserCardWithCard` entries.
+  1. **Zero new domain work** — `List<UserCardWithCard>.groupByCard()` and
+     `groupCollection(groups, mode)` (`shared/core-model`'s `CollectionGrouping.kt`/
+     `CollectionCardGroup.kt`) were already pure, already commonMain, and already exactly the shape
+     Android's own `CollectionViewModel` uses. `CollectionViewModel` now `combine()`s
+     `observeCollection()` with `collectionGroupingModeFlow` and runs both functions on every
+     emission of either, exposing `CollectionUiState.groups`/`sections`/`groupingMode`.
+  2. **Side effect, not scope creep**: switching to `CollectionCardGroup` tiles means the screen now
+     collapses same-(identity, set) copies into one tile with a combined quantity — matching
+     Android's Collection screen — instead of one raw tile per DB row. List mode also now reuses
+     `CardListItem`'s existing dedicated `CollectionCardGroup` overload directly (it already existed
+     in `shared/core-ui`, unused until now) instead of the screen's own hand-rolled foil/price
+     selection logic.
+  3. **UI**: a `ManaHubSelector` "Group by:" row (the same generic dropdown component
+     `GroupingFlowSelector`/the Deck Builder's grouping picker wraps) sits below the existing header
+     Grid/List toggle. Section headers render label + `"$count · x$totalCopies"`, skipped entirely
+     when `groupingMode == NONE` (the shared function still returns one blank-labelToken section for
+     `NONE` — the screen renders its items flat with no header rather than branching the whole render
+     path). Items are keyed `"${section.labelToken}|${item.groupKey}"` per `CollectionGrouping.kt`'s
+     own documented TAG-multi-section contract. `collectionSectionLabel()` is a minimal, non-
+     composable token→display-string resolver (no `TagDictionary` lookup for TAG, unlike Android's
+     `collectionGroupLabel` — acceptable for an English-only app per the task brief) covering
+     COLOR/CMC/SET/RARITY/TAG's raw tokens.
+  4. **Settings' "Group collection by" section description updated** (`SettingsScreen.kt`) — no
+     longer claims grouping is unapplied on Collection.
+  5. **Verified live in Chromium (Playwright, real guest session)**: added 9 distinct cards spanning
+     5 types (Creature/Instant/Sorcery/Artifact/Land), 5 colors, 4 CMC buckets, 3 rarities, and 4 sets
+     via real search+tap-to-add. Confirmed real per-bucket headers + correct counts cycling through
+     Type ("Creatures 2·x2" / "Instants 1·x1" / "Sorceries 3·x3"), Color ("White"/"Blue"/"Red" —
+     resolved display names, not raw letters), Mana value ("1 mana"/"3 mana"/"4 mana" — driven by
+     real Scryfall CMC data, not assumptions), Set (full set names, alphabetically ordered), and
+     Rarity (Mythic > Rare > Uncommon, matching the shared `rarityWeight` order); Tag mode correctly
+     falls back to a single "Untagged" bucket with no crash (no web card carries a STRATEGY tag yet).
+     Confirmed Grid and List both render sections identically and both toggle cleanly with grouping
+     active; confirmed 1280/768/375px are all overflow-free (no clipped headers/counts, bottom nav
+     bar unaffected); confirmed switching back to `None` returns to the exact original flat layout.
+     Zero console/page errors throughout. `:webApp:compileKotlinWasmJs` verified green in isolation
+     (see finding 6 on the auth bullet above re: the concurrent `sha256Hex` blocker and the shared
+     temporary stub); change is 100% confined to `webApp` wasmJsMain source files, so `:app` is
+     structurally unaffected (not re-run this slice — no androidMain file touched).
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (this session's findings to be recorded
+  there).
+
 - ✅ **Web scope expansion round 2, Friends — DONE** (2026-08-05, branch `kmp-migration-web`,
   commits `ff64ade2` + `46b6b181`). First slice of the second scope-expansion wave (approved
   2026-08-04); Trades remains a separate, larger follow-up (its repository-layer situation was
