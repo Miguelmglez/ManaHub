@@ -409,6 +409,7 @@ fun WebNavGraph(
                     scryfallId = route.scryfallId,
                     windowSizeClass = windowSizeClass,
                     onBack = { navController.navigateUp() },
+                    onNavigateToCard = { id -> navController.navigate(CardDetailRoute(id)) },
                 )
             }
             composable<DeckEditorRoute> { backStackEntry ->

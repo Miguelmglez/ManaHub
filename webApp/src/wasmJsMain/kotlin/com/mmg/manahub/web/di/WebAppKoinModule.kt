@@ -5,8 +5,12 @@ import com.mmg.manahub.core.common.DispatcherProvider
 import com.mmg.manahub.core.common.KeyValueStore
 import com.mmg.manahub.core.common.LocalStorageKeyValueStore
 import com.mmg.manahub.core.common.provideCrashReporter
+import com.mmg.manahub.core.data.cache.CardStrategyTagsCache
+import com.mmg.manahub.core.data.cache.WebCardStrategyTagsCache
 import com.mmg.manahub.core.data.network.ScryfallCache
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
+import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSource
+import com.mmg.manahub.core.data.remote.CardStrategyTagsRemoteDataSourceContract
 import com.mmg.manahub.core.data.remote.FriendRemoteDataSource
 import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.core.data.remote.ScryfallClient
@@ -30,9 +34,11 @@ import com.mmg.manahub.core.data.repository.WebOpenForTradeRepository
 import com.mmg.manahub.core.data.repository.WebTradesRepository
 import com.mmg.manahub.core.data.repository.WebUserCardRepository
 import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
+import com.mmg.manahub.core.data.repository.CardStrategyTagsRepositoryImpl
 import com.mmg.manahub.core.data.repository.WebWishlistRepository
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
@@ -71,6 +77,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -188,6 +195,15 @@ import org.koin.dsl.module
  * Koin runtime parameter -- same `params.get()` shape as [CardDetailViewModel]/[DeckEditorViewModel]
  * above). Creating a brand-new proposal from scratch (friend + item picker) is an explicit, flagged
  * follow-up -- see `TradesScreen`'s KDoc -- so no such ViewModel/screen is registered yet.
+ *
+ * The Card Detail completion slice (web roadmap W4b follow-up, 2026-08-05) adds the
+ * [CardStrategyTagsRepository] binding, backed by the SAME [CardStrategyTagsRepositoryImpl]
+ * (`shared/core-data` commonMain) Android's `CardStrategyTagsKoinModule` uses -- only [CardStrategyTagsCache]
+ * differs ([WebCardStrategyTagsCache], `shared/core-data` wasmJsMain: a plain session-scoped
+ * in-memory map, since Room has no wasmJs target). This powers [CardDetailViewModel]'s read-only
+ * tag DISPLAY (`getStrategyTags`) -- tag EDITING (`CardRepository.updateCardTags`/`unionCardTags`/
+ * the `custom_` key CRUD system) remains a documented, deliberate non-goal; [WebCardRepository]'s
+ * tag-mutation methods stay as their existing loud `UnsupportedOperationException` stubs.
  */
 val webAppKoinModule = module {
     single<KeyValueStore> { LocalStorageKeyValueStore() }
@@ -287,6 +303,21 @@ val webAppKoinModule = module {
     single<OpenForTradeRepository> {
         WebOpenForTradeRepository(remote = get(), cardRepository = get(), supabaseClient = get())
     }
+    // ── Card strategy tags stack (Card Detail tag DISPLAY, web roadmap W4b follow-up) ──────────
+    single<CardStrategyTagsCache> { WebCardStrategyTagsCache() }
+    single<CardStrategyTagsRemoteDataSourceContract> {
+        CardStrategyTagsRemoteDataSource(supabaseClient = get(), dispatcherProvider = get())
+    }
+    single<CardStrategyTagsRepository> {
+        CardStrategyTagsRepositoryImpl(
+            remote = get(),
+            cache = get(),
+            crashReporter = get(),
+            dispatcherProvider = get(),
+            now = { Clock.System.now().toEpochMilliseconds() },
+        )
+    }
+
     single { GetActiveTradesUseCase(repo = get()) }
     single { GetTradeHistoryUseCase(repo = get()) }
     single { RefreshTradesUseCase(repo = get()) }
@@ -315,7 +346,13 @@ val webAppKoinModule = module {
     }
     viewModel { DeckListViewModel(deckRepository = get(), crashReporter = get()) }
     viewModel { CollectionViewModel(userCardRepository = get(), userPreferencesRepository = get()) }
-    viewModel { params -> CardDetailViewModel(scryfallId = params.get(), cardRepository = get()) }
+    viewModel { params ->
+        CardDetailViewModel(
+            scryfallId = params.get(),
+            cardRepository = get(),
+            cardStrategyTagsRepository = get(),
+        )
+    }
     viewModel { params ->
         DeckEditorViewModel(
             deckId = params.get(),
