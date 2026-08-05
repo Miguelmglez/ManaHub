@@ -38,7 +38,99 @@ without the user.
 
 ## STATUS (2026-08-05)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE, Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE, Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI). Email/password auth (sign-in, sign-up, password reset) DONE — real (non-guest, non-Google) accounts are now genuinely reachable via the web UI itself, not just SQL-seeded test fixtures. Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
+
+- ✅ **Web email/password auth (sign-in, sign-up, password reset) — DONE** (2026-08-05, branch
+  `kmp-migration-web`, commit `7c7317db`). `:webApp` previously supported ONLY anonymous guest
+  sign-in (W2a) — Google OAuth is separately, deliberately deferred (needs external OAuth client
+  credentials), but email/password needs no external credentials at all (Supabase's own built-in
+  auth) and had simply never been built. User explicitly asked to confirm/add it.
+  1. **New `WebAuthRepository`** (`shared/core-data` wasmJsMain) implements the full, already-
+     commonMain `AuthRepository` interface (`shared/core-domain`) — the first web slice to route
+     auth actions through the shared repository/use-case layer instead of calling
+     `SupabaseClient.auth` directly (`AuthViewModel`'s W2a pragmatic shortcut). Real:
+     `signInWithEmail`/`signUpWithEmail`/`signOut`/`getCurrentUser`/`resetPassword`/
+     `updateNickname`/`updateAvatarUrl`/`signInAnonymously`/`sessionState`. Loud
+     `UnsupportedOperationException` stubs (matching the established `WebCardRepository`/
+     `WebDeckRepository` pattern): `signInWithGoogle`/`signUpWithGoogle`/`linkGoogleIdentity`
+     (Google OAuth, still deferred) and `deleteAccount` (a real but lower-priority, out-of-scope-
+     for-this-task Profile-adjacent follow-up). `sessionState` is JWT-metadata-only, NOT
+     `user_profiles`-enriched like Android's — `ProfileScreen` remains the sole source of truth for
+     the full profile view; see the class KDoc for the full rationale.
+  2. **`AuthViewModel` rewired** to take `AuthRepository` + the already-commonMain
+     `SignInWithEmailUseCase`/`SignUpWithEmailUseCase` (`shared/core-domain`) instead of a raw
+     `SupabaseClient`. `AuthUiState` dropped its `Error` case — every action-specific failure now
+     surfaces via a new `AuthFormState` (mode toggle, per-field values/errors, a neutral
+     `infoMessage` slot for email-confirmation-pending/password-reset-sent, separate from the red
+     `formError` slot) instead of overloading the session-status display.
+  3. **`AuthScreen` UI**: a sign-in/sign-up toggle (two `MagicCtaButton`s in a `Row`, each
+     `Modifier.weight(1f)` — the mandatory pattern per the W4d `MagicCtaButton`-unweighted-`Row`
+     bug), email + password (with a visibility-toggle trailing icon) fields, confirm-password +
+     nickname on sign-up, a "Forgot password?" link, and inline validation (empty fields, email
+     format, password `>= 8` chars) — all client-side, zero network calls until valid. Typed
+     `AuthError -> String` mapping mirrors Android's `feature.auth.presentation.AuthViewModel
+     .toUiMessage()` copy (`strings.xml` `auth_error_*` keys) for cross-platform consistency
+     without pulling Android string resources into `:webApp`.
+  4. **Password reset and "email already registered" are BOTH deliberately enumeration-safe** —
+     `resetPassword` always shows the same neutral "If an account exists for that email..."
+     message regardless of whether the account exists (confirmed live: real vs. nonexistent email
+     both returned HTTP 200 from `/auth/v1/recover`). Signing up with an email that's already
+     registered-and-confirmed is NOT a distinct red error either — Supabase GoTrue's own anti-
+     enumeration design returns a 200 fake-user response (no session, no error) for this case, so
+     it renders as the SAME green "check your inbox" info message a genuine new sign-up gets.
+     Confirmed via live testing + a direct SQL row-count check (still exactly 1 `auth.users` row
+     for the email, no duplicate/mutation) — this is expected secure behavior, not a bug to "fix"
+     by leaking account existence.
+  5. **Only a simple "check your inbox" confirmation was built for both flows** — NOT the fuller
+     password-recovery-link-landing flow (handling Supabase's recovery redirect URL to show a
+     "set new password" form), which is genuinely more complex and explicitly out of scope for
+     this slice; noted here as a deferred follow-up if that flow is ever requested.
+  6. **A real, unrelated build blocker was hit and NOT fixed by this agent**: `shared/core-common`'s
+     `expect fun sha256Hex` (new, uncommitted, from a concurrent Daily Puzzle work stream) had no
+     `wasmJs` `actual` — broke the ENTIRE wasmJs compile graph for every agent on this branch. A
+     sibling concurrent agent (working on `CollectionScreen`/`CollectionViewModel`) had already
+     dropped a documented TEMPORARY LOCAL-ONLY stub (`input.hashCode().toString()`, explicit
+     "deleted again once verification is done" comment) to unblock itself — this agent reused that
+     existing stub rather than writing a competing real implementation or duplicating effort; it
+     was gone again (deleted by its owner) by the time this slice's work was verified. Any future
+     session should NOT assume a real wasmJs `sha256Hex` actual exists — check first.
+  7. **CRITICAL process finding, not a code bug**: `git add <own files>` followed by a plain
+     `git commit -m "..."` swept in FOUR files from a concurrent agent's own staged-but-uncommitted
+     work (`CollectionScreen.kt`/`CollectionViewModel.kt`/`SettingsScreen.kt`/
+     `SettingsViewModel.kt`) into this agent's commit — multiple agents in this multi-agent session
+     share ONE git index/working tree, so staging is a shared, not per-agent, resource. Caught
+     immediately via `git show --stat HEAD` after committing (habit worth keeping), fixed with
+     `git reset --soft HEAD~1` (undoes the commit, keeps the index) +
+     `git restore --staged <the 4 foreign files>` + re-commit with an explicit `git commit --only
+     -- <exact file list>` (belt-and-braces: pathspec-scoped even if the index drifts again before
+     the commit lands). **Rule for any future multi-agent session on a shared working tree**: verify
+     `git status`/`git diff --cached --stat` immediately before EVERY commit, not just right after
+     `git add` — another agent's concurrent `git add` can land in the gap between your own `add` and
+     `commit`. Recorded in memory as a NEW, distinct hazard from the already-documented Gradle-
+     cache-corruption one.
+  8. **Verified live end-to-end in Chromium (Playwright) against the REAL Supabase project**
+     (`uimogilwuixgkgfcfmyb`): signed up a brand-new test email+password (real disposable address
+     pattern) → `/auth/v1/signup` 200, UI showed the green "check your inbox" message (this
+     project has email confirmation enabled) → confirmed the account via a direct SQL
+     `email_confirmed_at = now()` update (same seed/verify discipline as the Profile/Friends/Trades
+     slices) → confirmed `user_profiles` row exists with the EXACT nickname typed in the form →
+     signed in with the same email+password → `/auth/v1/token?grant_type=password` 200, session
+     state correctly showed "Signed in as account" (not "guest") → opened Profile → showed the
+     real nickname + server-generated game tag + Sign Out (proving `ProfileScreen`, built in an
+     earlier slice, now genuinely reflects non-guest state through this new flow, not just guest/
+     SQL-seeded testing) → signed out (`/auth/v1/logout` 204) → signed back in with the same
+     credentials → succeeded → wrong password → clean red "Incorrect email or password." (400,
+     no raw exception text) → empty-field / invalid-email-format / too-short-password validation
+     all correctly blocked submission client-side with per-field red messages, zero network calls.
+     Zero horizontal overflow at 375px/768px/1280px (375px screenshot confirmed the sign-in toggle
+     row + bottom nav bar both render correctly, no clipping). `:app:assembleDebug` green;
+     `:webApp:wasmJsBrowserDistribution` built successfully (fresh, not cached — a mid-verification
+     `--rerun` attempt hit the documented concurrent-daemon `NoSuchFileException` race, recovered by
+     retrying without `--rerun`); zero Android/commonMain source touched (100%
+     `shared/core-data` wasmJsMain + `webApp` wasmJsMain) — no leak-grep risk this slice. Test
+     account (`auth.users` + cascaded `user_profiles`) deleted afterward, confirmed 0 remaining rows.
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (this session's findings to be
+  recorded there) and memory `project_kmp_spike_findings`.
 
 - ✅ **Web scope expansion round 2, Friends — DONE** (2026-08-05, branch `kmp-migration-web`,
   commits `ff64ade2` + `46b6b181`). First slice of the second scope-expansion wave (approved
@@ -337,11 +429,11 @@ without the user.
        from `preferredCurrencyFlow` via `koinInject`, mirroring Android's `MainActivity` pattern.
        Verified live: switching the Settings currency chip flips a real card's displayed price from
        `$1.44` to `1,78 €` instantly, on the already-rendered Collection list.
-     - `CollectionGroupingMode` is exposed and persists correctly (round-trips through a fresh
-       browser/context restore) but is DELIBERATELY NOT consumed by `CollectionScreen` yet — grouping
-       needs a `CollectionCardGroup`-shaped collapsing step the web repository's raw
-       `List<UserCardWithCard>` doesn't have; real but non-trivial future work, documented in-UI via
-       an explicit "not applied yet" caption so it never reads as broken.
+     - `CollectionGroupingMode` was exposed and persisted correctly (round-trips through a fresh
+       browser/context restore) but was DELIBERATELY NOT consumed by `CollectionScreen` yet at this
+       point in the slice — grouping needed a `CollectionCardGroup`-shaped collapsing step the web
+       repository's raw `List<UserCardWithCard>` didn't have. **Closed 2026-08-05, commit
+       `cc44441a` — see the dedicated STATUS entry below.**
   4. **Verified live in Chromium (Playwright)**: guest sign-in → Account → Settings (all 4 sections
      render, 11-language `FlowRow` wraps cleanly) → changed all 4 settings (Español / USD / List /
      Rarity) → `storageState` captured → **fresh browser + fresh context restored from
@@ -1032,8 +1124,15 @@ without the user.
      decision on sequencing before the next attempt, not "pick up whenever convenient." Full
      investigation: memory `project_kmp_spike_findings` §"A3 debt item — CardRepositoryImpl move
      BLOCKED, investigated not executed (2026-08-04)".
-   - **Google OAuth remains explicitly deferred** (user decision, memory
-     `project_kmp_web_google_oauth_deferred`) — not a blocking prerequisite to anything above.
+   - **Email/password auth (sign-in/sign-up/password reset) is COMPLETE** (2026-08-05, commit
+     `7c7317db`, see STATUS above). **Google OAuth remains explicitly deferred** (user decision,
+     memory `project_kmp_web_google_oauth_deferred`) — not a blocking prerequisite to anything
+     above. Note this changes prior sessions' verification methodology: earlier slices (e.g.
+     Profile) seeded real non-guest test accounts directly via SQL because "Google OAuth is still
+     deferred and there's no other way to reach a non-guest session" — that caveat is now stale.
+     A real account can be created and signed into through the web UI itself; SQL-seeding remains
+     useful for BYPASSING email confirmation (`email_confirmed_at`) and for MULTI-ACCOUNT scenarios
+     needing two accounts set up in one shot, but is no longer the only path to a non-guest session.
    - **Deck Studio / Home richer-porting remain optional, additive future passes**, not required to
      call the MVP "done" — the repository layer needs zero further work for either
      (`WebDeckRepository`/`WebCardRepository`/`DeckRepository`/`UserCardRepository` already cover
