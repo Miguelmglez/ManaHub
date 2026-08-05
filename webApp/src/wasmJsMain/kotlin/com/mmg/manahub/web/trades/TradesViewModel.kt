@@ -5,10 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.remote.FriendshipClient
 import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
@@ -24,11 +29,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /** Top-level tabs inside the web Trades feature (Android splits Active/History and the Wishlist/Open-for-Trade hub across two screens; this web MVP folds all four into one). */
 enum class TradesTab { ACTIVE, HISTORY, WISHLIST, OPEN_FOR_TRADE }
@@ -45,6 +53,15 @@ data class TradesUiState(
     /** userId -> display name, resolved for every proposer/receiver seen so far. */
     val participantNames: Map<String, String> = emptyMap(),
     val error: String? = null,
+    // ── Wishlist add/edit (Trades completion slice, 2026-08-05) ─────────────────────────────────
+    val isWishlistSheetOpen: Boolean = false,
+    val wishlistSearchQuery: String = "",
+    val wishlistSearchResults: List<Card> = emptyList(),
+    val isSearchingWishlist: Boolean = false,
+    // ── Open-for-Trade add/edit (Trades completion slice, 2026-08-05) ───────────────────────────
+    val isOpenForTradeSheetOpen: Boolean = false,
+    val openForTradeQuery: String = "",
+    val myCollection: List<UserCardWithCard> = emptyList(),
 )
 
 /**
@@ -68,6 +85,8 @@ class TradesViewModel(
     private val tradesRepository: TradesRepository,
     private val wishlistRepository: WishlistRepository,
     private val openForTradeRepository: OpenForTradeRepository,
+    private val cardRepository: CardRepository,
+    private val userCardRepository: UserCardRepository,
     private val friendshipClient: FriendshipClient,
     private val crashReporter: CrashReporter,
 ) : ViewModel() {
@@ -76,10 +95,28 @@ class TradesViewModel(
     val uiState: StateFlow<TradesUiState> = _uiState.asStateFlow()
 
     private var refreshedForUserId: String? = null
+    private val wishlistSearchQueryFlow = MutableStateFlow("")
 
     init {
         observeSession()
         observeLists()
+        observeMyCollection()
+        wishlistSearchQueryFlow
+            .debounce(300L)
+            .distinctUntilChanged()
+            .onEach { query -> searchWishlistCards(query) }
+            .launchIn(viewModelScope)
+    }
+
+    private fun observeMyCollection() {
+        viewModelScope.launch {
+            userCardRepository.observeCollection()
+                .distinctUntilChanged()
+                .catch { }
+                .collect { collection ->
+                    _uiState.update { it.copy(myCollection = collection.sortedBy { c -> c.card.name }) }
+                }
+        }
     }
 
     private fun observeSession() {
@@ -157,6 +194,84 @@ class TradesViewModel(
 
     fun onTabSelected(tab: TradesTab) {
         _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    // ── Wishlist add/edit ─────────────────────────────────────────────────────────────────────
+
+    fun openWishlistSheet() = _uiState.update { it.copy(isWishlistSheetOpen = true) }
+    fun closeWishlistSheet() = _uiState.update { it.copy(isWishlistSheetOpen = false, wishlistSearchQuery = "", wishlistSearchResults = emptyList()) }
+
+    fun onWishlistSearchQueryChanged(query: String) {
+        _uiState.update { it.copy(wishlistSearchQuery = query, isSearchingWishlist = query.isNotBlank()) }
+        wishlistSearchQueryFlow.value = query
+    }
+
+    private suspend fun searchWishlistCards(query: String) {
+        if (query.isBlank()) {
+            _uiState.update { it.copy(wishlistSearchResults = emptyList(), isSearchingWishlist = false) }
+            return
+        }
+        when (val result = cardRepository.searchCards(query)) {
+            is DataResult.Success -> _uiState.update { it.copy(wishlistSearchResults = result.data, isSearchingWishlist = false) }
+            is DataResult.Error -> _uiState.update { it.copy(wishlistSearchResults = emptyList(), isSearchingWishlist = false) }
+        }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    fun addToWishlist(card: Card) {
+        val userId = _uiState.value.currentUserId
+        if (userId.isBlank()) return
+        viewModelScope.launch {
+            val entry = WishlistEntry(
+                id = "",
+                userId = userId,
+                cardId = card.scryfallId,
+                quantity = 1,
+                matchAnyVariant = false,
+                isFoil = false,
+                condition = "NM",
+                language = "en",
+                createdAt = Clock.System.now().toEpochMilliseconds(),
+            )
+            wishlistRepository.addAndSync(entry, userId)
+                .onFailure { e -> _uiState.update { it.copy(error = e.toUserFacingMessage("add ${card.name} to your wishlist", crashReporter)) } }
+        }
+    }
+
+    fun removeWishlistEntry(id: String) {
+        viewModelScope.launch {
+            wishlistRepository.removeLocal(id)
+                .onFailure { e -> _uiState.update { it.copy(error = e.toUserFacingMessage("remove this wishlist entry", crashReporter)) } }
+        }
+    }
+
+    // ── Open-for-Trade add/edit ───────────────────────────────────────────────────────────────
+
+    fun openOpenForTradeSheet() = _uiState.update { it.copy(isOpenForTradeSheetOpen = true) }
+    fun closeOpenForTradeSheet() = _uiState.update { it.copy(isOpenForTradeSheetOpen = false, openForTradeQuery = "") }
+    fun onOpenForTradeQueryChanged(query: String) = _uiState.update { it.copy(openForTradeQuery = query) }
+
+    fun addToOpenForTrade(userCard: UserCardWithCard) {
+        val userId = _uiState.value.currentUserId
+        if (userId.isBlank()) return
+        viewModelScope.launch {
+            openForTradeRepository.addAndSync(
+                scryfallId = userCard.card.scryfallId,
+                localCollectionId = userCard.userCard.id,
+                quantity = userCard.userCard.quantity,
+                isFoil = userCard.userCard.isFoil,
+                condition = userCard.userCard.condition,
+                language = userCard.userCard.language,
+                userId = userId,
+            ).onFailure { e -> _uiState.update { it.copy(error = e.toUserFacingMessage("mark ${userCard.card.name} open for trade", crashReporter)) } }
+        }
+    }
+
+    fun removeOpenForTradeEntry(entry: OpenForTradeEntry) {
+        viewModelScope.launch {
+            openForTradeRepository.removeByCollectionIdAndSync(entry.userCardId)
+                .onFailure { e -> _uiState.update { it.copy(error = e.toUserFacingMessage("remove this open-for-trade listing", crashReporter)) } }
+        }
     }
 
     /**
