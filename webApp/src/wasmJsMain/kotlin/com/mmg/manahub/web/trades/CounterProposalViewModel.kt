@@ -81,6 +81,22 @@ class CounterProposalViewModel(
     private val receiveQueryFlow = MutableStateFlow("")
     private var hasPrefilled = false
 
+    /**
+     * MUST be declared BEFORE `init {}` below (real bug, caught live during Trades completion
+     * verification -- a genuine Kotlin/Wasm `RuntimeError: dereferencing a null pointer` trap, not
+     * a hypothetical). `viewModelScope`'s dispatcher is `Main.immediate`: when `launch {}` is
+     * called from a thread already on Main (true here, since the constructor itself runs on Main),
+     * the coroutine body runs EAGERLY/SYNCHRONOUSLY up to its first real suspension point --
+     * `getThread(rootProposalId).collect {}` hits no suspension before its first (often synchronous,
+     * StateFlow-backed) emission, so `tryPrefill()` can run WHILE the constructor is still
+     * executing the `init` block, i.e. BEFORE any property declared textually AFTER `init` has run
+     * its own initializer. Kotlin property/init-block execution is strictly source-order, so a
+     * property referenced from an eagerly-run `init`-block coroutine must be declared ABOVE that
+     * `init` block, never below it -- "the class compiled, so ordering doesn't matter" is false for
+     * exactly this eager-coroutine-during-construction shape.
+     */
+    private var latestThread: List<TradeProposal> = emptyList()
+
     init {
         viewModelScope.launch {
             supabaseClient.auth.sessionStatus.collect { status ->
@@ -108,8 +124,6 @@ class CounterProposalViewModel(
             .onEach { query -> loadFriendCollection(query) }
             .launchIn(viewModelScope)
     }
-
-    private var latestThread: List<TradeProposal> = emptyList()
 
     private fun tryPrefill() {
         if (hasPrefilled) return

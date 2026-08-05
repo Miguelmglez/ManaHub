@@ -379,10 +379,17 @@ internal fun PickerRow(name: String, imageUrl: String?, detail: String, onAdd: (
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(width = 36.dp, height = 50.dp).clip(RoundedCornerShape(4.dp)),
         )
-        Column(modifier = Modifier.weight(1f)) {
+        // MagicCtaButton has an internal fillMaxWidth() on its text content that hogs the WHOLE
+        // row width when placed unweighted next to a weight(1f) sibling (same bug documented in
+        // project_w4d_home_screen.md / FriendsScreen's AddFriendSection) -- caught LIVE during
+        // Trades completion verification: the detail line rendered as one character per line
+        // ("x" / "3" / "N" / "M" stacked vertically) because this Column was being squeezed to
+        // near-zero width. Both children need an explicit weight so Compose bounds the button's
+        // share BEFORE its internal fillMaxWidth() applies.
+        Column(modifier = Modifier.weight(2f)) {
             Text(text = name, style = typography.bodyMedium, color = colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(text = detail, style = typography.bodySmall, color = colors.textSecondary)
+            Text(text = detail, style = typography.bodySmall, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        MagicCtaButton(onClick = onAdd, text = "Add", style = MagicCtaStyle.Outlined)
+        MagicCtaButton(onClick = onAdd, text = "Add", style = MagicCtaStyle.Outlined, modifier = Modifier.weight(1f))
     }
 }
