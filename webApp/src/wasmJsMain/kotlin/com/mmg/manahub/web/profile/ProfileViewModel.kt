@@ -6,12 +6,15 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.common.decodeIsAnonymousClaim
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.dto.UpdateNicknameDto
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.web.common.copyToClipboardOrNull
 import com.mmg.manahub.web.common.toUserFacingMessage
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.ktor.client.plugins.ClientRequestException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +75,7 @@ sealed interface ProfileEvent {
 class ProfileViewModel(
     supabaseClient: SupabaseClient,
     private val userProfileClient: UserProfileClient,
+    private val friendRepository: FriendRepository,
     private val crashReporter: CrashReporter,
 ) : ViewModel() {
 
@@ -94,6 +98,17 @@ class ProfileViewModel(
 
     private val _isSigningOut = MutableStateFlow(false)
     val isSigningOut: StateFlow<Boolean> = _isSigningOut.asStateFlow()
+
+    // ── Referral invite link (Friends completion slice, 2026-08-05) ──────────────────────────────
+    private val _shareUrl = MutableStateFlow<String?>(null)
+    val shareUrl: StateFlow<String?> = _shareUrl.asStateFlow()
+
+    private val _isLoadingShareUrl = MutableStateFlow(false)
+    val isLoadingShareUrl: StateFlow<Boolean> = _isLoadingShareUrl.asStateFlow()
+
+    /** True for a couple of seconds right after a successful [copyInviteLink] call. */
+    private val _linkCopied = MutableStateFlow(false)
+    val linkCopied: StateFlow<Boolean> = _linkCopied.asStateFlow()
 
     private val _events = Channel<ProfileEvent>(Channel.BUFFERED)
     val events: Flow<ProfileEvent> = _events.receiveAsFlow()
@@ -143,10 +158,51 @@ class ProfileViewModel(
                 gameTag = profile?.gameTag,
             )
             _nicknameInput.value = profile?.nickname.orEmpty()
+            loadShareUrl(userId)
         } catch (e: Throwable) {
             // wasmJs: a real fetch() failure surfaces as kotlin.Error, not kotlin.Exception --
             // must catch Throwable, never Exception (see toUserFacingMessage's KDoc).
             _uiState.value = ProfileUiState.Error(e.toUserFacingMessage("load profile", crashReporter))
+        }
+    }
+
+    /**
+     * Fetches the caller's own referral share link via [FriendRepository.getMyShareUrl]. Never
+     * called for [ProfileUiState.Guest] (anonymous sessions have no `user_profiles` row, so the
+     * `get_my_referral_code` RPC underneath would return null and this would always fail --
+     * matches the project-wide "guests have no profile row" invariant). A failure here is
+     * non-critical (the referral code may genuinely not exist yet, or a spurious network blip) --
+     * it's recorded to Crashlytics but leaves [shareUrl] null, which [ProfileScreen] renders as
+     * simply omitting the invite-link section rather than an error state.
+     */
+    private fun loadShareUrl(userId: String) {
+        viewModelScope.launch {
+            _isLoadingShareUrl.value = true
+            friendRepository.getMyShareUrl(userId)
+                .onSuccess { url -> _shareUrl.value = url }
+                .onFailure { e ->
+                    crashReporter.recordException(e)
+                    _shareUrl.value = null
+                }
+            _isLoadingShareUrl.value = false
+        }
+    }
+
+    /**
+     * Attempts to copy [shareUrl] to the clipboard via [copyToClipboardOrNull]. [linkCopied] flips
+     * true for ~2 seconds on success so [ProfileScreen] can show a transient "Copied!" confirmation;
+     * on failure the link stays visible in a selectable text field (see [copyToClipboardOrNull]'s
+     * KDoc) so the user can still copy it manually -- no error state needed here.
+     */
+    fun copyInviteLink() {
+        val url = _shareUrl.value ?: return
+        val copied = copyToClipboardOrNull(url)
+        _linkCopied.value = copied
+        if (copied) {
+            viewModelScope.launch {
+                delay(2000)
+                _linkCopied.value = false
+            }
         }
     }
 

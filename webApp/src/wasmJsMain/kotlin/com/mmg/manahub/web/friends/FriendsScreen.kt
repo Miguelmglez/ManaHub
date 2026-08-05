@@ -1,6 +1,7 @@
 package com.mmg.manahub.web.friends
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,20 +59,20 @@ import org.koin.compose.viewmodel.koinViewModel
  * - Outgoing (sent) requests with Cancel.
  * - Add-friend via exact game-tag search -> "Send request".
  *
- * Deliberately DEFERRED (documented, not half-built): a friend-detail view surfacing
- * [com.mmg.manahub.core.domain.repository.FriendRepository.getFriendCollection]/`getFriendStats`/
- * `getFriendMatchHistory` (a genuinely separate, bigger screen -- viewing another user's
- * server-RLS-gated data), and the referral-invite flow (`acceptInvite`/`getMyShareUrl`) -- the
- * latter's most natural home is [com.mmg.manahub.web.profile.ProfileScreen] (which already
- * surfaces the user's own `gameTag`), not a new control on this screen; not built this slice
- * either since neither Profile nor Friends needed it to ship the core loop.
+ * Friends completion slice (approved 2026-08-05) built the two pieces that WERE deliberately
+ * deferred here: tapping a friend row now navigates to [FriendDetailScreen] (surfacing
+ * `getFriendCollection`/`getFriendStats`/`getFriendMatchHistory` there), and this screen gained a
+ * "Have an invite code?" section wired to [FriendRepository.acceptInvite]. The matching
+ * "share my invite link" side of that flow ([FriendRepository.getMyShareUrl]) lives on
+ * [com.mmg.manahub.web.profile.ProfileScreen] instead (which already surfaces the user's own
+ * `gameTag`) -- see that screen's KDoc.
  *
  * A single [LazyColumn] mixing `item {}` section headers with `items()` per list -- never nested
  * `LazyColumn`s (CLAUDE.md) -- since friend/request lists are typically small (a handful of rows),
  * this stays performant while giving every row a stable `key` (friendship id).
  */
 @Composable
-fun FriendsScreen() {
+fun FriendsScreen(onFriendClick: (String) -> Unit = {}) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -95,12 +96,12 @@ fun FriendsScreen() {
             )
         }
 
-        is FriendsUiState.Content -> FriendsContent(state = state, viewModel = viewModel)
+        is FriendsUiState.Content -> FriendsContent(state = state, viewModel = viewModel, onFriendClick = onFriendClick)
     }
 }
 
 @Composable
-private fun FriendsContent(state: FriendsUiState.Content, viewModel: FriendsViewModel) {
+private fun FriendsContent(state: FriendsUiState.Content, viewModel: FriendsViewModel, onFriendClick: (String) -> Unit) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -110,6 +111,10 @@ private fun FriendsContent(state: FriendsUiState.Content, viewModel: FriendsView
     val searchResult by viewModel.searchResult.collectAsState()
     val searchMessage by viewModel.searchMessage.collectAsState()
     val isSendingRequest by viewModel.isSendingRequest.collectAsState()
+    val inviteCodeInput by viewModel.inviteCodeInput.collectAsState()
+    val isAcceptingInvite by viewModel.isAcceptingInvite.collectAsState()
+    val inviteMessage by viewModel.inviteMessage.collectAsState()
+    val inviteMessageIsError by viewModel.inviteMessageIsError.collectAsState()
 
     val isEmpty = state.friends.isEmpty() && state.pendingRequests.isEmpty() && state.outgoingRequests.isEmpty()
 
@@ -135,6 +140,17 @@ private fun FriendsContent(state: FriendsUiState.Content, viewModel: FriendsView
                     onInputChanged = viewModel::onGameTagInputChanged,
                     onSearch = viewModel::searchByGameTag,
                     onSendRequest = viewModel::sendFriendRequest,
+                )
+
+                HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
+
+                InviteCodeSection(
+                    inviteCodeInput = inviteCodeInput,
+                    isAccepting = isAcceptingInvite,
+                    message = inviteMessage,
+                    messageIsError = inviteMessageIsError,
+                    onInputChanged = viewModel::onInviteCodeInputChanged,
+                    onRedeem = viewModel::acceptInviteWithCode,
                 )
 
                 HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
@@ -179,6 +195,7 @@ private fun FriendsContent(state: FriendsUiState.Content, viewModel: FriendsView
                     friend = friend,
                     isBusy = friend.id in state.actionInFlightIds,
                     onRemove = { viewModel.removeFriend(friend.id) },
+                    onClick = { onFriendClick(friend.userId) },
                 )
             }
         }
@@ -289,6 +306,72 @@ private fun AddFriendSection(
     }
 }
 
+/**
+ * "Have an invite code?" section (Friends completion slice, 2026-08-05) -- the manual-entry side
+ * of [FriendRepository.acceptInvite][com.mmg.manahub.core.domain.repository.FriendRepository.acceptInvite].
+ *
+ * Android's own referral-invite entry point is deep-link-only ([InviteDispatcherScreen][
+ * com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherScreen], a phantom screen
+ * that auto-processes an incoming `manahub://` URI) -- there is genuinely no manual-entry UI to
+ * port there, since a mobile OS intercepts the link before the app ever needs one. A browser has
+ * no equivalent interception for an external landing-page URL
+ * (`https://miguelmglez.github.io/invite/<code>`, see [FriendRepository.getMyShareUrl]'s KDoc), so
+ * this manual text-entry field is the necessary web-native equivalent, not an invented UI the task
+ * brief's "check Android's precedent" guidance was meant to steer away from.
+ */
+@Composable
+private fun InviteCodeSection(
+    inviteCodeInput: String,
+    isAccepting: Boolean,
+    message: String?,
+    messageIsError: Boolean,
+    onInputChanged: (String) -> Unit,
+    onRedeem: () -> Unit,
+) {
+    val spacing = MaterialTheme.spacing
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        Text(text = "Have an invite code?", style = typography.titleMedium, color = colors.textPrimary)
+        // Caption-above-plain-field pattern -- see AddFriendSection's note on OutlinedTextField's
+        // broken `label` slot on this CMP/wasmJs version.
+        Text(text = "Invite code", style = typography.bodySmall, color = colors.textSecondary)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = inviteCodeInput,
+                onValueChange = onInputChanged,
+                singleLine = true,
+                enabled = !isAccepting,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = colors.textPrimary,
+                    unfocusedTextColor = colors.textPrimary,
+                    focusedBorderColor = colors.primaryAccent,
+                ),
+                modifier = Modifier.weight(2f),
+            )
+            MagicCtaButton(
+                onClick = onRedeem,
+                text = "Redeem",
+                enabled = !isAccepting && inviteCodeInput.isNotBlank(),
+                isLoading = isAccepting,
+                style = MagicCtaStyle.Outlined,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (message != null) {
+            Text(
+                text = message,
+                style = typography.bodySmall,
+                color = if (messageIsError) colors.lifeNegative else colors.lifePositive,
+            )
+        }
+    }
+}
+
 @Composable
 private fun PendingRequestRow(request: FriendRequest, isBusy: Boolean, onAccept: () -> Unit, onReject: () -> Unit) {
     val spacing = MaterialTheme.spacing
@@ -343,14 +426,25 @@ private fun OutgoingRequestRow(request: OutgoingFriendRequest, isBusy: Boolean, 
 }
 
 @Composable
-private fun FriendRow(friend: Friend, isBusy: Boolean, onRemove: () -> Unit) {
+private fun FriendRow(friend: Friend, isBusy: Boolean, onRemove: () -> Unit, onClick: () -> Unit = {}) {
     val spacing = MaterialTheme.spacing
     // Vertical stack, not a horizontal SpaceBetween Row -- see AddFriendSection's fillMaxWidth() note.
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
-        FriendIdentity(avatarUrl = friend.avatarUrl, nickname = friend.nickname, gameTag = friend.gameTag)
+        // Friends completion slice (2026-08-05): tapping the identity row (avatar + nickname +
+        // game tag) navigates to FriendDetailScreen. The Remove button below stays a SEPARATE
+        // click target (its own MagicCtaButton onClick), not nested inside this clickable -- a
+        // clickable Row containing another clickable descendant is fine in Compose (the inner
+        // one consumes its own tap), but keeping Remove visually below rather than inside the
+        // identity row avoids any ambiguity about which action a tap resolves to.
+        FriendIdentity(
+            avatarUrl = friend.avatarUrl,
+            nickname = friend.nickname,
+            gameTag = friend.gameTag,
+            modifier = Modifier.clickable(onClick = onClick),
+        )
         MagicCtaButton(
             onClick = onRemove,
             text = "Remove",
@@ -363,9 +457,13 @@ private fun FriendRow(friend: Friend, isBusy: Boolean, onRemove: () -> Unit) {
 }
 
 @Composable
-private fun FriendIdentity(avatarUrl: String?, nickname: String, gameTag: String) {
+internal fun FriendIdentity(avatarUrl: String?, nickname: String, gameTag: String, modifier: Modifier = Modifier) {
     val spacing = MaterialTheme.spacing
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+    ) {
         FriendAvatar(avatarUrl = avatarUrl)
         Column {
             val colors = MaterialTheme.magicColors
@@ -383,7 +481,7 @@ private fun FriendIdentity(avatarUrl: String?, nickname: String, gameTag: String
 }
 
 @Composable
-private fun FriendAvatar(avatarUrl: String?, size: Dp = 40.dp) {
+internal fun FriendAvatar(avatarUrl: String?, size: Dp = 40.dp) {
     val colors = MaterialTheme.magicColors
     val modifier = Modifier.size(size).clip(CircleShape).background(colors.surfaceVariant)
     if (avatarUrl.isNullOrBlank()) {

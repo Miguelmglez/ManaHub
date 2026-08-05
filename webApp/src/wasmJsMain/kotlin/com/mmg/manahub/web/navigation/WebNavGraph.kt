@@ -27,6 +27,7 @@ import com.mmg.manahub.web.carddetail.CardDetailScreen
 import com.mmg.manahub.web.collection.CollectionScreen
 import com.mmg.manahub.web.deckeditor.DeckEditorScreen
 import com.mmg.manahub.web.decks.DeckListScreen
+import com.mmg.manahub.web.friends.FriendDetailScreen
 import com.mmg.manahub.web.friends.FriendsScreen
 import com.mmg.manahub.web.home.HomeScreen
 import com.mmg.manahub.web.profile.ProfileScreen
@@ -162,6 +163,16 @@ private data class DeckEditorRoute(val deckId: String)
 private data class TradeThreadRoute(val rootProposalId: String)
 
 /**
+ * Friends completion slice (web scope expansion, approved 2026-08-05) -- the FOURTH parameterized
+ * route (same shape as [CardDetailRoute]/[DeckEditorRoute]/[TradeThreadRoute]): a destination you
+ * navigate INTO from [FriendsScreen]'s friend rows, never a top-level nav item. Encodes as
+ * `#frienddetail/<friendUserId>`.
+ */
+@Serializable
+@SerialName("frienddetail")
+private data class FriendDetailRoute(val friendUserId: String)
+
+/**
  * The routes above, keyed by their [kotlinx.serialization] serial name (the exact string
  * [androidx.navigation.bindToBrowserNavigation]'s DEFAULT `getBackStackEntryRoute` writes into the
  * URL fragment for a no-argument object route — confirmed live: the fragment reads e.g.
@@ -240,11 +251,15 @@ private suspend fun NavHostController.bindWebBrowserNavigation() {
     val tradeThreadId = initialFragment.takeIf { it.startsWith("trade/") }
         ?.removePrefix("trade/")
         ?.takeIf { it.isNotBlank() }
+    val friendDetailId = initialFragment.takeIf { it.startsWith("frienddetail/") }
+        ?.removePrefix("frienddetail/")
+        ?.takeIf { it.isNotBlank() }
     val initialRoute = ROUTES_BY_SERIAL_NAME[initialFragment]
     when {
         cardDetailId != null -> navigate(CardDetailRoute(scryfallId = cardDetailId)) { launchSingleTop = true }
         deckEditorId != null -> navigate(DeckEditorRoute(deckId = deckEditorId)) { launchSingleTop = true }
         tradeThreadId != null -> navigate(TradeThreadRoute(rootProposalId = tradeThreadId)) { launchSingleTop = true }
+        friendDetailId != null -> navigate(FriendDetailRoute(friendUserId = friendDetailId)) { launchSingleTop = true }
         initialRoute != null && initialRoute != HomeRoute -> navigate(initialRoute) { launchSingleTop = true }
     }
     bindToBrowserNavigation()
@@ -394,7 +409,15 @@ fun WebNavGraph(
                 )
             }
             composable<FriendsRoute> {
-                FriendsScreen()
+                FriendsScreen(onFriendClick = { userId -> navController.navigate(FriendDetailRoute(userId)) })
+            }
+            composable<FriendDetailRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<FriendDetailRoute>()
+                FriendDetailScreen(
+                    friendUserId = route.friendUserId,
+                    onBack = { navController.navigateUp() },
+                    onCardClick = { scryfallId -> navController.navigate(CardDetailRoute(scryfallId)) },
+                )
             }
             composable<TradesRoute> {
                 TradesScreen(onProposalClick = { rootProposalId -> navController.navigate(TradeThreadRoute(rootProposalId)) })
