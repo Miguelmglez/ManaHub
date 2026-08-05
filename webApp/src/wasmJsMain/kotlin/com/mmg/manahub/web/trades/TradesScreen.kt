@@ -28,6 +28,9 @@ import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -49,9 +52,13 @@ import org.koin.compose.viewmodel.koinViewModel
  * Reachable via its OWN bottom-nav-rail tab (see `WebNavGraph.kt`'s `TradesRoute`) rather than
  * hanging off the Account surface like Settings/Profile/Friends -- Trades is a primary feature, not
  * an account-adjacent one, per the task brief's explicit call.
+ *
+ * Trades completion slice (2026-08-05): the Active tab gained a "New proposal" button
+ * ([onNewProposal]) navigating to [CreateProposalScreen] -- the single heaviest piece deferred
+ * from the original Trades slice, see that screen's KDoc.
  */
 @Composable
-fun TradesScreen(onProposalClick: (String) -> Unit) {
+fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = {}) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -102,6 +109,16 @@ fun TradesScreen(onProposalClick: (String) -> Unit) {
                 style = typography.bodyMedium,
                 color = colors.lifeNegative,
                 modifier = Modifier.padding(top = spacing.sm),
+            )
+        }
+
+        if (uiState.selectedTab == TradesTab.ACTIVE || uiState.selectedTab == TradesTab.HISTORY) {
+            MagicCtaButton(
+                onClick = onNewProposal,
+                text = "New proposal",
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
             )
         }
 
