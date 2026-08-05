@@ -86,6 +86,19 @@ class FriendsViewModel(
     private val _isSendingRequest = MutableStateFlow(false)
     val isSendingRequest: StateFlow<Boolean> = _isSendingRequest.asStateFlow()
 
+    // ── Referral-invite redemption (Friends completion slice, 2026-08-05) ────────────────────────
+    private val _inviteCodeInput = MutableStateFlow("")
+    val inviteCodeInput: StateFlow<String> = _inviteCodeInput.asStateFlow()
+
+    private val _isAcceptingInvite = MutableStateFlow(false)
+    val isAcceptingInvite: StateFlow<Boolean> = _isAcceptingInvite.asStateFlow()
+
+    private val _inviteMessage = MutableStateFlow<String?>(null)
+    val inviteMessage: StateFlow<String?> = _inviteMessage.asStateFlow()
+
+    private val _inviteMessageIsError = MutableStateFlow(false)
+    val inviteMessageIsError: StateFlow<Boolean> = _inviteMessageIsError.asStateFlow()
+
     private var streamsStarted = false
 
     init {
@@ -235,4 +248,63 @@ class FriendsViewModel(
             }
         }
     }
+
+    fun onInviteCodeInputChanged(value: String) {
+        _inviteCodeInput.value = value
+        _inviteMessage.value = null
+    }
+
+    /**
+     * Redeems a referral code via [FriendRepository.acceptInvite]. Validates the Crockford base32
+     * shape client-side first -- matches Android's own
+     * `InviteDispatcherViewModel.isValidReferralCode` -- so an obviously malformed paste never
+     * reaches the network.
+     *
+     * `accept_invite` (confirmed live via the RPC's own SQL body, `pg_get_functiondef`) writes an
+     * ACCEPTED friendship directly for both directions -- there is no separate pending-request
+     * step to "accept" afterward, only a [FriendRepository.refreshFriends] cache pull so the new
+     * friend appears in [FriendsUiState.Content.friends] immediately rather than waiting for the
+     * next full reload.
+     */
+    fun acceptInviteWithCode() {
+        val state = _uiState.value
+        if (state !is FriendsUiState.Content || _isAcceptingInvite.value) return
+        val code = _inviteCodeInput.value.trim().uppercase()
+        if (!isValidReferralCode(code)) {
+            _inviteMessage.value = "That doesn't look like a valid invite code."
+            _inviteMessageIsError.value = true
+            return
+        }
+        viewModelScope.launch {
+            _isAcceptingInvite.value = true
+            _inviteMessage.value = null
+            try {
+                val result = friendRepository.acceptInvite(code).getOrThrow()
+                friendRepository.refreshFriends(state.currentUserId)
+                _inviteMessage.value = if (result.inviterNickname != null) {
+                    "Now you are friends with ${result.inviterNickname}."
+                } else {
+                    "New friendship accepted!"
+                }
+                _inviteMessageIsError.value = false
+                _inviteCodeInput.value = ""
+            } catch (e: Throwable) {
+                // Known semantic tokens surfaced by WebFriendRepository.acceptInvite's
+                // recoverCatching mapping -- same wording as Android's AppNavGraph invite toasts
+                // (friends_invite_self/friends_invite_invalid strings.xml entries).
+                val token = e.message ?: ""
+                _inviteMessage.value = when {
+                    token.contains("SELF_INVITE", ignoreCase = true) -> "That's your own invite link."
+                    token.contains("INVALID_CODE", ignoreCase = true) -> "Invitation is no longer valid."
+                    else -> e.toUserFacingMessage("accept the invitation", crashReporter)
+                }
+                _inviteMessageIsError.value = true
+            } finally {
+                _isAcceptingInvite.value = false
+            }
+        }
+    }
+
+    private fun isValidReferralCode(code: String): Boolean =
+        code.length == 8 && code.all { it in "23456789ABCDEFGHJKMNPQRSTVWXYZ" }
 }

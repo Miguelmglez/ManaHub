@@ -64,6 +64,7 @@ import com.mmg.manahub.web.collection.CollectionViewModel
 import com.mmg.manahub.web.config.WebAppConfig
 import com.mmg.manahub.web.deckeditor.DeckEditorViewModel
 import com.mmg.manahub.web.decks.DeckListViewModel
+import com.mmg.manahub.web.friends.FriendDetailViewModel
 import com.mmg.manahub.web.friends.FriendsViewModel
 import com.mmg.manahub.web.home.HomeViewModel
 import com.mmg.manahub.web.profile.ProfileViewModel
@@ -177,6 +178,15 @@ import org.koin.dsl.module
  * [CardRepository] singleton so [WebFriendRepository] can resolve joined card metadata for
  * `getFriendCollection` (same join-through-another-repository pattern as [WebUserCardRepository]).
  * Bound against the INTERFACE type for the same reason as every other repository above.
+ *
+ * The Friends completion slice (web scope expansion, approved 2026-08-05 -- the friend-detail view
+ * and referral-invite flow deferred from the Friends slice above) adds the [FriendDetailViewModel]
+ * factory (same `params.get()` runtime-parameter shape as [CardDetailViewModel]/[DeckEditorViewModel]/
+ * [TradeThreadViewModel], for `friendUserId`), backing [com.mmg.manahub.web.friends.FriendDetailScreen].
+ * No new repository binding needed -- reuses the existing [FriendRepository] singleton. This slice
+ * also adds a [FriendRepository] constructor param to the existing [ProfileViewModel] binding so
+ * [com.mmg.manahub.web.profile.ProfileScreen] can surface the caller's own invite link
+ * ([FriendRepository.getMyShareUrl]).
  *
  * The Trades slice (web scope expansion, approved 2026-08-04, Friends + Trades wave) adds three
  * repository bindings: [TradesRepository] (backed by [WebTradesRepository], the near-Room-free
@@ -364,10 +374,18 @@ val webAppKoinModule = module {
     viewModel { HomeViewModel(deckRepository = get(), userCardRepository = get()) }
     viewModel { SettingsViewModel(userPreferencesRepository = get()) }
     viewModel {
-        ProfileViewModel(supabaseClient = get(), userProfileClient = get(), crashReporter = get())
+        ProfileViewModel(
+            supabaseClient = get(),
+            userProfileClient = get(),
+            friendRepository = get(),
+            crashReporter = get(),
+        )
     }
     viewModel {
         FriendsViewModel(friendRepository = get(), supabaseClient = get(), crashReporter = get())
+    }
+    viewModel { params ->
+        FriendDetailViewModel(friendUserId = params.get(), friendRepository = get(), crashReporter = get())
     }
     viewModel {
         TradesViewModel(

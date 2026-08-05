@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -46,11 +47,12 @@ import org.koin.compose.viewmodel.koinViewModel
  * [com.mmg.manahub.web.settings.SettingsScreen].
  *
  * Deliberately MINIMAL: nickname edit, avatar DISPLAY only (no upload -- that needs a Storage
- * bucket + file picker, out of scope for this slice), a read-only game tag if present, and sign
- * out. Explicitly excludes everything gamification-related (achievements, stats, level/tier,
- * cosmetics, the `?tab=` deep-link arg) per the web v1 MVP scope -- see Android's
- * `ProfileScreen.kt`/`ProfileViewModel.kt` for the full (out-of-scope-for-web) surface this
- * intentionally does not port.
+ * bucket + file picker, out of scope for this slice), a read-only game tag if present, an
+ * "Invite a friend" share-link section (Friends completion slice, 2026-08-05 -- see
+ * [InviteLinkSection]'s KDoc), and sign out. Explicitly excludes everything gamification-related
+ * (achievements, stats, level/tier, cosmetics, the `?tab=` deep-link arg) per the web v1 MVP scope
+ * -- see Android's `ProfileScreen.kt`/`ProfileViewModel.kt` for the full (out-of-scope-for-web)
+ * surface this intentionally does not port.
  *
  * [onSignedOut] is invoked once [ProfileViewModel.events] actually emits [ProfileEvent.SignedOut]
  * (sign-out completed against the SDK), never optimistically on button click.
@@ -67,6 +69,8 @@ fun ProfileScreen(onSignedOut: () -> Unit = {}) {
     val nicknameError by viewModel.nicknameError.collectAsState()
     val nicknameSaved by viewModel.nicknameSaved.collectAsState()
     val isSigningOut by viewModel.isSigningOut.collectAsState()
+    val shareUrl by viewModel.shareUrl.collectAsState()
+    val linkCopied by viewModel.linkCopied.collectAsState()
 
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
@@ -142,6 +146,15 @@ fun ProfileScreen(onSignedOut: () -> Unit = {}) {
                             color = colors.textSecondary,
                         )
                     }
+                }
+
+                if (shareUrl != null) {
+                    HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
+                    InviteLinkSection(
+                        shareUrl = shareUrl,
+                        linkCopied = linkCopied,
+                        onCopy = viewModel::copyInviteLink,
+                    )
                 }
 
                 HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
@@ -225,6 +238,51 @@ private fun NicknameEditor(
                 isLoading = isSaving,
                 style = MagicCtaStyle.Filled,
                 color = MagicCtaColor.Primary,
+            )
+        }
+    }
+}
+
+/**
+ * "Invite a friend" section (Friends completion slice, 2026-08-05) -- the share side of the
+ * referral-invite flow. [shareUrl] is always shown in a [SelectionContainer] (manually selectable/
+ * copyable) so the link stays usable even if the Clipboard API call fails; the "Copy link" button
+ * is an additional convenience, not the only way to get the link out.
+ */
+@Composable
+private fun InviteLinkSection(shareUrl: String?, linkCopied: Boolean, onCopy: () -> Unit) {
+    val url = shareUrl ?: return
+    val spacing = MaterialTheme.spacing
+    val colors = MaterialTheme.magicColors
+    val typography = MaterialTheme.magicTypography
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        Text(text = "Invite a friend", style = typography.titleMedium, color = colors.textPrimary)
+        Text(
+            text = "Share this link -- when a friend opens it and signs in, you'll be friends automatically.",
+            style = typography.bodySmall,
+            color = colors.textSecondary,
+        )
+        SelectionContainer {
+            Text(
+                text = url,
+                style = typography.bodyMedium,
+                color = colors.primaryAccent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.backgroundSecondary)
+                    .padding(spacing.sm),
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MagicCtaButton(
+                onClick = onCopy,
+                text = if (linkCopied) "Copied!" else "Copy link",
+                style = MagicCtaStyle.Outlined,
+                color = if (linkCopied) MagicCtaColor.Success else MagicCtaColor.Primary,
             )
         }
     }
