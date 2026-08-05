@@ -22,6 +22,7 @@ import com.mmg.manahub.core.data.remote.trades.OpenForTradeRemoteDataSource
 import com.mmg.manahub.core.data.remote.trades.TradesRemoteDataSource
 import com.mmg.manahub.core.data.remote.trades.WishlistRemoteDataSource
 import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.data.repository.WebAuthRepository
 import com.mmg.manahub.core.data.repository.WebCardRepository
 import com.mmg.manahub.core.data.repository.WebDeckRepository
 import com.mmg.manahub.core.data.repository.WebFriendRepository
@@ -30,6 +31,7 @@ import com.mmg.manahub.core.data.repository.WebTradesRepository
 import com.mmg.manahub.core.data.repository.WebUserCardRepository
 import com.mmg.manahub.core.data.repository.WebUserPreferencesRepository
 import com.mmg.manahub.core.data.repository.WebWishlistRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
@@ -38,6 +40,8 @@ import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.DeclineProposalUseCase
@@ -218,6 +222,12 @@ val webAppKoinModule = module {
             baseUrl = "${WebAppConfig.SUPABASE_URL}/rest/v1/",
         )
     }
+
+    // ── Auth stack (email/password sign-in, sign-up, password reset -- 2026-08-05) ──────────────
+    single<AuthRepository> { WebAuthRepository(supabaseClient = get(), userProfileClient = get()) }
+    single { SignInWithEmailUseCase(repository = get()) }
+    single { SignUpWithEmailUseCase(repository = get()) }
+
     single {
         FriendshipClient(
             httpClient = get(named("supabaseKtor")),
@@ -288,7 +298,13 @@ val webAppKoinModule = module {
     single { RevokeAcceptanceUseCase(repo = get()) }
 
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
-    viewModel { AuthViewModel(supabaseClient = get(), crashReporter = get()) }
+    viewModel {
+        AuthViewModel(
+            authRepository = get(),
+            signInWithEmailUseCase = get(),
+            signUpWithEmailUseCase = get(),
+        )
+    }
     viewModel {
         CardSearchViewModel(
             cardRepository = get(),
