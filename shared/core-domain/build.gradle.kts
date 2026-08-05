@@ -19,6 +19,7 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -58,6 +59,9 @@ kotlin {
                 implementation(libs.coroutines.core)
                 // Use cases use Clock.System.now() for event timestamps.
                 implementation(libs.kotlinx.datetime)
+                // Daily Puzzle feature (Batch B1): SubmitPuzzleGuessUseCase parses a Puzzle's raw
+                // payloadJson into a typed GuessCardPayload.
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         commonTest {
