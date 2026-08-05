@@ -97,7 +97,7 @@ fun SettingsScreen() {
         HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
         SettingsChoiceSection(
             title = "Group collection by",
-            subtitle = "Saved for when Collection grouping ships -- not applied on the Collection screen yet.",
+            subtitle = "How the Collection screen buckets your cards into sections.",
             options = CollectionGroupingMode.entries,
             selected = groupingMode,
             optionLabel = CollectionGroupingMode::toDisplayLabel,
