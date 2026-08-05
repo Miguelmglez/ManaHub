@@ -46,9 +46,11 @@ import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
+import com.mmg.manahub.core.data.local.dao.PuzzleDao
 import com.mmg.manahub.core.data.local.entity.CommunityAggregateEntity
 import com.mmg.manahub.core.data.local.entity.ComboCacheEntity
 import com.mmg.manahub.core.data.local.entity.CardStrategyTagsCacheEntity
+import com.mmg.manahub.core.data.local.entity.PuzzleResultEntity
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.local.dao.FriendDao
@@ -111,8 +113,10 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         // Card strategy tags cache (offline tag pipeline precomputed tags) — Deck Engine
         // Unification plan D8, Phase 5c (v49)
         CardStrategyTagsCacheEntity::class,
+        // Daily Puzzle feature, Batch B1 foundation (v50)
+        PuzzleResultEntity::class,
     ],
-    version = 49,
+    version = 50,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -163,4 +167,7 @@ abstract class MtgDatabase : RoomDatabase() {
      * strategy tags) — Deck Engine Unification plan D8, Phase 5c (v49).
      */
     abstract fun cardStrategyTagsCacheDao(): CardStrategyTagsCacheDao
+
+    /** Daily-puzzle attempt/result history (Daily Puzzle feature, Batch B1 foundation, v50). */
+    abstract fun puzzleDao(): PuzzleDao
 }

@@ -22,6 +22,8 @@ import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
+import com.mmg.manahub.core.data.local.dao.PuzzleDao
+import com.mmg.manahub.feature.puzzle.di.puzzleKoinModule
 import com.mmg.manahub.core.di.cardStrategyTagsKoinModule
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
@@ -261,6 +263,10 @@ class ManaHubApp : Application(), KoinComponent {
     // SharedDomainUseCaseModule provider (same DAO singleton, see that provider's KDoc for why).
     @Inject lateinit var cardStrategyTagsCacheDao: CardStrategyTagsCacheDao
 
+    // Daily Puzzle feature (Batch B1 foundation). Serves puzzleKoinModule — the Room-owned
+    // PuzzleDao bridge, same pattern as cardStrategyTagsCacheDao above.
+    @Inject lateinit var puzzleDao: PuzzleDao
+
     // CardDetail island (Phase 1) bridge deps. The shared deps are NOT re-declared here:
     //  - AnalyticsHelper is now bridged in coreBridgeKoinModule (promoted from Settings; shared with it).
     //  - CardRepository, DeckRepository, UserPreferencesRepository, UserPreferencesDataStore,
@@ -472,6 +478,9 @@ class ManaHubApp : Application(), KoinComponent {
                 ),
                 cardStrategyTagsKoinModule(
                     cacheDao = cardStrategyTagsCacheDao,
+                ),
+                puzzleKoinModule(
+                    puzzleDao = puzzleDao,
                 ),
                 cardDetailKoinModule(),
                 friendsKoinModule(
