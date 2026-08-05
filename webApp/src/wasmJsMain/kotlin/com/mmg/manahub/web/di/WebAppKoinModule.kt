@@ -50,10 +50,13 @@ import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.CounterProposalUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.CreateTradeProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.DeclineProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetActiveTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeHistoryUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeThreadUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.MarkCompletedUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradeThreadUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradesUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RevokeAcceptanceUseCase
@@ -71,6 +74,8 @@ import com.mmg.manahub.web.profile.ProfileViewModel
 import com.mmg.manahub.web.search.CardSearchViewModel
 import com.mmg.manahub.web.settings.SettingsViewModel
 import com.mmg.manahub.web.theme.ThemeShowcaseViewModel
+import com.mmg.manahub.web.trades.CounterProposalViewModel
+import com.mmg.manahub.web.trades.CreateProposalViewModel
 import com.mmg.manahub.web.trades.TradeThreadViewModel
 import com.mmg.manahub.web.trades.TradesViewModel
 import io.github.jan.supabase.SupabaseClient
@@ -203,8 +208,21 @@ import org.koin.dsl.module
  * [com.mmg.manahub.web.trades.TradesScreen] (list level); [TradeThreadViewModel] backs
  * [com.mmg.manahub.web.trades.TradeThreadScreen] (negotiation detail, takes `rootProposalId` as a
  * Koin runtime parameter -- same `params.get()` shape as [CardDetailViewModel]/[DeckEditorViewModel]
- * above). Creating a brand-new proposal from scratch (friend + item picker) is an explicit, flagged
- * follow-up -- see `TradesScreen`'s KDoc -- so no such ViewModel/screen is registered yet.
+ * above).
+ *
+ * The Trades completion slice (web scope expansion, approved 2026-08-05 -- creating a brand-new
+ * proposal, Counter, and Mark Completed, all deferred from the Trades slice above) adds the
+ * [CreateTradeProposalUseCase]/[CounterProposalUseCase]/[MarkCompletedUseCase] singles (same
+ * shared, already-`commonMain` use-case classes as the rest of the negotiation suite) and two new
+ * ViewModel factories: [CreateProposalViewModel] (no runtime params -- backs
+ * [com.mmg.manahub.web.trades.CreateProposalScreen], reachable from `TradesScreen`'s "New
+ * proposal" button) and [CounterProposalViewModel] (TWO `String` runtime params, `parentProposalId`
+ * then `rootProposalId` -- Koin's `ParametersHolder.get<T>()` is index-cursored, so two sequential
+ * calls of the same type resolve in the SAME order `parametersOf(a, b)` was built with; backs
+ * [com.mmg.manahub.web.trades.CounterProposalScreen], reachable from `TradeThreadScreen`'s Counter
+ * button). [TradeThreadViewModel]'s binding below also gained `markCompleted` for its new Mark
+ * Completed confirm-dialog action. No new repository bindings needed -- both reuse the
+ * [FriendRepository]/[UserCardRepository]/[TradesRepository] singletons already registered above.
  *
  * The Card Detail completion slice (web roadmap W4b follow-up, 2026-08-05) adds the
  * [CardStrategyTagsRepository] binding, backed by the SAME [CardStrategyTagsRepositoryImpl]
@@ -337,6 +355,9 @@ val webAppKoinModule = module {
     single { DeclineProposalUseCase(repo = get()) }
     single { CancelProposalUseCase(repo = get()) }
     single { RevokeAcceptanceUseCase(repo = get()) }
+    single { CreateTradeProposalUseCase(repo = get()) }
+    single { CounterProposalUseCase(repo = get()) }
+    single { MarkCompletedUseCase(repo = get()) }
 
     viewModel { ThemeShowcaseViewModel(keyValueStore = get(), userPreferencesRepository = get()) }
     viewModel {
@@ -410,6 +431,29 @@ val webAppKoinModule = module {
             declineProposal = get(),
             cancelProposal = get(),
             revokeAcceptance = get(),
+            markCompleted = get(),
+            friendshipClient = get(),
+            crashReporter = get(),
+        )
+    }
+    viewModel {
+        CreateProposalViewModel(
+            supabaseClient = get(),
+            friendRepository = get(),
+            userCardRepository = get(),
+            createTradeProposal = get(),
+            crashReporter = get(),
+        )
+    }
+    viewModel { params ->
+        CounterProposalViewModel(
+            parentProposalId = params.get(),
+            rootProposalId = params.get(),
+            supabaseClient = get(),
+            getThread = get(),
+            userCardRepository = get(),
+            friendRepository = get(),
+            counterProposal = get(),
             friendshipClient = get(),
             crashReporter = get(),
         )

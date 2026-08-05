@@ -44,12 +44,14 @@ import org.koin.core.parameter.parametersOf
  * (`COMPLETED`/`CANCELLED`/`DECLINED`/`REVOKED`) and superseded (non-latest) versions render
  * read-only (no action row).
  *
- * **Deliberately deferred (flagged follow-up, not half-built, no dead UI -- see
- * [TradeThreadViewModel]'s KDoc)**: Counter (no button at all, not a no-op one), Mark Completed +
- * automatic collection sync, and the "gift trade" (review-collection-only) warning dialog.
+ * Trades completion slice (2026-08-05): Counter now navigates to [CounterProposalScreen] via
+ * [onCounter], and an ACCEPTED proposal gains a Mark Completed action (behind a confirm dialog,
+ * alongside Revoke acceptance). **Still deliberately deferred**: automatic collection sync on Mark
+ * Completed and the "gift trade" (review-collection-only) warning dialog -- see
+ * [TradeThreadViewModel]'s KDoc.
  */
 @Composable
-fun TradeThreadScreen(rootProposalId: String) {
+fun TradeThreadScreen(rootProposalId: String, onCounter: (parentProposalId: String, rootProposalId: String) -> Unit = { _, _ -> }) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -101,6 +103,8 @@ fun TradeThreadScreen(rootProposalId: String) {
                             onDecline = { viewModel.onDecline(proposal.id) },
                             onCancelRequested = { viewModel.onCancelRequested(proposal.id) },
                             onRevoke = { viewModel.onRevoke(proposal.id) },
+                            onCounter = { onCounter(proposal.id, rootProposalId) },
+                            onMarkCompletedRequested = { viewModel.onMarkCompletedRequested(proposal.id) },
                         )
                     }
                 }
@@ -120,6 +124,19 @@ fun TradeThreadScreen(rootProposalId: String) {
             onDismiss = viewModel::onCancelDismissed,
         )
     }
+
+    if (uiState.pendingMarkCompletedProposalId != null) {
+        MagicAlertDialog(
+            onDismissRequest = viewModel::onMarkCompletedDismissed,
+            title = "Mark this trade completed?",
+            text = "This won't update your collection automatically -- add or remove the traded cards yourself.",
+            confirmLabel = "Mark completed",
+            onConfirm = viewModel::onMarkCompletedConfirmed,
+            confirmColor = MagicCtaColor.Success,
+            dismissLabel = "Not yet",
+            onDismiss = viewModel::onMarkCompletedDismissed,
+        )
+    }
 }
 
 @Composable
@@ -133,6 +150,8 @@ private fun ProposalVersionCard(
     onDecline: () -> Unit,
     onCancelRequested: () -> Unit,
     onRevoke: () -> Unit,
+    onCounter: () -> Unit,
+    onMarkCompletedRequested: () -> Unit,
 ) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
@@ -173,43 +192,70 @@ private fun ProposalVersionCard(
                 val canRespond = !isProposer && proposal.status == TradeStatus.PROPOSED
                 val canCancel = isProposer && (proposal.status == TradeStatus.PROPOSED || proposal.status == TradeStatus.DRAFT)
                 val canRevoke = proposal.status == TradeStatus.ACCEPTED
+                // Mirrors Android's TradeNegotiationDetailScreen.ProposalActions ACCEPTED branch:
+                // hide the button once THIS user already marked it, so a fast double-tap or a
+                // re-render after refresh() can't offer a redundant mark.
+                val alreadyMarkedCompleted = if (isProposer) proposal.proposerMarkedCompletedAt != null else proposal.receiverMarkedCompletedAt != null
+                val canMarkCompleted = proposal.status == TradeStatus.ACCEPTED && !alreadyMarkedCompleted
 
-                if (canRespond || canCancel || canRevoke) {
+                if (canRespond || canCancel || canRevoke || canMarkCompleted) {
                     HorizontalDivider(color = colors.backgroundSecondary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                            if (canRespond) {
+                                MagicCtaButton(
+                                    onClick = onAccept,
+                                    text = "Accept",
+                                    style = MagicCtaStyle.Filled,
+                                    color = MagicCtaColor.Success,
+                                    isLoading = isProcessing,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                MagicCtaButton(
+                                    onClick = onDecline,
+                                    text = "Decline",
+                                    style = MagicCtaStyle.Outlined,
+                                    color = MagicCtaColor.Error,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (canCancel) {
+                                MagicCtaButton(
+                                    onClick = onCancelRequested,
+                                    text = "Cancel proposal",
+                                    style = MagicCtaStyle.Outlined,
+                                    color = MagicCtaColor.Error,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (canRevoke) {
+                                MagicCtaButton(
+                                    onClick = onRevoke,
+                                    text = "Revoke acceptance",
+                                    style = MagicCtaStyle.Outlined,
+                                    color = MagicCtaColor.Neutral,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (canMarkCompleted) {
+                                MagicCtaButton(
+                                    onClick = onMarkCompletedRequested,
+                                    text = "Mark completed",
+                                    style = MagicCtaStyle.Filled,
+                                    color = MagicCtaColor.Primary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                        // Full-width, below Accept/Decline -- same layout Android's ProposalActions
+                        // uses for the PROPOSED/receiver branch.
                         if (canRespond) {
                             MagicCtaButton(
-                                onClick = onAccept,
-                                text = "Accept",
-                                style = MagicCtaStyle.Filled,
-                                color = MagicCtaColor.Success,
-                                isLoading = isProcessing,
-                                modifier = Modifier.weight(1f),
-                            )
-                            MagicCtaButton(
-                                onClick = onDecline,
-                                text = "Decline",
-                                style = MagicCtaStyle.Outlined,
-                                color = MagicCtaColor.Error,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (canCancel) {
-                            MagicCtaButton(
-                                onClick = onCancelRequested,
-                                text = "Cancel proposal",
-                                style = MagicCtaStyle.Outlined,
-                                color = MagicCtaColor.Error,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (canRevoke) {
-                            MagicCtaButton(
-                                onClick = onRevoke,
-                                text = "Revoke acceptance",
+                                onClick = onCounter,
+                                text = "Counter",
                                 style = MagicCtaStyle.Outlined,
                                 color = MagicCtaColor.Neutral,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }

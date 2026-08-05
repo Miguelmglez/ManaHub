@@ -34,6 +34,8 @@ import com.mmg.manahub.web.profile.ProfileScreen
 import com.mmg.manahub.web.search.CardSearchScreen
 import com.mmg.manahub.web.settings.SettingsScreen
 import com.mmg.manahub.web.theme.ThemeShowcaseScreen
+import com.mmg.manahub.web.trades.CounterProposalScreen
+import com.mmg.manahub.web.trades.CreateProposalScreen
 import com.mmg.manahub.web.trades.TradeThreadScreen
 import com.mmg.manahub.web.trades.TradesScreen
 import kotlinx.browser.window
@@ -173,6 +175,26 @@ private data class TradeThreadRoute(val rootProposalId: String)
 private data class FriendDetailRoute(val friendUserId: String)
 
 /**
+ * Trades completion slice (web scope expansion, approved 2026-08-05) -- creating a brand-new
+ * proposal. A zero-arg route like [SettingsRoute]/[ProfileRoute] (no argument to encode), but
+ * reached from [TradesScreen]'s "New proposal" button (a destination, not a top-level nav item --
+ * no [AdaptiveNavItem] entry below). Encodes as the bare serial name `#newproposal`.
+ */
+@Serializable
+@SerialName("newproposal")
+private object NewProposalRoute
+
+/**
+ * Trades completion slice (web scope expansion, approved 2026-08-05) -- the FIFTH parameterized
+ * route, and the first with TWO arguments (same required-args-as-path-segments encoding as
+ * [CardDetailRoute] et al., just with two segments: `#counter/<parentProposalId>/<rootProposalId>`).
+ * Reached from [TradeThreadScreen]'s Counter button, never a top-level nav item.
+ */
+@Serializable
+@SerialName("counter")
+private data class CounterProposalRoute(val parentProposalId: String, val rootProposalId: String)
+
+/**
  * The routes above, keyed by their [kotlinx.serialization] serial name (the exact string
  * [androidx.navigation.bindToBrowserNavigation]'s DEFAULT `getBackStackEntryRoute` writes into the
  * URL fragment for a no-argument object route — confirmed live: the fragment reads e.g.
@@ -192,6 +214,7 @@ private val ROUTES_BY_SERIAL_NAME: Map<String, Any> = mapOf(
     "profile" to ProfileRoute,
     "friends" to FriendsRoute,
     "trades" to TradesRoute,
+    "newproposal" to NewProposalRoute,
 )
 
 /**
@@ -254,12 +277,22 @@ private suspend fun NavHostController.bindWebBrowserNavigation() {
     val friendDetailId = initialFragment.takeIf { it.startsWith("frienddetail/") }
         ?.removePrefix("frienddetail/")
         ?.takeIf { it.isNotBlank() }
+    // Trades completion slice -- the first TWO-argument deep link (see CounterProposalRoute's
+    // KDoc): both path segments must be present and non-blank, else fall through to the
+    // zero-arg lookup table (which will simply miss and no-op, same as any other malformed URL).
+    val counterProposalIds = initialFragment.takeIf { it.startsWith("counter/") }
+        ?.removePrefix("counter/")
+        ?.split("/")
+        ?.takeIf { it.size == 2 && it.all { segment -> segment.isNotBlank() } }
     val initialRoute = ROUTES_BY_SERIAL_NAME[initialFragment]
     when {
         cardDetailId != null -> navigate(CardDetailRoute(scryfallId = cardDetailId)) { launchSingleTop = true }
         deckEditorId != null -> navigate(DeckEditorRoute(deckId = deckEditorId)) { launchSingleTop = true }
         tradeThreadId != null -> navigate(TradeThreadRoute(rootProposalId = tradeThreadId)) { launchSingleTop = true }
         friendDetailId != null -> navigate(FriendDetailRoute(friendUserId = friendDetailId)) { launchSingleTop = true }
+        counterProposalIds != null -> navigate(
+            CounterProposalRoute(parentProposalId = counterProposalIds[0], rootProposalId = counterProposalIds[1]),
+        ) { launchSingleTop = true }
         initialRoute != null && initialRoute != HomeRoute -> navigate(initialRoute) { launchSingleTop = true }
     }
     bindToBrowserNavigation()
@@ -420,11 +453,46 @@ fun WebNavGraph(
                 )
             }
             composable<TradesRoute> {
-                TradesScreen(onProposalClick = { rootProposalId -> navController.navigate(TradeThreadRoute(rootProposalId)) })
+                TradesScreen(
+                    onProposalClick = { rootProposalId -> navController.navigate(TradeThreadRoute(rootProposalId)) },
+                    onNewProposal = { navController.navigate(NewProposalRoute) },
+                )
+            }
+            composable<NewProposalRoute> {
+                CreateProposalScreen(
+                    onBack = { navController.navigateUp() },
+                    onProposalCreated = { proposalId ->
+                        navController.navigate(TradeThreadRoute(proposalId)) {
+                            popUpTo(TradesRoute)
+                        }
+                    },
+                )
             }
             composable<TradeThreadRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<TradeThreadRoute>()
-                TradeThreadScreen(rootProposalId = route.rootProposalId)
+                TradeThreadScreen(
+                    rootProposalId = route.rootProposalId,
+                    onCounter = { parentProposalId, rootProposalId ->
+                        navController.navigate(CounterProposalRoute(parentProposalId, rootProposalId))
+                    },
+                )
+            }
+            composable<CounterProposalRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<CounterProposalRoute>()
+                CounterProposalScreen(
+                    parentProposalId = route.parentProposalId,
+                    rootProposalId = route.rootProposalId,
+                    onBack = { navController.navigateUp() },
+                    onCountered = { proposalId, rootProposalId ->
+                        // No popUpTo here (unlike NewProposalRoute's success nav above, which pops
+                        // a ZERO-ARG route -- the same shape ProfileScreen's onSignedOut already
+                        // proves works). A parameterized-route popUpTo instance match isn't an
+                        // established, verified pattern in this codebase yet; leaving one extra
+                        // back-stack entry (the Counter screen) is a minor UX nit, not a
+                        // correctness bug -- System Back from the fresh thread just revisits it.
+                        navController.navigate(TradeThreadRoute(rootProposalId)) { launchSingleTop = true }
+                    },
+                )
             }
             composable<CardDetailRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<CardDetailRoute>()

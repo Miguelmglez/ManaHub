@@ -9,6 +9,7 @@ import com.mmg.manahub.feature.trades.domain.usecase.AcceptProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.CancelProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.DeclineProposalUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.GetTradeThreadUseCase
+import com.mmg.manahub.feature.trades.domain.usecase.MarkCompletedUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RefreshTradeThreadUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.RevokeAcceptanceUseCase
 import com.mmg.manahub.web.common.toUserFacingMessage
@@ -32,22 +33,29 @@ data class NegotiationUiState(
     val error: String? = null,
     /** Proposal id awaiting a Cancel confirmation (mirrors Android's confirm-before-cancel dialog). */
     val pendingCancelProposalId: String? = null,
+    /**
+     * Proposal id awaiting a Mark Completed confirmation (Trades completion slice, 2026-08-05).
+     * Mirrors Android's confirm-before-cancel dialog shape, but simplified: web has no
+     * `TradeCollectionSyncDao` equivalent, so there is no "update my collection too" branch here
+     * -- confirming only calls [MarkCompletedUseCase], the same as Android's "Just complete" path.
+     */
+    val pendingMarkCompletedProposalId: String? = null,
 )
 
 /**
  * Backs [TradeThreadScreen] -- the negotiation detail view for one root proposal chain: every
- * version in the thread, and Accept / Decline / Cancel / Revoke acceptance actions. A
- * deliberately-scoped-down web port of Android's `TradeNegotiationViewModel`.
+ * version in the thread, and Accept / Decline / Cancel / Revoke acceptance / Counter / Mark
+ * Completed actions. A deliberately-scoped-down web port of Android's `TradeNegotiationViewModel`.
  *
- * **Deferred, per this project's no-stub rule (Home widget board precedent -- CLAUDE.md: "a
- * widget/slide may only ship if its data path is real end-to-end ... anything that can't be wired
- * must be deleted, never left as a placeholder"): Counter has NO UI here at all**, not a disabled/
- * no-op button -- there is no counter-offer item-picker screen yet (would need the same friend +
- * collection item-picker machinery as creating a brand-new proposal, itself an explicit follow-up),
- * so rendering a "Counter" affordance with nowhere to navigate would be a dead control. Also
- * deferred: Mark Completed + automatic collection sync (`UpdateTradeCollectionUseCase`, needs a
- * Room-specific `TradeCollectionSyncDao` sync-tracking table with no web equivalent yet) and the
- * "gift trade" warning dialog.
+ * **Trades completion slice (2026-08-05): Counter now navigates to [CounterProposalScreen]**
+ * (pure nav action from [TradeThreadScreen] -- this VM doesn't need to know about it, since the
+ * screen already has `proposal.id`/the root id in scope) and **Mark Completed calls
+ * [MarkCompletedUseCase]** behind a confirm dialog (mirrors the existing Cancel confirmation
+ * shape). Still deferred: automatic collection sync on Mark Completed
+ * (`UpdateTradeCollectionUseCase`, needs a Room-specific `TradeCollectionSyncDao` sync-tracking
+ * table with no web equivalent yet -- confirming here only calls [MarkCompletedUseCase], Android's
+ * "Just complete" path, never "update and complete") and the "gift trade" (review-collection-only)
+ * warning dialog.
  */
 class TradeThreadViewModel(
     private val rootProposalId: String,
@@ -58,6 +66,7 @@ class TradeThreadViewModel(
     private val declineProposal: DeclineProposalUseCase,
     private val cancelProposal: CancelProposalUseCase,
     private val revokeAcceptance: RevokeAcceptanceUseCase,
+    private val markCompleted: MarkCompletedUseCase,
     private val friendshipClient: FriendshipClient,
     private val crashReporter: CrashReporter,
 ) : ViewModel() {
@@ -152,6 +161,24 @@ class TradeThreadViewModel(
             cancelProposal(proposalId)
                 .onSuccess { refresh() }
                 .onFailure { e -> _uiState.update { it.copy(error = e.toUserFacingMessage("cancel this proposal", crashReporter)) } }
+        }
+    }
+
+    fun onMarkCompletedRequested(proposalId: String) {
+        _uiState.update { it.copy(pendingMarkCompletedProposalId = proposalId) }
+    }
+
+    fun onMarkCompletedDismissed() {
+        _uiState.update { it.copy(pendingMarkCompletedProposalId = null) }
+    }
+
+    fun onMarkCompletedConfirmed() {
+        val proposalId = _uiState.value.pendingMarkCompletedProposalId ?: return
+        _uiState.update { it.copy(pendingMarkCompletedProposalId = null) }
+        runGuarded {
+            markCompleted(proposalId)
+                .onSuccess { refresh() }
+                .onFailure { e -> _uiState.update { it.copy(error = e.toUserFacingMessage("mark this trade completed", crashReporter)) } }
         }
     }
 
