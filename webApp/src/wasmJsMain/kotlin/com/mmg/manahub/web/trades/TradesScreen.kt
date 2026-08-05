@@ -328,12 +328,16 @@ private fun WishlistList(entries: List<WishlistEntry>, onRemove: (String) -> Uni
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         items(entries, key = { it.id }) { entry ->
+            // MagicCtaButton's internal fillMaxWidth() hogs the row when placed unweighted next to
+            // a weight(1f) sibling (same bug documented on PickerRow above -- caught live during
+            // Trades completion verification on THIS exact row: the name/detail text collapsed to
+            // nothing). Both children need an explicit weight.
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(2f)) {
                     Text(
                         text = entry.card?.name ?: entry.cardId,
                         style = typography.titleMedium,
@@ -349,9 +353,17 @@ private fun WishlistList(entries: List<WishlistEntry>, onRemove: (String) -> Uni
                         },
                         style = typography.bodySmall,
                         color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                MagicCtaButton(onClick = { onRemove(entry.id) }, text = "Remove", style = MagicCtaStyle.Outlined, color = MagicCtaColor.Error)
+                MagicCtaButton(
+                    onClick = { onRemove(entry.id) },
+                    text = "Remove",
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Error,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -376,12 +388,13 @@ private fun OpenForTradeList(entries: List<OpenForTradeEntry>, onRemove: (OpenFo
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         items(entries, key = { it.id }) { entry ->
+            // Same MagicCtaButton unweighted-sibling fix as WishlistList above.
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(2f)) {
                     Text(
                         text = entry.card?.name ?: entry.scryfallId,
                         style = typography.titleMedium,
@@ -393,9 +406,17 @@ private fun OpenForTradeList(entries: List<OpenForTradeEntry>, onRemove: (OpenFo
                         text = "×${entry.quantity}${if (entry.isFoil) " · Foil" else ""}",
                         style = typography.bodySmall,
                         color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                MagicCtaButton(onClick = { onRemove(entry) }, text = "Remove", style = MagicCtaStyle.Outlined, color = MagicCtaColor.Error)
+                MagicCtaButton(
+                    onClick = { onRemove(entry) },
+                    text = "Remove",
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Error,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
