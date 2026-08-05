@@ -302,6 +302,12 @@ scripts/draftsim_py/**/__pycache__/
 # (~180MB) + cached EDHREC theme pages must never be committed — same rationale as draftsim_py above.
 tools/tag-pipeline/.cache/
 
+# Puzzle generator (tools/puzzle-generator, Daily Puzzle feature): downloaded Scryfall bulk data +
+# generated puzzle batches are uploaded to the private R2 prefix out-of-band and must not be
+# committed (a committed batch would leak future-dated answers via git history).
+tools/puzzle-generator/.cache/
+tools/puzzle-generator/output/
+
 
 # =============================================================================
 # SECTION 9 — MISCELLANEOUS GENERATED FILES
@@ -409,4 +415,3 @@ graphify-out/
 
 # User-collection test fixtures for the wizard quality harness (real user data - never commit)
 /testdata/
-/docs/adr/*
