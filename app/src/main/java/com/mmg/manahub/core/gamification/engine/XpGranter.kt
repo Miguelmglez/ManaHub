@@ -173,6 +173,12 @@ class XpGranter(
         // FeatureExplored grants no XP — it only advances exploration quests (no ledger row). Mapping
         // to null keeps the ledger clean and the `when` exhaustive (mirrors DeckSaved).
         is ProgressionEvent.FeatureExplored -> null
+
+        // Daily Puzzle feature (Batch B1 foundation): compile-exhaustiveness stub only, mirrors
+        // DeckSaved/FeatureExplored above. The real grant (XpConfig.puzzleSolved +
+        // XpConfig.puzzlePerfectBonus, XpSourceCategory.PUZZLE) is wired in the follow-up engine
+        // batch (B3) — do not add real grant logic here as part of B1.
+        is ProgressionEvent.PuzzleSolved -> null
     }
 
     private fun singleLine(
