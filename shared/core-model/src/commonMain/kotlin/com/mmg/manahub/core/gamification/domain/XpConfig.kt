@@ -58,6 +58,18 @@ object XpConfig {
     /** XP for completing a trade. */
     const val tradeCompleted: Int = 50
 
+    // ── Puzzle (Daily Puzzle feature) ───────────────────────────────────────────
+    /** XP for solving the daily puzzle. */
+    const val puzzleSolved: Int = 30
+
+    /**
+     * Additional XP when the puzzle was solved "perfectly" (see
+     * [com.mmg.manahub.core.gamification.domain.event.ProgressionEvent.PuzzleSolved.perfect]).
+     * Unreachable this pass — no shipped puzzle type sets `perfect = true` yet — wired for
+     * forward-compat with later puzzle types.
+     */
+    const val puzzlePerfectBonus: Int = 40
+
     // ── Social ───────────────────────────────────────────────────────────────────
     /** XP for adding a friend. */
     const val friendAdded: Int = 30
