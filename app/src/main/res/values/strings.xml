@@ -19,6 +19,7 @@
     <string name="retry">Retry</string>
     <string name="action_search">Search</string>
     <string name="action_close">Close</string>
+    <string name="action_dismiss">Dismiss</string>
     <string name="action_back">Back</string>
     <string name="action_ok">OK</string>
     <string name="action_info">Info</string>
@@ -2929,6 +2930,7 @@
     <string name="home_widget_desc_trending_commanders">This week\'s most popular commanders</string>
     <string name="home_widget_desc_friends">Your friends and pending requests</string>
     <string name="home_widget_desc_community_decks">Browse popular community decks</string>
+    <string name="home_widget_desc_daily_puzzle">Guess today\'s card from clues</string>
 
     <!-- Home feature overhaul — Quick Start labels (widget tiles) -->
     <string name="quick_start_scan_card">Scan Card</string>
@@ -3010,6 +3012,8 @@
     <!-- Home widget board overhaul, TASK 5a/5b: SOCIAL_HUB was split into FRIENDS + COMMUNITY_DECKS. -->
     <string name="widget_title_friends">Friends</string>
     <string name="widget_title_community_decks">Community Decks</string>
+    <!-- Daily Puzzle (ADR-006), Batch B2 — Home widget, gallery-only/opt-in. -->
+    <string name="widget_title_daily_puzzle">Daily Puzzle</string>
     <string name="home_edit_widgets">Edit Widgets</string>
     <string name="widget_title_wishlist">Wishlist</string>
     <string name="widget_title_discover">Discover cards</string>
@@ -3435,5 +3439,36 @@
     <string name="collection_grouping_tag">Tag</string>
     <!-- "12 unique · 34 copies" -->
     <string name="collection_group_count">%1$d unique · %2$d copies</string>
+
+    <!-- ══════════════════════════════════════════
+         DAILY PUZZLE (ADR-006) — screen + Home widget, Batch B2
+    ═══════════════════════════════════════════ -->
+    <string name="daily_puzzle_title">Daily Puzzle</string>
+    <string name="daily_puzzle_offline_message">Could not load today\'s puzzle. Check your connection and try again.</string>
+    <string name="daily_puzzle_type_unsupported">This puzzle type isn\'t available in this version yet. Update the app to play it.</string>
+    <string name="daily_puzzle_resumed_badge">Resuming your attempt from earlier today</string>
+    <string name="daily_puzzle_attempts_label">Attempt %1$d</string>
+    <string name="daily_puzzle_guess_hint">Guess the card…</string>
+    <string name="daily_puzzle_guess_submit">Guess</string>
+    <string name="daily_puzzle_guess_history_title">Guesses</string>
+    <string name="daily_puzzle_solved_title">Solved!</string>
+    <string name="daily_puzzle_not_solved_title">Out of guesses</string>
+    <string name="daily_puzzle_attempts_summary">%1$d attempts</string>
+    <!-- Short per-attribute chip labels for the guess-feedback row. -->
+    <string name="daily_puzzle_attr_cmc">MV</string>
+    <string name="daily_puzzle_attr_color">Color</string>
+    <string name="daily_puzzle_attr_rarity">Rarity</string>
+    <string name="daily_puzzle_attr_type">Type</string>
+    <string name="daily_puzzle_attr_set">Set</string>
+    <string name="daily_puzzle_attr_year">Year</string>
+    <string name="daily_puzzle_attr_power">Power</string>
+    <string name="daily_puzzle_attr_toughness">Toughness</string>
+
+    <!-- Home DAILY_PUZZLE widget preview (HomeViewModel.dailyPuzzleFlow). -->
+    <string name="home_daily_puzzle_solved">Solved in %1$d guesses!</string>
+    <string name="home_daily_puzzle_in_progress">%1$d guesses so far</string>
+    <string name="home_daily_puzzle_not_started">Today\'s puzzle is ready</string>
+    <string name="home_daily_puzzle_unavailable">Today\'s puzzle isn\'t available right now</string>
+    <string name="home_daily_puzzle_cta">Play</string>
 
 </resources>
