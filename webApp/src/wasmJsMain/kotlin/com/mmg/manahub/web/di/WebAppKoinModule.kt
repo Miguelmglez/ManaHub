@@ -223,6 +223,9 @@ import org.koin.dsl.module
  * button). [TradeThreadViewModel]'s binding below also gained `markCompleted` for its new Mark
  * Completed confirm-dialog action. No new repository bindings needed -- both reuse the
  * [FriendRepository]/[UserCardRepository]/[TradesRepository] singletons already registered above.
+ * The same slice also widened [TradesViewModel]'s binding with [CardRepository]/[UserCardRepository]
+ * params (Scryfall search for Wishlist add + the caller's own collection as the Open-for-Trade
+ * item source) -- again both already-registered singletons, no new bindings.
  *
  * The Card Detail completion slice (web roadmap W4b follow-up, 2026-08-05) adds the
  * [CardStrategyTagsRepository] binding, backed by the SAME [CardStrategyTagsRepositoryImpl]
@@ -417,6 +420,8 @@ val webAppKoinModule = module {
             tradesRepository = get(),
             wishlistRepository = get(),
             openForTradeRepository = get(),
+            cardRepository = get(),
+            userCardRepository = get(),
             friendshipClient = get(),
             crashReporter = get(),
         )

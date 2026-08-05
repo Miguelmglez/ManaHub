@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.OpenForTradeEntry
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
@@ -38,24 +39,21 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Trades hub -- the web scope expansion's Trades slice (approved 2026-08-04, Friends + Trades
- * wave). Four tabs: Active / History (proposal negotiation lists) plus minimal read-only Wishlist /
- * Open-for-Trade lists. Tapping an Active/History row navigates into [TradeThreadScreen] via
- * [onProposalClick] (the rootProposalId). **Creating a brand-new proposal from scratch (picking a
- * friend + their open-for-trade items) -- and Countering an existing one, which needs the same
- * item-picker -- are both explicit, flagged FOLLOW-UPs** -- this slice ships the
- * respond-to-an-existing-proposal flow (accept/decline/cancel/revoke, in [TradeThreadScreen])
- * solidly first, per the same "ship what's solid, defer what's half-built"
- * discipline every prior web slice has followed. Wishlist/Open-for-Trade are read-only lists here
- * (no add/edit UI yet -- that hangs off a Card Detail "add to wishlist" affordance that doesn't
- * exist on web yet either).
+ * wave). Four tabs: Active / History (proposal negotiation lists) and Wishlist / Open-for-Trade.
+ * Tapping an Active/History row navigates into [TradeThreadScreen] via [onProposalClick] (the
+ * rootProposalId).
  *
  * Reachable via its OWN bottom-nav-rail tab (see `WebNavGraph.kt`'s `TradesRoute`) rather than
  * hanging off the Account surface like Settings/Profile/Friends -- Trades is a primary feature, not
  * an account-adjacent one, per the task brief's explicit call.
  *
- * Trades completion slice (2026-08-05): the Active tab gained a "New proposal" button
- * ([onNewProposal]) navigating to [CreateProposalScreen] -- the single heaviest piece deferred
- * from the original Trades slice, see that screen's KDoc.
+ * Trades completion slice (2026-08-05): every tab now has a real add-affordance sharing ONE
+ * top-of-screen button whose label/action swaps per [TradesTab] -- "New proposal" (Active/History,
+ * navigates to [CreateProposalScreen] via [onNewProposal]), "Add to wishlist" (a Scryfall search
+ * dialog, any card), and "Add card" (Open-for-Trade -- a picker over the caller's OWN collection
+ * via [com.mmg.manahub.core.domain.repository.UserCardRepository.observeCollection], since you can
+ * only offer what you own -- reuses [CollectionPickerDialog]/[MyCollectionRow] from
+ * [CreateProposalScreen]). Both lists also gained a Remove button per row.
  */
 @Composable
 fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = {}) {
@@ -112,15 +110,18 @@ fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = 
             )
         }
 
-        if (uiState.selectedTab == TradesTab.ACTIVE || uiState.selectedTab == TradesTab.HISTORY) {
-            MagicCtaButton(
-                onClick = onNewProposal,
-                text = "New proposal",
-                style = MagicCtaStyle.Filled,
-                color = MagicCtaColor.Primary,
-                modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
-            )
+        val (topButtonLabel, topButtonAction) = when (uiState.selectedTab) {
+            TradesTab.ACTIVE, TradesTab.HISTORY -> "New proposal" to onNewProposal
+            TradesTab.WISHLIST -> "Add to wishlist" to viewModel::openWishlistSheet
+            TradesTab.OPEN_FOR_TRADE -> "Add card" to viewModel::openOpenForTradeSheet
         }
+        MagicCtaButton(
+            onClick = topButtonAction,
+            text = topButtonLabel,
+            style = MagicCtaStyle.Filled,
+            color = MagicCtaColor.Primary,
+            modifier = Modifier.fillMaxWidth().padding(top = spacing.md),
+        )
 
         Box(modifier = Modifier.fillMaxSize().padding(top = spacing.md)) {
             when {
@@ -143,10 +144,42 @@ fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = 
                     emptySubtitle = "Completed, declined, or cancelled trades will show up here.",
                     onProposalClick = onProposalClick,
                 )
-                uiState.selectedTab == TradesTab.WISHLIST -> WishlistList(uiState.wishlist)
-                else -> OpenForTradeList(uiState.openForTrade)
+                uiState.selectedTab == TradesTab.WISHLIST -> WishlistList(
+                    entries = uiState.wishlist,
+                    onRemove = viewModel::removeWishlistEntry,
+                )
+                else -> OpenForTradeList(
+                    entries = uiState.openForTrade,
+                    onRemove = viewModel::removeOpenForTradeEntry,
+                )
             }
         }
+    }
+
+    if (uiState.isWishlistSheetOpen) {
+        CollectionPickerDialog(
+            title = "Add to wishlist",
+            query = uiState.wishlistSearchQuery,
+            onQueryChange = viewModel::onWishlistSearchQueryChanged,
+            isLoading = uiState.isSearchingWishlist,
+            cards = uiState.wishlistSearchResults,
+            rowContent = { card -> ScryfallSearchRow(card = card, onAdd = { viewModel.addToWishlist(card) }) },
+            key = { it.scryfallId },
+            onDismiss = viewModel::closeWishlistSheet,
+        )
+    }
+
+    if (uiState.isOpenForTradeSheetOpen) {
+        CollectionPickerDialog(
+            title = "Mark a card open for trade",
+            query = uiState.openForTradeQuery,
+            onQueryChange = viewModel::onOpenForTradeQueryChanged,
+            isLoading = false,
+            cards = uiState.myCollection.filter { uiState.openForTradeQuery.isBlank() || it.card.name.contains(uiState.openForTradeQuery, ignoreCase = true) },
+            rowContent = { userCard -> MyCollectionRow(userCard = userCard, onAdd = { viewModel.addToOpenForTrade(userCard) }) },
+            key = { it.userCard.id },
+            onDismiss = viewModel::closeOpenForTradeSheet,
+        )
     }
 }
 
@@ -260,7 +293,7 @@ internal fun StatusBadge(status: TradeStatus) {
 }
 
 @Composable
-private fun WishlistList(entries: List<WishlistEntry>) {
+private fun WishlistList(entries: List<WishlistEntry>, onRemove: (String) -> Unit) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -278,30 +311,37 @@ private fun WishlistList(entries: List<WishlistEntry>) {
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         items(entries, key = { it.id }) { entry ->
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs)) {
-                Text(
-                    text = entry.card?.name ?: entry.cardId,
-                    style = typography.titleMedium,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = buildString {
-                        append("×${entry.quantity}")
-                        if (entry.isFoil) append(" · Foil")
-                        if (entry.matchAnyVariant) append(" · Any printing")
-                    },
-                    style = typography.bodySmall,
-                    color = colors.textSecondary,
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = entry.card?.name ?: entry.cardId,
+                        style = typography.titleMedium,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = buildString {
+                            append("×${entry.quantity}")
+                            if (entry.isFoil) append(" · Foil")
+                            if (entry.matchAnyVariant) append(" · Any printing")
+                        },
+                        style = typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                }
+                MagicCtaButton(onClick = { onRemove(entry.id) }, text = "Remove", style = MagicCtaStyle.Outlined, color = MagicCtaColor.Error)
             }
         }
     }
 }
 
 @Composable
-private fun OpenForTradeList(entries: List<OpenForTradeEntry>) {
+private fun OpenForTradeList(entries: List<OpenForTradeEntry>, onRemove: (OpenForTradeEntry) -> Unit) {
     val spacing = MaterialTheme.spacing
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
@@ -319,20 +359,37 @@ private fun OpenForTradeList(entries: List<OpenForTradeEntry>) {
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         items(entries, key = { it.id }) { entry ->
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs)) {
-                Text(
-                    text = entry.card?.name ?: entry.scryfallId,
-                    style = typography.titleMedium,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "×${entry.quantity}${if (entry.isFoil) " · Foil" else ""}",
-                    style = typography.bodySmall,
-                    color = colors.textSecondary,
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = entry.card?.name ?: entry.scryfallId,
+                        style = typography.titleMedium,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "×${entry.quantity}${if (entry.isFoil) " · Foil" else ""}",
+                        style = typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                }
+                MagicCtaButton(onClick = { onRemove(entry) }, text = "Remove", style = MagicCtaStyle.Outlined, color = MagicCtaColor.Error)
             }
         }
     }
+}
+
+@Composable
+private fun ScryfallSearchRow(card: Card, onAdd: () -> Unit) {
+    PickerRow(
+        name = card.name,
+        imageUrl = card.imageArtCrop ?: card.imageNormal,
+        detail = card.setName,
+        onAdd = onAdd,
+    )
 }
