@@ -38,7 +38,7 @@ without the user.
 
 ## STATUS (2026-08-05)
 
-**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE, Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI). Email/password auth (sign-in, sign-up, password reset) DONE — real (non-guest, non-Google) accounts are now genuinely reachable via the web UI itself, not just SQL-seeded test fixtures. Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
+**Android-on-KMP: COMPLETE with a short debt tail. Web: W0 + W1 + W2a + W2b + W3a + W3b + W3c + W3d + W4a + W4b + W4c + W4d + W5b DONE — MVP screen list complete + responsive regression sweep clean. Web scope expansion round 1 (approved 2026-08-04): Settings + Profile + Add Card ALL DONE. Web scope expansion round 2 (approved 2026-08-04, second wave): Friends DONE, Trades DONE (with explicit, flagged follow-ups — proposal creation/counter item-picker, Mark Completed + collection sync, gift-trade dialog, Trade Suggestions UI). Email/password auth (sign-in, sign-up, password reset) DONE — real (non-guest, non-Google) accounts are now genuinely reachable via the web UI itself, not just SQL-seeded test fixtures. Card Detail completion (print/language switching, art variants, read-only tag display) DONE — tag EDITING explicitly deferred; confirmed there is NO rulings gap (Android has no rulings feature at all). Game/online sessions remain explicitly out of scope (`feature/online` hard-excluded from the whole KMP migration).**
 
 - ✅ **Web email/password auth (sign-in, sign-up, password reset) — DONE** (2026-08-05, branch
   `kmp-migration-web`, commit `7c7317db`). `:webApp` previously supported ONLY anonymous guest
@@ -177,6 +177,64 @@ without the user.
      temporary stub); change is 100% confined to `webApp` wasmJsMain source files, so `:app` is
      structurally unaffected (not re-run this slice — no androidMain file touched).
   Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (this session's findings to be recorded
+  there).
+
+- ✅ **Web Card Detail completion — DONE** (2026-08-05, branch `kmp-migration-web`, commit
+  `8f08c44a`). Completes the W4b Card Detail screen (built deliberately minimal/read-only) with
+  print/language switching, art variants, and read-only tag display — task explicitly confirmed
+  Android has NO rulings feature at all before dispatching, so no rulings gap exists to fill.
+  1. **Zero new repository work for prints/languages/variants** — `CardRepository.getCardPrints`/
+     `getLanguagePrints`/`getCardArtVariants` were ALL among the 13 real `WebCardRepository` methods
+     since W3b. A single new generic `CardVersionPickerDialog` (`MagicAlertDialog` + `LazyColumn`,
+     not `ModalBottomSheet` — no web screen had used that yet, so the already-mandatory dialog
+     component was reused instead of introducing an unverified one) backs BOTH a prints/languages
+     picker (merges `getCardPrints(name)` + `getLanguagePrints(setCode, collectorNumber)`, deduped
+     by `scryfallId`) and an art variants picker (`getCardArtVariants(name)`) — one "pick a Card,
+     navigate to its detail" component, not three bespoke ones. Selecting a row re-navigates to
+     `CardDetailRoute` with the new `scryfallId` (a normal push, not a replace — a fresh
+     `CardDetailViewModel` resolves everything for the new printing, tags included).
+  2. **Tag DISPLAY required real wiring, not just a UI pass** — verified BEFORE assuming:
+     `WebCardRepository.getCardById` does NOT populate `Card.tags`/`userTags` (Scryfall has no tag
+     concept; that data comes from the separate Supabase `card_strategy_tags` table via the
+     already-commonMain `CardStrategyTagsRepository`/`CardStrategyTagsRepositoryImpl`/
+     `CardStrategyTagsRemoteDataSource` stack, previously unused by `:webApp`). Added ONE new file,
+     `WebCardStrategyTagsCache` (`shared/core-data` wasmJsMain) — a plain session-scoped in-memory
+     `CardStrategyTagsCache` actual (Room has no wasmJs target; mirrors `WebCardRepository`'s own
+     `sessionCardCache` pattern) — and wired the existing `CardStrategyTagsRepositoryImpl` into
+     `WebAppKoinModule` exactly like Android's `CardStrategyTagsKoinModule`, differing only in the
+     cache actual. `CardDetailViewModel` calls `getStrategyTags(oracleId)` directly and renders
+     `Found.tags` via the mandatory `CardTagChip` — deliberately does NOT reuse Android's
+     `RefreshCardStrategyTagsUseCase` (it persists via `CardRepository.unionCardTags`, a Room-only
+     stub on web that would silently no-op) and does NOT run the on-device fallback rule engine on a
+     miss — both out of scope for a read-only display slice. Since `CardStrategyTagsRepositoryImpl`
+     already resolves raw pipeline tag keys to `CardTag` objects internally (dictionary-miss
+     TYPE-category fallback included), no `TagDictionary` handling was needed at the web call site.
+  3. **Tag EDITING is explicitly deferred, not half-wired** — `WebCardRepository`'s
+     `updateCardTags`/`unionCardTags`/`updateUserTags`/`updateSuggestedTags`/`confirmSuggestedTag`/
+     `dismissSuggestedTag` remain untouched, still throwing their documented
+     `UnsupportedOperationException`. This is a genuinely separate, deeper feature (an override
+     repository + rule-syntax editor + the `custom_` key-prefix CRUD system per CLAUDE.md's tagging
+     engine section) — a real follow-up if/when the user asks for it, not started here.
+  4. **Verified live in Chromium (Playwright)**: searched "Sol Ring" → opened detail → confirmed 3
+     real tag chips render with correct per-category coloring (Artifact/TYPE, Mana rock/ROLE, Ramp/
+     ARCHETYPE) resolved from a real `GET .../card_strategy_tags?oracle_id=eq....` 200 response →
+     opened the prints/languages picker (real `unique:prints` + `lang:any` Scryfall queries, 6+ real
+     rows with thumbnails/set names/collector numbers/language flags, current printing checkmarked)
+     → selected a different printing → URL changed to the new `scryfallId`, new art/price rendered,
+     tags correctly re-resolved via the SAME `oracle_id` → opened the art variants picker (real
+     `(game:paper)` query, distinct Secret Lair/other-set illustrations rendered) → confirmed zero
+     horizontal overflow at 375px/768px/1280px including with a picker dialog open at 375px (dialog
+     stays legible, text ellipsizes, no clipping) → confirmed COMPACT (stacked) vs. MEDIUM (rail +
+     side-by-side) responsive split unaffected by the new header icon buttons. `:app:assembleDebug`
+     green (UP-TO-DATE); diff confirmed to touch only `webApp` wasmJsMain (4 files) + one new
+     `shared/core-data` wasmJsMain file — zero commonMain/Android leakage.
+  5. **Repeated the now-established scratch-shim workaround** for the concurrent Daily Puzzle
+     `sha256Hex` wasmJs-actual gap (see the auth bullet's finding 6) — created a temporary, never-
+     committed `actual fun sha256Hex` stub to unblock `:webApp`/`:shared:core-data` wasmJs
+     compilation and the `wasmJsBrowserDistribution` build, deleted it again immediately after each
+     verification pass. Confirmed via `git status` before and after that no trace of it was staged
+     or left behind.
+  Full detail: `.claude/agent-memory/kmp-web-fullstack-dev/` (this session's findings recorded
   there).
 
 - ✅ **Web scope expansion round 2, Friends — DONE** (2026-08-05, branch `kmp-migration-web`,
@@ -1180,6 +1238,13 @@ without the user.
      A real account can be created and signed into through the web UI itself; SQL-seeding remains
      useful for BYPASSING email confirmation (`email_confirmed_at`) and for MULTI-ACCOUNT scenarios
      needing two accounts set up in one shot, but is no longer the only path to a non-guest session.
+   - **Card Detail completion (print/language switching, art variants, read-only tag display) is
+     COMPLETE** (2026-08-05, commit `8f08c44a`, see STATUS above). **Tag EDITING remains explicitly
+     deferred** (confirming/dismissing suggested tags, custom user tags, the `custom_` key-prefix
+     CRUD system) — a genuinely separate, deeper feature; `WebCardRepository`'s tag-mutation methods
+     stay as their documented `UnsupportedOperationException` stubs. There is **no rulings gap** to
+     revisit — Android's `CardDetailViewModel` has zero ruling-related code, confirmed before this
+     slice was dispatched.
    - **Deck Studio / Home richer-porting remain optional, additive future passes**, not required to
      call the MVP "done" — the repository layer needs zero further work for either
      (`WebDeckRepository`/`WebCardRepository`/`DeckRepository`/`UserCardRepository` already cover
