@@ -46,4 +46,39 @@ class PuzzleNameNormalizerTest {
     fun `comma and period punctuation is stripped`() {
         assertEquals("jace the mind sculptor", PuzzleNameNormalizer.normalize("Jace, the Mind Sculptor."))
     }
+
+    // ── Regression fixtures added by the 2026-08-06 edge-case audit ──────────────────────────────
+    // An earlier Kotlin implementation DELETED non-alphanumeric characters instead of replacing them
+    // with a space, and had no æ/œ ligature handling — both would have made any real hyphenated or
+    // ligature-containing card name permanently unguessable if ever selected as an answer. This
+    // fixture list mirrors `tools/puzzle-generator/stages/normalize.test.mjs` on the JS side (both
+    // sides MUST be exercised against the SAME cases — see that file's own KDoc/comment header).
+
+    @Test
+    fun `hyphenated name splits into separate words instead of collapsing`() {
+        assertEquals(
+            "ranger captain of eos",
+            PuzzleNameNormalizer.normalize("Ranger-Captain of Eos"),
+        )
+    }
+
+    @Test
+    fun `ae ligature expands before diacritic stripping`() {
+        assertEquals("aerathi berserker", PuzzleNameNormalizer.normalize("Ærathi Berserker"))
+        assertEquals("aether vial", PuzzleNameNormalizer.normalize("Æther Vial"))
+    }
+
+    @Test
+    fun `additional hyphenated names split into separate words`() {
+        assertEquals("ghost lit redeemer", PuzzleNameNormalizer.normalize("Ghost-Lit Redeemer"))
+        assertEquals("blood chin rager", PuzzleNameNormalizer.normalize("Blood-Chin Rager"))
+    }
+
+    @Test
+    fun `surrounding whitespace is trimmed after front-face extraction`() {
+        assertEquals(
+            "sword of fire and ice",
+            PuzzleNameNormalizer.normalize("  Sword of Fire and Ice  "),
+        )
+    }
 }
