@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.gamification.engine
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
@@ -37,6 +38,7 @@ class AchievementEvaluator(
     private val dao: GamificationDao,
     private val statsDao: GamificationStatsDao,
     private val clock: Clock,
+    private val crashReporter: CrashReporter,
 ) {
 
     /** The five MTG color tokens used by the rainbow resolvers. */
@@ -59,6 +61,15 @@ class AchievementEvaluator(
         val unlocks = mutableListOf<AchievementUnlock>()
         for (def in defs) {
             runCatching { evaluateDef(def, event) }
+                .onFailure { e ->
+                    // This loop had ZERO telemetry before the 2026-08-06 audit (pre-existing gap,
+                    // first exposed by Daily Puzzle's new PUZZLE_SOLVER DERIVED resolver touching the
+                    // new puzzle_results table). Per-def isolated so one bad def never aborts the
+                    // rest of the batch — this only adds visibility, no control-flow change.
+                    crashReporter.setCustomKey("achievement_def_id", def.id)
+                    crashReporter.log("gamification_achievement_def_eval_failed")
+                    crashReporter.recordException(e)
+                }
                 .getOrNull()
                 ?.let { unlocks += it }
         }

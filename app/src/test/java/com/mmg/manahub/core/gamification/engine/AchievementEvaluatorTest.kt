@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.gamification.engine
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
@@ -35,6 +36,7 @@ class AchievementEvaluatorTest {
     private lateinit var dao: GamificationDao
     private lateinit var statsDao: GamificationStatsDao
     private lateinit var evaluator: AchievementEvaluator
+    private val crashReporter: CrashReporter = mockk(relaxed = true)
 
     private val fixedInstant: Instant = Instant.parse("2026-06-12T10:00:00Z")
     private val now: Long get() = fixedInstant.toEpochMilliseconds()
@@ -55,7 +57,7 @@ class AchievementEvaluatorTest {
     fun setUp() {
         dao = mockk(relaxed = true)
         statsDao = mockk(relaxed = true)
-        evaluator = AchievementEvaluator(dao, statsDao, FixedClock(fixedInstant))
+        evaluator = AchievementEvaluator(dao, statsDao, FixedClock(fixedInstant), crashReporter)
 
         // Default: no prior progress, no prior ledger txns, all stats 0.
         coEvery { dao.getAchievement(any()) } returns null

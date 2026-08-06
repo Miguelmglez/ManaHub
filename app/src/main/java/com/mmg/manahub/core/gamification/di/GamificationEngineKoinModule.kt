@@ -123,8 +123,9 @@ fun gamificationEngineKoinModule(
     }
 
     // ── Engine collaborators. ──
+    // crashReporter comes from coreBridgeKoinModule (single<CrashReporter>) — NOT re-declared here.
     single { XpGranter(dao = get(), clock = get(), timeZone = get(), userPreferencesDataStore = get()) }
-    single { AchievementEvaluator(dao = get(), statsDao = get(), clock = get()) }
+    single { AchievementEvaluator(dao = get(), statsDao = get(), clock = get(), crashReporter = get()) }
     single { QuestEvaluator(dao = get(), clock = get(), timeZone = get()) }
     single { StreakTracker(dao = get(), clock = get(), timeZone = get()) }
     single { EntitlementGranter(dao = get(), clock = get()) }
@@ -139,6 +140,7 @@ fun gamificationEngineKoinModule(
             streakTracker = get(),
             entitlementGranter = get(),
             defaultDispatcher = Dispatchers.Default,
+            crashReporter = get(),
         )
     }
 
