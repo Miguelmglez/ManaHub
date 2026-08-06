@@ -31,12 +31,16 @@ sealed interface PuzzleUiState {
     /**
      * An attempt is in progress (fresh or resumed). [guesses] is the ordered history of guesses
      * submitted so far this attempt; [resumedFromCache] is true when [guesses] was seeded from a
-     * locally-persisted in-progress [PuzzleResult] rather than starting empty.
+     * locally-persisted in-progress [PuzzleResult] rather than starting empty. [maxGuesses] is the
+     * server-authoritative guess budget resolved from [puzzle]'s own payload (see
+     * [com.mmg.manahub.feature.puzzle.presentation.PuzzleViewModel.resolveMaxGuesses]) — NEVER a
+     * client-side constant, so the app always enforces the same budget the generator published.
      */
     data class Playing(
         val puzzle: Puzzle,
         val guesses: List<PuzzleGuessResult>,
         val resumedFromCache: Boolean,
+        val maxGuesses: Int,
     ) : PuzzleUiState
 
     /**

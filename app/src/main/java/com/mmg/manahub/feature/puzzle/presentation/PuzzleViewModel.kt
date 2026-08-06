@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.puzzle.GuessCardPayload
+import com.mmg.manahub.core.model.puzzle.Puzzle
 import com.mmg.manahub.core.model.puzzle.PuzzleGuessResult
 import com.mmg.manahub.core.model.puzzle.PuzzleResult
+import com.mmg.manahub.core.model.puzzle.PuzzleType
 import com.mmg.manahub.feature.puzzle.domain.usecase.GetPuzzleResultUseCase
 import com.mmg.manahub.feature.puzzle.domain.usecase.GetTodayPuzzleUseCase
 import com.mmg.manahub.feature.puzzle.domain.usecase.SavePuzzleResultUseCase
@@ -24,6 +27,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.json.Json
 
 /**
  * Drives the Daily Puzzle screen: resolves today's puzzle (resuming an in-progress local attempt
@@ -31,8 +35,6 @@ import kotlinx.datetime.toLocalDateTime
  * progress after every guess so a process death mid-puzzle can resume correctly.
  *
  * ## Deviations from the original Batch B2 design note (documented, not silent)
- * - [com.mmg.manahub.core.model.puzzle.GuessCardPayload] (Batch B1) has no `maxGuesses` field — the
- *   guess budget is a client-side constant, [MAX_GUESSES], not a server-provided value.
  * - [GetPuzzleResultUseCase] did not exist in Batch B1 (only [GetTodayPuzzleUseCase],
  *   [SubmitPuzzleGuessUseCase] and [SavePuzzleResultUseCase] were wrapped) — it was added alongside
  *   this ViewModel as a fourth, thin, single-purpose use case (see its own KDoc).
@@ -88,6 +90,8 @@ class PuzzleViewModel(
      */
     private var sessionStartedAt: Instant = Clock.System.now()
 
+    private val json = Json { ignoreUnknownKeys = true }
+
     init {
         loadPuzzle()
         viewModelScope.launch {
@@ -122,6 +126,10 @@ class PuzzleViewModel(
                             puzzle = puzzle,
                             guesses = resumable?.guesses.orEmpty(),
                             resumedFromCache = resumable != null,
+                            // Server-authoritative — a corrupt/malformed payload fails the load
+                            // (caught by the outer runCatching below) rather than silently starting
+                            // the attempt under the wrong budget.
+                            maxGuesses = resolveMaxGuesses(puzzle),
                         )
                     }
                     is DataResult.Error -> PuzzleUiState.Offline
@@ -131,6 +139,22 @@ class PuzzleViewModel(
                 onFailure = { e -> _uiState.value = PuzzleUiState.Failed(e.message ?: "Unknown error") },
             )
         }
+    }
+
+    /**
+     * Resolves the server-authoritative guess budget from [puzzle]'s type-specific payload — never
+     * a client-side constant (the real bug this replaced: the client silently enforced a hardcoded
+     * 8-guess budget while the generator publishes `maxGuesses = 7`, so every real puzzle ran with a
+     * mismatched budget). Only [PuzzleType.GUESS_CARD] has a payload shape known to this build;
+     * any other/unknown type (not yet renderable — see `PuzzleScreen`'s `PuzzleType.UNKNOWN`
+     * branch) falls back to [DEFAULT_MAX_GUESSES], which mirrors the generator's own
+     * `DEFAULT_MAX_GUESSES` (`tools/puzzle-generator/stages/emit.mjs`) so the fallback stays
+     * consistent with the real server default rather than reintroducing an arbitrary client value.
+     */
+    private fun resolveMaxGuesses(puzzle: Puzzle): Int = when (puzzle.type) {
+        PuzzleType.GUESS_CARD ->
+            json.decodeFromString(GuessCardPayload.serializer(), puzzle.payloadJson).maxGuesses
+        else -> DEFAULT_MAX_GUESSES
     }
 
     fun onGuessQueryChange(query: String) {
@@ -182,7 +206,7 @@ class PuzzleViewModel(
 
     private suspend fun onGuessResolved(current: PuzzleUiState.Playing, guessResult: PuzzleGuessResult) {
         val updatedGuesses = current.guesses + guessResult
-        val isGameOver = guessResult.isCorrect || updatedGuesses.size >= MAX_GUESSES
+        val isGameOver = guessResult.isCorrect || updatedGuesses.size >= current.maxGuesses
         val now = Clock.System.now()
 
         val result = PuzzleResult(
@@ -220,7 +244,12 @@ class PuzzleViewModel(
         const val MIN_SUGGESTION_QUERY_LENGTH = 2
         const val MAX_SUGGESTIONS = 8
 
-        /** Client-side guess budget — see this class's KDoc "Deviations" section. */
-        const val MAX_GUESSES = 8
+        /**
+         * Fallback guess budget for a puzzle type with no known payload shape to read
+         * `maxGuesses` from (see [resolveMaxGuesses]) — mirrors the generator's own
+         * `DEFAULT_MAX_GUESSES` (`tools/puzzle-generator/stages/emit.mjs`), never used for
+         * [PuzzleType.GUESS_CARD], which always reads the real server-published value.
+         */
+        const val DEFAULT_MAX_GUESSES = 7
     }
 }
