@@ -88,6 +88,7 @@ import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileTab
+import com.mmg.manahub.feature.puzzle.presentation.PuzzleScreen
 import com.mmg.manahub.feature.scanner.presentation.ScannerScreen
 import com.mmg.manahub.feature.settings.presentation.SettingsScreen
 import com.mmg.manahub.feature.stats.presentation.StatsScreen
@@ -340,6 +341,7 @@ fun AppNavGraph(
                                     HomeAction.OpenAchievements -> navController.navigate(Screen.Stats.route)
                                     HomeAction.OpenProfileQuests ->
                                         navController.navigate(Screen.Profile.routeWithTab("quests"))
+                                    HomeAction.OpenDailyPuzzle -> navController.navigate(Screen.DailyPuzzle.route)
                                     is HomeAction.OpenCardDetail -> navController.navigate(
                                         Screen.CollectionCardDetail.createRoute(action.scryfallId, action.sharedTransitionKey)
                                     )
@@ -505,6 +507,11 @@ fun AppNavGraph(
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable,
                 )
+            }
+
+            // Daily Puzzle (ADR-006, Batch B2)
+            composable(route = Screen.DailyPuzzle.route) {
+                PuzzleScreen(onBack = { navController.popBackStack() })
             }
 
             // Community Decks browse / search (landing)

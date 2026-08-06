@@ -88,6 +88,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Drives the customizable Home widget board.
@@ -140,6 +141,12 @@ class HomeViewModel(
     // memory's "append new optional params at the end" rule for classes with positional-arg call
     // sites; this project's tests use named args throughout, but the convention is kept anyway).
     private val communityAggregateRepository: com.mmg.manahub.core.domain.repository.CommunityAggregateRepository? = null,
+    // Daily Puzzle (ADR-006), Batch B2 — appended last, same convention as above. Nullable with a
+    // null default (rather than required) so HomeViewModelTest's existing `buildViewModel()` (which
+    // does not pass these two) keeps compiling unchanged; a null value degrades dailyPuzzleFlow to
+    // Unavailable, same graceful-degradation shape as communityAggregateRepository above.
+    private val getTodayPuzzleUseCase: com.mmg.manahub.feature.puzzle.domain.usecase.GetTodayPuzzleUseCase? = null,
+    private val getPuzzleResultUseCase: com.mmg.manahub.feature.puzzle.domain.usecase.GetPuzzleResultUseCase? = null,
 ) : ViewModel() {
 
     /**
@@ -1065,6 +1072,65 @@ class HomeViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /**
+     * Home DAILY_PUZZLE widget preview (ADR-006, Batch B2). Kept as an INDEPENDENT `StateFlow`,
+     * mirroring [trendingFlow]/[communityDecksFlow]'s documented rationale: this widget's data has
+     * no dependency on anything else in [HomeUiState], and the main combine chain is already the
+     * most error-prone surface in this ViewModel.
+     *
+     * Unlike [trendingFlow]/[communityDecksFlow] (which collapse every failure to `null`/empty and
+     * hide the widget silently), this flow distinguishes [DailyPuzzleWidgetState.Loading] /
+     * [DailyPuzzleWidgetState.Loaded] / [DailyPuzzleWidgetState.Unavailable] so the widget can show
+     * a real unavailable message — see [DailyPuzzleWidgetState]'s KDoc for why that deviation is
+     * intentional here.
+     */
+    val dailyPuzzleFlow: StateFlow<DailyPuzzleWidgetState> =
+        flow {
+            emit(DailyPuzzleWidgetState.Loading)
+            val getTodayPuzzle = getTodayPuzzleUseCase
+            if (getTodayPuzzle == null) {
+                emit(DailyPuzzleWidgetState.Unavailable)
+                return@flow
+            }
+            // WS1+WS3 Part B item 9 (2026-07-28) — see the Discover-row `init` gate above for why.
+            awaitSyncWindow("daily_puzzle")
+
+            // Mirrors the server's UTC rollover boundary (ADR-006 Decision 2) so the local-progress
+            // read below targets the right row even before the network fetch confirms the real date.
+            val today = kotlinx.datetime.Clock.System.now()
+                .toLocalDateTime(kotlinx.datetime.TimeZone.UTC).date
+            val localResult = getPuzzleResultUseCase?.let { useCase ->
+                runCatching { useCase(today) }.getOrNull()
+            }
+
+            when (val result = runCatching { getTodayPuzzle() }.getOrNull()) {
+                is com.mmg.manahub.core.model.DataResult.Success -> {
+                    val puzzle = result.data
+                    // Only trust a local row that matches THIS server-confirmed puzzle date — a
+                    // stale/guessed-date row must never be reported as today's progress.
+                    val matchingLocal = localResult?.takeIf { it.puzzleDate == puzzle.date }
+                    emit(
+                        DailyPuzzleWidgetState.Loaded(
+                            puzzleType = puzzle.type,
+                            attemptsUsed = matchingLocal?.attempts ?: 0,
+                            solved = matchingLocal?.solved ?: false,
+                        )
+                    )
+                }
+                else -> {
+                    crashlytics.log("home_daily_puzzle_widget_failed")
+                    emit(DailyPuzzleWidgetState.Unavailable)
+                }
+            }
+        }.catch {
+            crashlytics.log("home_daily_puzzle_widget_failed")
+            emit(DailyPuzzleWidgetState.Unavailable)
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = DailyPuzzleWidgetState.Loading,
+        )
+
+    /**
      * Waits for [syncManager]'s sync state to leave [SyncState.SYNCING] before the caller proceeds
      * (WS1+WS3 Part B item 9's "serialize the login window" gate), logging a `home_sync_window_deferred`
      * breadcrumb ONLY when the wait was real (elapsed strictly greater than
@@ -1075,8 +1141,8 @@ class HomeViewModel(
      * proof that the gate is actually deferring real work in the field, not just theoretically
      * present in code — a source-tagged breadcrumb + duration, not a per-call event flood.
      *
-     * @param source one of `"trending"` / `"community_decks"` / `"discover_seed"` — identifies which
-     *   of the 3 call sites deferred, without embedding any free text.
+     * @param source one of `"trending"` / `"community_decks"` / `"discover_seed"` / `"daily_puzzle"`
+     *   (ADR-006, Batch B2) — identifies which call site deferred, without embedding any free text.
      */
     private suspend fun awaitSyncWindow(source: String) {
         val start = System.currentTimeMillis()

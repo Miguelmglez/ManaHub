@@ -438,6 +438,9 @@ fun HomeWidgetHost(
     // KDoc.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason as [trending];
+    // see [com.mmg.manahub.feature.home.presentation.HomeViewModel.dailyPuzzleFlow]'s KDoc.
+    dailyPuzzle: DailyPuzzleWidgetState? = null,
 ) {
     val spacing = MaterialTheme.spacing
     // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
@@ -523,6 +526,7 @@ fun HomeWidgetHost(
                 )
                 HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
                 HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
+                HomeWidgetType.DAILY_PUZZLE -> DailyPuzzleWidget(dailyPuzzle, onAction)
             }
         }
     }
@@ -549,6 +553,7 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.TRENDING_COMMANDERS -> HomeAction.OpenCommunityDecks
     HomeWidgetType.PROGRESSION_HUB -> HomeAction.OpenProfile
     HomeWidgetType.QUESTS_HUB -> HomeAction.OpenProfileQuests
+    HomeWidgetType.DAILY_PUZZLE -> HomeAction.OpenDailyPuzzle
     HomeWidgetType.QUICK_ACTIONS,
     HomeWidgetType.CARD_OF_THE_DAY,
     HomeWidgetType.RULES_TIP,
@@ -601,6 +606,60 @@ private fun TrendingCommandersWidget(
                     cardBackPainter = painterResource(Res.drawable.mtg_card_back),
                     modifier = Modifier.width(160.dp),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Daily Puzzle preview (ADR-006, Batch B2). Shows today's attempt progress (not started / N
+ * guesses so far / solved) and a Play CTA; the whole card and the CTA both navigate to
+ * [HomeAction.OpenDailyPuzzle]. Unlike [TrendingCommandersWidget] (which hides itself entirely on
+ * failure), an [DailyPuzzleWidgetState.Unavailable] state renders a real inline message — see
+ * [DailyPuzzleWidgetState]'s KDoc for why.
+ */
+@Composable
+private fun DailyPuzzleWidget(
+    dailyPuzzle: DailyPuzzleWidgetState?,
+    onAction: (HomeAction) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    when (dailyPuzzle) {
+        null, DailyPuzzleWidgetState.Loading -> WidgetLoading()
+        DailyPuzzleWidgetState.Unavailable ->
+            WidgetEmptyBody(stringResourceSafe(R.string.home_daily_puzzle_unavailable))
+        is DailyPuzzleWidgetState.Loaded -> {
+            WidgetShell(
+                onClick = { onAction(HomeAction.OpenDailyPuzzle) },
+                onClickLabel = stringResourceSafe(R.string.widget_title_daily_puzzle),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = when {
+                            dailyPuzzle.solved ->
+                                stringResourceSafe(R.string.home_daily_puzzle_solved, dailyPuzzle.attemptsUsed)
+                            dailyPuzzle.attemptsUsed > 0 ->
+                                stringResourceSafe(R.string.home_daily_puzzle_in_progress, dailyPuzzle.attemptsUsed)
+                            else -> stringResourceSafe(R.string.home_daily_puzzle_not_started)
+                        },
+                        style = ty.bodyMedium,
+                        color = mc.textPrimary,
+                        modifier = Modifier.padding(end = spacing.sm),
+                    )
+                    MagicCtaButton(
+                        onClick = { onAction(HomeAction.OpenDailyPuzzle) },
+                        text = stringResourceSafe(R.string.home_daily_puzzle_cta),
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Primary,
+                    )
+                }
             }
         }
     }
@@ -3757,6 +3816,8 @@ fun HomeWidgetContainer(
     // Home widget board overhaul, TASK 5b.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    // Daily Puzzle (ADR-006), Batch B2.
+    dailyPuzzle: DailyPuzzleWidgetState? = null,
 ) {
     Box(modifier = modifier) {
         HomeWidgetHost(
@@ -3768,6 +3829,7 @@ fun HomeWidgetContainer(
             trending = trending,
             communityDecks = communityDecks,
             communityDecksCategory = communityDecksCategory,
+            dailyPuzzle = dailyPuzzle,
         )
     }
 }

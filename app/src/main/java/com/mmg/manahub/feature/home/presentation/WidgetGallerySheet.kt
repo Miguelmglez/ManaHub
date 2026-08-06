@@ -593,4 +593,5 @@ private val HomeWidgetType.description: String
         HomeWidgetType.FRIENDS -> stringResource(R.string.home_widget_desc_friends)
         HomeWidgetType.TRENDING_COMMANDERS -> stringResource(R.string.home_widget_desc_trending_commanders)
         HomeWidgetType.COMMUNITY_DECKS -> stringResource(R.string.home_widget_desc_community_decks)
+        HomeWidgetType.DAILY_PUZZLE -> stringResource(R.string.home_widget_desc_daily_puzzle)
     }

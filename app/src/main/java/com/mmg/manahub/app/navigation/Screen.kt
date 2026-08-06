@@ -245,8 +245,10 @@ sealed class Screen(val route: String) {
         fun createRoute(deckId: String) = "playtest/hand/$deckId"
     }
 
-    // ── v2 stubs ─────────────────────────────────────────────────────────────
-    object Puzzle : Screen("puzzle")
+    // ── Daily Puzzle (ADR-006) ──────────────────────────────────────────────
+    // Repurposes the pre-existing "puzzle" route stub (formerly `object Puzzle`, unreferenced by
+    // any composable) rather than minting a second, parallel route for the same feature.
+    object DailyPuzzle : Screen("puzzle")
 
     // ── Trades (sub-section of Collection, also handles deep links) ───────────
     /**

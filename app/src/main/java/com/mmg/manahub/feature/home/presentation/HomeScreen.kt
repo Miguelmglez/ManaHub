@@ -119,6 +119,9 @@ fun HomeScreen(
     // HomeViewModel.communityDecksFlow's KDoc.
     val communityDecks by viewModel.communityDecksFlow.collectAsStateWithLifecycle()
     val communityDecksCategory by viewModel.communityDecksCategoryFlow.collectAsStateWithLifecycle()
+    // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason, see
+    // HomeViewModel.dailyPuzzleFlow's KDoc.
+    val dailyPuzzle by viewModel.dailyPuzzleFlow.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
     var showGallerySheet by remember { mutableStateOf(false) }
 
@@ -134,6 +137,7 @@ fun HomeScreen(
         trending = trending,
         communityDecks = communityDecks,
         communityDecksCategory = communityDecksCategory,
+        dailyPuzzle = dailyPuzzle,
         onAction = { action ->
             when (action) {
                 HomeAction.CustomizeQuickStart -> showCustomizeSheet = true
@@ -223,6 +227,8 @@ fun HomeScreen(
     // Home widget board overhaul, TASK 5b.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    // Daily Puzzle (ADR-006), Batch B2.
+    dailyPuzzle: DailyPuzzleWidgetState? = null,
 ) {
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -288,6 +294,7 @@ fun HomeScreen(
                     trending = trending,
                     communityDecks = communityDecks,
                     communityDecksCategory = communityDecksCategory,
+                    dailyPuzzle = dailyPuzzle,
                 )
             }
 

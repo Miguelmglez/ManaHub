@@ -7,9 +7,12 @@ import com.mmg.manahub.core.data.remote.PuzzleApi
 import com.mmg.manahub.core.data.remote.PuzzleApiContract
 import com.mmg.manahub.core.data.repository.PuzzleRepositoryImpl
 import com.mmg.manahub.core.domain.repository.PuzzleRepository
+import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
+import com.mmg.manahub.feature.puzzle.domain.usecase.GetPuzzleResultUseCase
 import com.mmg.manahub.feature.puzzle.domain.usecase.GetTodayPuzzleUseCase
 import com.mmg.manahub.feature.puzzle.domain.usecase.SavePuzzleResultUseCase
 import com.mmg.manahub.feature.puzzle.domain.usecase.SubmitPuzzleGuessUseCase
+import com.mmg.manahub.feature.puzzle.presentation.PuzzleViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -18,6 +21,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.Cache
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
 import java.io.File
@@ -28,10 +32,12 @@ import java.util.concurrent.TimeUnit
 private const val MAX_PUZZLE_RESPONSE_BYTES = 1L * 1024 * 1024
 
 /**
- * Koin module for the Daily Puzzle feature's FOUNDATION layer (Batch B1): data layer (remote +
- * local + repository) and use cases only. Presentation (ViewModel) and the rest of the
- * gamification engine wiring are separate follow-up batches (B2/B3) — this module intentionally
- * registers no `viewModel { }`.
+ * Koin module for the Daily Puzzle feature. Batch B1 wired the data layer (remote + local +
+ * repository) and use cases; Batch B2 (this revision) adds the presentation layer — [PuzzleViewModel]
+ * — plus [GetPuzzleResultUseCase], a fourth thin use case B1 did not include (the ViewModel's
+ * resume-check needs [PuzzleRepository.getPuzzleResult] and must not reach past the use-case layer
+ * to call the repository directly — see that use case's KDoc). The rest of the gamification engine
+ * wiring (achievements/streak, Batch B3) is a separate follow-up.
  *
  * ## Room-owned dependency, bridged from Hilt
  * [PuzzleDao] comes from the Hilt/Room graph (`DatabaseModule`) exactly like
@@ -81,8 +87,22 @@ fun puzzleKoinModule(
 
     // ── Use cases. ──
     single { GetTodayPuzzleUseCase(puzzleRepository = get()) }
+    single { GetPuzzleResultUseCase(puzzleRepository = get()) }
     single { SubmitPuzzleGuessUseCase(cardRepository = get()) }
     single { SavePuzzleResultUseCase(puzzleRepository = get()) }
+
+    // ── Presentation (Batch B2). SearchCardsUseCase is NOT re-declared here — it is already a
+    //    single in SharedDomainKoinModule (loaded in the same ManaHubApp `modules(...)` call), so
+    //    re-registering it would throw DefinitionOverrideException. ──
+    viewModel {
+        PuzzleViewModel(
+            getTodayPuzzleUseCase = get(),
+            getPuzzleResultUseCase = get(),
+            submitPuzzleGuessUseCase = get(),
+            savePuzzleResultUseCase = get(),
+            searchCardsUseCase = get(),
+        )
+    }
 }
 
 /**

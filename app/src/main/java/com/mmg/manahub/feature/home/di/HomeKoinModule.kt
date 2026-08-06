@@ -132,6 +132,10 @@ fun homeKoinModule(): Module = module {
             // Deck Doctor Community/Archetype plan, Phase 5 — from communityAggregateKoinModule
             // (loaded in the same ManaHubApp `modules(...)` call).
             communityAggregateRepository = get(),
+            // Daily Puzzle (ADR-006), Batch B2 — from puzzleKoinModule (loaded in the same
+            // ManaHubApp `modules(...)` call), no parallel data path.
+            getTodayPuzzleUseCase = get(),
+            getPuzzleResultUseCase = get(),
         )
     }
 }
