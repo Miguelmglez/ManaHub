@@ -164,6 +164,7 @@ class AchievementEvaluator(
         AchievementResolver.DISTINCT_DECK_FORMATS -> statsDao.distinctDeckFormats()
         AchievementResolver.SURVEYS_COMPLETED -> statsDao.surveysCompleted()
         AchievementResolver.GAMES_ENDED_AT_ONE_LIFE -> statsDao.localWinsAtExactLife(ONE_LIFE)
+        AchievementResolver.PUZZLES_SOLVED -> statsDao.puzzlesSolved()
     }
 
     /** Counts how many of the five WUBRG colors have >= 20 owned cards. */

@@ -174,11 +174,25 @@ class XpGranter(
         // to null keeps the ledger clean and the `when` exhaustive (mirrors DeckSaved).
         is ProgressionEvent.FeatureExplored -> null
 
-        // Daily Puzzle feature (Batch B1 foundation): compile-exhaustiveness stub only, mirrors
-        // DeckSaved/FeatureExplored above. The real grant (XpConfig.puzzleSolved +
-        // XpConfig.puzzlePerfectBonus, XpSourceCategory.PUZZLE) is wired in the follow-up engine
-        // batch (B3) — do not add real grant logic here as part of B1.
-        is ProgressionEvent.PuzzleSolved -> null
+        // Daily Puzzle feature (Batch B3 gamification hookup). The perfect-solve bonus is
+        // unreachable this pass (no shipped puzzle type sets perfect = true — see
+        // XpConfig.puzzlePerfectBonus KDoc) but is wired now for forward-compat; GUESS_CARD is
+        // explicitly excluded so a future accidental perfect = true on this type never silently
+        // starts paying a bonus it was never designed for.
+        is ProgressionEvent.PuzzleSolved -> {
+            val lines = buildList {
+                add(XpLineItem(XpSourceCategory.PUZZLE, XpConfig.puzzleSolved, "Puzzle solved"))
+                if (event.perfect && event.type != "GUESS_CARD") {
+                    add(XpLineItem(XpSourceCategory.PUZZLE, XpConfig.puzzlePerfectBonus, "Perfect solve"))
+                }
+            }
+            GrantPlan(
+                lines.sumOf { it.amount },
+                XpSourceCategory.PUZZLE,
+                event.puzzleDate.toString(),
+                lines,
+            )
+        }
     }
 
     private fun singleLine(

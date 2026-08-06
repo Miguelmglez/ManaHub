@@ -164,4 +164,10 @@ interface GamificationStatsDao {
     /** Distinct sessions with at least one survey answer. */
     @Query("SELECT COUNT(DISTINCT sessionId) FROM survey_answers")
     suspend fun surveysCompleted(): Int
+
+    // ── Daily Puzzle ─────────────────────────────────────────────────────────────
+
+    /** Total solved daily puzzles (ADR-006 Decision 5 — DERIVED, free retroactive backfill). */
+    @Query("SELECT COUNT(*) FROM puzzle_results WHERE solved = 1")
+    suspend fun puzzlesSolved(): Int
 }

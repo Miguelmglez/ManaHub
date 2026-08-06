@@ -157,6 +157,7 @@ class AchievementBackfill(
         AchievementResolver.DISTINCT_DECK_FORMATS -> statsDao.distinctDeckFormats()
         AchievementResolver.SURVEYS_COMPLETED -> statsDao.surveysCompleted()
         AchievementResolver.GAMES_ENDED_AT_ONE_LIFE -> statsDao.localWinsAtExactLife(ONE_LIFE)
+        AchievementResolver.PUZZLES_SOLVED -> statsDao.puzzlesSolved()
     }
 
     /** The rows to persist + the tier XP to grant, produced by [computeBackfillRows]. */

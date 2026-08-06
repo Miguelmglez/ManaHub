@@ -37,6 +37,7 @@ object AchievementCatalog {
     private val TRADE = ProgressionEvent.TradeCompleted::class
     private val FRIEND = ProgressionEvent.FriendAdded::class
     private val APP_OPEN = ProgressionEvent.AppOpenedToday::class
+    private val PUZZLE_SOLVED = ProgressionEvent.PuzzleSolved::class
 
     /** Any collection-touching event re-evaluates collection achievements. */
     private val COLLECTION_EVENTS: Set<KClass<out ProgressionEvent>> = setOf(CARDS, SCAN)
@@ -409,6 +410,27 @@ object AchievementCatalog {
                 emoji = "📅", // 📅
                 tiers = listOf(AchievementTier(30, XpConfig.achievementTier3)),
                 reactsTo = setOf(APP_OPEN), family = Family.COUNTER,
+            )
+        )
+
+        // ── DAILY PUZZLE ─────────────────────────────────────────────────────────
+        // ADR-006 Decision 5: only `puzzle_solver` ships this pass — `puzzle_streak` and the
+        // pre-existing STREAK_ counter-resolution stub (counterNextValue() always returns 0 for
+        // STREAK_-prefixed ids) are deferred together as separate follow-up work. DERIVED (not
+        // COUNTER) because `puzzle_results` durably stores every solve, so this gets free
+        // retroactive backfill with zero double-count risk — unlike the STREAK_ line above.
+        add(
+            AchievementDef(
+                id = "PUZZLE_SOLVER", category = AchievementCategory.DEDICATION,
+                title = "Puzzle Solver", description = "Solve 1 / 7 / 30 daily puzzles",
+                emoji = "🧩", // 🧩
+                tiers = listOf(
+                    AchievementTier(1, XpConfig.achievementTier1),
+                    AchievementTier(7, XpConfig.achievementTier2),
+                    AchievementTier(30, XpConfig.achievementTier3),
+                ),
+                reactsTo = setOf(PUZZLE_SOLVED), family = Family.DERIVED,
+                resolver = AchievementResolver.PUZZLES_SOLVED,
             )
         )
 

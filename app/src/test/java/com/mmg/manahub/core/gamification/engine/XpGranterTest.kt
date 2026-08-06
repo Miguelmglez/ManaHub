@@ -22,6 +22,7 @@ import org.junit.Test
 import com.mmg.manahub.core.gamification.FixedClock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.isoDayNumber
@@ -253,6 +254,78 @@ class XpGranterTest {
         )
 
         assertEquals(XpConfig.friendAdded, outcome.xpGranted)
+    }
+
+    // ── Daily Puzzle (Batch B3) ────────────────────────────────────────────────────
+
+    @Test
+    fun `puzzle solved grants the base puzzle amount`() = runTest {
+        val outcome = granter.grant(
+            ProgressionEvent.PuzzleSolved(
+                puzzleDate = LocalDate(2026, 8, 6), type = "GUESS_CARD",
+                attemptsUsed = 3, perfect = false, occurredAt = now,
+            )
+        )
+        assertEquals(XpConfig.puzzleSolved, outcome.xpGranted)
+    }
+
+    @Test
+    fun `a perfect GUESS_CARD solve does not stack the perfect bonus`() = runTest {
+        // GUESS_CARD is explicitly excluded from the perfect bonus even if perfect somehow reads
+        // true — no shipped puzzle type is designed to set it, so this must never silently pay out.
+        val outcome = granter.grant(
+            ProgressionEvent.PuzzleSolved(
+                puzzleDate = LocalDate(2026, 8, 6), type = "GUESS_CARD",
+                attemptsUsed = 1, perfect = true, occurredAt = now,
+            )
+        )
+        assertEquals(XpConfig.puzzleSolved, outcome.xpGranted)
+    }
+
+    @Test
+    fun `a perfect solve of a future non-GUESS_CARD type stacks the perfect bonus`() = runTest {
+        // Forward-compat: a future puzzle type that legitimately sets perfect = true gets the bonus.
+        val outcome = granter.grant(
+            ProgressionEvent.PuzzleSolved(
+                puzzleDate = LocalDate(2026, 8, 6), type = "ART_REVEAL",
+                attemptsUsed = 1, perfect = true, occurredAt = now,
+            )
+        )
+        assertEquals(XpConfig.puzzleSolved + XpConfig.puzzlePerfectBonus, outcome.xpGranted)
+    }
+
+    @Test
+    fun `puzzle idempotency key is the puzzle date and is not device-prefixed`() = runTest {
+        val txn = slot<XpTransactionEntity>()
+        coEvery {
+            dao.grantXpAtomically(capture(txn), any(), any(), any())
+        } coAnswers { appliedResult(secondArg<Int>()) }
+
+        granter.grant(
+            ProgressionEvent.PuzzleSolved(
+                puzzleDate = LocalDate(2026, 8, 6), type = "GUESS_CARD",
+                attemptsUsed = 2, perfect = false, occurredAt = now,
+            )
+        )
+
+        // PuzzleSolved.isDeviceScoped = false → dedupes across devices, verbatim key.
+        assertEquals("puzzle:2026-08-06:solved", txn.captured.idempotencyKey)
+        assertEquals(XpSourceCategory.PUZZLE.name, txn.captured.sourceCategory)
+    }
+
+    @Test
+    fun `duplicate puzzle solve for the same date is a no-op`() = runTest {
+        coEvery { dao.hasTransaction("puzzle:2026-08-06:solved") } returns true
+
+        val outcome = granter.grant(
+            ProgressionEvent.PuzzleSolved(
+                puzzleDate = LocalDate(2026, 8, 6), type = "GUESS_CARD",
+                attemptsUsed = 4, perfect = false, occurredAt = now,
+            )
+        )
+
+        assertEquals(0, outcome.xpGranted)
+        coVerify(exactly = 0) { dao.grantXpAtomically(any(), any(), any(), any()) }
     }
 
     @Test
