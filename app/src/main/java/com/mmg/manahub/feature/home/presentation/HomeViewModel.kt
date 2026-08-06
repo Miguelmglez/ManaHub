@@ -1088,6 +1088,7 @@ class HomeViewModel(
             emit(DailyPuzzleWidgetState.Loading)
             val getTodayPuzzle = getTodayPuzzleUseCase
             if (getTodayPuzzle == null) {
+                crashlytics.setCustomKey("puzzle_widget_unavailable_reason", "no_usecase")
                 emit(DailyPuzzleWidgetState.Unavailable)
                 return@flow
             }
@@ -1117,12 +1118,19 @@ class HomeViewModel(
                     )
                 }
                 else -> {
+                    crashlytics.setCustomKey("puzzle_widget_unavailable_reason", "fetch_error")
                     crashlytics.log("home_daily_puzzle_widget_failed")
                     emit(DailyPuzzleWidgetState.Unavailable)
                 }
             }
         }.catch {
+            // Log-only before this audit (not aggregable — no cause discrimination). The other two
+            // branches above are foreseen "no data source"/"fetch failed" paths; reaching THIS one
+            // means something actually threw (e.g. a payload decode crash upstream of the inner
+            // runCatching), so it also backs a non-fatal.
+            crashlytics.setCustomKey("puzzle_widget_unavailable_reason", "exception")
             crashlytics.log("home_daily_puzzle_widget_failed")
+            recordSafeNonFatal("home_daily_puzzle_widget_failed", it)
             emit(DailyPuzzleWidgetState.Unavailable)
         }.stateIn(
             scope = viewModelScope,
