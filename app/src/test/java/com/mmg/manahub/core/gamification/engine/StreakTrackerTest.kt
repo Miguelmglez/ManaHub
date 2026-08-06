@@ -2,7 +2,12 @@ package com.mmg.manahub.core.gamification.engine
 
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.entity.StreakEntity
+import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -216,5 +221,69 @@ class StreakTrackerTest {
         val existing = streak(current = 4, longest = 4, lastDate = today.plus(2, DateTimeUnit.DAY), tokens = 1)
         val result = tracker.advance(existing, today)
         assertSame(existing, result)
+    }
+
+    // ── process() IO shell (Batch B3: PuzzleSolved branch added) ──────────────────
+
+    /** A [GamificationDao] mock + tracker wired to the fixed clock, for [process] IO-shell tests. */
+    private fun processHarness(): Pair<GamificationDao, StreakTracker> {
+        val dao = mockk<GamificationDao>(relaxed = true)
+        val processTracker = StreakTracker(dao, FixedClock(Instant.parse("2026-06-12T10:00:00Z")), TimeZone.UTC)
+        return dao to processTracker
+    }
+
+    @Test
+    fun `process on AppOpenedToday reads and writes the daily_activity streak using clock now (regression)`() = runTest {
+        // Regression guard: proves the pre-existing AppOpenedToday behavior is byte-identical after
+        // adding the PuzzleSolved branch — same type read, same `today` source (clock, NOT the event).
+        val (dao, processTracker) = processHarness()
+        coEvery { dao.getStreak(StreakTracker.TYPE_DAILY_ACTIVITY) } returns null
+
+        val rows = slot<StreakEntity>()
+        coEvery { dao.upsertStreak(capture(rows)) } returns Unit
+
+        processTracker.process(
+            ProgressionEvent.AppOpenedToday(localDate = "2026-06-12", occurredAt = Instant.parse("2026-06-12T10:00:00Z"))
+        )
+
+        coVerify(exactly = 1) { dao.getStreak(StreakTracker.TYPE_DAILY_ACTIVITY) }
+        assertEquals(StreakTracker.TYPE_DAILY_ACTIVITY, rows.captured.type)
+        assertEquals("2026-06-12", rows.captured.lastActiveDate) // from clock, not the event payload
+        assertEquals(1, rows.captured.current)
+    }
+
+    @Test
+    fun `process on PuzzleSolved reads and writes the puzzle streak using the event's own puzzleDate`() = runTest {
+        val (dao, processTracker) = processHarness()
+        // The event's puzzleDate (2026-06-10) deliberately differs from the pinned clock's local date
+        // (2026-06-12) to prove the puzzle streak advances off the EVENT date, never clock.now().
+        coEvery { dao.getStreak(StreakTracker.TYPE_PUZZLE) } returns null
+
+        val rows = slot<StreakEntity>()
+        coEvery { dao.upsertStreak(capture(rows)) } returns Unit
+
+        processTracker.process(
+            ProgressionEvent.PuzzleSolved(
+                puzzleDate = LocalDate(2026, 6, 10), type = "GUESS_CARD",
+                attemptsUsed = 3, perfect = false, occurredAt = Instant.parse("2026-06-12T10:00:00Z"),
+            )
+        )
+
+        coVerify(exactly = 1) { dao.getStreak(StreakTracker.TYPE_PUZZLE) }
+        coVerify(exactly = 0) { dao.getStreak(StreakTracker.TYPE_DAILY_ACTIVITY) }
+        assertEquals(StreakTracker.TYPE_PUZZLE, rows.captured.type)
+        assertEquals("2026-06-10", rows.captured.lastActiveDate) // from event.puzzleDate, not clock.now()
+    }
+
+    @Test
+    fun `process ignores events that are neither AppOpenedToday nor PuzzleSolved`() = runTest {
+        val (dao, processTracker) = processHarness()
+
+        processTracker.process(
+            ProgressionEvent.DeckSaved(deckId = "deck-1", cardCount = 60, occurredAt = Instant.parse("2026-06-12T10:00:00Z"))
+        )
+
+        coVerify(exactly = 0) { dao.getStreak(any()) }
+        coVerify(exactly = 0) { dao.upsertStreak(any()) }
     }
 }
