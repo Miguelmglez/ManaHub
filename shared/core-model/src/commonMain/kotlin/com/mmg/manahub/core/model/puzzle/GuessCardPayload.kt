@@ -13,6 +13,11 @@ import kotlinx.serialization.Serializable
  * canonical printing for post-solve UI (card image, link) — it is safe to ship in the clear because
  * it alone does not reveal the answer without also knowing which of the day's candidate cards it
  * points to.
+ *
+ * @param maxGuesses the server-authoritative guess budget for this puzzle (published by
+ *   `tools/puzzle-generator/stages/emit.mjs`'s `DEFAULT_MAX_GUESSES`, required by
+ *   `schemaValidate.mjs`). The client MUST read this rather than hardcoding its own budget — see
+ *   [com.mmg.manahub.feature.puzzle.presentation.PuzzleViewModel] for the consumer.
  */
 @Serializable
 data class GuessCardPayload(
@@ -20,4 +25,5 @@ data class GuessCardPayload(
     val dailySalt: String,
     val canonicalScryfallId: String,
     val attributes: PuzzleCardAttributes,
+    val maxGuesses: Int,
 )
