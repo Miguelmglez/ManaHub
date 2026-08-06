@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.puzzle.presentation
 
 import app.cash.turbine.test
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.PaginatedCards
@@ -17,7 +18,10 @@ import com.mmg.manahub.feature.puzzle.domain.usecase.SavePuzzleResultUseCase
 import com.mmg.manahub.feature.puzzle.domain.usecase.SubmitPuzzleGuessUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -105,6 +109,8 @@ class PuzzleViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(dispatcher)
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
         coEvery { getPuzzleResultUseCase(any()) } returns null
         coEvery { savePuzzleResultUseCase(any()) } returns Unit
         // Default stub for the debounced guess-suggestion search — several tests type into the
@@ -115,6 +121,7 @@ class PuzzleViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     private fun buildViewModel() = PuzzleViewModel(
@@ -235,6 +242,57 @@ class PuzzleViewModelTest {
     }
 
     @Test
+    fun `a resumed attempt already at its guess budget emits Solved, not Playing`() = runTest(dispatcher) {
+        // Real-world cause (2026-08-06 edge-case audit): Batch B3 fixed a hardcoded-8-vs-server-7
+        // maxGuesses mismatch, so a local row saved BEFORE that fix can carry 7 guesses under a
+        // server that now publishes maxGuesses = 7, with completedAt still null (the old client
+        // never crossed its own hardcoded 8). Resuming that row must not show Playing with an
+        // enabled submit button for a budget that's already spent.
+        val exhaustedGuesses = (1..7).map { buildGuessResult(name = "Wrong Guess $it", isCorrect = false) }
+        val staleLocalResult = PuzzleResult(
+            puzzleDate = today,
+            type = PuzzleType.GUESS_CARD,
+            attempts = 7,
+            solved = false,
+            perfect = false,
+            elapsedMs = 60_000L,
+            startedAt = Clock.System.now(),
+            guesses = exhaustedGuesses,
+            completedAt = null,
+        )
+        coEvery { getPuzzleResultUseCase(today) } returns staleLocalResult
+        coEvery { getTodayPuzzleUseCase() } returns DataResult.Success(testPuzzle) // maxGuesses = 7
+
+        val viewModel = buildViewModel()
+        viewModel.uiState.test {
+            assertEquals(PuzzleUiState.Loading, awaitItem())
+            val solved = awaitItem() as PuzzleUiState.Solved
+            assertFalse("an over-budget resume can never retroactively count as solved", solved.result.solved)
+            assertEquals(7, solved.result.attempts)
+            assertTrue("the terminal state must persist a non-null completedAt", solved.result.completedAt != null)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify { savePuzzleResultUseCase(match { it.completedAt != null && it.attempts == 7 }) }
+    }
+
+    @Test
+    fun `a maxGuesses value outside the generator's valid range fails the load`() = runTest(dispatcher) {
+        // schemaValidate.mjs requires payload.maxGuesses in [1, 20] -- an out-of-range value should
+        // never actually ship, but a corrupt/tampered response must fail loudly rather than silently
+        // start an instantly-over (0) or effectively-infinite (huge) puzzle.
+        val outOfRangePuzzle = testPuzzle.copy(payloadJson = buildPayloadJson(maxGuesses = 21))
+        coEvery { getTodayPuzzleUseCase() } returns DataResult.Success(outOfRangePuzzle)
+
+        val viewModel = buildViewModel()
+        viewModel.uiState.test {
+            assertEquals(PuzzleUiState.Loading, awaitItem())
+            val failed = awaitItem() as PuzzleUiState.Failed
+            assertTrue(failed.message.isNotBlank())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `offline path with no local cache emits Offline`() = runTest(dispatcher) {
         coEvery { getTodayPuzzleUseCase() } returns DataResult.Error("network down")
 
@@ -267,6 +325,10 @@ class PuzzleViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify { savePuzzleResultUseCase(match { it.completedAt == null && it.attempts == 1 && !it.solved }) }
+        // The just-rejected name must not linger in the input -- otherwise a second Submit tap
+        // re-submits an identical guess and burns a budget slot on an accidental duplicate.
+        assertEquals("", viewModel.guessQueryText.value)
+        assertTrue(viewModel.guessSuggestions.value.isEmpty())
     }
 
     @Test

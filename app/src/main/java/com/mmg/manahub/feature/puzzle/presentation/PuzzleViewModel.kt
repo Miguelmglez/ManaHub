@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.puzzle.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
@@ -28,6 +29,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
+import com.mmg.manahub.core.util.recordSafeNonFatal
 
 /**
  * Drives the Daily Puzzle screen: resolves today's puzzle (resuming an in-progress local attempt
@@ -92,6 +94,15 @@ class PuzzleViewModel(
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Static-call convention (matches `DeckWizardViewModel`/`HomeViewModel`) — this ViewModel is
+     * Android-only (Daily Puzzle Phase 0/1 per ADR-006), so no `CrashReporter` DI is needed here.
+     * Repo-layer failures (Worker fetch, resume-row decode) are reported via the injected
+     * `CrashReporter` in `PuzzleRepositoryImpl` instead — see `crashlytics-ux-auditor`'s
+     * `audit_daily_puzzle.md`.
+     */
+    private val crashlytics = FirebaseCrashlytics.getInstance()
+
     init {
         loadPuzzle()
         viewModelScope.launch {
@@ -122,21 +133,47 @@ class PuzzleViewModel(
                         // never be silently merged into a different day's puzzle.
                         val resumable = localInProgress?.takeIf { it.puzzleDate == puzzle.date }
                         sessionStartedAt = resumable?.startedAt ?: Clock.System.now()
-                        PuzzleUiState.Playing(
-                            puzzle = puzzle,
-                            guesses = resumable?.guesses.orEmpty(),
-                            resumedFromCache = resumable != null,
-                            // Server-authoritative — a corrupt/malformed payload fails the load
-                            // (caught by the outer runCatching below) rather than silently starting
-                            // the attempt under the wrong budget.
-                            maxGuesses = resolveMaxGuesses(puzzle),
-                        )
+                        // Server-authoritative — a corrupt/malformed payload fails the load (caught
+                        // by the outer runCatching below) rather than silently starting the attempt
+                        // under the wrong budget.
+                        val maxGuesses = resolveMaxGuesses(puzzle)
+
+                        if (resumable != null && resumable.guesses.size >= maxGuesses) {
+                            // A local row saved under a DIFFERENT (larger) budget than the server
+                            // currently publishes is already exhausted — e.g. Batch B3's hardcoded-
+                            // 8-vs-server-7 mismatch left rows with 7 guesses and no completedAt.
+                            // Route straight to the terminal state instead of re-showing Playing
+                            // with an already-spent budget (which would render an enabled submit
+                            // button for an attempt that is, in truth, already over). By
+                            // construction the last saved guess here can never have been correct —
+                            // a correct guess always sets completedAt regardless of budget — so this
+                            // row's `solved` is always false.
+                            val closedOut = resumable.copy(completedAt = Clock.System.now())
+                            // Best-effort persistence of the correction — never blocks reaching the
+                            // terminal state, mirrors onGuessResolved's own save-failure tolerance.
+                            runCatching { savePuzzleResultUseCase(closedOut) }
+                            PuzzleUiState.Solved(closedOut)
+                        } else {
+                            PuzzleUiState.Playing(
+                                puzzle = puzzle,
+                                guesses = resumable?.guesses.orEmpty(),
+                                resumedFromCache = resumable != null,
+                                maxGuesses = maxGuesses,
+                            )
+                        }
                     }
-                    is DataResult.Error -> PuzzleUiState.Offline
+                    is DataResult.Error -> {
+                        crashlytics.log("puzzle_offline_state_shown")
+                        PuzzleUiState.Offline
+                    }
                 }
             }.fold(
                 onSuccess = { state -> _uiState.value = state },
-                onFailure = { e -> _uiState.value = PuzzleUiState.Failed(e.message ?: "Unknown error") },
+                onFailure = { e ->
+                    crashlytics.setCustomKey("puzzle_load_failure_source", e::class.simpleName ?: "Unknown")
+                    recordSafeNonFatal("puzzle_load_unexpected_failure", e)
+                    _uiState.value = PuzzleUiState.Failed(e.message ?: "Unknown error")
+                },
             )
         }
     }
@@ -150,10 +187,21 @@ class PuzzleViewModel(
      * branch) falls back to [DEFAULT_MAX_GUESSES], which mirrors the generator's own
      * `DEFAULT_MAX_GUESSES` (`tools/puzzle-generator/stages/emit.mjs`) so the fallback stays
      * consistent with the real server default rather than reintroducing an arbitrary client value.
+     *
+     * A decoded [GuessCardPayload.maxGuesses] outside [VALID_MAX_GUESSES_RANGE] (the generator's own
+     * `schemaValidate.mjs` bound, `tools/puzzle-generator/stages/schemaValidate.mjs`) throws, which
+     * the caller's `runCatching` turns into a [PuzzleUiState.Failed] load — a corrupt/out-of-range
+     * payload fails to load rather than silently starting an instantly-over or effectively-infinite
+     * puzzle, same framing as the malformed-JSON case above.
      */
     private fun resolveMaxGuesses(puzzle: Puzzle): Int = when (puzzle.type) {
-        PuzzleType.GUESS_CARD ->
-            json.decodeFromString(GuessCardPayload.serializer(), puzzle.payloadJson).maxGuesses
+        PuzzleType.GUESS_CARD -> {
+            val maxGuesses = json.decodeFromString(GuessCardPayload.serializer(), puzzle.payloadJson).maxGuesses
+            require(maxGuesses in VALID_MAX_GUESSES_RANGE) {
+                "GuessCardPayload.maxGuesses ($maxGuesses) is outside the valid range $VALID_MAX_GUESSES_RANGE"
+            }
+            maxGuesses
+        }
         else -> DEFAULT_MAX_GUESSES
     }
 
@@ -198,7 +246,11 @@ class PuzzleViewModel(
             _guessError.value = null
             submitPuzzleGuessUseCase(current.puzzle, guessName).fold(
                 onSuccess = { guessResult -> onGuessResolved(current, guessResult) },
-                onFailure = { e -> _guessError.value = e.message ?: "Could not find a card with that name" },
+                onFailure = { e ->
+                    crashlytics.setCustomKey("puzzle_guess_submit_error_type", e::class.simpleName ?: "Unknown")
+                    recordSafeNonFatal("puzzle_guess_submit_failed", e)
+                    _guessError.value = e.message ?: "Could not find a card with that name"
+                },
             )
             _isSubmittingGuess.value = false
         }
@@ -223,20 +275,33 @@ class PuzzleViewModel(
 
         // Persisted after EVERY guess (not just on solve) so a process death mid-puzzle resumes
         // correctly. The guess itself is already resolved client-side by this point, so a save
-        // failure never blocks local progress — it only surfaces as a soft warning.
+        // failure never blocks local progress — it only surfaces as a soft warning. A solved puzzle
+        // that fails to save here is a genuine data-loss surface (lost XP/streak/achievement, since
+        // PuzzleRepositoryImpl.savePuzzleResult only emits ProgressionEvent.PuzzleSolved AFTER a
+        // successful write) — record it as a non-fatal, not just a UI warning, so it's actually
+        // visible in aggregate.
         runCatching { savePuzzleResultUseCase(result) }
-            .onFailure { e -> _guessError.value = "Guess resolved, but couldn't save progress: ${e.message}" }
+            .onFailure { e ->
+                crashlytics.setCustomKey("puzzle_date", result.puzzleDate.toString())
+                crashlytics.setCustomKey("puzzle_attempts_used", result.attempts)
+                crashlytics.setCustomKey("puzzle_is_game_over", isGameOver)
+                recordSafeNonFatal("puzzle_progress_save_failed", e)
+                _guessError.value = "Guess resolved, but couldn't save progress: ${e.message}"
+            }
 
         _uiState.value = if (isGameOver) {
+            crashlytics.log(if (result.solved) "puzzle_solved" else "puzzle_failed")
+            crashlytics.setCustomKey("puzzle_attempts_used", result.attempts)
             PuzzleUiState.Solved(result)
         } else {
             current.copy(guesses = updatedGuesses)
         }
 
-        if (isGameOver) {
-            _guessQueryText.value = ""
-            _guessSuggestions.value = emptyList()
-        }
+        // Clear the input after EVERY resolved guess, not just on game-over — otherwise the
+        // just-rejected name stays in the field and a second tap on Submit re-submits an identical
+        // guess, burning a budget slot on an accidental duplicate.
+        _guessQueryText.value = ""
+        _guessSuggestions.value = emptyList()
     }
 
     private companion object {
@@ -251,5 +316,12 @@ class PuzzleViewModel(
          * [PuzzleType.GUESS_CARD], which always reads the real server-published value.
          */
         const val DEFAULT_MAX_GUESSES = 7
+
+        /**
+         * The generator's own valid range for [GuessCardPayload.maxGuesses]
+         * (`tools/puzzle-generator/stages/schemaValidate.mjs`: `payload.maxGuesses must be in [1, 20]`).
+         * A decoded value outside this range is treated as a corrupt payload — see [resolveMaxGuesses].
+         */
+        val VALID_MAX_GUESSES_RANGE = 1..20
     }
 }
