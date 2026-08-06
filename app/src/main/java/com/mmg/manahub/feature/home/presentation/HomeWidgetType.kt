@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.home.presentation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Feed
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
@@ -212,6 +213,24 @@ enum class HomeWidgetType(
         category = WidgetCategory.COMMUNITY,
         audience = WidgetAudience.ALL,
         icon = Icons.Default.Style,
+    ),
+
+    // ── Daily Puzzle (ADR-006), Batch B2 ─────────────────────────────────────────
+    /** Preview of today's Cardle-style guessing puzzle; tap navigates to
+     * [com.mmg.manahub.app.navigation.Screen.DailyPuzzle]. Gallery-only/opt-in (NOT in either
+     * default layout, matching [TRENDING_COMMANDERS]' board-length discipline) and deliberately
+     * NOT gamification-gated ([isGamification] below stays a fixed allowlist of exactly
+     * [PROGRESSION_HUB]/[QUESTS_HUB]) — the puzzle must stay playable with the gamification master
+     * toggle off (ADR-005 Decision 1's "gate the backend, not just the UI" principle does not apply
+     * here: the puzzle screen is not a gamification surface, it merely EMITS XP/streak progress on
+     * solve, same as any other feature). */
+    DAILY_PUZZLE(
+        persistedId = "daily_puzzle",
+        defaultTitleRes = R.string.widget_title_daily_puzzle,
+        supportedSizes = setOf(WidgetSize.MEDIUM),
+        category = WidgetCategory.DISCOVER,
+        audience = WidgetAudience.ALL,
+        icon = Icons.Default.Extension,
     );
 
     /** True for widgets that belong to the gamification system (hidden when the toggle is off). */

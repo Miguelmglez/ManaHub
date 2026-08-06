@@ -426,3 +426,35 @@ enum class HomeCommunityDeckCategory(
             entries.firstOrNull { it.persistedId == id } ?: POPULAR
     }
 }
+
+/**
+ * Home DAILY_PUZZLE widget preview state (ADR-006, Batch B2), fed by [HomeViewModel.dailyPuzzleFlow].
+ *
+ * Deliberate deviation from the [HomeViewModel.trendingFlow]/[HomeViewModel.communityDecksFlow]
+ * convention of collapsing every failure to `null` and hiding the widget silently: this widget
+ * distinguishes [Loading]/[Loaded]/[Unavailable] so it can show a real "today's puzzle isn't
+ * available right now" message instead of vanishing — losing a whole widget silently is a poor
+ * experience for a feature the user deliberately added to their board (gallery-only, opt-in), as
+ * opposed to [HomeWidgetType.TRENDING_COMMANDERS]/[HomeWidgetType.COMMUNITY_DECKS], which are
+ * "nice-to-have if reachable" community-data widgets.
+ */
+sealed interface DailyPuzzleWidgetState {
+    object Loading : DailyPuzzleWidgetState
+
+    /**
+     * @param puzzleType the fetched puzzle's type — the widget only shows a play/preview CTA for a
+     *   type it recognizes ([com.mmg.manahub.core.model.puzzle.PuzzleType.GUESS_CARD]); any other
+     *   type (including UNKNOWN) still counts as "loaded" but the widget degrades its copy rather
+     *   than claim there is something playable it cannot actually render.
+     * @param attemptsUsed guesses submitted so far today (0 if the user has not attempted yet).
+     * @param solved whether today's attempt (if any) already ended in a correct guess.
+     */
+    data class Loaded(
+        val puzzleType: com.mmg.manahub.core.model.puzzle.PuzzleType,
+        val attemptsUsed: Int,
+        val solved: Boolean,
+    ) : DailyPuzzleWidgetState
+
+    /** Today's puzzle could not be fetched (network/server failure, or the feature's DI is absent). */
+    object Unavailable : DailyPuzzleWidgetState
+}

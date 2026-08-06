@@ -111,6 +111,9 @@ sealed interface HomeAction {
 
     /** Opens the Profile screen on the Quests tab (gamification Phase 2). */
     object OpenProfileQuests : HomeAction
+
+    /** Opens the Daily Puzzle screen (ADR-006), from either the widget's title/CTA. */
+    object OpenDailyPuzzle : HomeAction
     data class OpenCardDetail(val scryfallId: String, val sharedTransitionKey: String? = null) : HomeAction
     data class OpenDeck(val deckId: String) : HomeAction
 
