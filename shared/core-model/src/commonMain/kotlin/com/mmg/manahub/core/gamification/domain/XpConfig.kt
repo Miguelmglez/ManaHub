@@ -65,8 +65,10 @@ object XpConfig {
     /**
      * Additional XP when the puzzle was solved "perfectly" (see
      * [com.mmg.manahub.core.gamification.domain.event.ProgressionEvent.PuzzleSolved.perfect]).
-     * Unreachable this pass — no shipped puzzle type sets `perfect = true` yet — wired for
-     * forward-compat with later puzzle types.
+     * Deliberately EXCLUDED for [com.mmg.manahub.core.model.puzzle.PuzzleType.GUESS_CARD] (see the
+     * exclusion in `XpGranter`'s `PuzzleSolved` branch) — a lucky or already-known first guess isn't
+     * a skill signal worth rewarding on a guess-based puzzle. Reserved for future skill-based puzzle
+     * types (e.g. Connections, Mana Math), where a genuinely optimal solve is meaningful to reward.
      */
     const val puzzlePerfectBonus: Int = 40
 

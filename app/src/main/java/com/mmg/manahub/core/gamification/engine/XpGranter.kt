@@ -175,10 +175,12 @@ class XpGranter(
         is ProgressionEvent.FeatureExplored -> null
 
         // Daily Puzzle feature (Batch B3 gamification hookup). The perfect-solve bonus is
-        // unreachable this pass (no shipped puzzle type sets perfect = true — see
-        // XpConfig.puzzlePerfectBonus KDoc) but is wired now for forward-compat; GUESS_CARD is
-        // explicitly excluded so a future accidental perfect = true on this type never silently
-        // starts paying a bonus it was never designed for.
+        // DELIBERATELY EXCLUDED for GUESS_CARD (see XpConfig.puzzlePerfectBonus KDoc): a lucky or
+        // already-known first guess on a guess-based puzzle isn't a skill signal worth rewarding.
+        // event.perfect IS reachable here (PuzzleViewModel.onGuessResolved sets
+        // perfect = isCorrect && updatedGuesses.size == 1, which a first-try guess satisfies) — the
+        // `event.type != "GUESS_CARD"` guard is the actual gate, reserved for future skill-based
+        // puzzle types where a genuinely optimal solve is meaningful to reward.
         is ProgressionEvent.PuzzleSolved -> {
             val lines = buildList {
                 add(XpLineItem(XpSourceCategory.PUZZLE, XpConfig.puzzleSolved, "Puzzle solved"))
