@@ -45,10 +45,13 @@ private const val MAX_PUZZLE_RESPONSE_BYTES = 1L * 1024 * 1024
  * `cardStrategyTagsKoinModule` — passed in as [puzzleDao] and registered as a Koin `single` here.
  *
  * ## Reused cross-module singletons (resolved via `get()`)
- * [com.mmg.manahub.core.gamification.domain.ProgressionEventBus] and
- * [com.mmg.manahub.core.domain.repository.CardRepository] are already registered as Koin singles in
- * `coreBridgeKoinModule` (loaded in the same `modules(...)` call in `ManaHubApp`) — they are NOT
- * re-declared here to avoid a `DefinitionOverrideException`.
+ * [com.mmg.manahub.core.gamification.domain.ProgressionEventBus],
+ * [com.mmg.manahub.core.domain.repository.CardRepository], and
+ * [com.mmg.manahub.core.common.CrashReporter] (crashlytics-ux-auditor's `audit_daily_puzzle.md`,
+ * F1/F2 — DI'd into [PuzzleRepositoryImpl] instead of a static `FirebaseCrashlytics.getInstance()`
+ * call) are already registered as Koin singles in `coreBridgeKoinModule` (loaded in the same
+ * `modules(...)` call in `ManaHubApp`) — they are NOT re-declared here to avoid a
+ * `DefinitionOverrideException`.
  *
  * ## Same Worker as Draft content, different path
  * The puzzle endpoint (`GET puzzle/today`) is served by the SAME `manahub-draft-api` Cloudflare
@@ -77,11 +80,13 @@ fun puzzleKoinModule(
     }
 
     // ── Data layer: remote fetch + Room-backed local store + XP emission on solve. ──
+    // crashReporter comes from coreBridgeKoinModule (single<CrashReporter>) — NOT re-declared here.
     single<PuzzleRepository> {
         PuzzleRepositoryImpl(
             remote = get(),
             puzzleDao = get(),
             progressionEventBus = get(),
+            crashReporter = get(),
         )
     }
 

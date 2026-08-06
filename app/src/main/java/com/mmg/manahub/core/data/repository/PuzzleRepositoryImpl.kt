@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.data.repository
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.PuzzleDao
 import com.mmg.manahub.core.data.local.entity.PuzzleResultEntity
 import com.mmg.manahub.core.data.remote.PuzzleApiContract
@@ -26,11 +27,16 @@ import kotlinx.serialization.json.Json
  * stays `androidMain`-only per the KMP migration's data-layer rule, so this repository impl (which
  * touches [PuzzleDao] directly) lives in `:app`, exactly like `TradesRepositoryImpl`
  * (`feature/trades/data/repository/`) touches `CardDao` directly.
+ *
+ * [crashReporter] is DI'd (not a static `FirebaseCrashlytics.getInstance()` call) since this is a
+ * Koin-native `androidMain` class, matching the `ArchidektRequestQueue`/`FriendRepositoryImpl`
+ * precedent (crashlytics-ux-auditor's `audit_daily_puzzle.md`, F1/F2).
  */
 class PuzzleRepositoryImpl(
     private val remote: PuzzleApiContract,
     private val puzzleDao: PuzzleDao,
     private val progressionEventBus: ProgressionEventBus,
+    private val crashReporter: CrashReporter,
 ) : PuzzleRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -39,11 +45,29 @@ class PuzzleRepositoryImpl(
         runCatching { remote.getTodayPuzzle().toDomain() }
             .fold(
                 onSuccess = { DataResult.Success(it) },
-                onFailure = { e -> DataResult.Error(e.message ?: "Unknown error") },
+                onFailure = { e ->
+                    // The only new network dependency in this feature, zero prior production
+                    // signal — a Worker outage or schema drift would otherwise be invisible.
+                    crashReporter.setCustomKey("puzzle_fetch_error_type", e::class.simpleName ?: "Unknown")
+                    crashReporter.log("puzzle_fetch_failed")
+                    crashReporter.recordException(e)
+                    DataResult.Error(e.message ?: "Unknown error")
+                },
             )
 
     override suspend fun getPuzzleResult(date: LocalDate): PuzzleResult? =
-        puzzleDao.getByDate(date.toString())?.toDomain(json)
+        puzzleDao.getByDate(date.toString())?.let { entity ->
+            runCatching { entity.toDomain(json) }
+                .onFailure { e ->
+                    // A corrupt guesses_json blob (e.g. a partial write, or a manual DB edit) would
+                    // otherwise throw ungaurded here and surface as an opaque puzzle-load failure —
+                    // record it distinctly so a resume-corruption pattern is visible in aggregate,
+                    // and degrade to "nothing resumable" instead of crashing the load.
+                    crashReporter.log("puzzle_resume_parse_failed")
+                    crashReporter.recordException(e)
+                }
+                .getOrNull()
+        }
 
     override suspend fun savePuzzleResult(result: PuzzleResult) {
         puzzleDao.upsert(result.toEntity(json))
@@ -65,7 +89,12 @@ class PuzzleRepositoryImpl(
     }
 
     override fun observeResults(): Flow<List<PuzzleResult>> =
-        puzzleDao.observeAll().map { entities -> entities.map { it.toDomain(json) } }
+        puzzleDao.observeAll().map { entities ->
+            // One corrupt row (see getPuzzleResult's KDoc) must not kill this flow for every
+            // collector — skip it and keep the rest. No consumers yet (zero blast radius today), but
+            // this is a live trap for the next feature that calls it.
+            entities.mapNotNull { entity -> runCatching { entity.toDomain(json) }.getOrNull() }
+        }
 
     private fun PuzzleResultEntity.toDomain(json: Json): PuzzleResult = PuzzleResult(
         puzzleDate = LocalDate.parse(puzzleDate),
