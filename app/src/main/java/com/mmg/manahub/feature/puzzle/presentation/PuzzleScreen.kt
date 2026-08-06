@@ -26,12 +26,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.puzzle.PuzzleResult
 import com.mmg.manahub.core.model.puzzle.PuzzleType
@@ -40,6 +42,7 @@ import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.recordNonFatal
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -67,6 +70,12 @@ fun PuzzleScreen(
 
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+
+    // Screen-entry breadcrumb (no PII) — matches CardDetailScreen/HomeScreen/DeckStudioScreen's
+    // convention. Fires once per entry (keyed on Unit).
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: daily_puzzle")
+    }
 
     Scaffold(
         containerColor = mc.background,
@@ -128,10 +137,21 @@ fun PuzzleScreen(
                         onDismissError = viewModel::dismissGuessError,
                     )
                     // Forward-compat: a puzzle type this client build doesn't know how to render yet
-                    // (see PuzzleType.fromWire's KDoc) degrades gracefully instead of crashing.
-                    PuzzleType.UNKNOWN -> FullErrorState(
-                        message = stringResource(R.string.daily_puzzle_type_unsupported),
-                    )
+                    // (see PuzzleType.fromWire's KDoc) degrades gracefully instead of crashing. Should
+                    // be ~0 occurrences in Phase 0/1 (only GUESS_CARD ships) -- reaching this branch
+                    // signals a generator/client type mismatch, so it backs a non-fatal.
+                    PuzzleType.UNKNOWN -> {
+                        LaunchedEffect(state.puzzle.date) {
+                            FirebaseCrashlytics.getInstance().setCustomKey(
+                                "puzzle_date",
+                                state.puzzle.date.toString(),
+                            )
+                            recordNonFatal("puzzle_unsupported_type_reached")
+                        }
+                        FullErrorState(
+                            message = stringResource(R.string.daily_puzzle_type_unsupported),
+                        )
+                    }
                 }
 
                 is PuzzleUiState.Solved -> PuzzleSolvedContent(result = state.result)
