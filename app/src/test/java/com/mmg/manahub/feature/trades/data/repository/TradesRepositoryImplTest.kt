@@ -443,4 +443,79 @@ class TradesRepositoryImplTest {
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is TradeError.Unauthorized)
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 7 — refreshItemsForThread (Backend & Performance Optimization plan,
+    //            WS4a finding 2, 2026-07-28): item-only fan-out, no metadata re-fetch
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun tradeItemDto(
+        id: String,
+        proposalId: String,
+        cardId: String = "card-uuid-1",
+        fromUserId: String = USER_ID,
+        toUserId: String = "receiver-uuid-002",
+    ) = TradeItemDto(
+        id = id,
+        tradeProposalId = proposalId,
+        fromUserId = fromUserId,
+        toUserId = toUserId,
+        cardId = cardId,
+    )
+
+    @Test
+    fun `given a cached proposal in the thread when refreshItemsForThread then only fetchProposalItems is called never fetchProposals`() =
+        runTest {
+            // Arrange: populate the cache via refreshProposals first (metadata already fresh).
+            val dto = buildProposalDto(id = "p-001", rootProposalId = "p-001")
+            coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto))
+            repository.refreshProposals(USER_ID)
+
+            coEvery { remote.fetchProposalItems("p-001") } returns
+                Result.success(listOf(tradeItemDto(id = "item-1", proposalId = "p-001")))
+
+            // Act
+            val result = repository.refreshItemsForThread("p-001")
+
+            // Assert
+            assertTrue(result.isSuccess)
+            coVerify(exactly = 1) { remote.fetchProposalItems("p-001") }
+            // The whole point of refreshItemsForThread: it must NOT re-fetch proposal metadata --
+            // fetchProposals is only ever called once, by the setup refreshProposals() above.
+            coVerify(exactly = 1) { remote.fetchProposals(USER_ID) }
+        }
+
+    @Test
+    fun `given a proposal id not present in the cache when refreshItemsForThread then it is a no-op success`() = runTest {
+        // No refreshProposals() call -- the cache starts empty, so no proposal belongs to this thread.
+        val result = repository.refreshItemsForThread("unknown-root")
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { remote.fetchProposalItems(any()) }
+    }
+
+    @Test
+    fun `given fetched items when refreshItemsForThread then items merge into the existing cache entry by proposal id`() =
+        runTest {
+            val dto1 = buildProposalDto(id = "p-001", rootProposalId = "p-001")
+            val dto2 = buildProposalDto(id = "p-002", rootProposalId = "p-002")
+            coEvery { remote.fetchProposals(USER_ID) } returns Result.success(listOf(dto1, dto2))
+            repository.refreshProposals(USER_ID)
+
+            coEvery { remote.fetchProposalItems("p-001") } returns
+                Result.success(listOf(tradeItemDto(id = "item-1", proposalId = "p-001")))
+
+            repository.refreshItemsForThread("p-001")
+
+            repository.observeAllProposals().test {
+                val proposals = awaitItem()
+                val p1 = proposals.single { it.id == "p-001" }
+                val p2 = proposals.single { it.id == "p-002" }
+                assertEquals(1, p1.items.size)
+                // p-002 was never part of the refreshed thread -- its items (empty from the
+                // refreshProposals() default) must be untouched, not cleared.
+                assertTrue(p2.items.isEmpty())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

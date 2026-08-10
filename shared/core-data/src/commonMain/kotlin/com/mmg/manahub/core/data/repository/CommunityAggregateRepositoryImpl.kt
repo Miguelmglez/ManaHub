@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.remote.CommunityAggregateKeys
 import com.mmg.manahub.core.data.remote.SixtyFallbackFetcher
 import com.mmg.manahub.core.data.remote.dto.CommanderAggregateResponseDto
 import com.mmg.manahub.core.data.remote.dto.SixtyAggregateResponseDto
+import com.mmg.manahub.core.data.remote.dto.TrendingResponseDto
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.model.AggregateSource
@@ -60,6 +61,16 @@ class CommunityAggregateRepositoryImpl(
     private val now: () -> Long,
     private val isEngineEnabled: suspend () -> Boolean,
 ) : CommunityAggregateRepository {
+
+    /**
+     * WS7 telemetry (backend-performance-optimization-plan.md, 2026-07-29): approximate, non-atomic
+     * session hit/miss counters for [getTrending]'s cache-first gate (WS4a finding 3 -- the fix that
+     * gave this method the same cache-first pattern its siblings already had). Plain non-synchronized
+     * `var`s by design, same accepted approximation as [ScryfallRemoteDataSource]'s equivalent
+     * counters -- a rare lost increment under a genuine race is not worth a new `Mutex`.
+     */
+    private var trendingCacheHits = 0L
+    private var trendingCacheMisses = 0L
 
     override suspend fun getCommanderAggregate(commanderName: String): DataResult<CommunityAggregate.Commander> =
         withContext(dispatcherProvider.io) {
@@ -130,12 +141,34 @@ class CommunityAggregateRepositoryImpl(
     override suspend fun getTrending(week: String?): DataResult<TrendingSnapshot> =
         withContext(dispatcherProvider.io) {
             if (!isEngineEnabled()) return@withContext disabledError()
+
+            // Backend & Performance Optimization plan, WS4a finding 3 (2026-07-28): this used to
+            // skip the cache-first pattern its siblings (getCommanderAggregate/getSixtyAggregate)
+            // both use, hitting the Worker on every call -- including HomeViewModel.trendingFlow's
+            // WhileSubscribed(5_000) cold flow re-fetching on every Home revisit after a brief
+            // background gap, AND CommunityDecksSearchViewModel.loadDiscover() in the same window.
+            val key = CommunityAggregateKeys.trendingCacheKey(week)
+            val cached = cache.get(key)
+            val isHit = cached != null && isFresh(cached.cachedAt)
+            if (isHit) trendingCacheHits++ else trendingCacheMisses++
+            crashReporter.setCustomKey(
+                "community_trending_cache_ratio_session",
+                "$trendingCacheHits/$trendingCacheMisses",
+            )
+            if (isHit) {
+                val decoded = decodeTrending(cached!!.json)
+                return@withContext if (decoded != null) DataResult.Success(decoded) else DataResult.Error("Corrupt community cache entry")
+            }
+
             try {
-                DataResult.Success(api.getTrending(week).toDomain())
+                val dto = api.getTrending(week)
+                cache.insert(key, aggregateJson.encodeToString(TrendingResponseDto.serializer(), dto), now())
+                DataResult.Success(dto.toDomain())
             } catch (e: Exception) {
                 // Trending is a nice-to-have widget signal — never noisy in Crashlytics.
                 crashReporter.log("community_trending_fetch_failed")
-                DataResult.Error("Trending data unavailable")
+                val stale = cached?.let { decodeTrending(it.json) }
+                if (stale != null) DataResult.Success(stale, isStale = true) else DataResult.Error("Trending data unavailable")
             }
         }
 
@@ -151,6 +184,13 @@ class CommunityAggregateRepositoryImpl(
     private fun decodeSixty(json: String, source: AggregateSource): CommunityAggregate.Sixty? =
         try {
             aggregateJson.decodeFromString(SixtyAggregateResponseDto.serializer(), json).toDomain(source)
+        } catch (e: Exception) {
+            null
+        }
+
+    private fun decodeTrending(json: String): TrendingSnapshot? =
+        try {
+            aggregateJson.decodeFromString(TrendingResponseDto.serializer(), json).toDomain()
         } catch (e: Exception) {
             null
         }

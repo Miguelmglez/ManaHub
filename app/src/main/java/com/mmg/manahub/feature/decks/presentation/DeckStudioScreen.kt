@@ -41,6 +41,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Explore
@@ -87,6 +88,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.feature.decks.presentation.components.SynergyCardTile
 import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
@@ -96,6 +98,7 @@ import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
+import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.ui.components.CardSearchSheet
@@ -117,19 +120,18 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
-import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.model.AlmostCombo
 import com.mmg.manahub.feature.decks.domain.model.Combo
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
+import com.mmg.manahub.feature.decks.domain.template.partitionByAxis
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanChip
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanHint
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanSheetContent
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
-import com.mmg.manahub.feature.decks.presentation.components.BudgetInputBar
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardRow
 import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
@@ -137,7 +139,6 @@ import com.mmg.manahub.feature.decks.presentation.components.DeckFormatChipRow
 import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckStatsCard
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
-import com.mmg.manahub.feature.decks.presentation.components.DiscoveryRow
 import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
@@ -148,7 +149,6 @@ import com.mmg.manahub.feature.decks.presentation.components.SimilarDeckCard
 import com.mmg.manahub.feature.decks.presentation.components.CutSuggestionRow
 import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
 import com.mmg.manahub.feature.decks.presentation.components.RoleCoverageRow
-import com.mmg.manahub.feature.decks.presentation.components.SeedsContent
 import com.mmg.manahub.feature.decks.presentation.components.WarningChip
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
@@ -250,7 +250,6 @@ fun DeckStudioScreen(
     val cardAddedMsg = stringResource(R.string.deck_studio_card_added)
     val cardCutMsg = stringResource(R.string.deck_studio_card_cut)
     val externalFailedMsg = stringResource(R.string.deck_studio_external_pool_failed)
-    val seedBuiltMsg = stringResource(R.string.deck_studio_seed_built)
     val archetypePlanUpdatedMsg = stringResource(R.string.deck_studio_archetype_plan_updated)
     val strategyUnlockedMsg = stringResource(R.string.deck_studio_strategy_unlocked)
 
@@ -293,15 +292,14 @@ fun DeckStudioScreen(
     }
     BackHandler(onBack = handleBack)
 
-    // Deck Builder v2 (plan D10/§3.7): a single "Build from seed" entry point routes to the v2
-    // wizard when DECK_BUILDER_V2_ENABLED, else opens the legacy seed sheet -- shared by BOTH the
-    // top-bar overflow item and the empty-state primary button so the two never drift.
+    // Deck Builder v2 (plan D10/§3.7): the single "Build from seed" entry point routes to the v2
+    // wizard -- shared by BOTH the top-bar overflow item and the empty-state primary button so
+    // the two never drift. The legacy seed sheet (`SeedsContent`/`BuildDeckFromSeedsUseCase`) was
+    // RETIRED in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28) -- this entry point's
+    // visibility is still gated on `DeckFeatureFlags.DECK_BUILDER_V2_ENABLED` (see `seedEnabled`
+    // below), but once visible it has exactly one destination.
     val handleBuildFromSeed: () -> Unit = {
-        if (DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) {
-            onNavigateToWizard(null, null, null, null, null)
-        } else {
-            viewModel.openSeedSheet()
-        }
+        onNavigateToWizard(null, null, null, null, null)
     }
 
     val isCommanderFormat = uiState.deck?.format
@@ -480,6 +478,7 @@ fun DeckStudioScreen(
                             onCommunityCardTap = { id -> selectedCardId = id },
                             onViewCommunityDecksForCard = onNavigateToCommunityDecksByCard,
                             onOpenSimilarDeck = onNavigateToCommunityDeckDetail,
+                            onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
                         )
                     }
                 }
@@ -550,77 +549,6 @@ fun DeckStudioScreen(
 
     // ── Sheets ──────────────────────────────────────────────────────────────────
 
-    // Seed-build sheet (Phase 3): VM-state driven (uiState.showSeedSheet), unlike the
-    // local-state sheets below.
-    if (uiState.showSeedSheet) {
-        val seedSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.closeSeedSheet() },
-            sheetState = seedSheetState,
-            shape = BottomSheetShape,
-            containerColor = mc.background,
-        ) {
-            Column(Modifier.fillMaxHeight(0.92f)) {
-                Text(
-                    text = stringResource(R.string.deck_studio_seed_sheet_title),
-                    style = ty.titleLarge,
-                    color = mc.textPrimary,
-                    modifier = Modifier.padding(
-                        horizontal = MaterialTheme.spacing.lg,
-                        vertical = MaterialTheme.spacing.md,
-                    ),
-                )
-                val seedFormat = uiState.deck?.format
-                    ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
-                    ?: DeckFormat.CASUAL
-                SeedsContent(
-                    seedCards = uiState.seedCards,
-                    identity = uiState.inferredIdentity,
-                    skeleton = DeckSkeletons.forFormat(seedFormat),
-                    budget = uiState.budgetConstraints,
-                    query = uiState.seedQuery,
-                    searchResults = uiState.seedSearchResults,
-                    isSearching = uiState.isSearchingSeeds,
-                    canGenerate = uiState.seedCards.isNotEmpty() && !uiState.isGenerating,
-                    isGenerating = uiState.isGenerating,
-                    onQueryChange = viewModel::onSeedQueryChange,
-                    onAddSeed = viewModel::addSeed,
-                    onRemoveSeed = viewModel::removeSeed,
-                    // Unused: the budget is driven by the custom budgetSlot below (free-text input).
-                    onBudgetChanged = { },
-                    onGenerate = {
-                        focusManager.clearFocus()
-                        viewModel.generateFromSeeds { count ->
-                            toastState.show(
-                                String.format(seedBuiltMsg, count),
-                                MagicToastType.SUCCESS,
-                            )
-                        }
-                    },
-                    budgetSlot = {
-                        BudgetInputBar(
-                            perCardText = uiState.rawPerCardText,
-                            totalText = uiState.rawTotalText,
-                            ownedCardsAreFree = uiState.ownedCardsAreFree,
-                            hasError = uiState.budgetError,
-                            onPerCardChange = viewModel::onPerCardBudgetChange,
-                            onTotalChange = viewModel::onTotalBudgetChange,
-                            onOwnedFreeChange = viewModel::onOwnedCardsFreeChange,
-                            onClear = viewModel::onClearBudget,
-                        )
-                    },
-                    // Phase 5: the toggle row is only shown when the master flag is on.
-                    useCommunityData = uiState.useCommunityDataForSeed,
-                    onToggleUseCommunityData = if (uiState.communityEngineEnabled) {
-                        viewModel::toggleUseCommunityDataForSeed
-                    } else {
-                        null
-                    },
-                )
-            }
-        }
-    }
-
     // Inspirations (Discoveries) sheet (Phase 4): VM-state driven (uiState.showInspirations).
     if (uiState.showInspirations) {
         val inspirationsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -630,66 +558,57 @@ fun DeckStudioScreen(
             shape = BottomSheetShape,
             containerColor = mc.background,
         ) {
-            // Deck Builder v2 Phase 5 (plan D10/§3.7): the SAME entry point, content swaps on the
-            // flag -- Discoveries v2 clusters (identity-only, color-coherent) hand off to the v2
-            // wizard pre-filled (D11); the legacy content still seeds the old seed sheet.
-            if (DeckFeatureFlags.DISCOVERIES_V2_ENABLED) {
-                InspirationsSheetContentV2(
-                    discoveries = uiState.discoveriesV2,
-                    filteredDiscoveries = uiState.filteredDiscoveriesV2,
-                    matchingCards = uiState.discoveryMatchingCards,
-                    isLoading = uiState.isLoadingDiscoveries,
-                    onBuildThis = { discovery ->
-                        viewModel.closeInspirations()
-                        onNavigateToWizard(
-                            discovery.archetype?.name,
-                            discovery.theme?.name,
-                            discovery.tribe,
-                            discovery.dominantColors.joinToString("") { it.symbol },
-                            null,
-                        )
-                    },
-                    inspirationsTab = uiState.inspirationsTab,
-                    onSelectTab = viewModel::onSelectInspirationsTab,
-                    searchQuery = uiState.discoverySearchQuery,
-                    onSearchQueryChange = viewModel::onDiscoverySearchQueryChange,
-                    selectedCardNames = uiState.discoverySelectedCardNames,
-                    onToggleSearchCard = viewModel::onToggleDiscoverySearchCard,
-                    onClearSearch = viewModel::onClearDiscoverySearch,
-                    comboResult = uiState.comboResult,
-                    comboCardsByName = uiState.comboCardsByName,
-                    isLoadingCombos = uiState.isLoadingCombos,
-                    onUseComboAsSeed = { cardNames ->
-                        viewModel.closeInspirations()
-                        onNavigateToWizard(null, null, null, null, cardNames)
-                    },
-                    // Combos tab only -- Strategies-tab card taps open the inline zoom overlay
-                    // (self-contained inside InspirationsSheetContentV2) and never call this.
-                    // Close the sheet BEFORE navigating (same sequencing as `onBuildThis`/
-                    // `onUseComboAsSeed` just above, and the coordination pattern in
-                    // `ScannerScreen.kt`'s `ScanQueueSheet` -- `onOpenCardDetail(fromQueue = true)`
-                    // flips `showQueueSheet` off in the SAME state update as opening the detail
-                    // overlay): otherwise the sheet's own show/hide animation is still playing
-                    // when CardDetailScreen's entry transition starts, and the two race visibly.
-                    onNavigateToCardDetail = { id ->
-                        focusManager.clearFocus()
-                        viewModel.closeInspirations()
-                        onCardClick(id)
-                    },
-                    sharedTransitionScope = null,
-                    animatedVisibilityScope = null,
-                )
-            } else {
-                InspirationsSheetContent(
-                    discoveries = uiState.discoveries,
-                    isLoading = uiState.isLoadingDiscoveries,
-                    onCardClick = { id ->
-                        focusManager.clearFocus()
-                        onCardClick(id)
-                    },
-                    onSeedStudio = { discovery -> viewModel.startFromDiscovery(discovery) },
-                )
-            }
+            // Deck Builder v2 Phase 5 (plan D10/§3.7): Discoveries v2 clusters (identity-only,
+            // color-coherent) hand off to the v2 wizard pre-filled (D11). The legacy content
+            // (ANY-tag-category clustering, seeding the old seed sheet) was RETIRED in the Deck
+            // Wizard & Engine Rework plan, WS7.2 (2026-07-28) -- this is reachable only when
+            // `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` is on (see `inspirationsEnabled` below,
+            // the entry point's own visibility gate), so there is exactly one content branch left.
+            InspirationsSheetContentV2(
+                discoveries = uiState.discoveriesV2,
+                filteredDiscoveries = uiState.filteredDiscoveriesV2,
+                matchingCards = uiState.discoveryMatchingCards,
+                isLoading = uiState.isLoadingDiscoveries,
+                onBuildThis = { discovery ->
+                    viewModel.closeInspirations()
+                    onNavigateToWizard(
+                        discovery.archetype?.name,
+                        discovery.theme?.name,
+                        discovery.tribe,
+                        discovery.dominantColors.joinToString("") { it.symbol },
+                        null,
+                    )
+                },
+                inspirationsTab = uiState.inspirationsTab,
+                onSelectTab = viewModel::onSelectInspirationsTab,
+                searchQuery = uiState.discoverySearchQuery,
+                onSearchQueryChange = viewModel::onDiscoverySearchQueryChange,
+                selectedCardNames = uiState.discoverySelectedCardNames,
+                onToggleSearchCard = viewModel::onToggleDiscoverySearchCard,
+                onClearSearch = viewModel::onClearDiscoverySearch,
+                comboResult = uiState.comboResult,
+                comboCardsByName = uiState.comboCardsByName,
+                isLoadingCombos = uiState.isLoadingCombos,
+                onUseComboAsSeed = { cardNames ->
+                    viewModel.closeInspirations()
+                    onNavigateToWizard(null, null, null, null, cardNames)
+                },
+                // Combos tab only -- Strategies-tab card taps open the inline zoom overlay
+                // (self-contained inside InspirationsSheetContentV2) and never call this.
+                // Close the sheet BEFORE navigating (same sequencing as `onBuildThis`/
+                // `onUseComboAsSeed` just above, and the coordination pattern in
+                // `ScannerScreen.kt`'s `ScanQueueSheet` -- `onOpenCardDetail(fromQueue = true)`
+                // flips `showQueueSheet` off in the SAME state update as opening the detail
+                // overlay): otherwise the sheet's own show/hide animation is still playing
+                // when CardDetailScreen's entry transition starts, and the two race visibly.
+                onNavigateToCardDetail = { id ->
+                    focusManager.clearFocus()
+                    viewModel.closeInspirations()
+                    onCardClick(id)
+                },
+                sharedTransitionScope = null,
+                animatedVisibilityScope = null,
+            )
         }
     }
 
@@ -881,9 +800,9 @@ private fun DeckStudioTopBar(
                             onEdit()
                         },
                     )
-                    // Deck Builder v2 (plan D10/§3.7): visible whenever EITHER the legacy seed
-                    // sheet OR the v2 wizard is enabled -- handleBuildFromSeed picks the destination.
-                    if (DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED || DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) {
+                    // Deck Builder v2 (plan D10/§3.7): visible when the v2 wizard is enabled. The
+                    // legacy seed-sheet sibling flag was RETIRED in WS7.2 (2026-07-28).
+                    if (DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -905,10 +824,11 @@ private fun DeckStudioTopBar(
                             },
                         )
                     }
-                    // Deck Builder v2 (plan D10/§3.7): visible whenever EITHER the legacy
-                    // discoverSynergies content OR Discoveries v2 is enabled -- the sheet content
-                    // itself branches on DISCOVERIES_V2_ENABLED (see the ModalBottomSheet below).
-                    if (DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED || DeckFeatureFlags.DISCOVERIES_V2_ENABLED) {
+                    // Deck Builder v2 (plan D10/§3.7): visible when Discoveries v2 is enabled. The
+                    // legacy discoverSynergies content's sibling flag was RETIRED in WS7.2
+                    // (2026-07-28) -- the sheet's content (see the ModalBottomSheet above) has
+                    // exactly one branch now.
+                    if (DeckFeatureFlags.DISCOVERIES_V2_ENABLED) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -997,8 +917,7 @@ private fun BuildTab(
         ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
         ?.maxCopies ?: 4
 
-    // Smooth crossfade between the loading spinner and the loaded content (UI polish, 2026-07-22),
-    // matching the sibling (dead) DeckBuilderScreen.kt's ViewStepContent AnimatedContent pattern —
+    // Smooth crossfade between the loading spinner and the loaded content (UI polish, 2026-07-22) —
     // avoids the abrupt jump-cut previously felt right after a Community Deck import navigates
     // into a freshly-created deck whose data is still loading from Room.
     AnimatedContent(
@@ -1010,7 +929,7 @@ private fun BuildTab(
     ) { isLoading ->
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
             }
         } else if (uiState.isEmptyDeck) {
             val currentFormat = uiState.deck?.format
@@ -1291,9 +1210,11 @@ private fun EmptyDeckState(
     // "Build from seed" and "Browse inspirations" are HIDDEN for release behind their
     // DeckFeatureFlags. When BOTH are disabled, "Import deck" is promoted to the PRIMARY (Filled)
     // CTA so the empty state still has a clear primary action (the + FAB remains the main
-    // add-cards affordance). Unchanged from the previous layout.
-    val seedEnabled = DeckFeatureFlags.DECK_STUDIO_BUILD_FROM_SEED_ENABLED || DeckFeatureFlags.DECK_BUILDER_V2_ENABLED
-    val inspirationsEnabled = DeckFeatureFlags.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED || DeckFeatureFlags.DISCOVERIES_V2_ENABLED
+    // add-cards affordance). Unchanged from the previous layout. Each flag's legacy sibling
+    // (DECK_STUDIO_BUILD_FROM_SEED_ENABLED / DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED) was RETIRED
+    // in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28).
+    val seedEnabled = DeckFeatureFlags.DECK_BUILDER_V2_ENABLED
+    val inspirationsEnabled = DeckFeatureFlags.DISCOVERIES_V2_ENABLED
     val importIsPrimary = !seedEnabled && !inspirationsEnabled
 
     LazyColumn(
@@ -1490,74 +1411,11 @@ private fun SectionHeader(
 }
 
 /**
- * The Inspirations (Discoveries) sheet content (Phase 4, P4-T1): lists collection-synergy
- * discoveries. Tapping "Seed Studio" pre-seeds the seed sheet (the user still taps Generate).
- *
- * Stateless: discoveries + loading flag come from the VM; every tap is a callback.
- */
-@Composable
-private fun InspirationsSheetContent(
-    discoveries: List<com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery>,
-    isLoading: Boolean,
-    onCardClick: (String) -> Unit,
-    onSeedStudio: (com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Column(
-        modifier = Modifier
-            .fillMaxHeight(0.92f)
-            .padding(horizontal = spacing.lg),
-    ) {
-        Text(
-            text = stringResource(R.string.deck_studio_inspirations_title),
-            style = ty.titleLarge,
-            color = mc.textPrimary,
-            modifier = Modifier.padding(top = spacing.md),
-        )
-        Text(
-            text = stringResource(R.string.deck_studio_inspirations_subtitle),
-            style = ty.bodySmall,
-            color = mc.textSecondary,
-            modifier = Modifier.padding(top = spacing.xxs, bottom = spacing.sm),
-        )
-
-        when {
-            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
-            }
-            discoveries.isEmpty() -> EmptyState(
-                title = stringResource(R.string.deck_studio_inspirations_empty_title),
-                subtitle = stringResource(R.string.deck_studio_inspirations_empty_subtitle),
-                icon = Icons.Default.AutoAwesome,
-            )
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = rememberLazyListState(),
-                contentPadding = PaddingValues(vertical = spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
-            ) {
-                // C3: key by primaryTag.key + label — two discoveries can share the same
-                // CardTag, and a bare primaryTag.key would crash the LazyColumn on duplicate keys.
-                items(discoveries.take(20), key = { "${it.primaryTag.key}_${it.label}" }) { discovery ->
-                    DiscoveryRow(
-                        discovery = discovery,
-                        onCardClick = onCardClick,
-                        onSeedStudio = { onSeedStudio(discovery) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Deck Builder v2 Phase 5 (plan §3.5) sheet content -- the [DeckDiscoveryV2] sibling of
- * [InspirationsSheetContent], rendered instead of it when `DeckFeatureFlags
- * .DISCOVERIES_V2_ENABLED` is on (same entry point, D10/§3.7). "Build this" hands off to the v2
- * wizard pre-filled (D11) instead of the old seed-sheet handoff.
+ * Deck Builder v2 Phase 5 (plan §3.5) sheet content over the [DeckDiscoveryV2] cluster model,
+ * shown when `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` is on (D10/§3.7). "Build this" hands off
+ * to the v2 wizard pre-filled (D11). The legacy `InspirationsSheetContent` (ANY-tag-category
+ * clustering, seed-sheet handoff) was RETIRED in the Deck Wizard & Engine Rework plan, WS7.2
+ * (2026-07-28) -- this is the sheet's only content now.
  *
  * Deck Engine Unification plan D7 (Phase 4) redesign: this is now a two-tab synergy browser
  * (Strategies / Combos) with free-text + search-by-card filtering on the Strategies tab (4.1/4.2)
@@ -1840,7 +1698,7 @@ private fun StrategiesTabContent(
 
         when {
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
             }
             discoveries.isEmpty() -> EmptyState(
                 title = stringResource(R.string.deck_studio_inspirations_empty_title),
@@ -1852,21 +1710,56 @@ private fun StrategiesTabContent(
                 subtitle = stringResource(R.string.deck_studio_inspirations_search_empty_subtitle),
                 icon = Icons.Default.Search,
             )
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = rememberLazyListState(),
-                contentPadding = PaddingValues(vertical = spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(spacing.md),
-            ) {
-                // Keyed by the cluster's own stable identity (tag key or tribe key) -- distinct
-                // from the legacy MagicDiscovery key shape (no primaryTag on this model).
-                items(filteredDiscoveries.take(20), key = { it.key.stableKey() }) { discovery ->
-                    com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
-                        discovery = discovery,
-                        rootCoordinates = rootCoordinates,
-                        onCardTap = onCardTap,
-                        onBuildThis = { onBuildThis(discovery) },
-                    )
+            else -> {
+                // Deck Wizard & Engine Rework plan (WS 1.3, plan §0 F1): Strategy and Tribe are
+                // disjoint taxonomy axes -- they used to render as ONE mixed labeled list here
+                // ("Spirits"/"Humans" read as strategies), which is exactly the "descompensado"
+                // asymmetry the plan calls out. Split into two headed sections, each keeping the
+                // use case's own best-fit-first ordering within its half.
+                val (strategyDiscoveries, tribeDiscoveries) = filteredDiscoveries.partitionByAxis()
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = rememberLazyListState(),
+                    contentPadding = PaddingValues(vertical = spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(spacing.md),
+                ) {
+                    if (strategyDiscoveries.isNotEmpty()) {
+                        item(key = "section_strategies") {
+                            Text(
+                                text = stringResource(R.string.deck_studio_inspirations_section_strategies),
+                                style = ty.labelLarge,
+                                color = mc.primaryAccent,
+                            )
+                        }
+                        // Keyed by the cluster's own stable identity (tag key) -- distinct from the
+                        // legacy MagicDiscovery key shape (no primaryTag on this model).
+                        items(strategyDiscoveries.take(20), key = { it.key.stableKey() }) { discovery ->
+                            com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
+                                discovery = discovery,
+                                rootCoordinates = rootCoordinates,
+                                onCardTap = onCardTap,
+                                onBuildThis = { onBuildThis(discovery) },
+                            )
+                        }
+                    }
+                    if (tribeDiscoveries.isNotEmpty()) {
+                        item(key = "section_tribes") {
+                            Text(
+                                text = stringResource(R.string.deck_studio_inspirations_section_tribes),
+                                style = ty.labelLarge,
+                                color = mc.primaryAccent,
+                                modifier = Modifier.padding(top = if (strategyDiscoveries.isNotEmpty()) spacing.sm else 0.dp),
+                            )
+                        }
+                        items(tribeDiscoveries.take(20), key = { it.key.stableKey() }) { discovery ->
+                            com.mmg.manahub.feature.decks.presentation.components.DiscoveryRowV2(
+                                discovery = discovery,
+                                rootCoordinates = rootCoordinates,
+                                onCardTap = onCardTap,
+                                onBuildThis = { onBuildThis(discovery) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1897,10 +1790,10 @@ private fun CombosTabContent(
 
     when {
         isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            MagicLoadingSpinner()
         }
         comboResult == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            MagicLoadingSpinner()
         }
         comboResult.complete.isEmpty() && comboResult.almostThere.isEmpty() -> EmptyState(
             title = stringResource(R.string.deck_studio_combos_empty_title),
@@ -1964,15 +1857,63 @@ private fun com.mmg.manahub.feature.decks.domain.template.DiscoveryClusterKey.st
 /**
  * The Suggestions surface (Deck Doctor inline, Phase 1/2): a Health summary, the Cut list, and
  * the "From your collection" Add list (Motor A, Phase 2 — offline, always available), all driven
- * by the live deck via [DeckStudioViewModel]. [BudgetInputBar] is NOT shown here (D5 — Motor A
- * suggestions are already owned, so budget is moot); it stays in the codebase for a different
- * editing surface. The row composables and string helpers live in
- * [com.mmg.manahub.feature.decks.presentation.components] — this is now the SOLE Deck Doctor UI
- * surface; the standalone Deck Improvement screen those composables were originally copied from
- * was retired in Phase 0.5 (D10).
+ * by the live deck via [DeckStudioViewModel]. No budget UI is shown here (D5 — Motor A suggestions
+ * are already owned, so budget is moot); the whole budget-suggestions pipeline
+ * (`SuggestAddsWithBudgetUseCase`/`BudgetOptimizer`/`BudgetFilterBar`/`BudgetInputBar`) was DELETED
+ * in the Deck Wizard & Engine Rework plan, WS7.3 (2026-07-28, D-H). The row composables and string
+ * helpers live in [com.mmg.manahub.feature.decks.presentation.components] — this is now the SOLE
+ * Deck Doctor UI surface; the standalone Deck Improvement screen those composables were originally
+ * copied from was retired in Phase 0.5 (D10).
  *
  * Stateless: all state comes from [uiState]; every mutation is a callback to the VM.
  */
+/**
+ * Deck Wizard & Engine Rework plan, Workstream 8.4: the Suggestions tab's staged progress screen
+ * for the full [DeckDoctorOrchestrator][com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator]
+ * analysis pass -- mirrors [com.mmg.manahub.feature.decks.presentation.wizard.GeneratingContent]'s
+ * visual language exactly (spinner + current-stage label + a checkmarked list of already-finished
+ * stages) rather than a second, divergent design.
+ */
+@Composable
+private fun DoctorStagedProgressContent(
+    stage: DoctorAnalysisStage,
+    completedStages: List<DoctorAnalysisStage>,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(spacing.lg),
+        ) {
+            MagicLoadingSpinner(
+                modifier = Modifier.size(48.dp),
+            )
+            Text(text = stage.label(), style = ty.titleMedium, color = mc.textPrimary)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(spacing.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                completedStages.forEach { done ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = mc.lifePositive,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(done.label(), style = ty.labelMedium, color = mc.textSecondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SuggestionsTab(
@@ -1994,13 +1935,28 @@ private fun SuggestionsTab(
     onCommunityCardTap: (String) -> Unit = {},
     onViewCommunityDecksForCard: (String) -> Unit = {},
     onOpenSimilarDeck: (Int) -> Unit = {},
+    // Deck Wizard & Engine Rework plan WS8.2 -- no-op default, same "never re-plumb every call
+    // site" precedent as the Motor B params above.
+    onToggleIncludeOutsideCollection: (Boolean) -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
 
-    // First-open loading (the lazy full analysis kicked off by onSelectTab).
+    // Deck Wizard & Engine Rework plan, Workstream 8.4: the FULL analysis pass (loadAnalysis) is
+    // staged -- non-null uiState.doctorStage covers the whole window from the first snapshot
+    // through Motor A + the Scryfall backstop finishing (see DeckDoctorOrchestrator.loadAnalysis's
+    // KDoc), replacing the old bare spinner with the same "current stage + completed checklist"
+    // visual language as the wizard's own GeneratingContent. Motor B (community) is intentionally
+    // NOT part of this gate -- it stays fire-and-forget with its own section-level isCommunityLoading
+    // spinner further down, so a slow community fetch never delays revealing the rest of the tab.
+    if (uiState.doctorStage != null) {
+        DoctorStagedProgressContent(stage = uiState.doctorStage, completedStages = uiState.doctorCompletedStages)
+        return
+    }
+    // Defensive fallback for the (should-be-impossible-in-practice) window before the FIRST
+    // loadAnalysis has ever set a stage.
     if (uiState.isSuggestionsLoading && uiState.health == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            MagicLoadingSpinner()
         }
         return
     }
@@ -2145,8 +2101,9 @@ private fun SuggestionsTab(
         }
 
         // ── Adds — Motor A (Deck Doctor Community/Archetype plan Phase 2): collection-only,
-        //    offline, always available. `BudgetInputBar` stays in the codebase (D5) but is not
-        //    surfaced here — every Motor A suggestion is already owned, so budget is moot for it.
+        //    offline, always available. No budget UI is surfaced here (D5) -- every Motor A
+        //    suggestion is already owned, so budget is moot for it; the budget-suggestions
+        //    pipeline itself was DELETED in WS7.3 (D-H).
         //    Deck Builder v2 (plan §3.8): grouped by SuggestionCategoryResolver with a header chip
         //    per category (Removal/Ramp/Tokens/...) — presentation-side only, DeckDoctorOrchestrator's
         //    state shape is unchanged.
@@ -2156,13 +2113,50 @@ private fun SuggestionsTab(
                 mc.lifePositive,
             )
         }
+        // Deck Wizard & Engine Rework plan WS8.2 -- the Scryfall backstop toggle (3rd adds source,
+        // a SEPARATE per-session choice from the wizard's own build-time toggle). Mirrors the
+        // owned-cards-are-free Switch styling the retired `BudgetInputBar` used (WS7.3).
+        item(key = "adds_outside_collection_toggle") {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = stringResource(R.string.deck_studio_include_outside_collection_toggle),
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textPrimary,
+                    )
+                    androidx.compose.material3.Switch(
+                        checked = uiState.includeOutsideCollection,
+                        onCheckedChange = onToggleIncludeOutsideCollection,
+                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                            checkedThumbColor = mc.background,
+                            checkedTrackColor = mc.primaryAccent,
+                            uncheckedThumbColor = mc.textSecondary,
+                            uncheckedTrackColor = mc.surfaceVariant,
+                        ),
+                        modifier = Modifier.size(width = 52.dp, height = 48.dp),
+                    )
+                }
+                if (uiState.outsideCollectionUnavailable) {
+                    Text(
+                        text = stringResource(R.string.deck_studio_outside_collection_unavailable),
+                        style = MaterialTheme.magicTypography.labelSmall,
+                        color = mc.lifeNegative,
+                        modifier = Modifier.padding(top = spacing.xs),
+                    )
+                }
+            }
+        }
         when {
             uiState.isAddsLoading -> item(key = "adds_loading") {
                 Box(
                     Modifier.fillMaxWidth().padding(vertical = spacing.xl),
                     contentAlignment = Alignment.Center,
                 ) {
-                    androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+                    MagicLoadingSpinner()
                 }
             }
             uiState.adds.isEmpty() -> item(key = "adds_empty") {
@@ -2207,7 +2201,7 @@ private fun SuggestionsTab(
                         Modifier.fillMaxWidth().padding(vertical = spacing.xl),
                         contentAlignment = Alignment.Center,
                     ) {
-                        androidx.compose.material3.CircularProgressIndicator(color = mc.secondaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
                 uiState.communityUnavailable -> item(key = "community_unavailable") {

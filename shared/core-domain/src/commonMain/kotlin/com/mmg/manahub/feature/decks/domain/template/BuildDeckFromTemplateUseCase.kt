@@ -14,20 +14,22 @@ import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCardWithCard
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeData
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
+import com.mmg.manahub.feature.decks.domain.engine.CATEGORY_FILL_FIT_FLOOR
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
-import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
-import com.mmg.manahub.feature.decks.domain.engine.DeckSkeletons
+import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
 import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
+import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
@@ -37,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlin.math.roundToInt
 
 /**
  * Deck Builder v2 (`docs/plans/deck-builder-v2-plan.md` §3.3) — the v2 builder. Fills a
@@ -102,6 +105,11 @@ class BuildDeckFromTemplateUseCase(
     private val communityAggregateRepository: CommunityAggregateRepository? = null,
     private val suggestAddsFromCommunityUseCase: SuggestAddsFromCommunityUseCase? = null,
     private val isCommunityEngineEnabled: suspend () -> Boolean = { false },
+    // ── Scryfall backstop fill (Deck Wizard & Engine Rework plan, Workstream 4.1) — appended last,
+    // defaulted/nullable, same "no existing positional-arg-free call site breaks" precedent as Motor
+    // B above. A `null` generator or `spec.includeOutsideCollection == false` is a silent no-op: the
+    // build stays exactly as it was before this workstream (Motor A/B only, honest gaps otherwise).
+    private val candidatePoolGenerator: CandidatePoolGenerator? = null,
 ) {
 
     operator fun invoke(spec: DeckWizardSpec, collection: List<UserCardWithCard>): Flow<TemplateBuildProgress> = flow {
@@ -138,7 +146,21 @@ class BuildDeckFromTemplateUseCase(
 
         emit(TemplateBuildProgress.Stage(BuildStage.FILLING_FROM_COLLECTION))
         val targetMainboardSize = mainboardTargetSize(spec)
-        val plannedLands = if (spec.fillLands) computeLandTarget(spec, template, seedEntries) else 0
+        // WS6 (One land engine): provisional seeds-only estimate, purely to size the Motor-A loop's
+        // targetNonLand -- routed through the SAME LandTargetResolver the final recompute (below,
+        // after the loop) and Deck Studio's calculateLandDeltas both call, instead of the old
+        // private computeLandTarget. This estimate never changes after this fix; only its
+        // implementation moved.
+        val plannedLands = if (spec.fillLands) {
+            LandTargetResolver.resolve(
+                format = spec.format,
+                archetypeSkeleton = resolveArchetypeSkeleton(template, initialProfile),
+                profile = initialProfile,
+                manaBaseAnalyzer = manaBaseAnalyzer,
+            )
+        } else {
+            0
+        }
         val targetNonLand = targetMainboardSize - plannedLands
 
         val state = FillState()
@@ -154,19 +176,49 @@ class BuildDeckFromTemplateUseCase(
             state = state,
         )
 
+        // Workstream 4.1 (F4 fix): the Scryfall backstop -- a LAST-RESORT fill source, only reached
+        // once the owned-collection Motor A/B loop above has genuinely run dry. Gated on
+        // spec.includeOutsideCollection; a silent no-op (state untouched) when the toggle is off or
+        // no CandidatePoolGenerator was injected.
+        runScryfallBackstopLoop(spec = spec, template = template, targetNonLand = targetNonLand, state = state)
+
         emit(TemplateBuildProgress.Stage(BuildStage.RESOLVING_GAPS))
         val gapResult = resolveCommunitySuggestions(categories, state)
 
         emit(TemplateBuildProgress.Stage(BuildStage.FILLING_LANDS))
-        val landEntries = if (spec.fillLands) fillLands(spec, template, state.placedEntries) else emptyList()
+        // WS6 (One land engine): the ONE authoritative land-target computation, over the FINAL
+        // placed nonland entries (state.placedEntries is final at this point -- the Motor A/B loop
+        // and community-gap resolution never mutate it again). This value becomes the ACTUAL number
+        // of lands fillLands materializes -- not "whatever's left to hit targetMainboardSize" -- so
+        // that Deck Studio's own LandTargetResolver.resolve call over this SAME finished mainboard
+        // later returns the byte-identical Int (the zero-land-delta round-trip this workstream
+        // exists to guarantee).
+        val finalLandTarget = if (spec.fillLands) {
+            val finalProfile = recomputeProfile(spec, template, state.placedEntries)
+            LandTargetResolver.resolve(
+                format = spec.format,
+                archetypeSkeleton = resolveArchetypeSkeleton(template, finalProfile),
+                profile = finalProfile,
+                manaBaseAnalyzer = manaBaseAnalyzer,
+            )
+        } else {
+            0
+        }
+        val landEntries = if (spec.fillLands) {
+            fillLands(spec, template, state.placedEntries, finalLandTarget, collection, ownedQuantityByName, state.usedNames)
+        } else {
+            emptyList()
+        }
 
-        // Safety-net overshoot trim: computeLandTarget is called with two DIFFERENT mainboard
-        // snapshots (the pre-loop planning estimate above vs. fillLands' own real materialization),
-        // so the two are not guaranteed monotonic and the REAL total (nonland + lands) can land a
-        // card or two OVER targetMainboardSize with nothing upstream to pull it back down (the
-        // "61/60" bug, Wizard Quality Campaign Wave 2). Shortfall and overshoot are mutually
-        // exclusive by construction (the Motor A loop never places past targetNonLand), so this is a
-        // pure safety net for the OPPOSITE case.
+        // Safety-net overshoot trim: the provisional seeds-only land estimate (plannedLands, above)
+        // and the final full-mainboard land target (finalLandTarget, just computed) are each derived
+        // from a DIFFERENT mainboard snapshot, so they are not guaranteed to agree -- the REAL total
+        // (nonland + lands) can still land a card or two OVER targetMainboardSize with nothing
+        // upstream to pull it back down (the "61/60" bug, Wizard Quality Campaign Wave 2). Shortfall
+        // and overshoot are mutually exclusive by construction (the Motor A loop never places past
+        // targetNonLand), so this is a pure safety net for the OPPOSITE case. Post-WS6 this should
+        // fire far less often than before (the old two-different-computeLandTarget-snapshots
+        // disagreement is gone -- only the seeds-only-vs-final estimate gap remains).
         val trimmedCount = trimExcess(spec, template, state, seedEntries, landEntries, targetMainboardSize)
 
         if (gapResult.unresolvedMisses > 0) {
@@ -179,6 +231,14 @@ class BuildDeckFromTemplateUseCase(
         if (trimmedCount > 0) {
             crashReporter?.log("deck_builder_v2_trim_excess")
             crashReporter?.setCustomKey("deck_builder_v2_trimmed_count", trimmedCount.toString())
+            // WS6 canary (breadcrumb-only, NOT an error -- mirrors DeckTemplateResolver
+            // .logSyntheticFallback's "frequency, not noise" pattern): the trim safety net firing
+            // post-WS6 can now only mean the provisional seeds-only land estimate (plannedLands)
+            // disagreed with the final full-mainboard land target (finalLandTarget) -- the
+            // two-different-computeLandTarget-snapshots disagreement this workstream removed is no
+            // longer a possible cause. If this fires often in practice, the ordering fix has a real
+            // hole worth investigating.
+            crashReporter?.log("deck_builder_v2_land_target_estimate_mismatch")
         }
 
         emit(TemplateBuildProgress.Stage(BuildStage.DONE))
@@ -198,6 +258,12 @@ class BuildDeckFromTemplateUseCase(
             crashReporter?.setCustomKey("deck_builder_v2_gap_count", trueShortfall.toString())
             crashReporter?.setCustomKey("deck_builder_v2_gap_format", spec.format.name)
             crashReporter?.setCustomKey("deck_builder_v2_gap_archetype", template.archetypeInfo.archetype.name)
+            // Workstream 4.2: fill_source breakdown -- how many nonland copies each source placed
+            // BEFORE this gap was declared, so post-release we can see where fills actually come
+            // from (and how often the Scryfall backstop was even reachable).
+            crashReporter?.setCustomKey("deck_builder_v2_fill_source_collection", state.collectionPlacedCopies.toString())
+            crashReporter?.setCustomKey("deck_builder_v2_fill_source_community", state.communityPlacedCopies.toString())
+            crashReporter?.setCustomKey("deck_builder_v2_fill_source_scryfall_backstop", state.scryfallBackstopPlacedCopies.toString())
         }
         val gaps = buildGaps(categories, filledCounts, template.colorIdentity, trueShortfall)
 
@@ -310,6 +376,11 @@ class BuildDeckFromTemplateUseCase(
 
     // ── FILLING_FROM_COLLECTION (Motor A/B loop, Deck Engine Unification D1) ───────
 
+    /** Workstream 4.2 telemetry: which fill source placed a given [MotorCandidate] / backstop card
+     * -- reported as a `fill_source` breakdown alongside a declared gap (see [invoke]'s
+     * `deck_builder_v2_gap_declared` block), never used for placement logic itself. */
+    private enum class FillSource { COLLECTION, COMMUNITY, SCRYFALL_BACKSTOP }
+
     private class FillState {
         val placedEntries = mutableListOf<DeckEntry>()
         val usedNames = mutableSetOf<String>()
@@ -317,11 +388,16 @@ class BuildDeckFromTemplateUseCase(
          * playset target because the collection didn't hold enough copies) -- folded into
          * [TemplateBuildResult.communitySuggestions] alongside genuinely-unowned template refs. */
         val sameCardShortfalls = mutableMapOf<String, MutableList<TemplateCardSuggestion>>()
+        /** Workstream 4.2 telemetry counters -- nonland copies placed by each fill source, read once
+         * when a gap is declared. Never consulted by any placement/scoring decision. */
+        var collectionPlacedCopies = 0
+        var communityPlacedCopies = 0
+        var scryfallBackstopPlacedCopies = 0
     }
 
     /** One placement candidate, unifying Motor A ([AddSuggestion]) and Motor B
      * ([CommunityAddSuggestion]) into a single rankable shape for the merge/sort step. */
-    private data class MotorCandidate(val card: Card, val score: Float, val suggestedCopies: Int)
+    private data class MotorCandidate(val card: Card, val score: Float, val suggestedCopies: Int, val source: FillSource)
 
     /**
      * The Deck Engine Unification (D1) placement loop: repeatedly asks [suggestAddsFromCollectionUseCase]
@@ -365,12 +441,18 @@ class BuildDeckFromTemplateUseCase(
             }.getOrElse { t ->
                 crashReporter?.recordException(RuntimeException("deck_builder_v2_motor_a_failed", t))
                 emptyList()
-            }.map { MotorCandidate(it.fit.card, it.fit.score, it.suggestedCopies) }
+            }.map { MotorCandidate(it.fit.card, it.fit.score, it.suggestedCopies, FillSource.COLLECTION) }
 
             val motorBCandidates = communityOwnedPool
                 .asSequence()
                 .filter { it.card.name !in state.usedNames }
-                .map { MotorCandidate(it.card, it.synergy, motorBSuggestedCopies(it.card, spec, state, ownedQuantityByName)) }
+                .map {
+                    MotorCandidate(
+                        it.card, it.synergy,
+                        motorBSuggestedCopies(it.card, spec, state, ownedQuantityByName),
+                        FillSource.COMMUNITY,
+                    )
+                }
                 .toList()
 
             val combined = (motorACandidates + motorBCandidates)
@@ -396,6 +478,11 @@ class BuildDeckFromTemplateUseCase(
                 state.placedEntries += DeckEntry(card = candidate.card, quantity = placedCopies, isOwned = true, isSideboard = false)
                 remainingInBatch -= placedCopies
                 placedAny = true
+                when (candidate.source) {
+                    FillSource.COLLECTION -> state.collectionPlacedCopies += placedCopies
+                    FillSource.COMMUNITY -> state.communityPlacedCopies += placedCopies
+                    FillSource.SCRYFALL_BACKSTOP -> Unit // never produced by this loop; see runScryfallBackstopLoop
+                }
 
                 val shortfall = candidate.suggestedCopies - placedCopies
                 if (shortfall > 0) {
@@ -431,8 +518,123 @@ class BuildDeckFromTemplateUseCase(
             format = archetypeFormat,
             archetype = archetype,
             themes = themes,
-            colorCount = profile.colorIdentity.count { it != ManaColor.C },
+            identity = profile.colorIdentity,
         )
+    }
+
+    // ── Scryfall backstop fill (Deck Wizard & Engine Rework plan, Workstream 4.1 / F4) ──────────
+
+    /**
+     * The last-resort fill source: runs AFTER [runMotorALoop] has already exhausted the owned
+     * collection (plus Motor B), and BEFORE community-template gap resolution declares the
+     * remaining slots as [DeckGap]s. Gated on BOTH a non-null [candidatePoolGenerator] (constructor
+     * wiring) and [DeckWizardSpec.includeOutsideCollection] (the user's own per-session toggle) — a
+     * silent no-op otherwise, leaving the build byte-identical to pre-Workstream-4 behavior.
+     *
+     * Mirrors [runMotorALoop]'s own loop shape (recompute profile -> ask for candidates -> place
+     * everything clearing [CATEGORY_FILL_FIT_FLOOR] -> repeat) but sources candidates from
+     * [CandidatePoolGenerator] (a live Scryfall query, revived per plan F4) instead of the owned
+     * collection, and re-scores them through the SAME [suggestAddsFromCollectionUseCase] (Motor A)
+     * so the fit floor and ranking stay byte-identical in spirit to every other placement decision
+     * this use case makes — quality over completion, never a weak fill just to hit the target size.
+     *
+     * Pagination + progressive relaxation (plan's stop-condition policy): each iteration that clears
+     * no candidate above the floor first pages forward (up to [MAX_BACKSTOP_PAGES]) on the SAME
+     * query set, then -- once every page is exhausted -- tries ONE relaxed round (role-gap queries
+     * dropped, strategy/tribe queries kept, per [CandidatePoolGenerator]'s own `relaxed` param) before
+     * giving up entirely. A remaining shortfall after that becomes an honest [DeckGap], exactly like
+     * an exhausted owned collection — [TemplateBuildResult.gaps]' `gaps.sumOf { it.missingCount } ==
+     * trueShortfall` invariant is untouched by this phase (it only ever ADDS placed entries or stops).
+     */
+    private suspend fun runScryfallBackstopLoop(
+        spec: DeckWizardSpec,
+        template: DeckTemplate,
+        targetNonLand: Int,
+        state: FillState,
+    ) {
+        val generator = candidatePoolGenerator ?: return
+        if (!spec.includeOutsideCollection) return
+
+        var page = 1
+        var relaxed = false
+        var iterations = 0
+        val maxIterations = targetNonLand + MAX_BACKSTOP_ITERATION_SLACK
+        while (iterations < maxIterations) {
+            iterations++
+            val remaining = targetNonLand - state.placedEntries.sumOf { it.quantity }
+            if (remaining <= 0) return
+
+            val profile = recomputeProfile(spec, template, state.placedEntries)
+            val resolvedSkeleton = resolveArchetypeSkeleton(template, profile)
+            val nonLandEntries = state.placedEntries.filterNot { BasicLandCalculator.isLand(it.card) }
+            val evaluation = deckScorer.evaluate(profile, nonLandEntries)
+
+            val freshPool = runCatching {
+                generator(profile = profile, evaluation = evaluation, page = page, relaxed = relaxed)
+            }.getOrElse { t ->
+                crashReporter?.recordException(RuntimeException("deck_builder_v2_scryfall_backstop_query_failed", t))
+                emptyList()
+            }.filterNot { it.name in state.usedNames }
+
+            val scored = if (freshPool.isEmpty()) {
+                emptyList()
+            } else {
+                runCatching {
+                    suggestAddsFromCollectionUseCase(
+                        collection = freshPool,
+                        mainboard = state.placedEntries,
+                        profile = profile,
+                        resolvedSkeleton = resolvedSkeleton,
+                        weights = ScoreWeights(),
+                        limit = freshPool.size,
+                    )
+                }.getOrElse { t ->
+                    crashReporter?.recordException(RuntimeException("deck_builder_v2_scryfall_backstop_score_failed", t))
+                    emptyList()
+                }
+            }
+                .filter { it.fit.score >= CATEGORY_FILL_FIT_FLOOR }
+                .sortedWith(
+                    compareByDescending<AddSuggestion> { it.fit.score }
+                        .thenBy { it.fit.card.name }
+                        .thenBy { it.fit.card.scryfallId }
+                )
+
+            if (scored.isEmpty()) {
+                // Progressive relaxation (plan's stop-condition policy): page forward on the SAME
+                // query set first; only once every page is exhausted, try one relaxed round; only
+                // once that ALSO comes up empty does this phase give up and let the shortfall
+                // surface as an honest DeckGap downstream.
+                if (page < MAX_BACKSTOP_PAGES) {
+                    page++
+                    continue
+                }
+                if (!relaxed) {
+                    relaxed = true
+                    page = 1
+                    continue
+                }
+                return
+            }
+
+            var remainingInBatch = remaining
+            for (candidate in scored) {
+                if (remainingInBatch <= 0) break
+                val card = candidate.fit.card
+                if (card.name in state.usedNames) continue
+                state.usedNames += card.name
+                // Unlike runMotorALoop, there is no owned-quantity clamp here -- these cards are
+                // genuinely NOT owned (fetched from Scryfall), so only the format's own copy limit
+                // (already applied by suggestAddsFromCollectionUseCase's suggestedCopies) bounds them.
+                val placedCopies = minOf(candidate.suggestedCopies, remainingInBatch).coerceAtLeast(1)
+                state.placedEntries += DeckEntry(card = card, quantity = placedCopies, isOwned = false, isSideboard = false)
+                remainingInBatch -= placedCopies
+                state.scryfallBackstopPlacedCopies += placedCopies
+            }
+            // The profile/gaps just shifted with this batch's placements -- re-evaluate fresh on the
+            // next iteration rather than continuing to page the now-stale query set.
+            page = 1
+        }
     }
 
     // ── Motor B (Deck Engine Unification D1) — fetched ONCE per build ─────────────
@@ -553,10 +755,12 @@ class BuildDeckFromTemplateUseCase(
     // ── TRIMMING_EXCESS ─────────────────────────────────────────────────────────
 
     /**
-     * Overshoot safety net (Wizard Quality Campaign Wave 2): [computeLandTarget] is called with a
-     * DIFFERENT mainboard snapshot at its two call sites (the pre-loop planning estimate vs.
-     * [fillLands]'s own real materialization) -- the two are not guaranteed monotonic, so the REAL
-     * total (nonland + [landEntries]) can land a card or two OVER [targetFullSize] with nothing
+     * Overshoot safety net (Wizard Quality Campaign Wave 2, refined by WS6 "One land engine"): the
+     * provisional seeds-only land estimate (`plannedLands`, computed before the Motor A/B loop) and
+     * the final [com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver] recompute over the
+     * finished nonland mainboard (`finalLandTarget`, computed just before [fillLands]) are each
+     * derived from a DIFFERENT mainboard snapshot -- the two are not guaranteed monotonic, so the
+     * REAL total (nonland + [landEntries]) can land a card or two OVER [targetFullSize] with nothing
      * upstream to pull it back down. Removes the WORST-fit surplus nonland card(s) -- ranked by the
      * SAME [DeckScorer.fit] the loop placed them with -- until the deck is exactly on target or the
      * trimmable pool is exhausted. Pure math delegated to [MainboardTrimmer] (kept directly
@@ -600,31 +804,35 @@ class BuildDeckFromTemplateUseCase(
         return beforeQty - trimmed.sumOf { it.quantity }
     }
 
-    // ── FILLING_LANDS ───────────────────────────────────────────────────────────
+    // ── FILLING_LANDS (Deck Wizard & Engine Rework plan, Workstream 9.4) ────────
 
-    /** Shared by the pre-loop planning step and [fillLands]'s own materialization -- keeps the
-     * "planned" land count the loop reserves nonland slots against and the REAL land count
-     * [fillLands] later produces derived from the identical logic. */
-    private fun computeLandTarget(spec: DeckWizardSpec, template: DeckTemplate, mainboardSoFar: List<DeckEntry>): Int =
-        if (spec.format.isSixtyCardConstructed) {
-            // §3.6: refine the archetype-driven land count by the ACTUAL placed non-land mix
-            // (ramp/curve/draw) -- dynamicLandIdeal can only RELAX the count, never exceed it.
-            val fullProfile = recomputeProfile(spec, template, mainboardSoFar)
-            manaBaseAnalyzer.dynamicLandIdeal(fullProfile).takeIf { it > 0 } ?: template.landTarget
-        } else {
-            template.landTarget.takeIf { it > 0 } ?: DeckSkeletons.forFormat(spec.format).idealFor(DeckRole.LAND)
-        }
-
+    /**
+     * Two-stage land fill (WS9.4, F fix "the wizard's own manabase never has enough fixing"):
+     * 1. NON-BASIC fixing lands first ([fillFixingLands]) -- count driven by [ArchetypeData
+     *    .landMixFor]'s basics-vs-fixing composition for the deck's color count.
+     * 2. Whatever land slots remain -> [BasicLandCalculator]'s existing basics split, UNCHANGED
+     *    math, just now filling fewer slots than before whenever stage 1 placed anything.
+     */
     private suspend fun fillLands(
         spec: DeckWizardSpec,
         template: DeckTemplate,
         placedEntries: List<DeckEntry>,
+        landTarget: Int,
+        collection: List<UserCardWithCard>,
+        ownedQuantityByName: Map<String, Int>,
+        usedNames: MutableSet<String>,
     ): List<DeckEntry> {
+        val fixingLandEntries = fillFixingLands(spec, template, landTarget, collection, ownedQuantityByName, usedNames)
+
         val nonBasicLandSeeds = spec.seeds.filter { BasicLandCalculator.isLand(it) && !BasicLandCalculator.isBasicLand(it) }
-        val landTarget = computeLandTarget(spec, template, placedEntries)
 
         val mainboardDeckCards = placedEntries.map { DeckCard(it.card, it.quantity, it.isOwned) }
-        val nonBasicLandDeckCards = nonBasicLandSeeds.map { DeckCard(it, 1, true) }
+        // WS9.4: the newly-placed fixing lands reduce the basics slot count exactly like a
+        // non-basic land SEED already did -- both are folded into the SAME `nonBasicLands` param so
+        // BasicLandCalculator.calculate's `basicSlotsAvailable = totalLandTarget - nonBasicCount`
+        // subtraction accounts for the fixing fill without any change to that calculator's math.
+        val nonBasicLandDeckCards = nonBasicLandSeeds.map { DeckCard(it, 1, true) } +
+            fixingLandEntries.map { DeckCard(it.card, it.quantity, it.isOwned) }
         // BasicLandCalculator.calculate falls back to an EVEN SPLIT across `commanderIdentity` only
         // when the mainboard has zero colored pips (totalWeight == 0) -- with a bare `null` for
         // every non-Commander format, that fallback never fires and the calculator silently returns
@@ -648,7 +856,127 @@ class BuildDeckFromTemplateUseCase(
             totalLandTarget = landTarget,
             commanderIdentity = landColorIdentity,
         )
-        return materializeBasics(distribution)
+        return fixingLandEntries + materializeBasics(distribution)
+    }
+
+    /**
+     * Stage 1 of [fillLands] (WS9.4): places NON-BASIC fixing lands (duals/triomes/rainbow
+     * utility lands producing >= 2 distinct colors -- the SAME "fixing land" definition
+     * [com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier]'s `manaFixMatcher`
+     * uses via [Card.producedMana]) before any basic is materialized. The TARGET count comes from
+     * [ArchetypeData.landMixFor]'s `basicsRatio` for [template]'s color count -- `(1 -
+     * midpoint(basicsRatio)) * landTarget`, rounded -- never a separate hardcoded number.
+     *
+     * Sourced from the user's OWNED collection first (deterministic: most colors produced desc,
+     * then name/id for a stable tie-break -- never an alphabetical Scryfall search), then the
+     * WS4 Scryfall backstop (mirrors [runScryfallBackstopLoop]'s shape: budget-free per D-H,
+     * paginated, `ScryfallRequestQueue`-routed via [CardRepository.searchWithRawQuery]) ONLY when
+     * [DeckWizardSpec.includeOutsideCollection] is on. A [DeckFormat.DRAFT] spec (no
+     * [ArchetypeFormat]) or a mono-color / colorless identity (fixing ratio ~0) short-circuits to
+     * an empty list -- the existing basics-only path is untouched for those cases.
+     */
+    private suspend fun fillFixingLands(
+        spec: DeckWizardSpec,
+        template: DeckTemplate,
+        landTarget: Int,
+        collection: List<UserCardWithCard>,
+        ownedQuantityByName: Map<String, Int>,
+        usedNames: MutableSet<String>,
+    ): List<DeckEntry> {
+        if (landTarget <= 0) return emptyList()
+        val archetypeFormat = ArchetypeFormat.of(spec.format) ?: return emptyList()
+        val identity = template.colorIdentity
+        val colorCount = identity.count { it != ManaColor.C }
+        val mix = ArchetypeData.landMixFor(archetypeFormat, colorCount)
+        val fixingRatio = 1.0 - ((mix.basicsRatio.start + mix.basicsRatio.endInclusive) / 2.0)
+        val fixingTarget = (fixingRatio * landTarget).roundToInt().coerceIn(0, landTarget)
+        if (fixingTarget <= 0) return emptyList()
+
+        val identitySymbols = identity.map { it.symbol }.toSet()
+        val maxCopies = if (spec.format == DeckFormat.COMMANDER) 1 else spec.format.maxCopies
+
+        val placed = mutableListOf<DeckEntry>()
+        var remaining = fixingTarget
+
+        val ownedFixingLands = collection
+            .map { it.card }
+            .distinctBy { it.scryfallId }
+            .filter { isFixingLand(it) }
+            .filter { identitySymbols.containsAll(it.colorIdentity) }
+            .filter { it.name !in usedNames }
+            .sortedWith(
+                compareByDescending<Card> { it.producedMana.toSet().count { c -> c in "WUBRG" } }
+                    .thenBy { it.name }
+                    .thenBy { it.scryfallId }
+            )
+        for (card in ownedFixingLands) {
+            if (remaining <= 0) break
+            if (card.name in usedNames) continue
+            usedNames += card.name
+            val owned = ownedQuantityByName[card.name] ?: 1
+            val qty = minOf(owned, maxCopies, remaining).coerceAtLeast(1)
+            placed += DeckEntry(card = card, quantity = qty, isOwned = true, isSideboard = false)
+            remaining -= qty
+        }
+
+        if (remaining > 0 && spec.includeOutsideCollection) {
+            placed += fillFixingLandsFromScryfallBackstop(spec, identity, remaining, usedNames)
+        }
+
+        return placed
+    }
+
+    /** The same "fixing land" definition as
+     * [com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier]'s private
+     * `manaFixMatcher` (D14's [Card.producedMana], >= 2 distinct WUBRG colors) -- a non-basic land
+     * that structurally produces at least two colors. */
+    private fun isFixingLand(card: Card): Boolean =
+        BasicLandCalculator.isLand(card) &&
+            !BasicLandCalculator.isBasicLand(card) &&
+            card.producedMana.toSet().count { it in "WUBRG" } >= 2
+
+    /**
+     * Stage 1's outside-collection last resort (WS9.4), mirroring [runScryfallBackstopLoop]'s
+     * shape (paginated, budget-free per D-H, `CardRepository`-routed, dedup by name) but over a
+     * single fixed query rather than a role/theme loop: `t:land id<=<identity> produces>=2
+     * -t:basic`, `order=edhrec`. Every card this returns is genuinely NOT owned, so only the
+     * format's own copy limit bounds it (no owned-quantity clamp, unlike the collection branch).
+     */
+    private suspend fun fillFixingLandsFromScryfallBackstop(
+        spec: DeckWizardSpec,
+        identity: Set<ManaColor>,
+        needed: Int,
+        usedNames: MutableSet<String>,
+    ): List<DeckEntry> {
+        val idSymbols = identity.filter { it != ManaColor.C }.map { it.symbol }.sorted().joinToString(separator = "")
+        val idFragment = if (idSymbols.isEmpty()) null else "id<=$idSymbols"
+        // v1 wizard scope is Commander + Casual (DeckWizardSpec's own KDoc); Casual has no
+        // universal Scryfall legality token, mirroring CandidatePoolGenerator.legalityFragment.
+        val legalFragment = if (spec.format == DeckFormat.COMMANDER) "legal:commander" else null
+        val query = listOfNotNull(idFragment, legalFragment, "t:land", "produces>=2", "-t:basic").joinToString(separator = " ")
+        val maxCopies = if (spec.format == DeckFormat.COMMANDER) 1 else spec.format.maxCopies
+
+        val placed = mutableListOf<DeckEntry>()
+        var remaining = needed
+        var page = 1
+        while (remaining > 0 && page <= MAX_FIXING_LAND_BACKSTOP_PAGES) {
+            val results = runCatching { cardRepository.searchWithRawQuery(query, order = "edhrec", page = page) }
+                .getOrElse { t ->
+                    crashReporter?.recordException(RuntimeException("deck_builder_v2_fixing_land_backstop_failed", t))
+                    emptyList()
+                }
+            if (results.isEmpty()) break
+            for (card in results) {
+                if (remaining <= 0) break
+                if (card.name in usedNames) continue
+                usedNames += card.name
+                val qty = minOf(maxCopies, remaining)
+                placed += DeckEntry(card = card, quantity = qty, isOwned = false, isSideboard = false)
+                remaining -= qty
+            }
+            page++
+        }
+        return placed
     }
 
     private suspend fun materializeBasics(distribution: BasicLandDistribution): List<DeckEntry> {
@@ -800,15 +1128,6 @@ class BuildDeckFromTemplateUseCase(
     private companion object {
         const val COLOR_DISCIPLINE_LIMIT = 2
 
-        /** Deck Engine Unification (D3), formerly Wave 3 (Task 1): the minimum RAW score (Motor A's
-         * [com.mmg.manahub.feature.decks.domain.engine.CardFit.score] or Motor B's `synergy`) a
-         * placement candidate must clear to be placed at all. Below this, the candidate is skipped --
-         * there is no more no-floor top-up fallback (D3: a deck that comes out short reports
-         * structured [TemplateBuildResult.gaps] instead of a weak fill). Tunable; 0.25 is comfortably
-         * below a genuinely decent fit (mid-0.4s+ in practice) but above the near-zero scores a truly
-         * off-strategy card gets. */
-        const val CATEGORY_FILL_FIT_FLOOR = 0.25f
-
         /** Bounds the cost of each Motor A call within the loop (plan §5 Phase 2: "batch per
          * skeleton role/category, never per single card"). */
         const val MOTOR_A_BATCH_LIMIT = 24
@@ -816,6 +1135,21 @@ class BuildDeckFromTemplateUseCase(
         /** Hard iteration cap on [runMotorALoop] -- defensive only; the loop already breaks the
          * instant a batch places nothing or clears no candidate above the floor. */
         const val MAX_ITERATION_SLACK = 20
+
+        /** Workstream 4.1: the max Scryfall results page [runScryfallBackstopLoop] pages forward to
+         * on a given query set before trying one relaxed round (see that function's KDoc). */
+        const val MAX_BACKSTOP_PAGES = 5
+
+        /** Hard iteration cap on [runScryfallBackstopLoop] -- defensive only, mirrors
+         * [MAX_ITERATION_SLACK]'s role for [runMotorALoop]; the loop already returns the instant a
+         * relaxed, fully-paged pass clears no candidate above the floor. */
+        const val MAX_BACKSTOP_ITERATION_SLACK = 30
+
+        /** Workstream 9.4: the max Scryfall results page [fillFixingLandsFromScryfallBackstop]
+         * pages forward to before giving up (no relaxed-round lever like the nonland backstop --
+         * a single `t:land id<=… produces>=2` query is broad enough that a niche identity + this
+         * small a page budget is the honest failure mode, not a missing relaxation pass). */
+        const val MAX_FIXING_LAND_BACKSTOP_PAGES = 3
 
         const val SIGNATURE_CARD_COUNT = 3
 

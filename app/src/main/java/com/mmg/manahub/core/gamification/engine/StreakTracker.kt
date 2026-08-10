@@ -13,7 +13,8 @@ import kotlinx.datetime.daysUntil
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * Advances the daily-activity streak on [ProgressionEvent.AppOpenedToday] (ADR-002 §Context, Phase 2).
+ * Advances the daily-activity streak on [ProgressionEvent.AppOpenedToday] (ADR-002 §Context, Phase 2)
+ * and the Daily Puzzle streak on [ProgressionEvent.PuzzleSolved] (ADR-006 Decision 5, Batch B3).
  *
  * Streaks use FREEZE TOKENS, never punishment: a single missed day (or several, if enough tokens are
  * banked) consumes tokens to PRESERVE the streak instead of resetting it. Tokens regenerate as the user
@@ -30,14 +31,26 @@ class StreakTracker(
 ) {
 
     /**
-     * On [ProgressionEvent.AppOpenedToday], advances the `daily_activity` streak for today's local date.
-     * All other events are ignored.
+     * On [ProgressionEvent.AppOpenedToday], advances the `daily_activity` streak for today's local
+     * date. On [ProgressionEvent.PuzzleSolved], advances the separate `puzzle` streak — deliberately
+     * using the EVENT'S OWN server-authoritative [ProgressionEvent.PuzzleSolved.puzzleDate], never
+     * [clock].now(), so the puzzle streak's "day" is the Daily Puzzle Worker's global UTC rollover,
+     * independent of the daily-activity streak's local-device clock (ADR-006 Decision 5 — "two
+     * independent clocks" by design, not an oversight). All other events are ignored.
      */
     suspend fun process(event: ProgressionEvent) {
-        if (event !is ProgressionEvent.AppOpenedToday) return
-        val today = clock.now().toLocalDateTime(timeZone).date
-        val existing = dao.getStreak(TYPE_DAILY_ACTIVITY)
-        dao.upsertStreak(advance(existing, today))
+        when (event) {
+            is ProgressionEvent.AppOpenedToday -> {
+                val today = clock.now().toLocalDateTime(timeZone).date
+                dao.upsertStreak(advance(dao.getStreak(TYPE_DAILY_ACTIVITY), today, TYPE_DAILY_ACTIVITY))
+            }
+
+            is ProgressionEvent.PuzzleSolved -> {
+                dao.upsertStreak(advance(dao.getStreak(TYPE_PUZZLE), event.puzzleDate, TYPE_PUZZLE))
+            }
+
+            else -> Unit
+        }
     }
 
     /**
@@ -135,8 +148,11 @@ class StreakTracker(
     }
 
     companion object {
-        /** The single streak type tracked in this chunk. */
+        /** The daily-activity (app open) streak type. */
         const val TYPE_DAILY_ACTIVITY = "daily_activity"
+
+        /** The Daily Puzzle streak type — advanced by the puzzle's own server-authoritative date. */
+        const val TYPE_PUZZLE = "puzzle"
 
         /** Maximum freeze tokens a streak can bank. */
         const val MAX_FREEZE_TOKENS = 2

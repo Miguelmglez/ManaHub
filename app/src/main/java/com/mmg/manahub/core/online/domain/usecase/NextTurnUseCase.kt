@@ -6,6 +6,6 @@ import javax.inject.Inject
 class NextTurnUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend operator fun invoke(sessionId: String): Result<Unit> =
-        repository.nextTurn(sessionId)
+    suspend operator fun invoke(sessionId: String, guestToken: String? = null): Result<Unit> =
+        repository.nextTurn(sessionId, guestToken)
 }

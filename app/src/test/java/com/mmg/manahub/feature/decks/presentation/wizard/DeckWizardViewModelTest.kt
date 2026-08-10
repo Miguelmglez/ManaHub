@@ -6,6 +6,8 @@ import app.cash.turbine.test
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.repository.CardStrategyTagsRepository
+import com.mmg.manahub.core.domain.repository.CardStrategyTagsResult
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
@@ -24,6 +26,7 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.card
+import com.mmg.manahub.feature.decks.domain.usecase.DeriveCommanderStrategiesUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildStage
 import com.mmg.manahub.feature.decks.domain.template.CategorySuggestions
@@ -54,6 +57,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -77,6 +81,12 @@ class DeckWizardViewModelTest {
     private val buildDeckFromTemplateUseCase = mockk<BuildDeckFromTemplateUseCase>()
     private val searchCardsUseCase = mockk<SearchCardsUseCase>()
     private val communityAggregateRepository = mockk<CommunityAggregateRepository>()
+    // Deck Wizard & Engine Rework plan, Workstream 2.2 -- STRATEGY step's source 1. Non-relaxed
+    // (matches this file's own convention for the other collaborators above), but every call site
+    // inside DeckWizardViewModel.deriveCommanderStrategies wraps it in runCatching, so an unstubbed
+    // invocation degrades safely (source 1 empty, falls through to source 2/3) rather than crashing
+    // a test that never touches this behavior directly.
+    private val cardStrategyTagsRepository = mockk<CardStrategyTagsRepository>()
     private val crashReporter = mockk<CrashReporter>(relaxed = true)
     private val appContext = mockk<Context>()
 
@@ -134,6 +144,7 @@ class DeckWizardViewModelTest {
         // so tests run them REAL (no stubbing burden, mirrors this file's own CollectionProfileUseCase
         // precedent) unless a test needs to isolate a specific ranking/coherence outcome.
         userPreferences = userPreferences,
+        cardStrategyTagsRepository = cardStrategyTagsRepository,
     )
 
     @Before
@@ -196,12 +207,12 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `Commander skips ENTRY entirely and forces the CARDS flow`() = runTest(dispatcher) {
+    fun `Commander skips ENTRY entirely, forces the CARDS flow, and routes to COMMANDER_PICK (Workstream 2)`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
         vm.onNextFromFormat()
-        assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
         assertEquals(WizardEntryFlow.CARDS, vm.uiState.value.entryFlow)
     }
 
@@ -257,18 +268,20 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `Flow B-C skip IDENTITY -- onNextFromDirection goes straight to REVIEW, and back mirrors it`() = runTest(dispatcher) {
+    fun `Flow B-C now land on MANUAL_ADDS (Workstream 3), and back mirrors it`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
-        // onNextFromDirection now requires at least one color pick for the COLORS flow (a separate,
-        // unrelated VM change that landed after this test was written -- "never trust the UI-only
-        // disabled state" guard, same precedent as the Commander-requires-a-commander check).
         vm.onToggleColorFlowColor(ManaColor.R)
+        // Workstream 3 -- the COLORS flow now ALSO requires a real strategy pick before advancing
+        // (unified with Flow A/C's own gate), not just a color pick.
+        val entry = vm.uiState.value.colorAffinityEntries.first()
+        vm.onSelectColorAffinityEntry(entry)
         vm.onNextFromDirection()
-        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+        assertNotNull(vm.uiState.value.manualAddsSkeleton)
 
         vm.onBackPressed()
         assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
@@ -283,18 +296,19 @@ class DeckWizardViewModelTest {
     }
 
     @Test
-    fun `Commander direction requires a commander before advancing, and shows a toast`() = runTest(dispatcher) {
+    fun `COMMANDER_PICK requires a commander before advancing, and shows a toast (Workstream 2)`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.COMMANDER)
         vm.onNextFromFormat()
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
 
         vm.events.test {
-            vm.onNextFromDirection()
+            vm.onNextFromCommanderPick()
             val event = awaitItem()
             assertTrue(event is DeckWizardEvent.ShowToast)
         }
-        assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
     }
 
     @Test
@@ -317,15 +331,15 @@ class DeckWizardViewModelTest {
         }
         assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
 
-        // Picking a color combo unblocks it.
+        // Picking a color combo unblocks it -- Workstream 3: lands on MANUAL_ADDS now, not REVIEW.
         val combo = vm.uiState.value.colorComboSuggestions.first()
         vm.onSelectColorCombo(combo)
         vm.onNextFromDirection()
-        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
     }
 
     @Test
-    fun `picking a commander pre-fills color identity from it`() = runTest(dispatcher) {
+    fun `picking a commander pre-fills color identity from it, and Next advances to STRATEGY (Workstream 2)`() = runTest(dispatcher) {
         coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
         val vm = viewModel()
         advanceUntilIdle()
@@ -335,19 +349,338 @@ class DeckWizardViewModelTest {
         advanceUntilIdle()
 
         assertEquals(setOf(ManaColor.G), vm.uiState.value.colorIdentity)
-        vm.onNextFromDirection()
-        assertEquals(WizardPhase.IDENTITY, vm.uiState.value.phase)
+        vm.onNextFromCommanderPick()
+        assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
+    }
+
+    // ── Commander flow (Deck Wizard & Engine Rework plan, Workstream 2) ──────────
+
+    @Test
+    fun `Commander full step chain -- COMMANDER_PICK to STRATEGY to MANUAL_ADDS to REVIEW, and back mirrors it`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
+
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+        assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
+
+        vm.onNextFromStrategy()
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+
+        vm.onNextFromManualAdds()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+
+        // Back navigation mirrors the forward chain exactly (2.4).
+        vm.onBackPressed()
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.STRATEGY, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.COMMANDER_PICK, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
     }
 
     @Test
-    fun `Casual direction advances without a commander`() = runTest(dispatcher) {
+    fun `STRATEGY step advances with no pick at all -- Commander's GENERIC Balanced escape hatch (D-B), and resolves NO skeleton`() = runTest(dispatcher) {
+        // Fix 5 (edge-case audit, 2026-07-28): a GENERIC ("Balanced") pick with no themes must
+        // mirror BuildDeckFromTemplateUseCase.resolveArchetypeSkeleton's own gate -- the REAL build
+        // never resolves an archetype-flavored skeleton for this case (Motor A scores with zero
+        // theme bonus), so this UI-only preview must not show one either. Before this fix, this
+        // test asserted the OPPOSITE (a non-null skeleton) as the intended behavior -- that was
+        // itself the bug: a misleading MANUAL_ADDS role chip the real build never actually applied.
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+
+        assertNull(vm.uiState.value.selectedArchetype)
+        vm.onNextFromStrategy()
+
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+        assertNull("a GENERIC pick with no themes must resolve NO skeleton, matching the real build's own gate", vm.uiState.value.manualAddsSkeleton)
+    }
+
+    @Test
+    fun `onSelectStrategyArchetype and onToggleStrategyTheme update the STRATEGY step's own selection`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+        vm.onNextFromCommanderPick()
+
+        vm.onSelectStrategyArchetype(ArchetypeId.AGGRO)
+        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
+
+        vm.onToggleStrategyTheme(ThemeId.TOKENS)
+        assertEquals(listOf(ThemeId.TOKENS), vm.uiState.value.selectedStrategyThemes)
+
+        // Toggling the same theme again removes it (StrategyPickerLogic.toggleTheme contract).
+        vm.onToggleStrategyTheme(ThemeId.TOKENS)
+        assertTrue(vm.uiState.value.selectedStrategyThemes.isEmpty())
+
+        // Casual's own single-theme slot (selectedDirectionTheme) is untouched -- the two flows use
+        // SEPARATE fields for the theme axis (see DeckWizardUiState.selectedStrategyThemes' KDoc).
+        assertNull(vm.uiState.value.selectedDirectionTheme)
+
+        vm.onSelectStrategyArchetype(null)
+        assertNull(vm.uiState.value.selectedArchetype)
+    }
+
+    @Test
+    fun `D-A -- commander search stays off by default, and only fires once includeOutsideCollection is toggled on`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+        assertTrue(!vm.uiState.value.includeOutsideCollection)
+
+        vm.onCommanderQueryChange("Zada")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.commanderSearchResults.isEmpty())
+        coVerify(exactly = 0) { searchCardsUseCase(any(), any()) }
+
+        vm.onToggleIncludeOutsideCollection()
+        assertTrue(vm.uiState.value.includeOutsideCollection)
+        coEvery { searchCardsUseCase("is:commander Zada", any()) } returns DataResult.Success(
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
+        )
+
+        vm.onCommanderQueryChange("Zada")
+        advanceUntilIdle()
+
+        assertEquals(listOf(commander), vm.uiState.value.commanderSearchResults)
+    }
+
+    @Test
+    fun `selecting a commander derives STRATEGY candidates from its own card_strategy_tags (source 1)`() = runTest(dispatcher) {
+        coEvery { communityAggregateRepository.getCommanderAggregate(any()) } returns DataResult.Error("Worker down")
+        coEvery { cardStrategyTagsRepository.getStrategyTags(any()) } returns CardStrategyTagsResult.Found(
+            tags = listOf(CardTag.TRIBAL),
+            tribes = listOf("elf"),
+        )
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.COMMANDER)
+        vm.onNextFromFormat()
+
+        vm.onSelectCommander(commander)
+        advanceUntilIdle()
+
+        val candidates = vm.uiState.value.commanderStrategyCandidates
+        assertTrue(candidates.tribes.any { it.key == "tribe:elf" })
+    }
+
+    @Test
+    fun `Casual CARDS direction requires a strategy pick and colors before advancing (Workstream 3, D-B generalized)`() = runTest(dispatcher) {
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+
+        vm.events.test {
+            vm.onNextFromDirection()
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
+
+        // A strategy pick alone (no colors) still blocks.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        assertEquals(ArchetypeId.RAMP, vm.uiState.value.selectedArchetype)
+        vm.events.test {
+            vm.onNextFromDirection()
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
+
+        // Both a strategy AND a color -- advances to the shared MANUAL_ADDS step.
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        assertEquals(WizardPhase.IDENTITY, vm.uiState.value.phase)
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+        assertNotNull(vm.uiState.value.manualAddsSkeleton)
+    }
+
+    // ── Flow A -- Workstream 3.1 locked-color invariants ─────────────────────────
+
+    @Test
+    fun `adding a seed locks its colors into colorIdentity immediately`() = runTest(dispatcher) {
+        val seed = card(id = "seed-1", name = "Bicolor Seed", colorIdentity = listOf("U", "R"))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+
+        vm.onAddSeed(seed)
+
+        assertEquals(setOf(ManaColor.U, ManaColor.R), vm.uiState.value.colorIdentity)
+        assertEquals(setOf(ManaColor.U, ManaColor.R), vm.uiState.value.lockedColors)
+    }
+
+    @Test
+    fun `removing a seed unlocks its color, but the color stays picked until manually deselected`() = runTest(dispatcher) {
+        val seed = card(id = "seed-1", name = "Bicolor Seed", colorIdentity = listOf("U", "R"))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(seed)
+
+        vm.onRemoveSeed(seed)
+
+        assertTrue(vm.uiState.value.lockedColors.isEmpty())
+        assertEquals(setOf(ManaColor.U, ManaColor.R), vm.uiState.value.colorIdentity)
+    }
+
+    @Test
+    fun `a locked color cannot be deselected, but an unlocked color can be freely toggled`() = runTest(dispatcher) {
+        val seed = card(id = "seed-1", name = "Mono Seed", colorIdentity = listOf("G"))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(seed)
+        assertEquals(setOf(ManaColor.G), vm.uiState.value.lockedColors)
+
+        // Cannot deselect the locked color.
+        vm.onToggleCardsFlowColor(ManaColor.G)
+        assertEquals(setOf(ManaColor.G), vm.uiState.value.colorIdentity)
+
+        // Can freely add/remove an UNLOCKED color.
+        vm.onToggleCardsFlowColor(ManaColor.U)
+        assertEquals(setOf(ManaColor.G, ManaColor.U), vm.uiState.value.colorIdentity)
+        vm.onToggleCardsFlowColor(ManaColor.U)
+        assertEquals(setOf(ManaColor.G), vm.uiState.value.colorIdentity)
+    }
+
+    @Test
+    fun `an explicit color pick survives adding a seed with a different color -- union, not replace`() = runTest(dispatcher) {
+        val seed = card(id = "seed-1", name = "Mono Red Seed", colorIdentity = listOf("R"))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onToggleCardsFlowColor(ManaColor.G)
+
+        vm.onAddSeed(seed)
+
+        assertEquals(setOf(ManaColor.G, ManaColor.R), vm.uiState.value.colorIdentity)
+        assertEquals(setOf(ManaColor.R), vm.uiState.value.lockedColors)
+    }
+
+    // ── Flow A -- Workstream 3.1 coherence-hint VM wiring (exhaustive logic already covered by
+    //    SuggestStrategiesForSeedsUseCaseTest) ────────────────────────────────────
+
+    @Test
+    fun `a seed strategy candidate's misfit hint reflects the currently picked seeds and colors`() = runTest(dispatcher) {
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val offSeed = card(id = "gy-1", name = "Graveyard Piece", tags = listOf(CardTag.GRAVEYARD))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(rampSeed)
+        vm.onAddSeed(offSeed)
+
+        val rampCandidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        assertTrue(rampCandidate.misfitSeeds.any { it.scryfallId == "gy-1" })
+
+        // Removing the misfit seed re-ranks: the SAME candidate no longer carries it as a misfit.
+        vm.onRemoveSeed(offSeed)
+        val reranked = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        assertTrue(reranked.misfitSeeds.isEmpty())
+    }
+
+    // ── Flow A/B/C -- Workstream 3 per-flow full step chains ─────────────────────
+
+    @Test
+    fun `Flow A full step chain -- FORMAT to ENTRY to DIRECTION to MANUAL_ADDS to REVIEW, and back mirrors it`() = runTest(dispatcher) {
+        val seed = card(id = "seed-1", name = "Ramp Seed", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G"))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
+
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
+
+        vm.onAddSeed(seed)
+        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        vm.onSelectSeedStrategyCandidate(candidate)
+
+        vm.onNextFromDirection()
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+        assertNotNull(vm.uiState.value.manualAddsSkeleton)
+
+        vm.onNextFromManualAdds()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+
+        vm.onBackPressed()
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.ENTRY, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.FORMAT, vm.uiState.value.phase)
+    }
+
+    @Test
+    fun `Flow B full step chain -- DIRECTION to MANUAL_ADDS to REVIEW`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.COLORS)
+        vm.onToggleColorFlowColor(ManaColor.R)
+        val entry = vm.uiState.value.colorAffinityEntries.first()
+        vm.onSelectColorAffinityEntry(entry)
+
+        vm.onNextFromDirection()
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+
+        vm.onNextFromManualAdds()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+        vm.onBackPressed()
+        assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
+    }
+
+    @Test
+    fun `Flow C full step chain -- DIRECTION to MANUAL_ADDS to REVIEW`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
+        vm.onSelectTaxonomyArchetype(ArchetypeId.RAMP)
+        val combo = vm.uiState.value.colorComboSuggestions.first()
+        vm.onSelectColorCombo(combo)
+
+        vm.onNextFromDirection()
+        assertEquals(WizardPhase.MANUAL_ADDS, vm.uiState.value.phase)
+
+        vm.onNextFromManualAdds()
+        assertEquals(WizardPhase.REVIEW, vm.uiState.value.phase)
     }
 
     @Test
@@ -379,38 +712,6 @@ class DeckWizardViewModelTest {
         vm.onToggleColor(ManaColor.B)
         vm.onToggleColor(ManaColor.R)
         assertTrue(vm.uiState.value.showColorDisciplineHint)
-    }
-
-    @Test
-    fun `onNextFromDirection prefills colorIdentity from seeds for Casual when none chosen explicitly`() = runTest(dispatcher) {
-        val seed = card(id = "seed-1", name = "Bicolor Seed", colorIdentity = listOf("U", "R"))
-        val vm = viewModel()
-        advanceUntilIdle()
-        vm.onSelectFormat(DeckFormat.CASUAL)
-        vm.onNextFromFormat()
-        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
-        vm.onAddSeed(seed)
-
-        vm.onNextFromDirection()
-
-        assertEquals(setOf(ManaColor.U, ManaColor.R), vm.uiState.value.colorIdentity)
-        assertEquals(WizardPhase.IDENTITY, vm.uiState.value.phase)
-    }
-
-    @Test
-    fun `onNextFromDirection never clobbers an explicit color choice for Casual`() = runTest(dispatcher) {
-        val seed = card(id = "seed-1", name = "Bicolor Seed", colorIdentity = listOf("U", "R"))
-        val vm = viewModel()
-        advanceUntilIdle()
-        vm.onSelectFormat(DeckFormat.CASUAL)
-        vm.onNextFromFormat()
-        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
-        vm.onToggleColor(ManaColor.G)
-        vm.onAddSeed(seed)
-
-        vm.onNextFromDirection()
-
-        assertEquals(setOf(ManaColor.G), vm.uiState.value.colorIdentity)
     }
 
     // ── Discoveries v2 hand-off (D11) ────────────────────────────────────────
@@ -457,7 +758,7 @@ class DeckWizardViewModelTest {
     fun `an unowned combo card (the missing piece) resolves via a network search`() = runTest(dispatcher) {
         val basaltMonolith = card(id = "basalt-1", name = "Basalt Monolith")
         coEvery { searchCardsUseCase("Basalt Monolith", any()) } returns DataResult.Success(
-            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(basaltMonolith), hasMore = false)
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(basaltMonolith), hasMore = false, totalCards = 1)
         )
 
         val vm = viewModel(mapOf("seeds" to "Basalt Monolith"))
@@ -525,8 +826,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -556,8 +864,11 @@ class DeckWizardViewModelTest {
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
         advanceUntilIdle()
-        vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        // Deck Wizard & Engine Rework plan, Workstream 2 -- the new Commander step sequence
+        // (COMMANDER_PICK -> STRATEGY -> MANUAL_ADDS), replacing the old DIRECTION/IDENTITY pair.
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -587,8 +898,10 @@ class DeckWizardViewModelTest {
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
         advanceUntilIdle()
-        vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        // Deck Wizard & Engine Rework plan, Workstream 2 -- the new Commander step sequence.
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -604,8 +917,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
 
         // Simulates a double-tap: by the time the second call reads state, the first call's
         // synchronous GENERATING write already landed, so the re-entrancy guard short-circuits it.
@@ -629,8 +949,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -650,8 +977,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -677,8 +1011,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -710,8 +1051,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -730,8 +1078,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -755,8 +1110,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -788,8 +1150,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -813,8 +1182,13 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing;
+        // satisfying it here avoids a stray blocked-attempt ShowToast sitting in the buffered events
+        // channel ahead of the OpenDeckStudio event this test actually asserts on.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -855,6 +1229,43 @@ class DeckWizardViewModelTest {
         vm.onAddSeed(rampSeed)
         vm.onRemoveSeed(rampSeed)
         assertNull(vm.uiState.value.seedStrategySuggestion)
+    }
+
+    @Test
+    fun `removing the last seed after picking a strategy clears the stale pick and re-blocks onNextFromDirection (Fix 6)`() = runTest(dispatcher) {
+        // Edge-case audit Fix 6: add a seed, select a suggested strategy for it, then remove that
+        // SAME (last) seed. Pre-fix, `selectedArchetype` stayed set even though the visible
+        // strategy-candidate list recomputes to empty (nothing left to rank against) -- the
+        // mandatory-strategy gate in onNextFromDirection would then silently pass on the stale pick
+        // and advance to MANUAL_ADDS on a plan the user can no longer see or reconsider.
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onSelectFormat(DeckFormat.CASUAL)
+        vm.onNextFromFormat()
+        vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        vm.onAddSeed(rampSeed)
+        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        vm.onSelectSeedStrategyCandidate(candidate)
+        assertEquals(ArchetypeId.RAMP, vm.uiState.value.selectedArchetype)
+
+        vm.onRemoveSeed(rampSeed)
+
+        assertNull("removing the last seed must clear the strategy pick it justified", vm.uiState.value.selectedArchetype)
+        assertNull(vm.uiState.value.selectedDirectionTheme)
+        assertNull(vm.uiState.value.selectedTribeKey)
+
+        // Also need a color pick (CARDS flow's OTHER mandatory-gate condition) so the assertion
+        // below proves the block is specifically about the cleared strategy, not colors.
+        vm.onToggleCardsFlowColor(ManaColor.G)
+        vm.events.test {
+            vm.onNextFromDirection()
+            assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
+        }
+        assertEquals(
+            "onNextFromDirection must NOT advance past DIRECTION on a cleared/stale strategy pick",
+            WizardPhase.DIRECTION, vm.uiState.value.phase,
+        )
     }
 
     @Test
@@ -1035,8 +1446,15 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -1087,8 +1505,10 @@ class DeckWizardViewModelTest {
         vm.onNextFromFormat()
         vm.onSelectCommander(commander)
         advanceUntilIdle()
-        vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        // Deck Wizard & Engine Rework plan, Workstream 2 -- the new Commander step sequence.
+        vm.onNextFromCommanderPick()
+        vm.onNextFromStrategy()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 
@@ -1121,8 +1541,15 @@ class DeckWizardViewModelTest {
         }
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
+        // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing,
+        // and lands on the shared MANUAL_ADDS step (onNextFromIdentity is unreachable dead code post
+        // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
+        // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
+        // strategy/color picked.
+        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
-        vm.onNextFromIdentity()
+        vm.onNextFromManualAdds()
         vm.onGenerate()
         advanceUntilIdle()
 

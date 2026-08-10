@@ -27,4 +27,12 @@ object CommunityAggregateKeys {
 
     fun sixtyCacheKey(format: Int, signatureCards: List<String>): String =
         "agg:$format:${buildCanonicalKey(signatureCards)}"
+
+    /**
+     * Cache key for the trending snapshot (Backend & Performance Optimization plan, WS4a finding
+     * 3, 2026-07-28). `null`/blank [week] means "current week" -- normalised to a fixed literal
+     * segment (not the empty string) so it can't collide with a future literal week value.
+     */
+    fun trendingCacheKey(week: String?): String =
+        "agg:trending:${week?.takeIf { it.isNotBlank() } ?: "current"}"
 }

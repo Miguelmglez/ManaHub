@@ -45,8 +45,9 @@ import java.util.concurrent.TimeUnit
  * Because none of those types is consumed by any Hilt feature, the Hilt module was DELETED and its
  * `@Provides` were ported here verbatim as Koin `single { }` (the Archidekt OkHttpClient is still built
  * FROM SCRATCH — not from the global client — so it keeps its dedicated HTTP cache + User-Agent + 5 MB
- * response guard, mirroring the old behaviour exactly). [ArchidektRequestQueue] (no deps) and the three
- * use cases are likewise provided here. The repository's IO dispatcher is `Dispatchers.IO` directly —
+ * response guard, mirroring the old behaviour exactly). [ArchidektRequestQueue] (WS2: takes the shared
+ * `CrashReporter` for cooldown telemetry, resolved via `get()`) and the three use cases are likewise
+ * provided here. The repository's IO dispatcher is `Dispatchers.IO` directly —
  * the exact same singleton instance the old `@IoDispatcher` Hilt binding returned, so no behaviour
  * changes and no named Koin qualifier is needed.
  *
@@ -76,10 +77,12 @@ fun communityDecksKoinModule(
 
     // ── Archidekt network stack (Ktor + ArchidektClient, replaces the old Retrofit API). ──
     single { provideArchidektClient(androidContext()) }
-    single { ArchidektRequestQueue() }
+    // CrashReporter comes from coreBridgeKoinModule (WS2: cooldown-entered/exited telemetry).
+    single { ArchidektRequestQueue(crashReporter = get()) }
 
-    // ── Cache abstraction (Room-backed on Android). ──
-    single<CommunityDeckCache> { CommunityDeckCacheImpl(cacheDao = get()) }
+    // ── Cache abstraction (Room-backed on Android). CrashReporter (coreBridgeKoinModule) records
+    //    a corrupt cache row as a non-fatal instead of letting the read throw (bug fix). ──
+    single<CommunityDeckCache> { CommunityDeckCacheImpl(cacheDao = get(), crashReporter = get()) }
 
     // ── Data layer. CommunityDeckCache + DeckRepository + CardRepository resolve via get() ──
     // (cache from this module; DeckRepository + CardRepository from coreBridgeKoinModule;
@@ -103,12 +106,14 @@ fun communityDecksKoinModule(
     single { ImportCommunityDeckUseCase(importDeckCardsUseCase = get()) }
 
     // ── Import-survives-navigation coordinator (bug fix, 2026-07-22). Runs the import on the
-    //    app-scoped CoroutineScope (the same Hilt-bridged `@ApplicationScope` singleton
-    //    `decksKoinModule` already registers as a plain `CoroutineScope` — resolved here via
-    //    `get()`, NOT a fresh scope, so it is the SAME instance shared with the rest of the app and
-    //    outlives any single screen). See CommunityDeckImportCoordinator's KDoc for the full
-    //    rationale (viewModelScope cancellation on navigation used to silently drop in-flight
-    //    imports). ──
+    //    app-scoped CoroutineScope (`coreBridgeKoinModule`'s unqualified `single<CoroutineScope>`,
+    //    which is `ManaHubApp`'s own `appScope` field — resolved here via `get()`, NOT a fresh scope,
+    //    so it is the SAME instance shared with the rest of the app and outlives any single screen;
+    //    production crash fix 2026-07-29 relocated this registration out of `decksKoinModule`, which
+    //    used to own it incidentally and silently dropped it on retirement — see
+    //    `coreBridgeKoinModule`'s KDoc for the full story). See CommunityDeckImportCoordinator's KDoc
+    //    for the full rationale (viewModelScope cancellation on navigation used to silently drop
+    //    in-flight imports). ──
     single { CommunityDeckImportCoordinator(importCommunityDeck = get(), appScope = get()) }
 
     // ── The Koin island: both Community Decks ViewModels are now resolved by Koin, not Hilt. ──

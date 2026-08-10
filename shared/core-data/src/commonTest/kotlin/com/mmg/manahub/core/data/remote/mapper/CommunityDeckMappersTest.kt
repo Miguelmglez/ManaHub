@@ -285,6 +285,16 @@ class CommunityDeckMappersTest {
     )
 
     @Test
+    fun summaryMapping_carriesDeckFormatId() {
+        val dto = buildSummaryDto().copy(deckFormat = 3) // Commander
+
+        val summary = dto.toDomain()
+
+        assertEquals(3, summary.deckFormatId)
+        assertEquals("commander", summary.format)
+    }
+
+    @Test
     fun featuredImageUrl_prefersCustomFeaturedWhenNonBlank() {
         val dto = buildSummaryDto(
             featured = "https://storage.googleapis.com/archidekt-card-images/auto/uid_art_crop.jpg",

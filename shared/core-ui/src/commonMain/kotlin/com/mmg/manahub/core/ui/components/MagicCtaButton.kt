@@ -21,10 +21,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -250,8 +252,10 @@ private fun CenteredButtonContent(
                                 color = tintColor
                             )
                         } else icon?.let {
-                            Box(modifier = if (gradientBrush != null) Modifier.gradientTint(gradientBrush) else Modifier) {
-                                it()
+                            CompositionLocalProvider(LocalContentColor provides tintColor) {
+                                Box(modifier = if (gradientBrush != null) Modifier.gradientTint(gradientBrush) else Modifier) {
+                                    it()
+                                }
                             }
                         }
                     }
@@ -268,13 +272,15 @@ private fun CenteredButtonContent(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center
             ) {
+                val textModifier = if (gradientBrush != null) Modifier.gradientTint(gradientBrush) else Modifier
                 AutoResizeText(
                     text = text.uppercase(),
                     style = ty.labelLarge.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.5.sp
                     ),
-                    color = tintColor
+                    color = tintColor,
+                    modifier = textModifier
                 )
             }
         }
@@ -293,7 +299,9 @@ private fun CenteredButtonContent(
                         if (isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.5.dp, color = tintColor)
                         } else if (icon != null) {
-                            icon()
+                            CompositionLocalProvider(LocalContentColor provides tintColor) {
+                                icon()
+                            }
                         }
                     }
                 }

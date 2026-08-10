@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -46,7 +46,7 @@ import java.util.Locale
  * Displays the friend's collection statistics inside the Stats tab of [FriendDetailScreen].
  *
  * Three rendering states:
- * 1. Loading — shows a centred [CircularProgressIndicator].
+ * 1. Loading — shows a centred [MagicLoadingSpinner].
  * 2. Error   — shows an error message and a retry button.
  * 3. Loaded  — shows a scrollable stats dashboard. If the server returned no row
  *              ([UiState.friendStats] is null after a successful fetch) a "no data yet"
@@ -71,7 +71,7 @@ fun FriendStatsTab(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = mc.primaryAccent)
+                    MagicLoadingSpinner()
                 }
             }
 

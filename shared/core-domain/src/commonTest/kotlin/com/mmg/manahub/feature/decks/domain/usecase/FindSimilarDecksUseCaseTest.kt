@@ -29,7 +29,7 @@ private class FakeCommunityDecksRepository(
     var lastQuery: String? = null
     override suspend fun getDeckById(archidektId: Int): DataResult<com.mmg.manahub.core.model.CommunityDeck> = error("unused")
     override suspend fun searchDecks(filters: CommunityDeckSearchFilters): DataResult<CommunityDeckSearchResult> {
-        lastQuery = filters.cardName
+        lastQuery = filters.cardNames.firstOrNull()
         return result
     }
 }

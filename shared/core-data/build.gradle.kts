@@ -29,7 +29,7 @@ kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {
         namespace = "com.mmg.manahub.core.data"
-        compileSdk = 37
+        compileSdk = 36
         minSdk = 29
 
         // Enable a JVM host unit-test component so commonTest runs as an Android host test
@@ -70,6 +70,7 @@ kotlin {
                 implementation(project.dependencies.platform(libs.supabase.bom))
                 implementation(libs.supabase.postgrest)
                 implementation(libs.supabase.auth)
+                implementation(libs.supabase.realtime)
             }
         }
         commonTest {

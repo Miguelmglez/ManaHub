@@ -237,4 +237,52 @@ class DiscoverSynergiesV2UseCaseTest {
         val unfiltered = DiscoverySearchFilter.apply(discoveries, query = "", selectedCardNames = emptySet())
         assertEquals(discoveries, unfiltered)
     }
+
+    // ── partitionByAxis (Deck Wizard & Engine Rework plan, WS 1.3) ─────────────────────────────
+
+    @Test
+    fun `partitionByAxis splits a mixed list into Strategy clusters first and Tribe clusters second`() = runTest(dispatcher) {
+        val collection = (1..8).map { i ->
+            owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
+        } + (1..10).map { i ->
+            owned("elf$i") { card(id = "elf$i", name = "Elf $i", typeLine = "Creature — Elf", colorIdentity = listOf("G")) }
+        }
+        val discoveries = useCase(collection)
+        assertEquals(2, discoveries.size)
+
+        val (strategies, tribes) = discoveries.partitionByAxis()
+
+        assertEquals(1, strategies.size)
+        assertTrue(strategies.all { it.key is DiscoveryClusterKey.Strategy })
+        assertEquals(1, tribes.size)
+        assertTrue(tribes.all { it.key is DiscoveryClusterKey.Tribe })
+    }
+
+    @Test
+    fun `partitionByAxis never drops or duplicates a discovery`() = runTest(dispatcher) {
+        val collection = (1..8).map { i ->
+            owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
+        } + (1..8).map { i ->
+            owned("token$i") { card(id = "token$i", name = "Token Card $i", tags = listOf(CardTag.TOKENS), colorIdentity = listOf("W")) }
+        } + (1..10).map { i ->
+            owned("elf$i") { card(id = "elf$i", name = "Elf $i", typeLine = "Creature — Elf", colorIdentity = listOf("G")) }
+        }
+        val discoveries = useCase(collection)
+        val (strategies, tribes) = discoveries.partitionByAxis()
+
+        assertEquals(discoveries.size, strategies.size + tribes.size)
+        assertEquals(discoveries.toSet(), (strategies + tribes).toSet())
+    }
+
+    @Test
+    fun `partitionByAxis on an all-strategy list yields an empty Tribe half`() = runTest(dispatcher) {
+        val collection = (1..8).map { i ->
+            owned("ramp$i") { card(id = "ramp$i", name = "Ramp Card $i", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G")) }
+        }
+        val discoveries = useCase(collection)
+        val (strategies, tribes) = discoveries.partitionByAxis()
+
+        assertEquals(discoveries, strategies)
+        assertTrue(tribes.isEmpty())
+    }
 }

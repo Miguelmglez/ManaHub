@@ -27,6 +27,7 @@ import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 
 private const val CARD_ASPECT_RATIO = 63f / 88f
@@ -47,7 +48,7 @@ fun MagicCard(
     onClick: (() -> Unit)? = null,
     sourceHidden: Boolean = false,
     animateAlpha: Boolean = true,
-    shape: Shape = CardShape,
+    shape: Shape = SmallCardShape,
 ) {
     val mc = MaterialTheme.magicColors
 

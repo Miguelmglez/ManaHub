@@ -23,6 +23,7 @@ import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
+import com.mmg.manahub.core.data.local.dao.PuzzleDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.NewsDao
@@ -134,6 +135,10 @@ object DatabaseModule {
                 // reason). Additive: creates the card_strategy_tags_cache table (Deck
                 // Engine Unification plan, Phase 5c, D8).
                 MIGRATION_48_49,
+                // v49 → v50 lives as a top-level `val` in Migration_49_50.kt (same
+                // reason). Additive: creates the puzzle_results table (Daily Puzzle
+                // feature, Batch B1 foundation).
+                MIGRATION_49_50,
             )
             .build()
 
@@ -761,4 +766,5 @@ object DatabaseModule {
     @Provides fun provideCommunityAggregateDao(db: MtgDatabase): CommunityAggregateDao = db.communityAggregateDao()
     @Provides fun provideComboCacheDao(db: MtgDatabase): ComboCacheDao = db.comboCacheDao()
     @Provides fun provideCardStrategyTagsCacheDao(db: MtgDatabase): CardStrategyTagsCacheDao = db.cardStrategyTagsCacheDao()
+    @Provides fun providePuzzleDao(db: MtgDatabase): PuzzleDao = db.puzzleDao()
 }

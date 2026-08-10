@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.communitydecks.data.remote
 
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.data.local.entity.CommunityDeckCacheEntity
 import com.mmg.manahub.core.data.remote.dto.ArchidektCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektCardEntryDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
@@ -8,9 +10,17 @@ import com.mmg.manahub.core.data.remote.dto.ArchidektOracleCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektOwnerDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektPricesDto
 import com.mmg.manahub.core.data.remote.mapper.toDomain
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.serialization.json.Json
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -20,6 +30,20 @@ import org.junit.Test
  * ADR-004 §1 conventions). No Room migration was needed since these are pure cache-blob fields.
  */
 class CommunityDecksMappersTest {
+
+    @Before
+    fun setUp() {
+        // CommunityDeckCacheEntity.toDomain()'s corrupt-blob guard calls the static
+        // recordNonFatal(...) helper (FirebaseCrashlytics.getInstance()) outside a runCatching the
+        // test can't otherwise reach.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
+    }
 
     private fun buildDto() = ArchidektDeckDetailDto(
         id = 1,
@@ -54,8 +78,9 @@ class CommunityDecksMappersTest {
 
         val entity = dto.toCacheEntity()
         val domain = entity.toDomain()
+        assertNotNull(domain)
 
-        val card = domain.cards.single()
+        val card = domain!!.cards.single()
         assertEquals("4d42e22d-f60e-40c5-b069-5e1708f3bebc", card.scryfallId)
         assertEquals("mh2", card.setCode)
         assertEquals("Modern Horizons 2", card.setName)
@@ -100,5 +125,30 @@ class CommunityDecksMappersTest {
         assertEquals("", card.setCode)
         assertEquals("", card.rarity)
         assertTrue(card.priceUsd == null)
+    }
+
+    /**
+     * Regression test (post-review hardening): a corrupted/unparseable [responseJson] blob must
+     * degrade to `null` (treated as a cache miss upstream) instead of throwing out of [toDomain].
+     * Before this fix, [CommunityDecksRepositoryImpl.getDeckById] would call this path a second
+     * time from its own catch block to attempt a stale-cache fallback against the SAME corrupt
+     * row, re-throwing uncaught and crashing the caller's `viewModelScope.launch`.
+     */
+    @Test
+    fun toDomain_returnsNullOnCorruptBlob() {
+        val entity = CommunityDeckCacheEntity(
+            archidektId = 1,
+            name = "Corrupt Cached Deck",
+            ownerUsername = "user",
+            format = "commander",
+            description = "",
+            viewCount = 0,
+            cardCount = 0,
+            responseJson = "{ this is not valid json at all",
+        )
+
+        val domain = entity.toDomain()
+
+        assertNull(domain)
     }
 }

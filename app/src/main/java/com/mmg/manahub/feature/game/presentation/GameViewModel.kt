@@ -146,6 +146,14 @@ class GameViewModel(
     private val deltaJobs = mutableMapOf<Int, Job>()
 
     private var onlineSessionId: String? = null
+    /**
+     * Opaque identity token captured from the lobby (host/join) when this session's caller had no
+     * Supabase Auth session at all (a guest — see the 2026-08 anonymous-sign-in removal). Null for
+     * a real signed-in account, in which case every online-session RPC below resolves identity via
+     * `auth.uid()` exactly as before. Set once in [initFromOnlineSession] and threaded into every
+     * subsequent RPC-backed call this VM makes for the session's lifetime.
+     */
+    private var onlineGuestToken: String? = null
     private var mySlotIndex: Int = -1
     private var isNearbySession: Boolean = false
     private var isNearbyHost: Boolean = false
@@ -252,7 +260,7 @@ class GameViewModel(
             }
             viewModelScope.launch {
                 updateCounterUseCase.broadcast(sessionId, playerId, type.name, newValue)
-                runCatching { updateCounterUseCase(sessionId, playerId, type.name, delta) }
+                runCatching { updateCounterUseCase(sessionId, playerId, type.name, delta, onlineGuestToken) }
             }
         }
     }
@@ -316,7 +324,7 @@ class GameViewModel(
                 ?.commanderDamage?.get(sourceId) ?: 0
             viewModelScope.launch {
                 updateCommanderDamageUseCase.broadcast(sessionId, targetId, sourceId, newDmg)
-                runCatching { updateCommanderDamageUseCase(sessionId, targetId, sourceId, delta) }
+                runCatching { updateCommanderDamageUseCase(sessionId, targetId, sourceId, delta, onlineGuestToken) }
             }
         }
     }
@@ -377,7 +385,7 @@ class GameViewModel(
         } else if (sessionId != null) {
             viewModelScope.launch {
                 advancePhaseUseCase.broadcast(sessionId, s.currentPhase.name, s.activePlayerId, s.turnNumber)
-                runCatching { nextTurnUseCase(sessionId) }
+                runCatching { nextTurnUseCase(sessionId, onlineGuestToken) }
             }
         }
     }
@@ -498,7 +506,7 @@ class GameViewModel(
         } else if (sessionId != null && playerId == mySlotIndex) {
             viewModelScope.launch {
                 confirmDefeatUseCase.broadcast(sessionId, playerId)
-                runCatching { confirmDefeatUseCase(sessionId, playerId) }
+                runCatching { confirmDefeatUseCase(sessionId, playerId, onlineGuestToken) }
             }
         }
     }
@@ -514,7 +522,7 @@ class GameViewModel(
         if (isNearbySession && playerId == mySlotIndex) {
             nearbyRepo.sendMessage(NearbyGameMessage.DefeatRevoked(playerId))
         } else if (sessionId != null && playerId == mySlotIndex) {
-            viewModelScope.launch { runCatching { revokeDefeatUseCase(sessionId, playerId) } }
+            viewModelScope.launch { runCatching { revokeDefeatUseCase(sessionId, playerId, onlineGuestToken) } }
         }
     }
 
@@ -700,6 +708,7 @@ class GameViewModel(
         configs:     List<PlayerConfig>,
         mode:        GameMode,
         layout:      LayoutTemplate? = null,
+        guestToken:  String? = null,
     ) {
         deltaJobs.values.forEach { it.cancel() }
         deltaJobs.clear()
@@ -708,8 +717,9 @@ class GameViewModel(
         persistPhaseJob?.cancel()
         onlineObserveJob?.cancel()
 
-        this.onlineSessionId = sessionId
-        this.mySlotIndex     = mySlotIndex
+        this.onlineSessionId   = sessionId
+        this.onlineGuestToken  = guestToken
+        this.mySlotIndex       = mySlotIndex
 
         val players = configs.mapIndexed { i, cfg ->
             Player(
@@ -760,7 +770,7 @@ class GameViewModel(
                     return@launch
                 }
             // 3. Load initial state AFTER subscribing so broadcasts during the HTTP call are buffered.
-            observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+            observeSessionUseCase.getSnapshot(sessionId, onlineGuestToken).onSuccess { snapshot ->
                 val participantsBySlot = snapshot.participants.associateBy { it.slotIndex }
                 val playerStatesBySlot = snapshot.playerStates.associateBy { it.slotIndex }
                 _uiState.update { s ->
@@ -1152,7 +1162,7 @@ class GameViewModel(
                 delay(3_000L)
                 val state = _uiState.value
                 if (state.winner != null || !state.isGameRunning) break
-                observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                observeSessionUseCase.getSnapshot(sessionId, onlineGuestToken).onSuccess { snapshot ->
                     if (snapshot.session.status == OnlineSessionStatus.ABANDONED) {
                         if (!_uiState.value.isOnlineSessionAbandoned) {
                             _uiState.update { it.copy(isOnlineSessionAbandoned = true, isGameRunning = false) }
@@ -1196,7 +1206,7 @@ class GameViewModel(
         persistLifeJobs[slotIndex]?.cancel()
         persistLifeJobs[slotIndex] = viewModelScope.launch {
             delay(500L)
-            runCatching { updateLifeUseCase.persist(sessionId, slotIndex, newLife) }
+            runCatching { updateLifeUseCase.persist(sessionId, slotIndex, newLife, onlineGuestToken) }
         }
     }
 
@@ -1204,7 +1214,7 @@ class GameViewModel(
         persistPhaseJob?.cancel()
         persistPhaseJob = viewModelScope.launch {
             delay(500L)
-            runCatching { advancePhaseUseCase.persist(sessionId) }
+            runCatching { advancePhaseUseCase.persist(sessionId, onlineGuestToken) }
         }
     }
 
@@ -1224,7 +1234,7 @@ class GameViewModel(
             if (!isNearbySession) {
                 observeSessionUseCase.disconnect(sessionId)
             }
-            runCatching { leaveSessionUseCase(sessionId) }
+            runCatching { leaveSessionUseCase(sessionId, onlineGuestToken) }
             cleanupScope.cancel()
         }
     }

@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.online.presentation.lobby
 
 import android.content.Context
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.online.domain.model.JoinSessionResult
 import com.mmg.manahub.core.online.domain.model.OnlineParticipant
 import com.mmg.manahub.core.online.domain.model.OnlineSession
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
@@ -13,9 +14,6 @@ import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import com.mmg.manahub.core.online.domain.usecase.JoinSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
-import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.domain.auth.AuthUser
-import com.mmg.manahub.core.domain.auth.SessionState as AuthSessionState
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -26,7 +24,6 @@ import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -71,7 +68,6 @@ class LobbyJoinViewModelTest {
     private val leaveSessionUseCase      = mockk<LeaveSessionUseCase>(relaxed = true)
     private val repository               = mockk<OnlineSessionRepository>(relaxed = true)
     private val userPreferencesDataStore = mockk<UserPreferencesDataStore>(relaxed = true)
-    private val authRepository           = mockk<AuthRepository>(relaxed = true)
     private val appContext               = mockk<Context>(relaxed = true)
 
     // Shared event flow reused across tests that need to emit realtime events
@@ -83,14 +79,6 @@ class LobbyJoinViewModelTest {
         const val SESSION_ID   = "session-xyz-999"
         const val SESSION_CODE = "123456"
         const val SLOT_INDEX   = 2
-        val TEST_USER = AuthUser(
-            id = "user-test",
-            email = null,
-            nickname = null,
-            gameTag = null,
-            avatarUrl = null,
-            provider = "anonymous",
-        )
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -159,19 +147,12 @@ class LobbyJoinViewModelTest {
             Result.success(buildSnapshot(snapshotMode, snapshotPlayerCount))
         // init block calls userPreferencesDataStore.playerNameFlow.first()
         coEvery { userPreferencesDataStore.playerNameFlow } returns flowOf("")
-        // Already-authenticated by default so joinSession's `.first { it !is Loading }` await
-        // (audit finding #20) resolves immediately instead of suspending on a Flow the relaxed
-        // mock never emits on. A real StateFlow always has a current value ready for the first
-        // collector, matching production behaviour.
-        every { authRepository.sessionState } returns
-            MutableStateFlow(AuthSessionState.Authenticated(TEST_USER))
         return LobbyJoinViewModel(
             joinSessionUseCase       = joinSessionUseCase,
             observeSessionUseCase    = observeSessionUseCase,
             leaveSessionUseCase      = leaveSessionUseCase,
             repository               = repository,
             userPreferencesDataStore = userPreferencesDataStore,
-            authRepository           = authRepository,
             appContext               = appContext,
         )
     }
@@ -282,10 +263,10 @@ class LobbyJoinViewModelTest {
     fun `given already joined when prefillCode called then code is NOT changed`() = runTest {
         // Arrange — simulate joined state by performing a successful join
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
         val codeBeforePrefill = vm.uiState.value.codeInput
 
@@ -304,12 +285,12 @@ class LobbyJoinViewModelTest {
     fun `given valid code when joinSession succeeds then sessionId and slotIndex are set`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(SESSION_CODE, any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -323,12 +304,12 @@ class LobbyJoinViewModelTest {
     fun `given joinSession succeeds then snapshot is fetched and mode and playerCount are stored`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel(snapshotMode = "BRAWL", snapshotPlayerCount = 3)
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — snapshot values stored in state
@@ -340,12 +321,12 @@ class LobbyJoinViewModelTest {
     fun `given joinSession succeeds then connects and observes the session`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -361,14 +342,14 @@ class LobbyJoinViewModelTest {
             capturedDisplayName = it.firstOrNull()
         }), any()) } coAnswers {
             capturedDisplayName = secondArg()
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         }
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
         // Deliberately leave displayName blank
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — fallback is "Player"
@@ -383,14 +364,14 @@ class LobbyJoinViewModelTest {
     fun `given already joined when joinSession called again then use case is NOT called a second time`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act — second join attempt
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — use case invoked exactly once
@@ -410,7 +391,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -427,7 +408,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -442,7 +423,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged("ab")
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — error set (either by client validation or mapped from backend)
@@ -458,7 +439,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -474,7 +455,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -490,7 +471,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -505,11 +486,11 @@ class LobbyJoinViewModelTest {
     fun `given joined session when setReady true called then isReady is optimistically set to true`() = runTest {
         // Arrange — join first
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         coEvery { repository.setReady(SESSION_ID, true) } returns Result.success(Unit)
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act
@@ -524,12 +505,12 @@ class LobbyJoinViewModelTest {
     fun `given setReady true when backend fails then isReady is reverted to false`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         coEvery { repository.setReady(SESSION_ID, true) } returns
             Result.failure(RuntimeException("Network error"))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act
@@ -544,11 +525,11 @@ class LobbyJoinViewModelTest {
     fun `given setReady true then false when both succeed then isReady is false`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         coEvery { repository.setReady(SESSION_ID, any()) } returns Result.success(Unit)
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act
@@ -565,13 +546,13 @@ class LobbyJoinViewModelTest {
     fun `given setReady false when backend fails then isReady is reverted to true`() = runTest {
         // Arrange — start ready=true, then fail toggling to false
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         coEvery { repository.setReady(SESSION_ID, true) } returns Result.success(Unit)
         coEvery { repository.setReady(SESSION_ID, false) } returns
             Result.failure(RuntimeException("network error"))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Set to true first (succeeds)
@@ -608,10 +589,10 @@ class LobbyJoinViewModelTest {
     fun `given joined session when leaveSession then LeaveSessionUseCase is called`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act
@@ -626,10 +607,10 @@ class LobbyJoinViewModelTest {
     fun `given joined session when leaveSession then onNavigateBack is invoked`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
         var navigated = false
 
@@ -664,10 +645,10 @@ class LobbyJoinViewModelTest {
     fun `given ParticipantUpdated event then participant is added to list`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act
@@ -684,10 +665,10 @@ class LobbyJoinViewModelTest {
     fun `given existing participant receives update then replaced not duplicated`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         val p1 = buildParticipant("p1", slotIndex = 0)
@@ -707,10 +688,10 @@ class LobbyJoinViewModelTest {
     fun `given ParticipantUpdated with LEFT status then participant is removed`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         val p1 = buildParticipant("p1", slotIndex = 0, status = ParticipantStatus.JOINED)
@@ -733,10 +714,10 @@ class LobbyJoinViewModelTest {
     fun `given multiple participants events then sorted by slotIndex`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act — emit out of order
@@ -758,7 +739,7 @@ class LobbyJoinViewModelTest {
     fun `given joined session when SessionStatusChanged to ACTIVE then onGameStart is called with correct params`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel(snapshotMode = "COMMANDER", snapshotPlayerCount = 4)
         vm.onCodeChanged(SESSION_CODE)
 
@@ -766,12 +747,14 @@ class LobbyJoinViewModelTest {
         var capturedSlot: Int? = null
         var capturedMode: String? = null
         var capturedPlayerCount: Int? = null
+        var capturedGuestToken: String? = "unset"
 
-        vm.joinSession { sid, slot, mode, count ->
+        vm.joinSession { sid, slot, mode, count, guestToken ->
             capturedSessionId   = sid
             capturedSlot        = slot
             capturedMode        = mode
             capturedPlayerCount = count
+            capturedGuestToken  = guestToken
         }
         advanceUntilIdle()
 
@@ -784,17 +767,18 @@ class LobbyJoinViewModelTest {
         assertEquals(SLOT_INDEX, capturedSlot)
         assertEquals("COMMANDER", capturedMode)
         assertEquals(4, capturedPlayerCount)
+        assertNull("Real account join must not carry a guest token", capturedGuestToken)
     }
 
     @Test
     fun `given SessionStatusChanged to LOBBY then sessionStatus is updated but onGameStart is NOT called`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
         var gameStartCount = 0
-        vm.joinSession { _, _, _, _ -> gameStartCount++ }
+        vm.joinSession { _, _, _, _, _ -> gameStartCount++ }
         advanceUntilIdle()
 
         // Act — non-ACTIVE status change
@@ -810,10 +794,10 @@ class LobbyJoinViewModelTest {
     fun `given SessionEvent Error after join then error is mapped and set in state`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Act
@@ -835,7 +819,7 @@ class LobbyJoinViewModelTest {
             Result.failure(RuntimeException("Session is full"))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
         assertNotNull("Pre-condition: error must be set", vm.uiState.value.error)
 
@@ -858,7 +842,7 @@ class LobbyJoinViewModelTest {
         vm.prefillCode("AB!C1D") // '!' is non-alphanumeric
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — validation must reject it before hitting the use case
@@ -877,7 +861,7 @@ class LobbyJoinViewModelTest {
         // Do not call onCodeChanged — codeInput stays ""
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -895,7 +879,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged("AB12") // 4 chars
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -910,12 +894,12 @@ class LobbyJoinViewModelTest {
     fun `given code with only digits when joinSession then accepted and use case is called`() = runTest {
         // Arrange — all-digit codes are valid alphanumeric codes
         coEvery { joinSessionUseCase("123456", any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged("123456")
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — valid code must reach the use case
@@ -930,7 +914,7 @@ class LobbyJoinViewModelTest {
         vm.prefillCode("%2FABX")
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert
@@ -951,7 +935,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — raw server details must not be visible to the user
@@ -968,13 +952,13 @@ class LobbyJoinViewModelTest {
         // Arrange — 32-char name is the boundary value; must be stored intact and forwarded
         val maxName = "A".repeat(32)
         coEvery { joinSessionUseCase(SESSION_CODE, maxName, any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
         vm.onDisplayNameChanged(maxName)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         // Assert — 32-char name passes through to the use case unchanged
@@ -1008,11 +992,11 @@ class LobbyJoinViewModelTest {
     fun `given ACTIVE event received twice then onGameStart is invoked only once`() = runTest {
         // Arrange
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
         var gameStartCount = 0
-        vm.joinSession { _, _, _, _ -> gameStartCount++ }
+        vm.joinSession { _, _, _, _, _ -> gameStartCount++ }
         advanceUntilIdle()
 
         // Act — a lagging Realtime CDC event can redeliver the same ACTIVE transition after
@@ -1032,7 +1016,7 @@ class LobbyJoinViewModelTest {
         // 3s poll must recover sessionMode/sessionPlayerCount from its own snapshot instead of
         // leaving the "STANDARD"/2 defaults in place for the rest of the session (audit finding #5).
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         coEvery { observeSessionUseCase.getSnapshot(any()) } returnsMany listOf(
             Result.failure(RuntimeException("network blip")),
@@ -1041,7 +1025,7 @@ class LobbyJoinViewModelTest {
         vm.onCodeChanged(SESSION_CODE)
 
         // Act
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle() // consumes the failing initial getSnapshot() call
 
         // Pre-condition: defaults still in place right after the failed initial call
@@ -1062,10 +1046,10 @@ class LobbyJoinViewModelTest {
         // cycle even if the lagging HTTP snapshot doesn't include it yet: merge by id, never a
         // raw replace (audit finding #4 — this is the CLAUDE.md-documented invariant).
         coEvery { joinSessionUseCase(any(), any(), any()) } returns
-            Result.success(Pair(SESSION_ID, SLOT_INDEX))
+            Result.success(JoinSessionResult(SESSION_ID, SLOT_INDEX, null))
         val vm = createViewModel()
         vm.onCodeChanged(SESSION_CODE)
-        vm.joinSession { _, _, _, _ -> }
+        vm.joinSession { _, _, _, _, _ -> }
         advanceUntilIdle()
 
         val realtimeOnly = buildParticipant("p-fast", slotIndex = 1)

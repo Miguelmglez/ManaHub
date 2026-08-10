@@ -28,7 +28,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -60,6 +59,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.ManaColorPicker
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -246,9 +246,7 @@ fun ProfileEditSheet(
                             .fillMaxWidth(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(
-                            color = mc.primaryAccent,
-                        )
+                        MagicLoadingSpinner()
                     }
                 }
 
@@ -300,10 +298,8 @@ fun ProfileEditSheet(
                                         .padding(16.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    CircularProgressIndicator(
+                                    MagicLoadingSpinner(
                                         modifier = Modifier.size(24.dp),
-                                        color = mc.primaryAccent,
-                                        strokeWidth = 2.dp,
                                     )
                                 }
                             }

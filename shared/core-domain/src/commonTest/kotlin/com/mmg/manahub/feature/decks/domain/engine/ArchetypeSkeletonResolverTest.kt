@@ -7,20 +7,24 @@ import kotlin.test.assertTrue
 /**
  * Deck Doctor Community/Archetype plan, Phase 1.8 — behavioral unit tests for
  * [ArchetypeSkeletonResolver] that exercise paths the golden Appendix-B port
- * ([ArchetypeSkeletonGoldenTest]) does not: [ArchetypeSkeletonResolver.resolveWithColor] (A.5
- * color modulation, NOT part of the annex's own validated `resolve()`), the 2-theme 0.75 dilution
- * factor, and the anti-role tolerance rule.
+ * ([ArchetypeSkeletonGoldenTest]) does not: [ArchetypeSkeletonResolver.resolveWithColorCount] (A.5
+ * color-COUNT modulation, NOT part of the annex's own validated `resolve()`), the 2-theme 0.75
+ * dilution factor, and the anti-role tolerance rule. These specifically use
+ * [ArchetypeSkeletonResolver.resolveWithColorCount] (not [ArchetypeSkeletonResolver
+ * .resolveWithColor]) to isolate the color-COUNT layer from WS9.2's color-IDENTITY layer --
+ * identity-aware behavior has its own dedicated coverage in `ArchetypeIdentityModulationTest`.
  */
 class ArchetypeSkeletonResolverTest {
 
     @Test
     fun resolveWithColorMergesManaFixAndShiftsLandsForFourPlusColors() {
         val base = ArchetypeSkeletonResolver.resolve(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE)
-        val colored = ArchetypeSkeletonResolver.resolveWithColor(
+        val colored = ArchetypeSkeletonResolver.resolveWithColorCount(
             ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, colorCount = 5,
         )
-        // 4-5 color commander: mana_fix [12,16,22], lands_delta +1.
-        assertEquals(RoleTarget(12, 16, 22), colored.roleTargets[ArchetypeData.MANA_FIX_KEY])
+        // WS9.3 retune (2026-07-28): 4-5 color commander mana_fix bumped (12,16,22) -> (14,20,28)
+        // -- see ArchetypeData.kt's COLOR_MODULATION header for the citation. lands_delta stays +1.
+        assertEquals(RoleTarget(14, 20, 28), colored.roleTargets[ArchetypeData.MANA_FIX_KEY])
         assertEquals(base.lands.min + 1, colored.lands.min)
         assertEquals(base.lands.ideal + 1, colored.lands.ideal)
         assertEquals(base.lands.max + 1, colored.lands.max)
@@ -29,7 +33,7 @@ class ArchetypeSkeletonResolverTest {
     @Test
     fun resolveWithColorSkipsModulationForUnknownColorCount() {
         val base = ArchetypeSkeletonResolver.resolve(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE)
-        val colored = ArchetypeSkeletonResolver.resolveWithColor(
+        val colored = ArchetypeSkeletonResolver.resolveWithColorCount(
             ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, colorCount = 0,
         )
         assertEquals(base, colored)
@@ -37,7 +41,7 @@ class ArchetypeSkeletonResolverTest {
 
     @Test
     fun monoColorCommanderGetsAZeroFloorManaFixBand() {
-        val colored = ArchetypeSkeletonResolver.resolveWithColor(
+        val colored = ArchetypeSkeletonResolver.resolveWithColorCount(
             ArchetypeFormat.COMMANDER, ArchetypeId.AGGRO, colorCount = 1,
         )
         assertEquals(RoleTarget(0, 0, 3), colored.roleTargets[ArchetypeData.MANA_FIX_KEY])
@@ -49,7 +53,10 @@ class ArchetypeSkeletonResolverTest {
         val removalMass = resolved.roleTargets.getValue("removal_mass")
         assertEquals(0, removalMass.min)
         assertEquals(0, removalMass.ideal)
-        assertEquals(1, removalMass.max) // AGGRO commander's own roles_override sets max=1
+        // WS5 retune (2026-07-28): AGGRO commander's own roles_override sets max=2, matching the
+        // plan's ep.658 anchor "mass disruption 1-2 (anti-role above that)" (plan line ~306) --
+        // was max=1 pre-retune.
+        assertEquals(2, removalMass.max)
         assertTrue("removal_mass" in resolved.antiRoles)
     }
 
@@ -76,6 +83,9 @@ class ArchetypeSkeletonResolverTest {
     fun genericSkeletonHasNoAntiRolesAndMatchesAppendixLandBand() {
         val generic = ArchetypeSkeletonResolver.resolve(ArchetypeFormat.COMMANDER)
         assertTrue(generic.antiRoles.isEmpty())
-        assertEquals(RoleTarget(34, 37, 39), generic.lands)
+        // WS5 retune (2026-07-28): re-anchored to the plan's ep.658 "Baseline" row (38 lands
+        // ideal, plan line ~304) -- was (34,37,39) pre-retune (the prior D15/EDHREC-calibrated
+        // band, whose ideal already matched 37 -- close to, but not exactly, ep.658's 38).
+        assertEquals(RoleTarget(36, 38, 40), generic.lands)
     }
 }

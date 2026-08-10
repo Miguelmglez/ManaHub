@@ -8,6 +8,7 @@ import com.mmg.manahub.core.data.repository.TradesRepository
 import com.mmg.manahub.core.data.usecase.stats.GetTradeStatsUseCase
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.core.model.TradeStatus
@@ -22,7 +23,6 @@ import com.mmg.manahub.feature.game.domain.model.PlayerCountWinrate
 import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionSetCodesUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetCollectionStatsUseCase
 import com.mmg.manahub.core.domain.usecase.stats.GetSetCompletionCountsUseCase
@@ -30,18 +30,25 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** Collection tab's "available sets + set completion" pipeline result (see [StatsViewModel]). */
+private typealias CollectionSetsResult = Pair<List<MagicSet>, List<SetCompletion>>
 
 /**
  * ViewModel for the Stats screen.
@@ -50,6 +57,34 @@ import kotlinx.coroutines.launch
  * longer `@HiltViewModel`; it is constructed by the `viewModel { }` factory in `statsKoinModule` and
  * resolved at the call site via `koinViewModel()`. Its dependencies are still Hilt-owned singletons,
  * bridged into Koin by `ManaHubApp` (see `statsKoinModule` / `coreBridgeKoinModule`).
+ *
+ * ## Tab-scoped subscriptions (2026-07-28 backend perf plan, WS5a)
+ * The Games tab's 12-flow `combine` ([gameStatsPipeline]), the Collection tab's stats query
+ * ([collectionStatsPipeline]), and the Collection tab's "available sets + set completion" query
+ * ([collectionSetsPipeline]) are all gated behind [_selectedTab] via `flatMapLatest` — switching
+ * tabs cancels the previously-active tab's Room subscription instead of running all three
+ * concurrently for the ViewModel's whole lifetime. Each pipeline is exposed as a
+ * `stateIn(WhileSubscribed(5_000))` [StateFlow] (mirrors `HomeViewModel`'s established pattern)
+ * rather than a bare cold [Flow] collected via a permanently-running `launch { collect }`.
+ *
+ * Two signals are DELIBERATELY kept always-on/cheap rather than tab-scoped: [hasGameStatsFlow] and
+ * [hasTradeStatsFlow]. Both control whether their tab even APPEARS in the tab row
+ * ([StatsUiState.hasGameStats] / [StatsUiState.hasTradeStats]) — gating them behind "the tab is
+ * already selected" would be a chicken-and-egg bug (the tab could never be selected, because it
+ * would never appear in the row in the first place). Each is a single cheap query (a Room count /
+ * a metadata-only proposal check), not the expensive per-tab pipeline, so leaving them always-on
+ * does not reintroduce the problem this workstream fixes. [allSetsSharedFlow] is similarly kept
+ * alive for the ViewModel's whole life (`SharingStarted.Lazily`, not tab-scoped) because it is a
+ * ONE-TIME Scryfall network fetch — tab-scoping it would silently turn a single fetch into a
+ * repeated network call every time the user revisits the Collection tab.
+ *
+ * Price refresh (2026-07-28 backend perf plan, WS1+WS3 item 7b — user decision: prices refresh
+ * automatically once a day via `PriceRefreshWorker`, the user is never asked). Stats only ever
+ * DISPLAYS the last-refreshed timestamp (read-only, see [observeLastPriceRefresh] /
+ * [StatsUiState.lastRefreshedAt]) — it never triggers a refresh itself. The former manual
+ * `refreshPrices()` entry point and its `isRefreshingPrices`/`refreshProgress`/`refreshResult`/
+ * `refreshError` UI state were removed entirely, along with the [RefreshCollectionPricesUseCase]
+ * [com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase] dependency.
  */
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class StatsViewModel(
@@ -57,7 +92,6 @@ class StatsViewModel(
     private val getSetCodes:              GetCollectionSetCodesUseCase,
     private val getSetCompletionCounts:   GetSetCompletionCountsUseCase,
     private val scryfallDataSource:       ScryfallRemoteDataSource,
-    private val refreshPricesUseCase:     RefreshCollectionPricesUseCase,
     private val userPreferencesDataStore: UserPreferencesRepository,
     private val gameSessionRepository:    GameSessionRepository,
     private val deckRepository:           DeckRepository,
@@ -74,55 +108,64 @@ class StatsViewModel(
         const val RECENT_FORM_LIMIT = 10
     }
 
-    init {
-        observeCollectionStats()
-        observeAvailableSetsAndCompletion()
-        observePreferredCurrency()
-        observeLastPriceRefresh()
-        observeGameStats()
-        observeTradeTabVisibility()
-    }
+    /**
+     * Single source of truth for the active tab. Every tab-scoped pipeline below `flatMapLatest`s
+     * off this flow (see class doc). [onTabSelected] is the only writer.
+     */
+    private val _selectedTab = MutableStateFlow(StatsTab.COLLECTION)
 
-    // ── Collection tab observers ──────────────────────────────────────────────
+    // ── Collection tab pipelines (tab-scoped to StatsTab.COLLECTION) ───────────
 
-    private fun observeCollectionStats() {
-        viewModelScope.launch {
+    /**
+     * The Collection tab's stats query. `null` while off-tab or before the first value has
+     * arrived — the bridging collector in [init] ignores `null` so switching tabs away and back
+     * never wipes out the last-displayed [StatsUiState.stats] (Room resubscribes fast; no flicker).
+     */
+    private val collectionStatsPipeline: StateFlow<CollectionStats?> =
+        _selectedTab.flatMapLatest { tab ->
+            if (tab != StatsTab.COLLECTION) return@flatMapLatest flowOf<CollectionStats?>(null)
             combine(
                 userPreferencesDataStore.preferredCurrencyFlow,
                 _uiState.map { it.selectedColor }.distinctUntilChanged(),
                 _uiState.map { it.selectedSet?.code }.distinctUntilChanged(),
             ) { currency, color, setCode -> Triple(currency, color, setCode) }
-            .flatMapLatest { (currency, color, setCode) ->
-                getStats(currency, color, setCode)
-                    .debounce(300)
-                    .catch { e ->
-                        recordSafeNonFatal("stats_collection_pipeline", e)
-                        _uiState.update { it.copy(error = e.message, isLoading = false) }
-                    }
-            }
-            .collect { stats ->
-                _uiState.update { it.copy(stats = stats, isLoading = false) }
-            }
-        }
-    }
+                .flatMapLatest { (currency, color, setCode) ->
+                    getStats(currency, color, setCode)
+                        .debounce(300)
+                        .catch { e ->
+                            recordSafeNonFatal("stats_collection_pipeline", e)
+                            _uiState.update { it.copy(error = e.message, isLoading = false) }
+                        }
+                }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** Fetches every Scryfall set once; on failure degrades to an empty list rather than crashing. */
-    private fun allSetsFlow(): Flow<List<MagicSet>> = flow { emit(scryfallDataSource.getAllSets()) }
-        .catch { e ->
-            recordSafeNonFatal("stats_available_sets_fetch", e)
-            emit(emptyList())
-        }
+    /**
+     * Fetches every Scryfall set ONCE for the ViewModel's whole life (`SharingStarted.Lazily`,
+     * deliberately NOT tab-scoped — see class doc: re-tab-scoping this would turn one network
+     * fetch into a repeated one every time the user revisits the Collection tab). On failure
+     * degrades to an empty list rather than crashing.
+     */
+    private val allSetsSharedFlow: StateFlow<List<MagicSet>> =
+        flow { emit(scryfallDataSource.getAllSets()) }
+            .catch { e ->
+                recordSafeNonFatal("stats_available_sets_fetch", e)
+                emit(emptyList())
+            }
+            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     /**
      * Wires the set filter's [StatsUiState.availableSets] AND Phase 2's "Set completion" section
-     * off the SAME Scryfall sets fetch, so the network call is made once, not twice. Both are
-     * global/unfiltered — set completion ignores the active color/set filter (Phase 2 spec).
+     * off the SAME cached [allSetsSharedFlow], so the network call is made once, not twice. Both
+     * are global/unfiltered — set completion ignores the active color/set filter (Phase 2 spec).
+     * The two Room queries here ([getSetCodes], [getSetCompletionCounts]) ARE tab-scoped to
+     * [StatsTab.COLLECTION] — only the Scryfall fetch itself is shared/always-on.
      */
-    private fun observeAvailableSetsAndCompletion() {
-        viewModelScope.launch {
+    private val collectionSetsPipeline: StateFlow<CollectionSetsResult?> =
+        _selectedTab.flatMapLatest { tab ->
+            if (tab != StatsTab.COLLECTION) return@flatMapLatest flowOf<CollectionSetsResult?>(null)
             combine(
                 getSetCodes(),
-                allSetsFlow(),
+                allSetsSharedFlow,
                 getSetCompletionCounts(),
             ) { codes, allSets, ownedCounts ->
                 val available = if (codes.isEmpty()) emptyList() else allSets.filter { it.code in codes }
@@ -132,11 +175,8 @@ class StatsViewModel(
                     .sortedByDescending { it.completionRatio }
                     .take(5)
                 available to completions
-            }.collect { (available, completions) ->
-                _uiState.update { it.copy(availableSets = available, setCompletions = completions) }
             }
-        }
-    }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private fun observePreferredCurrency() {
         viewModelScope.launch {
@@ -168,10 +208,28 @@ class StatsViewModel(
         }
     }
 
-    // ── Games tab observer ────────────────────────────────────────────────────
+    // ── Games tab ────────────────────────────────────────────────────────────
 
-    private fun observeGameStats() {
-        viewModelScope.launch {
+    /**
+     * Cheap, ALWAYS-ON gate for [StatsUiState.hasGameStats] — a single Room count query, not the
+     * heavy 12-flow combine below. Kept off the tab-scoping so the GAMES tab can appear in the tab
+     * row before it has ever been selected (see class doc).
+     */
+    private val hasGameStatsFlow: StateFlow<Boolean> =
+        gameSessionRepository.observeTotalGames()
+            .map { it > 0 }
+            .distinctUntilChanged()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
+     * The Games tab's 12-flow `combine`, gated to [StatsTab.GAMES] via `flatMapLatest` — this is
+     * the pipeline named in the backend perf plan (WS5a) as the primary Room/memory offender when
+     * left running regardless of the selected tab. `null` while off-tab; the bridging collector in
+     * [init] ignores `null`.
+     */
+    private val gameStatsPipeline: StateFlow<GameStatsResult?> =
+        _selectedTab.flatMapLatest { tab ->
+            if (tab != StatsTab.GAMES) return@flatMapLatest flowOf<GameStatsResult?>(null)
             // Win/loss, history, and per-deck stats are resolved against the local seat
             // (is_local = 1), not a playerName match (see ADR-001). The stored seat name
             // can diverge from the current UserPreferences name (default "Wizard"), which
@@ -273,23 +331,8 @@ class StatsViewModel(
 
                 GameStatsResult(gameStats, historyItems, deckPerf, matchups, modeWinrateItems, playerCountItems, recentForm)
             }
-            .catch { e -> recordSafeNonFatal("stats_game_pipeline", e) }
-            .collect { result ->
-                _uiState.update {
-                    it.copy(
-                        hasGameStats        = result.gameStats.totalGames > 0,
-                        gameStats           = result.gameStats,
-                        sessionHistory      = result.history,
-                        deckPerformance     = result.deckPerformance,
-                        archetypeMatchups   = result.matchups,
-                        modeWinrates        = result.modeWinrates,
-                        playerCountWinrates = result.playerCountWinrates,
-                        recentForm          = result.recentForm,
-                    )
-                }
-            }
-        }
-    }
+                .catch { e -> recordSafeNonFatal("stats_game_pipeline", e) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Internal carrier for the game-stats pipeline output (combine emits a single object). */
     private data class GameStatsResult(
@@ -333,33 +376,33 @@ class StatsViewModel(
         return best
     }
 
-    // ── Trades tab observer (Phase 4, 2026-07 stats expansion) ───────────────
+    // ── Trades tab (Phase 4, 2026-07 stats expansion) ─────────────────────────
 
     /**
-     * Determines Games-tab-style TRADES tab visibility via a lightweight, metadata-only
-     * [TradesRepository.refreshProposals] warm-up (mirrors `HomeViewModel`'s own trades warm-up,
-     * see memory `feedback_home_dashboard_audit_fixes_2026-07-13`), THEN derives
-     * [StatsUiState.hasTradeStats] reactively from the resulting in-memory cache.
-     *
-     * This is a ONE-SHOT resolution of the auth session (`.first { it !is Loading }`), matching
-     * `HomeViewModel`'s established pattern — a sign-in/sign-out that happens LATER in the same
-     * Stats session is not picked up. Deliberately does NOT trigger the expensive per-thread item
-     * fetch (that stays fully lazy — see [loadTradeStats]), only the cheap metadata call needed to
-     * know whether any COMPLETED proposal exists at all.
+     * Cheap, ALWAYS-ON gate for [StatsUiState.hasTradeStats] — mirrors [hasGameStatsFlow]'s
+     * "not tab-scoped" reasoning (see class doc): the TRADES tab must be able to appear before it
+     * has ever been selected. Performs a ONE-SHOT resolution of the auth session
+     * (`.first { it !is Loading }`), matching `HomeViewModel`'s established pattern — a
+     * sign-in/sign-out that happens LATER in the same Stats session is not picked up. Deliberately
+     * does NOT trigger the expensive per-thread item fetch (that stays fully lazy — see
+     * [loadTradeStats]), only the cheap metadata call needed to know whether any COMPLETED
+     * proposal exists at all.
      */
-    private fun observeTradeTabVisibility() {
-        viewModelScope.launch {
-            val session = authRepository.sessionState.first { it !is SessionState.Loading }
-            val userId = (session as? SessionState.Authenticated)?.takeIf { !it.user.isAnonymous }?.user?.id
-                ?: return@launch
-            runCatching { tradesRepository.refreshProposals(userId) }
-                .onFailure { e -> recordSafeNonFatal("stats_trades_visibility_refresh", e) }
+    private val hasTradeStatsFlow: StateFlow<Boolean> = flow {
+        val session = authRepository.sessionState.first { it !is SessionState.Loading }
+        val userId = (session as? SessionState.Authenticated)?.takeIf { !it.user.isAnonymous }?.user?.id
+        if (userId == null) {
+            emit(false)
+            return@flow
+        }
+        runCatching { tradesRepository.refreshProposals(userId) }
+            .onFailure { e -> recordSafeNonFatal("stats_trades_visibility_refresh", e) }
+        emitAll(
             tradesRepository.observeAllProposals()
                 .map { proposals -> proposals.any { it.status == TradeStatus.COMPLETED } }
                 .distinctUntilChanged()
-                .collect { hasCompleted -> _uiState.update { it.copy(hasTradeStats = hasCompleted) } }
-        }
-    }
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** Resolves the current non-anonymous authenticated user id, or null if not eligible. */
     private fun currentAuthenticatedUserId(): String? =
@@ -394,6 +437,49 @@ class StatsViewModel(
     /** Retries the TRADES tab fetch after an [TradeStatsUiState.Error]. */
     fun retryTradeStats() = loadTradeStats()
 
+    // ── Bridging collectors: fold each pipeline's StateFlow into [_uiState] ────
+
+    init {
+        viewModelScope.launch {
+            collectionStatsPipeline.collect { stats ->
+                if (stats != null) _uiState.update { it.copy(stats = stats, isLoading = false) }
+            }
+        }
+        viewModelScope.launch {
+            collectionSetsPipeline.collect { result ->
+                if (result != null) {
+                    val (available, completions) = result
+                    _uiState.update { it.copy(availableSets = available, setCompletions = completions) }
+                }
+            }
+        }
+        viewModelScope.launch {
+            hasGameStatsFlow.collect { has -> _uiState.update { it.copy(hasGameStats = has) } }
+        }
+        viewModelScope.launch {
+            gameStatsPipeline.collect { result ->
+                if (result != null) {
+                    _uiState.update {
+                        it.copy(
+                            gameStats           = result.gameStats,
+                            sessionHistory      = result.history,
+                            deckPerformance     = result.deckPerformance,
+                            archetypeMatchups   = result.matchups,
+                            modeWinrates        = result.modeWinrates,
+                            playerCountWinrates = result.playerCountWinrates,
+                            recentForm          = result.recentForm,
+                        )
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            hasTradeStatsFlow.collect { has -> _uiState.update { it.copy(hasTradeStats = has) } }
+        }
+        observePreferredCurrency()
+        observeLastPriceRefresh()
+    }
+
     // ── Public actions ────────────────────────────────────────────────────────
 
     fun onColorSelected(color: MtgColor?) {
@@ -417,11 +503,15 @@ class StatsViewModel(
     fun onErrorDismissed() = _uiState.update { it.copy(error = null) }
 
     /**
-     * Switches the visible tab. Activating TRADES for the first time (or after an error/currency
-     * invalidation) lazily triggers [loadTradeStats] — the expensive per-thread item fetch never
-     * runs from the shared `combine` pipeline (Phase 0 feasibility caveat).
+     * Switches the visible tab. Updates [_selectedTab] — the single source of truth every
+     * tab-scoped pipeline `flatMapLatest`s off (see class doc) — as well as the mirrored
+     * [StatsUiState.selectedTab] the UI reads for the `TabRow`. Activating TRADES for the first
+     * time (or after an error/currency invalidation) lazily triggers [loadTradeStats] — the
+     * expensive per-thread item fetch never runs from a shared `combine` pipeline (Phase 0
+     * feasibility caveat).
      */
     fun onTabSelected(tab: StatsTab) {
+        _selectedTab.value = tab
         _uiState.update { it.copy(selectedTab = tab) }
         if (tab == StatsTab.TRADES && _uiState.value.tradeStats == TradeStatsUiState.Idle) {
             loadTradeStats()
@@ -443,46 +533,4 @@ class StatsViewModel(
 
     /** Clears the one-shot delete-session toast state after it has been shown. */
     fun clearDeleteSessionMessage() = _uiState.update { it.copy(deleteSessionSuccess = null) }
-
-    fun refreshPrices() {
-        if (_uiState.value.isRefreshingPrices) return
-        viewModelScope.launch {
-            refreshPricesUseCase.invoke().collect { result ->
-                when (result) {
-                    is RefreshCollectionPricesUseCase.Result.Progress -> {
-                        _uiState.update { it.copy(
-                            isRefreshingPrices = true,
-                            refreshProgress    = result.current to result.total,
-                        )}
-                    }
-                    is RefreshCollectionPricesUseCase.Result.Success -> {
-                        val now = System.currentTimeMillis()
-                        userPreferencesDataStore.saveLastPriceRefresh(now)
-                        val message = buildString {
-                            append("Updated ${result.updatedCount} prices")
-                            if (result.notFoundCount > 0)
-                                append(" (${result.notFoundCount} not found)")
-                        }
-                        _uiState.update { it.copy(
-                            isRefreshingPrices = false,
-                            refreshProgress    = null,
-                            lastRefreshedAt    = now,
-                            refreshResult      = message,
-                        )}
-                    }
-                    is RefreshCollectionPricesUseCase.Result.Error -> {
-                        _uiState.update { it.copy(
-                            isRefreshingPrices = false,
-                            refreshProgress    = null,
-                            refreshError       = result.message,
-                        )}
-                    }
-                }
-            }
-        }
-    }
-
-    fun clearRefreshMessage() {
-        _uiState.update { it.copy(refreshResult = null, refreshError = null) }
-    }
 }

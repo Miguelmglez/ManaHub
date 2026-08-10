@@ -76,34 +76,9 @@ class TradesRepositoryImpl(
 
         val dtos = proposalsResult.getOrThrow().distinctBy { it.id }
 
-        // Fetch items for every proposal in this thread CONCURRENTLY. Network/DB calls stay
-        // OUTSIDE the cache.update lambda below (its lambda must be pure/fast —
-        // MutableStateFlow.update may re-run it under contention).
-        //
-        // A sequential `associate { ... }` here would await each proposal's fetchProposalItems
-        // round-trip before starting the next one — an N+1 that pays full latency × thread length
-        // on long counter chains (trades audit §6.1, 2026-07-10). `coroutineScope` + `async` per
-        // proposal fans the fetches out; the `cache.update` merge below is unchanged.
-        val threadItems: Map<String, Pair<List<TradeItemDto>, Map<String, CardEntity>>> = coroutineScope {
-            dtos.filter { it.rootProposalId == rootProposalId }.map { dto ->
-                async {
-                    val itemsResult = remote.fetchProposalItems(dto.id)
-                    val itemDtos = if (itemsResult.isSuccess) itemsResult.getOrThrow() else emptyList()
-                    val cardIds = itemDtos.map { it.cardId }.distinct()
-                    if (cardIds.isNotEmpty()) {
-                        // Pre-warm Room for any card the user never cached (typically the
-                        // counterparty's side of the trade) so it doesn't render as a raw
-                        // Scryfall UUID below. Best-effort: warmCacheForIds swallows its own
-                        // failures internally (trades audit §5.4, 2026-07-10).
-                        cardRepository.warmCacheForIds(cardIds)
-                    }
-                    val cardMap: Map<String, CardEntity> = if (cardIds.isNotEmpty()) {
-                        cardDao.getByIds(cardIds).associateBy { it.scryfallId }
-                    } else emptyMap()
-                    dto.id to (itemDtos to cardMap)
-                }
-            }.awaitAll().toMap()
-        }
+        val threadItems = fetchItemsForProposals(
+            dtos.filter { it.rootProposalId == rootProposalId }.map { it.id }
+        )
 
         // For proposals in this thread: use the freshly-fetched items. For others: preserve
         // whatever items are in the cache. Computed inside update() — see §2.8 note above.
@@ -119,6 +94,59 @@ class TradesRepositoryImpl(
             }
         }
         return Result.success(Unit)
+    }
+
+    override suspend fun refreshItemsForThread(rootProposalId: String): Result<Unit> {
+        // WS4a finding 2 (Backend & Performance Optimization plan, 2026-07-28): item-only variant
+        // of refreshProposalThread that skips the metadata re-fetch — for callers (Home's
+        // hydrateTradeItemCounts fan-out) that already refreshed metadata for the whole account a
+        // moment ago via refreshProposals(). Reads proposal ids straight from the in-memory cache
+        // rather than fetching dtos again.
+        val threadProposalIds = cache.value.filter { it.rootProposalId == rootProposalId }.map { it.id }
+        if (threadProposalIds.isEmpty()) return Result.success(Unit)
+
+        val threadItems = fetchItemsForProposals(threadProposalIds)
+
+        cache.update { current ->
+            current.map { proposal ->
+                val fetched = threadItems[proposal.id] ?: return@map proposal
+                proposal.copy(items = fetched.first.map { it.toDomain(fetched.second) })
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    /**
+     * Fetches [TradeItemDto]s + a Room card lookup map for each of [proposalIds], CONCURRENTLY.
+     * Network/DB calls stay OUTSIDE any `cache.update` lambda (that lambda must be pure/fast —
+     * `MutableStateFlow.update` may re-run it under contention).
+     *
+     * A sequential `associate { ... }` here would await each proposal's fetchProposalItems
+     * round-trip before starting the next one — an N+1 that pays full latency × thread length on
+     * long counter chains (trades audit §6.1, 2026-07-10). `coroutineScope` + `async` per proposal
+     * fans the fetches out. Shared by [refreshProposalThread] and [refreshItemsForThread].
+     */
+    private suspend fun fetchItemsForProposals(
+        proposalIds: List<String>,
+    ): Map<String, Pair<List<TradeItemDto>, Map<String, CardEntity>>> = coroutineScope {
+        proposalIds.map { proposalId ->
+            async {
+                val itemsResult = remote.fetchProposalItems(proposalId)
+                val itemDtos = if (itemsResult.isSuccess) itemsResult.getOrThrow() else emptyList()
+                val cardIds = itemDtos.map { it.cardId }.distinct()
+                if (cardIds.isNotEmpty()) {
+                    // Pre-warm Room for any card the user never cached (typically the
+                    // counterparty's side of the trade) so it doesn't render as a raw
+                    // Scryfall UUID below. Best-effort: warmCacheForIds swallows its own
+                    // failures internally (trades audit §5.4, 2026-07-10).
+                    cardRepository.warmCacheForIds(cardIds)
+                }
+                val cardMap: Map<String, CardEntity> = if (cardIds.isNotEmpty()) {
+                    cardDao.getByIds(cardIds).associateBy { it.scryfallId }
+                } else emptyMap()
+                proposalId to (itemDtos to cardMap)
+            }
+        }.awaitAll().toMap()
     }
 
     override suspend fun createProposal(

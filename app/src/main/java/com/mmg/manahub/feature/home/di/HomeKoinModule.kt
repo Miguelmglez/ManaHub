@@ -123,12 +123,19 @@ fun homeKoinModule(): Module = module {
             tradeSuggestionsRepository = get(),
             friendRepository = get(),
             playtestRepository = get(),
+            // Backend & Performance Optimization plan, WS1+WS3 Part B item 9 (2026-07-28) — SyncManager
+            // is bridged in coreBridgeKoinModule (promoted from Collection; see that module's KDoc).
+            syncManager = get(),
             // Home widget board overhaul, TASK 5b — from communityDecksKoinModule (loaded in the
             // same ManaHubApp `modules(...)` call), no parallel data path.
             searchCommunityDecksUseCase = get(),
             // Deck Doctor Community/Archetype plan, Phase 5 — from communityAggregateKoinModule
             // (loaded in the same ManaHubApp `modules(...)` call).
             communityAggregateRepository = get(),
+            // Daily Puzzle (ADR-006), Batch B2 — from puzzleKoinModule (loaded in the same
+            // ManaHubApp `modules(...)` call), no parallel data path.
+            getTodayPuzzleUseCase = get(),
+            getPuzzleResultUseCase = get(),
         )
     }
 }

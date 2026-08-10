@@ -23,10 +23,13 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
+import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
+import com.mmg.manahub.feature.decks.domain.usecase.AddOrigin
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
+import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
@@ -47,6 +50,45 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/**
+ * Deck Wizard & Engine Rework plan, Workstream 8.4: the named progress phases the Suggestions
+ * tab's FULL [DeckDoctorOrchestrator.loadAnalysis] pass moves through -- mirrors
+ * [com.mmg.manahub.feature.decks.domain.template.BuildStage]'s visual language (the same
+ * "current stage + completed-stages checklist" UI pattern the wizard's generating step already
+ * uses, not a second divergent design). Ordinal order is display order.
+ *
+ * NEVER set from [DeckDoctorOrchestrator.recomputeIncremental] or a bare
+ * [DeckDoctorOrchestrator.recomputeAdds] (budget-change) call -- those stay instant/unstaged by
+ * design (see [DeckDoctorOrchestrator.loadAnalysis]'s KDoc); only the full analysis pass emits
+ * [DeckDoctorState.stage] transitions.
+ */
+enum class DoctorAnalysisStage {
+    /** Snapshotting the live deck + resolving the mainboard/commander/seed tags, before Health/
+     * Cuts are computed. */
+    READING_DECK_PLAN,
+    /** Motor A ([com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase])
+     * ranking the owned collection. */
+    EVALUATING_COLLECTION,
+    /**
+     * Motor B ([com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase] /
+     * [com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase]) -- runs
+     * CONCURRENTLY with the stages around it ([recomputeCommunityInternal] is fire-and-forget,
+     * never awaited by [loadAnalysis]), so this stage is best-effort/informational only: it can
+     * legitimately appear slightly out of the 1-2-3-4-5 order relative to the other stages, but
+     * never regresses the displayed sequence backward (see [advanceDoctorStage]) and never
+     * resurrects the staged screen once Motor A + the backstop have already finished.
+     */
+    SEARCHING_COMMUNITY,
+    /** The Workstream 8.2 Scryfall backstop
+     * ([com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator]) -- a NEW latency
+     * source only when [DeckDoctorState.includeOutsideCollection] is on; a near-instant no-op
+     * otherwise. */
+    SEARCHING_CARD_POOL,
+    /** Final merge/sort/cap of the ADD list -- the last stage before the Suggestions tab reveals
+     * real content. */
+    RANKING_SUGGESTIONS,
+}
 
 /**
  * Read-only Deck Doctor (Suggestions surface) state, mirrored into a host ViewModel's own UI
@@ -73,6 +115,17 @@ data class DeckDoctorState(
     val isAddsLoading: Boolean = false,
     /** True once at least one full [DeckDoctorOrchestrator.loadAnalysis] has completed. */
     val isLoaded: Boolean = false,
+
+    // ── Staged progress (Deck Wizard & Engine Rework plan, Workstream 8.4) ──────────────────────
+    /** Non-null while the FULL [loadAnalysis] pass is progressing (Motor A + the Scryfall
+     * backstop); null once that pass finishes, or when no full analysis is in flight (a budget
+     * recompute / incremental add-cut never sets this). Drives the Suggestions tab's staged
+     * progress screen -- see [DoctorAnalysisStage]. */
+    val stage: DoctorAnalysisStage? = null,
+    /** Stages already finished THIS pass, oldest first (the completed-stages checklist under the
+     * current stage, mirroring [com.mmg.manahub.feature.decks.domain.template.BuildStage]'s UI).
+     * Reset to empty at the start of every [loadAnalysis]. */
+    val completedStages: List<DoctorAnalysisStage> = emptyList(),
     /**
      * Deck Engine Unification plan (D4): mirrors `Deck.strategyLocked`. While true, [cuts] never
      * includes a [DeckCardSource.WIZARD]-sourced card (see [loadAnalysis]/[recomputeIncremental]'s
@@ -80,6 +133,20 @@ data class DeckDoctorState(
      * off via [unlockStrategy] (an explicit, confirmed user action).
      */
     val strategyLocked: Boolean = false,
+
+    // ── Scryfall backstop -- 3rd adds source at evaluation time (Deck Wizard & Engine Rework
+    //    plan, Workstream 8.2). Reuses the WS4 CandidatePoolGenerator (the wizard's own build-time
+    //    last-resort fill source) as a Suggestions-tab source; entirely additive to Motor A -- when
+    //    OFF (the default), [adds] is byte-identical to pre-WS8.2. Mirrors [communityUnavailable]'s
+    //    degrade-not-hide contract exactly. ──────────────────────────────────────────────────────
+    /** The user's own per-session toggle (mirrors the wizard's `includeOutsideCollection` — a
+     * SEPARATE, Suggestions-tab-local choice, not shared state with the wizard). Resets to `false`
+     * on every full [loadAnalysis]. */
+    val includeOutsideCollection: Boolean = false,
+    /** True when [includeOutsideCollection] is on but the last Scryfall backstop fetch failed --
+     * [adds] still shows Motor A's (and Motor B's) results in that case, never a silently thinner
+     * list passed off as "nothing more to suggest". */
+    val outsideCollectionUnavailable: Boolean = false,
 
     // ── Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) ────────
     // Entirely additive to Motor A above and gated behind `communityEngineEnabledFlow` (D4):
@@ -140,8 +207,9 @@ sealed interface DeckDoctorEvent {
  *
  * ## Phase 2 — Motor A is the PRIMARY (and, as of this phase, only) adds source
  * `docs/claude-code-prompt-deck-doctor-community.md` Phase 2 replaces the previous
- * `SuggestAddsWithBudgetUseCase` pipeline (wishlist + external Scryfall via the now-dormant
- * `CandidatePoolGenerator`/`BudgetOptimizer`, D5 — see `project_dormant_budget_pool` memory) with
+ * `SuggestAddsWithBudgetUseCase` pipeline (wishlist + external Scryfall via `CandidatePoolGenerator`/
+ * `BudgetOptimizer`, D5 -- that whole pipeline was DELETED in the Deck Wizard & Engine Rework plan,
+ * WS7.3, 2026-07-28, D-H: the budget feature is not coming back) with
  * [SuggestAddsFromCollectionUseCase]: an OFFLINE, ALWAYS-AVAILABLE source with no flag gate (unlike
  * the future Cloudflare-Worker-backed Motor B, Phase 4, which IS flag-gated behind
  * `communityEngineEnabledFlow`). Because Motor A only ever suggests already-owned cards, the whole
@@ -183,6 +251,11 @@ class DeckDoctorOrchestrator(
     private val suggestAddsFromCommunityUseCase: SuggestAddsFromCommunityUseCase? = null,
     private val findSimilarDecksUseCase: FindSimilarDecksUseCase? = null,
     private val isCommunityEngineEnabled: suspend () -> Boolean = { false },
+    // ── Scryfall backstop (Workstream 8.2) -- appended last, defaulted null, same "no existing
+    // positional-arg call site needs to change" precedent as Motor B above. `null` is a silent
+    // no-op: [DeckDoctorState.includeOutsideCollection] can still be toggled on by the UI, but
+    // [recomputeAddsInternal] simply never finds a generator to call, so `adds` stays Motor-A-only.
+    private val candidatePoolGenerator: CandidatePoolGenerator? = null,
 ) {
 
     private val _state = MutableStateFlow(DeckDoctorState())
@@ -205,6 +278,20 @@ class DeckDoctorOrchestrator(
 
     /** The in-flight Motor B (community) fetch job — cancelled before every new launch, mirroring H3. */
     private var communityJob: Job? = null
+
+    /**
+     * Workstream 8.4 -- bumped once per [loadAnalysis] call, BEFORE its coroutine is launched. Every
+     * [recomputeAddsInternal]/[recomputeCommunityInternal] invocation that is PART OF a specific
+     * [loadAnalysis] pass captures the generation value active at that moment (`ownerGeneration`)
+     * and re-checks it against the CURRENT [stagingGeneration] before applying a [DoctorAnalysisStage]
+     * transition. This is what stops an old, superseded [loadAnalysis] pass's own
+     * [recomputeAddsJob]/[communityJob] (siblings of [analysisJob], NOT its children -- cancelling
+     * [analysisJob] alone does not stop them) from emitting a stale stage update after a NEWER
+     * [loadAnalysis] call has already taken over — the two jobs are independently cancelled via
+     * their own existing cancel-before-launch calls, but only once the new pass's code reaches
+     * them, which can lag behind the old jobs' own in-flight network calls.
+     */
+    private var stagingGeneration: Int = 0
 
     private class AnalysisCache(
         var workingMainboard: List<DeckEntry>,
@@ -237,6 +324,11 @@ class DeckDoctorOrchestrator(
         /** Scryfall ids of every mainboard slot whose persisted `source == WIZARD` -- folded into
          * [suggestCutsUseCase]'s `protectedIds` while [strategyLocked] (D4 hard no-cut guarantee). */
         val wizardSourcedIds: Set<String>,
+        // ── Scryfall backstop (Workstream 8.2) ──────────────────────────────────
+        /** The user's per-session Suggestions-tab toggle -- see [setIncludeOutsideCollection] and
+         * [DeckDoctorState.includeOutsideCollection]'s KDoc. Always starts `false` on a fresh
+         * [loadAnalysis]. */
+        var includeOutsideCollection: Boolean = false,
     )
 
     /**
@@ -247,9 +339,20 @@ class DeckDoctorOrchestrator(
     fun loadAnalysis(deckId: String, constraints: BudgetConstraints) {
         analysisCache = null
         analysisJob?.cancel()
+        // Workstream 8.4 -- this pass's own identity, captured BEFORE launch so every stage-emitting
+        // sub-job it spawns (recomputeAddsInternal/recomputeCommunityInternal) can tell whether it is
+        // still the CURRENT pass by the time it actually gets to update [DeckDoctorState.stage].
+        val myGeneration = ++stagingGeneration
         analysisJob = scope.launch {
             crashReporter.log("deck_studio_suggestions_analysis_started")
-            _state.update { it.copy(isSuggestionsLoading = true, isLoaded = true) }
+            _state.update {
+                it.copy(
+                    isSuggestionsLoading = true,
+                    isLoaded = true,
+                    stage = DoctorAnalysisStage.READING_DECK_PLAN,
+                    completedStages = emptyList(),
+                )
+            }
 
             val deckWithCards = deckRepository.observeDeckWithCards(deckId).first()
             if (deckWithCards == null) {
@@ -311,6 +414,7 @@ class DeckDoctorOrchestrator(
                 profile = health.profile,
                 protectedIds = cutProtectedIds(commanderId, strategyLocked, wizardSourcedIds),
                 weights = weights,
+                resolvedSkeleton = resolveArchetypeSkeleton(health),
             )
 
             val collectionCards = collection.map { it.card }
@@ -358,11 +462,11 @@ class DeckDoctorOrchestrator(
                     strategyLocked = strategyLocked,
                 )
             }
-            recomputeAddsInternal(constraints)
+            recomputeAddsInternal(constraints, emitStages = true, ownerGeneration = myGeneration)
             // Motor B (Phase 4): fetched once per full analysis, not on every incremental add/cut
             // (see [recomputeCommunityInternal]'s KDoc for why) — [onAddCard]/[onCutCard] instead
             // locally filter the already-fetched lists.
-            recomputeCommunityInternal()
+            recomputeCommunityInternal(ownerGeneration = myGeneration)
         }
     }
 
@@ -380,8 +484,29 @@ class DeckDoctorOrchestrator(
      * Recomputes the ADD suggestions from [analysisCache] via Motor A
      * ([SuggestAddsFromCollectionUseCase]). [constraints] is accepted (see [recomputeAdds]'s KDoc)
      * but not forwarded — Motor A has no budget dimension.
+     *
+     * @param emitStages Workstream 8.4 -- true ONLY when called from [loadAnalysis] (the full
+     *   analysis pass); a budget-change ([recomputeAdds]) or incremental ([recomputeIncremental])
+     *   caller leaves this `false` so [DeckDoctorState.stage] is never touched outside a full pass.
+     * @param ownerGeneration the [stagingGeneration] value active when the ENCLOSING [loadAnalysis]
+     *   pass launched this recompute (irrelevant when [emitStages] is false). Re-checked against the
+     *   CURRENT [stagingGeneration] AT EACH stage-transition call site below (edge-case audit Fix 4,
+     *   2026-07-28 — freshly recomputed every time, never cached in a single local `val` and reused)
+     *   so a superseded pass's job can never emit a stale stage — see [stagingGeneration]'s KDoc.
+     *   Pre-fix, this freshness check was computed ONCE at the top of the function and the resulting
+     *   boolean was reused at 2 later stage-advance call sites (`SEARCHING_CARD_POOL`/
+     *   `RANKING_SUGGESTIONS`) — if a NEWER pass (higher generation) started and progressed its OWN
+     *   stage between this job's launch and one of those later call sites, this job's stale-true
+     *   flag would still fire, overwriting whatever genuinely-current stage the newer pass was
+     *   displaying. The two `_state.update` blocks below (the failure path and the terminal
+     *   success path) already recomputed freshness inline correctly — only the 2 intermediate
+     *   `advanceDoctorStage` calls were affected.
      */
-    private fun recomputeAddsInternal(@Suppress("UNUSED_PARAMETER") constraints: BudgetConstraints) {
+    private fun recomputeAddsInternal(
+        @Suppress("UNUSED_PARAMETER") constraints: BudgetConstraints,
+        emitStages: Boolean = false,
+        ownerGeneration: Int = stagingGeneration,
+    ) {
         val context = analysisCache ?: return
         val health = _state.value.health ?: return
         // Cancel any in-flight recompute so two racing computations can't both emit a stale ADD
@@ -389,6 +514,7 @@ class DeckDoctorOrchestrator(
         recomputeAddsJob?.cancel()
         recomputeAddsJob = scope.launch {
             _state.update { it.copy(isAddsLoading = true) }
+            if (emitStages && ownerGeneration == stagingGeneration) advanceDoctorStage(DoctorAnalysisStage.EVALUATING_COLLECTION)
             val weights = weightsProvider().toScoreWeights()
             val resolvedSkeleton = resolveArchetypeSkeleton(health)
 
@@ -411,25 +537,126 @@ class DeckDoctorOrchestrator(
                 if (error != null) {
                     crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_external_pool_failed", error))
                 }
-                _state.update { it.copy(isAddsLoading = false) }
+                // Clear the staged screen on this defensive failure path too -- never leave the
+                // Suggestions tab stuck on a stage forever because Motor A (a pure in-memory
+                // computation that should never throw) unexpectedly threw.
+                _state.update { s ->
+                    val stillCurrent = emitStages && ownerGeneration == stagingGeneration
+                    s.copy(
+                        isAddsLoading = false,
+                        completedStages = if (stillCurrent && s.stage != null) s.completedStages + s.stage else s.completedStages,
+                        stage = if (stillCurrent) null else s.stage,
+                    )
+                }
                 _events.send(DeckDoctorEvent.ExternalPoolFailed)
                 return@launch
             }
 
-            suggestions.forEach {
+            // Fix 4 (edge-case audit, 2026-07-28): freshly re-checked HERE, not read from a val
+            // cached at the top of the function -- see this function's own KDoc for the exact race.
+            if (emitStages && ownerGeneration == stagingGeneration) advanceDoctorStage(DoctorAnalysisStage.SEARCHING_CARD_POOL)
+            // Workstream 8.2: the Scryfall backstop as a THIRD adds source, merged in ONLY when the
+            // user's own per-session toggle is on -- a silent no-op (empty, never-failed) otherwise,
+            // so `adds` stays byte-identical to Motor-A-only pre-WS8.2 whenever the toggle is off.
+            val (backstopSuggestions, backstopFailed) = fetchOutsideCollectionSuggestions(
+                context = context,
+                health = health,
+                resolvedSkeleton = resolvedSkeleton,
+                weights = weights,
+            )
+            // Fix 4 (edge-case audit, 2026-07-28): same re-check, freshly evaluated again -- the
+            // Scryfall backstop fetch above is another suspend point where a newer pass could have
+            // advanced past this job's stale understanding of "still current".
+            if (emitStages && ownerGeneration == stagingGeneration) advanceDoctorStage(DoctorAnalysisStage.RANKING_SUGGESTIONS)
+            val merged = (suggestions + backstopSuggestions)
+                .distinctBy { it.fit.card.scryfallId }
+                .sortedWith(
+                    compareByDescending<AddSuggestion> { it.fit.score }
+                        .thenBy { it.fit.card.name }
+                        .thenBy { it.fit.card.scryfallId }
+                )
+                .take(ADDS_DISPLAY_LIMIT)
+
+            merged.forEach {
                 val id = it.fit.card.scryfallId
                 if (id !in context.resolvedById) context.resolvedById[id] = it.fit.card
             }
 
             _state.update {
+                val stillCurrent = emitStages && ownerGeneration == stagingGeneration
                 it.copy(
-                    adds = suggestions,
+                    adds = merged,
                     addsTotalCostEur = 0.0,
                     addsCardsToBuy = 0,
                     isAddsLoading = false,
+                    includeOutsideCollection = context.includeOutsideCollection,
+                    outsideCollectionUnavailable = backstopFailed,
+                    // Workstream 8.4 -- this is the terminal stage: fold whatever stage is still
+                    // showing into the checklist, then clear it so the Suggestions tab reveals its
+                    // real content. Gated on [stillCurrent] so a superseded pass's own job can never
+                    // clear a NEWER pass's in-progress stage out from under it.
+                    completedStages = if (stillCurrent && it.stage != null) it.completedStages + it.stage else it.completedStages,
+                    stage = if (stillCurrent) null else it.stage,
                 )
             }
         }
+    }
+
+    /**
+     * Workstream 8.2 -- fetches the Scryfall backstop pool ([CandidatePoolGenerator], the SAME
+     * class the wizard's own build-time last-resort fill reuses, per
+     * `BuildDeckFromTemplateUseCase.runScryfallBackstopLoop`'s exact shape: recompute profile ->
+     * ask the generator -> rescore through the SAME [suggestAddsFromCollectionUseCase] Motor A
+     * call) and tags every result [AddOrigin.NEW] (genuinely not owned). Returns an empty,
+     * non-failed result when [candidatePoolGenerator] is unset or the toggle is off (silent no-op,
+     * mirrors [recomputeCommunityInternal]'s "null dependency / flag off" contract) -- ANY OTHER
+     * failure (network, parsing) is caught and reported as `failed = true` so the caller can show a
+     * per-source degrade notice ([DeckDoctorState.outsideCollectionUnavailable]) rather than
+     * silently returning a thinner merged list that looks like "nothing more to suggest".
+     */
+    private suspend fun fetchOutsideCollectionSuggestions(
+        context: AnalysisCache,
+        health: DeckHealth,
+        resolvedSkeleton: ResolvedArchetypeSkeleton?,
+        weights: ScoreWeights,
+    ): Pair<List<AddSuggestion>, Boolean> {
+        val generator = candidatePoolGenerator ?: return emptyList<AddSuggestion>() to false
+        if (!context.includeOutsideCollection) return emptyList<AddSuggestion>() to false
+
+        return runCatching {
+            val pool = generator(profile = health.profile, evaluation = health.evaluation)
+            if (pool.isEmpty()) {
+                emptyList()
+            } else {
+                suggestAddsFromCollectionUseCase(
+                    collection = pool,
+                    mainboard = context.workingMainboard,
+                    profile = health.profile,
+                    resolvedSkeleton = resolvedSkeleton,
+                    weights = weights,
+                ).map { it.copy(origin = AddOrigin.NEW) }
+            }
+        }.fold(
+            onSuccess = { it to false },
+            onFailure = { t ->
+                crashReporter.log("deck_studio_scryfall_backstop_suggestions_failed")
+                crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_scryfall_backstop_suggestions_failed", t))
+                emptyList<AddSuggestion>() to true
+            },
+        )
+    }
+
+    /**
+     * Workstream 8.2 -- toggles the Scryfall backstop (3rd adds source) for the CURRENT session
+     * only (mirrors the wizard's own `includeOutsideCollection`, but this is a SEPARATE choice --
+     * the Suggestions tab does not read or write the wizard's spec). A no-op when no analysis is
+     * primed yet, or the value is unchanged (avoids a redundant recompute on a no-op toggle tap).
+     */
+    fun setIncludeOutsideCollection(enabled: Boolean, constraints: BudgetConstraints) {
+        val context = analysisCache ?: return
+        if (context.includeOutsideCollection == enabled) return
+        context.includeOutsideCollection = enabled
+        recomputeAddsInternal(constraints)
     }
 
     /**
@@ -448,8 +675,15 @@ class DeckDoctorOrchestrator(
      *    .ExternalPoolFailed] (that event stays Motor-A-only; Motor B has its own dedicated,
      *    non-blocking degradation flag instead of a toast, since the Studio renders an inline
      *    per-section error state — see the plan's "Worker down -> Motor A untouched" requirement).
+     *
+     * @param ownerGeneration Workstream 8.4 -- the [stagingGeneration] value active when the
+     *   ENCLOSING [loadAnalysis] pass launched this fetch (this method has only ever had one
+     *   caller, [loadAnalysis], so there is no unstaged variant to preserve). Re-checked against
+     *   the CURRENT [stagingGeneration] before setting [DoctorAnalysisStage.SEARCHING_COMMUNITY] so
+     *   a superseded pass's community job can never emit a stale stage — see [stagingGeneration]'s
+     *   KDoc.
      */
-    private fun recomputeCommunityInternal() {
+    private fun recomputeCommunityInternal(ownerGeneration: Int) {
         val context = analysisCache ?: return
         val health = _state.value.health ?: return
         val aggregateRepository = communityAggregateRepository
@@ -465,6 +699,7 @@ class DeckDoctorOrchestrator(
                 }
                 return@launch
             }
+            if (ownerGeneration == stagingGeneration) advanceDoctorStage(DoctorAnalysisStage.SEARCHING_COMMUNITY)
             _state.update { it.copy(isCommunityLoading = true, communityUnavailable = false) }
 
             val archetypeFormat = ArchetypeFormat.of(context.format)
@@ -589,6 +824,7 @@ class DeckDoctorOrchestrator(
                 profile = health.profile,
                 protectedIds = cutProtectedIds(context.commanderId, context.strategyLocked, context.wizardSourcedIds),
                 weights = weights,
+                resolvedSkeleton = resolveArchetypeSkeleton(health),
             )
             _state.update {
                 it.copy(
@@ -670,7 +906,25 @@ class DeckDoctorOrchestrator(
             recomputeAddsJob?.cancel()
             communityJob?.cancel()
             analysisCache = null
-            _state.update { it.copy(isLoaded = false) }
+            _state.update { it.copy(isLoaded = false, stage = null, completedStages = emptyList()) }
+        }
+    }
+
+    /**
+     * Workstream 8.4 -- advances [DeckDoctorState.stage] forward (by [DoctorAnalysisStage] ordinal,
+     * never backward) and appends the stage it is replacing to [DeckDoctorState.completedStages].
+     * A no-op when [DeckDoctorState.stage] is already `null` — either the pass hasn't set its own
+     * initial stage yet (never happens in practice: [loadAnalysis] sets [DoctorAnalysisStage
+     * .READING_DECK_PLAN] directly, synchronously, before spawning anything that calls this), or the
+     * pass already finished ([recomputeAddsInternal]'s terminal update cleared it) — in the latter
+     * case this guard is what stops a late [recomputeCommunityInternal] update from resurrecting the
+     * staged screen after Motor A + the backstop already revealed the real Suggestions content.
+     */
+    private fun advanceDoctorStage(next: DoctorAnalysisStage) {
+        _state.update { s ->
+            val current = s.stage ?: return@update s
+            if (next.ordinal <= current.ordinal) return@update s
+            s.copy(completedStages = s.completedStages + current, stage = next)
         }
     }
 
@@ -760,7 +1014,7 @@ class DeckDoctorOrchestrator(
             format = archetypeFormat,
             archetype = resolution.macro,
             themes = resolution.themes,
-            colorCount = health.profile.colorIdentity.size,
+            identity = health.profile.colorIdentity,
         )
     }
 
@@ -850,5 +1104,10 @@ class DeckDoctorOrchestrator(
         /** Archidekt's "Custom" format id (`7`) — the best-effort proxy for ManaHub's generic
          * CASUAL 60-card format, which has no clean 1:1 Archidekt equivalent (see [ArchidektFormat]). */
         const val SIXTY_ARCHIDEKT_FORMAT_ID = 7
+
+        /** Workstream 8.2 -- the merged (Motor A + Scryfall backstop) adds list is capped here,
+         * matching [SuggestAddsFromCollectionUseCase]'s own default `limit` so merging in a second
+         * source never balloons the Suggestions tab's displayed list size. */
+        const val ADDS_DISPLAY_LIMIT = 50
     }
 }

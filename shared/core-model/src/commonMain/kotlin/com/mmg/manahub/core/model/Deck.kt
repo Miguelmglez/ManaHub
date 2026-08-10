@@ -61,14 +61,29 @@ data class Deck(
  * Per-card provenance (Deck Engine Unification plan, D4 hard no-cut guarantee). Persisted as a raw
  * TEXT column (`deck_cards.source`) -- [fromRaw] parses defensively (CLAUDE.md: never `.valueOf()`),
  * an unknown/stale string falls back to [USER] rather than crashing or guessing.
+ *
+ * [protectionRank] orders the three sources from LEAST to MOST cut-protected (`USER` < `SUGGESTION`
+ * < `WIZARD`). Edge-case audit Fix 3 (2026-07-28): a mainboard<->sideboard board move that MERGES
+ * onto an existing stack of the same card must never downgrade that stack's provenance -- see
+ * [moreProtected] and its sole caller, `DeckRepositoryImpl.moveCardQuantity`.
  */
-enum class DeckCardSource {
+enum class DeckCardSource(private val protectionRank: Int) {
     /** Placed manually by the user in Deck Studio (the default -- also every pre-migration row). */
-    USER,
-    /** Placed by the wizard's build (seeds, commander, category fill, lands). */
-    WIZARD,
+    USER(protectionRank = 0),
     /** Added by accepting a Deck Doctor Suggestions-tab add. */
-    SUGGESTION;
+    SUGGESTION(protectionRank = 1),
+    /** Placed by the wizard's build (seeds, commander, category fill, lands). */
+    WIZARD(protectionRank = 2);
+
+    /**
+     * Returns whichever of `this`/[other] carries the STRONGER cut-protection guarantee. A board
+     * move that merges two differently-sourced stacks of the SAME card can only ever GAIN
+     * protection, never lose it (edge-case audit Fix 3) -- e.g. merging a USER-sourced sideboard
+     * copy onto a WIZARD-sourced mainboard stack must leave the merged row `WIZARD`, not silently
+     * downgrade it to `USER` just because the USER side happened to initiate the move.
+     */
+    fun moreProtected(other: DeckCardSource): DeckCardSource =
+        if (other.protectionRank > this.protectionRank) other else this
 
     companion object {
         fun fromRaw(raw: String?): DeckCardSource = entries.firstOrNull { it.name == raw } ?: USER

@@ -1,9 +1,5 @@
 package com.mmg.manahub.core.data.repository
 
-import com.mmg.manahub.core.data.remote.collection.CollectionRemoteDataSource
-import com.mmg.manahub.core.data.remote.collection.SupabaseCollectionDataSource
-import com.mmg.manahub.core.data.remote.decks.DeckRemoteDataSource
-import com.mmg.manahub.core.data.remote.decks.SupabaseDeckDataSource
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
@@ -23,16 +19,24 @@ abstract class RepositoryModule {
     @Binds @Singleton
     abstract fun bindUserCardRepository(impl: UserCardRepositoryImpl): UserCardRepository
 
-    @Binds @Singleton
-    abstract fun bindCollectionRemoteDataSource(impl: SupabaseCollectionDataSource): CollectionRemoteDataSource
-
-    @Binds @Singleton
-    abstract fun bindDeckRemoteDataSource(impl: SupabaseDeckDataSource): DeckRemoteDataSource
+    // bindCollectionRemoteDataSource was REMOVED (KMP web roadmap W3d): SupabaseCollectionDataSource
+    // moved to :shared:core-data commonMain and lost its @Inject/@Singleton (Hilt is
+    // androidMain-only), so a @Binds abstract fun can no longer target it. It is now provided via
+    // SharedDomainUseCaseModule.provideCollectionRemoteDataSource (mirrors the pre-existing
+    // provideDeckRemoteDataSource @Provides pattern) — still consumed by the still-Hilt
+    // SyncManager/UserCardRepositoryImpl, behavior unchanged.
 
     // bindDeckRepository was REMOVED (KMP migration — Hilt→Koin cutover batch 3): DeckRepositoryImpl
     // lost its @Inject constructor and is now a native Koin `single` in
-    // com.mmg.manahub.app.di.coreBridgeKoinModule. DeckRemoteDataSource stays Hilt-bound below (still
-    // consumed by the still-Hilt SyncManager); DeckRepositoryImpl no longer uses it directly.
+    // com.mmg.manahub.app.di.coreBridgeKoinModule. DeckRepositoryImpl no longer uses
+    // DeckRemoteDataSource directly.
+
+    // bindDeckRemoteDataSource was REMOVED (KMP web roadmap W3c): SupabaseDeckDataSource moved to
+    // :shared:core-data commonMain and lost its @Inject/@Singleton (Hilt is androidMain-only), so a
+    // @Binds abstract fun can no longer target it. It is now provided via
+    // SharedDomainUseCaseModule.provideDeckRemoteDataSource (mirrors the pre-existing
+    // provideScryfallRemoteDataSource @Provides pattern) — still consumed by the still-Hilt
+    // SyncManager, behavior unchanged.
 
     // bindStatsRepository was REMOVED (KMP migration — Hilt→Koin cutover batch 7): StatsRepositoryImpl
     // lost its @Inject constructor and is now a native Koin `single` in

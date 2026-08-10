@@ -2,6 +2,8 @@ package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
+import com.mmg.manahub.feature.decks.domain.engine.StrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.card
 import kotlin.test.Test
@@ -96,5 +98,83 @@ class SuggestStrategiesForSeedsUseCaseTest {
         val result = useCase(listOf(seed))
         val scores = result.candidates.map { it.fitScore }
         assertEquals(scores.sortedDescending(), scores)
+    }
+
+    // ── Deck Wizard & Engine Rework plan, Workstream 3.1 -- coherence hints ──────
+
+    @Test
+    fun `a seed sharing nothing with a candidate surfaces as that candidate's misfitSeeds`() {
+        val rampSeed = card(id = "s1", name = "Ramp Piece", tags = listOf(CardTag.RAMP))
+        val offSeed = card(id = "s2", name = "Graveyard Piece", tags = listOf(CardTag.GRAVEYARD))
+        val result = useCase(listOf(rampSeed, offSeed))
+
+        val rampCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        assertTrue(rampCandidate.misfitSeeds.any { it.scryfallId == "s2" })
+        assertTrue(rampCandidate.misfitSeeds.none { it.scryfallId == "s1" })
+    }
+
+    @Test
+    fun `a candidate every seed supports has no misfitSeeds`() {
+        val seedA = card(id = "s1", name = "Ramp Piece A", tags = listOf(CardTag.RAMP))
+        val seedB = card(id = "s2", name = "Ramp Piece B", tags = listOf(CardTag.RAMP))
+        val result = useCase(listOf(seedA, seedB))
+
+        val rampCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        assertTrue(rampCandidate.misfitSeeds.isEmpty())
+    }
+
+    @Test
+    fun `misfitColors is empty when no colors are selected yet`() {
+        val seed = card(id = "s1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
+        val result = useCase(listOf(seed))
+        val aggroCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
+        assertTrue(aggroCandidate.misfitColors.isEmpty())
+    }
+
+    @Test
+    fun `a selected color absent from every curated combo for a candidate is flagged as a misfit`() {
+        // AGGRO's curated ColorStrategyAffinity combos (mono-W, mono-R, Rakdos, Gruul, Boros,
+        // Naya, Mardu...) never include Blue -- picking Blue alongside an AGGRO candidate must
+        // surface it as a misfit, regardless of which specific combo the tie-break lands on.
+        val seed = card(id = "s1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
+        val result = useCase(listOf(seed), selectedColors = setOf(ManaColor.U))
+        val aggroCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
+        assertTrue(ManaColor.U in aggroCandidate.misfitColors)
+    }
+
+    @Test
+    fun `a selected color present in the best curated combo is not flagged`() {
+        val seed = card(id = "s1", name = "Aggro Beater", tags = listOf(CardTag.AGGRO))
+        val result = useCase(listOf(seed), selectedColors = setOf(ManaColor.R))
+        val aggroCandidate = result.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
+        assertTrue(ManaColor.R !in aggroCandidate.misfitColors)
+    }
+
+    @Test
+    fun `a tribe candidate carries ThemeId-TRIBAL so it passes StrategyCatalog-isValidCombination`() {
+        // WS3.1 bug fix -- before this, a tribe candidate's profile carried no ThemeId.TRIBAL, so
+        // StrategyCatalog.isValidCombination (a WS1 addition made AFTER this use case's tribe
+        // candidates were first written) rejected it as an orphaned tribe pick.
+        val elfA = card(id = "s1", name = "Elf Warrior", typeLine = "Creature — Elf Warrior")
+        val elfB = card(id = "s2", name = "Elf Druid", typeLine = "Creature — Elf Druid")
+        val result = useCase(listOf(elfA, elfB))
+
+        val tribeCandidate = result.candidates.first { it.profile.tribe == "tribe:elf" }
+        assertEquals(listOf(ThemeId.TRIBAL), tribeCandidate.profile.themes)
+        assertTrue(StrategyCatalog.isValidCombination(tribeCandidate.profile.archetype, tribeCandidate.profile.themes, tribeCandidate.profile.tribe))
+    }
+
+    @Test
+    fun `every returned candidate passes StrategyCatalog-isValidCombination`() {
+        val rampSeed = card(id = "s1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val elf = card(id = "s2", name = "Elf Warrior", typeLine = "Creature — Elf Warrior")
+        val result = useCase(listOf(rampSeed, elf))
+        assertTrue(result.candidates.isNotEmpty())
+        result.candidates.forEach { candidate ->
+            assertTrue(
+                StrategyCatalog.isValidCombination(candidate.profile.archetype, candidate.profile.themes, candidate.profile.tribe),
+                "candidate ${candidate.label} must pass isValidCombination",
+            )
+        }
     }
 }

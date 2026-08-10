@@ -61,8 +61,21 @@ interface DeckDao {
      *
      * The new quantities are passed in pre-computed by the repository (which already
      * holds the current counts), so this method only writes:
-     *  - source side: removed entirely when [newSourceQty] <= 0, otherwise upserted.
-     *  - target side: always upserted with [newTargetQty].
+     *  - source side: removed entirely when [newSourceQty] <= 0, otherwise upserted with
+     *    [sourceRowSource] -- ALWAYS the origin row's own, unchanged provenance (the shrunk
+     *    remainder of the origin stack is not a merge, so there is nothing to reconcile here).
+     *  - target side: always upserted with [newTargetQty] and [targetRowSource].
+     *
+     * Edge-case audit Fix 3 (2026-07-28): [sourceRowSource]/[targetRowSource] are two SEPARATE
+     * params (not one shared `source`) precisely because the TARGET side can be a MERGE onto an
+     * existing stack of the same card with a DIFFERENT provenance -- the repository is responsible
+     * for resolving [targetRowSource] to the MORE-PROTECTED of the two sides via
+     * [com.mmg.manahub.core.model.DeckCardSource.moreProtected] before calling this DAO method
+     * (this method itself stays a pure mechanical writer, no merge policy here). Prior to this fix,
+     * a single `source` param was applied unconditionally to BOTH sides, so moving a USER-sourced
+     * card onto an existing WIZARD-sourced stack silently downgraded the WHOLE merged stack to
+     * USER, stripping the D4 hard no-cut guarantee even though the deck still displayed
+     * `strategyLocked = true`.
      */
     @Transaction
     fun moveCardQuantity(
@@ -71,11 +84,8 @@ interface DeckDao {
         fromSideboard: Boolean,
         newSourceQty: Int,
         newTargetQty: Int,
-        // Deck Engine Unification (v47, D4): preserves the slot's existing provenance across a
-        // mainboard<->sideboard move -- without this, every move silently reset a WIZARD/SUGGESTION
-        // -sourced card back to the DeckCardEntity default ("USER"), which would have broken the D4
-        // no-cut guarantee for a wizard-built card the user simply sideboarded and moved back.
-        source: String = "USER",
+        sourceRowSource: String = "USER",
+        targetRowSource: String = "USER",
     ) {
         if (newSourceQty <= 0) {
             removeDeckCard(deckId, scryfallId, fromSideboard)
@@ -86,7 +96,7 @@ interface DeckDao {
                     scryfallId = scryfallId,
                     quantity = newSourceQty,
                     isSideboard = fromSideboard,
-                    source = source,
+                    source = sourceRowSource,
                 )
             )
         }
@@ -96,7 +106,7 @@ interface DeckDao {
                 scryfallId = scryfallId,
                 quantity = newTargetQty,
                 isSideboard = !fromSideboard,
-                source = source,
+                source = targetRowSource,
             )
         )
     }

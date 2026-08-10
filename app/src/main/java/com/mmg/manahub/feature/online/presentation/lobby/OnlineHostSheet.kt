@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.online.domain.model.ActiveSession
 import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ParticipantListRow
 import com.mmg.manahub.core.ui.components.RoomCodeDisplay
@@ -87,7 +87,7 @@ fun OnlineHostSheet(
     initialDisplayName: String = "",
     initialThemeKey: String = "Crimson",
     onDismiss: () -> Unit,
-    onGameStart: (sessionId: String, mode: GameMode, playerCount: Int) -> Unit,
+    onGameStart: (sessionId: String, mode: GameMode, playerCount: Int, guestToken: String?) -> Unit,
     viewModel: LobbyHostViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -244,10 +244,8 @@ fun OnlineHostSheet(
                             shape = ButtonShape,
                         ) {
                             if (uiState.isLoading) {
-                                CircularProgressIndicator(
+                                MagicLoadingSpinner(
                                     modifier = Modifier.size(20.dp),
-                                    color = mc.background,
-                                    strokeWidth = 2.dp,
                                 )
                             } else {
                                 Text(text = stringResource(R.string.lobby_create_button), style = ty.labelLarge)
@@ -318,10 +316,8 @@ fun OnlineHostSheet(
                                 shape = ButtonShape,
                             ) {
                                 if (uiState.isLoading) {
-                                    CircularProgressIndicator(
+                                    MagicLoadingSpinner(
                                         modifier = Modifier.size(20.dp),
-                                        color = mc.background,
-                                        strokeWidth = 2.dp,
                                     )
                                 } else {
                                     Text(text = stringResource(R.string.lobby_start_button), style = ty.labelLarge)

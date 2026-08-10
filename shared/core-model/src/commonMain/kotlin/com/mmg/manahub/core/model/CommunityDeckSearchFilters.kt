@@ -3,7 +3,7 @@ package com.mmg.manahub.core.model
 /**
  * Every filter Archidekt's `GET /api/decks/v3/` search endpoint actually supports, verified live
  * 2026-07-15 (see `docs/adr/ADR-004-community-api-contracts.md` §1b). Replaces the old positional
- * `cardName/deckFormat/orderBy/page/pageSize` parameter list on [com.mmg.manahub.core.data.remote.ArchidektClient.searchDecks]
+ * `cardNames/deckFormat/orderBy/page/pageSize` parameter list on [com.mmg.manahub.core.data.remote.ArchidektClient.searchDecks]
  * / [com.mmg.manahub.core.domain.repository.CommunityDecksRepository.searchDecks] so new filters
  * can be added without growing a positional signature further.
  *
@@ -11,7 +11,14 @@ package com.mmg.manahub.core.model
  * the client — omitted parameters are simply not sent to Archidekt.
  *
  * @property deckName substring filter on the deck's own name (Archidekt `name`).
- * @property cardName a card the deck must contain (Archidekt `cardName`).
+ * @property cardNames cards the deck must contain (Archidekt `cardName`). Archidekt's search API
+ *   only accepts a SINGLE `cardName` per request — repeated `cardName` params reliably trigger a
+ *   server-side statement timeout (verified live 2026-07-24, see
+ *   `docs/adr/ADR-004-community-api-contracts.md` §1/§1b). Multi-card filtering is therefore
+ *   decomposed client-side: `size <= 1` calls Archidekt directly
+ *   ([com.mmg.manahub.core.data.remote.ArchidektClient.searchDecks] sends `singleOrNull()`);
+ *   `size > 1` is fanned out to one search per card with the results intersected by deck id
+ *   (`com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl.searchDecksMultiCard`).
  * @property commanderName exact commander name (Archidekt `commanderName`).
  * @property ownerUsername exact Archidekt owner username (Archidekt `ownerUsername`; NOT `owner`,
  *   which is silently ignored by the API).
@@ -32,7 +39,7 @@ package com.mmg.manahub.core.model
  */
 data class CommunityDeckSearchFilters(
     val deckName: String? = null,
-    val cardName: String? = null,
+    val cardNames: List<String> = emptyList(),
     val commanderName: String? = null,
     val ownerUsername: String? = null,
     val deckFormatId: Int? = null,

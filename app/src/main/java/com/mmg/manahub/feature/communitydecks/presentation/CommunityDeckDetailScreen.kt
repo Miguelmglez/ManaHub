@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,11 +30,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,46 +48,44 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import org.jetbrains.compose.resources.painterResource
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
-import com.mmg.manahub.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-
+import com.mmg.manahub.R
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
+import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
-import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.TimeAgoFormatter
-import com.mmg.manahub.core.model.CommunityDeck
 import com.mmg.manahub.feature.communitydecks.presentation.components.CommunityDeckAttribution
 import com.mmg.manahub.feature.communitydecks.presentation.components.communityDeckCardItems
+import org.jetbrains.compose.resources.painterResource
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * Community Deck detail screen.
@@ -207,17 +200,36 @@ fun CommunityDeckDetailScreen(
                             .padding(padding),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = mc.primaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
 
                 is CommunityDeckDetailUiState.Error -> {
-                    FullErrorState(
-                        message = state.message,
-                        retryLabel = stringResource(R.string.retry),
-                        onRetry = viewModel::loadDeck,
-                        modifier = Modifier.padding(padding),
-                    )
+                    // WS2: Archidekt rate-limit exhausted -- disable retry with a live countdown
+                    // instead of letting a rapid re-tap re-trigger the storm the queue is already
+                    // recovering from.
+                    val rateLimitRetryAfterMs = RateLimitExhaustedException.retryAfterMsOrNull(state.message)
+                    if (rateLimitRetryAfterMs != null) {
+                        val remainingSeconds = rememberRateLimitCountdownSeconds(rateLimitRetryAfterMs)
+                        FullErrorState(
+                            message = stringResource(R.string.error_rate_limited_message),
+                            retryLabel = if (remainingSeconds > 0) {
+                                stringResource(R.string.error_rate_limited_retry_countdown, remainingSeconds)
+                            } else {
+                                stringResource(R.string.retry)
+                            },
+                            onRetry = viewModel::loadDeck,
+                            enabled = remainingSeconds <= 0,
+                            modifier = Modifier.padding(padding),
+                        )
+                    } else {
+                        FullErrorState(
+                            message = state.message,
+                            retryLabel = stringResource(R.string.retry),
+                            onRetry = viewModel::loadDeck,
+                            modifier = Modifier.padding(padding),
+                        )
+                    }
                 }
 
                 is CommunityDeckDetailUiState.Content -> {

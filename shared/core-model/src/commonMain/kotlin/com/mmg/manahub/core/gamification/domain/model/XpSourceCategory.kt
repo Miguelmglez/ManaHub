@@ -18,4 +18,5 @@ enum class XpSourceCategory {
     QUEST,
     DAILY_OPEN,
     ACHIEVEMENT,
+    PUZZLE,
 }

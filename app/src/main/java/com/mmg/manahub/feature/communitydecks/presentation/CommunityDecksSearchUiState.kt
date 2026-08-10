@@ -18,6 +18,14 @@ import com.mmg.manahub.core.model.CommunityDeckSummary
 enum class CommunityHubTab { DISCOVER, SEARCH }
 
 /**
+ * Maximum number of cards the CARD advanced filter accepts (Archidekt multi-card search
+ * expansion, 2026-07-24). Mirrors `MULTI_CARD_MAX` in `CommunityDecksRepositoryImpl` (data layer)
+ * — kept as a SEPARATE constant rather than a shared import because this one gates UI selection
+ * (picker hide, cap enforcement in the ViewModel) while the data-layer one bounds request fan-out;
+ * both must independently agree on `3`, but they answer different questions.
+ */
+const val MAX_COMMUNITY_CARD_FILTERS = 3
+/**
  * UI state for the Community Decks Hub (Discover + Search).
  *
  * @property query the DECK NAME search bar text (Discover/Search overhaul 2026-07-15 — this used
@@ -62,11 +70,11 @@ data class CommunityDecksSearchUiState(
     val recentDecks: List<CommunityDeckSummary> = emptyList(),
     val updatedDecks: List<CommunityDeckSummary> = emptyList(),
     val primerDecks: List<CommunityDeckSummary> = emptyList(),
-    val featuredFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.STANDARD,
-    val featuredFormatDecks: List<CommunityDeckSummary> = emptyList(),
+    val selectedDiscoveryFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.COMMANDER,
 
     // ── Search — advanced filters (Phase 2) ────────────────────────────────────────
     val advancedFilters: CommunityAdvancedFilters = CommunityAdvancedFilters(),
+    val selectedFormats: List<CommunityDeckFormatFilter> = emptyList(),
     val commanderQuery: String = "",
     val commanderResults: List<Card> = emptyList(),
     val isCommanderSearching: Boolean = false,
@@ -82,29 +90,38 @@ data class CommunityDecksSearchUiState(
  * `docs/adr/ADR-004-community-api-contracts.md` §1b) except [deckSize], which is free text parsed
  * to an `Int?` only at request-build time (Archidekt's `size` filter is exact-equality only, there
  * is no comparator). Deliberately omits any deck-tag filter — `deckTags` always statement-timeouts.
+ *
+ * @property cards up to [MAX_COMMUNITY_CARD_FILTERS] cards the deck must ALL contain (Archidekt
+ *   multi-card search expansion, 2026-07-24) — mapped 1:1 onto
+ *   [CommunityDeckSearchFilters.cardNames] by [toSearchFilters]. `size <= 1` reaches Archidekt as
+ *   a direct request; `size > 1` is fanned out and intersected client-side (see
+ *   `com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl.searchDecksMultiCard`).
  */
 data class CommunityAdvancedFilters(
-    val format: CommunityDeckFormatFilter = CommunityDeckFormatFilter.ALL,
+    val formats: CommunityDeckFormatFilter =CommunityDeckFormatFilter.COMMANDER,
     val colors: Set<String> = emptySet(),
     val edhBracket: Int? = null,
     val commander: Card? = null,
-    val card: Card? = null,
+    val cards: List<Card> = emptyList(),
     val ownerUsername: String = "",
     val deckSize: String = "",
     val primersOnly: Boolean = false,
 ) {
-    /** Number of distinct filters currently active — drives the Tune-icon badge. */
+    /**
+     * Number of distinct filters currently active — drives the Tune-icon badge. Each selected
+     * [cards] entry counts individually (2 cards selected contributes `2`, not `1`) so the badge
+     * reflects true filter weight rather than collapsing to a single boolean like every other
+     * filter here (Archidekt multi-card search expansion, 2026-07-24).
+     */
     val activeCount: Int
         get() = listOf(
-            format != CommunityDeckFormatFilter.ALL,
             colors.isNotEmpty(),
             edhBracket != null,
             commander != null,
-            card != null,
             ownerUsername.isNotBlank(),
             deckSize.isNotBlank(),
             primersOnly,
-        ).count { it }
+        ).count { it } + cards.size
 }
 
 /**
@@ -118,10 +135,10 @@ fun CommunityAdvancedFilters.toSearchFilters(
     pageSize: Int,
 ): CommunityDeckSearchFilters = CommunityDeckSearchFilters(
     deckName = deckName?.takeIf { it.isNotBlank() },
-    cardName = card?.name,
+    cardNames = cards.map { it.name },
     commanderName = commander?.name,
     ownerUsername = ownerUsername.takeIf { it.isNotBlank() },
-    deckFormatId = format.apiId,
+    deckFormatId = formats.apiId,
     edhBracket = edhBracket,
     colors = colors,
     size = deckSize.toIntOrNull(),
@@ -150,21 +167,25 @@ enum class CommunityDeckSort(val apiValue: String, @StringRes val labelRes: Int)
  * these are standard MTG format names that are never translated), so they are
  * used directly rather than via string resources.
  *
- * @property apiId the Archidekt `deckFormat` id, or `null` for [ALL] (no filter).
+ * Declaration order IS the chip display order (curated 2026-07-24, Archidekt multi-card/more-
+ * formats expansion): the 6 "big" constructed formats first, then Commander variants grouped
+ * together, then the remaining casual/niche formats — rather than a flat numeric-id or
+ * alphabetical order, which would scatter e.g. Commander/Commander 1v1/Duel Commander/Pauper
+ * EDH/PreDH apart from each other.
+ *
+ * @property apiId the Archidekt `deckFormat` id. There is no "ALL / no filter" case — every entry
+ *   maps to a concrete Archidekt format id, and [CommunityAdvancedFilters.formats] always holds a
+ *   real selection (defaulting to [COMMANDER]).
  */
-enum class CommunityDeckFormatFilter(val apiId: Int?, val label: String) {
-    ALL(null, "All Formats"),
+enum class CommunityDeckFormatFilter(val apiId: Int, val label: String) {
     STANDARD(1, "Standard"),
+    PIONEER(15, "Pioneer"),
     MODERN(2, "Modern"),
-    COMMANDER(3, "Commander"),
     LEGACY(4, "Legacy"),
     VINTAGE(5, "Vintage"),
     PAUPER(6, "Pauper"),
-    PIONEER(15, "Pioneer"),
-    OATHBREAKER(14, "Oathbreaker"),
-    BRAWL(13, "Brawl"),
-    HISTORIC(16, "Historic"),
-    ;
+    COMMANDER(3, "Commander") ;
+
 
     companion object {
         /**
@@ -173,7 +194,6 @@ enum class CommunityDeckFormatFilter(val apiId: Int?, val label: String) {
          * number deterministically indexes into it.
          */
         val FEATURED_ROTATION: List<CommunityDeckFormatFilter> = listOf(
-            STANDARD, MODERN, PIONEER, PAUPER, LEGACY, VINTAGE, OATHBREAKER, BRAWL, HISTORIC,
-        )
+            STANDARD, MODERN, PIONEER, PAUPER, LEGACY, VINTAGE)
     }
 }

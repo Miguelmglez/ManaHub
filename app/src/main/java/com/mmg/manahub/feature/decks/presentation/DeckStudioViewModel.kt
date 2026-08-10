@@ -26,18 +26,23 @@ import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.card.SuggestTagsUseCase
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
+import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
+import com.mmg.manahub.feature.decks.domain.engine.LandTargetResolver
+import com.mmg.manahub.feature.decks.domain.engine.ManaBaseAnalyzer
+import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
-import com.mmg.manahub.feature.decks.domain.engine.DeckMagicEngine
-import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
-import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorEvent
 import com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
+import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
-import com.mmg.manahub.feature.decks.domain.usecase.BuildDeckFromSeedsUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.CommunityAddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.DeckHealth
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
@@ -47,28 +52,21 @@ import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportOutcome
 import com.mmg.manahub.feature.decks.domain.usecase.ImportSource
 import com.mmg.manahub.feature.decks.domain.usecase.InferDeckIdentityUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.InferredIdentity
-import com.mmg.manahub.feature.decks.domain.usecase.SeedDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.SimilarDeckResult
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.WeightedCardName
 import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
 import com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase
 import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.usecase.FindCombosUseCase
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
-import com.mmg.manahub.core.model.CommunityAggregate
-import com.mmg.manahub.feature.decks.presentation.DeckStudioViewModel.Companion.MAX_SEED_CARDS
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -122,6 +120,20 @@ enum class DeckStudioTab { BUILD, SUGGESTIONS }
 
 /** Tabs of the v2 synergy browser (Deck Engine Unification plan D7, Phase 4). */
 enum class InspirationsTab { STRATEGIES, COMBOS }
+
+/**
+ * A single basic-land count adjustment recommended by [BasicLandCalculator] against a deck's
+ * current basic-land counts. Positive [delta] = add that many of [landName]; negative = remove.
+ *
+ * Originally declared in the retired `DeckMagicDetailViewModel` (deleted in the Deck Wizard &
+ * Engine Rework plan, WS7.1) — moved here since [MagicLandSuggestionItem] and this ViewModel are
+ * its only consumers now.
+ */
+data class LandDelta(
+    val landName: String,
+    val manaSymbol: String,
+    val delta: Int,
+)
 
 /**
  * UI state for the unified Deck Studio editor surface (Phase 1).
@@ -198,6 +210,23 @@ data class DeckStudioUiState(
     val isAddsLoading: Boolean = false,
     /** True once the Suggestions surface has been opened at least once (lazy first analysis). */
     val suggestionsLoaded: Boolean = false,
+    /** Deck Wizard & Engine Rework plan, Workstream 8.4 -- non-null while the FULL analysis pass
+     * is progressing (mirrors [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorState.stage]).
+     * Drives the Suggestions tab's staged progress screen (same visual language as the wizard's
+     * generating step). */
+    val doctorStage: DoctorAnalysisStage? = null,
+    /** Stages already finished this analysis pass, oldest first -- the completed-stages checklist
+     * shown under [doctorStage]'s current label. */
+    val doctorCompletedStages: List<DoctorAnalysisStage> = emptyList(),
+
+    // ── Scryfall backstop -- 3rd adds source (Deck Wizard & Engine Rework plan WS8.2) ──────────
+    /** The Suggestions tab's own "include outside collection" toggle -- see
+     * [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorState.includeOutsideCollection]'s
+     * KDoc (a SEPARATE choice from the wizard's own per-build toggle). */
+    val includeOutsideCollection: Boolean = false,
+    /** True when the toggle above is on but the last Scryfall backstop fetch failed -- [adds]
+     * still shows Motor A's (and Motor B's) results, this is a per-source degrade notice only. */
+    val outsideCollectionUnavailable: Boolean = false,
 
     // ── Motor B — community suggestions (Deck Doctor Community/Archetype plan, Phase 4) ────────
     /** Whether Motor B / the Community Hub Discover surface is enabled (`communityEngineEnabledFlow`). */
@@ -221,33 +250,11 @@ data class DeckStudioUiState(
     /** True when the current raw text failed to parse — the inline error is shown and the last valid budget is kept. */
     val budgetError: Boolean = false,
 
-    // ── Seed-build flow (Phase 3) ─────────────────────────────────────────────
-    /** Whether the "Build from seed" sheet is visible. */
-    val showSeedSheet: Boolean = false,
-    /** Currently picked seed cards (de-duped by scryfallId). */
-    val seedCards: List<Card> = emptyList(),
-    /** Seed-search text. */
-    val seedQuery: String = "",
-    /** Scryfall search results for the current seed query. */
-    val seedSearchResults: List<Card> = emptyList(),
-    /** True while a debounced seed search is in flight. */
-    val isSearchingSeeds: Boolean = false,
-    /** Inferred identity from the picked seeds (null when no seeds). */
-    val inferredIdentity: InferredIdentity? = null,
-    /** True while the seed deck is being generated + written. */
-    val isGenerating: Boolean = false,
-    /** "Use community data" toggle (Phase 5) — defaults ON only when [communityEngineEnabled] is
-     * true; ignored by [BuildDeckFromSeedsUseCase] when false (falls back to the pre-Phase-5
-     * heuristic filler unchanged). */
-    val useCommunityDataForSeed: Boolean = false,
-
     // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
-    /** Collection-synergy discoveries (Inspirations surface, Phase 4). Empty until loaded. Used
-     * when [DeckFeatureFlags.DISCOVERIES_V2_ENABLED] is off. */
-    val discoveries: List<MagicDiscovery> = emptyList(),
-    /** Deck Builder v2 Phase 5 discoveries (identity-only clustering, plan §3.5). Used when
-     * [DeckFeatureFlags.DISCOVERIES_V2_ENABLED] is on -- populated INSTEAD of [discoveries], never
-     * both (see [loadDiscoveries]). */
+    /** Discoveries (identity-only clustering: STRATEGY/ARCHETYPE tags + derived `tribe:<x>` keys)
+     * populated by [discoverSynergiesV2UseCase]. The legacy ANY-tag-category `discoveries` field
+     * (backed by `DeckMagicEngine.discoverSynergies`) was RETIRED in the Deck Wizard & Engine
+     * Rework plan, WS7.2 (2026-07-28) — this is the only discoveries list now. */
     val discoveriesV2: List<DeckDiscoveryV2> = emptyList(),
     /** Whether the Inspirations (Discoveries) bottom sheet is visible. */
     val showInspirations: Boolean = false,
@@ -297,10 +304,10 @@ data class DeckStudioUiState(
 /**
  * Drives the unified Deck Studio editor against a single live draft deck.
  *
- * Unlike [DeckMagicDetailViewModel] (an in-memory draft that flushes to Room on
- * exit), every manual operation writes straight through [DeckRepository] so the
- * live `deckId` is always the source of truth. [observeDeckWithCards] re-emits and
- * rebuilds the UI after each write.
+ * Unlike the retired `DeckMagicDetailViewModel` (an in-memory draft that flushed to Room on
+ * exit — deleted in the Deck Wizard & Engine Rework plan, WS7.1), every manual operation writes
+ * straight through [DeckRepository] so the live `deckId` is always the source of truth.
+ * [observeDeckWithCards] re-emits and rebuilds the UI after each write.
  *
  * Phase 1 scope: manual editing (add/remove/+/-/move/basic-lands/commander/
  * metadata/export) + the discard-if-empty exit contract. The Suggestions surface
@@ -321,10 +328,8 @@ class DeckStudioViewModel(
     private val inferDeckIdentityUseCase: InferDeckIdentityUseCase,
     private val suggestCutsUseCase: SuggestCutsUseCase,
     private val suggestAddsFromCollectionUseCase: SuggestAddsFromCollectionUseCase,
-    private val buildDeckFromSeedsUseCase: BuildDeckFromSeedsUseCase,
     private val getDeckGameStatsUseCase: GetDeckGameStatsUseCase,
     private val importDeckUseCase: ImportDeckUseCase,
-    private val deckMagicEngine: DeckMagicEngine,
     private val wishlistRepository: WishlistRepository,
     private val userPreferences: UserPreferencesDataStore,
     private val crashReporter: CrashReporter,
@@ -348,6 +353,18 @@ class DeckStudioViewModel(
     // existing test call site needs to change; null means the Combos tab always degrades to an
     // empty result (never a crash -- mirrors every other optional community-data dependency here).
     private val findCombosUseCase: FindCombosUseCase? = null,
+    // Deck Wizard & Engine Rework plan, Workstream 6 ("One land engine") -- appended last,
+    // nullable/defaulted so no existing test call site needs to change. `deckScorer == null` (every
+    // test call site that doesn't pass it) means calculateLandDeltas falls back to EXACTLY the
+    // pre-WS6 behavior (format.targetLandCount-based BasicLandCalculator.calculate) -- never a
+    // crash, never a silently wrong number. See calculateLandDeltas'/resolveStudioLandTarget's KDoc.
+    private val deckScorer: DeckScorer? = null,
+    private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
+    // Deck Wizard & Engine Rework plan, Workstream 8.2 -- appended last, nullable-defaulted so no
+    // existing test call site needs to change; `null` means the Suggestions tab's "include outside
+    // collection" toggle is inert (adds stays Motor-A-only regardless of the toggle's UI state).
+    // Shares the SAME CandidatePoolGenerator singleton the wizard's own build-time backstop uses.
+    private val candidatePoolGenerator: CandidatePoolGenerator? = null,
 ) : ViewModel() {
 
     /**
@@ -388,13 +405,14 @@ class DeckStudioViewModel(
         suggestAddsFromCommunityUseCase = suggestAddsFromCommunityUseCase,
         findSimilarDecksUseCase = findSimilarDecksUseCase,
         isCommunityEngineEnabled = { userPreferences.communityEngineEnabledFlow.first() },
+        candidatePoolGenerator = candidatePoolGenerator,
     )
 
     /**
      * Per-deck game statistics for the [DeckStatsCard], kept independent of [uiState]
      * so a stats update never invalidates the editor state machine.
      *
-     * Unlike [DeckMagicDetailViewModel], the live `deckId` here is resolved
+     * Unlike the retired `DeckMagicDetailViewModel`, the live `deckId` here is resolved
      * ASYNCHRONOUSLY in [init] (it may be a freshly created draft), so this flow keys
      * off `uiState.deck?.id` — which becomes non-null only after [observeDeck] emits,
      * i.e. once `deckId` exists — rather than off a synchronous SavedStateHandle id.
@@ -460,6 +478,10 @@ class DeckStudioViewModel(
                         isSuggestionsLoading = doctorState.isSuggestionsLoading,
                         isAddsLoading = doctorState.isAddsLoading,
                         suggestionsLoaded = doctorState.isLoaded,
+                        doctorStage = doctorState.stage,
+                        doctorCompletedStages = doctorState.completedStages,
+                        includeOutsideCollection = doctorState.includeOutsideCollection,
+                        outsideCollectionUnavailable = doctorState.outsideCollectionUnavailable,
                         communityAdds = doctorState.communityAdds,
                         similarDecks = doctorState.similarDecks,
                         isCommunityLoading = doctorState.isCommunityLoading,
@@ -530,46 +552,38 @@ class DeckStudioViewModel(
 
     /**
      * Computes collection-synergy discoveries off the user's collection for the Inspirations
-     * surface. Mirrors `DeckMagicViewModel.loadDiscoveries()`: feeds the RAW `observeCollection()`
-     * items (List<UserCardWithCard>) to the engine. A failure logs + records and leaves the
-     * discovery list empty — never fatal.
+     * surface, via [discoverSynergiesV2UseCase] (identity-only clustering — STRATEGY/ARCHETYPE
+     * tags + derived `tribe:<x>` keys). A failure logs + records and leaves the discovery list
+     * empty — never fatal.
      *
-     * Deck Builder v2 Phase 5: when [DeckFeatureFlags.DISCOVERIES_V2_ENABLED] is on AND
-     * [discoverSynergiesV2UseCase] was actually wired (Koin), [DeckStudioUiState.discoveriesV2] is
-     * populated INSTEAD of the legacy [DeckStudioUiState.discoveries] — never both, so the sheet
-     * content branch (see `DeckStudioScreen.kt`) always has exactly one list to render.
+     * The legacy `DeckMagicEngine.discoverSynergies` path (ANY-tag-category clustering, mixing
+     * STRATEGY/TYPE/KEYWORD indiscriminately — the exact "presentation mixes the axes" bug the v2
+     * clustering was built to fix) was RETIRED in the Deck Wizard & Engine Rework plan, WS7.2
+     * (2026-07-28), together with `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` (v2 is now the only
+     * path). [discoverSynergiesV2UseCase] stays nullable/defaulted for test-constructor
+     * convenience only — a `null` value degrades to an empty [DeckStudioUiState.discoveriesV2]
+     * (never a crash), mirroring every other optional community-data dependency here.
      */
     private fun loadDiscoveries() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingDiscoveries = true) }
             val v2UseCase = discoverSynergiesV2UseCase
-            if (DeckFeatureFlags.DISCOVERIES_V2_ENABLED && v2UseCase != null) {
-                runCatching {
-                    val collection = userCardRepository.observeCollection().first()
-                    v2UseCase(collection)
-                }.onSuccess { discoveries ->
-                    // 4.2: filteredDiscoveriesV2 starts equal to the full list (no search active
-                    // yet) -- recomputeFilteredDiscoveries() re-derives it from state whenever the
-                    // user actually searches, so this is just the correct initial value.
-                    _uiState.update { it.copy(discoveriesV2 = discoveries, filteredDiscoveriesV2 = discoveries, isLoadingDiscoveries = false) }
-                }.onFailure { t ->
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("deck_studio_discovery_v2_seeding_failed")
-                        recordException(RuntimeException("[DeckStudio] deck_studio_discovery_v2_seeding_failed", t))
-                    }
-                    _uiState.update { it.copy(isLoadingDiscoveries = false) }
-                }
+            if (v2UseCase == null) {
+                _uiState.update { it.copy(isLoadingDiscoveries = false) }
                 return@launch
             }
             runCatching {
                 val collection = userCardRepository.observeCollection().first()
-                deckMagicEngine.discoverSynergies(collection)
+                v2UseCase(collection)
             }.onSuccess { discoveries ->
-                _uiState.update { it.copy(discoveries = discoveries, isLoadingDiscoveries = false) }
+                // 4.2: filteredDiscoveriesV2 starts equal to the full list (no search active
+                // yet) -- recomputeFilteredDiscoveries() re-derives it from state whenever the
+                // user actually searches, so this is just the correct initial value.
+                _uiState.update { it.copy(discoveriesV2 = discoveries, filteredDiscoveriesV2 = discoveries, isLoadingDiscoveries = false) }
             }.onFailure { t ->
                 FirebaseCrashlytics.getInstance().apply {
-                    log("deck_studio_discovery_seeding_failed")
-                    recordException(RuntimeException("[DeckStudio] deck_studio_discovery_seeding_failed", t))
+                    log("deck_studio_discovery_v2_seeding_failed")
+                    recordException(RuntimeException("[DeckStudio] deck_studio_discovery_v2_seeding_failed", t))
                 }
                 _uiState.update { it.copy(isLoadingDiscoveries = false) }
             }
@@ -580,10 +594,28 @@ class DeckStudioViewModel(
 
     private fun observeDeck() {
         deckRepository.observeDeckWithCards(deckId)
+            .distinctUntilChanged()
             .onEach { deckWithCards ->
                 if (deckWithCards == null) {
                     _uiState.update { it.copy(isLoading = false) }
                     return@onEach
+                }
+
+                // WS4a finding 4 (Backend & Performance Optimization plan, 2026-07-28): batch-
+                // resolve every mainboard/sideboard id BEFORE building entries. resolveCard() below
+                // used to be called per-slot inside a sequential map -- up to N Room/network
+                // round-trips for an N-card deck, re-fired on every content-changing
+                // observeDeckWithCards emission. warmCacheForIds + getCardsByIds mirrors the
+                // FriendRepositoryImpl N+1 fix (WS1+WS3): only ids missing from the in-memory
+                // cardCache are resolved, and only via Room (no per-id network fallback here) --
+                // resolveCard() still covers any id Room can't resolve as a last-resort fallback.
+                val unresolvedIds = (deckWithCards.mainboard.map { it.scryfallId } + deckWithCards.sideboard.map { it.scryfallId })
+                    .distinct()
+                    .filterNot { cardCache.containsKey(it) }
+                if (unresolvedIds.isNotEmpty()) {
+                    cardRepository.warmCacheForIds(unresolvedIds)
+                    val resolved = cardRepository.getCardsByIds(unresolvedIds).associateBy { it.scryfallId }
+                    cardCache = cardCache + resolved
                 }
 
                 val mainEntries = deckWithCards.mainboard.map { slot ->
@@ -605,6 +637,7 @@ class DeckStudioViewModel(
 
     private fun observeCollection() {
         userCardRepository.observeCollection()
+            .distinctUntilChanged()
             .onEach { collection ->
                 collectionCards = collection.map { it.card }.distinctBy { it.scryfallId }.sortedBy { it.name }
                 _uiState.update { it.copy(collectionIds = collectionCards.map { c -> c.scryfallId }.toSet()) }
@@ -672,7 +705,7 @@ class DeckStudioViewModel(
                 manaCurve = calculateManaCurve(allEntries),
                 landDeltas = calculateLandDeltas(
                     entries = allEntries,
-                    formatName = deck.format,
+                    deck = deck,
                     commanderIdentity = commanderColorIdentity,
                 ),
                 overLimitCards = overLimit,
@@ -704,15 +737,26 @@ class DeckStudioViewModel(
     /**
      * Computes the per-color basic-land deltas between the [BasicLandCalculator] recommendation
      * and the deck's current basic-land counts. A positive delta = add that many of the land; a
-     * negative delta = remove that many. Ported from [DeckMagicDetailViewModel.calculateLandDeltas]
-     * (identical math; this VM only reads from resolved [DeckSlotEntry]s instead of an in-memory map).
+     * negative delta = remove that many. Originally ported from the retired
+     * `DeckMagicDetailViewModel.calculateLandDeltas` (identical math; this VM only reads from
+     * resolved [DeckSlotEntry]s instead of an in-memory map).
+     *
+     * WS6 (One land engine, `docs/plans/deck-wizard-rework-plan.md`): the TOTAL land target now
+     * comes from [LandTargetResolver] (via [resolveStudioLandTarget]) -- the SAME resolver
+     * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase] uses at build
+     * time -- instead of [BasicLandCalculator]'s convenience overload that hardcodes
+     * [DeckFormat.targetLandCount] (archetype-blind, `dynamicLandIdeal`-blind). [deckScorer] is
+     * `null` at every existing test call site (a nullable-defaulted, appended-last constructor
+     * param): that falls back to EXACTLY the pre-WS6 behavior, never a crash. A failure resolving
+     * the WS6 land target (defensive; should not happen in practice) also falls back to the legacy
+     * path rather than propagating.
      */
     private fun calculateLandDeltas(
         entries: List<DeckSlotEntry>,
-        formatName: String,
+        deck: Deck,
         commanderIdentity: Set<String>? = null,
     ): List<LandDelta> {
-        val format = DeckFormat.entries.firstOrNull { it.name.equals(formatName, ignoreCase = true) }
+        val format = DeckFormat.entries.firstOrNull { it.name.equals(deck.format, ignoreCase = true) }
             ?: DeckFormat.CASUAL
 
         val deckCards = entries.filter { it.card != null && !it.isSideboard }
@@ -721,12 +765,35 @@ class DeckStudioViewModel(
         val nonBasicLands = deckCards.filter { !BasicLandCalculator.isBasicLand(it.card) && BasicLandCalculator.isLand(it.card) }
         val mainboardNonLands = deckCards.filter { !BasicLandCalculator.isLand(it.card) }
 
-        val suggestedMap = BasicLandCalculator.calculate(
-            mainboard = mainboardNonLands,
-            nonBasicLands = nonBasicLands,
-            format = format,
-            commanderIdentity = commanderIdentity,
-        ).toMap()
+        val scorer = deckScorer
+        val distribution = if (scorer != null) {
+            runCatching {
+                val landTarget = resolveStudioLandTarget(scorer, format, deck, mainboardNonLands, commanderIdentity)
+                BasicLandCalculator.calculate(
+                    mainboard = mainboardNonLands,
+                    nonBasicLands = nonBasicLands,
+                    totalLandTarget = landTarget,
+                    commanderIdentity = commanderIdentity,
+                )
+            }.getOrElse { t ->
+                crashReporter.log("deck_studio_land_target_resolve_failed")
+                crashReporter.recordException(RuntimeException("[DeckStudioViewModel] deck_studio_land_target_resolve_failed", t))
+                BasicLandCalculator.calculate(
+                    mainboard = mainboardNonLands,
+                    nonBasicLands = nonBasicLands,
+                    format = format,
+                    commanderIdentity = commanderIdentity,
+                )
+            }
+        } else {
+            BasicLandCalculator.calculate(
+                mainboard = mainboardNonLands,
+                nonBasicLands = nonBasicLands,
+                format = format,
+                commanderIdentity = commanderIdentity,
+            )
+        }
+        val suggestedMap = distribution.toMap()
 
         val currentCounts = mutableMapOf<String, Int>()
         entries.filter { it.card != null && !it.isSideboard && BasicLandCalculator.isBasicLand(it.card!!) }
@@ -741,6 +808,74 @@ class DeckStudioViewModel(
             }
         }
         return deltas
+    }
+
+    /**
+     * WS6 (One land engine): resolves the land target the SAME way
+     * [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase] does at build
+     * time -- [LandTargetResolver.resolve] over a resolved [ArchetypeSkeletonResolver] skeleton (or
+     * `null` for the GENERIC-with-no-themes case) plus a [DeckScorer.profile] snapshot of the
+     * mainboard.
+     *
+     * The archetype/themes come from [Deck.archetypeOverride]/[Deck.themesOverride] -- the RAW
+     * persisted pin the wizard itself wrote at build time via `template.archetypeInfo`, mapped
+     * defensively via `entries.firstOrNull` (same pattern as
+     * [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator.pinSeedTags]) --
+     * deliberately NOT a re-inferred/Doctor-evaluated identity (`DeckHealth.archetypeResolution`),
+     * since that requires [DeckDoctorOrchestrator]'s async analysis state, which may not be loaded
+     * yet when [rebuildUiState] fires, AND because the raw override is exactly what the wizard used
+     * for its OWN final land-target recompute -- the correct basis for byte-identical agreement.
+     *
+     * Color count is derived via [deriveStudioColorIdentity] (mirrors
+     * [com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase.deriveColorIdentity]) --
+     * a placeholder/simplification WS9 (color-identity/count awareness) will revisit.
+     */
+    private fun resolveStudioLandTarget(
+        scorer: DeckScorer,
+        format: DeckFormat,
+        deck: Deck,
+        mainboardNonLands: List<DeckCard>,
+        commanderIdentitySymbols: Set<String>?,
+    ): Int {
+        val archetype = deck.archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
+            ?: ArchetypeId.GENERIC
+        val themes = deck.themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
+        val colorIdentity = deriveStudioColorIdentity(mainboardNonLands, commanderIdentitySymbols)
+        val archetypeFormat = ArchetypeFormat.of(format)
+        val skeleton = if (archetypeFormat == null || (archetype == ArchetypeId.GENERIC && themes.isEmpty())) {
+            null
+        } else {
+            ArchetypeSkeletonResolver.resolveWithColor(
+                format = archetypeFormat,
+                archetype = archetype,
+                themes = themes,
+                identity = colorIdentity,
+            )
+        }
+        val mainboardEntries = mainboardNonLands.map { deckCard ->
+            DeckEntry(card = deckCard.card, quantity = deckCard.quantity, isOwned = true, isSideboard = false)
+        }
+        val profile = scorer.profile(mainboard = mainboardEntries, format = format, colorIdentity = colorIdentity, seedTags = emptyList())
+        return LandTargetResolver.resolve(
+            format = format,
+            archetypeSkeleton = skeleton,
+            profile = profile,
+            manaBaseAnalyzer = manaBaseAnalyzer,
+        )
+    }
+
+    /**
+     * Mirrors [com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase.deriveColorIdentity]
+     * (private there, so re-derived here rather than exposed): union of [mainboardNonLands]' own
+     * [Card.colorIdentity] symbols plus the commander's, mapped to [ManaColor] -- only WUBRG maps,
+     * "C"/unknown symbols are dropped (an empty result correctly means "no color restriction").
+     */
+    private fun deriveStudioColorIdentity(mainboardNonLands: List<DeckCard>, commanderIdentitySymbols: Set<String>?): Set<ManaColor> {
+        val symbols = buildSet {
+            mainboardNonLands.forEach { addAll(it.card.colorIdentity) }
+            commanderIdentitySymbols?.let { addAll(it) }
+        }
+        return symbols.mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) } }.toSet()
     }
 
     /**
@@ -1300,12 +1435,6 @@ class DeckStudioViewModel(
     //  collectors in [init]).
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** The debounced seed-search job (Phase 3); cancelled on each new keystroke / sheet close. */
-    private var seedSearchJob: Job? = null
-
-    /** The in-flight seed-generation job (Phase 3); cancelled when the seed sheet is closed (M6). */
-    private var generateJob: Job? = null
-
     // ── Budget free-text (U7) ─────────────────────────────────────────────────
 
     /**
@@ -1452,6 +1581,17 @@ class DeckStudioViewModel(
     }
 
     /**
+     * Deck Wizard & Engine Rework plan WS8.2: the Suggestions tab's own "include outside
+     * collection" toggle (a SEPARATE choice from the wizard's per-build one). Delegates straight
+     * to [DeckDoctorOrchestrator.setIncludeOutsideCollection], which re-ranks `adds` incrementally
+     * (no full [DeckDoctorOrchestrator.loadAnalysis] reload needed — only the ADD candidate
+     * sources change, never the deck's health/cuts).
+     */
+    fun onToggleIncludeOutsideCollection(enabled: Boolean) {
+        deckDoctorOrchestrator.setIncludeOutsideCollection(enabled, _uiState.value.budgetConstraints)
+    }
+
+    /**
      * Deck Engine Unification plan (D4): the deck's own explicit "Unlock strategy" action (Studio
      * shows a confirmation dialog before calling this — see [DeckStudioScreen]). Delegates straight
      * to [DeckDoctorOrchestrator.unlockStrategy], which flips `Deck.strategyLocked` off and re-runs a
@@ -1477,225 +1617,6 @@ class DeckStudioViewModel(
             // Suggestions the inline error doesn't linger from a previous editing session.
             _uiState.update { it.copy(budgetError = false) }
         }
-    }
-
-    // ── Seed-build flow (Phase 3) ─────────────────────────────────────────────
-
-    fun openSeedSheet() {
-        // Phase 5: default the "Use community data" toggle ON only when the master flag is on.
-        _uiState.update { it.copy(showSeedSheet = true, useCommunityDataForSeed = it.communityEngineEnabled) }
-    }
-
-    /** Toggles the seed sheet's "Use community data" switch (Phase 5). No-op UI-wise when the
-     * master flag is off — the sheet hides the toggle entirely in that case. */
-    fun toggleUseCommunityDataForSeed() =
-        _uiState.update { it.copy(useCommunityDataForSeed = !it.useCommunityDataForSeed) }
-
-    fun closeSeedSheet() {
-        seedSearchJob?.cancel()
-        // M6: cancel any in-flight generation so dismissing the sheet doesn't leave a build
-        // running (which would later write cards into a deck the user backed out of) and
-        // reset the spinner.
-        generateJob?.cancel()
-        _uiState.update {
-            it.copy(
-                showSeedSheet = false,
-                seedQuery = "",
-                seedSearchResults = emptyList(),
-                isSearchingSeeds = false,
-                isGenerating = false,
-            )
-        }
-    }
-
-    /** Debounced Scryfall seed search (mirrors DeckMagicViewModel.onSeedQueryChange). */
-    fun onSeedQueryChange(query: String) {
-        _uiState.update { it.copy(seedQuery = query) }
-        seedSearchJob?.cancel()
-        if (query.trim().length < SEED_QUERY_MIN_LENGTH) {
-            _uiState.update { it.copy(seedSearchResults = emptyList(), isSearchingSeeds = false) }
-            return
-        }
-        seedSearchJob = viewModelScope.launch {
-            delay(SEED_SEARCH_DEBOUNCE_MS)
-            _uiState.update { it.copy(isSearchingSeeds = true) }
-            val results = when (val res = searchCardsUseCase(query.trim())) {
-                is DataResult.Success -> res.data.cards
-                is DataResult.Error -> emptyList()
-            }
-            _uiState.update { it.copy(seedSearchResults = results, isSearchingSeeds = false) }
-        }
-    }
-
-    /** Adds a seed (de-duped by scryfallId) and re-infers identity. */
-    fun addSeed(card: Card) {
-        // M7: compute the inferred identity OUTSIDE the update lambda. _uiState.update may
-        // re-run its block under contention, and inferDeckIdentityUseCase is non-trivial work
-        // that must not execute more than once per state change.
-        val current = _uiState.value.seedCards
-        if (current.any { it.scryfallId == card.scryfallId }) return
-        val seeds = current + card
-        val identity = inferDeckIdentityUseCase(seeds)
-        _uiState.update { it.copy(seedCards = seeds, inferredIdentity = identity) }
-    }
-
-    /** Removes a seed and re-infers identity (null when empty). */
-    fun removeSeed(card: Card) {
-        // M7: identity inference computed outside the update lambda (see addSeed).
-        val seeds = _uiState.value.seedCards.filterNot { it.scryfallId == card.scryfallId }
-        val identity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds)
-        _uiState.update { it.copy(seedCards = seeds, inferredIdentity = identity) }
-    }
-
-    /**
-     * Generates a deck from the picked seeds and writes it INTO the live draft deck.
-     *
-     * Double-tap guard: the snapshot is captured atomically INSIDE [_uiState.update] so two
-     * rapid taps can't both pass the `isGenerating` check (mirrors DeckMagicViewModel).
-     *
-     * On success the seeds are cleared, the sheet is closed and the Build tab is selected; the
-     * caller's [onComplete] fires the SUCCESS toast with the number of cards written. On failure
-     * the sheet stays open so the user can retry.
-     *
-     * @param onComplete invoked with the number of mainboard cards actually written.
-     */
-    fun generateFromSeeds(onComplete: (Int) -> Unit) {
-        var captured: DeckStudioUiState? = null
-        _uiState.update { s ->
-            if (s.seedCards.isEmpty() || s.isGenerating) return@update s
-            captured = s
-            s.copy(isGenerating = true)
-        }
-        val snapshot = captured ?: return
-
-        // L5: a failed draft creation returns early in init without initializing `deckId`.
-        // Guard the lateinit access here so a generate tap on a half-created studio surfaces a
-        // toast instead of throwing UninitializedPropertyAccessException.
-        if (!::deckId.isInitialized) {
-            _uiState.update { it.copy(isGenerating = false) }
-            viewModelScope.launch {
-                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_seed_build_failed)))
-            }
-            return
-        }
-
-        generateJob = viewModelScope.launch {
-            val crashlytics = FirebaseCrashlytics.getInstance()
-            crashlytics.log("deck_studio_seed_build_started")
-
-            val writtenCount = runCatching {
-                val format = deckFormat ?: DeckFormat.CASUAL
-                val identity = snapshot.inferredIdentity ?: inferDeckIdentityUseCase(snapshot.seedCards)
-                // REUSE the Phase-2 free-text budget state (never a separate budget here).
-                val constraints = snapshot.budgetConstraints
-                val collection = userCardRepository.observeCollection().first().map { it.card }
-                val weights = userPreferences.observeScoreWeightOverrides().first().toScoreWeights()
-                // Phase 5: an OPTIONAL community-aggregate priority pool for the seeds' own
-                // commander (Commander format) / signature cards (60-card). ANY failure here
-                // (Worker down, no aggregate for an obscure seed) degrades to an empty pool —
-                // the seed build below NEVER fails because of this, it just falls back to the
-                // pre-Phase-5 heuristic fill order (see BuildDeckFromSeedsUseCase's KDoc).
-                val communityPool = communityPoolForSeeds(snapshot.useCommunityDataForSeed, snapshot.seedCards, format)
-                val seedResult: SeedDeckResult = buildDeckFromSeedsUseCase(
-                    seeds = snapshot.seedCards,
-                    identity = identity,
-                    format = format,
-                    constraints = constraints,
-                    collection = collection,
-                    weights = weights,
-                    communityPool = communityPool,
-                )
-
-                // U8: write straight through the repository, one card per copy. A coroutine
-                // cancellation mid-loop leaves a PARTIAL write — this is ACCEPTABLE (the live
-                // deck is the source of truth and the user reviews the result on the Build tab);
-                // we intentionally do NOT add a batch repo method.
-                var written = 0
-                seedResult.mainboard.forEach { magicCard ->
-                    val card = magicCard.card
-                    // Cache the generated card so the observe rebuild resolves it without a re-fetch.
-                    cardCache = cardCache + (card.scryfallId to card)
-                    // H1: write the engine-recommended copy count, not a hard-coded 1 (the seed
-                    // engine may recommend multiples of a card in 60-card formats).
-                    val copies = magicCard.quantity.coerceAtLeast(1)
-                    deckRepository.addCardToDeck(deckId, card.scryfallId, copies, false)
-                    written += copies
-                }
-                // seedResult.reservedLandSlots land slots are INTENTIONALLY left for the user to
-                // fill via the existing BasicLandsSheet: BuildDeckFromSeedsUseCase deliberately does
-                // NOT materialize lands (no color-distribution logic lives in the studio), so
-                // auto-adding basics here would invent a mana base. Per the use-case contract,
-                // lands are out of scope and `written` is the spell count only.
-                written
-            }.getOrElse { t ->
-                logFailure("deck_studio_seed_build_failed", t)
-                _uiState.update { it.copy(isGenerating = false) }
-                // Sheet stays open so the user can retry.
-                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_seed_build_failed)))
-                return@launch
-            }
-
-            // Refresh suggestions lazily: the next Suggestions open re-runs loadAnalysis()
-            // against the new cards (consistent with every other manual mutation). Done
-            // unconditionally — even a zero-card build invalidates the prior analysis.
-            invalidateSuggestions()
-
-            // M5: a successful build that wrote zero cards means the engine found nothing
-            // within the active budget (distinct from an engine error, handled in getOrElse
-            // above). Surface a budget-specific toast and keep the sheet open so the user can
-            // raise the budget / add seeds, instead of silently closing on an empty result.
-            if (writtenCount == 0) {
-                crashlytics.log("deck_studio_seed_build_no_results")
-                _uiState.update { it.copy(isGenerating = false) }
-                _events.send(DeckStudioEvent.ShowToast(appContext.getString(R.string.deck_studio_seed_build_no_results)))
-                return@launch
-            }
-
-            crashlytics.log("deck_studio_seed_build_succeeded")
-            _uiState.update {
-                it.copy(
-                    isGenerating = false,
-                    showSeedSheet = false,
-                    seedCards = emptyList(),
-                    seedQuery = "",
-                    seedSearchResults = emptyList(),
-                    inferredIdentity = null,
-                    selectedTab = DeckStudioTab.BUILD,
-                )
-            }
-            onComplete(writtenCount)
-        }
-    }
-
-    /**
-     * Fetches an OPTIONAL community-aggregate priority pool for [BuildDeckFromSeedsUseCase] (Phase
-     * 5) — a NO-OP (empty list) when [useCommunityData] is false, [communityAggregateRepository]
-     * was never wired (Koin didn't inject it), or no seed is commander-eligible / no signature
-     * cards exist. ANY exception is swallowed (returns empty) — this is a pure enhancement, never a
-     * seed-build blocker (mirrors the class-wide "Motor B never blocks the primary path" rule).
-     */
-    private suspend fun communityPoolForSeeds(
-        useCommunityData: Boolean,
-        seeds: List<Card>,
-        format: DeckFormat,
-    ): List<WeightedCardName> {
-        val repository = communityAggregateRepository ?: return emptyList()
-        if (!useCommunityData || seeds.isEmpty()) return emptyList()
-        return runCatching {
-            val cards: List<com.mmg.manahub.core.model.AggregateCardEntry> = if (format == DeckFormat.COMMANDER) {
-                val commanderSeed = seeds.firstOrNull {
-                    it.typeLine.contains("Legendary", ignoreCase = true) &&
-                        it.typeLine.contains("Creature", ignoreCase = true)
-                } ?: return emptyList()
-                (repository.getCommanderAggregate(commanderSeed.name) as? DataResult.Success)?.data?.cards.orEmpty()
-            } else {
-                val signature = seeds.map { it.name }.distinct().sorted().take(3)
-                if (signature.isEmpty()) return emptyList()
-                val result = repository.getSixtyAggregate(signature, SEED_COMMUNITY_ARCHIDEKT_FORMAT_ID)
-                (result as? DataResult.Success)?.data?.let { it as? CommunityAggregate.Sixty.Materialized }?.cards.orEmpty()
-            }
-            cards.map { WeightedCardName(name = it.name, weight = it.synergy) }
-        }.getOrDefault(emptyList())
     }
 
     // ── Inspirations (Discoveries, Phase 4) ───────────────────────────────────
@@ -1829,37 +1750,6 @@ class DeckStudioViewModel(
             .toMap()
     }
 
-    /**
-     * Seeds the studio from a collection discovery: pre-populates [DeckStudioUiState.seedCards]
-     * from the discovery's cards (de-duped and capped at [MAX_SEED_CARDS]), sets the inferred
-     * identity from those seeds, closes the Inspirations sheet, and OPENS the seed sheet.
-     *
-     * The user still taps Generate — we deliberately do NOT auto-generate (R3/U9). We re-infer
-     * identity from the seed cards (consistent with [addSeed]/[removeSeed]) rather than using
-     * the discovery's `primaryTag` directly, so the seed sheet shows the same identity shape.
-     */
-    fun startFromDiscovery(discovery: MagicDiscovery) {
-        // H2: MERGE the discovery's cards into any seeds the user already picked (de-duped by
-        // scryfallId) rather than overwriting them — opening Inspirations after manually adding
-        // seeds must not silently discard the manual picks. Capped at MAX_SEED_CARDS.
-        val discoverySeeds = discovery.cards.map { it.card }
-        val seeds = (_uiState.value.seedCards + discoverySeeds)
-            .distinctBy { it.scryfallId }
-            .take(MAX_SEED_CARDS)
-        // M7: identity inference computed outside the update lambda (see addSeed).
-        val identity = if (seeds.isEmpty()) null else inferDeckIdentityUseCase(seeds)
-        _uiState.update {
-            it.copy(
-                showInspirations = false,
-                showSeedSheet = true,
-                seedCards = seeds,
-                inferredIdentity = identity,
-                seedQuery = "",
-                seedSearchResults = emptyList(),
-            )
-        }
-    }
-
     private fun logFailure(tag: String, t: Throwable) {
         FirebaseCrashlytics.getInstance().apply {
             log("$tag: deckId=${if (::deckId.isInitialized) deckId else "uninitialized"}")
@@ -1872,23 +1762,9 @@ class DeckStudioViewModel(
     }
 
     private companion object {
-        /** Cap on auto-selected identity seed cards (plus the commander) so one card can't skew the seed. */
-        const val MAX_SEED_CARDS = 8
-
-        /** Minimum seed-query length before a Scryfall search fires (mirrors DeckMagicViewModel). */
-        const val SEED_QUERY_MIN_LENGTH = 2
-
         /** Cap on distinct combo card names resolved to full [Card]s per [loadCombos] call, so a
          * large combo result can't burst an unbounded number of concurrent Scryfall lookups. */
         const val MAX_COMBO_CARDS_TO_RESOLVE = 40
-
-        /** Debounce before a seed search runs, in ms (mirrors DeckMagicViewModel). */
-        const val SEED_SEARCH_DEBOUNCE_MS = 400L
-
-        /** Archidekt's "Custom" format id — best-effort proxy for ManaHub's generic 60-card CASUAL
-         * format (mirrors [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator
-         * .SIXTY_ARCHIDEKT_FORMAT_ID]). */
-        const val SEED_COMMUNITY_ARCHIDEKT_FORMAT_ID = 7
 
         /** Detects a pasted deckstats.net deck URL in the Studio's plain-text import field
          * (Phase 6, D17) — a cheap containment check, not a full URL parse (that happens inside

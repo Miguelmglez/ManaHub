@@ -20,11 +20,23 @@ class ArchidektClient(
      * `docs/adr/ADR-004-community-api-contracts.md` §1b). Only non-null/non-empty
      * [CommunityDeckSearchFilters] fields are sent — `deckTags` is intentionally never exposed
      * (confirmed to always statement-timeout).
+     *
+     * @throws IllegalArgumentException if [CommunityDeckSearchFilters.cardNames] carries more than
+     *   one card — Archidekt's API only accepts a single `cardName` param; repeated `cardName`
+     *   params reliably statement-timeout server-side (verified live 2026-07-24, see the ADR §1).
+     *   Multi-card filtering must be decomposed by the caller before reaching this client — see
+     *   [com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl.searchDecksMultiCard].
      */
-    suspend fun searchDecks(filters: CommunityDeckSearchFilters): ArchidektSearchResultDto =
-        httpClient.get("${baseUrl}api/decks/v3/") {
+    suspend fun searchDecks(filters: CommunityDeckSearchFilters): ArchidektSearchResultDto {
+        require(filters.cardNames.size <= 1) {
+            "ArchidektClient.searchDecks only accepts a single cardName per request (repeated " +
+                "cardName params reliably statement-timeout server-side) — caller must decompose " +
+                "multi-card filtering into one search per card, see " +
+                "CommunityDecksRepositoryImpl.searchDecksMultiCard."
+        }
+        return httpClient.get("${baseUrl}api/decks/v3/") {
             filters.deckName?.let { parameter("name", it) }
-            filters.cardName?.let { parameter("cardName", it) }
+            filters.cardNames.singleOrNull()?.let { parameter("cardName", it) }
             filters.commanderName?.let { parameter("commanderName", it) }
             filters.ownerUsername?.let { parameter("ownerUsername", it) }
             filters.deckFormatId?.let { parameter("deckFormat", it) }
@@ -36,4 +48,5 @@ class ArchidektClient(
             parameter("page", filters.page)
             parameter("pageSize", filters.pageSize)
         }.body()
+    }
 }

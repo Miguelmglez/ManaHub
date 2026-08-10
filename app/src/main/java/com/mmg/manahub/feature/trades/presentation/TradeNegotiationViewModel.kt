@@ -167,6 +167,7 @@ class TradeNegotiationViewModel(
         }
         viewModelScope.launch {
             friendRepository.observeFriends()
+                .distinctUntilChanged()
                 .catch { /* friends are supplementary for display only */ }
                 .collect { friends ->
                     val names = friends.associate { it.userId to it.nickname }
@@ -175,6 +176,7 @@ class TradeNegotiationViewModel(
         }
         viewModelScope.launch {
             getThread(rootProposalId)
+                .distinctUntilChanged()
                 .catch { _uiState.update { s -> s.copy(isLoading = false) } }
                 .collect { thread ->
                     _uiState.update { s -> s.copy(thread = thread, isLoading = false) }

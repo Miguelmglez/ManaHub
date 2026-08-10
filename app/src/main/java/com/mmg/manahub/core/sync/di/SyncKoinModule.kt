@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.sync.di
 
 import com.mmg.manahub.core.data.local.dao.StatsDao
+import com.mmg.manahub.core.sync.CardBackfillWorker
 import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
 import com.mmg.manahub.core.sync.PriceRefreshWorker
 import org.koin.android.ext.koin.androidContext
@@ -37,8 +38,12 @@ import org.koin.dsl.module
  * dispatches to Koin's `KoinWorkerFactory` alongside the still-Hilt `HiltWorkerFactory` (the latter only
  * serves the excluded scanner's dormant `@HiltWorker`, if one is ever reinstated).
  *
+ * Backend & Performance Optimization plan, WS1+WS3 Part B item 8 (2026-07-28) added a third worker,
+ * [CardBackfillWorker] — see its own KDoc. It resolves [com.mmg.manahub.core.domain.repository.CardRepository]
+ * and [com.mmg.manahub.core.sync.SyncManager], both bridged singles in `coreBridgeKoinModule`.
+ *
  * @param statsDao the Hilt/Room-owned [StatsDao] singleton (this module only).
- * @return a Koin [Module] providing the [StatsDao] bridge and the two `worker { }` registrations.
+ * @return a Koin [Module] providing the [StatsDao] bridge and the three `worker { }` registrations.
  */
 fun syncKoinModule(statsDao: StatsDao): Module = module {
     single { statsDao }
@@ -60,6 +65,18 @@ fun syncKoinModule(statsDao: StatsDao): Module = module {
             workerParams = it.get(),
             refreshPricesUseCase = get(),
             userPreferencesDataStore = get(),
+        )
+    }
+
+    // Backend & Performance Optimization plan, WS1+WS3 Part B item 8 (2026-07-28) — see
+    // CardBackfillWorker's own KDoc. CardRepository and SyncManager are both bridged singles in
+    // coreBridgeKoinModule, resolved via get().
+    worker {
+        CardBackfillWorker(
+            appContext = androidContext(),
+            workerParams = it.get(),
+            cardRepository = get(),
+            syncManager = get(),
         )
     }
 }

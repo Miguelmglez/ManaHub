@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,19 +80,20 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * Steps 1-4 shown by [WizardStepIndicator]; GENERATING/RESULT replace the whole body instead.
- * Deck Engine Unification plan (§5 Phase 3.1) — this is now COMPUTED, not a fixed list: Commander
- * skips [WizardPhase.ENTRY] entirely (always [WizardEntryFlow.CARDS], see that enum's KDoc), and
- * Flow B/C skip [WizardPhase.IDENTITY] ([DeckWizardViewModel.onNextFromDirection] routes straight to
- * REVIEW for them) — a fixed list would show a wrong/skipped step number for either case.
+ * Steps shown by [WizardStepIndicator]; GENERATING/RESULT replace the whole body instead.
+ * Deck Engine Unification plan (§5 Phase 3.1) / Deck Wizard & Engine Rework plan (Workstream 2/3) —
+ * this is COMPUTED, not a fixed list: Commander runs `FORMAT → COMMANDER_PICK → STRATEGY →
+ * MANUAL_ADDS → REVIEW` (see [WizardPhase]'s KDoc); every Casual flow (A/B/C) now runs the SAME
+ * shape as of Workstream 3 -- `FORMAT → ENTRY → DIRECTION → MANUAL_ADDS → REVIEW`
+ * ([WizardPhase.IDENTITY] is unreachable dead code for every flow now, see
+ * [DeckWizardViewModel.onNextFromDirection]'s KDoc) -- so this no longer branches on [uiState]'s
+ * entry flow at all; kept as a function (not a `val`) for parity with the Commander branch above it.
  */
 private fun stepPhasesFor(uiState: DeckWizardUiState): List<WizardPhase> {
-    val steps = mutableListOf(WizardPhase.FORMAT)
-    if (uiState.selectedFormat != DeckFormat.COMMANDER) steps += WizardPhase.ENTRY
-    steps += WizardPhase.DIRECTION
-    if (uiState.entryFlow == WizardEntryFlow.CARDS) steps += WizardPhase.IDENTITY
-    steps += WizardPhase.REVIEW
-    return steps
+    if (uiState.selectedFormat == DeckFormat.COMMANDER) {
+        return listOf(WizardPhase.FORMAT, WizardPhase.COMMANDER_PICK, WizardPhase.STRATEGY, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
+    }
+    return listOf(WizardPhase.FORMAT, WizardPhase.ENTRY, WizardPhase.DIRECTION, WizardPhase.MANUAL_ADDS, WizardPhase.REVIEW)
 }
 
 /**
@@ -173,6 +173,31 @@ fun DeckWizardScreen(
                         WizardPhase.ENTRY -> EntryStepContent(
                             onSelect = viewModel::onSelectEntryFlow,
                         )
+                        WizardPhase.COMMANDER_PICK -> CommanderPickStepContent(
+                            uiState = uiState,
+                            onToggleColorFilter = viewModel::onToggleCommanderColorFilter,
+                            onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
+                            onQueryChange = viewModel::onCommanderQueryChange,
+                            onSelectCommander = viewModel::onSelectCommander,
+                            onClearCommander = viewModel::onClearCommander,
+                            onNext = viewModel::onNextFromCommanderPick,
+                        )
+                        WizardPhase.STRATEGY -> StrategyStepContent(
+                            uiState = uiState,
+                            onSelectArchetype = viewModel::onSelectStrategyArchetype,
+                            onToggleTheme = viewModel::onToggleStrategyTheme,
+                            onSelectTribe = viewModel::onSelectStrategyTribe,
+                            onNext = viewModel::onNextFromStrategy,
+                        )
+                        WizardPhase.MANUAL_ADDS -> ManualAddsStepContent(
+                            uiState = uiState,
+                            onQueryChange = viewModel::onManualAddsQueryChange,
+                            onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
+                            onSelectRoleFilter = viewModel::onSelectManualAddsRoleFilter,
+                            onAddSeed = viewModel::onAddSeed,
+                            onRemoveSeed = viewModel::onRemoveSeed,
+                            onNext = viewModel::onNextFromManualAdds,
+                        )
                         WizardPhase.DIRECTION -> DirectionStepContent(
                             uiState = uiState,
                             onSelectDirectionTag = viewModel::onSelectDirectionTag,
@@ -181,10 +206,12 @@ fun DeckWizardScreen(
                             onSelectCommander = viewModel::onSelectCommander,
                             onClearCommander = viewModel::onClearCommander,
                             onToggleSeedPicker = viewModel::onToggleSeedPicker,
+                            onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
                             onSeedQueryChange = viewModel::onSeedQueryChange,
                             onAddSeed = viewModel::onAddSeed,
                             onRemoveSeed = viewModel::onRemoveSeed,
                             onSelectSeedStrategyCandidate = viewModel::onSelectSeedStrategyCandidate,
+                            onToggleCardsFlowColor = viewModel::onToggleCardsFlowColor,
                             onToggleColorFlowColor = viewModel::onToggleColorFlowColor,
                             onSelectColorAffinityEntry = viewModel::onSelectColorAffinityEntry,
                             onTaxonomyQueryChange = viewModel::onTaxonomyQueryChange,
@@ -292,8 +319,8 @@ private fun WizardStepIndicator(stepIndex: Int, stepCount: Int, modifier: Modifi
     }
 }
 
-/** Sticky bottom CTA reused by every step-1-4 content composable (mirrors [com.mmg.manahub.feature
- * .decks.presentation.components.SeedsContent]'s own sticky-button pattern). */
+/** Sticky bottom CTA reused by every step-1-4 content composable (mirrors the retired legacy
+ * `SeedsContent`'s own sticky-button pattern). */
 @Composable
 internal fun WizardStickyButton(
     label: String,

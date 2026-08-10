@@ -95,6 +95,26 @@ object ArchetypeRoleClassifier {
     }
 
     /**
+     * Deck Wizard & Engine Rework plan, Workstream 2.3 -- English label for a [RoleKey] this
+     * classifier can produce (both the 5 [LEGACY_ROLE_MAP] roles and every [ROLE_SPECS] entry),
+     * used by the wizard's MANUAL_ADDS step for its role-section headers. Falls back to a humanized
+     * version of the raw key for any role key not covered here (should not happen in practice for a
+     * key that came from a real [ResolvedArchetypeSkeleton.roleTargets] map, since every possible
+     * role key this engine assigns a band to is produced by [classify] and therefore covered by one
+     * of the two tables below).
+     */
+    fun label(key: RoleKey): String = ROLE_LABELS[key] ?: key.replace('_', ' ').replaceFirstChar { it.uppercase() }
+
+    private val ROLE_LABELS: Map<RoleKey, String> = buildMap {
+        put("ramp", "Ramp")
+        put("card_draw", "Card Draw")
+        put("removal_spot", "Spot Removal")
+        put("removal_mass", "Mass Removal")
+        put("tutor", "Tutor")
+        ROLE_SPECS.forEach { spec -> put(spec.key, spec.label) }
+    }
+
+    /**
      * The full role map for one card: the 5 [LEGACY_ROLE_MAP] roles (via [RoleClassifier],
      * unmodified) plus every [ROLE_SPECS] hit (confidence > 0). Never mutates/reclassifies the
      * card; pure function.

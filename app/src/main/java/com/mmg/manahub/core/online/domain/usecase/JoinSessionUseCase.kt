@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.online.domain.usecase
 
+import com.mmg.manahub.core.online.domain.model.JoinSessionResult
 import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import javax.inject.Inject
 
@@ -10,5 +11,5 @@ class JoinSessionUseCase @Inject constructor(
         code: String,
         displayName: String,
         themeKey: String,
-    ): Result<Pair<String, Int>> = repository.joinSession(code, displayName, themeKey)
+    ): Result<JoinSessionResult> = repository.joinSession(code, displayName, themeKey)
 }

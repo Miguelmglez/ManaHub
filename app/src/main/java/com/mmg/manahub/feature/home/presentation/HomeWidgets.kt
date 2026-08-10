@@ -67,7 +67,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Whatshot
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -132,6 +131,7 @@ import com.mmg.manahub.core.ui.components.DraftSetCard
 import com.mmg.manahub.core.ui.components.NewsItemCard
 import com.mmg.manahub.core.ui.components.NewsItemOrientation
 import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
@@ -144,6 +144,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
+import com.mmg.manahub.feature.puzzle.presentation.PuzzleFeatureFlags
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -300,7 +301,7 @@ private fun WidgetLoading() {
             .heightIn(min = MediumMinHeight - 48.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(28.dp))
+        MagicLoadingSpinner(modifier = Modifier.size(28.dp))
     }
 }
 
@@ -438,11 +439,19 @@ fun HomeWidgetHost(
     // KDoc.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason as [trending];
+    // see [com.mmg.manahub.feature.home.presentation.HomeViewModel.dailyPuzzleFlow]'s KDoc.
+    dailyPuzzle: DailyPuzzleWidgetState? = null,
 ) {
     val spacing = MaterialTheme.spacing
     // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
     // in the persisted layout (so they reappear if re-enabled) but are not shown.
     if (widget.type.isGamification && !uiState.gamificationEnabled) return
+    // Daily Puzzle hidden for release (docs/hidden-features/daily-puzzle.md) — same treatment as
+    // gamification above: an existing board that already carries a DAILY_PUZZLE tile (persisted
+    // before the flag flipped) renders nothing rather than a broken/dead tile; the tile reappears
+    // once PuzzleFeatureFlags.PUZZLE_ENABLED flips back to true.
+    if (widget.type == HomeWidgetType.DAILY_PUZZLE && !PuzzleFeatureFlags.PUZZLE_ENABLED) return
     // Phase 5: silently hidden (never an error state) while there's no trending data yet / the
     // community engine is off / the Worker is unreachable — see HomeWidgetType.TRENDING_COMMANDERS'
     // KDoc.
@@ -523,6 +532,7 @@ fun HomeWidgetHost(
                 )
                 HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
                 HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
+                HomeWidgetType.DAILY_PUZZLE -> DailyPuzzleWidget(dailyPuzzle, onAction)
             }
         }
     }
@@ -549,6 +559,7 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.TRENDING_COMMANDERS -> HomeAction.OpenCommunityDecks
     HomeWidgetType.PROGRESSION_HUB -> HomeAction.OpenProfile
     HomeWidgetType.QUESTS_HUB -> HomeAction.OpenProfileQuests
+    HomeWidgetType.DAILY_PUZZLE -> HomeAction.OpenDailyPuzzle
     HomeWidgetType.QUICK_ACTIONS,
     HomeWidgetType.CARD_OF_THE_DAY,
     HomeWidgetType.RULES_TIP,
@@ -601,6 +612,60 @@ private fun TrendingCommandersWidget(
                     cardBackPainter = painterResource(Res.drawable.mtg_card_back),
                     modifier = Modifier.width(160.dp),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Daily Puzzle preview (ADR-006, Batch B2). Shows today's attempt progress (not started / N
+ * guesses so far / solved) and a Play CTA; the whole card and the CTA both navigate to
+ * [HomeAction.OpenDailyPuzzle]. Unlike [TrendingCommandersWidget] (which hides itself entirely on
+ * failure), an [DailyPuzzleWidgetState.Unavailable] state renders a real inline message — see
+ * [DailyPuzzleWidgetState]'s KDoc for why.
+ */
+@Composable
+private fun DailyPuzzleWidget(
+    dailyPuzzle: DailyPuzzleWidgetState?,
+    onAction: (HomeAction) -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    when (dailyPuzzle) {
+        null, DailyPuzzleWidgetState.Loading -> WidgetLoading()
+        DailyPuzzleWidgetState.Unavailable ->
+            WidgetEmptyBody(stringResourceSafe(R.string.home_daily_puzzle_unavailable))
+        is DailyPuzzleWidgetState.Loaded -> {
+            WidgetShell(
+                onClick = { onAction(HomeAction.OpenDailyPuzzle) },
+                onClickLabel = stringResourceSafe(R.string.widget_title_daily_puzzle),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = when {
+                            dailyPuzzle.solved ->
+                                stringResourceSafe(R.string.home_daily_puzzle_solved, dailyPuzzle.attemptsUsed)
+                            dailyPuzzle.attemptsUsed > 0 ->
+                                stringResourceSafe(R.string.home_daily_puzzle_in_progress, dailyPuzzle.attemptsUsed)
+                            else -> stringResourceSafe(R.string.home_daily_puzzle_not_started)
+                        },
+                        style = ty.bodyMedium,
+                        color = mc.textPrimary,
+                        modifier = Modifier.padding(end = spacing.sm),
+                    )
+                    MagicCtaButton(
+                        onClick = { onAction(HomeAction.OpenDailyPuzzle) },
+                        text = stringResourceSafe(R.string.home_daily_puzzle_cta),
+                        style = MagicCtaStyle.Outlined,
+                        color = MagicCtaColor.Primary,
+                    )
+                }
             }
         }
     }
@@ -2465,9 +2530,7 @@ private fun DiscoverCardsWidget(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
                     ) {
-                        CircularProgressIndicator(
-                            color = mc.primaryAccent,
-                            strokeWidth = 2.dp,
+                        MagicLoadingSpinner(
                             modifier = Modifier.size(16.dp),
                         )
                     }
@@ -3757,6 +3820,8 @@ fun HomeWidgetContainer(
     // Home widget board overhaul, TASK 5b.
     communityDecks: List<com.mmg.manahub.core.model.CommunityDeckSummary>? = null,
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
+    // Daily Puzzle (ADR-006), Batch B2.
+    dailyPuzzle: DailyPuzzleWidgetState? = null,
 ) {
     Box(modifier = modifier) {
         HomeWidgetHost(
@@ -3768,6 +3833,7 @@ fun HomeWidgetContainer(
             trending = trending,
             communityDecks = communityDecks,
             communityDecksCategory = communityDecksCategory,
+            dailyPuzzle = dailyPuzzle,
         )
     }
 }

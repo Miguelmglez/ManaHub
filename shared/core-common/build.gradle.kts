@@ -7,6 +7,8 @@
  *   - KeyValueStore       → suspend key/value persistence (Android DataStore / web localStorage).
  *   - CrashReporter       → crash/log reporting (Firebase Crashlytics on Android, no-op on web).
  *   - Page / PaginatedResult → a platform-neutral pagination model (future PagingData replacement).
+ *   - SupabaseJwt         → pure-Kotlin JWT-claim decoding (e.g. GoTrue's top-level `is_anonymous`
+ *                           claim), shared by the Android AuthRepositoryImpl and the web AuthViewModel.
  *
  * Targets/source-set/plugin setup mirror :shared:core-model (the AGP-9 KMP-library path).
  *
@@ -16,13 +18,15 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
+    // SupabaseJwt.kt parses the decoded JWT payload as JSON (kotlinx.serialization.json).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
     // ── Android target ────────────────────────────────────────────────────────────────────────
     androidLibrary {
         namespace = "com.mmg.manahub.core.common"
-        compileSdk = 37
+        compileSdk = 36
         minSdk = 29
 
         // Enable a JVM host unit-test component so commonTest runs as an Android host test
@@ -50,6 +54,8 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.coroutines.core)
+                // SupabaseJwt.kt: parses the base64url-decoded JWT payload segment as JSON.
+                implementation(libs.kotlinx.serialization.json)
             }
         }
         commonTest {
@@ -66,7 +72,10 @@ kotlin {
             }
         }
         wasmJsMain {
-            dependencies {}
+            dependencies {
+                // KeyValueStore wasmJs actual — real window.localStorage (web roadmap W1).
+                implementation(libs.kotlinx.browser)
+            }
         }
         // jvmMain intentionally has no code — no jvm-specific actual is needed by the pipeline
         // (it only consumes pure commonMain types: Card, CardTag, TagDictionaryEntry, etc.).

@@ -2,7 +2,6 @@ package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
-import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.CardEntity
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.model.CardTag
@@ -33,19 +32,24 @@ import org.junit.Test
 /**
  * Unit tests for [CardRepositoryImpl].
  *
- * Critical regression test group: "CASCADE DELETE BUG — refreshCollectionPrices".
- * The bug was that CardDao.upsert() used OnConflictStrategy.REPLACE (DELETE+INSERT),
- * which triggered the CASCADE FK on user_cards and silently wiped UserCardEntity rows.
- * The fix uses INSERT-IGNORE + @Update, which never deletes the parent row.
- * These tests verify that refreshCollectionPrices() calls upsert() (not any destructive
- * operation) and that upsert() does not invoke any delete path.
+ * The CASCADE DELETE BUG regression group that used to live here (CardDao.upsert() must use
+ * INSERT-IGNORE + @Update, NEVER OnConflictStrategy.REPLACE — REPLACE = DELETE+INSERT, which
+ * CASCADEs the FK on user_cards and silently wipes UserCardEntity rows) tested
+ * `refreshCollectionPrices()`, which was DELETED end-to-end (Backend & Performance Optimization
+ * plan, WS1+WS3 Part B item 7a, 2026-07-28) — `PriceRefreshWorker` -> `RefreshCollectionPricesUseCase`
+ * (`shared/core-data`) is now the sole price-refresh path, and it never calls `upsert`/`upsertAll`
+ * at all (it writes prices via `CardDao.updatePricesBatch`, a plain `UPDATE` with no INSERT
+ * involved, so the REPLACE-CASCADE hazard does not even apply to that path). The underlying
+ * invariant is still enforced by [CardDao]'s own `@Insert(onConflict = OnConflictStrategy.IGNORE)` +
+ * `@Update` implementation (see its class KDoc) — this file no longer needs to re-assert it via a
+ * deleted repository method. WS6 (android-unit-test-writer) should add equivalent coverage against
+ * `RefreshCollectionPricesUseCase`/`PriceRefreshWorker` instead.
  */
 class CardRepositoryImplTest {
 
     // ── Mocks ─────────────────────────────────────────────────────────────────
 
-    private val cardDao               = mockk<CardDao>(relaxed = true)
-    private val userCardCollectionDao = mockk<UserCardCollectionDao>(relaxed = true)
+    private val cardDao   = mockk<CardDao>(relaxed = true)
     private val remote    = mockk<ScryfallRemoteDataSource>()
     private val userPrefs = mockk<UserPreferencesDataStore>()
 
@@ -78,7 +82,6 @@ class CardRepositoryImplTest {
 
         repository = CardRepositoryImpl(
             cardDao               = cardDao,
-            userCardCollectionDao = userCardCollectionDao,
             remote                = remote,
             resolveCardStrategyTags = resolveCardStrategyTags,
             userPrefs             = userPrefs,
@@ -96,160 +99,10 @@ class CardRepositoryImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 1 — CASCADE DELETE BUG REGRESSION (refreshCollectionPrices)
-    //  These are the tests that would have caught the bug before the fix.
+    //  GROUP 1 — (RETIRED) CASCADE DELETE BUG REGRESSION (refreshCollectionPrices)
+    //  See the class KDoc: refreshCollectionPrices() was deleted (WS1+WS3 Part B item 7a,
+    //  2026-07-28); these 8 tests exercised it directly and were removed with it.
     // ══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `given collection has stale cards when refreshCollectionPrices succeeds then upsertAll is called not delete`() = runTest {
-        // Arrange — refreshCollectionPrices now uses getByIds (batch) + upsertAll (batch)
-        // instead of N individual getById + upsert calls.
-        val staleCard = TestFixtures.buildExpiredCard("id-stale-001")
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-stale-001")
-        // getByIds is called first to load the cached map in one query; returning empty
-        // means the card is treated as stale (null in cachedMap).
-        coEvery { cardDao.getByIds(listOf("id-stale-001")) } returns emptyList()
-        coEvery { remote.getCardsBatch(listOf("id-stale-001")) } returns Result.success(listOf(staleCard))
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: upsertAll() was called — NOT any destructive operation
-        coVerify(exactly = 1) { cardDao.upsertAll(any()) }
-        coVerify(exactly = 0) { cardDao.upsert(any()) }
-    }
-
-    @Test
-    fun `given refreshCollectionPrices succeeds then clearStale is called for each refreshed card`() = runTest {
-        // Arrange
-        val card1 = TestFixtures.buildExpiredCard("id-001")
-        val card2 = TestFixtures.buildExpiredCard("id-002")
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001", "id-002")
-        // Both cards absent from cache → both are stale
-        coEvery { cardDao.getByIds(listOf("id-001", "id-002")) } returns emptyList()
-        coEvery { remote.getCardsBatch(listOf("id-001", "id-002")) } returns
-                Result.success(listOf(card1, card2))
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: stale flag is cleared for each card that was successfully refreshed
-        coVerify(exactly = 1) { cardDao.clearStale("id-001") }
-        coVerify(exactly = 1) { cardDao.clearStale("id-002") }
-    }
-
-    @Test
-    fun `given refreshCollectionPrices succeeds then upsertAll is called once for all refreshed cards`() = runTest {
-        // Arrange — simulates multiple collection cards needing a price refresh.
-        // The new implementation batches all entities into a single upsertAll() call.
-        val ids = listOf("id-001", "id-002", "id-003")
-        val cards = ids.map { TestFixtures.buildExpiredCard(it) }
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns ids
-        // No cards in cache → all are stale
-        coEvery { cardDao.getByIds(ids) } returns emptyList()
-        coEvery { remote.getCardsBatch(ids) } returns Result.success(cards)
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: one batch upsertAll call (not N individual upserts)
-        coVerify(exactly = 1) { cardDao.upsertAll(any()) }
-        coVerify(exactly = 0) { cardDao.upsert(any()) }
-    }
-
-    @Test
-    fun `given refreshCollectionPrices succeeds then existing user tags are preserved in upserted entity`() = runTest {
-        // Arrange — card in DB already has user-saved tags stored in the JSON format used by TagRecord.
-        // The implementation reads existing tags from cachedMap (loaded via getByIds), not getById.
-        val existingEntity = TestFixtures.buildExpiredCardEntity("id-001").copy(
-            tags     = """[{"k":"removal","c":"ROLE"}]""",
-            userTags = """[{"k":"my_tag","c":"CUSTOM"}]""",
-        )
-
-        val refreshedCard = TestFixtures.buildCard("id-001")
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001")
-        // Return existing entity via the batch query so cachedMap is populated correctly.
-        coEvery { cardDao.getByIds(listOf("id-001")) } returns listOf(existingEntity)
-        coEvery { remote.getCardsBatch(listOf("id-001")) } returns Result.success(listOf(refreshedCard))
-
-        val upsertedListSlot = slot<List<CardEntity>>()
-        coEvery { cardDao.upsertAll(capture(upsertedListSlot)) } returns Unit
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: the user's custom tag is NOT wiped out — userTags must not be blank/empty
-        val captured = upsertedListSlot.captured.first()
-        assertTrue(
-            "userTags must be preserved from existing entity",
-            captured.userTags.isNotBlank() && captured.userTags != "[]"
-        )
-    }
-
-    @Test
-    fun `given empty collection when refreshCollectionPrices then no network call is made`() = runTest {
-        // Arrange
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns emptyList()
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: early return — no remote call should happen
-        coVerify(exactly = 0) { remote.getCardsBatch(any()) }
-    }
-
-    @Test
-    fun `given all collection cards are fresh when refreshCollectionPrices then no network call is made`() = runTest {
-        // Arrange — all cards are within the 24-h freshness window.
-        // getByIds returns the fresh entity, so staleIds is empty.
-        val freshEntity = TestFixtures.buildFreshCardEntity("id-fresh-001")
-
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-fresh-001")
-        coEvery { cardDao.getByIds(listOf("id-fresh-001")) } returns listOf(freshEntity)
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: staleIds is empty — no batch request made
-        coVerify(exactly = 0) { remote.getCardsBatch(any()) }
-    }
-
-    @Test
-    fun `given network fails when refreshCollectionPrices then stale cards get markStale called`() = runTest {
-        // Arrange
-        val staleEntity = TestFixtures.buildStaleCardEntity("id-001")
-
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001")
-        coEvery { cardDao.getByIds(listOf("id-001")) } returns listOf(staleEntity)
-        coEvery { remote.getCardsBatch(any()) } returns
-                Result.failure(RuntimeException("Network unavailable"))
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: card is marked stale with a reason — NOT deleted
-        coVerify(exactly = 1) { cardDao.markStale("id-001", any()) }
-        coVerify(exactly = 0) { cardDao.upsertAll(any()) }
-    }
-
-    @Test
-    fun `given batch returns subset of requested cards when refreshCollectionPrices then missing cards are marked stale`() = runTest {
-        // Arrange — two cards requested, only one returned
-        val staleEntity1 = TestFixtures.buildStaleCardEntity("id-001")
-        val staleEntity2 = TestFixtures.buildStaleCardEntity("id-002")
-
-        coEvery { userCardCollectionDao.getAllScryfallIds() } returns listOf("id-001", "id-002")
-        coEvery { cardDao.getByIds(listOf("id-001", "id-002")) } returns listOf(staleEntity1, staleEntity2)
-        val returnedCard = TestFixtures.buildCard("id-001")
-        coEvery { remote.getCardsBatch(any()) } returns Result.success(listOf(returnedCard))
-
-        // Act
-        repository.refreshCollectionPrices()
-
-        // Assert: id-001 refreshed OK, id-002 not in response → marked stale
-        coVerify(exactly = 1) { cardDao.clearStale("id-001") }
-        coVerify(exactly = 1) { cardDao.markStale("id-002", any()) }
-    }
 
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 2 — getCardById cache logic

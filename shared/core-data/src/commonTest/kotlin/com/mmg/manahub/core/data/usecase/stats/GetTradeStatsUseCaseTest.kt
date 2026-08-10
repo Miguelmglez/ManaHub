@@ -58,6 +58,10 @@ private class FakeTradesRepository(
         return refreshThreadResult(rootProposalId)
     }
 
+    // WS4a (Backend & Performance Optimization plan, 2026-07-28) added this item-only sibling to
+    // the interface -- unused by GetTradeStatsUseCase, never exercised here.
+    override suspend fun refreshItemsForThread(rootProposalId: String): Result<Unit> = error("unused")
+
     override suspend fun createProposal(
         receiverId: String,
         items: List<TradeItemRequestDto>,

@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -58,148 +57,21 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.engine.MagicDiscovery
 import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
+import com.mmg.manahub.feature.decks.presentation.DeckFeatureFlags
 import org.jetbrains.compose.resources.painterResource
-
-/** Height of the cluster-strength indicator bar track. */
-private val FitBarHeight = 6.dp
-
-/** Card-art thumbnail size for the discovery preview row. */
-private val ArtThumbWidth = 52.dp
-private val ArtThumbHeight = 38.dp
 
 /** Minimum touch-target size so each art thumbnail is tappable (≥48dp). */
 private val ArtTouchTarget = 48.dp
 
-/** The cluster size treated as a "strong" synergy when normalizing the fit bar. */
-private const val STRONG_CLUSTER_SIZE = 8f
-
 /**
- * A single collection-synergy discovery card for the Inspirations surface (Phase 4).
+ * Deck Builder v2 Phase 5 (plan §3.5) discovery row. Adds a dominant-colors mana-pip row (D11's
+ * "Build this" hands the SAME colors to the wizard) and a real member count (never a bare
+ * cluster-size proxy — [DeckDiscoveryV2.memberCount] is the ALREADY color-coherent count, computed
+ * by [com.mmg.manahub.feature.decks.domain.template.DiscoverSynergiesV2UseCase]).
  *
- * Adapted from the legacy `DiscoveryCard` (DeckMagicScreen) but rebuilt on ManaHub
- * design tokens (no raw shapes/dp-fonts/CardDefaults). [MagicDiscovery] carries no
- * numeric score, so cluster strength is represented as a labelled horizontal bar
- * (fill = cluster size / [STRONG_CLUSTER_SIZE]) rather than a bare percentage.
- *
- * @param onCardClick opens a card detail screen for the tapped art (by scryfallId).
- * @param onSeedStudio pre-seeds the studio's seed sheet from this discovery.
- */
-@Composable
-internal fun DiscoveryRow(
-    discovery: MagicDiscovery,
-    onCardClick: (String) -> Unit,
-    onSeedStudio: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = mc.backgroundSecondary,
-        shape = CardShape,
-    ) {
-        Column(modifier = Modifier.padding(spacing.md)) {
-            CardName(
-                name = discovery.label,
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-            )
-            Text(
-                text = discovery.primaryTag.label(),
-                style = ty.labelMedium,
-                color = mc.goldMtg,
-            )
-            Spacer(Modifier.height(spacing.xxs))
-            Text(
-                text = discovery.description,
-                style = ty.bodySmall,
-                color = mc.textSecondary,
-            )
-
-            // ── Fit indicator: labelled cluster-strength bar (no bare %) ──────────
-            Spacer(Modifier.height(spacing.sm))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val fillFraction = (discovery.cards.size / STRONG_CLUSTER_SIZE).coerceIn(0.1f, 1f)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(FitBarHeight)
-                        .clip(ChipShape)
-                        .background(mc.surfaceVariant),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(fillFraction)
-                            .height(FitBarHeight)
-                            .clip(ChipShape)
-                            .background(mc.primaryAccent),
-                    )
-                }
-                Spacer(Modifier.width(spacing.sm))
-                Text(
-                    text = stringResource(R.string.deck_studio_inspiration_fit, discovery.cards.size),
-                    style = ty.labelSmall,
-                    color = mc.textSecondary,
-                )
-            }
-
-            // ── Card-art preview row ──────────────────────────────────────────────
-            Spacer(Modifier.height(spacing.sm))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                items(discovery.cards.take(6), key = { it.card.scryfallId }) { magicCard ->
-                    Box(
-                        modifier = Modifier
-                            .heightIn(min = ArtTouchTarget)
-                            .clip(ChipShape)
-                            .clickable { onCardClick(magicCard.card.scryfallId) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        AsyncImage(
-                            model = magicCard.card.imageArtCrop,
-                            contentDescription = stringResource(R.string.deck_studio_inspiration_card_art),
-                            placeholder = painterResource(Res.drawable.mtg_card_back),
-                            error = painterResource(Res.drawable.mtg_card_back),
-                            fallback = painterResource(Res.drawable.mtg_card_back),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(width = ArtThumbWidth, height = ArtThumbHeight)
-                                .clip(ChipShape),
-                        )
-                    }
-                }
-            }
-
-            // ── Primary action ────────────────────────────────────────────────────
-            Spacer(Modifier.height(spacing.sm))
-            OutlinedButton(
-                onClick = onSeedStudio,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = ArtTouchTarget),
-                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                shape = ButtonShape,
-            ) {
-                Text(
-                    text = stringResource(R.string.deck_studio_inspiration_seed_studio),
-                    style = ty.labelLarge,
-                    color = mc.primaryAccent,
-                )
-            }
-        }
-    }
-}
-
-/**
- * Deck Builder v2 Phase 5 (plan §3.5) discovery row -- the [DeckDiscoveryV2] sibling of
- * [DiscoveryRow], rendered instead of it when `DeckFeatureFlags.DISCOVERIES_V2_ENABLED` is on.
- * Adds a dominant-colors mana-pip row (D11's "Build this" hands the SAME colors to the wizard) and
- * a real member count (never a bare cluster-size proxy — [DeckDiscoveryV2.memberCount] is the
- * ALREADY color-coherent count, computed by [com.mmg.manahub.feature.decks.domain.template
- * .DiscoverSynergiesV2UseCase]).
+ * The legacy `MagicDiscovery`-based `DiscoveryRow` (ANY-tag-category clustering) was RETIRED in the
+ * Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28) — this is the only discovery row now.
  *
  * @param rootCoordinates the Strategies tab's root [LayoutCoordinates] (forwarded from
  *   [InspirationsSheetContentV2]'s hosting `Box`), used so [SynergyCardTile] can report each
@@ -210,6 +82,11 @@ internal fun DiscoveryRow(
  *   inspection overlay.
  * @param onBuildThis hands off to the v2 wizard, pre-filled with this discovery's strategy/tribe
  *   hint + dominant colors (D11) -- replaces [DiscoveryRow]'s seed-sheet handoff.
+ * @param showBuildHandoff Deck Wizard & Engine Rework plan (WS 1.3, D-E): gates the "Build this"
+ *   CTA behind `DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED` -- the row itself (art, member
+ *   count, colors) always renders (read-only browsing stays available), only the hand-off action
+ *   is hidden when `false`. Defaults to the flag's current value so every existing call site keeps
+ *   working without change; pass explicitly only from a test.
  */
 @Composable
 internal fun DiscoveryRowV2(
@@ -218,6 +95,7 @@ internal fun DiscoveryRowV2(
     onCardTap: (Card, Rect) -> Unit,
     onBuildThis: () -> Unit,
     modifier: Modifier = Modifier,
+    showBuildHandoff: Boolean = DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -258,14 +136,16 @@ internal fun DiscoveryRowV2(
                 }
             }
 
-            Spacer(Modifier.height(spacing.sm))
-            OutlinedButton(
-                onClick = onBuildThis,
-                modifier = Modifier.fillMaxWidth().heightIn(min = ArtTouchTarget),
-                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                shape = ButtonShape,
-            ) {
-                Text(text = stringResource(R.string.deck_wizard_build_this), style = ty.labelLarge, color = mc.primaryAccent)
+            if (showBuildHandoff) {
+                Spacer(Modifier.height(spacing.sm))
+                OutlinedButton(
+                    onClick = onBuildThis,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = ArtTouchTarget),
+                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                    shape = ButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.deck_wizard_build_this), style = ty.labelLarge, color = mc.primaryAccent)
+                }
             }
         }
     }

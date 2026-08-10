@@ -42,8 +42,9 @@ googleid             = "1.1.1"
 
 youtube-player       = "13.0.0"
 play-app-update      = "2.1.0"
-play-review          = "2.0.1"
+play-review          = "2.0.2"
 vosk                 = "0.3.75"
+lottie              = "6.7.1"
 
 # Kotlin Multiplatform (KMP) migration — Phase 0, Spike A.
 # compose-multiplatform: JetBrains Compose Multiplatform plugin (wasmJs-capable UI). Added now so
@@ -57,6 +58,21 @@ koin = "4.2.2"
 # kotlinx-datetime — KMP date/time library replacing java.time in shared code (Phase 4).
 kotlinx-datetime = "0.6.2"
 
+# kotlinx-browser — Web roadmap W0 spike: real `window.localStorage`/DOM access on wasmJs, replacing
+# the in-memory LocalStorageKeyValueStore stub. 0.5.0 requires kotlin-stdlib >= 2.2.20-Beta2, which
+# this project's pinned Kotlin 2.3.20 satisfies. NOT the same as the `browser` alias above
+# (androidx.browser Custom Tabs, Android-only).
+kotlinx-browser = "0.5.0"
+
+# navigation-compose-multiplatform — Web roadmap W4a: the JetBrains Compose Multiplatform port of
+# androidx.navigation (group org.jetbrains.androidx.navigation), used ONLY by :webApp. This is a
+# DIFFERENT artifact from the `navigation` alias above (androidx.navigation:navigation-compose,
+# Android-only, consumed by :app) — never let the two collide on the same catalog key. 2.9.2 is the
+# latest stable (non-alpha) release on Maven Central as of this pin; it ships the STABLE
+# `NavController.bindToBrowserNavigation()` API (introduced 2.9.0, superseding the older deprecated
+# `Window.bindToNavigation()`).
+navigation-compose-multiplatform = "2.9.2"
+
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 # opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
@@ -64,6 +80,13 @@ paging-runtime   = { group = "androidx.paging", name = "paging-runtime-ktx",  ve
 paging-compose   = { group = "androidx.paging", name = "paging-compose",       version.ref = "paging" }
 room-paging      = { group = "androidx.room",   name = "room-paging",          version.ref = "room" }
 work-runtime     = { group = "androidx.work",   name = "work-runtime-ktx",     version.ref = "work" }
+# work-testing — Backend & Performance Optimization plan, WS7 Part 2 (2026-07-29): pins to the SAME
+# `work` version as work-runtime-ktx above to avoid a runtime/test classpath skew. testImplementation
+# only (app/build.gradle.kts) — provides androidx.work.testing.WorkManagerTestInitHelper + a
+# synchronous TestDriver, needed to pin the gamification gate / PriceRefreshWorker / CardBackfillWorker
+# worker behaviours a plain JVM unit test can't otherwise exercise (WorkManager's real Configuration/
+# WorkDatabase wiring).
+work-testing     = { group = "androidx.work",   name = "work-testing",         version.ref = "work" }
 hilt-work        = { group = "androidx.hilt",   name = "hilt-work",            version.ref = "hilt-work" }
 hilt-work-compiler = { group = "androidx.hilt", name = "hilt-compiler",        version.ref = "hilt-work" }
 compose-bom             = { group = "androidx.compose", name = "compose-bom",              version.ref = "compose-bom" }
@@ -129,6 +152,7 @@ ktor-client-mock     = { module = "io.ktor:ktor-client-mock",                   
 credentials          = { module = "androidx.credentials:credentials",                      version.ref = "credentials" }
 credentials-play     = { module = "androidx.credentials:credentials-play-services-auth",   version.ref = "credentials" }
 googleid             = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+lottie               = { module = "com.airbnb.android:lottie-compose", version.ref = "lottie" }
 
 youtube-player       = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", name = "core", version.ref = "youtube-player" }
 play-app-update      = { module = "com.google.android.play:app-update-ktx", version.ref = "play-app-update" }
@@ -137,6 +161,14 @@ vosk-android         = { group = "com.alphacephei", name = "vosk-android", versi
 kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.7.3" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinx-datetime" }
+# Web roadmap W0/W1 — real window.localStorage on wasmJs.
+kotlinx-browser = { group = "org.jetbrains.kotlinx", name = "kotlinx-browser", version.ref = "kotlinx-browser" }
+# Web roadmap W4a — real NavHost/back-stack + browser URL routing for :webApp only. NOT the same
+# artifact as `navigation-compose` above (that one is androidx.navigation, Android-only, :app).
+navigation-compose-multiplatform = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref = "navigation-compose-multiplatform" }
+# coil3 KMP network fetcher backed by Ktor — needed on wasmJs/JS where coil-network-okhttp (Android/JVM
+# only) is unavailable. Pinned to the same `coil` version as coil-compose to avoid a KMP artifact skew.
+coil-network-ktor3 = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil" }
 
 # KMP commonTest assertions (multiplatform-safe; replaces JUnit/MockK in commonMain test source sets).
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
@@ -147,6 +179,11 @@ kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.re
 koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
 koin-android = { group = "io.insert-koin", name = "koin-android", version.ref = "koin" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
+# Web roadmap W1: the pure-CMP koinViewModel() equivalent for :webApp (koin-androidx-compose above
+# is Android-only — depends on androidx.activity/androidx.compose Android artifacts). Same version
+# as the rest of the koin.* aliases (4.2.2) — koin-compose-viewmodel is published in lockstep with
+# koin-core.
+koin-compose-viewmodel = { group = "io.insert-koin", name = "koin-compose-viewmodel", version.ref = "koin" }
 # koin-androidx-workmanager — KMP migration Hilt→Koin cutover batch 6: `worker { }` DSL +
 # `KoinWorkerFactory` so the 7 non-excluded @HiltWorkers can be resolved by Koin, coexisting with the
 # still-Hilt-owned (currently dormant) scanner worker via a DelegatingWorkerFactory (core.di.SyncModule).

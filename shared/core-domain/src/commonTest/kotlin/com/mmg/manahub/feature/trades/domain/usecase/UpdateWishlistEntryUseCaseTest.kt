@@ -44,11 +44,11 @@ private class FakeCardRepository(
     override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardArtVariants(name: String): DataResult<List<Card>> = error("unused")
     override suspend fun getCardByExactName(name: String): Result<Card> = error("unused")
-    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> = error("unused")
+    override suspend fun searchWithRawQuery(query: String, order: String?, page: Int): List<Card> = error("unused")
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = error("unused")
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
-    override suspend fun refreshCollectionPrices() = error("unused")
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
+    override suspend fun updatePricesBatch(updates: List<com.mmg.manahub.core.domain.repository.CardPriceUpdate>) = error("unused")
     override suspend fun evictStaleCache() = error("unused")
     override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
     override suspend fun unionCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
@@ -131,7 +131,6 @@ private class FakeAuthRepository(initialState: SessionState = SessionState.Unaut
     override suspend fun updateNickname(nickname: String): AuthResult<AuthUser> = error("unused")
     override suspend fun linkGoogleIdentity(email: String, password: String, pendingIdToken: String, pendingNonce: String): AuthResult<AuthUser> = error("unused")
     override suspend fun updateAvatarUrl(avatarUrl: String?): AuthResult<Unit> = error("unused")
-    override suspend fun signInAnonymously(): AuthResult<Unit> = error("unused")
 }
 
 private fun buildCard(scryfallId: String = "scry-new") = Card(

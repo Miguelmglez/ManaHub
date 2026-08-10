@@ -17,6 +17,16 @@ import javax.inject.Singleton
 // Validates session join code matches backend format: 6 digits.
 private val SESSION_CODE_REGEX = Regex("^[0-9]{6}$")
 
+/**
+ * Remote data source for online session RPCs.
+ *
+ * All state-mutating/reading calls (everything except [getMyActiveSession]/[getMyActiveSessions],
+ * which are real-account-only) accept an optional [guestToken]. Passing a non-null token lets a
+ * caller with no Supabase Auth session at all (a guest — see the 2026-08 anonymous-sign-in
+ * removal) authenticate via the backend's `p_guest_token` param instead of `auth.uid()`. Real
+ * signed-in accounts must always pass null: the RPC resolves their identity from the JWT exactly
+ * as before.
+ */
 @Singleton
 class OnlineSessionRemoteDataSource @Inject constructor(
     private val supabaseClient: SupabaseClient,
@@ -37,15 +47,19 @@ class OnlineSessionRemoteDataSource @Inject constructor(
         }
     }
 
-    suspend fun abandonMyActiveSession(sessionId: String): Result<Unit> = withContext(ioDispatcher) {
-        runCatching {
-            supabaseClient.postgrest.rpc(
-                "abandon_my_active_session",
-                buildJsonObject { put("p_session_id", sessionId) },
-            )
-            Unit
+    suspend fun abandonMyActiveSession(sessionId: String, guestToken: String? = null): Result<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseClient.postgrest.rpc(
+                    "abandon_my_active_session",
+                    buildJsonObject {
+                        put("p_session_id", sessionId)
+                        guestToken?.let { put("p_guest_token", it) }
+                    },
+                )
+                Unit
+            }
         }
-    }
 
     suspend fun createSession(
         mode: String,
@@ -72,6 +86,7 @@ class OnlineSessionRemoteDataSource @Inject constructor(
         code: String,
         displayName: String,
         themeKey: String,
+        guestToken: String? = null,
     ): Result<JoinSessionResponseDto> = withContext(ioDispatcher) {
         runCatching {
             val sanitized = code.trim()
@@ -83,61 +98,79 @@ class OnlineSessionRemoteDataSource @Inject constructor(
                     put("p_code", sanitized)
                     put("p_display_name", displayName.trim())
                     put("p_theme_key", themeKey)
+                    guestToken?.let { put("p_guest_token", it) }
                 },
             ).decodeAs<JoinSessionResponseDto>()
         }
     }
 
-    suspend fun getSnapshot(sessionId: String): Result<SessionSnapshotDto> =
+    suspend fun getSnapshot(sessionId: String, guestToken: String? = null): Result<SessionSnapshotDto> =
         withContext(ioDispatcher) {
             runCatching {
                 supabaseClient.postgrest.rpc(
                     "get_session_snapshot",
-                    buildJsonObject { put("p_session_id", sessionId) },
+                    buildJsonObject {
+                        put("p_session_id", sessionId)
+                        guestToken?.let { put("p_guest_token", it) }
+                    },
                 ).decodeAs<SessionSnapshotDto>()
             }
         }
 
-    suspend fun startSession(sessionId: String): Result<Unit> = withContext(ioDispatcher) {
-        runCatching {
-            supabaseClient.postgrest.rpc(
-                "start_session",
-                buildJsonObject { put("p_session_id", sessionId) },
-            )
-            Unit
-        }
-    }
-
-    suspend fun leaveSession(sessionId: String): Result<Unit> = withContext(ioDispatcher) {
-        runCatching {
-            supabaseClient.postgrest.rpc(
-                "leave_session",
-                buildJsonObject { put("p_session_id", sessionId) },
-            )
-            Unit
-        }
-    }
-
-    suspend fun updateLife(sessionId: String, slotIndex: Int, newLife: Int): Result<Unit> =
+    suspend fun startSession(sessionId: String, guestToken: String? = null): Result<Unit> =
         withContext(ioDispatcher) {
             runCatching {
                 supabaseClient.postgrest.rpc(
-                    "update_player_life",
+                    "start_session",
                     buildJsonObject {
                         put("p_session_id", sessionId)
-                        put("p_slot_index", slotIndex)
-                        put("p_new_life", newLife)
+                        guestToken?.let { put("p_guest_token", it) }
                     },
                 )
                 Unit
             }
         }
 
+    suspend fun leaveSession(sessionId: String, guestToken: String? = null): Result<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseClient.postgrest.rpc(
+                    "leave_session",
+                    buildJsonObject {
+                        put("p_session_id", sessionId)
+                        guestToken?.let { put("p_guest_token", it) }
+                    },
+                )
+                Unit
+            }
+        }
+
+    suspend fun updateLife(
+        sessionId: String,
+        slotIndex: Int,
+        newLife: Int,
+        guestToken: String? = null,
+    ): Result<Unit> = withContext(ioDispatcher) {
+        runCatching {
+            supabaseClient.postgrest.rpc(
+                "update_player_life",
+                buildJsonObject {
+                    put("p_session_id", sessionId)
+                    put("p_slot_index", slotIndex)
+                    put("p_new_life", newLife)
+                    guestToken?.let { put("p_guest_token", it) }
+                },
+            )
+            Unit
+        }
+    }
+
     suspend fun updateCommanderDamage(
         sessionId: String,
         targetSlot: Int,
         sourceSlot: Int,
         delta: Int,
+        guestToken: String? = null,
     ): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
             supabaseClient.postgrest.rpc(
@@ -147,6 +180,7 @@ class OnlineSessionRemoteDataSource @Inject constructor(
                     put("p_target_slot", targetSlot)
                     put("p_source_slot", sourceSlot)
                     put("p_delta", delta)
+                    guestToken?.let { put("p_guest_token", it) }
                 },
             )
             Unit
@@ -158,6 +192,7 @@ class OnlineSessionRemoteDataSource @Inject constructor(
         slotIndex: Int,
         counterType: String,
         delta: Int,
+        guestToken: String? = null,
     ): Result<Unit> = withContext(ioDispatcher) {
         runCatching {
             supabaseClient.postgrest.rpc(
@@ -167,33 +202,42 @@ class OnlineSessionRemoteDataSource @Inject constructor(
                     put("p_slot_index", slotIndex)
                     put("p_counter_type", counterType)
                     put("p_delta", delta)
+                    guestToken?.let { put("p_guest_token", it) }
                 },
             )
             Unit
         }
     }
 
-    suspend fun advancePhase(sessionId: String): Result<Unit> = withContext(ioDispatcher) {
-        runCatching {
-            supabaseClient.postgrest.rpc(
-                "advance_phase",
-                buildJsonObject { put("p_session_id", sessionId) },
-            )
-            Unit
+    suspend fun advancePhase(sessionId: String, guestToken: String? = null): Result<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseClient.postgrest.rpc(
+                    "advance_phase",
+                    buildJsonObject {
+                        put("p_session_id", sessionId)
+                        guestToken?.let { put("p_guest_token", it) }
+                    },
+                )
+                Unit
+            }
         }
-    }
 
-    suspend fun nextTurn(sessionId: String): Result<Unit> = withContext(ioDispatcher) {
-        runCatching {
-            supabaseClient.postgrest.rpc(
-                "next_turn",
-                buildJsonObject { put("p_session_id", sessionId) },
-            )
-            Unit
+    suspend fun nextTurn(sessionId: String, guestToken: String? = null): Result<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseClient.postgrest.rpc(
+                    "next_turn",
+                    buildJsonObject {
+                        put("p_session_id", sessionId)
+                        guestToken?.let { put("p_guest_token", it) }
+                    },
+                )
+                Unit
+            }
         }
-    }
 
-    suspend fun confirmDefeat(sessionId: String, slotIndex: Int): Result<Unit> =
+    suspend fun confirmDefeat(sessionId: String, slotIndex: Int, guestToken: String? = null): Result<Unit> =
         withContext(ioDispatcher) {
             runCatching {
                 supabaseClient.postgrest.rpc(
@@ -201,13 +245,14 @@ class OnlineSessionRemoteDataSource @Inject constructor(
                     buildJsonObject {
                         put("p_session_id", sessionId)
                         put("p_slot_index", slotIndex)
+                        guestToken?.let { put("p_guest_token", it) }
                     },
                 )
                 Unit
             }
         }
 
-    suspend fun revokeDefeat(sessionId: String, slotIndex: Int): Result<Unit> =
+    suspend fun revokeDefeat(sessionId: String, slotIndex: Int, guestToken: String? = null): Result<Unit> =
         withContext(ioDispatcher) {
             runCatching {
                 supabaseClient.postgrest.rpc(
@@ -215,13 +260,14 @@ class OnlineSessionRemoteDataSource @Inject constructor(
                     buildJsonObject {
                         put("p_session_id", sessionId)
                         put("p_slot_index", slotIndex)
+                        guestToken?.let { put("p_guest_token", it) }
                     },
                 )
                 Unit
             }
         }
 
-    suspend fun setReady(sessionId: String, isReady: Boolean): Result<Unit> =
+    suspend fun setReady(sessionId: String, isReady: Boolean, guestToken: String? = null): Result<Unit> =
         withContext(ioDispatcher) {
             runCatching {
                 supabaseClient.postgrest.rpc(
@@ -229,6 +275,7 @@ class OnlineSessionRemoteDataSource @Inject constructor(
                     buildJsonObject {
                         put("p_session_id", sessionId)
                         put("p_is_ready", isReady)
+                        guestToken?.let { put("p_guest_token", it) }
                     },
                 )
                 Unit
