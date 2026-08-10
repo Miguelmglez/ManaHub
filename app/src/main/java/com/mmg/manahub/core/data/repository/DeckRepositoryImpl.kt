@@ -193,9 +193,18 @@ class DeckRepositoryImpl(
             val sourceQty = sourceRow?.quantity ?: 0
             if (sourceQty <= 0) return@withContext
             val toMove = quantity.coerceIn(1, sourceQty)
-            val targetQty = rows.firstOrNull {
-                it.scryfallId == scryfallId && it.isSideboard == !fromSideboard
-            }?.quantity ?: 0
+            val targetRow = rows.firstOrNull { it.scryfallId == scryfallId && it.isSideboard == !fromSideboard }
+            val targetQty = targetRow?.quantity ?: 0
+
+            // Edge-case audit Fix 3 (2026-07-28): the ORIGIN row's remaining stack keeps its OWN
+            // provenance unchanged (it's a shrink, not a merge). The TARGET row is a potential MERGE
+            // -- when it already holds a stack of the same card with a DIFFERENT (more-protected)
+            // source, the merged row must resolve to the MORE-protected of the two, never whichever
+            // side happened to initiate the move (a USER sideboard copy moved onto a WIZARD
+            // mainboard stack must leave the merged stack WIZARD, preserving the D4 hard no-cut
+            // guarantee instead of silently stripping it).
+            val originSource = DeckCardSource.fromRaw(sourceRow?.source)
+            val targetSource = targetRow?.let { DeckCardSource.fromRaw(it.source) }?.moreProtected(originSource) ?: originSource
 
             deckDao.moveCardQuantity(
                 deckId = deckId,
@@ -203,9 +212,8 @@ class DeckRepositoryImpl(
                 fromSideboard = fromSideboard,
                 newSourceQty = sourceQty - toMove,
                 newTargetQty = targetQty + toMove,
-                // Deck Engine Unification (D4): preserve the slot's provenance across the move
-                // instead of resetting it to the DAO default -- see moveCardQuantity's KDoc.
-                source = sourceRow?.source ?: "USER",
+                sourceRowSource = originSource.name,
+                targetRowSource = targetSource.name,
             )
             deckDao.getDeckById(deckId)?.let { deck ->
                 deckDao.upsertDeck(deck.copy(updatedAt = System.currentTimeMillis()))

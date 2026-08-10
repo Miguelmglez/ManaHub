@@ -5,6 +5,7 @@ import com.mmg.manahub.core.data.local.dao.DeckSummaryRow
 import com.mmg.manahub.core.data.local.entity.DeckCardEntity
 import com.mmg.manahub.core.data.local.entity.DeckEntity
 import com.mmg.manahub.core.model.Deck
+import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import io.mockk.every
 import io.mockk.mockk
@@ -35,6 +36,7 @@ import org.junit.Test
  *  - GROUP 5: removeCardFromDeck — DAO delegation, deck updatedAt bump
  *  - GROUP 6: clearDeck   — DAO delegation, deck updatedAt bump
  *  - GROUP 7: observeAllDeckSummaries — groupBy, cardCount, colorIdentity, sorting
+ *  - GROUP 8: moveCardQuantity — provenance merge on a board-move (edge-case audit Fix 3)
  */
 class DeckRepositoryImplTest {
 
@@ -420,5 +422,130 @@ class DeckRepositoryImplTest {
         val summaries = repository.observeAllDeckSummaries().first()
 
         assertTrue(summaries[0].colorIdentity.isEmpty())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — moveCardQuantity: provenance merge on a board-move
+    //  (edge-case audit Fix 3, 2026-07-28)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun buildDeckCardEntity(
+        deckId:      String  = DECK_ID,
+        scryfallId:  String  = "bolt-001",
+        quantity:    Int     = 1,
+        isSideboard: Boolean = false,
+        source:      String  = "USER",
+    ) = DeckCardEntity(
+        deckId      = deckId,
+        scryfallId  = scryfallId,
+        quantity    = quantity,
+        isSideboard = isSideboard,
+        source      = source,
+    )
+
+    @Test
+    fun `given a USER sideboard copy moved onto an existing WIZARD mainboard stack then the merged row keeps WIZARD`() = runTest {
+        // The exact edge-case audit repro: a wizard-built mainboard stack (protected, D4 no-cut
+        // guarantee) must NOT be downgraded to USER just because a USER-sourced sideboard copy of
+        // the SAME card initiated the move onto it.
+        every { deckDao.getDeckCards(DECK_ID) } returns listOf(
+            buildDeckCardEntity(scryfallId = "bolt-001", quantity = 2, isSideboard = false, source = "WIZARD"),
+            buildDeckCardEntity(scryfallId = "bolt-001", quantity = 1, isSideboard = true, source = "USER"),
+        )
+        every { deckDao.getDeckById(DECK_ID) } returns buildDeckEntity()
+
+        repository.moveCardQuantity(deckId = DECK_ID, scryfallId = "bolt-001", fromSideboard = true, quantity = 1)
+
+        verify(exactly = 1) {
+            deckDao.moveCardQuantity(
+                deckId = DECK_ID,
+                scryfallId = "bolt-001",
+                fromSideboard = true,
+                newSourceQty = 0,
+                newTargetQty = 3,
+                sourceRowSource = "USER",
+                targetRowSource = "WIZARD",
+            )
+        }
+    }
+
+    @Test
+    fun `given a WIZARD mainboard copy moved onto an existing USER sideboard stack then the merged row is upgraded to WIZARD`() = runTest {
+        // The reverse direction of the same invariant: the merge must gain protection regardless
+        // of which side the move originated from.
+        every { deckDao.getDeckCards(DECK_ID) } returns listOf(
+            buildDeckCardEntity(scryfallId = "bolt-001", quantity = 1, isSideboard = false, source = "WIZARD"),
+            buildDeckCardEntity(scryfallId = "bolt-001", quantity = 2, isSideboard = true, source = "USER"),
+        )
+        every { deckDao.getDeckById(DECK_ID) } returns buildDeckEntity()
+
+        repository.moveCardQuantity(deckId = DECK_ID, scryfallId = "bolt-001", fromSideboard = false, quantity = 1)
+
+        verify(exactly = 1) {
+            deckDao.moveCardQuantity(
+                deckId = DECK_ID,
+                scryfallId = "bolt-001",
+                fromSideboard = false,
+                newSourceQty = 0,
+                newTargetQty = 3,
+                sourceRowSource = "WIZARD",
+                targetRowSource = "WIZARD",
+            )
+        }
+    }
+
+    @Test
+    fun `given no existing target stack when moveCardQuantity then the new stack simply keeps the origin's own source`() = runTest {
+        // No merge involved -- a fresh target-side row must behave exactly as before this fix.
+        every { deckDao.getDeckCards(DECK_ID) } returns listOf(
+            buildDeckCardEntity(scryfallId = "bolt-001", quantity = 2, isSideboard = false, source = "SUGGESTION"),
+        )
+        every { deckDao.getDeckById(DECK_ID) } returns buildDeckEntity()
+
+        repository.moveCardQuantity(deckId = DECK_ID, scryfallId = "bolt-001", fromSideboard = false, quantity = 1)
+
+        verify(exactly = 1) {
+            deckDao.moveCardQuantity(
+                deckId = DECK_ID,
+                scryfallId = "bolt-001",
+                fromSideboard = false,
+                newSourceQty = 1,
+                newTargetQty = 1,
+                sourceRowSource = "SUGGESTION",
+                targetRowSource = "SUGGESTION",
+            )
+        }
+    }
+
+    @Test
+    fun `given a SUGGESTION copy moved onto a WIZARD stack then WIZARD still wins as the most-protected source`() = runTest {
+        every { deckDao.getDeckCards(DECK_ID) } returns listOf(
+            buildDeckCardEntity(scryfallId = "bolt-001", quantity = 1, isSideboard = false, source = "WIZARD"),
+            buildDeckCardEntity(scryfallId = "bolt-001", quantity = 1, isSideboard = true, source = "SUGGESTION"),
+        )
+        every { deckDao.getDeckById(DECK_ID) } returns buildDeckEntity()
+
+        repository.moveCardQuantity(deckId = DECK_ID, scryfallId = "bolt-001", fromSideboard = true, quantity = 1)
+
+        verify(exactly = 1) {
+            deckDao.moveCardQuantity(
+                deckId = DECK_ID,
+                scryfallId = "bolt-001",
+                fromSideboard = true,
+                newSourceQty = 0,
+                newTargetQty = 2,
+                sourceRowSource = "SUGGESTION",
+                targetRowSource = "WIZARD",
+            )
+        }
+    }
+
+    @Test
+    fun `DeckCardSource moreProtected orders WIZARD above SUGGESTION above USER in both directions`() {
+        assertEquals(DeckCardSource.WIZARD, DeckCardSource.WIZARD.moreProtected(DeckCardSource.USER))
+        assertEquals(DeckCardSource.WIZARD, DeckCardSource.USER.moreProtected(DeckCardSource.WIZARD))
+        assertEquals(DeckCardSource.WIZARD, DeckCardSource.WIZARD.moreProtected(DeckCardSource.SUGGESTION))
+        assertEquals(DeckCardSource.SUGGESTION, DeckCardSource.SUGGESTION.moreProtected(DeckCardSource.USER))
+        assertEquals(DeckCardSource.USER, DeckCardSource.USER.moreProtected(DeckCardSource.USER))
     }
 }

@@ -7,34 +7,37 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CollectionCardGroup
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
-import com.mmg.manahub.core.model.groupByCard
-import com.mmg.manahub.core.model.groupCollection
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.UserCardWithCard
-import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.domain.usecase.collection.GetCollectionUseCase
+import com.mmg.manahub.core.model.groupByCard
+import com.mmg.manahub.core.model.groupCollection
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.core.domain.auth.SessionState
-import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -96,6 +99,15 @@ class CollectionViewModel(
     private var wishlistUnsyncedCount = 0
     private var openForTradeUnsyncedCount = 0
 
+    // Backend & Performance Optimization plan, WS5c item 4 (2026-07-28): the search box used to
+    // call applyFilters() synchronously on every keystroke — a filter+group+sort pass over the
+    // whole collection running on Compose's Main thread per character typed. Raw keystrokes are
+    // pushed here instead; the TextField's visible value still updates immediately via
+    // `_uiState.searchQuery` in [onSearchQueryChange] (no input lag), but the expensive re-filter
+    // is debounced (mirrors TradeProposalViewModel's `searchQueryFlow` §6.3 fix — same anti-pattern,
+    // same established remedy in this codebase).
+    private val searchQueryFlow = MutableStateFlow("")
+
     init {
         // Initialize tab from SavedStateHandle ("tab" nav arg)
         val tabArg = savedStateHandle.get<String>("tab")?.lowercase()
@@ -109,10 +121,27 @@ class CollectionViewModel(
         observeCollection()
         observeWishlistIds()
         observeTradeListUnsyncedCounts()
-        refreshPrices()
+        // Backend & Performance Optimization plan, WS1+WS3 Part B item 7a (2026-07-28): the
+        // per-screen-entry price refresh that used to run here was removed — it duplicated
+        // `PriceRefreshWorker`'s daily, watermark-guarded, stale-only refresh with NO guard of its
+        // own (every Collection open re-fetched the whole collection's prices unconditionally,
+        // stacking on top of the login-window Scryfall burst). `PriceRefreshWorker` is now the
+        // SOLE price-refresh path.
         observeSyncState()
         observeSessionChanges()
         observeUserPreferences()
+
+        viewModelScope.launch {
+            searchQueryFlow
+                .debounce(SEARCH_DEBOUNCE_MS)
+                .distinctUntilChanged()
+                .collectLatest { applyFilters() }
+        }
+    }
+
+    private companion object {
+        /** Matches TradeProposalViewModel's SEARCH_DEBOUNCE_MS — one shared convention. */
+        const val SEARCH_DEBOUNCE_MS = 300L
     }
 
     private fun observeUserPreferences() {
@@ -131,7 +160,7 @@ class CollectionViewModel(
 
     private fun observeWishlistIds() {
         viewModelScope.launch {
-            getLocalWishlist().collect { entries ->
+            getLocalWishlist().distinctUntilChanged().collect { entries ->
                 _wishlistCardIds.value = entries.map { it.cardId }.toSet()
                 applyFilters()
             }
@@ -140,13 +169,13 @@ class CollectionViewModel(
 
     private fun observeTradeListUnsyncedCounts() {
         viewModelScope.launch {
-            wishlistRepository.observeUnsyncedCount().collect { count ->
+            wishlistRepository.observeUnsyncedCount().distinctUntilChanged().collect { count ->
                 wishlistUnsyncedCount = count
                 recomputeUnsyncedBanner()
             }
         }
         viewModelScope.launch {
-            openForTradeRepository.observeUnsyncedCount().collect { count ->
+            openForTradeRepository.observeUnsyncedCount().distinctUntilChanged().collect { count ->
                 openForTradeUnsyncedCount = count
                 recomputeUnsyncedBanner()
             }
@@ -157,8 +186,8 @@ class CollectionViewModel(
         val userId = authRepository.getCurrentUser()?.id
         val hasPending = if (userId != null && syncManager.syncState.value != SyncState.SYNCING) {
             syncManager.countPendingChanges(userId) > 0
-                || wishlistUnsyncedCount > 0
-                || openForTradeUnsyncedCount > 0
+                    || wishlistUnsyncedCount > 0
+                    || openForTradeUnsyncedCount > 0
         } else {
             wishlistUnsyncedCount > 0 || openForTradeUnsyncedCount > 0
         }
@@ -170,6 +199,7 @@ class CollectionViewModel(
     private fun observeCollection() {
         viewModelScope.launch {
             getCollection()
+                .distinctUntilChanged()
                 .catch { e ->
                     FirebaseCrashlytics.getInstance().apply {
                         log("collection_observe_failed")
@@ -190,13 +220,14 @@ class CollectionViewModel(
                     // and is set to SYNCING before any Room emissions from the PULL phase,
                     // closing the TOCTOU window between SyncManager emitting SYNCING and
                     // _uiState being updated by the separate observeSyncState coroutine.
-                    val hasPending = if (userId != null && syncManager.syncState.value != SyncState.SYNCING) {
-                        syncManager.countPendingChanges(userId) > 0
-                            || wishlistUnsyncedCount > 0
-                            || openForTradeUnsyncedCount > 0
-                    } else {
-                        _uiState.value.hasUnsyncedChanges
-                    }
+                    val hasPending =
+                        if (userId != null && syncManager.syncState.value != SyncState.SYNCING) {
+                            syncManager.countPendingChanges(userId) > 0
+                                    || wishlistUnsyncedCount > 0
+                                    || openForTradeUnsyncedCount > 0
+                        } else {
+                            _uiState.value.hasUnsyncedChanges
+                        }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -241,7 +272,8 @@ class CollectionViewModel(
         groups.map { group ->
             val card = group.card
             if (card.lang == "en") return@map group
-            val englishSibling = englishSiblingCache[card.setCode to card.collectorNumber] ?: return@map group
+            val englishSibling =
+                englishSiblingCache[card.setCode to card.collectorNumber] ?: return@map group
             group.copy(
                 card = card.copy(
                     imageNormal = englishSibling.imageNormal,
@@ -249,19 +281,6 @@ class CollectionViewModel(
                 )
             )
         }
-
-    private fun refreshPrices() {
-        viewModelScope.launch {
-            runCatching { cardRepository.refreshCollectionPrices() }
-                .onFailure { e ->
-                    FirebaseCrashlytics.getInstance().apply {
-                        log("collection_price_refresh_failed")
-                        setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                        recordException(RuntimeException("[CollectionViewModel] Price refresh failed", e))
-                    }
-                }
-        }
-    }
 
     /** Forwards [SyncManager.syncState] into the UI state and clears the banner on success. */
     private fun observeSyncState() {
@@ -299,6 +318,7 @@ class CollectionViewModel(
                             triggerTradeListMigration(state.user.id)
                         }
                     }
+
                     is SessionState.Unauthenticated -> {
                         // Cancel background sync — stale/missing session would cause
                         // Supabase RPC failures if the worker ran now.
@@ -310,9 +330,17 @@ class CollectionViewModel(
                         syncManager.resetSyncState()
                         // Also clear hasUnsyncedChanges — a logged-out user must never see
                         // the sync banner, and stale true would persist into the next login.
-                        _uiState.update { it.copy(syncState = SyncState.IDLE, syncError = null, hasUnsyncedChanges = false) }
+                        _uiState.update {
+                            it.copy(
+                                syncState = SyncState.IDLE,
+                                syncError = null,
+                                hasUnsyncedChanges = false
+                            )
+                        }
                     }
-                    is SessionState.Loading -> { /* no-op — wait for final state */ }
+
+                    is SessionState.Loading -> { /* no-op — wait for final state */
+                    }
                 }
             }
         }
@@ -339,19 +367,20 @@ class CollectionViewModel(
             // Capture the migration error so it can be surfaced to the UI — previously
             // the Result was discarded, silently leaving the banner stuck when Supabase
             // rejected the batch insert (e.g. network timeout or RLS violation).
-            val migrationError: String? = if (wishlistUnsyncedCount > 0 || openForTradeUnsyncedCount > 0) {
-                migrateLocalTradeLists(userId)
-                    .onFailure { e ->
-                        FirebaseCrashlytics.getInstance().apply {
-                            log("trade_lists_migration_failed_on_sync")
-                            recordException(e)
+            val migrationError: String? =
+                if (wishlistUnsyncedCount > 0 || openForTradeUnsyncedCount > 0) {
+                    migrateLocalTradeLists(userId)
+                        .onFailure { e ->
+                            FirebaseCrashlytics.getInstance().apply {
+                                log("trade_lists_migration_failed_on_sync")
+                                recordException(e)
+                            }
                         }
-                    }
-                    .exceptionOrNull()
-                    ?.message
-            } else {
-                null
-            }
+                        .exceptionOrNull()
+                        ?.message
+                } else {
+                    null
+                }
 
             // Surface the first non-null error: collection sync error takes priority
             // over migration error so the most critical failure is always visible.
@@ -374,7 +403,7 @@ class CollectionViewModel(
 
     fun onSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
-        applyFilters()
+        searchQueryFlow.value = query
     }
 
     fun onSortChange(sort: SortOrder) {
@@ -412,7 +441,10 @@ class CollectionViewModel(
             } else {
                 CollectionViewMode.GRID
             }
-            analyticsHelper.logEvent("collection_view_mode_toggled", mapOf("new_mode" to newMode.name))
+            analyticsHelper.logEvent(
+                "collection_view_mode_toggled",
+                mapOf("new_mode" to newMode.name)
+            )
             userPreferencesRepository.saveCollectionViewMode(newMode)
         }
     }
@@ -438,7 +470,10 @@ class CollectionViewModel(
             migrateLocalTradeLists(userId)
                 .onSuccess { count ->
                     if (count > 0) {
-                        analyticsHelper.logEvent("trade_lists_migrated", mapOf("migrated_count" to count))
+                        analyticsHelper.logEvent(
+                            "trade_lists_migrated",
+                            mapOf("migrated_count" to count)
+                        )
                         _uiState.update { it.copy(snackbarMessage = count.toString()) }
                     }
                 }
@@ -454,10 +489,13 @@ class CollectionViewModel(
     fun applyAdvancedFilters(query: AdvancedSearchQuery) {
         _uiState.update { it.copy(activeQuery = if (query.isEmpty()) null else query) }
         if (!query.isEmpty()) {
-            analyticsHelper.logEvent("collection_advanced_filter_applied", mapOf(
-                "criteria_count" to query.criteria.size,
-            ))
-            FirebaseCrashlytics.getInstance().setCustomKey("collection_active_filters_count", query.criteria.size)
+            analyticsHelper.logEvent(
+                "collection_advanced_filter_applied", mapOf(
+                    "criteria_count" to query.criteria.size,
+                )
+            )
+            FirebaseCrashlytics.getInstance()
+                .setCustomKey("collection_active_filters_count", query.criteria.size)
         }
         applyFilters()
     }
@@ -465,6 +503,12 @@ class CollectionViewModel(
     fun clearAdvancedFilters() {
         _uiState.update { it.copy(activeQuery = null) }
         applyFilters()
+    }
+
+    fun getAllCollectionTags(): Set<com.mmg.manahub.core.model.CardTag> {
+        return _allCards.value.flatMap { it.card.tags + it.card.userTags }
+            .distinctBy { it.key }
+            .toSet()
     }
 
     // ── Filtering & sorting ───────────────────────────────────────────────────
@@ -495,10 +539,21 @@ class CollectionViewModel(
 
         // Sort
         val sorted = when (state.sortOrder) {
-            SortOrder.NAME       -> grouped.sortedBy { it.card.name }
-            SortOrder.PRICE_DESC -> grouped.sortedWith(compareByDescending<CollectionCardGroup> { it.card.priceUsd ?: 0.0 }.thenBy { it.card.name })
-            SortOrder.PRICE_ASC  -> grouped.sortedWith(compareBy<CollectionCardGroup> { it.card.priceUsd ?: 0.0 }.thenBy { it.card.name })
-            SortOrder.RARITY     -> grouped.sortedWith(compareByDescending<CollectionCardGroup> { rarityWeight(it.card.rarity) }.thenBy { it.card.name })
+            SortOrder.NAME -> grouped.sortedBy { it.card.name }
+            SortOrder.PRICE_DESC -> grouped.sortedWith(compareByDescending<CollectionCardGroup> {
+                it.card.priceUsd ?: 0.0
+            }.thenBy { it.card.name })
+
+            SortOrder.PRICE_ASC -> grouped.sortedWith(compareBy<CollectionCardGroup> {
+                it.card.priceUsd ?: 0.0
+            }.thenBy { it.card.name })
+
+            SortOrder.RARITY -> grouped.sortedWith(compareByDescending<CollectionCardGroup> {
+                rarityWeight(
+                    it.card.rarity
+                )
+            }.thenBy { it.card.name })
+
             SortOrder.DATE_ADDED -> grouped.sortedWith(compareByDescending<CollectionCardGroup> { it.latestAddedAt }.thenBy { it.card.name })
         }
 
@@ -518,122 +573,146 @@ class CollectionViewModel(
                     card.card.name.equals(criterion.value, ignoreCase = true)
                 else
                     card.card.name.contains(criterion.value, ignoreCase = true)
+
             is SearchCriterion.OracleText ->
                 card.card.oracleText?.contains(criterion.value, ignoreCase = true) == true
-            is SearchCriterion.CardType ->
-                criterion.value.split(" ").filter { it.isNotBlank() }.all { word ->
-                    card.card.typeLine.contains(word, ignoreCase = true)
+
+            is SearchCriterion.CardType -> {
+                val check: (String) -> Boolean = { type ->
+                    card.card.typeLine.contains(type, ignoreCase = true)
                 }
+                if (criterion.matchAll) criterion.types.all(check)
+                else criterion.types.any(check)
+            }
+
             is SearchCriterion.Colors ->
                 if (criterion.exactly)
                     card.card.colors.map { it.uppercase() }.toSet() ==
-                        criterion.colors.map { it.uppercase() }.toSet()
+                            criterion.colors.map { it.uppercase() }.toSet()
                 else
                     criterion.colors.all { c ->
                         card.card.colors.any { it.equals(c, ignoreCase = true) }
                     }
+
             is SearchCriterion.ColorIdentity ->
                 if (criterion.exactly)
                     card.card.colorIdentity.map { it.uppercase() }.toSet() ==
-                        criterion.colors.map { it.uppercase() }.toSet()
+                            criterion.colors.map { it.uppercase() }.toSet()
                 else
                     criterion.colors.all { c ->
                         card.card.colorIdentity.any { it.equals(c, ignoreCase = true) }
                     }
+
             is SearchCriterion.Rarity ->
-                compareRarity(card.card.rarity, criterion.rarity, criterion.operator)
+                compareRarity(card.card.rarity, criterion.rarity)
+
             is SearchCriterion.ManaCost ->
                 compareInt(card.card.cmc.toInt(), criterion.value, criterion.operator)
+
             is SearchCriterion.Price -> {
-                val price = if (criterion.currency == "eur") card.card.priceEur else card.card.priceUsd
+                val price =
+                    if (criterion.currency == "eur") card.card.priceEur else card.card.priceUsd
                 price != null && compareDouble(price, criterion.value, criterion.operator)
             }
+
             is SearchCriterion.CardSet ->
                 criterion.setCodes.contains(card.card.setCode.lowercase())
+
             is SearchCriterion.Power -> {
                 val power = card.card.power?.toIntOrNull() ?: return false
                 compareInt(power, criterion.value, criterion.operator)
             }
+
             is SearchCriterion.Toughness -> {
                 val toughness = card.card.toughness?.toIntOrNull() ?: return false
                 compareInt(toughness, criterion.value, criterion.operator)
             }
+
             is SearchCriterion.Format ->
                 matchesFormat(card.card, criterion.format, criterion.legal)
-            is SearchCriterion.Keyword ->
-                card.card.keywords.any { it.equals(criterion.value, ignoreCase = true) } ||
-                    card.card.oracleText?.contains(criterion.value, ignoreCase = true) == true
+
+
             // ── Collection-local ──────────────────────────────────────────────
-            is SearchCriterion.IsInWishlist ->
-                (_wishlistCardIds.value.contains(card.userCard.scryfallId)) == criterion.value
-            is SearchCriterion.IsForTrade ->
-                card.userCard.isForTrade == criterion.value
+            is SearchCriterion.CollectionStatus -> {
+                val matchesWishlist = criterion.wishlist && _wishlistCardIds.value.contains(card.userCard.scryfallId)
+                val matchesTrade = criterion.forTrade && card.userCard.isForTrade
+                matchesWishlist || matchesTrade
+            }
+
             is SearchCriterion.HasTag ->
                 criterion.keys.any { key ->
                     card.card.tags.any { it.key == key } ||
-                        card.card.userTags.any { it.key == key }
+                            card.card.userTags.any { it.key == key }
                 }
+
             else -> true
         }
     }
 
     private fun matchesFormat(
-        card: com.mmg.manahub.core.model.Card,
-        format: String,
+        card: Card,
+        formats: List<String>,
         legal: Boolean,
     ): Boolean {
-        val isLegal = when (format.lowercase()) {
-            "standard"  -> card.legalityStandard  == "legal"
-            "pioneer"   -> card.legalityPioneer   == "legal"
-            "modern"    -> card.legalityModern    == "legal"
-            "commander" -> card.legalityCommander == "legal"
-            else        -> false
+        if (legal) {
+            for (format in formats) {
+                val isLegal = when (format) {
+                    "standard" -> card.legalityStandard == "legal"
+                    "pioneer" -> card.legalityPioneer == "legal"
+                    "modern" -> card.legalityModern == "legal"
+                    "commander" -> card.legalityCommander == "legal"
+                    else -> false
+                }
+                if (isLegal) return true
+            }
+            return false
+        } else {
+            for (format in formats) {
+                val isNotLegal = when (format) {
+                    "standard" -> card.legalityStandard != "legal"
+                    "pioneer" -> card.legalityPioneer != "legal"
+                    "modern" -> card.legalityModern != "legal"
+                    "commander" -> card.legalityCommander != "legal"
+                    else -> false
+                }
+                if (isNotLegal) return true
+            }
+            return false
         }
-        return isLegal == legal
     }
 
     private fun compareRarity(
         cardRarity: String,
-        targetRarity: String,
-        op: ComparisonOperator,
+        targetRarity: List<String>,
     ): Boolean {
-        val order = listOf("common", "uncommon", "rare", "mythic")
-        val cardIdx = order.indexOf(cardRarity.lowercase())
-        val targetIdx = order.indexOf(targetRarity.lowercase())
-        if (cardIdx < 0 || targetIdx < 0) return false
-        return when (op) {
-            ComparisonOperator.EQUAL            -> cardIdx == targetIdx
-            ComparisonOperator.LESS             -> cardIdx < targetIdx
-            ComparisonOperator.LESS_OR_EQUAL    -> cardIdx <= targetIdx
-            ComparisonOperator.GREATER          -> cardIdx > targetIdx
-            ComparisonOperator.GREATER_OR_EQUAL -> cardIdx >= targetIdx
-            ComparisonOperator.NOT_EQUAL        -> cardIdx != targetIdx
-        }
+        return if (targetRarity.isEmpty() ) true
+        else if (targetRarity.contains(cardRarity.lowercase())) true
+        else false
     }
 
     private fun compareInt(cardVal: Int, target: Int, op: ComparisonOperator): Boolean = when (op) {
-        ComparisonOperator.EQUAL            -> cardVal == target
-        ComparisonOperator.LESS             -> cardVal < target
-        ComparisonOperator.LESS_OR_EQUAL    -> cardVal <= target
-        ComparisonOperator.GREATER          -> cardVal > target
+        ComparisonOperator.EQUAL -> cardVal == target
+        ComparisonOperator.LESS -> cardVal < target
+        ComparisonOperator.LESS_OR_EQUAL -> cardVal <= target
+        ComparisonOperator.GREATER -> cardVal > target
         ComparisonOperator.GREATER_OR_EQUAL -> cardVal >= target
-        ComparisonOperator.NOT_EQUAL        -> cardVal != target
+        ComparisonOperator.NOT_EQUAL -> cardVal != target
     }
 
     private fun compareDouble(cardVal: Double, target: Double, op: ComparisonOperator): Boolean =
         when (op) {
-            ComparisonOperator.EQUAL            -> cardVal == target
-            ComparisonOperator.LESS             -> cardVal < target
-            ComparisonOperator.LESS_OR_EQUAL    -> cardVal <= target
-            ComparisonOperator.GREATER          -> cardVal > target
+            ComparisonOperator.EQUAL -> cardVal == target
+            ComparisonOperator.LESS -> cardVal < target
+            ComparisonOperator.LESS_OR_EQUAL -> cardVal <= target
+            ComparisonOperator.GREATER -> cardVal > target
             ComparisonOperator.GREATER_OR_EQUAL -> cardVal >= target
-            ComparisonOperator.NOT_EQUAL        -> cardVal != target
+            ComparisonOperator.NOT_EQUAL -> cardVal != target
         }
 
     private fun rarityWeight(rarity: String) = when (rarity.lowercase()) {
-        "mythic"   -> 4
-        "rare"     -> 3
+        "mythic" -> 4
+        "rare" -> 3
         "uncommon" -> 2
-        else       -> 1
+        else -> 1
     }
 }

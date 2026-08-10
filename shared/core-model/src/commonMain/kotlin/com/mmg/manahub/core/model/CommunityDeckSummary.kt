@@ -20,6 +20,7 @@ data class CommunityDeckSummary(
     val name: String,
     val size: Int,
     val format: String,
+    val deckFormatId: Int,
     val owner: CommunityDeckOwner,
     val viewCount: Int,
     val createdAt: String,

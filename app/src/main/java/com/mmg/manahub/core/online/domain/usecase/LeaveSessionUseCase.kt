@@ -6,8 +6,8 @@ import javax.inject.Inject
 class LeaveSessionUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend operator fun invoke(sessionId: String): Result<Unit> {
+    suspend operator fun invoke(sessionId: String, guestToken: String? = null): Result<Unit> {
         repository.disconnectRealtime(sessionId)
-        return repository.leaveSession(sessionId)
+        return repository.leaveSession(sessionId, guestToken)
     }
 }

@@ -41,7 +41,7 @@ class FixtureCardRepository(
     /** MUST stay unreachable during a wizard build (D-something "zero alphabetical Scryfall
      * searches" invariant) -- tracked so the harness can assert it the same way
      * BuildDeckFromTemplateUseCaseTest does. */
-    override suspend fun searchWithRawQuery(query: String, order: String?): List<Card> {
+    override suspend fun searchWithRawQuery(query: String, order: String?, page: Int): List<Card> {
         searchWithRawQueryCallCount++
         return emptyList()
     }
@@ -61,7 +61,6 @@ class FixtureCardRepository(
     override suspend fun getPlayableSets(): DataResult<List<MagicSet>> = error("unused")
     override suspend fun getCardsByIds(scryfallIds: List<String>): List<Card> = error("unused")
     override fun observeCard(scryfallId: String): Flow<Card?> = flowOf(null)
-    override suspend fun refreshCollectionPrices() = error("unused")
     override suspend fun updatePrices(scryfallId: String, priceUsd: Double?, priceUsdFoil: Double?, priceEur: Double?, priceEurFoil: Double?, updatedAt: Long) = error("unused")
     override suspend fun updatePricesBatch(updates: List<CardPriceUpdate>) = error("unused")
     override suspend fun evictStaleCache() = error("unused")

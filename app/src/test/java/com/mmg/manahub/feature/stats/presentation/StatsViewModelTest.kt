@@ -3,7 +3,6 @@ package com.mmg.manahub.feature.stats.presentation
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
 import com.mmg.manahub.core.data.repository.TradesRepository
-import com.mmg.manahub.core.data.usecase.collection.RefreshCollectionPricesUseCase
 import com.mmg.manahub.core.data.usecase.stats.GetTradeStatsUseCase
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.AuthUser
@@ -77,7 +76,6 @@ class StatsViewModelTest {
     private val getSetCodes = mockk<GetCollectionSetCodesUseCase>()
     private val getSetCompletionCounts = mockk<GetSetCompletionCountsUseCase>()
     private val scryfallDataSource = mockk<ScryfallRemoteDataSource>()
-    private val refreshPricesUseCase = mockk<RefreshCollectionPricesUseCase>()
     private val userPreferencesDataStore = mockk<UserPreferencesRepository>(relaxed = true)
     private val gameSessionRepository = mockk<GameSessionRepository>()
     private val deckRepository = mockk<DeckRepository>()
@@ -158,7 +156,6 @@ class StatsViewModelTest {
         getSetCodes = getSetCodes,
         getSetCompletionCounts = getSetCompletionCounts,
         scryfallDataSource = scryfallDataSource,
-        refreshPricesUseCase = refreshPricesUseCase,
         userPreferencesDataStore = userPreferencesDataStore,
         gameSessionRepository = gameSessionRepository,
         deckRepository = deckRepository,
@@ -274,6 +271,10 @@ class StatsViewModelTest {
 
         val vm = buildViewModel()
         advanceUntilIdle()
+        // WS5a: the Games tab's 12-flow combine is gated to StatsTab.GAMES via flatMapLatest —
+        // it never populates state.gameStats while the default COLLECTION tab is active.
+        vm.onTabSelected(StatsTab.GAMES)
+        advanceUntilIdle()
 
         val state = vm.uiState.value
         assertTrue(state.hasGameStats)
@@ -288,9 +289,65 @@ class StatsViewModelTest {
         assertEquals("My Deck", state.sessionHistory.first { it.sessionId == 4L }.deckName)
     }
 
+    // ── Tab-scoped subscription (Backend & Performance Optimization plan, WS5, 2026-07-28) ──
+
+    @Test
+    fun `given game session data available when the default COLLECTION tab is active then gameStats stays null (the GAMES combine is not subscribed)`() =
+        runTest {
+            totalGamesFlow.value = 4
+            localWinsFlow.value = 3
+            avgDurationFlow.value = 1200.0
+            favoriteModeFlow.value = GameModeCount("COMMANDER", 3)
+            mostFrequentEliminationFlow.value = EliminationStats("LIFE", 2)
+            pendingSurveyFlow.value = 1
+            localSessionHistoryFlow.value = listOf(historyEntry(sessionId = 1, localIsWinner = true))
+
+            val vm = buildViewModel()
+            advanceUntilIdle()
+
+            // The default tab is COLLECTION -- the 12-flow GAMES combine is flatMapLatest-gated off
+            // StatsTab and must never populate state.gameStats until GAMES is explicitly selected,
+            // even though every underlying game-session flow already has real data available.
+            assertEquals(StatsTab.COLLECTION, vm.uiState.value.selectedTab)
+            assertEquals(null, vm.uiState.value.gameStats)
+        }
+
+    @Test
+    fun `given the GAMES tab is left and re-entered when the underlying session data changed meanwhile then gameStats reflects the fresh data, not a stale value`() =
+        runTest {
+            totalGamesFlow.value = 4
+            localWinsFlow.value = 3
+            localSessionHistoryFlow.value = listOf(historyEntry(sessionId = 1, localIsWinner = true))
+
+            val vm = buildViewModel()
+            advanceUntilIdle()
+            vm.onTabSelected(StatsTab.GAMES)
+            advanceUntilIdle()
+            assertEquals(4, vm.uiState.value.gameStats?.totalGames)
+
+            // Navigate away -- flatMapLatest cancels/unsubscribes the 12-flow combine while off-tab
+            // (the WS5 fix this test protects). The underlying data changes WHILE unsubscribed.
+            vm.onTabSelected(StatsTab.COLLECTION)
+            advanceUntilIdle()
+            totalGamesFlow.value = 10
+            localWinsFlow.value = 7
+            advanceUntilIdle()
+
+            // Re-entering GAMES must re-subscribe and recompute from the CURRENT data, proving the
+            // gate is a real subscribe/unsubscribe toggle rather than a one-time snapshot.
+            vm.onTabSelected(StatsTab.GAMES)
+            advanceUntilIdle()
+
+            assertEquals(10, vm.uiState.value.gameStats?.totalGames)
+            assertEquals(7, vm.uiState.value.gameStats?.wins)
+        }
+
     @Test
     fun `given no sessions when observing game stats then hasGameStats stays false and winrate is zero`() = runTest {
         val vm = buildViewModel()
+        advanceUntilIdle()
+        // WS5a: gameStats is only populated once the GAMES tab is active.
+        vm.onTabSelected(StatsTab.GAMES)
         advanceUntilIdle()
 
         val state = vm.uiState.value
@@ -362,6 +419,8 @@ class StatsViewModelTest {
 
         val vm = buildViewModel()
         advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
+        advanceUntilIdle()
 
         assertEquals(0, vm.uiState.value.gameStats?.currentStreak)
         assertEquals(0, vm.uiState.value.gameStats?.bestStreak)
@@ -377,6 +436,8 @@ class StatsViewModelTest {
         )
 
         val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
         advanceUntilIdle()
 
         assertEquals(3, vm.uiState.value.gameStats?.currentStreak)
@@ -394,6 +455,8 @@ class StatsViewModelTest {
         )
 
         val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
         advanceUntilIdle()
 
         assertEquals(1, vm.uiState.value.gameStats?.currentStreak) // only the front-most win before the loss
@@ -413,6 +476,8 @@ class StatsViewModelTest {
 
         val vm = buildViewModel()
         advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
+        advanceUntilIdle()
 
         val items = vm.uiState.value.modeWinrates
         assertEquals(listOf("STANDARD", "COMMANDER"), items.map { it.mode })
@@ -431,6 +496,8 @@ class StatsViewModelTest {
         )
 
         val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
         advanceUntilIdle()
 
         val items = vm.uiState.value.playerCountWinrates
@@ -453,6 +520,8 @@ class StatsViewModelTest {
 
         val vm = buildViewModel()
         advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
+        advanceUntilIdle()
 
         val recent = vm.uiState.value.recentForm
         assertEquals(10, recent.size)
@@ -469,6 +538,8 @@ class StatsViewModelTest {
 
         val vm = buildViewModel()
         advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
+        advanceUntilIdle()
 
         assertNull(vm.uiState.value.gameStats?.mostFrequentLoss)
     }
@@ -478,6 +549,8 @@ class StatsViewModelTest {
         mostFrequentEliminationFlow.value = EliminationStats("COMMANDER_DAMAGE", 7)
 
         val vm = buildViewModel()
+        advanceUntilIdle()
+        vm.onTabSelected(StatsTab.GAMES)
         advanceUntilIdle()
 
         assertEquals("COMMANDER_DAMAGE", vm.uiState.value.gameStats?.mostFrequentLoss)

@@ -56,14 +56,29 @@ import kotlin.math.round
  * re-query per role whose otag came back empty), keeping the burst well within the queue's ≤10 req/s
  * budget. Results are merged, de-duplicated by `scryfallId` and sorted by `edhrecRank` (nulls last).
  *
- * **DORMANT: not wired to any live surface as of 2026-07.** Do NOT delete — kept for a possible
- * budget-suggestions revival (D5, `docs/claude-code-prompt-deck-doctor-community.md` Phase 0.6).
- * The Deck Studio "Suggestions" tab that exercises this class end-to-end (via
- * `SuggestAddsWithBudgetUseCase`) is currently hidden behind
- * `DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` (default `false` —
- * see `docs/hidden-features/deck-studio-suggestions.md`), so no user-reachable screen calls this
- * code path today even though it stays fully compiled and unit-tested. See memory
- * `project_dormant_budget_pool`.
+ * ## Pagination + progressive relaxation (Deck Wizard & Engine Rework plan, Workstream 4.1)
+ * [page] threads a Scryfall results page (1-based) into every query this generation issues, so a
+ * caller that still has unfilled slots after page 1's candidates are exhausted can re-invoke with
+ * `page = 2, 3, ...` to keep drawing from the SAME otag/strategy/tribe queries instead of widening
+ * the query itself. [relaxed] drops the role-gap queries entirely (keeping only the strategy/tribe
+ * queries plus identity/legality) for a final, looser pass once every role-targeted page has been
+ * exhausted — this is deliberately the ONLY relaxation lever; the fit floor a caller applies
+ * downstream (e.g. [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
+ * .CATEGORY_FILL_FIT_FLOOR]) never relaxes, so relaxation widens the POOL, never the bar a candidate
+ * must clear to be placed (quality over completion, per the plan).
+ *
+ * ## STATUS (no longer dormant — Workstreams 4 and 7.3)
+ * The dormant D5 budget-suggestions pipeline (`SuggestAddsWithBudgetUseCase`, `BudgetOptimizer`)
+ * and the legacy `BuildDeckFromSeedsUseCase` seed-build path (Deck Doctor Phase 7) — this class's
+ * ONLY two callers pre-campaign — were BOTH DELETED in the Deck Wizard & Engine Rework plan
+ * (WS7.3, D-H "budget is not coming back", and WS7.2 respectively, 2026-07-28). This class
+ * SURVIVED both deletions because Workstream 4 gave it a THIRD, live caller before the deletions
+ * landed: [com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase]'s Scryfall
+ * backstop fill phase (gated on
+ * [com.mmg.manahub.feature.decks.domain.template.DeckWizardSpec.includeOutsideCollection]), plus a
+ * second live caller added by WS8.2: `DeckDoctorOrchestrator`'s own Suggestions-tab "include
+ * outside collection" toggle. This is now the class's SOLE reason to exist — do not delete it, and
+ * do not resurrect the deleted dormant-pipeline classes as new callers.
  */
 class CandidatePoolGenerator(
     private val cardRepository: CardRepository,
@@ -76,6 +91,13 @@ class CandidatePoolGenerator(
      * @param usdCap an optional LOOSE per-card USD cap appended as `usd<=` to pre-trim expensive
      *        results before the exact € filtering happens in [BudgetOptimizer]. Null = no pre-filter.
      * @param perRoleLimit maximum cards kept per query after the Scryfall response is parsed.
+     * @param page the Scryfall results page (1-based) requested for every query issued this call
+     *        (plan Workstream 4.1). Defaults to `1`; a caller paginating past an exhausted page 1
+     *        re-invokes with an incremented [page] to keep drawing from the SAME queries.
+     * @param relaxed when `true`, drops every role-gap query and keeps only the strategy/tribe
+     *        queries (plus identity/legality) — a final, looser pass once role-targeted pages are
+     *        exhausted (plan Workstream 4.1's progressive relaxation policy). Defaults to `false`
+     *        (byte-identical to pre-Workstream-4 behavior for every existing caller).
      * @return external candidate cards (not de-duplicated against the collection here — the caller
      *         merges sources and resolves origin priority), sorted by EDHREC rank (nulls last).
      */
@@ -84,13 +106,21 @@ class CandidatePoolGenerator(
         evaluation: DeckEvaluation,
         usdCap: Double? = null,
         perRoleLimit: Int = PER_ROLE_LIMIT,
+        page: Int = 1,
+        relaxed: Boolean = false,
     ): List<Card> = withContext(ioDispatcher) {
         // Only roles that are actually under-covered AND have a queryable fragment are worth a query.
-        val gapRoles = evaluation.roleCoverage
-            .filter { it.gap > 0 }
-            .map { it.role }
-            .filter { it.queryFragment() != null }
-            .distinct()
+        // Workstream 4.1 progressive relaxation: a relaxed pass drops role-gap queries entirely,
+        // keeping only the strategy/tribe queries below.
+        val gapRoles = if (relaxed) {
+            emptyList()
+        } else {
+            evaluation.roleCoverage
+                .filter { it.gap > 0 }
+                .map { it.role }
+                .filter { it.queryFragment() != null }
+                .distinct()
+        }
 
         // Strategy/tribe queries cover the deck-defining roles (PAYOFF/SYNERGY/THREAT) that have no
         // generic role query (plan E3). Derived purely from the profile via fixed allowlists.
@@ -122,7 +152,7 @@ class CandidatePoolGenerator(
                 roleFragment = plan.primary,
                 budgetFragment = budgetFragment,
             )
-            val primaryResult = runCatching { cardRepository.searchWithRawQuery(primaryQuery, order = "edhrec") }
+            val primaryResult = runCatching { cardRepository.searchWithRawQuery(primaryQuery, order = "edhrec", page = page) }
             val primaryCards = primaryResult.getOrDefault(emptyList())
 
             // E2 fallback: when the otag query ERRORS or returns EMPTY, retry with the legacy
@@ -136,7 +166,7 @@ class CandidatePoolGenerator(
                         roleFragment = fb,
                         budgetFragment = budgetFragment,
                     )
-                    runCatching { cardRepository.searchWithRawQuery(fallbackQuery, order = "edhrec") }.getOrDefault(emptyList())
+                    runCatching { cardRepository.searchWithRawQuery(fallbackQuery, order = "edhrec", page = page) }.getOrDefault(emptyList())
                 } ?: primaryCards
             } else {
                 primaryCards
@@ -214,13 +244,20 @@ class CandidatePoolGenerator(
     }
 
     /**
-     * `id<={WUBRG}` restricts results to cards WITHIN the commander color identity. For an empty
-     * identity (no restriction) the fragment is omitted entirely.
+     * `id<={WUBRG}` restricts results to cards WITHIN the deck's color identity. An EMPTY
+     * [identity] is a REAL "colorless required" constraint, never "no restriction" (edge-case audit
+     * Fix 2) -- [profile]'s `colorIdentity` always reflects the deck actually being built/analyzed
+     * (the commander's identity, the wizard's explicit color picks, or the Colorless wizard pick
+     * itself; `BuildDeckFromTemplateUseCase.analyzeCollection`'s own D9 comment documents
+     * `colorIdentity.isEmpty()` as exactly this intentional state for 60-card constructed formats).
+     * Pre-fix this returned `null` here, so the Scryfall backstop had NO color restriction at all
+     * for a Colorless build -- `id=c` is Scryfall's exact-match colorless-identity token and closes
+     * that gap.
      */
     private fun colorIdentityFragment(identity: Set<ManaColor>): String? {
         // ManaColor.C carries no WUBRG letter; only the five colors restrict identity.
         val symbols = identity.mapNotNull { it.wubrgSymbolOrNull() }.sorted().joinToString(separator = "")
-        return if (symbols.isEmpty()) null else "id<=$symbols"
+        return if (symbols.isEmpty()) "id=c" else "id<=$symbols"
     }
 
     private fun legalityFragment(profile: DeckProfile): String? = when (profile.format) {

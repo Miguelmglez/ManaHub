@@ -173,6 +173,28 @@ class XpGranter(
         // FeatureExplored grants no XP — it only advances exploration quests (no ledger row). Mapping
         // to null keeps the ledger clean and the `when` exhaustive (mirrors DeckSaved).
         is ProgressionEvent.FeatureExplored -> null
+
+        // Daily Puzzle feature (Batch B3 gamification hookup). The perfect-solve bonus is
+        // DELIBERATELY EXCLUDED for GUESS_CARD (see XpConfig.puzzlePerfectBonus KDoc): a lucky or
+        // already-known first guess on a guess-based puzzle isn't a skill signal worth rewarding.
+        // event.perfect IS reachable here (PuzzleViewModel.onGuessResolved sets
+        // perfect = isCorrect && updatedGuesses.size == 1, which a first-try guess satisfies) — the
+        // `event.type != "GUESS_CARD"` guard is the actual gate, reserved for future skill-based
+        // puzzle types where a genuinely optimal solve is meaningful to reward.
+        is ProgressionEvent.PuzzleSolved -> {
+            val lines = buildList {
+                add(XpLineItem(XpSourceCategory.PUZZLE, XpConfig.puzzleSolved, "Puzzle solved"))
+                if (event.perfect && event.type != "GUESS_CARD") {
+                    add(XpLineItem(XpSourceCategory.PUZZLE, XpConfig.puzzlePerfectBonus, "Perfect solve"))
+                }
+            }
+            GrantPlan(
+                lines.sumOf { it.amount },
+                XpSourceCategory.PUZZLE,
+                event.puzzleDate.toString(),
+                lines,
+            )
+        }
     }
 
     private fun singleLine(

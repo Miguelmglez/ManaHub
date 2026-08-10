@@ -11,6 +11,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
+import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.NeutralPowerResolver
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
@@ -87,12 +88,13 @@ object HarnessDoctorPipeline {
             commanderTags = commanderTags,
         )
         val protectedIds = setOfNotNull(commander?.scryfallId) + (if (strategyLocked) wizardSourcedIds else emptySet())
+        val resolvedSkeleton = resolveArchetypeSkeleton(health)
         val cuts = suggestCutsUseCase(
             mainboard = mainboard,
             profile = health.profile,
             protectedIds = protectedIds,
+            resolvedSkeleton = resolvedSkeleton,
         )
-        val resolvedSkeleton = resolveArchetypeSkeleton(health)
         val adds = runCatching {
             suggestAddsFromCollectionUseCase(
                 collection = collection,
@@ -104,6 +106,27 @@ object HarnessDoctorPipeline {
 
         return DoctorResult(health = health, cuts = cuts, adds = adds)
     }
+
+    /**
+     * Deck Wizard & Engine Rework plan Workstream 8.1 (round-trip alignment invariant): re-ranks
+     * cuts against an ARBITRARY [protectedIds] set over the SAME [profile] a prior [evaluate] call
+     * already produced -- lets the harness compare the LOCKED cuts ranking (commander + every
+     * wizard-placed card protected) against the UNLOCKED ranking (commander only) without paying
+     * for a second full evaluate (Motor A/B + ArchetypeEvaluator would rerun for no reason, since
+     * lock state never changes the profile/health themselves, only which ids [SuggestCutsUseCase]
+     * excludes). Reuses the SAME [suggestCutsUseCase] instance [evaluate] uses.
+     */
+    suspend fun cutsWithProtection(
+        mainboard: List<DeckEntry>,
+        profile: DeckProfile,
+        protectedIds: Set<String>,
+        resolvedSkeleton: ResolvedArchetypeSkeleton?,
+    ): List<CardFit> = suggestCutsUseCase(
+        mainboard = mainboard,
+        profile = profile,
+        protectedIds = protectedIds,
+        resolvedSkeleton = resolvedSkeleton,
+    )
 
     /** Mirrors DeckDoctorOrchestrator.inferenceSeeds EXACTLY. */
     private fun inferenceSeeds(commander: Card?, mainboard: List<DeckEntry>): List<Card> {
@@ -129,8 +152,10 @@ object HarnessDoctorPipeline {
         return DeckIdentitySeedTags.forArchetype(archetype ?: ArchetypeId.GENERIC, themes, tribeOverride)
     }
 
-    /** Mirrors DeckDoctorOrchestrator.resolveArchetypeSkeleton EXACTLY. */
-    private fun resolveArchetypeSkeleton(health: DeckHealth): ResolvedArchetypeSkeleton? {
+    /** Mirrors DeckDoctorOrchestrator.resolveArchetypeSkeleton EXACTLY. Public (not private) so
+     * [HarnessMatrixRunner]'s WS8.1 round-trip UNLOCKED re-rank can resolve the SAME skeleton
+     * [evaluate] used, keeping the two cut rankings comparable under the identical WS8.3 layers. */
+    fun resolveArchetypeSkeleton(health: DeckHealth): ResolvedArchetypeSkeleton? {
         val archetypeFormat = ArchetypeFormat.of(health.profile.format) ?: return null
         val resolution = health.archetypeResolution
         if (resolution.macro == ArchetypeId.GENERIC && resolution.themes.isEmpty()) return null
@@ -138,7 +163,7 @@ object HarnessDoctorPipeline {
             format = archetypeFormat,
             archetype = resolution.macro,
             themes = resolution.themes,
-            colorCount = health.profile.colorIdentity.size,
+            identity = health.profile.colorIdentity,
         )
     }
 }

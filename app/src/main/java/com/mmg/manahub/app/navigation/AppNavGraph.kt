@@ -55,7 +55,6 @@ import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionTab
-import com.mmg.manahub.feature.decks.presentation.DeckMagicDetailScreen
 import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
@@ -89,6 +88,7 @@ import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileTab
+import com.mmg.manahub.feature.puzzle.presentation.PuzzleScreen
 import com.mmg.manahub.feature.scanner.presentation.ScannerScreen
 import com.mmg.manahub.feature.settings.presentation.SettingsScreen
 import com.mmg.manahub.feature.stats.presentation.StatsScreen
@@ -341,6 +341,7 @@ fun AppNavGraph(
                                     HomeAction.OpenAchievements -> navController.navigate(Screen.Stats.route)
                                     HomeAction.OpenProfileQuests ->
                                         navController.navigate(Screen.Profile.routeWithTab("quests"))
+                                    HomeAction.OpenDailyPuzzle -> navController.navigate(Screen.DailyPuzzle.route)
                                     is HomeAction.OpenCardDetail -> navController.navigate(
                                         Screen.CollectionCardDetail.createRoute(action.scryfallId, action.sharedTransitionKey)
                                     )
@@ -488,28 +489,6 @@ fun AppNavGraph(
                         )
                     }
 
-            // ── Decks ─────────────────────────────────────────────────────────
-            composable(
-                route = Screen.DeckDetail.route,
-                arguments = listOf(navArgument("deckId") { type = NavType.StringType }),
-            ) {
-                DeckMagicDetailScreen(
-                    onBack = { navController.popBackStack() },
-                    // D10 (Phase 0.5): the standalone Deck Improvement screen was retired —
-                    // Deck Studio's Suggestions tab is now the sole Deck Doctor UI. "Improve
-                    // deck" re-points here instead of Screen.DeckImprovement (deleted).
-                    onImproveDeck = { id ->
-                        navController.navigate(Screen.DeckStudio.createRoute(id))
-                    },
-                    onReviewSurvey = { sessionId ->
-                        navController.navigate(Screen.GameSurvey.createRoute(sessionId, "REVIEW"))
-                    },
-                    onPlaytest = { id ->
-                        navController.navigate(Screen.PlaytestSetup.createRoute(id))
-                    },
-                )
-            }
-
             // ── Community Decks (Archidekt browse + import) ───────────────────
             composable(
                 route = Screen.CommunityDeckDetail.route,
@@ -528,6 +507,11 @@ fun AppNavGraph(
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable,
                 )
+            }
+
+            // Daily Puzzle (ADR-006, Batch B2)
+            composable(route = Screen.DailyPuzzle.route) {
+                PuzzleScreen(onBack = { navController.popBackStack() })
             }
 
             // Community Decks browse / search (landing)
@@ -1018,7 +1002,7 @@ fun AppNavGraph(
                             popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
                         }
                     },
-                    onOnlineHostGameStart = { sessionId, mode, playerCount ->
+                    onOnlineHostGameStart = { sessionId, mode, playerCount, guestToken ->
                         val configs = (0 until playerCount).mapIndexed { i, _ ->
                             PlayerConfig(
                                 id        = i,
@@ -1027,12 +1011,12 @@ fun AppNavGraph(
                                 isAppUser = i == 0,
                             )
                         }
-                        gameVm.initFromOnlineSession(sessionId, 0, configs, mode)
+                        gameVm.initFromOnlineSession(sessionId, 0, configs, mode, guestToken = guestToken)
                         navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
                             popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
                         }
                     },
-                    onOnlineJoinGameStart = { sessionId, slotIndex, modeStr, playerCount ->
+                    onOnlineJoinGameStart = { sessionId, slotIndex, modeStr, playerCount, guestToken ->
                         val mode = runCatching { GameMode.valueOf(modeStr) }.getOrDefault(GameMode.STANDARD)
                         val configs = (0 until playerCount).mapIndexed { i, _ ->
                             PlayerConfig(
@@ -1042,7 +1026,7 @@ fun AppNavGraph(
                                 isAppUser = i == slotIndex,
                             )
                         }
-                        gameVm.initFromOnlineSession(sessionId, slotIndex, configs, mode)
+                        gameVm.initFromOnlineSession(sessionId, slotIndex, configs, mode, guestToken = guestToken)
                         navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
                             popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
                         }

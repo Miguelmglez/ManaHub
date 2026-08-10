@@ -48,7 +48,7 @@ data class CategoryFill(
 
 /**
  * Deck Engine Unification plan (D3): a structured, honest declaration of "the build could not fill
- * this many slots from the owned collection above [BuildDeckFromTemplateUseCase.CATEGORY_FILL_FIT_FLOOR]"
+ * this many slots from the owned collection above [com.mmg.manahub.feature.decks.domain.engine.CATEGORY_FILL_FIT_FLOOR]"
  * -- REPLACES the old scalar [TemplateBuildResult] `shortfall: Int` (Wizard Quality Campaign B2b).
  * The wizard Result screen and Deck Studio's Suggestions tab render the SAME shape ("missing 3 Ramp
  * in {G}" / "missing 5 Other").
@@ -96,7 +96,7 @@ data class TemplateBuildResult(
      * Deck Engine Unification plan (D3) -- REPLACES the old scalar `shortfall: Int` (Wizard Quality
      * Campaign B2b). Empty means the mainboard reached the format's full target size (lands
      * included). A non-empty list is an HONEST declaration that the owned collection had nothing
-     * left clearing [BuildDeckFromTemplateUseCase.CATEGORY_FILL_FIT_FLOOR] -- the build NEVER places
+     * left clearing [com.mmg.manahub.feature.decks.domain.engine.CATEGORY_FILL_FIT_FLOOR] -- the build NEVER places
      * a weak filler card just to hit the format's size; it reports the gap instead. See [DeckGap]'s
      * KDoc for the exact reconciliation guarantee (`gaps.sumOf { it.missingCount }` is always the
      * true numeric shortfall).

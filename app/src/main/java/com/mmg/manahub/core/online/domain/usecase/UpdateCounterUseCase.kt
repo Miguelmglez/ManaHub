@@ -14,5 +14,6 @@ class UpdateCounterUseCase @Inject constructor(
         slotIndex: Int,
         counterType: String,
         delta: Int,
-    ): Result<Unit> = repository.updateCounter(sessionId, slotIndex, counterType, delta)
+        guestToken: String? = null,
+    ): Result<Unit> = repository.updateCounter(sessionId, slotIndex, counterType, delta, guestToken)
 }

@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +60,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -430,10 +430,8 @@ fun FeedbackSheet(onDismiss: () -> Unit) {
                     ),
                 ) {
                     if (isSending) {
-                        CircularProgressIndicator(
+                        MagicLoadingSpinner(
                             modifier = Modifier.size(20.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp,
                         )
                     } else {
                         Icon(

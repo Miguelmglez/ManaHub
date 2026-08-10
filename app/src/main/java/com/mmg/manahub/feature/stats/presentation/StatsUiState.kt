@@ -162,11 +162,13 @@ data class StatsUiState(
     val currency:            PreferredCurrency = if (PriceFormatter.isEuropeanLocale()) PreferredCurrency.EUR else PreferredCurrency.USD,
     val isLoading:           Boolean          = true,
     val error:               String?          = null,
-    val isRefreshingPrices:  Boolean          = false,
-    val refreshProgress:     Pair<Int, Int>?  = null,
+    /**
+     * Read-only price-freshness signal (2026-07-28 backend perf plan, WS1+WS3/WS5a — prices
+     * refresh automatically once a day via `PriceRefreshWorker`; Stats only ever DISPLAYS this
+     * timestamp, it never triggers a refresh). The manual refresh entry point
+     * (`isRefreshingPrices`/`refreshProgress`/`refreshResult`/`refreshError`) was removed.
+     */
     val lastRefreshedAt:     Long?            = null,
-    val refreshError:        String?          = null,
-    val refreshResult:       String?          = null,
 
     // ── Collection tab — Phase 2 additions (2026-07 stats expansion) ───────────
     /** Top sets by completion ratio (owned-distinct / card_count), global/unfiltered, capped. */

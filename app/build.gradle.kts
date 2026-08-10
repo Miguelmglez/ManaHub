@@ -305,6 +305,11 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.arch.core.testing)
     testImplementation(libs.okhttp.mockwebserver)
+    // work-testing — Backend & Performance Optimization plan, WS7 Part 2 (2026-07-29): TestListenableWorkerBuilder
+    // lets a plain JVM unit test build a real CoroutineWorker instance (own WorkerParameters) and call
+    // doWork() in isolation, pinning the gamification gate / PriceRefreshWorker / CardBackfillWorker
+    // behaviours. Pinned to the SAME version as work-runtime-ktx (see the catalog entry's comment).
+    testImplementation(libs.work.testing)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
@@ -351,6 +356,9 @@ dependencies {
 
     // Stable collection types for Compose recomposition stability
     implementation(libs.kotlinx.collections.immutable)
+
+    // Lottie files for animated items
+    implementation(libs.lottie)
 }
 
 hilt {

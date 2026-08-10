@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -87,6 +86,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -277,8 +277,7 @@ fun PlaytestHandScreen(
                     .padding(padding),
             ) {
                 when {
-                    uiState.isLoading -> CircularProgressIndicator(
-                        color = mc.primaryAccent,
+                    uiState.isLoading -> MagicLoadingSpinner(
                         modifier = Modifier.align(Alignment.Center),
                     )
 

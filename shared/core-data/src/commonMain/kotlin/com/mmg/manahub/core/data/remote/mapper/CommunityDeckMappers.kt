@@ -106,6 +106,7 @@ fun ArchidektDeckSummaryDto.toDomain(): CommunityDeckSummary = CommunityDeckSumm
     name = name,
     size = size,
     format = ArchidektFormat.toManaHubFormat(deckFormat),
+    deckFormatId = deckFormat,
     owner = owner
         ?.let { CommunityDeckOwner(id = it.id, username = it.username, avatarUrl = it.avatar) }
         ?: CommunityDeckOwner(id = 0, username = "Unknown", avatarUrl = ""),

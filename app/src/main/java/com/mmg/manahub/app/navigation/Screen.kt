@@ -27,9 +27,9 @@ sealed class Screen(val route: String) {
     }
 
     // ── Decks (sub-section of Collection) ────────────────────────────────────
-    object DeckDetail  : Screen("collection/deckmagic/{deckId}") {
-        fun createRoute(deckId: String) = "collection/deckmagic/$deckId"
-    }
+    // The legacy `DeckDetail` route (`DeckMagicDetailScreen`) was RETIRED in the Deck Wizard &
+    // Engine Rework plan, Workstream 7.1 (2026-07-28) — Deck Studio (below) is the single
+    // create+edit surface. Do not re-add this route.
 
     /**
      * Unified hybrid deck builder ("Deck Studio") — combines manual editing,
@@ -99,8 +99,7 @@ sealed class Screen(val route: String) {
     }
     // Screen.DeckImprovement (the standalone Deck Doctor screen) was RETIRED in Phase 0.5 of
     // docs/claude-code-prompt-deck-doctor-community.md (D10) — Deck Studio's Suggestions tab
-    // is now the sole Deck Doctor UI surface. DeckMagicDetailScreen.onImproveDeck navigates to
-    // Screen.DeckStudio instead (see AppNavGraph.kt).
+    // is now the sole Deck Doctor UI surface.
 
     // ── Community Decks (Archidekt browse + import) ──────────────────────────
     /** Community Decks landing / browse screen. */
@@ -246,8 +245,10 @@ sealed class Screen(val route: String) {
         fun createRoute(deckId: String) = "playtest/hand/$deckId"
     }
 
-    // ── v2 stubs ─────────────────────────────────────────────────────────────
-    object Puzzle : Screen("puzzle")
+    // ── Daily Puzzle (ADR-006) ──────────────────────────────────────────────
+    // Repurposes the pre-existing "puzzle" route stub (formerly `object Puzzle`, unreferenced by
+    // any composable) rather than minting a second, parallel route for the same feature.
+    object DailyPuzzle : Screen("puzzle")
 
     // ── Trades (sub-section of Collection, also handles deep links) ───────────
     /**

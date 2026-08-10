@@ -49,6 +49,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.model.AlmostCombo
 import com.mmg.manahub.feature.decks.domain.model.Combo
+import com.mmg.manahub.feature.decks.presentation.DeckFeatureFlags
 import org.jetbrains.compose.resources.painterResource
 
 /** Standard MTG card aspect ratio, shared by every combo card tile. */
@@ -69,6 +70,9 @@ private const val COMBO_CARD_ASPECT_RATIO = 63f / 88f
  * @param sharedTransitionScope / @param animatedVisibilityScope non-null only when the hosting
  *   nav destination participates in a `SharedTransitionLayout` -- null degrades to a plain tap
  *   with no shared-element animation.
+ * @param showUseAsSeed Deck Wizard & Engine Rework plan (WS 1.3, D-E): gates the "Use as seed" CTA
+ *   behind `DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED` -- the combo itself always renders
+ *   read-only, only the hand-off action is hidden when `false`.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -80,6 +84,7 @@ internal fun ComboRow(
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
     modifier: Modifier = Modifier,
+    showUseAsSeed: Boolean = DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -125,14 +130,16 @@ internal fun ComboRow(
                 animatedVisibilityScope = animatedVisibilityScope,
             )
 
-            Spacer(Modifier.height(spacing.sm))
-            OutlinedButton(
-                onClick = onUseAsSeed,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                shape = ButtonShape,
-            ) {
-                Text(text = stringResource(R.string.deck_wizard_build_this), style = ty.labelLarge, color = mc.primaryAccent)
+            if (showUseAsSeed) {
+                Spacer(Modifier.height(spacing.sm))
+                OutlinedButton(
+                    onClick = onUseAsSeed,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                    shape = ButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.deck_wizard_build_this), style = ty.labelLarge, color = mc.primaryAccent)
+                }
             }
         }
     }
@@ -153,6 +160,8 @@ internal fun AlmostComboRow(
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
     modifier: Modifier = Modifier,
+    // See ComboRow's showUseAsSeed KDoc (WS 1.3, D-E).
+    showUseAsSeed: Boolean = DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -200,14 +209,16 @@ internal fun AlmostComboRow(
                 animatedVisibilityScope = animatedVisibilityScope,
             )
 
-            Spacer(Modifier.height(spacing.sm))
-            OutlinedButton(
-                onClick = onUseAsSeed,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
-                shape = ButtonShape,
-            ) {
-                Text(text = stringResource(R.string.deck_wizard_build_this), style = ty.labelLarge, color = mc.primaryAccent)
+            if (showUseAsSeed) {
+                Spacer(Modifier.height(spacing.sm))
+                OutlinedButton(
+                    onClick = onUseAsSeed,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.5f)),
+                    shape = ButtonShape,
+                ) {
+                    Text(text = stringResource(R.string.deck_wizard_build_this), style = ty.labelLarge, color = mc.primaryAccent)
+                }
             }
         }
     }

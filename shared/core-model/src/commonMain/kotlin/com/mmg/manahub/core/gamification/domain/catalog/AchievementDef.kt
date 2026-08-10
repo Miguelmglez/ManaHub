@@ -82,6 +82,13 @@ enum class AchievementResolver {
      * count — 0 or more; the secret unlocks at threshold 1.
      */
     GAMES_ENDED_AT_ONE_LIFE,
+
+    /**
+     * Total solved daily puzzles (`COUNT(*) FROM puzzle_results WHERE solved = 1`). Daily Puzzle
+     * feature (ADR-006 Decision 5) — DERIVED so `PUZZLE_SOLVER` gets free retroactive backfill from
+     * the durable `puzzle_results` table with zero double-count risk.
+     */
+    PUZZLES_SOLVED,
 }
 
 /**

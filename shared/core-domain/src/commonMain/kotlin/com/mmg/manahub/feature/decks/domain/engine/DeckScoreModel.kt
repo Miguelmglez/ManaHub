@@ -18,6 +18,27 @@ import com.mmg.manahub.core.model.DeckFormat
 //   · Everything is compared by CardTag.key (locale-safe), not by object equality.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Deck Engine Unification (D3), formerly Wave 3 (Task 1) — the minimum RAW fit score
+ * ([CardFit.score] / Motor B's `synergy`) a candidate must clear to be treated as a legitimate
+ * placement/keep anywhere in the pipeline: the build-time Motor A/B/Scryfall-backstop loops
+ * ([com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase]) require it to
+ * PLACE a card at all (D3: "gaps beat weak fills" — a deck that comes out short reports a
+ * structured gap instead of a weak filler), and the Deck Wizard & Engine Rework plan's Workstream
+ * 8 (Suggestions system) additionally uses it as:
+ *  - the round-trip alignment invariant's threshold ("a wizard-placed card with fit >= this floor
+ *    must never rank as a top cut" — the harness's `GoldenDeckHarnessTest`/real-collection
+ *    `WizardQualityMatrixTest` coherence checks), and
+ *  - the cut-simulation "no better replacement available" gate ([SuggestCutsUseCase]).
+ *
+ * Promoted to this single shared location (was a private constant duplicated per call site) so
+ * every consumer reads the exact same value — a build-time float and an evaluate-time float
+ * silently drifting apart would reopen the exact class of "wizard places it, Doctor cuts it" bug
+ * this whole workstream exists to close. Tunable; 0.25 is comfortably below a genuinely decent fit
+ * (mid-0.4s+ in practice) but above the near-zero scores a truly off-strategy card gets.
+ */
+const val CATEGORY_FILL_FIT_FLOOR = 0.25f
+
 /** Functional role of a card inside a deck. Foundation of the whole evaluation. */
 enum class DeckRole {
     RAMP,            // mana acceleration (mana_rock, mana_dork, ramp)
@@ -127,6 +148,40 @@ sealed interface ScoreReason {
     data object OutOfColorIdentity : ScoreReason
     data object Colorless : ScoreReason
     data object InCollection : ScoreReason
+
+    /** Deck Wizard & Engine Rework plan, Workstream 9.5 -- this card's heaviest single-colour pip
+     * ([intensity]) exceeds what the deck's OWN [ManaBaseAnalyzer]-measured sources for [color] can
+     * reliably support (`have < need`). Attached by [com.mmg.manahub.feature.decks.domain.usecase
+     * .SuggestCutsUseCase] as an additive layer on top of [DeckScorer.rankCuts] -- never emitted by
+     * the base engine itself. */
+    data class UnsupportedPipCost(val color: ManaColor, val intensity: Int) : ScoreReason
+
+    // ── Archetype-aware add/cut reasons (Deck Wizard & Engine Rework plan, Workstream 8.2/8.3) ──
+    // Distinct from FillsGap/OverCovered above (which are keyed on the legacy DeckRole/GENERIC
+    // skeleton) -- these are keyed on the dynamic RoleKey vocabulary + the resolved archetype/theme
+    // plan, mirroring DeckWarning.ArchetypeRoleGap/ArchetypeAntiRolePresent's shape exactly so the
+    // UI can say "Aggro wants..." consistently across warnings AND suggestion reasons. Attached
+    // ONLY when a non-GENERIC/themed skeleton resolved (mirrors every other archetype-aware term
+    // in this codebase); a GENERIC deck's suggestions never carry either of these.
+
+    /**
+     * WS8.2 -- this ADD candidate fills a role ([roleKey]) the resolved archetype/theme skeleton
+     * still needs: [current] copies are in the deck against an [ideal] target, for the [planLabel]
+     * plan (e.g. "Aggro wants 24+ threats -- you have 19"). Attached by
+     * [com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase] alongside its
+     * theme-role gap bonus -- the bonus and the reason always travel together (one is never emitted
+     * without the other).
+     */
+    data class FillsArchetypeGap(val roleKey: RoleKey, val current: Int, val ideal: Int, val planLabel: String) : ScoreReason
+
+    /**
+     * WS8.3 -- this CUT candidate's dominant role ([roleKey]) is currently OVER the resolved
+     * skeleton's [max] tolerance ([current] copies run against it) for the [planLabel] plan
+     * ("worst fit among your 9 Board Wipes -- Aggro wants at most 2"). Attached by
+     * [com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase] as an additive layer on top
+     * of [DeckScorer.rankCuts], same discipline as [UnsupportedPipCost].
+     */
+    data class OverArchetypeBand(val roleKey: RoleKey, val current: Int, val max: Int, val planLabel: String) : ScoreReason
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -412,23 +467,32 @@ sealed interface DeckWarning {
      * vocabulary, e.g. `"mana_fix"`, `"sac_outlet"`, `"tutor"`). Distinct from the legacy
      * [MissingRole] (which is keyed on the old [DeckRole] enum) — this is keyed on the new dynamic
      * [RoleKey] string vocabulary.
+     *
+     * @property planLabel the resolved plan's display name (e.g. "Aggro", "Aggro + Tokens") --
+     *           Deck Wizard & Engine Rework plan, WS5.4: named explicitly so the rendered copy can
+     *           say "Aggro wants..." instead of a generic "this plan wants..." ([ArchetypeEvaluator
+     *           .evaluate] is the only constructor; see [ResolvedArchetypeSkeleton.planLabel]).
      */
-    data class ArchetypeRoleGap(val roleKey: RoleKey, val current: Int, val min: Int) : DeckWarning
+    data class ArchetypeRoleGap(val roleKey: RoleKey, val current: Int, val min: Int, val planLabel: String) : DeckWarning
 
     /**
      * The deck runs more copies of an archetype ANTI-role (e.g. `removal_mass` in an AGGRO
      * skeleton) than the resolved tolerance allows (A.4 step 5: anti-roles resolve to
      * `[0, 0, priorMax]`).
+     *
+     * @property planLabel see [ArchetypeRoleGap.planLabel].
      */
-    data class ArchetypeAntiRolePresent(val roleKey: RoleKey, val current: Int, val tolerance: Int) : DeckWarning
+    data class ArchetypeAntiRolePresent(val roleKey: RoleKey, val current: Int, val tolerance: Int, val planLabel: String) : DeckWarning
 
     /**
      * The deck's average CMC falls outside the resolved archetype's curve band
      * ([ResolvedArchetypeSkeleton.curve]). Distinct from [CurveTooHigh]/[CurveTooLow] (which use a
      * fixed, archetype-agnostic threshold) — this compares against the archetype-specific band and
      * is suppressed entirely when an active [CurveExemption] applies (A.3).
+     *
+     * @property planLabel see [ArchetypeRoleGap.planLabel].
      */
-    data class CurveOutsideArchetypeBand(val avgCmc: Double, val min: Double, val max: Double) : DeckWarning
+    data class CurveOutsideArchetypeBand(val avgCmc: Double, val min: Double, val max: Double, val planLabel: String) : DeckWarning
 }
 
 data class DeckEvaluation(

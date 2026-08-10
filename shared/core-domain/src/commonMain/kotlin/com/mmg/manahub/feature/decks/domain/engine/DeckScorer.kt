@@ -408,7 +408,27 @@ class DeckScorer(
 
     /** HARD color-identity filter + soft bonus (fixes the soft-zero of the old scorers). */
     private fun colorScore(card: Card, profile: DeckProfile, reasons: MutableList<ScoreReason>): Pair<Boolean, Float> {
-        if (profile.colorIdentity.isEmpty()) return true to 1.0f
+        if (profile.colorIdentity.isEmpty()) {
+            // Edge-case audit Fix 2: an EMPTY deck identity is ambiguous by format. For COMMANDER
+            // and every 60-card constructed format (`DeckFormat.isSixtyCardConstructed`) it is a
+            // REAL, explicit "colorless required" constraint -- BuildDeckFromTemplateUseCase
+            // .analyzeCollection's own D9 comment documents `colorIdentity.isEmpty()` as the
+            // intentional Colorless wizard pick for exactly these formats, and this scorer must
+            // gate the SAME way, never fall through to a universal pass (the old unconditional
+            // `true to 1.0f` here let a colored card from the Scryfall backstop slip into an
+            // explicitly Colorless build). DRAFT (and any other non-constructed, non-Commander
+            // format) has no identity concept at all -- `analyzeCollection`'s own `else -> true`
+            // branch is the precedent -- so it keeps the permissive universal pass.
+            val identityIsMeaningful = profile.format == DeckFormat.COMMANDER || profile.format.isSixtyCardConstructed
+            if (!identityIsMeaningful) return true to 1.0f
+            return if (card.colorIdentity.isEmpty()) {
+                reasons += ScoreReason.Colorless
+                true to 1.0f
+            } else {
+                reasons += ScoreReason.OutOfColorIdentity
+                false to 0.0f
+            }
+        }
         if (card.colorIdentity.isEmpty()) { reasons += ScoreReason.Colorless; return true to 0.95f }
         val allowed = profile.colorIdentity.map { it.symbol }.toSet()
         val within = card.colorIdentity.all { it in allowed }

@@ -45,7 +45,7 @@ class ArchidektDirectFallbackSource(
             val search = archidektRequestQueue.execute {
                 archidektClient.searchDecks(
                     CommunityDeckSearchFilters(
-                        cardName = signatureCard,
+                        cardNames = listOf(signatureCard),
                         deckFormatId = format,
                         pageSize = FALLBACK_SAMPLE_SIZE,
                     ),

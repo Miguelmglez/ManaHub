@@ -4,6 +4,8 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.online.data.remote.OnlineSessionRemoteDataSource
 import com.mmg.manahub.core.online.data.remote.SupabaseRealtimeClient
 import com.mmg.manahub.core.online.domain.model.ActiveSession
+import com.mmg.manahub.core.online.domain.model.CreateSessionResult
+import com.mmg.manahub.core.online.domain.model.JoinSessionResult
 import com.mmg.manahub.core.online.domain.model.SessionEvent
 import com.mmg.manahub.core.online.domain.model.SessionSnapshot
 import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
@@ -41,8 +43,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun abandonMyActiveSession(sessionId: String): Result<Unit> =
-        remoteDataSource.abandonMyActiveSession(sessionId)
+    override suspend fun abandonMyActiveSession(sessionId: String, guestToken: String?): Result<Unit> =
+        remoteDataSource.abandonMyActiveSession(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_abandon_active_session_failed: ${throwable.message}")
@@ -57,9 +59,9 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         layoutKey: String?,
         displayName: String,
         themeKey: String,
-    ): Result<Pair<String, String>> =
+    ): Result<CreateSessionResult> =
         remoteDataSource.createSession(mode, playerCount, layoutKey, displayName, themeKey)
-            .map { Pair(it.sessionId, it.code) }
+            .map { CreateSessionResult(it.sessionId, it.code, it.guestToken) }
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_create_session_failed: mode=$mode player_count=$playerCount")
@@ -74,9 +76,9 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         code: String,
         displayName: String,
         themeKey: String,
-    ): Result<Pair<String, Int>> =
+    ): Result<JoinSessionResult> =
         remoteDataSource.joinSession(code, displayName, themeKey)
-            .map { Pair(it.sessionId, it.slotIndex) }
+            .map { JoinSessionResult(it.sessionId, it.slotIndex, it.guestToken) }
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_join_session_failed: ${throwable.message}")
@@ -85,8 +87,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun getSnapshot(sessionId: String): Result<SessionSnapshot> =
-        remoteDataSource.getSnapshot(sessionId).map { it.toDomain() }
+    override suspend fun getSnapshot(sessionId: String, guestToken: String?): Result<SessionSnapshot> =
+        remoteDataSource.getSnapshot(sessionId, guestToken).map { it.toDomain() }
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_get_snapshot_failed: ${throwable.message}")
@@ -95,8 +97,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun startSession(sessionId: String): Result<Unit> =
-        remoteDataSource.startSession(sessionId)
+    override suspend fun startSession(sessionId: String, guestToken: String?): Result<Unit> =
+        remoteDataSource.startSession(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_start_session_failed: ${throwable.message}")
@@ -105,8 +107,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun leaveSession(sessionId: String): Result<Unit> =
-        remoteDataSource.leaveSession(sessionId)
+    override suspend fun leaveSession(sessionId: String, guestToken: String?): Result<Unit> =
+        remoteDataSource.leaveSession(sessionId, guestToken)
             .onFailure { throwable ->
                 // Non-fatal: leave failures are silent to the user but indicate a Realtime/RPC problem
                 crashlytics.apply {
@@ -120,7 +122,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         sessionId: String,
         slotIndex: Int,
         newLife: Int,
-    ): Result<Unit> = remoteDataSource.updateLife(sessionId, slotIndex, newLife)
+        guestToken: String?,
+    ): Result<Unit> = remoteDataSource.updateLife(sessionId, slotIndex, newLife, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_update_life_failed: slot=$slotIndex new_life=$newLife")
@@ -135,7 +138,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         targetSlot: Int,
         sourceSlot: Int,
         delta: Int,
-    ): Result<Unit> = remoteDataSource.updateCommanderDamage(sessionId, targetSlot, sourceSlot, delta)
+        guestToken: String?,
+    ): Result<Unit> = remoteDataSource.updateCommanderDamage(sessionId, targetSlot, sourceSlot, delta, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_update_commander_damage_failed: target=$targetSlot source=$sourceSlot delta=$delta")
@@ -149,7 +153,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
         slotIndex: Int,
         counterType: String,
         delta: Int,
-    ): Result<Unit> = remoteDataSource.updateCounter(sessionId, slotIndex, counterType, delta)
+        guestToken: String?,
+    ): Result<Unit> = remoteDataSource.updateCounter(sessionId, slotIndex, counterType, delta, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_update_counter_failed: slot=$slotIndex type=$counterType delta=$delta")
@@ -159,8 +164,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun advancePhase(sessionId: String): Result<Unit> =
-        remoteDataSource.advancePhase(sessionId)
+    override suspend fun advancePhase(sessionId: String, guestToken: String?): Result<Unit> =
+        remoteDataSource.advancePhase(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_advance_phase_failed: ${throwable.message}")
@@ -169,8 +174,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun nextTurn(sessionId: String): Result<Unit> =
-        remoteDataSource.nextTurn(sessionId)
+    override suspend fun nextTurn(sessionId: String, guestToken: String?): Result<Unit> =
+        remoteDataSource.nextTurn(sessionId, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_next_turn_failed: ${throwable.message}")
@@ -179,8 +184,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun confirmDefeat(sessionId: String, slotIndex: Int): Result<Unit> =
-        remoteDataSource.confirmDefeat(sessionId, slotIndex)
+    override suspend fun confirmDefeat(sessionId: String, slotIndex: Int, guestToken: String?): Result<Unit> =
+        remoteDataSource.confirmDefeat(sessionId, slotIndex, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_confirm_defeat_failed: slot=$slotIndex ${throwable.message}")
@@ -190,8 +195,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun revokeDefeat(sessionId: String, slotIndex: Int): Result<Unit> =
-        remoteDataSource.revokeDefeat(sessionId, slotIndex)
+    override suspend fun revokeDefeat(sessionId: String, slotIndex: Int, guestToken: String?): Result<Unit> =
+        remoteDataSource.revokeDefeat(sessionId, slotIndex, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_revoke_defeat_failed: slot=$slotIndex ${throwable.message}")
@@ -201,8 +206,8 @@ class OnlineSessionRepositoryImpl @Inject constructor(
                 }
             }
 
-    override suspend fun setReady(sessionId: String, isReady: Boolean): Result<Unit> =
-        remoteDataSource.setReady(sessionId, isReady)
+    override suspend fun setReady(sessionId: String, isReady: Boolean, guestToken: String?): Result<Unit> =
+        remoteDataSource.setReady(sessionId, isReady, guestToken)
             .onFailure { throwable ->
                 crashlytics.apply {
                     log("repo_set_ready_failed: is_ready=$isReady ${throwable.message}")

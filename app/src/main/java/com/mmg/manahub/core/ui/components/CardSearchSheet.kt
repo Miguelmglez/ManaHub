@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -242,7 +241,7 @@ fun CardSearchSheet(
                                 else -> isSearchingScryfall
                             }
                         }
-                        if (isSearching) CircularProgressIndicator(Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
+                        if (isSearching) MagicLoadingSpinner(Modifier.size(20.dp))
                         else Icon(Icons.Default.Search, null, tint = mc.textSecondary)
                     },
                     trailingIcon = if (query.isNotEmpty()) {

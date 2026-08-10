@@ -1,8 +1,6 @@
 package com.mmg.manahub.feature.friends.data.repository
 
-import android.util.Log
 import com.mmg.manahub.core.common.CrashReporter
-import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -186,24 +184,28 @@ class FriendRepositoryImpl(
             offset = offset
         )
         // Pre-warm Room cache in one batch call instead of N sequential Scryfall fetches.
-        cardRepo.warmCacheForIds(dtos.map { it.scryfallId }.distinct())
+        val distinctIds = dtos.map { it.scryfallId }.distinct()
+        cardRepo.warmCacheForIds(distinctIds)
+
+        // Backend & Performance Optimization plan, WS1+WS3 Part B item 10 (2026-07-28): hydrate from
+        // Room ONLY. The batched warm above was already correct, but the per-DTO enrichment used to
+        // call `cardRepo.getCardById(dto.scryfallId)` — which falls back to a LIVE Scryfall fetch on
+        // a cache miss — for every row, re-introducing an N+1 network call for any id
+        // `warmCacheForIds` couldn't resolve (it is best-effort/failure-silent by design). A friend's
+        // card list degrades gracefully by simply omitting a row Room still can't resolve after the
+        // batch warm, same tolerance every other Room-only list path in this codebase already has.
+        val cardsById = cardRepo.getCardsByIds(distinctIds).associateBy { it.scryfallId }
 
         dtos.mapNotNull { dto ->
-            // The RPC returns only scryfall_id + user-specific fields. We enrich
-            // each row with card metadata from the local Room cache. getCardById
-            // automatically falls back to Scryfall and caches the result when the
-            // card is not yet in Room (e.g. first-time viewing a friend's collection).
-            val card = when (val r = cardRepo.getCardById(dto.scryfallId)) {
-                is DataResult.Success -> r.data
-                is DataResult.Error -> {
-                    Log.w("FriendRepository", "Card metadata unavailable: ${dto.scryfallId} — ${r.message}")
-                    crashReporter.log(
-                        "getFriendCollection: card metadata unavailable for ${dto.scryfallId} (list=$list): ${r.message}"
-                    )
-                    null
-                }
+            // The RPC returns only scryfall_id + user-specific fields. We enrich each row with card
+            // metadata from the local Room cache (batch-fetched above).
+            val card = cardsById[dto.scryfallId]
+            if (card == null) {
+                crashReporter.log(
+                    "getFriendCollection: card metadata unavailable for ${dto.scryfallId} (list=$list)"
+                )
+                return@mapNotNull null
             }
-            if (card == null) return@mapNotNull null
             // Apply the optional name filter client-side.
             if (query.isNotBlank() && !card.name.contains(query, ignoreCase = true)) {
                 return@mapNotNull null

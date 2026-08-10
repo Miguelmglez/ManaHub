@@ -8,6 +8,7 @@ import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.ScoreReason
+import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 
 /**
  * Presentation-side localization for the scoring engine's structured outputs.
@@ -66,11 +67,11 @@ fun DeckWarning.label(): String = when (this) {
     is DeckWarning.UnfixedSplash ->
         stringResource(R.string.deck_health_warning_unfixed_splash, color.displayName)
     is DeckWarning.ArchetypeRoleGap ->
-        stringResource(R.string.deck_health_warning_archetype_role_gap, roleKey.archetypeRoleLabel(), min, current)
+        stringResource(R.string.deck_health_warning_archetype_role_gap, planLabel, roleKey.archetypeRoleLabel(), min, current)
     is DeckWarning.ArchetypeAntiRolePresent ->
-        stringResource(R.string.deck_health_warning_archetype_anti_role, roleKey.archetypeRoleLabel(), current, tolerance)
+        stringResource(R.string.deck_health_warning_archetype_anti_role, planLabel, roleKey.archetypeRoleLabel(), tolerance, current)
     is DeckWarning.CurveOutsideArchetypeBand ->
-        stringResource(R.string.deck_health_warning_curve_outside_archetype_band, formatCmc(avgCmc), formatCmc(min), formatCmc(max))
+        stringResource(R.string.deck_health_warning_curve_outside_archetype_band, planLabel, formatCmc(avgCmc), formatCmc(min), formatCmc(max))
 }
 
 /**
@@ -79,6 +80,23 @@ fun DeckWarning.label(): String = when (this) {
  */
 fun RoleKey.archetypeRoleLabel(): String = replace('_', ' ').split(' ')
     .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+
+/**
+ * Deck Wizard & Engine Rework plan, Workstream 8.4: human-readable label for a [DoctorAnalysisStage],
+ * mirroring [com.mmg.manahub.feature.decks.presentation.wizard.BuildStage.label]'s own mapper (same
+ * pattern, separate `strings.xml` copy since this is the Suggestions tab's analysis pass, not a
+ * deck build).
+ */
+@Composable
+fun DoctorAnalysisStage.label(): String = stringResource(
+    when (this) {
+        DoctorAnalysisStage.READING_DECK_PLAN -> R.string.deck_doctor_stage_reading_deck_plan
+        DoctorAnalysisStage.EVALUATING_COLLECTION -> R.string.deck_doctor_stage_evaluating_collection
+        DoctorAnalysisStage.SEARCHING_COMMUNITY -> R.string.deck_doctor_stage_searching_community
+        DoctorAnalysisStage.SEARCHING_CARD_POOL -> R.string.deck_doctor_stage_searching_card_pool
+        DoctorAnalysisStage.RANKING_SUGGESTIONS -> R.string.deck_doctor_stage_ranking_suggestions
+    }
+)
 
 /** Stable identity for a warning, used as a LazyColumn key. */
 val DeckWarning.key: String
@@ -124,19 +142,29 @@ fun ScoreReason.label(): String = when (this) {
     ScoreReason.OutOfColorIdentity -> stringResource(R.string.deck_reason_off_color)
     ScoreReason.Colorless -> stringResource(R.string.deck_reason_colorless)
     ScoreReason.InCollection -> stringResource(R.string.deck_reason_in_collection)
+    is ScoreReason.UnsupportedPipCost -> stringResource(R.string.deck_reason_unsupported_pip, intensity, color.displayName)
+    is ScoreReason.FillsArchetypeGap ->
+        stringResource(R.string.deck_reason_fills_archetype_gap, planLabel, roleKey.archetypeRoleLabel(), ideal, current)
+    is ScoreReason.OverArchetypeBand ->
+        stringResource(R.string.deck_reason_over_archetype_band, planLabel, roleKey.archetypeRoleLabel(), max, current)
 }
 
 /**
  * Picks the single most informative reason to surface as a CUT chip.
  *
  * Cut candidates are ranked by lowest fit, so the most useful explanation is *why* the card scores
- * low. Priority (most → least telling for a cut): off-strategy, off-color, low power, over-covered,
- * curve gap. We deliberately ignore positive reasons (SynergyMatch / FillsGap / HighPower) here —
- * they explain a good fit, not a cut. Returns null when no negative reason applies (rare; the row
- * then shows only its fit score).
+ * low. Priority (most → least telling for a cut): unsupported pip cost (WS9.5 -- the manabase
+ * genuinely cannot cast it reliably, the single most actionable cut reason when present), over an
+ * archetype band (WS8.3 -- this card's own role is already over-stuffed, a concrete "you have too
+ * many of these" signal), off-strategy, off-color, low power, over-covered, curve gap. We
+ * deliberately ignore positive reasons (SynergyMatch / FillsGap / FillsArchetypeGap / HighPower)
+ * here — they explain a good fit, not a cut. Returns null when no negative reason applies (rare;
+ * the row then shows only its fit score).
  */
 fun CardFit.primaryCutReason(): ScoreReason? =
-    reasons.firstOrNull { it is ScoreReason.OffStrategy }
+    reasons.firstOrNull { it is ScoreReason.UnsupportedPipCost }
+        ?: reasons.firstOrNull { it is ScoreReason.OverArchetypeBand }
+        ?: reasons.firstOrNull { it is ScoreReason.OffStrategy }
         ?: reasons.firstOrNull { it is ScoreReason.OutOfColorIdentity }
         ?: reasons.firstOrNull { it is ScoreReason.BelowPowerFloor }
         ?: reasons.firstOrNull { it is ScoreReason.OverCovered }
@@ -145,3 +173,8 @@ fun CardFit.primaryCutReason(): ScoreReason? =
 /** The role gap this card fills, if any — used for the ADD "Fills: <role>" tag. */
 fun CardFit.fillsGapRole(): DeckRole? =
     (reasons.firstOrNull { it is ScoreReason.FillsGap } as? ScoreReason.FillsGap)?.role
+
+/** WS8.2 -- the archetype/theme band this card fills, if any (the dynamic-[RoleKey]-vocabulary
+ * counterpart to [fillsGapRole]) — used for the ADD "Fills: <band>" tag on an archetype-aware deck. */
+fun CardFit.fillsArchetypeGapReason(): ScoreReason.FillsArchetypeGap? =
+    reasons.firstOrNull { it is ScoreReason.FillsArchetypeGap } as? ScoreReason.FillsArchetypeGap

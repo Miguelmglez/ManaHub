@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.gamification.engine
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.dao.GamificationDao
 import com.mmg.manahub.core.data.local.dao.GamificationStatsDao
 import com.mmg.manahub.core.data.local.entity.AchievementProgressEntity
@@ -20,6 +21,7 @@ import org.junit.Before
 import org.junit.Test
 import com.mmg.manahub.core.gamification.FixedClock
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
 /**
@@ -34,6 +36,7 @@ class AchievementEvaluatorTest {
     private lateinit var dao: GamificationDao
     private lateinit var statsDao: GamificationStatsDao
     private lateinit var evaluator: AchievementEvaluator
+    private val crashReporter: CrashReporter = mockk(relaxed = true)
 
     private val fixedInstant: Instant = Instant.parse("2026-06-12T10:00:00Z")
     private val now: Long get() = fixedInstant.toEpochMilliseconds()
@@ -44,11 +47,17 @@ class AchievementEvaluatorTest {
             durationMs = 0L, winTurn = null, localFinalLife = null, occurredAt = fixedInstant,
         )
 
+    private fun puzzleEvent(puzzleDate: LocalDate = LocalDate(2026, 6, 12)) =
+        ProgressionEvent.PuzzleSolved(
+            puzzleDate = puzzleDate, type = "GUESS_CARD",
+            attemptsUsed = 3, perfect = false, occurredAt = fixedInstant,
+        )
+
     @Before
     fun setUp() {
         dao = mockk(relaxed = true)
         statsDao = mockk(relaxed = true)
-        evaluator = AchievementEvaluator(dao, statsDao, FixedClock(fixedInstant))
+        evaluator = AchievementEvaluator(dao, statsDao, FixedClock(fixedInstant), crashReporter)
 
         // Default: no prior progress, no prior ledger txns, all stats 0.
         coEvery { dao.getAchievement(any()) } returns null
@@ -236,5 +245,69 @@ class AchievementEvaluatorTest {
         val streak = rows.first { it.achievementId == "WIN_STREAK_3" }
         assertEquals(0, streak.currentValue)
         assertEquals(0, streak.tierReached)
+    }
+
+    // ── Daily Puzzle: PUZZLE_SOLVER (Batch B3, ADR-006 Decision 5) ─────────────────
+
+    @Test
+    fun `crossing the puzzles-solved tier-1 threshold unlocks and stamps unlocked_at`() = runTest {
+        coEvery { statsDao.puzzlesSolved() } returns 1
+
+        val rows = mutableListOf<AchievementProgressEntity>()
+        coEvery { dao.upsertAchievement(capture(rows)) } just Runs
+
+        val unlocks = evaluator.process(puzzleEvent())
+
+        val solver = rows.first { it.achievementId == "PUZZLE_SOLVER" }
+        assertEquals(1, solver.currentValue)
+        assertEquals(1, solver.tierReached)
+        assertEquals(now, solver.unlockedAt)
+        assertTrue(unlocks.any { it.id == "PUZZLE_SOLVER" && it.tier == 1 })
+    }
+
+    @Test
+    fun `puzzles-solved DERIVED resolver retroactively crosses multiple tiers at once`() = runTest {
+        // No prior progress, but 7 puzzles already solved (e.g. a backfill) → tiers 1 AND 7 unlock
+        // in the same evaluation, mirroring the GAMES_PLAYED retroactive-unlock test above.
+        coEvery { statsDao.puzzlesSolved() } returns 7
+
+        val unlocks = evaluator.process(puzzleEvent())
+
+        assertTrue(unlocks.any { it.id == "PUZZLE_SOLVER" && it.tier == 1 })
+        assertTrue(unlocks.any { it.id == "PUZZLE_SOLVER" && it.tier == 2 })
+    }
+
+    @Test
+    fun `puzzles-solved below the first threshold does not unlock`() = runTest {
+        coEvery { statsDao.puzzlesSolved() } returns 0
+
+        val rows = mutableListOf<AchievementProgressEntity>()
+        coEvery { dao.upsertAchievement(capture(rows)) } just Runs
+
+        val unlocks = evaluator.process(puzzleEvent())
+
+        val solver = rows.first { it.achievementId == "PUZZLE_SOLVER" }
+        assertEquals(0, solver.tierReached)
+        assertTrue(unlocks.none { it.id == "PUZZLE_SOLVER" })
+    }
+
+    @Test
+    fun `puzzle tier XP is granted through the ledger key and is not re-granted`() = runTest {
+        coEvery { statsDao.puzzlesSolved() } returns 1
+        val txn = slot<XpTransactionEntity>()
+        coEvery {
+            dao.grantXpAtomically(capture(txn), any(), any(), any())
+        } answers { appliedResult(secondArg<Int>()) }
+
+        evaluator.process(puzzleEvent())
+
+        assertEquals("achievement:PUZZLE_SOLVER:tier:1", txn.captured.idempotencyKey)
+
+        // A repeat evaluation with the same ledger key already present must not re-grant.
+        coEvery { dao.hasTransaction("achievement:PUZZLE_SOLVER:tier:1") } returns true
+        evaluator.process(puzzleEvent())
+        coVerify(exactly = 1) {
+            dao.grantXpAtomically(match { it.idempotencyKey == "achievement:PUZZLE_SOLVER:tier:1" }, any(), any(), any())
+        }
     }
 }

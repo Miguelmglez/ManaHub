@@ -26,6 +26,17 @@ enum class ArchidektFormat(val apiId: Int, val manahubFormat: String) {
     PIONEER(15, "pioneer"),
     HISTORIC(16, "historic"),
     PAUPER_COMMANDER(17, "pauper"),
+    // Verified live 2026-07-24 (see docs/adr/ADR-004-community-api-contracts.md §1b addendum).
+    // Id 26 ("Brawl" variant) is a new, ambiguous format on Archidekt's side — intentionally left
+    // unmapped until its semantics are clarified.
+    ALCHEMY(18, "casual"),
+    EXPLORER(19, "pioneer"),
+    HISTORIC_BRAWL(20, "brawl"),
+    GLADIATOR(21, "casual"),
+    PREMODERN(22, "casual"),
+    PREDH(23, "commander"),
+    TIMELESS(24, "casual"),
+    CANADIAN_HIGHLANDER(25, "casual"),
     ;
 
     companion object {

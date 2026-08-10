@@ -1,6 +1,8 @@
 package com.mmg.manahub.core.ui.components.search
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.MonetizationOn
@@ -46,6 +50,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -68,6 +73,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -97,6 +103,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import com.mmg.manahub.core.ui.components.MagicCtaButton
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -104,6 +111,7 @@ fun AdvancedSearchSheet(
     onDismiss: () -> Unit,
     onSearch: (advancedQuery: AdvancedSearchQuery, rawScryfall: String) -> Unit,
     isCollectionMode: Boolean = false,
+    getAvailableTags: () -> Set<com.mmg.manahub.core.model.CardTag> = { emptySet() },
     viewModel: AdvancedSearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -255,51 +263,89 @@ fun AdvancedSearchSheet(
                         title = stringResource(R.string.advsearch_section_type),
                         icon = Icons.Default.Style
                     ) {
-                        data class TypeOption(val scryfallValue: String, val labelRes: Int)
-                        val typeOptions = listOf(
-                            TypeOption("Creature",     R.string.cardtype_creature),
-                            TypeOption("Instant",      R.string.cardtype_instant),
-                            TypeOption("Sorcery",      R.string.cardtype_sorcery),
-                            TypeOption("Enchantment",  R.string.cardtype_enchantment),
-                            TypeOption("Artifact",     R.string.cardtype_artifact),
-                            TypeOption("Planeswalker", R.string.cardtype_planeswalker),
-                            TypeOption("Land",         R.string.cardtype_land),
-                            TypeOption("Legendary",    R.string.cardtype_legendary),
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        var showTypePicker by remember { mutableStateOf(false) }
+
+                        Surface(
+                            onClick = { showTypePicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = mc.surface,
+                            border = BorderStroke(
+                                width = if (uiState.cardType.isNotEmpty()) 1.5.dp else 0.5.dp,
+                                color = if (uiState.cardType.isNotEmpty()) mc.primaryAccent else mc.surfaceVariant,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            typeOptions.forEach { option ->
-                                val isSelected = uiState.cardType.contains(option.scryfallValue, ignoreCase = true)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        val new = if (isSelected)
-                                            uiState.cardType.replace(option.scryfallValue, "", ignoreCase = true).trim()
-                                        else
-                                            "${uiState.cardType} ${option.scryfallValue}".trim()
-                                        viewModel.setCardType(new)
-                                    },
-                                    label = { Text(stringResource(option.labelRes), style = ty.labelMedium) },
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = if (uiState.cardType.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(
+                                    text = if (uiState.cardType.isEmpty())
+                                        stringResource(R.string.advsearch_type_hint)
+                                    else
+                                        "${uiState.cardType.size} types selected",
+                                    style = ty.bodyLarge,
+                                    color = if (uiState.cardType.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
-                        OutlinedTextField(
-                            value = uiState.cardType,
-                            onValueChange = viewModel::setCardType,
-                            placeholder = {
-                                Text(
-                                    stringResource(R.string.advsearch_type_hint),
-                                    color = mc.textDisabled,
-                                    style = ty.bodyLarge
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = magicOutlinedTextFieldColors(mc),
-                            singleLine = true,
-                        )
+
+                        if (uiState.cardType.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(top = 8.dp),
+                            ) {
+                                uiState.cardType.forEach { type ->
+                                    InputChip(
+                                        selected = true,
+                                        onClick = { viewModel.toggleCardType(type) },
+                                        label = { Text(type, style = ty.labelMedium) },
+                                        trailingIcon = {
+                                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Checkbox(
+                                checked = uiState.cardTypeMatchAll,
+                                onCheckedChange = viewModel::setCardTypeMatchAll,
+                                colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent),
+                            )
+                            Text(
+                                "Match exactly ALL selected types (AND)",
+                                style = ty.bodyMedium,
+                                color = mc.textSecondary,
+                            )
+                        }
+
+                        if (showTypePicker) {
+                            CardTypePickerSheet(
+                                selectedTypes = uiState.cardType,
+                                onToggleType = viewModel::toggleCardType,
+                                onDismiss = { showTypePicker = false },
+                            )
+                        }
                     }
                 }
 
@@ -315,6 +361,8 @@ fun AdvancedSearchSheet(
                                 true to stringResource(R.string.advsearch_color_mode_identity)
                             ).forEach { (isIdentity, label) ->
                                 FilterChip(
+                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.useColorIdentity == isIdentity, selectedBorderColor = mc.primaryAccent),
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
                                     selected = uiState.useColorIdentity == isIdentity,
                                     onClick = { viewModel.setUseColorIdentity(isIdentity) },
                                     label = { Text(label, style = ty.labelMedium) },
@@ -380,51 +428,26 @@ fun AdvancedSearchSheet(
                         icon = Icons.Default.Diamond
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(
-                                    stringResource(R.string.advsearch_rarity_operator),
-                                    style = ty.bodyMedium,
-                                    color = mc.textSecondary,
-                                )
-                                OperatorSelector(
-                                    selected = uiState.rarityOp,
-                                    onSelect = { op -> viewModel.setRarity(uiState.selectedRarity, op) },
-                                    options = listOf(
-                                        ComparisonOperator.EQUAL,
-                                        ComparisonOperator.GREATER_OR_EQUAL,
-                                        ComparisonOperator.LESS_OR_EQUAL,
-                                    ),
-                                )
-                            }
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                listOf(
-                                    "common"   to Pair("●", Color(0xFFAAAAAA)),
-                                    "uncommon" to Pair("◆", Color(0xFFB0C4DE)),
-                                    "rare"     to Pair("◈", Color(0xFFC9A84C)),
-                                    "mythic"   to Pair("✦", Color(0xFFE8A030)),
-                                ).forEach { (rarity, symbolColor) ->
-                                    val (symbol, color) = symbolColor
-                                    val isSelected = uiState.selectedRarity == rarity
+                                listOf("common",
+                                    "uncommon",
+                                    "rare",
+                                    "mythic",
+                                ).forEach { rarity ->
+                                    val isSelected = uiState.selectedRarity.contains(rarity)
                                     FilterChip(
                                         selected = isSelected,
-                                        onClick = {
-                                            viewModel.setRarity(
-                                                if (isSelected) "" else rarity,
-                                                uiState.rarityOp,
-                                            )
-                                        },
+                                        onClick = { viewModel.updateRarity(rarity) },
+                                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, selectedBorderColor = mc.primaryAccent),
+                                        colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
                                         label = {
                                             Row(
                                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
-                                                Text(symbol, color = color, style = ty.labelLarge)
                                                 Text(
                                                     stringResource(when (rarity) {
                                                         "common"   -> R.string.stats_rarity_common
@@ -569,7 +592,6 @@ fun AdvancedSearchSheet(
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_stats),
                         icon = Icons.Default.BarChart,
-                        collapsedByDefault = true,
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -653,7 +675,6 @@ fun AdvancedSearchSheet(
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_price),
                         icon = Icons.Default.MonetizationOn,
-                        collapsedByDefault = true,
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -676,6 +697,8 @@ fun AdvancedSearchSheet(
                                     "usd" to stringResource(R.string.price_symbol_usd)
                                 ).forEach { (curr, symbol) ->
                                     FilterChip(
+                                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.priceCurrency == curr, selectedBorderColor = mc.primaryAccent),
+                                        colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
                                         selected = uiState.priceCurrency == curr,
                                         onClick = { viewModel.setPrice(uiState.priceMax, curr) },
                                         label = { Text(symbol, style = ty.labelLarge) },
@@ -691,7 +714,6 @@ fun AdvancedSearchSheet(
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_format),
                         icon = Icons.Default.Gavel,
-                        collapsedByDefault = true,
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -705,7 +727,7 @@ fun AdvancedSearchSheet(
                             Switch(
                                 checked = uiState.formatLegal,
                                 onCheckedChange = { legal ->
-                                    viewModel.setFormat(uiState.selectedFormat, legal)
+                                    viewModel.updateLegalSwitch(legal)
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
@@ -739,12 +761,11 @@ fun AdvancedSearchSheet(
                         ) {
                             formatOptions.forEach { option ->
                                 FilterChip(
-                                    selected = uiState.selectedFormat == option.scryfallValue,
+                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.selectedFormat.contains(option.scryfallValue), selectedBorderColor = mc.primaryAccent),
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
+                                    selected = uiState.selectedFormat.contains(option.scryfallValue),
                                     onClick = {
-                                        viewModel.setFormat(
-                                            if (uiState.selectedFormat == option.scryfallValue) "" else option.scryfallValue,
-                                            uiState.formatLegal,
-                                        )
+                                       viewModel.updateFormat(option.scryfallValue)
                                     },
                                     label = {
                                         Text(
@@ -758,56 +779,6 @@ fun AdvancedSearchSheet(
                     }
                 }
 
-                // ── Keywords ──
-                item {
-                    SearchSection(
-                        title = stringResource(R.string.advsearch_section_keyword),
-                        icon = Icons.Default.VpnKey,
-                        collapsedByDefault = true,
-                    ) {
-                        data class KeywordOption(val scryfallValue: String, val labelRes: Int)
-                        val keywordOptions = listOf(
-                            KeywordOption("Flying",       R.string.keyword_flying),
-                            KeywordOption("Haste",        R.string.keyword_haste),
-                            KeywordOption("Trample",      R.string.keyword_trample),
-                            KeywordOption("Lifelink",     R.string.keyword_lifelink),
-                            KeywordOption("Deathtouch",   R.string.keyword_deathtouch),
-                            KeywordOption("Vigilance",    R.string.keyword_vigilance),
-                            KeywordOption("Flash",        R.string.keyword_flash),
-                            KeywordOption("Reach",        R.string.keyword_reach),
-                            KeywordOption("First Strike", R.string.keyword_first_strike),
-                            KeywordOption("Hexproof",     R.string.keyword_hexproof),
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            keywordOptions.forEach { option ->
-                                val isSelected = uiState.keyword.contains(option.scryfallValue, ignoreCase = true)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { viewModel.setKeyword(if (isSelected) "" else option.scryfallValue) },
-                                    label = { Text(stringResource(option.labelRes), style = ty.labelMedium) },
-                                )
-                            }
-                        }
-                        OutlinedTextField(
-                            value = uiState.keyword,
-                            onValueChange = viewModel::setKeyword,
-                            placeholder = {
-                                Text(
-                                    stringResource(R.string.advsearch_keyword_hint),
-                                    color = mc.textDisabled,
-                                    style = ty.bodyLarge
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = magicOutlinedTextFieldColors(mc),
-                            singleLine = true,
-                        )
-                    }
-                }
 
                 // ── Collection status (collection mode only) ──
                 if (isCollectionMode) {
@@ -825,6 +796,8 @@ fun AdvancedSearchSheet(
                                     stringResource(R.string.advsearch_filter_for_trade) to (uiState.filterForTrade == true),
                                 ).forEachIndexed { index, (label, isSelected) ->
                                     FilterChip(
+                                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, selectedBorderColor = mc.primaryAccent),
+                                        colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
                                         selected = isSelected,
                                         onClick = {
                                             if (index == 0)
@@ -847,18 +820,74 @@ fun AdvancedSearchSheet(
                             title = stringResource(R.string.advsearch_section_tags),
                             icon = Icons.Default.LocalOffer
                         ) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            var showTagPicker by remember { mutableStateOf(false) }
+
+                            Surface(
+                                onClick = { showTagPicker = true },
+                                shape = RoundedCornerShape(12.dp),
+                                color = mc.surface,
+                                border = BorderStroke(
+                                    width = if (uiState.filterTags.isNotEmpty()) 1.5.dp else 0.5.dp,
+                                    color = if (uiState.filterTags.isNotEmpty()) mc.primaryAccent else mc.surfaceVariant,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
-                                com.mmg.manahub.core.model.CardTag.canonical.forEach { tag ->
-                                    val isSelected = uiState.filterTags.contains(tag.key)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = { viewModel.toggleFilterTag(tag.key) },
-                                        label = { Text(tag.label(), style = ty.labelMedium) },
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = if (uiState.filterTags.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                    Text(
+                                        text = if (uiState.filterTags.isEmpty())
+                                            "Search by tags"
+                                        else
+                                            "${uiState.filterTags.size} tags selected",
+                                        style = ty.bodyLarge,
+                                        color = if (uiState.filterTags.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = mc.textDisabled,
+                                        modifier = Modifier.size(20.dp),
                                     )
                                 }
+                            }
+
+                            if (uiState.filterTags.isNotEmpty()) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(top = 8.dp),
+                                ) {
+                                    uiState.filterTags.forEach { key ->
+                                        val tagLabel = getAvailableTags().find { it.key == key }?.label() ?: key
+                                        InputChip(
+                                            selected = true,
+                                            onClick = { viewModel.toggleFilterTag(key) },
+                                            label = { Text(tagLabel, style = ty.labelMedium) },
+                                            trailingIcon = {
+                                                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (showTagPicker) {
+                                TagPickerSheet(
+                                    availableTags = getAvailableTags(),
+                                    selectedTags = uiState.filterTags,
+                                    onToggleTag = viewModel::toggleFilterTag,
+                                    onDismiss = { showTagPicker = false },
+                                )
                             }
                         }
                     }
@@ -869,7 +898,6 @@ fun AdvancedSearchSheet(
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_sort),
                         icon = Icons.Default.Sort,
-                        collapsedByDefault = true,
                     ) {
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -877,6 +905,8 @@ fun AdvancedSearchSheet(
                         ) {
                             SearchOrder.entries.forEach { order ->
                                 FilterChip(
+                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.orderBy == order, selectedBorderColor = mc.primaryAccent),
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
                                     selected = uiState.orderBy == order,
                                     onClick = { viewModel.setOrder(order, uiState.orderDirection) },
                                     label = {
@@ -884,7 +914,8 @@ fun AdvancedSearchSheet(
                                             stringResource(when(order) {
                                                 SearchOrder.NAME -> R.string.advsearch_sort_name
                                                 SearchOrder.CMC -> R.string.advsearch_sort_cmc
-                                                SearchOrder.PRICE -> R.string.advsearch_sort_price
+                                                SearchOrder.PRICE_EUR -> R.string.advsearch_sort_price_eur
+                                                SearchOrder.PRICE_USD -> R.string.advsearch_sort_price_usd
                                                 SearchOrder.RARITY -> R.string.advsearch_sort_rarity
                                                 SearchOrder.RELEASED -> R.string.advsearch_sort_released
                                                 SearchOrder.COLOR -> R.string.advsearch_sort_color
@@ -901,6 +932,8 @@ fun AdvancedSearchSheet(
                                 SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
                             ).forEach { (dir, label) ->
                                 FilterChip(
+                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.orderDirection == dir, selectedBorderColor = mc.primaryAccent),
+                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
                                     selected = uiState.orderDirection == dir,
                                     onClick = { viewModel.setOrder(uiState.orderBy, dir) },
                                     label = { Text(label, style = ty.labelSmall) },
@@ -912,34 +945,21 @@ fun AdvancedSearchSheet(
             }
 
             // ── Search / Apply button ───────────────────────────────────────────
-            Button(
+            MagicCtaButton(
+                text = stringResource(
+                    if (isCollectionMode) R.string.advsearch_apply_button
+                    else R.string.advsearch_search_button
+                ),
                 onClick = {
                     onSearch(uiState.currentQuery, uiState.builtQuery)
                     handleDismiss()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(56.dp),
-                enabled = if (isCollectionMode) true
-                          else uiState.builtQuery.isNotBlank(),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    disabledContainerColor = mc.surfaceVariant,
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(
-                        if (isCollectionMode) R.string.advsearch_apply_button
-                        else R.string.advsearch_search_button
-                    ),
-                    style = ty.titleMedium.copy(fontWeight = FontWeight.Bold),
-                )
-            }
+                    .padding(16.dp),
+                icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                enabled = if (isCollectionMode) true else uiState.builtQuery.isNotBlank(),
+            )
         }
     }
 }
@@ -1002,3 +1022,245 @@ private fun magicOutlinedTextFieldColors(mc: com.mmg.manahub.core.ui.theme.Magic
         focusedContainerColor = Color.Transparent,
         unfocusedContainerColor = Color.Transparent,
     )
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CardTypePickerSheet(
+    selectedTypes: Set<String>,
+    onToggleType: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Search query filters within each section; manual expand/collapse state is the source of
+    // truth and is OR'd with "has a search match" while a query is active (restored as-is on clear).
+    var searchQuery by remember { mutableStateOf("") }
+    var manualExpandedSections by remember { mutableStateOf(setOf<com.mmg.manahub.core.model.CardTypeSection>()) }
+
+    val query = searchQuery.trim()
+    val isSearching = query.isNotBlank()
+
+    val sectionRows = remember(query) {
+        com.mmg.manahub.core.model.CardTypeSection.entries.mapNotNull { section ->
+            val all = com.mmg.manahub.core.model.CardTypeOption.bySection[section].orEmpty()
+            val visible = if (isSearching) {
+                all.filter { option ->
+                    option.label.contains(query, ignoreCase = true) ||
+                        option.scryfallValue.contains(query, ignoreCase = true)
+                }
+            } else {
+                all
+            }
+            if (isSearching && visible.isEmpty()) null else Triple(section, all.size, visible)
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).navigationBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = mc.textPrimary)
+                }
+                Text(
+                    "Card Types",
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(
+                        "Search card types…",
+                        color = mc.textDisabled,
+                        style = ty.bodyLarge,
+                    )
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search", tint = mc.textDisabled)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = magicOutlinedTextFieldColors(mc),
+                singleLine = true,
+            )
+
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                sectionRows.forEach { (section, totalCount, options) ->
+                    val isExpanded = isSearching || manualExpandedSections.contains(section)
+
+                    item(key = "header:${section.name}") {
+                        val rotation by animateFloatAsState(
+                            targetValue = if (isExpanded) 180f else 0f,
+                            label = "chevronRotation",
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .clickable {
+                                    manualExpandedSections = if (manualExpandedSections.contains(section)) {
+                                        manualExpandedSections - section
+                                    } else {
+                                        manualExpandedSections + section
+                                    }
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                "${section.label} ($totalCount)",
+                                style = ty.labelLarge,
+                                color = mc.textPrimary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (isExpanded) "Collapse section" else "Expand section",
+                                tint = mc.textSecondary,
+                                modifier = Modifier.rotate(rotation),
+                            )
+                        }
+                    }
+
+                    if (isExpanded) {
+                        items(
+                            count = options.size,
+                            key = { i -> "${section.name}:${options[i].scryfallValue}" }
+                        ) { index ->
+                            val option = options[index]
+                            val isSelected = selectedTypes.contains(option.scryfallValue)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .clickable { onToggleType(option.scryfallValue) },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { onToggleType(option.scryfallValue) },
+                                    colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent)
+                                )
+                                Text(
+                                    option.label,
+                                    style = ty.bodyLarge,
+                                    color = mc.textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TagPickerSheet(
+    availableTags: Set<com.mmg.manahub.core.model.CardTag>,
+    selectedTags: Set<String>,
+    onToggleTag: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    // Convert to list for LazyColumn, sorted by label
+    val tagList = remember(availableTags) { 
+        availableTags.toList().sortedBy { it.label() }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).navigationBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = mc.textPrimary)
+                }
+                Text(
+                    "Collection Tags",
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            if (tagList.isEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Text("No tags in your collection", style = ty.bodyLarge, color = mc.textSecondary)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(
+                        count = tagList.size,
+                        key = { i -> tagList[i].key }
+                    ) { index ->
+                        val tag = tagList[index]
+                        val isSelected = selectedTags.contains(tag.key)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = { onToggleTag(tag.key) },
+                                colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent)
+                            )
+                            Text(
+                                tag.label(),
+                                style = ty.bodyLarge,
+                                color = mc.textPrimary,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

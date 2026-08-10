@@ -183,6 +183,93 @@ class ArchidektFormatTest {
         assertEquals("pauper", ArchidektFormat.toManaHubFormat(17))
     }
 
+    // ── Group 8b: more-formats expansion (Archidekt multi-card/more-formats plan, 2026-07-24) ──
+
+    @Test
+    fun `fromApiId returns ALCHEMY for id 18`() {
+        assertEquals(ArchidektFormat.ALCHEMY, ArchidektFormat.fromApiId(18))
+    }
+
+    @Test
+    fun `fromApiId returns EXPLORER for id 19`() {
+        assertEquals(ArchidektFormat.EXPLORER, ArchidektFormat.fromApiId(19))
+    }
+
+    @Test
+    fun `fromApiId returns HISTORIC_BRAWL for id 20`() {
+        assertEquals(ArchidektFormat.HISTORIC_BRAWL, ArchidektFormat.fromApiId(20))
+    }
+
+    @Test
+    fun `fromApiId returns GLADIATOR for id 21`() {
+        assertEquals(ArchidektFormat.GLADIATOR, ArchidektFormat.fromApiId(21))
+    }
+
+    @Test
+    fun `fromApiId returns PREMODERN for id 22`() {
+        assertEquals(ArchidektFormat.PREMODERN, ArchidektFormat.fromApiId(22))
+    }
+
+    @Test
+    fun `fromApiId returns PREDH for id 23`() {
+        assertEquals(ArchidektFormat.PREDH, ArchidektFormat.fromApiId(23))
+    }
+
+    @Test
+    fun `fromApiId returns TIMELESS for id 24`() {
+        assertEquals(ArchidektFormat.TIMELESS, ArchidektFormat.fromApiId(24))
+    }
+
+    @Test
+    fun `fromApiId returns CANADIAN_HIGHLANDER for id 25`() {
+        assertEquals(ArchidektFormat.CANADIAN_HIGHLANDER, ArchidektFormat.fromApiId(25))
+    }
+
+    @Test
+    fun `toManaHubFormat maps Alchemy id 18 to casual`() {
+        assertEquals("casual", ArchidektFormat.toManaHubFormat(18))
+    }
+
+    @Test
+    fun `toManaHubFormat maps Explorer id 19 to pioneer`() {
+        assertEquals("pioneer", ArchidektFormat.toManaHubFormat(19))
+    }
+
+    @Test
+    fun `toManaHubFormat maps Historic Brawl id 20 to brawl`() {
+        assertEquals("brawl", ArchidektFormat.toManaHubFormat(20))
+    }
+
+    @Test
+    fun `toManaHubFormat maps Gladiator id 21 to casual`() {
+        assertEquals("casual", ArchidektFormat.toManaHubFormat(21))
+    }
+
+    @Test
+    fun `toManaHubFormat maps Premodern id 22 to casual`() {
+        assertEquals("casual", ArchidektFormat.toManaHubFormat(22))
+    }
+
+    @Test
+    fun `toManaHubFormat maps PreDH id 23 to commander`() {
+        assertEquals("commander", ArchidektFormat.toManaHubFormat(23))
+    }
+
+    @Test
+    fun `toManaHubFormat maps Timeless id 24 to casual`() {
+        assertEquals("casual", ArchidektFormat.toManaHubFormat(24))
+    }
+
+    @Test
+    fun `toManaHubFormat maps Canadian Highlander id 25 to casual`() {
+        assertEquals("casual", ArchidektFormat.toManaHubFormat(25))
+    }
+
+    @Test
+    fun `fromApiId returns null for the unmapped Brawl-variant id 26`() {
+        assertNull(ArchidektFormat.fromApiId(26))
+    }
+
     // ── Group 9: enum coverage — all entries have unique apiId ───────────────
 
     @Test

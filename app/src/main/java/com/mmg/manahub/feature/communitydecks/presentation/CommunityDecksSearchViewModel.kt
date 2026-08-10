@@ -83,6 +83,8 @@ class CommunityDecksSearchViewModel(
 
     private var currentPage = 1
     private var searchJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var discoverJob: Job? = null
     private var discoverLoaded = false
 
     /** Debounced input flows for the two advanced-search card pickers (Commander / Card). */
@@ -109,17 +111,24 @@ class CommunityDecksSearchViewModel(
         }
 
         viewModelScope.launch {
+            // `distinctUntilChanged()` runs BEFORE `filter` (bug fix) so a blank reset — e.g.
+            // `onClearAdvancedFilters`'s `commanderQueryFlow.value = ""` — still advances
+            // distinctUntilChanged's "last seen" baseline even though the blank value itself never
+            // reaches `runCardPickerSearch`. With the filter first (the original order), a blank
+            // emission was dropped BEFORE distinctUntilChanged ever saw it, so the baseline stayed
+            // on the last real query — re-entering that EXACT same query right after a clear was
+            // silently suppressed as a "duplicate", leaving the picker's results stuck empty.
             commanderQueryFlow
                 .debounce(CARD_PICKER_DEBOUNCE_MS)
-                .filter { it.length >= CARD_PICKER_MIN_LENGTH }
                 .distinctUntilChanged()
+                .filter { it.length >= CARD_PICKER_MIN_LENGTH }
                 .collectLatest { query -> runCardPickerSearch(query, isCommander = true) }
         }
         viewModelScope.launch {
             cardQueryFlow
                 .debounce(CARD_PICKER_DEBOUNCE_MS)
-                .filter { it.length >= CARD_PICKER_MIN_LENGTH }
                 .distinctUntilChanged()
+                .filter { it.length >= CARD_PICKER_MIN_LENGTH }
                 .collectLatest { query -> runCardPickerSearch(query, isCommander = false) }
         }
     }
@@ -138,7 +147,9 @@ class CommunityDecksSearchViewModel(
 
             _uiState.update {
                 if (resolved != null) {
-                    it.copy(advancedFilters = it.advancedFilters.copy(card = resolved))
+                    // Deep-link REPLACES the CARD filter (never appends) — this is the entry
+                    // point's own single-card intent, not an addition to a pre-existing selection.
+                    it.copy(advancedFilters = it.advancedFilters.copy(cards = listOf(resolved)))
                 } else {
                     it.copy(query = name)
                 }
@@ -156,27 +167,29 @@ class CommunityDecksSearchViewModel(
     /**
      * Fetches every Discover section IN PARALLEL: trending commanders/cards (resolved to full
      * [Card]s for image tiles), popular/recent/recently-updated/primer decks, and a weekly-rotating
-     * featured non-Commander format. Runs at most once per ViewModel instance ([discoverLoaded]).
-     * Each section fails INDEPENDENTLY (`runCatching`) and simply renders empty/hidden —
-     * [CommunityDecksSearchUiState.discoverUnavailable] is only set when literally EVERY section
-     * came back empty, never for a single degraded source.
+     * featured non-Commander format. Runs at most once per ViewModel instance ([discoverLoaded])
+     * on the FIRST call, but [onSelectDiscoveryFormat] re-invokes it on every format switch — the
+     * previous in-flight [discoverJob] is cancelled first (bug fix) so a slower response for a
+     * format the user already switched away from can never land after, and overwrite, the newer
+     * format's results (the same stale-response race [search] already guarded against via
+     * [searchJob]). Each section fails INDEPENDENTLY (`runCatching`) and simply renders
+     * empty/hidden — [CommunityDecksSearchUiState.discoverUnavailable] is only set when literally
+     * EVERY section came back empty, never for a single degraded source.
      */
     private fun loadDiscover() {
         discoverLoaded = true
-        viewModelScope.launch {
+        discoverJob?.cancel()
+        discoverJob = viewModelScope.launch {
             _uiState.update { it.copy(isDiscoverLoading = true) }
 
-            val featuredFormat = pickFeaturedFormat()
+            val selectedFormat = uiState.value.selectedDiscoveryFormat
 
             val trendingDeferred = async { runCatching { communityAggregateRepository.getTrending() }.getOrNull() }
-            val popularDeferred = async { fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue) }
-            val recentDeferred = async { fetchDecks(orderBy = CommunityDeckSort.RECENT.apiValue) }
-            val updatedDeferred = async { fetchDecks(orderBy = CommunityDeckSort.UPDATED.apiValue) }
+            val popularDeferred = async { fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue, deckFormat = selectedFormat) }
+            val recentDeferred = async { fetchDecks(orderBy = CommunityDeckSort.RECENT.apiValue, deckFormat = selectedFormat) }
+            val updatedDeferred = async { fetchDecks(orderBy = CommunityDeckSort.UPDATED.apiValue, deckFormat = selectedFormat) }
             val primersDeferred = async {
-                fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue, primersOnly = true)
-            }
-            val featuredDeferred = async {
-                fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue, deckFormatId = featuredFormat.apiId)
+                fetchDecks(orderBy = CommunityDeckSort.POPULAR.apiValue, primersOnly = true, deckFormat = selectedFormat)
             }
 
             val trendingSnapshot = (trendingDeferred.await() as? DataResult.Success)?.data
@@ -187,10 +200,9 @@ class CommunityDecksSearchViewModel(
             val recentDecks = recentDeferred.await()
             val updatedDecks = updatedDeferred.await()
             val primerDecks = primersDeferred.await()
-            val featuredDecks = featuredDeferred.await()
 
             val allEmpty = commanderCards.isEmpty() && cardCards.isEmpty() && popularDecks.isEmpty() &&
-                recentDecks.isEmpty() && updatedDecks.isEmpty() && primerDecks.isEmpty() && featuredDecks.isEmpty()
+                recentDecks.isEmpty() && updatedDecks.isEmpty() && primerDecks.isEmpty()
             if (allEmpty) crashlytics.log("community_discover_all_failed")
 
             _uiState.update {
@@ -203,8 +215,7 @@ class CommunityDecksSearchViewModel(
                     recentDecks = recentDecks,
                     updatedDecks = updatedDecks,
                     primerDecks = primerDecks,
-                    featuredFormat = featuredFormat,
-                    featuredFormatDecks = featuredDecks,
+                    selectedDiscoveryFormat = selectedFormat,
                 )
             }
         }
@@ -213,12 +224,11 @@ class CommunityDecksSearchViewModel(
     /** One Discover section's decks; any failure (exception or [DataResult.Error]) degrades to empty. */
     private suspend fun fetchDecks(
         orderBy: String,
-        deckFormatId: Int? = null,
+        deckFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.COMMANDER,
         primersOnly: Boolean = false,
     ): List<CommunityDeckSummary> = runCatching {
         val filters = CommunityAdvancedFilters(
-            format = CommunityDeckFormatFilter.entries.firstOrNull { it.apiId == deckFormatId }
-                ?: CommunityDeckFormatFilter.ALL,
+            formats = deckFormat,
             primersOnly = primersOnly,
         ).toSearchFilters(deckName = null, orderBy = orderBy, page = 1, pageSize = DISCOVER_SECTION_SIZE)
         (searchCommunityDecks(filters) as? DataResult.Success)?.data?.decks.orEmpty()
@@ -232,16 +242,7 @@ class CommunityDecksSearchViewModel(
             .filterNotNull()
     }
 
-    /**
-     * Picks the weekly-rotating non-Commander featured format via the ISO week-based-year number
-     * (never `WeekFields.of(Locale)` — locale-dependent, see the project's established gamification
-     * convention) indexing deterministically into [CommunityDeckFormatFilter.FEATURED_ROTATION].
-     */
-    private fun pickFeaturedFormat(): CommunityDeckFormatFilter {
-        val rotation = CommunityDeckFormatFilter.FEATURED_ROTATION
-        val week = LocalDate.now().get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
-        return rotation[week % rotation.size]
-    }
+
 
     /** A trending commander tile tapped in Discover — switches to Search with the COMMANDER filter set. */
     fun onTrendingCommanderClick(card: Card) {
@@ -252,11 +253,15 @@ class CommunityDecksSearchViewModel(
         search()
     }
 
-    /** A trending card tile tapped in Discover — switches to Search with the CARD filter set. */
+    /**
+     * A trending card tile tapped in Discover — switches to Search with the CARD filter set to
+     * ONLY this card (replaces, never appends — mirrors the ByCard deep-link's replace semantics;
+     * a Discover tap is a fresh single-card intent, not an addition to a stale selection).
+     */
     fun onTrendingCardClick(card: Card) {
         crashlytics.log("community_discover_term_click")
         _uiState.update {
-            it.copy(hubTab = CommunityHubTab.SEARCH, advancedFilters = it.advancedFilters.copy(card = card))
+            it.copy(hubTab = CommunityHubTab.SEARCH, advancedFilters = it.advancedFilters.copy(cards = listOf(card)))
         }
         search()
     }
@@ -268,16 +273,31 @@ class CommunityDecksSearchViewModel(
     }
 
     /** Re-runs the search if one was already issued (so the new sort applies live). */
-    fun onSortSelected(sort: CommunityDeckSort) {
+    fun onSortUpdated(sort: CommunityDeckSort) {
         _uiState.update { it.copy(selectedSort = sort) }
         if (_uiState.value.hasSearched) search()
     }
 
-    // ── Advanced search filters (Phase 2) ───────────────────────────────────────────
-
-    fun onFormatFilterSelected(format: CommunityDeckFormatFilter) {
-        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(format = format)) }
+    fun onSearchDeckFilterUpdated(format: CommunityDeckFormatFilter) {
+        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(formats = format)) }
+        if (_uiState.value.hasSearched) search()
     }
+
+    fun onSelectDiscoveryFormat(format: CommunityDeckFormatFilter){
+        if (_uiState.value.selectedDiscoveryFormat == format){
+            return
+        } else {
+            _uiState.update { it.copy(selectedDiscoveryFormat = format) }
+            loadDiscover()
+        }
+
+    }
+    // ── Advanced search filters (Phase 2) ───────────────────────────────────────────
+    // NOTE: the advanced-search sheet's format selection is driven by `onSearchDeckFilterUpdated`
+    // (below, wired to the ManaHubBottomSheetSelector in the Search body) — a separate
+    // `onFormatFilterSelected` used to exist here wired to a `CommunityAdvancedSearchSheet` format
+    // callback that the sheet itself never actually invoked (dead code, removed in the same pass
+    // as this note).
 
     fun onColorToggled(color: String) {
         _uiState.update {
@@ -341,18 +361,31 @@ class CommunityDecksSearchViewModel(
         _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(commander = null)) }
     }
 
+    /**
+     * Appends [card] to the CARD advanced filter (Archidekt multi-card search expansion,
+     * 2026-07-24), capped at [MAX_COMMUNITY_CARD_FILTERS] and deduped by name. Selecting a card
+     * already in the list, or attempting to add past the cap, is a silent no-op — the sheet hides
+     * the picker once the cap is reached (see `CommunityAdvancedSearchSheet`), so this is
+     * defense-in-depth, not the primary UX gate.
+     */
     fun onCardFilterSelected(card: Card) {
         _uiState.update {
+            val current = it.advancedFilters.cards
+            val alreadySelected = current.any { existing -> existing.name == card.name }
+            val next = if (alreadySelected || current.size >= MAX_COMMUNITY_CARD_FILTERS) current else current + card
             it.copy(
-                advancedFilters = it.advancedFilters.copy(card = card),
+                advancedFilters = it.advancedFilters.copy(cards = next),
                 cardQuery = "",
                 cardResults = emptyList(),
             )
         }
     }
 
-    fun onCardFilterCleared() {
-        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(card = null)) }
+    /** Removes one [card] from the CARD advanced filter (replaces the old single-card clear). */
+    fun onCardFilterRemoved(card: Card) {
+        _uiState.update {
+            it.copy(advancedFilters = it.advancedFilters.copy(cards = it.advancedFilters.cards - card))
+        }
     }
 
     fun onClearAdvancedFilters() {
@@ -365,6 +398,13 @@ class CommunityDecksSearchViewModel(
                 cardResults = emptyList(),
             )
         }
+        // Bug fix: also reset the backing debounce flows, not just the visible uiState text. A
+        // MutableStateFlow conflates equal values and runCardPickerSearch's pipeline applies
+        // distinctUntilChanged — leaving these at their pre-clear value meant re-entering the EXACT
+        // same query text right after clearing (e.g. a paste) silently produced no new emission, so
+        // the picker never re-searched even though the visible query field was blank a moment ago.
+        commanderQueryFlow.value = ""
+        cardQueryFlow.value = ""
     }
 
     /** Applies the advanced filters (called from the sheet's Search button) and runs a fresh search. */
@@ -378,6 +418,10 @@ class CommunityDecksSearchViewModel(
      * Runs a fresh search (page 1) combining the deck-name query bar with the applied advanced
      * filters. No-ops only when BOTH the query is blank AND no advanced filter is active — a blank
      * query with active filters (e.g. "commander = Krenko, Mob Boss") still searches.
+     *
+     * Also cancels any in-flight [loadMoreJob] (bug fix): without this, a [loadMore] fetch for the
+     * PREVIOUS query/filters could complete after this fresh search's own result lands and append
+     * its now-stale page onto the new (unrelated) result set via `it.results + result.data.decks`.
      */
     fun search() {
         val state = _uiState.value
@@ -386,15 +430,26 @@ class CommunityDecksSearchViewModel(
         if (deckName.isBlank() && filters.activeCount == 0) return
 
         searchJob?.cancel()
+        loadMoreJob?.cancel()
         currentPage = 1
 
         searchJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true) }
+            // `isLoadingMore = false` guards against a stuck "loading more" spinner: the
+            // `loadMoreJob` just cancelled above may have already flipped it to `true` and, being
+            // cancelled, will never reach its own completion update to flip it back.
+            _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, isLoadingMore = false) }
 
-            crashlytics.setCustomKey("community_search_format", filters.format.name)
+            crashlytics.setCustomKey("community_search_format", filters.formats.apiId)
             crashlytics.setCustomKey("community_search_sort", state.selectedSort.name)
             crashlytics.setCustomKey("community_search_query_len", deckName.length)
+            // NOTE (Archidekt multi-card search expansion, 2026-07-24): the semantics of
+            // `activeCount` shifted here — each selected card now counts individually (see
+            // CommunityAdvancedFilters.activeCount KDoc), so this key's value can jump by more
+            // than 1 per user action. `community_search_card_filter_count` below is the
+            // card-selection-only signal for anyone reading the dashboard who needs to
+            // disambiguate the two.
             crashlytics.setCustomKey("community_search_active_filters", filters.activeCount)
+            crashlytics.setCustomKey("community_search_card_filter_count", filters.cards.size)
 
             val dataFilters = filters.toSearchFilters(
                 deckName = deckName,
@@ -427,13 +482,19 @@ class CommunityDecksSearchViewModel(
         }
     }
 
-    /** Appends the next page of results. No-ops when already loading more or no more pages. */
+    /**
+     * Appends the next page of results. No-ops when already loading more or no more pages.
+     *
+     * Tracks its own [loadMoreJob] (bug fix) so a fresh [search] can cancel an in-flight
+     * `loadMore` fetch for the query/filters that were active before the change — otherwise the
+     * old page could land after the new search's results and get appended onto them.
+     */
     fun loadMore() {
         if (_uiState.value.isLoadingMore || !_uiState.value.hasMore) return
 
         val nextPage = currentPage + 1
 
-        viewModelScope.launch {
+        loadMoreJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true) }
 
             val state = _uiState.value

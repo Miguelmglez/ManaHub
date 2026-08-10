@@ -20,9 +20,6 @@ import com.mmg.manahub.core.online.domain.usecase.LeaveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.ObserveSessionUseCase
 import com.mmg.manahub.core.online.domain.usecase.StartSessionUseCase
 import com.mmg.manahub.core.online.presentation.mapOnlineBackendError
-import com.mmg.manahub.core.domain.auth.AuthResult
-import com.mmg.manahub.core.domain.auth.SessionState
-import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -61,7 +58,6 @@ class LobbyHostViewModel @Inject constructor(
     private val repository: OnlineSessionRepository,
     private val userPreferencesDataStore: UserPreferencesDataStore,
     private val savedStateHandle: SavedStateHandle,
-    private val authRepository: AuthRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -111,6 +107,15 @@ class LobbyHostViewModel @Inject constructor(
     private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var gameLaunched = false
+
+    /**
+     * Opaque identity token captured from [CreateSessionUseCase]'s response when this VM's caller
+     * has no Supabase Auth session at all (a guest — see the 2026-08 anonymous-sign-in removal).
+     * Null for a real signed-in account, in which case every RPC below resolves identity via
+     * `auth.uid()` exactly as before. Threaded into every subsequent call this VM makes for the
+     * lobby session (`setReady`, `startSession`, `leaveSession`, snapshot polling).
+     */
+    private var guestToken: String? = null
 
     /** Per-participant-id consecutive-miss counter, used by the two-strike ghost rule. */
     private var participantMissStreak: Map<String, Int> = emptyMap()
@@ -170,7 +175,7 @@ class LobbyHostViewModel @Inject constructor(
         viewModelScope.launch {
             crashlytics.log("online_session_host_ready_toggled: ready=$ready")
             _uiState.update { it.copy(isHostReady = ready) }
-            repository.setReady(sessionId, ready).onFailure { throwable ->
+            repository.setReady(sessionId, ready, guestToken).onFailure { throwable ->
                 crashlytics.log("online_session_host_ready_failed: type=${throwable::class.simpleName}")
                 crashlytics.recordException(throwable)
                 _uiState.update { it.copy(isHostReady = !ready, error = mapOnlineBackendError(appContext, throwable.message)) }
@@ -194,7 +199,9 @@ class LobbyHostViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             crashlytics.log("online_session_rejoin_started: session_id_hash=${session.sessionId.take(8)}")
-            observeSessionUseCase.getSnapshot(session.sessionId).fold(
+            // resumeSession only ever surfaces sessions from getMyActiveSessionsUseCase, which is
+            // real-account-only (no guest concept) — guestToken stays null here by construction.
+            observeSessionUseCase.getSnapshot(session.sessionId, guestToken).fold(
                 onSuccess = { snapshot ->
                     crashlytics.log("online_session_rejoin_snapshot_loaded: participant_count=${snapshot.participants.size}")
                     val ps = snapshot.participants.filter { it.status != ParticipantStatus.LEFT }
@@ -264,25 +271,14 @@ class LobbyHostViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            // Ensure a Supabase session exists; sign in anonymously for guests.
-            // Await a settled auth state first — checking `.value` directly could observe a
-            // transient/initializing state and skip anonymous sign-in, causing the RPC below
-            // to fail with a generic error instead.
-            val settledSession = authRepository.sessionState.first { it !is SessionState.Loading }
-            if (settledSession is SessionState.Unauthenticated) {
-                val anonResult = authRepository.signInAnonymously()
-                if (anonResult is AuthResult.Error) {
-                    val msg = anonResult.error.toString()
-                    crashlytics.log("online_session_anon_signin_failed: $msg")
-                    _uiState.update { it.copy(isLoading = false, error = mapOnlineBackendError(appContext, msg)) }
-                    return@launch
-                }
-            }
-
             crashlytics.log("online_session_create_started: mode=${state.gameMode.name} player_count=${state.playerCount}")
             crashlytics.setCustomKey("online_session_game_mode", state.gameMode.name)
             crashlytics.setCustomKey("online_session_player_count", state.playerCount)
 
+            // No auth gate: the RPC mints/validates identity server-side via an optional
+            // guest_token when the caller has no Supabase Auth session at all (2026-08 — guests
+            // never create a Supabase Auth user of any kind). Real signed-in accounts keep
+            // resolving identity via auth.uid() exactly as before.
             createSessionUseCase(
                 mode = state.gameMode.name,
                 playerCount = state.playerCount,
@@ -290,9 +286,10 @@ class LobbyHostViewModel @Inject constructor(
                 displayName = state.displayName.ifBlank { appContext.getString(R.string.lobby_host_default_name) },
                 themeKey = state.selectedThemeKey,
             ).fold(
-                onSuccess = { (sessionId, code) ->
+                onSuccess = { (sessionId, code, token) ->
                     crashlytics.log("online_session_create_success: session_id_hash=${sessionId.take(8)}")
                     crashlytics.setCustomKey("online_session_id_hash", sessionId.take(8))
+                    this@LobbyHostViewModel.guestToken = token
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -306,7 +303,7 @@ class LobbyHostViewModel @Inject constructor(
                     startLobbyPolling(sessionId)
                     // Realtime subscription as optional fast-path.
                     connectAndObserve(sessionId)
-                    repository.setReady(sessionId, true)
+                    repository.setReady(sessionId, true, guestToken)
                         .onSuccess {
                             _uiState.update { it.copy(isHostReady = true) }
                         }
@@ -343,9 +340,11 @@ class LobbyHostViewModel @Inject constructor(
      * Only callable when [UiState.canStart] is true.
      *
      * @param onGameStart Invoked on the main thread once the backend confirms the session
-     *   has transitioned to ACTIVE. Provides the session ID, selected mode, and player count.
+     *   has transitioned to ACTIVE. Provides the session ID, selected mode, player count, and the
+     *   guest identity token (null for a real signed-in account) so [GameViewModel] can keep
+     *   authenticating in-game RPCs the same way.
      */
-    fun startSession(onGameStart: (sessionId: String, mode: GameMode, playerCount: Int) -> Unit) {
+    fun startSession(onGameStart: (sessionId: String, mode: GameMode, playerCount: Int, guestToken: String?) -> Unit) {
         val state = _uiState.value
         if (state.isLoading) return
         val sessionId = state.sessionId ?: return
@@ -355,12 +354,12 @@ class LobbyHostViewModel @Inject constructor(
             crashlytics.log("online_session_start_requested: participant_count=${state.participants.size}")
             crashlytics.setCustomKey("online_session_participant_count", state.participants.size)
 
-            startSessionUseCase(sessionId).fold(
+            startSessionUseCase(sessionId, guestToken).fold(
                 onSuccess = {
                     gameLaunched = true
                     crashlytics.log("online_session_start_success: mode=${state.gameMode.name}")
                     _uiState.update { it.copy(isLoading = false) }
-                    onGameStart(sessionId, state.gameMode, state.playerCount)
+                    onGameStart(sessionId, state.gameMode, state.playerCount, guestToken)
                 },
                 onFailure = { throwable ->
                     crashlytics.log("online_session_start_failed: type=${throwable::class.simpleName}")
@@ -388,7 +387,7 @@ class LobbyHostViewModel @Inject constructor(
         viewModelScope.launch {
             if (sessionId != null) {
                 crashlytics.log("online_session_host_left: participant_count=${_uiState.value.participants.size}")
-                leaveSessionUseCase(sessionId)
+                leaveSessionUseCase(sessionId, guestToken)
             }
             onNavigateBack()
         }
@@ -403,7 +402,7 @@ class LobbyHostViewModel @Inject constructor(
     fun refreshParticipants() {
         val sessionId = _uiState.value.sessionId ?: return
         viewModelScope.launch {
-            observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+            observeSessionUseCase.getSnapshot(sessionId, guestToken).onSuccess { snapshot ->
                 _uiState.update { state ->
                     mergeSnapshotParticipants(state, snapshot.participants)
                 }
@@ -429,7 +428,7 @@ class LobbyHostViewModel @Inject constructor(
             while (_uiState.value.sessionId != null && !gameLaunched) {
                 kotlinx.coroutines.delay(3_000L)
                 if (_uiState.value.sessionId == null || gameLaunched) break
-                observeSessionUseCase.getSnapshot(sessionId).onSuccess { snapshot ->
+                observeSessionUseCase.getSnapshot(sessionId, guestToken).onSuccess { snapshot ->
                     if (snapshot.session.status.isTerminal()) {
                         handleTerminalStatus(snapshot.session.status)
                         return@launch
@@ -470,6 +469,7 @@ class LobbyHostViewModel @Inject constructor(
     private fun handleTerminalStatus(status: OnlineSessionStatus) {
         crashlytics.log("online_session_terminal: host_view status=${status.name} participant_count=${_uiState.value.participants.size}")
         participantMissStreak = emptyMap()
+        guestToken = null
         val message = if (status == OnlineSessionStatus.FINISHED) {
             appContext.getString(R.string.lobby_session_finished_msg)
         } else {

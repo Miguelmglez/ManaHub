@@ -138,9 +138,36 @@ in a `@Transaction`. Regression test: `CardDao CASCADE regression`.
 - Schema: `app/schemas/com.mmg.manahub.core.data.local.MtgDatabase/` (latest version json gitignored —
   regenerate locally).
 
-### Scryfall rate-limiting
+### Scryfall / Archidekt rate-limiting
 All Scryfall calls must be wrapped in `ScryfallRequestQueue.execute { }` (≤10 req/s, 100 ms min between
-requests, serialised by a `Mutex`).
+requests); all Archidekt calls go through `ArchidektRequestQueue.execute { }` (≤5 req/s). Both delegate
+to the shared `RateLimitedQueue` (`shared/core-data/.../network/`), which is a SINGLE app-wide instance
+per API (never construct a second one, never add a bypass path around either queue). Since WS2 of the
+backend-performance-optimization plan (2026-07-28), `RateLimitedQueue` also enforces: a SHARED cooldown
+gate (every caller, not just the one that got 429'd, waits out an active cooldown before dispatching —
+this is what makes the app recoverable from a 429 instead of digging deeper), bounded concurrency
+(`Semaphore(maxConcurrent)`, default 2), and escalating back-off across consecutive 429/503 hits that
+decays after a clean window. When retries are exhausted on a retryable failure, callers get a typed
+`RateLimitExhaustedException` (never the raw HTTP exception) so a UI retry CTA can be disabled with a
+countdown instead of re-triggering the storm. → memory: `project_scryfall_rate_limit_resilience_ws2`
+
+### Backend call budget (ADR-005, 2026-07-28)
+Three cross-cutting rules. Full rationale + the open findings list: `docs/adr/ADR-005-backend-call-budget.md`.
+- **Gate a hidden feature's BACKEND work, not just its UI.** A flag that hides a feature must also stop
+  its engine collectors, WorkManager scheduling, sync and startup reconciles — and must `cancelUniqueWork`
+  already-enqueued work, not merely skip future scheduling. Gate reactively (`collect`), never a one-shot
+  read. Precedent + the ADR-002 override: the Gamification section below.
+- **Card prices refresh on exactly ONE automatic path — never ask the user.** `PriceRefreshWorker` →
+  `RefreshCollectionPricesUseCase` (daily, 23 h watermark, stale ids only, ~500-id slices, ONE
+  `updatePricesBatch` per slice, capped per run with an auto follow-up; watermark claimed only on a full
+  pass). There is **no** manual refresh button and no screen-entry trigger — both were deleted, along with
+  the duplicate `CardRepositoryImpl.refreshCollectionPrices()`. Do not reintroduce either. Never write one
+  batch per 75-card chunk (invalidation storm → production OOM). Resumability is cursor-free by design:
+  the stale-id list is recomputed each run, so a numeric offset would point at the wrong slice.
+- **A write path that mutates cached fields MUST invalidate the matching cache entries.** `ScryfallCache`
+  holds full `Card` objects (prices included) in `cards`/`cardNames`/`artVariants`; a stale cache serves
+  old data and callers re-fetch to "fix" it — producing exactly the duplicate calls the cache exists to
+  prevent.
 
 ### Theming
 12 `AppTheme` palettes (dark-first; exactly one light theme: `HallowedPrint`). Fixed palettes — never
@@ -380,7 +407,7 @@ a correctness dependency. Must-know:
   `FINISHED` must NOT set `isOnlineSessionAbandoned` (only `ABANDONED` does). Lobby skips disconnect when
   `gameLaunched`; `GameViewModel` owns the final disconnect. Local player always in BOTTOM slot.
 - Connect order in game: disconnect stale → connect → snapshot → collect.
-- **Guest access**: `LobbyHostViewModel` and `LobbyJoinViewModel` auto-sign-in anonymously (`authRepository.signInAnonymously()`) if `sessionState.value is Unauthenticated` before the first RPC call. Anonymous users have `AuthUser.isAnonymous = true` (read from Supabase `appMetadata["is_anonymous"]`). `isAuthenticatedFlow` in `HomeViewModel` excludes anonymous users — they never see account-gated features. All 15 session RPCs are GRANT'd to both `authenticated` and `anon` roles. Never call `upsertUserProfile` for anonymous users — they have no `user_profiles` row.
+- **Guest access**: `LobbyHostViewModel` and `LobbyJoinViewModel` auto-sign-in anonymously (`authRepository.signInAnonymously()`) if `sessionState.value is Unauthenticated` before the first RPC call. Anonymous users have `AuthUser.isAnonymous = true`. GoTrue puts `is_anonymous` as a TOP-LEVEL claim on the session's JWT access token — **never** inside `app_metadata`/`user_metadata`, and supabase-kt's `UserInfo` DTO does not expose it at all — so it is decoded from the access token via the shared `decodeIsAnonymousClaim()` helper (`shared/core-common/.../core/common/SupabaseJwt.kt`, pure commonMain), applied in `AuthRepositoryImpl.toSessionState()` (the sole path feeding `sessionState`). A prior version of this code read `userInfo.appMetadata?.get("is_anonymous")`, which always evaluated false — see `feedback_auth_isanonymous_jwt_toplevel_claim` memory. `isAuthenticatedFlow` in `HomeViewModel` excludes anonymous users — they never see account-gated features. All 15 session RPCs are GRANT'd to both `authenticated` and `anon` roles. Never call `upsertUserProfile` for anonymous users — they have no `user_profiles` row. **This is now enforced at the DB level** (`public.handle_new_user()` guards `is_anonymous` and skips the INSERT entirely, since 2026-08-03 — before that fix it was only true by accident of Android client code never asking; a web client that did ask got a real row back). No `AFTER UPDATE` trigger exists or is needed: no code path in this app flips an existing anonymous `auth.users` row to permanent in place (`signInWithGoogle`/`linkGoogleIdentity`/`signUpWithGoogle` all mint a fresh identity via `supabaseAuth.signInWith`, never an in-place link from an anonymous session) — gamification's `reconcileOnSignIn` merges guest progress into the new account at the application layer instead. → memory: `feedback_handle_new_user_anonymous_guard`
 - → memory: `project_online_sessions`, `feedback_online_lobby_snapshot`, `feedback_online_game_sync`,
   `feedback_online_lobby_bugs_2026-05-28`, `feedback_online_ingame_sync_bugs_2026-05-28`,
   `project_gamesetup_hub_refactor`, `project_online_guest_support`
@@ -484,28 +511,26 @@ Content (tier list, guide, booster, engine) is generated offline and served by t
   `project_card_tag_category_colors_2026-07-23`, `feedback_collection_tag_grouping_strategy_only`
 
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
-**Suggestions tab hidden again (2026-07-21, temporary)**: `DeckFeatureFlags
-.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` is `false` — it had actually been flipped back to `true` at
-some point after the original 2026-07-14 hide (for the Community/Archetype plan Suggestions-tab
-launch, 2026-07-12 onward) and stayed `true` through the Deck Builder v2 work below; this pass
-flips it off again alongside the two v2 flags (see next paragraph). Code intact, flip back to
-`true` to re-enable. Manual editing and Import are unaffected.
+**Suggestions tab (`DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED`) is currently `true`** —
+it went through a hide/re-enable cycle (hidden 2026-07-14, re-enabled for the Community/Archetype
+plan, hidden again 2026-07-21, re-enabled during the Deck Wizard & Engine Rework campaign); flip to
+`false` to hide it again. Manual editing and Import are unaffected either way. See
+`docs/hidden-features/deck-studio-suggestions.md`.
 
-**Deck Builder v2 landed 2026-07-17 (`docs/plans/deck-builder-v2-plan.md` Phases 3-5), then hidden
-again 2026-07-21 (temporary — distinct from the 2026-07-14 permanent-release hide batch):** a new
-full-screen wizard (`Screen.DeckWizard` / `feature/decks/presentation/wizard/`) REPLACED
-`.DECK_STUDIO_BUILD_FROM_SEED_ENABLED` (already `false`) as the "Build from seed" entry point's
-destination, and a new `DiscoverSynergiesV2UseCase` (identity-only clustering) REPLACED
-`.DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED` (already `false`) as the "Browse inspirations" sheet's
-content — both legacy paths stay compiled. Both entry points stayed visible from 2026-07-17 through
-2026-07-21 whenever EITHER the legacy flag or its v2 sibling was `true`; as of 2026-07-21
-`DECK_BUILDER_V2_ENABLED`/`DISCOVERIES_V2_ENABLED` are ALSO flipped to `false`, so with all four
-flags now off, **both entry points are fully hidden end-to-end** (no destination reachable from
-either). This is a compile-time-flag-flip-only change — no logic/composables/ViewModels were
-touched or deleted. See `docs/hidden-features/deck-studio-build-from-seed.md` and `-inspirations.md`
-and `-suggestions.md` for the re-enable/retire procedure. → memory: `project_deck_builder_v2`
-(consolidated; per-run detail in `.claude/agent-memory/android-kotlin-architect/`),
-`project_deck_studio_temporary_hide_2026-07-21`
+**Deck Builder v2 wizard (`Screen.DeckWizard`) and Discoveries v2 (`DiscoverSynergiesV2UseCase`,
+identity-only clustering) are the SOLE "Build from seed" / "Browse inspirations" entry points** —
+gated by `DeckFeatureFlags.DECK_BUILDER_V2_ENABLED`/`DISCOVERIES_V2_ENABLED` (currently `true`).
+Their LEGACY siblings (`DECK_STUDIO_BUILD_FROM_SEED_ENABLED`/`DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED`,
+and the `SeedsContent`/`BuildDeckFromSeedsUseCase`/`DeckMagicEngine.discoverSynergies` content they
+gated) went through a hide-then-retire cycle: hidden 2026-07-17 when v2 landed, both entry points
+temporarily hidden end-to-end 2026-07-21 (all four flags briefly `false`), then the legacy code was
+DELETED OUTRIGHT (not just re-hidden) in the Deck Wizard & Engine Rework plan, Workstream 7.2
+(2026-07-28) after a parity audit confirmed the current wizard fully supersedes it — see
+`docs/plans/deck-wizard-rework-plan.md` §WS7 and `feature_deck_wizard_rework_ws7_retirement` memory.
+`docs/hidden-features/deck-studio-build-from-seed.md`/`-inspirations.md` were deleted alongside it;
+only `docs/hidden-features/deck-studio-suggestions.md` remains (still-real hide/show toggle, no
+legacy sibling to retire). → memory: `project_deck_builder_v2` (consolidated; per-run detail in
+`.claude/agent-memory/android-kotlin-architect/`), `project_deck_studio_temporary_hide_2026-07-21`
 
 **The SINGLE deck create + edit surface.** Both new decks AND existing decks route here: DeckList FAB +
 empty-state, Collection/Stats/Home/CardDetail deck-open, and Home → "Build deck" all navigate to
@@ -539,11 +564,14 @@ draft. Fuses manual editing + inline Deck Doctor suggestions + seed-build + Disc
   CardDetail), basic-land suggestions (`landDeltas`/`applyLandSuggestions`), stateless `WarningOverlay`
   (over-limit/color-identity/non-legendary-commander + acknowledge), deck game-stats card, playtest button.
   `CardDetailSheet`/`WarningOverlay`/`DeckFormatChipRow` are reusable composables in `presentation/components/`.
-- `DeckMagicDetailScreen` (in `DeckBuilderScreen.kt`) + `DeckBuilderViewModel` + `Screen.DeckDetail` route are
-  now an UNUSED fallback (kept compiling until parity confirmed in real use — then delete).
+- `DeckMagicDetailScreen`/`DeckBuilderScreen.kt`/`DeckMagicDetailViewModel`/`DeckBuilderViewModel.kt`/
+  `Screen.DeckDetail` — the legacy unused-fallback editor — were DELETED (not just hidden) in the
+  Deck Wizard & Engine Rework plan, Workstream 7.1 (2026-07-28) after confirming zero navigation
+  call sites and full feature parity with Deck Studio (commander flow, land suggestions, grouping,
+  sideboard movement, playtest button, share/export all live in `DeckStudioScreen`/
+  `DeckStudioViewModel`). Do not re-add this route or screen.
   **`DeckImprovementScreen`/`DeckImprovementViewModel`/`Screen.DeckImprovement` were RETIRED (D10)** — the
-  Studio Suggestions tab is the sole Deck Doctor UI surface; `DeckMagicDetailScreen.onImproveDeck`
-  re-points to `Screen.DeckStudio`.
+  Studio Suggestions tab is the sole Deck Doctor UI surface.
 - **Motor B (community suggestions, Phase 4) + community seed-build (Phase 5)**: the Suggestions tab
   gains a flag-gated (`communityEngineEnabledFlow`, D4) "Popular in similar decks" section +
   "Decks like yours" carousel, entirely additive to Motor A; the seed sheet gains a flag-gated
@@ -571,20 +599,31 @@ archetype-aware warnings when non-GENERIC/themed — a GENERIC deck's evaluation
 before. Deck Studio's Suggestions header carries a "Deck plan" chip/sheet (still behind the same
 `DECK_STUDIO_SUGGESTIONS_TAB_ENABLED` flag). Phase 2 added **Motor A**
 (`SuggestAddsFromCollectionUseCase`, same package): the offline, always-on, collection-only add
-source, now `DeckDoctorOrchestrator`'s SOLE adds source (it REPLACED, not supplemented,
-`SuggestAddsWithBudgetUseCase`). → memory: `project_archetype_engine`, `project_deck_doctor_phase2_motor_a`.
+source, now `DeckDoctorOrchestrator`'s SOLE adds source (it REPLACED, not supplemented, the since-
+retired `SuggestAddsWithBudgetUseCase`). → memory: `project_archetype_engine`,
+`project_deck_doctor_phase2_motor_a`.
 Key invariants:
 - `DeckFormat.valueOf()` must NOT be used — use `DeckFormat.entries.firstOrNull { ... } ?: STANDARD`.
-- `generateFromSeeds()` captures inputs atomically inside `_uiState.update { }` (double-tap + stale-snapshot guards).
+- The wizard's `DeckWizardViewModel.onGenerate()` re-entrancy-guards a double-tap via a synchronous
+  phase check (`state.phase != WizardPhase.REVIEW` returns early) before launching `generateJob`.
+  (The legacy `DeckStudioViewModel.generateFromSeeds()` used an analogous atomic `_uiState.update {}`
+  capture — that whole seed-build path was DELETED in the Deck Wizard & Engine Rework plan, WS7.2,
+  2026-07-28; the wizard is now the only build entry point.)
 - `DeckDoctorOrchestrator.loadAnalysis()` cancels its own `analysisJob` before relaunching (the
   incremental-analysis machinery lives there now, not inline in the ViewModel — see the Deck Studio
   section above).
-- `CandidatePoolGenerator`/`BudgetOptimizer`/`SuggestAddsWithBudgetUseCase` (D5) are DORMANT — still
-  Koin-registered but no longer referenced by any live class since Motor A replaced them in
-  `DeckDoctorOrchestrator` (Phase 2); do not delete. `Card.colors`/`colorIdentity`/`producedMana`
+- `BudgetOptimizer`/`SuggestAddsWithBudgetUseCase` (D5 dormant pipeline) were DELETED in the Deck
+  Wizard & Engine Rework plan, Workstream 7.3 (2026-07-28, D-H: the budget feature is not coming
+  back). **`CandidatePoolGenerator` SURVIVED** — it gained a live caller (the wizard's Scryfall
+  backstop fill, WS4) before the D5 pipeline was deleted, and a second live caller since (the
+  Suggestions tab's own "include outside collection" toggle, WS8.2); do not delete it. `BudgetConstraints`
+  also survived (moved to its own file, `.../domain/usecase/BudgetConstraints.kt`) — still threaded
+  through `DeckDoctorOrchestrator`'s API and `DeckStudioViewModel`'s free-text budget state (U7)
+  even though Motor A ignores its values entirely. `Card.colors`/`colorIdentity`/`producedMana`
   (D14) are persisted as compact WUBRG-subset strings (not JSON); Motor A's pip-intensity multiplier
   and unknown-color-identity fail-closed filter (Commander only) consume them. → memory:
-  `project_dormant_budget_pool`, `project_card_model_produced_mana`, `project_deck_doctor_phase2_motor_a`
+  `project_dormant_budget_pool` (retirement recorded), `project_card_model_produced_mana`,
+  `project_deck_doctor_phase2_motor_a`, `feedback_candidatepoolgenerator_no_longer_dormant`
 - **Phase 3** added a new Cloudflare Worker `cloudflare/manahub-community/` (TypeScript, Wrangler,
   vitest+miniflare) aggregating community deck data — EDHREC for Commander, Archidekt for 60-card
   (D16) — behind KV (7-day snapshot TTL) + D1 (anonymous weekly trending counters, no PII), plus a
@@ -691,10 +730,13 @@ Key invariants:
   `STRATEGY_OTAGS` allowlist (no allowlist hit ⇒ no query — never guess an otag from an arbitrary key), and the
   dominant Phase-2 `tribe:<x>` key → `t:<tribe>` with the token sanitised to letters-only. `MAX_QUERIES` is 8.
   **All query fragments stay constants/allowlist — no user free text, the tribe token is `[a-z]`-sanitised.**
-  E8: `AddSuggestion.priceUnknown` (priceEur == null); `BudgetOptimizer` EXCLUDES a non-free unknown-price card
-  under an ACTIVE `maxTotalEur` cap (it cannot be costed — never silently 0€), keeps owned/free unknown-price
-  ones, and is inert with no cap. `runningPaid`/`cardsToBuy` are charged only on a known `cost > 0`. When the
-  otag-vs-substring stub returns empty in a test, the fallback fires → a single role issues 2 queries.
+  E8: `AddSuggestion.priceUnknown` (priceEur == null) — the retired `BudgetOptimizer` used to EXCLUDE
+  a non-free unknown-price card under an ACTIVE `maxTotalEur` cap (it cannot be costed — never
+  silently 0€), keeping owned/free unknown-price ones, inert with no cap; `runningPaid`/`cardsToBuy`
+  were charged only on a known `cost > 0`. That whole budget-optimizer pipeline was DELETED in the
+  Deck Wizard & Engine Rework plan, WS7.3 (2026-07-28) — `priceUnknown` itself survives (still set
+  by `SuggestAddsUseCase`), just with no remaining consumer of the flag. When the otag-vs-substring
+  stub returns empty in a test, the fallback fires → a single role issues 2 queries.
 - **Phase 4 format correctness + construction validation (D1-D4/C5):** `DeckFormat` now covers PIONEER/
   MODERN/LEGACY/VINTAGE/PAUPER/CASUAL (+`isSixtyCardConstructed`); `GameFormat→DeckFormat` is **1:1** via
   `GameFormat.toEngineDeckFormat()` (engine pkg) — never collapse non-Commander to STANDARD again.
@@ -705,8 +747,9 @@ Key invariants:
   +DeckScorerTest green); `EvaluateDeckUseCase` passes the full mainboard. New `DeckWarning`s: `DeckTooSmall`,
   `TooManyCopies`, `SingletonViolation`, `OffColorIdentity` — quantity-aware, copy limit is **by card name**,
   basics exempt, CASUAL/DRAFT skip min-size. D3 multi-copy: `AddSuggestion.suggestedCopies` (≤`maxCopies −
-  owned-by-name`; Commander/Draft = 1) and `BudgetOptimizer` charges `copies × price`; pass
-  `mainboardCopiesByName` to `SuggestAddsWithBudgetUseCase`. D4: `CandidatePoolGenerator` edhrec-pre-sorts
+  owned-by-name`; Commander/Draft = 1) — consumed today by the wizard build
+  (`BuildDeckFromTemplateUseCase`) to write the right per-card quantity; the retired `BudgetOptimizer`
+  used to charge `copies × price` against it. D4: `CandidatePoolGenerator` edhrec-pre-sorts
   ONLY for Commander; constructed pools rank by fit. When touching `DeckWarning`, add the new cases'
   `label()`+`key` in `DeckDoctorStrings` + `strings.xml`.
 - **Re-run the golden ORDERING invariants after ANY scoring-component change** — a re-tune of one component
@@ -848,6 +891,16 @@ content). Must-know:
 Cross-cutting XP/levels/achievements/quests/streaks/cosmetics engine. **Local-first** (works 100%
 offline; account only adds Phase-4 sync). The durable design doc is `docs/adr/ADR-002-gamification.md`
 — **read it + the memory files before any gamification work.** Must-know:
+- **The whole BACKEND is gated on `gamificationEnabledFlow` (default OFF), not just the UI** (2026-07-28,
+  ADR-005 Decision 1 — this **deliberately overrides ADR-002's "engine keeps recording silently"**). When
+  the flag is off: no engine start, no backfill/`reconcileAll`/quest reconcile, no `AppOpenedToday` emit,
+  no `GamificationSyncWorker`/`QuestRotationWorker` scheduling, and both work names are `cancelUniqueWork`'d
+  (an install may carry an enqueued periodic worker). Both workers ALSO return `Result.success()`
+  immediately when the flag is off, as defense in depth. The gate is a **reactive `collect`**, never a
+  one-shot `.first()`, so a Settings toggle takes effect without a restart. Rationale for the override:
+  the XP ledger is idempotent and the backfill/reconcile passes are retroactive, so enabling later
+  recomputes the user's true state — silent recording bought nothing and cost an hourly Supabase sync
+  (9 RPCs × ~24/day). **Do not "restore" silent recording.**
 - **Features never call the engine.** They emit a `ProgressionEvent` on `ProgressionEventBus` at the
   canonical write path (repository/use-case, after a successful commit — never a ViewModel/composable);
   the engine collects the bus in `ManaHubApp.onCreate` and processes on `@DefaultDispatcher`.

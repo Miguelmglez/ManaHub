@@ -58,6 +58,20 @@ object XpConfig {
     /** XP for completing a trade. */
     const val tradeCompleted: Int = 50
 
+    // ── Puzzle (Daily Puzzle feature) ───────────────────────────────────────────
+    /** XP for solving the daily puzzle. */
+    const val puzzleSolved: Int = 30
+
+    /**
+     * Additional XP when the puzzle was solved "perfectly" (see
+     * [com.mmg.manahub.core.gamification.domain.event.ProgressionEvent.PuzzleSolved.perfect]).
+     * Deliberately EXCLUDED for [com.mmg.manahub.core.model.puzzle.PuzzleType.GUESS_CARD] (see the
+     * exclusion in `XpGranter`'s `PuzzleSolved` branch) — a lucky or already-known first guess isn't
+     * a skill signal worth rewarding on a guess-based puzzle. Reserved for future skill-based puzzle
+     * types (e.g. Connections, Mana Math), where a genuinely optimal solve is meaningful to reward.
+     */
+    const val puzzlePerfectBonus: Int = 40
+
     // ── Social ───────────────────────────────────────────────────────────────────
     /** XP for adding a friend. */
     const val friendAdded: Int = 30

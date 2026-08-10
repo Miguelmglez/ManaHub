@@ -10,7 +10,10 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 /**
@@ -35,6 +38,7 @@ class GamificationSyncWorker(
     workerParams: WorkerParameters,
     private val gamificationSyncManager: GamificationSyncManager,
     private val authRepository: AuthRepository,
+    private val userPreferencesDataStore: UserPreferencesDataStore,
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -88,6 +92,20 @@ class GamificationSyncWorker(
     }
 
     override suspend fun doWork(): Result {
+        // Defense in depth (WS1+WS3 Part A item 3, backend-performance-optimization-plan.md §1):
+        // ManaHubApp cancels this worker's unique work reactively when the gamification master
+        // flag is off, but an ALREADY-enqueued periodic request (scheduled before the flag was
+        // last flipped off, e.g. from a previous install) can still fire before that cancel lands.
+        // Re-check the flag here so such a stray run reaches Supabase zero times.
+        if (!userPreferencesDataStore.gamificationEnabledFlow.first()) {
+            // WS7 telemetry (2026-07-29, ADR-005 Decision 1): this is the direct empirical proof
+            // point that the reactive cancel in ManaHubApp actually holds in the field — should fire
+            // near-never. Frequent firing means the cancel isn't landing before an already-enqueued
+            // periodic run fires (see this method's own class KDoc / defense-in-depth comment above).
+            recordNonFatal("gamification_sync_worker_self_aborted_flag_off")
+            return Result.success()
+        }
+
         // Guest users without any Supabase account (no current user) — skip entirely. Anonymous guests
         // DO have an id, so they sync (local progress is preserved/merged into the anon account).
         val userId = authRepository.getCurrentUser()?.id ?: return Result.success()

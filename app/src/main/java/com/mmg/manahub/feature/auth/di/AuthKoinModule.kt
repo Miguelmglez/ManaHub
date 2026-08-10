@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.auth.di
 
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.UserProfileClient
+import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
@@ -18,10 +19,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.android.ext.koin.androidContext
@@ -77,6 +75,21 @@ import org.koin.dsl.module
  *   (the promote-then-shrink ritual) so it resolves the ONE native single here via `get()` instead of
  *   throwing `DefinitionOverrideException` from a duplicate registration.
  *
+ * ## KMP web roadmap W2b — shared Ktor auth-header plugin
+ * `@Named("supabaseKtor")` used to build its OWN OkHttp interceptor to inject
+ * `apikey`/`Authorization`/`Content-Type`/`Accept` headers, duplicating logic that had to be
+ * hand-copied for the web (`Js`) engine. That header-injection logic is now
+ * [installSupabaseAuthHeaders] (`shared/core-data` commonMain,
+ * `remote/SupabaseAuthHeaderPlugin.kt`) — a plain Ktor `HttpClientConfig` extension installed
+ * identically on Android (`OkHttp` engine, this file) and Web (`Js` engine,
+ * `webApp`'s `WebAppKoinModule.kt`). **The `@Named("supabase")` [OkHttpClient] single below is
+ * UNCHANGED and keeps its OWN auth interceptor** — `AuthRepositoryImpl` makes two RAW OkHttp calls
+ * (`delete-current-user`/`set-google-account-password` Edge Functions) that bypass Ktor entirely
+ * and rely on that interceptor for header injection; removing it would break those calls silently.
+ * `@Named("supabaseKtor")`'s own OkHttp engine is now a SEPARATE, bare `OkHttpClient` (logging
+ * only, no auth interceptor) so header injection happens exactly once, at the Ktor layer, matching
+ * web — not duplicated across both an OkHttp interceptor AND the new Ktor plugin.
+ *
  * @return a Koin [Module] that provides the ten auth use cases, the two qualified HTTP clients,
  *   [UserProfileClient], [UserProfileDataSource] and the [AuthViewModel] factory.
  */
@@ -93,6 +106,10 @@ fun authKoinModule(): Module = module {
      * [io.github.jan.supabase.auth.Auth.currentSessionOrNull] reads in-memory state from
      * `Auth.sessionStatus` — it is a plain (non-suspend) function, so no blocking or coroutine
      * bridge is needed here.
+     *
+     * **Kept separate from `@Named("supabaseKtor")`'s own engine (see class KDoc above)**: this
+     * client is consumed directly (not through Ktor) by `AuthRepositoryImpl` for two raw Edge
+     * Function calls, so its interceptor-based header injection must stay exactly as-is.
      */
     single(named("supabase")) {
         val supabaseAuth = get<SupabaseClient>().auth
@@ -124,24 +141,35 @@ fun authKoinModule(): Module = module {
     }
 
     /**
-     * Provides a Ktor [HttpClient] backed by the Supabase [OkHttpClient].
+     * Provides a Ktor [HttpClient] for [UserProfileClient]/[FriendshipClient] PostgREST calls.
      *
-     * `encodeDefaults = true` mirrors the old Gson `serializeNulls()` behavior so that
-     * fields with default values (e.g. `pLimit = 50`) are always serialized.
+     * The OkHttp engine backing this client is bare (logging only) — auth-header injection
+     * (`apikey`/`Authorization`/`Content-Type`/`Accept`) happens via the shared
+     * [installSupabaseAuthHeaders] Ktor plugin instead, the SAME plugin the web target installs on
+     * its `Js` engine, so header behavior is byte-identical across platforms. `encodeDefaults =
+     * true` (set inside the shared plugin) mirrors the old Gson `serializeNulls()` behavior so
+     * that fields with default values (e.g. `pLimit = 50`) are always serialized.
      */
     single(named("supabaseKtor")) {
-        val preconfiguredOkHttpClient: OkHttpClient = get(named("supabase"))
+        val loggingOnlyOkHttpClient = OkHttpClient.Builder()
+            .addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = if (BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.BODY
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+                }
+            )
+            .build()
         HttpClient(OkHttp) {
             engine {
-                preconfigured = preconfiguredOkHttpClient
+                preconfigured = loggingOnlyOkHttpClient
             }
-            install(ContentNegotiation) {
-                json(Json {
-                    ignoreUnknownKeys = true
-                    encodeDefaults = true
-                })
-            }
-            expectSuccess = true
+            installSupabaseAuthHeaders(
+                supabaseClient = get<SupabaseClient>(),
+                anonKey = BuildConfig.SUPABASE_ANON_KEY,
+            )
         }
     }
 

@@ -62,18 +62,17 @@ import org.koin.dsl.module
  * ## KMP migration — Hilt→Koin cutover batch 6 (WorkManager subsystem)
  * [CollectionSyncWorker] was converted from `@HiltWorker`/`@AssistedInject` to a plain `CoroutineWorker`
  * registered here via Koin's `worker { }` DSL, co-located with the [SyncManager] bridge single it needs.
- * [SyncManager] itself KEEPS its Hilt `@Inject constructor` — the legacy (still `@HiltViewModel`)
- * `DeckBuilderViewModel` also injects it — so this stays a forward bridge, not a native conversion.
- * `AuthRepository` is a native Koin single in `coreBridgeKoinModule`, resolved via `get()`.
+ * [SyncManager] itself KEEPS its Hilt `@Inject constructor` because `ManaHubApp` (`@AndroidEntryPoint`)
+ * still Hilt-injects it as a bridge field passed into this module — so this stays a forward bridge, not
+ * a native conversion. `AuthRepository` is a native Koin single in `coreBridgeKoinModule`, resolved via
+ * `get()`.
  *
- * @param syncManager the Hilt-owned [SyncManager] singleton (this island only).
  * @param workManager the Hilt-owned [WorkManager] singleton (this island only; the same instance
  *   `ManaHubApp` already injects for global sync scheduling).
  * @return a Koin [Module] that provides the Collection-only bridged singletons and the
  *   [CollectionViewModel] factory.
  */
 fun collectionKoinModule(
-    syncManager: SyncManager,
     workManager: WorkManager,
 ): Module = module {
     // ── Hilt → Koin bridge: re-expose the Collection-only Hilt-owned singletons to Koin. ──
@@ -82,8 +81,10 @@ fun collectionKoinModule(
     //  UserCardRepository are already singles in tradesKoinModule / cardDetailKoinModule; GetCollectionUseCase
     //  and MigrateLocalTradeListsUseCase are now singles in SharedDomainKoinModule. All resolved below via
     //  get(), never re-registered here — a second single<T> for the same type across two loaded modules
-    //  would throw DefinitionOverrideException.)
-    single { syncManager }
+    //  would throw DefinitionOverrideException.
+    //  [SyncManager] was ALSO a Collection-only single here until the backend-performance-optimization-
+    //  plan WS1+WS3 promoted it to `coreBridgeKoinModule` (Home now needs its `syncState` too) — it now
+    //  resolves cross-module via get(), same as every other promoted dep in this comment block.)
     single { workManager }
 
     // ── KMP migration — Hilt→Koin cutover batch 6: WorkManager subsystem. ──

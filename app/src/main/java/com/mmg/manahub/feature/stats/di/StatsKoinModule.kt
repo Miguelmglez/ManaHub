@@ -29,11 +29,13 @@ import org.koin.dsl.module
  * - `AuthRepository` / `TradesRepository` (Phase 4, 2026-07 stats expansion) — shared with
  *   Trades/Home/Friends, both already global singles in `coreBridgeKoinModule`.
  *
- * `GetCollectionStatsUseCase`, `GetCollectionSetCodesUseCase`, `RefreshCollectionPricesUseCase`,
- * `GetSetCompletionCountsUseCase` (added for the 2026-07 stats expansion's collection phase) and
- * `GetTradeStatsUseCase` (added for its Phase 4/trades phase) are all natively Koin-built in
- * `SharedDomainKoinModule` — this module takes NO constructor params anymore and resolves all five
- * via `get()`, same as the shared repositories.
+ * `GetCollectionStatsUseCase`, `GetCollectionSetCodesUseCase`, `GetSetCompletionCountsUseCase`
+ * (added for the 2026-07 stats expansion's collection phase) and `GetTradeStatsUseCase` (added for
+ * its Phase 4/trades phase) are all natively Koin-built in `SharedDomainKoinModule` — this module
+ * takes NO constructor params anymore and resolves all four via `get()`, same as the shared
+ * repositories. `RefreshCollectionPricesUseCase` was REMOVED from this module's wiring (2026-07-28
+ * backend perf plan, WS1+WS3/WS5a) — `StatsViewModel` no longer has a manual price-refresh entry
+ * point; `PriceRefreshWorker` is the sole owner of price refresh.
  *
  * As features migrate, each `single { hiltInstance }` here is replaced by a real Koin provider and the
  * matching Hilt `@Provides`/`@Binds` is deleted — so the bridge shrinks to nothing without ever leaving
@@ -49,7 +51,6 @@ fun statsKoinModule(): Module = module {
             getSetCodes = get(),
             getSetCompletionCounts = get(),
             scryfallDataSource = get(),
-            refreshPricesUseCase = get(),
             userPreferencesDataStore = get(),
             gameSessionRepository = get(),
             deckRepository = get(),

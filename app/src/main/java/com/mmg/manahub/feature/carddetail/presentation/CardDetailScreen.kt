@@ -70,7 +70,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -134,6 +133,7 @@ import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.CardTagChip
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
@@ -264,7 +264,7 @@ fun CardDetailScreen(
                         .fillMaxSize()
                         .padding(padding),
                     contentAlignment = Alignment.Center,
-                ) { CircularProgressIndicator() }
+                ) { MagicLoadingSpinner() }
 
                 uiState.card != null -> CardDetailContent(
                     card = uiState.card!!,
@@ -495,7 +495,7 @@ private fun CardDetailLanguageSheet(
                         modifier = Modifier.fillMaxWidth().height(160.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = mc.primaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
 
@@ -699,7 +699,7 @@ private fun CardDetailContent(
             ) {
                 // Front Face
                 AsyncImage(
-                    model = coil3.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    model = coil3.request.ImageRequest.Builder(LocalContext.current)
                         .data(card.imageNormal)
                         .crossfade(false) // Disable Coil fade to prioritize shared transition fade
                         .memoryCachePolicy(CachePolicy.ENABLED)
@@ -719,7 +719,7 @@ private fun CardDetailContent(
                 // Back Face
                 if (card.imageBackNormal != null) {
                     AsyncImage(
-                        model = coil3.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        model = coil3.request.ImageRequest.Builder(LocalContext.current)
                             .data(card.imageBackNormal)
                             .crossfade(false)
                             .memoryCachePolicy(CachePolicy.ENABLED)

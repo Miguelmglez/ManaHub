@@ -63,14 +63,18 @@ object ArchetypeEvaluator {
         colorModulation: ColorModulationEntry?,
         curveExemptionActive: Boolean = false,
     ): List<DeckWarning> = buildList {
+        // WS5.4 (Deck Wizard & Engine Rework plan): computed once per evaluate() call, not per
+        // warning -- pure string formatting, never a card-level lookup.
+        val planLabel = skeleton.planLabel()
+
         skeleton.roleTargets.forEach { (key, band) ->
             if (key == ArchetypeData.MANA_FIX_KEY) return@forEach // A.5 check handled separately below
 
             val have = roleCounts[key] ?: 0
             if (key in skeleton.antiRoles) {
-                if (have > band.max) add(DeckWarning.ArchetypeAntiRolePresent(key, have, band.max))
+                if (have > band.max) add(DeckWarning.ArchetypeAntiRolePresent(key, have, band.max, planLabel))
             } else if (have < band.min) {
-                add(DeckWarning.ArchetypeRoleGap(key, have, band.min))
+                add(DeckWarning.ArchetypeRoleGap(key, have, band.min, planLabel))
             }
         }
 
@@ -92,7 +96,7 @@ object ArchetypeEvaluator {
 
         // Curve-band check (suppressed under an active A.3 exemption).
         if (!curveExemptionActive && avgMv !in skeleton.curve.min..skeleton.curve.max) {
-            add(DeckWarning.CurveOutsideArchetypeBand(avgMv, skeleton.curve.min, skeleton.curve.max))
+            add(DeckWarning.CurveOutsideArchetypeBand(avgMv, skeleton.curve.min, skeleton.curve.max, planLabel))
         }
 
         // Color modulation — mana_fix minimum only (Appendix B checks this SEPARATELY from the
@@ -101,7 +105,7 @@ object ArchetypeEvaluator {
         if (colorModulation != null) {
             val have = roleCounts[ArchetypeData.MANA_FIX_KEY] ?: 0
             if (have < colorModulation.manaFix.min) {
-                add(DeckWarning.ArchetypeRoleGap(ArchetypeData.MANA_FIX_KEY, have, colorModulation.manaFix.min))
+                add(DeckWarning.ArchetypeRoleGap(ArchetypeData.MANA_FIX_KEY, have, colorModulation.manaFix.min, planLabel))
             }
         }
     }

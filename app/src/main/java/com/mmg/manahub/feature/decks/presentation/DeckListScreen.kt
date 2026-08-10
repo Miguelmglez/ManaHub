@@ -22,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -48,6 +47,7 @@ import org.jetbrains.compose.resources.painterResource
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.components.DeckItem
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
@@ -86,8 +86,7 @@ fun DeckListScreen(
                 .padding(padding)
         ) {
             when {
-                uiState.isLoading -> CircularProgressIndicator(
-                    color    = mc.primaryAccent,
+                uiState.isLoading -> MagicLoadingSpinner(
                     modifier = Modifier.align(Alignment.Center),
                 )
 

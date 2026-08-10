@@ -1,6 +1,7 @@
 package com.mmg.manahub.core.gamification.domain.event
 
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
@@ -205,6 +206,32 @@ sealed interface ProgressionEvent {
         override val idempotencyKey: String
             get() = "explore:$featureKey:${occurredAt.toLocalDateTime(TimeZone.currentSystemDefault()).date}"
         // Never reaches the ledger (0 XP, advances quests only) — scoping is irrelevant; false.
+        override val isDeviceScoped: Boolean get() = false
+    }
+
+    /**
+     * A daily puzzle was solved (Daily Puzzle feature, Batch B1 foundation).
+     *
+     * @param puzzleDate the server-authoritative puzzle calendar date this attempt was for — the
+     *   same [Puzzle][com.mmg.manahub.core.model.puzzle.Puzzle.date] the client fetched from
+     *   [PuzzleRepository][com.mmg.manahub.core.domain.repository.PuzzleRepository.getTodayPuzzle].
+     * @param type the puzzle's [PuzzleType][com.mmg.manahub.core.model.puzzle.PuzzleType] wire name.
+     * @param attemptsUsed number of guesses the solve took.
+     * @param perfect whether the puzzle was solved without any incorrect guesses. Unreachable this
+     *   pass (no shipped puzzle type sets `perfect = true` yet — see [XpConfig.puzzlePerfectBonus]),
+     *   wired for forward-compat with later puzzle types that can distinguish a "perfect" solve.
+     */
+    data class PuzzleSolved(
+        val puzzleDate: LocalDate,
+        val type: String,
+        val attemptsUsed: Int,
+        val perfect: Boolean,
+        override val occurredAt: Instant,
+    ) : ProgressionEvent {
+        override val idempotencyKey: String get() = "puzzle:$puzzleDate:solved"
+        // Server-authoritative puzzle date — globally stable per user; NOT device-scoped so two
+        // devices solving the same day's puzzle intentionally dedupe to a single grant (mirrors
+        // TradeCompleted's reasoning above).
         override val isDeviceScoped: Boolean get() = false
     }
 }

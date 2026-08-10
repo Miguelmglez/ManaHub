@@ -23,9 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -38,7 +36,6 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -80,6 +77,7 @@ import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -202,7 +200,7 @@ fun CreateTradeProposalScreen(
                         shape    = ButtonShape
                     ) {
                         if (uiState.isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = mc.background, strokeWidth = 2.dp)
+                            MagicLoadingSpinner(modifier = Modifier.size(18.dp))
                         } else {
                             Text(
                                 stringResource(
@@ -243,7 +241,7 @@ fun CreateTradeProposalScreen(
                         modifier = Modifier.fillMaxSize().padding(innerPadding),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = mc.primaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
 
@@ -757,61 +755,71 @@ private fun FriendSelector(
                         )
                     }
                 }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
+                // Backend & Performance Optimization plan, WS5b (2026-07-28): was a
+                // Column + verticalScroll rendering every friend eagerly — an unbounded list per
+                // CLAUDE.md's Compose rules. Converted to a LazyColumn keyed by `friend.userId`
+                // (never by index — the CLAUDE.md rule against a key value that can repeat).
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.lg),
                 ) {
-                    Text(
-                        text = stringResource(R.string.trades_friend_selector_sheet_title),
-                        style = MaterialTheme.magicTypography.titleMedium,
-                        color = mc.textPrimary
-                    )
+                    item(key = "friend_selector_title") {
+                        Text(
+                            text = stringResource(R.string.trades_friend_selector_sheet_title),
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            color = mc.textPrimary
+                        )
+                    }
 
                     when {
                         sessionState is SessionState.Unauthenticated -> {
-                            EmptyState(
-                                title = stringResource(R.string.trades_friend_sheet_login_title),
-                                actionLabel = stringResource(R.string.trades_friend_sheet_login_action),
-                                onAction = {
-                                    showSheet = false
-                                    onNavigateToLogin()
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            item(key = "friend_selector_login_empty_state") {
+                                EmptyState(
+                                    title = stringResource(R.string.trades_friend_sheet_login_title),
+                                    actionLabel = stringResource(R.string.trades_friend_sheet_login_action),
+                                    onAction = {
+                                        showSheet = false
+                                        onNavigateToLogin()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                         friends.isEmpty() -> {
-                            EmptyState(
-                                title = stringResource(R.string.trades_friend_sheet_no_friends_title),
-                                actionLabel = stringResource(R.string.trades_friend_sheet_no_friends_action),
-                                onAction = {
-                                    showSheet = false
-                                    onNavigateToAddFriends()
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            item(key = "friend_selector_no_friends_empty_state") {
+                                EmptyState(
+                                    title = stringResource(R.string.trades_friend_sheet_no_friends_title),
+                                    actionLabel = stringResource(R.string.trades_friend_sheet_no_friends_action),
+                                    onAction = {
+                                        showSheet = false
+                                        onNavigateToAddFriends()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                         else -> {
                             // "None" option
-                            Surface(
-                                onClick = {
-                                    onFriendSelected(null)
-                                    showSheet = false
-                                },
-                                shape = CardShape,
-                                color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    stringResource(R.string.trades_friend_none_option),
-                                    modifier = Modifier.padding(MaterialTheme.spacing.lg),
-                                    style = MaterialTheme.magicTypography.bodyMedium,
-                                    color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
-                                )
+                            item(key = "friend_selector_none_option") {
+                                Surface(
+                                    onClick = {
+                                        onFriendSelected(null)
+                                        showSheet = false
+                                    },
+                                    shape = CardShape,
+                                    color = if (selectedFriend == null) mc.primaryAccent.copy(alpha = 0.1f) else Color.Transparent,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        stringResource(R.string.trades_friend_none_option),
+                                        modifier = Modifier.padding(MaterialTheme.spacing.lg),
+                                        style = MaterialTheme.magicTypography.bodyMedium,
+                                        color = if (selectedFriend == null) mc.primaryAccent else mc.textPrimary
+                                    )
+                                }
                             }
 
-                            friends.forEach { friend ->
+                            items(friends, key = { it.userId }) { friend ->
                                 Surface(
                                     onClick = {
                                         onFriendSelected(friend)

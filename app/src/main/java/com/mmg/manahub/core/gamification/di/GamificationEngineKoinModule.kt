@@ -123,8 +123,9 @@ fun gamificationEngineKoinModule(
     }
 
     // ── Engine collaborators. ──
+    // crashReporter comes from coreBridgeKoinModule (single<CrashReporter>) — NOT re-declared here.
     single { XpGranter(dao = get(), clock = get(), timeZone = get(), userPreferencesDataStore = get()) }
-    single { AchievementEvaluator(dao = get(), statsDao = get(), clock = get()) }
+    single { AchievementEvaluator(dao = get(), statsDao = get(), clock = get(), crashReporter = get()) }
     single { QuestEvaluator(dao = get(), clock = get(), timeZone = get()) }
     single { StreakTracker(dao = get(), clock = get(), timeZone = get()) }
     single { EntitlementGranter(dao = get(), clock = get()) }
@@ -139,6 +140,7 @@ fun gamificationEngineKoinModule(
             streakTracker = get(),
             entitlementGranter = get(),
             defaultDispatcher = Dispatchers.Default,
+            crashReporter = get(),
         )
     }
 
@@ -173,12 +175,17 @@ fun gamificationEngineKoinModule(
     }
 
     // ── KMP migration — Hilt→Koin cutover batch 6: WorkManager subsystem. ──
+    // Both workers gained a `userPreferencesDataStore` param (WS1+WS3 Part A item 3, backend-
+    // performance-optimization-plan.md §1) — defense-in-depth so an already-enqueued periodic run
+    // no-ops when the gamification master flag is off. `UserPreferencesDataStore` is bridged in
+    // `coreBridgeKoinModule` — resolved via `get()`, not re-registered here.
     worker {
         GamificationSyncWorker(
             appContext = androidContext(),
             workerParams = it.get(),
             gamificationSyncManager = get(),
             authRepository = get(),
+            userPreferencesDataStore = get(),
         )
     }
     worker {
@@ -186,6 +193,7 @@ fun gamificationEngineKoinModule(
             appContext = androidContext(),
             workerParams = it.get(),
             questReconciler = get(),
+            userPreferencesDataStore = get(),
         )
     }
 }

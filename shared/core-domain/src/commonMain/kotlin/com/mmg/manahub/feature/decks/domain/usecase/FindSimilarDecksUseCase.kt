@@ -70,7 +70,7 @@ class FindSimilarDecksUseCase(
         when (
             val result = communityDecksRepository.searchDecks(
                 CommunityDeckSearchFilters(
-                    cardName = seedQuery,
+                    cardNames = listOf(seedQuery),
                     deckFormatId = deckFormat,
                     orderBy = "-viewCount",
                     page = 1,

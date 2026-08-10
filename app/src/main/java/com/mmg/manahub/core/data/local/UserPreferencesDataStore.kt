@@ -205,7 +205,7 @@ class UserPreferencesDataStore @Inject constructor(
         context.getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
             .edit()
             .putString("app_language_sync", language.code)
-            .commit()
+            .apply()
     }
 
     override suspend fun setCardLanguage(language: CardLanguage) {

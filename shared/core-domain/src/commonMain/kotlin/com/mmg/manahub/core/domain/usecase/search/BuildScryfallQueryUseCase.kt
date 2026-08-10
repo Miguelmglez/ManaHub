@@ -3,6 +3,7 @@ package com.mmg.manahub.core.domain.usecase.search
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.SearchOrder
+import com.mmg.manahub.core.model.SearchPrefer
 
 class BuildScryfallQueryUseCase {
 
@@ -16,6 +17,7 @@ class BuildScryfallQueryUseCase {
                 if (queryString.isNotBlank()) append(" ")
                 append("order:${query.orderBy.scryfallValue}")
                 append(" direction:${query.direction.scryfallValue}")
+                append(" prefer:${SearchPrefer.BEST}")
             }
         }.trim()
     }
@@ -31,11 +33,17 @@ class BuildScryfallQueryUseCase {
             }
             is SearchCriterion.OracleText -> {
                 if (criterion.value.isBlank()) return null
-                "o:${escapeValue(criterion.value)}"
+                criterion.value.split(Regex("\\s+")).filter { it.isNotBlank() }
+                    .joinToString(" AND ", prefix = "(", postfix = ")") { "oracle:${escapeValue(it)}" }
             }
             is SearchCriterion.CardType -> {
-                if (criterion.value.isBlank()) return null
-                "t:${escapeValue(criterion.value)}"
+                if (criterion.types.isEmpty()) return null
+                val parts = criterion.types.map { "t:${escapeValue(it)}" }
+                if (criterion.matchAll) {
+                    parts.joinToString(",", prefix = "(", postfix = ")")
+                } else {
+                    "(${parts.joinToString(" OR ", prefix = "(", postfix = ")")})"
+                }
             }
             is SearchCriterion.Colors -> {
                 if (criterion.colors.isEmpty()) return null
@@ -52,14 +60,15 @@ class BuildScryfallQueryUseCase {
             is SearchCriterion.ManaCost ->
                 "mv${criterion.operator.symbol}${criterion.value}"
             is SearchCriterion.Rarity ->
-                "r${criterion.operator.symbol}${criterion.rarity}"
+                (criterion.rarity).joinToString(" OR ", prefix = "(", postfix = ")") {"r:${it.lowercase()}" }
+
             is SearchCriterion.CardSet -> {
                 if (criterion.setCodes.isEmpty()) return null
                 if (criterion.setCodes.size == 1)
-                    "s:${criterion.setCodes.first().lowercase()}"
+                    "set:${criterion.setCodes.first().lowercase()}"
                 else {
-                    val parts = criterion.setCodes.joinToString(" OR ") {
-                        "s:${it.lowercase()}"
+                    val parts = criterion.setCodes.joinToString(" OR ", prefix = "(", postfix = ")") {
+                        "set:${it.lowercase()}"
                     }
                     "($parts)"
                 }
@@ -75,11 +84,8 @@ class BuildScryfallQueryUseCase {
                 "$curr${criterion.operator.symbol}${criterion.value}"
             }
             is SearchCriterion.Format -> {
-                val prefix = if (criterion.legal) "" else "-"
-                "${prefix}f:${criterion.format}"
+                (criterion.format).joinToString(" AND ", prefix = "(", postfix = ")") {if (criterion.legal) "f:" + it.lowercase() else "banned:" + it.lowercase() }
             }
-            is SearchCriterion.Keyword ->
-                "kw:${escapeValue(criterion.value)}"
             is SearchCriterion.Language ->
                 "lang:${criterion.langCode}"
             is SearchCriterion.Artist ->
@@ -87,8 +93,7 @@ class BuildScryfallQueryUseCase {
             is SearchCriterion.FlavorText ->
                 "ft:${escapeValue(criterion.value)}"
             // Collection-local filters have no Scryfall equivalent
-            is SearchCriterion.IsInWishlist,
-            is SearchCriterion.IsForTrade,
+            is SearchCriterion.CollectionStatus,
             is SearchCriterion.HasTag -> null
         }
     }
