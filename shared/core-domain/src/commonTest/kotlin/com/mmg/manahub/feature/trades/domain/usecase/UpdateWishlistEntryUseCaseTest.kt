@@ -131,7 +131,6 @@ private class FakeAuthRepository(initialState: SessionState = SessionState.Unaut
     override suspend fun updateNickname(nickname: String): AuthResult<AuthUser> = error("unused")
     override suspend fun linkGoogleIdentity(email: String, password: String, pendingIdToken: String, pendingNonce: String): AuthResult<AuthUser> = error("unused")
     override suspend fun updateAvatarUrl(avatarUrl: String?): AuthResult<Unit> = error("unused")
-    override suspend fun signInAnonymously(): AuthResult<Unit> = error("unused")
 }
 
 private fun buildCard(scryfallId: String = "scry-new") = Card(

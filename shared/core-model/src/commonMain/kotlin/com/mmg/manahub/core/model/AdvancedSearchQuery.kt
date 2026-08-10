@@ -20,7 +20,7 @@ sealed class SearchCriterion {
 
     data class OracleText(val value: String) : SearchCriterion()
 
-    data class CardType(val value: String) : SearchCriterion()
+    data class CardType(val types: Set<String>, val matchAll: Boolean = true) : SearchCriterion()
 
     data class Colors(
         val colors: Set<String>,
@@ -38,9 +38,7 @@ sealed class SearchCriterion {
     ) : SearchCriterion()
 
     data class Rarity(
-        val rarity: String,
-        val operator: ComparisonOperator = ComparisonOperator.EQUAL,
-    ) : SearchCriterion()
+        val rarity: List<String>) : SearchCriterion()
 
     data class CardSet(val setCodes: Set<String>) : SearchCriterion()
 
@@ -66,11 +64,10 @@ sealed class SearchCriterion {
     ) : SearchCriterion()
 
     data class Format(
-        val format: String,
+        val format: List<String>,
         val legal: Boolean = true,
     ) : SearchCriterion()
 
-    data class Keyword(val value: String) : SearchCriterion()
 
     data class Language(val langCode: String) : SearchCriterion()
 
@@ -80,9 +77,7 @@ sealed class SearchCriterion {
 
     // ── Collection-local filters (not translated to Scryfall syntax) ──────────
 
-    data class IsInWishlist(val value: Boolean) : SearchCriterion()
-
-    data class IsForTrade(val value: Boolean) : SearchCriterion()
+    data class CollectionStatus(val wishlist: Boolean, val forTrade: Boolean) : SearchCriterion()
 
     /** Matches cards that have ANY of the given tag keys (in auto-tags OR user-tags). */
     data class HasTag(val keys: List<String>) : SearchCriterion()
@@ -92,6 +87,7 @@ data class AdvancedSearchQuery(
     val criteria: List<SearchCriterion> = emptyList(),
     val orderBy: SearchOrder = SearchOrder.NAME,
     val direction: SearchDirection = SearchDirection.ASC,
+    val prefer: SearchPrefer = SearchPrefer.BEST,
 ) {
     fun isEmpty() = criteria.isEmpty()
 }
@@ -99,7 +95,8 @@ data class AdvancedSearchQuery(
 enum class SearchOrder(val scryfallValue: String) {
     NAME("name"),
     CMC("cmc"),
-    PRICE("usd"),
+    PRICE_USD("usd"),
+    PRICE_EUR("eur"),
     RARITY("rarity"),
     RELEASED("released"),
     COLOR("color"),
@@ -108,4 +105,8 @@ enum class SearchOrder(val scryfallValue: String) {
 enum class SearchDirection(val scryfallValue: String) {
     ASC("asc"),
     DESC("desc"),
+}
+
+enum class SearchPrefer(val scryfallValue: String) {
+    BEST("best"),
 }

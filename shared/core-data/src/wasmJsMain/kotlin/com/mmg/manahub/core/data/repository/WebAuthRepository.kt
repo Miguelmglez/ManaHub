@@ -48,7 +48,7 @@ import kotlin.time.ExperimentalTime
  *
  * ## Scope: real methods vs. loud stubs
  * Real: [signInWithEmail], [signUpWithEmail], [signOut], [getCurrentUser], [resetPassword],
- * [updateNickname], [updateAvatarUrl], [signInAnonymously], [sessionState]. Google OAuth
+ * [updateNickname], [updateAvatarUrl], [sessionState]. Google OAuth
  * ([signInWithGoogle]/[signUpWithGoogle]/[linkGoogleIdentity]) and [deleteAccount] are loud
  * [UnsupportedOperationException] stubs -- NOT a web platform limitation, a deliberate scope cut
  * for this task (Google needs external OAuth client credentials not available yet; deleteAccount
@@ -196,11 +196,6 @@ class WebAuthRepository(
 
     override suspend fun updateAvatarUrl(avatarUrl: String?): AuthResult<Unit> = runCatching {
         userProfileClient.updateAvatarUrl(UpdateAvatarUrlDto(newAvatarUrl = avatarUrl))
-        AuthResult.Success(Unit)
-    }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
-
-    override suspend fun signInAnonymously(): AuthResult<Unit> = runCatching {
-        auth.signInAnonymously()
         AuthResult.Success(Unit)
     }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
 

@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.repository
 
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.common.DispatcherProvider
+import com.mmg.manahub.core.data.cache.CachedDeckEntry
 import com.mmg.manahub.core.data.cache.CommunityDeckCache
 import com.mmg.manahub.core.data.network.ArchidektRequestQueue
 import com.mmg.manahub.core.data.remote.ArchidektClient
@@ -73,7 +74,7 @@ class CommunityDecksRepositoryImpl(
             } catch (e: ResponseException) {
                 // HTTP error → try stale cache before failing.
                 val statusCode = e.response.status.value
-                val stale = cache.getById(archidektId)
+                val stale = safeStaleCache(archidektId)
                 crashReporter.log("community_deck_fetch")
                 crashReporter.recordException(e)
                 crashReporter.setCustomKey("community_deck_archidekt_id", archidektId.toString())
@@ -96,7 +97,7 @@ class CommunityDecksRepositoryImpl(
                 // CommunityDecksRepositoryImplTest / feedback_cancellation_swallowed_in_repo_catch.
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 // Any other failure (IO, parse, …) → try stale cache before failing.
-                val stale = cache.getById(archidektId)
+                val stale = safeStaleCache(archidektId)
                 crashReporter.log("community_deck_fetch")
                 crashReporter.recordException(e)
                 crashReporter.setCustomKey("community_deck_archidekt_id", archidektId.toString())
@@ -106,6 +107,28 @@ class CommunityDecksRepositoryImpl(
                     DataResult.Error(e.message ?: "Unknown error")
                 }
             }
+        }
+
+    /**
+     * Bug fix (post-review hardening): a corrupt/unparseable cached row used to make [cache]'s
+     * OWN [CommunityDeckCache.getById] throw. [getDeckById]'s catch blocks already call this a
+     * SECOND time (against the SAME row) to attempt a stale-cache fallback after a network/HTTP
+     * failure — an uncaught throw there propagated straight out of [getDeckById] and crashed the
+     * caller's coroutine instead of degrading to [DataResult.Error]. The Android [CommunityDeckCache]
+     * implementation now guards its own corrupt-blob path, but this wrapper stays defense-in-depth
+     * for any other/future [CommunityDeckCache] implementation (e.g. a web IndexedDB cache) that
+     * might not.
+     */
+    private suspend fun safeStaleCache(archidektId: Int): CachedDeckEntry? =
+        try {
+            cache.getById(archidektId)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            crashReporter.log("community_deck_cache_corrupt")
+            crashReporter.recordException(e)
+            crashReporter.setCustomKey("community_deck_archidekt_id", archidektId.toString())
+            null
         }
 
     override suspend fun searchDecks(

@@ -10,8 +10,8 @@ class ObserveSessionUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
     // Returns full snapshot for reconnection. Remote snapshot always wins over local cache.
-    suspend fun getSnapshot(sessionId: String): Result<SessionSnapshot> =
-        repository.getSnapshot(sessionId)
+    suspend fun getSnapshot(sessionId: String, guestToken: String? = null): Result<SessionSnapshot> =
+        repository.getSnapshot(sessionId, guestToken)
 
     suspend fun connect(sessionId: String) = repository.connectRealtime(sessionId)
 

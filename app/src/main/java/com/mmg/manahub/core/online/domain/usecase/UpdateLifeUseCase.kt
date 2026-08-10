@@ -10,6 +10,6 @@ class UpdateLifeUseCase @Inject constructor(
     suspend fun broadcast(sessionId: String, slotIndex: Int, newLife: Int) =
         repository.broadcastLifeDelta(sessionId, slotIndex, newLife)
 
-    suspend fun persist(sessionId: String, slotIndex: Int, newLife: Int): Result<Unit> =
-        repository.updateLife(sessionId, slotIndex, newLife)
+    suspend fun persist(sessionId: String, slotIndex: Int, newLife: Int, guestToken: String? = null): Result<Unit> =
+        repository.updateLife(sessionId, slotIndex, newLife, guestToken)
 }

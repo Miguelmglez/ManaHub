@@ -6,6 +6,6 @@ import javax.inject.Inject
 class AbandonMyActiveSessionUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend operator fun invoke(sessionId: String): Result<Unit> =
-        repository.abandonMyActiveSession(sessionId)
+    suspend operator fun invoke(sessionId: String, guestToken: String? = null): Result<Unit> =
+        repository.abandonMyActiveSession(sessionId, guestToken)
 }

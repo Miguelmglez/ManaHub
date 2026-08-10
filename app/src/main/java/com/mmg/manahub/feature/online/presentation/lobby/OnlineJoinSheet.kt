@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.online.domain.model.OnlineSessionStatus
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
@@ -76,7 +76,7 @@ fun OnlineJoinSheet(
     initialDisplayName: String = "",
     initialThemeKey: String = "Crimson",
     onDismiss: () -> Unit,
-    onGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
+    onGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int, guestToken: String?) -> Unit,
     viewModel: LobbyJoinViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -198,10 +198,8 @@ fun OnlineJoinSheet(
                             shape = ButtonShape,
                         ) {
                             if (uiState.isLoading) {
-                                CircularProgressIndicator(
+                                MagicLoadingSpinner(
                                     modifier = Modifier.size(20.dp),
-                                    color = mc.background,
-                                    strokeWidth = 2.dp,
                                 )
                             } else {
                                 Text(text = stringResource(R.string.lobby_join_button), style = ty.labelLarge)

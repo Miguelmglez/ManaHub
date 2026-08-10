@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 
 /**
@@ -50,9 +51,9 @@ fun PlaytestHandCard(
             .width(width)
             .aspectRatio(63f / 88f)
             .scale(scale)
-            .shadow(elevation = elevation, shape = CardShape)
+            .shadow(elevation = elevation, shape = SmallCardShape)
             .clip(CardShape)
-            .border(0.5.dp, mc.surfaceVariant, CardShape)
+            .border(0.5.dp, mc.surfaceVariant, SmallCardShape)
             .background(mc.surface)
             // Tap gesture handled separately from drag — both can coexist.
             .pointerInput(card.scryfallId) {

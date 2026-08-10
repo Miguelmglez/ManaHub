@@ -23,7 +23,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,6 +56,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.mtg_card_back
@@ -443,7 +443,7 @@ fun CommanderSearchSheet(
                     modifier          = Modifier.fillMaxWidth().height(100.dp),
                     contentAlignment  = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(32.dp))
+                    MagicLoadingSpinner(modifier = Modifier.size(32.dp))
                 }
             } else {
                 LazyColumn(

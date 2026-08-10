@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -356,10 +356,8 @@ fun TournamentSetupScreen(
                         enabled  = !uiState.isCreating && uiState.name.isNotBlank(),
                     ) {
                         if (uiState.isCreating) {
-                            CircularProgressIndicator(
+                            MagicLoadingSpinner(
                                 modifier    = Modifier.size(24.dp),
-                                color       = mc.onAccent,
-                                strokeWidth = 2.dp,
                             )
                         } else {
                             Text(

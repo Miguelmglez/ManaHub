@@ -85,7 +85,7 @@ fun TournamentsSheet(
     onCreateLocal: () -> Unit,
     onOpenTournament: (Long) -> Unit,
     onNavigateToTournamentList: () -> Unit = {},
-    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
+    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int, guestToken: String?) -> Unit,
     viewModel: TournamentListViewModel = koinViewModel(),
 ) {
     val mc = MaterialTheme.magicColors

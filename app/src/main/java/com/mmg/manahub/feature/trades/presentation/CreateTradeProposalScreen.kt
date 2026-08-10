@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,6 +77,7 @@ import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -200,7 +200,7 @@ fun CreateTradeProposalScreen(
                         shape    = ButtonShape
                     ) {
                         if (uiState.isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = mc.background, strokeWidth = 2.dp)
+                            MagicLoadingSpinner(modifier = Modifier.size(18.dp))
                         } else {
                             Text(
                                 stringResource(
@@ -241,7 +241,7 @@ fun CreateTradeProposalScreen(
                         modifier = Modifier.fillMaxSize().padding(innerPadding),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = mc.primaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
 

@@ -63,7 +63,6 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -114,6 +113,7 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
@@ -1046,7 +1046,7 @@ private fun DetectedCardOverlay(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
+                    MagicLoadingSpinner(modifier = Modifier.size(16.dp))
                     Text(text = stringResource(R.string.scanner_searching_indicator), style = ty.bodySmall, color = mc.textPrimary)
                 }
             } else {

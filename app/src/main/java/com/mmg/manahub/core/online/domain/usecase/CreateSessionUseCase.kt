@@ -1,5 +1,6 @@
 package com.mmg.manahub.core.online.domain.usecase
 
+import com.mmg.manahub.core.online.domain.model.CreateSessionResult
 import com.mmg.manahub.core.online.domain.repository.OnlineSessionRepository
 import javax.inject.Inject
 
@@ -12,5 +13,5 @@ class CreateSessionUseCase @Inject constructor(
         layoutKey: String? = null,
         displayName: String = "",
         themeKey: String = "Crimson",
-    ): Result<Pair<String, String>> = repository.createSession(mode, playerCount, layoutKey, displayName, themeKey)
+    ): Result<CreateSessionResult> = repository.createSession(mode, playerCount, layoutKey, displayName, themeKey)
 }

@@ -110,6 +110,9 @@
     <string name="addcard_search_min_chars">Type at least 2 characters to search</string>
     <string name="addcard_no_results">No cards found</string>
     <string name="addcard_no_results_subtitle">Try searching in another language\nor check the spelling</string>
+    <string name="addcard_index_title">Browse the MTG universe!</string>
+    <string name="addcard_index_subtitle">Type the name of a card or open the Advanced search to find by its attributes</string>
+
     <string name="addcard_scanner_button">Open Scanner</string>
     <string name="addcard_spotlight_header">Latest Set: %1$s</string>
     <string name="addcard_language_button">Search language: %1$s. Tap to change.</string>
@@ -1963,6 +1966,7 @@
     <string name="advsearch_section_keyword">Keywords</string>
     <string name="advsearch_keyword_hint">e.g. Flying, Haste…</string>
     <string name="advsearch_section_sort">Sort results</string>
+    <string name="advsearch_show_results">Found: %1$d cards</string>
     <string name="advsearch_no_results">No cards found for this search</string>
     <string name="advsearch_no_criteria">Add at least one criterion</string>
     <string name="advsearch_mana_hint">0..15</string>
@@ -2035,7 +2039,8 @@
     <string name="advsearch_color_mode_identity">Identity</string>
     <string name="advsearch_sort_name">Name</string>
     <string name="advsearch_sort_cmc">CMC</string>
-    <string name="advsearch_sort_price">Price</string>
+    <string name="advsearch_sort_price_usd">Price USD</string>
+    <string name="advsearch_sort_price_eur">Price EUR</string>
     <string name="advsearch_sort_rarity">Rarity</string>
     <string name="advsearch_sort_released">Date</string>
     <string name="advsearch_sort_color">Color</string>
@@ -3383,6 +3388,13 @@
     <string name="community_deck_sort_label">Sort: %1$s</string>
     <string name="community_deck_sort_label_base">Sort by:</string>
     <string name="community_deck_format_label">Format:</string>
+    <string name="community_deck_format_commander">Commander</string>
+    <string name="community_deck_format_modern">Modern</string>
+    <string name="community_deck_format_legacy">Legacy</string>
+    <string name="community_deck_format_pauper">Pauper</string>
+    <string name="community_deck_format_standard">Standard</string>
+    <string name="community_deck_format_pioneer">Pioneer</string>
+    <string name="community_deck_format_vintage">Vintage</string>
     <string name="community_deck_tile_format_views">%1$s · %2$d views</string>
 
     <!-- Community Hub — Discover (Deck Doctor Community/Archetype plan, Phase 5; overhauled into a
@@ -3425,7 +3437,7 @@
 
     <!-- Community Hub — multi-card search (Archidekt multi-card search expansion, 2026-07-24) -->
     <string name="community_advsearch_cards_caption">Add up to 3 cards — decks must contain all of them</string>
-    <string name="community_advsearch_cards_caption_multicard">Multi-card results are matched against each card\'s most popular decks</string>
+    <string name="community_advsearch_cards_caption_multicard">Multi-card results are matched against each card\'s most popular decks and admit only 1 deck format</string>
     <string name="community_advsearch_card_remove">Remove %1$s</string>
 
     <!-- ══════════════════════════════════════════

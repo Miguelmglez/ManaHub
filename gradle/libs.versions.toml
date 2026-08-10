@@ -42,8 +42,9 @@ googleid             = "1.1.1"
 
 youtube-player       = "13.0.0"
 play-app-update      = "2.1.0"
-play-review          = "2.0.1"
+play-review          = "2.0.2"
 vosk                 = "0.3.75"
+lottie              = "6.7.1"
 
 # Kotlin Multiplatform (KMP) migration — Phase 0, Spike A.
 # compose-multiplatform: JetBrains Compose Multiplatform plugin (wasmJs-capable UI). Added now so
@@ -151,6 +152,7 @@ ktor-client-mock     = { module = "io.ktor:ktor-client-mock",                   
 credentials          = { module = "androidx.credentials:credentials",                      version.ref = "credentials" }
 credentials-play     = { module = "androidx.credentials:credentials-play-services-auth",   version.ref = "credentials" }
 googleid             = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+lottie               = { module = "com.airbnb.android:lottie-compose", version.ref = "lottie" }
 
 youtube-player       = { group = "com.pierfrancescosoffritti.androidyoutubeplayer", name = "core", version.ref = "youtube-player" }
 play-app-update      = { module = "com.google.android.play:app-update-ktx", version.ref = "play-app-update" }

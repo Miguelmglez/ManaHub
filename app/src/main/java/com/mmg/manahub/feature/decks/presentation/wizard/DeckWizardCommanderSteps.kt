@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +46,7 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.ManaColorPicker
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -169,7 +169,7 @@ internal fun CommanderPickStepContent(
                         placeholder = { Text(stringResource(R.string.deck_wizard_commander_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
                         leadingIcon = {
                             if (uiState.isSearchingCommander) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
+                                MagicLoadingSpinner(modifier = Modifier.size(20.dp))
                             } else {
                                 Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
                             }
@@ -324,7 +324,7 @@ internal fun StrategyStepContent(
         }
         if (uiState.isLoadingCommanderStrategies) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
             }
         } else {
             StrategyPickerSheet(
@@ -476,7 +476,7 @@ internal fun ManualAddsStepContent(
                     placeholder = { Text(stringResource(R.string.deck_wizard_manual_adds_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
                     leadingIcon = {
                         if (uiState.isSearchingManualAdds) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
+                            MagicLoadingSpinner(modifier = Modifier.size(20.dp))
                         } else {
                             Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
                         }

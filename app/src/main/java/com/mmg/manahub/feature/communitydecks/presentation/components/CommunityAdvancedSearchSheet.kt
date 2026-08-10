@@ -82,7 +82,6 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksSearchUiState
-import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter
 import com.mmg.manahub.feature.communitydecks.presentation.MAX_COMMUNITY_CARD_FILTERS
 import kotlinx.coroutines.launch
 
@@ -112,7 +111,6 @@ private data class InspectingSession(
 fun CommunityAdvancedSearchSheet(
     state: CommunityDecksSearchUiState,
     onDismiss: () -> Unit,
-    onFormatSelected: (CommunityDeckFormatFilter) -> Unit,
     onColorToggled: (String) -> Unit,
     onBracketSelected: (Int?) -> Unit,
     onCommanderQueryChange: (String) -> Unit,
@@ -236,26 +234,6 @@ fun CommunityAdvancedSearchSheet(
                         }
                     }
 
-                    // ── Deck format ──
-                    item {
-                        SearchSection(
-                            title = stringResource(R.string.community_advsearch_section_format),
-                            icon = Icons.Default.Gavel
-                        ) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                CommunityDeckFormatFilter.entries.forEach { format ->
-                                    FilterChip(
-                                        selected = filters.format == format,
-                                        onClick = { onFormatSelected(format) },
-                                        label = { Text(format.label, style = ty.labelMedium) },
-                                    )
-                                }
-                            }
-                        }
-                    }
 
                     // ── Commander bracket ──
                     item {
@@ -270,7 +248,12 @@ fun CommunityAdvancedSearchSheet(
                                 FilterChip(
                                     selected = filters.edhBracket == null,
                                     onClick = { onBracketSelected(null) },
-                                    label = { Text(stringResource(R.string.community_advsearch_bracket_any), style = ty.labelMedium) },
+                                    label = {
+                                        Text(
+                                            stringResource(R.string.community_advsearch_bracket_any),
+                                            style = ty.labelMedium
+                                        )
+                                    },
                                 )
                                 (1..5).forEach { bracket ->
                                     FilterChip(
@@ -328,7 +311,13 @@ fun CommunityAdvancedSearchSheet(
                                         InputChip(
                                             selected = true,
                                             onClick = { onCardRemoved(card) },
-                                            label = { Text(card.name, style = ty.labelMedium, maxLines = 1) },
+                                            label = {
+                                                Text(
+                                                    card.name,
+                                                    style = ty.labelMedium,
+                                                    maxLines = 1
+                                                )
+                                            },
                                             trailingIcon = {
                                                 Icon(
                                                     Icons.Default.Close,
@@ -377,7 +366,7 @@ fun CommunityAdvancedSearchSheet(
                                 Text(
                                     stringResource(R.string.community_advsearch_cards_caption),
                                     style = ty.labelSmall,
-                                    color = mc.textDisabled,
+                                    color = mc.textSecondary,
                                 )
                             }
 
@@ -385,7 +374,7 @@ fun CommunityAdvancedSearchSheet(
                                 Text(
                                     stringResource(R.string.community_advsearch_cards_caption_multicard),
                                     style = ty.labelSmall,
-                                    color = mc.textDisabled,
+                                    color = mc.textSecondary,
                                 )
                             }
                         }

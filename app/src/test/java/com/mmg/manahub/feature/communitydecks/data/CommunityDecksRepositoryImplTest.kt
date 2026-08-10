@@ -225,6 +225,47 @@ class CommunityDecksRepositoryImplTest {
         assertTrue((result as DataResult.Success).isStale)
     }
 
+    // ── Group 3b: Regression — corrupt cache row must never propagate an exception ──
+    // (post-review hardening: a corrupted cache row used to throw straight out of getDeckById
+    // when the stale-fallback re-read inside a catch block hit the SAME corrupt row a second time.)
+
+    @Test
+    fun `given network failure and a corrupt stale cache row when getDeckById then degrades to Error instead of throwing`() = runTest {
+        // Arrange — the FIRST cache.getById (fresh-check) is a clean miss so the code proceeds to
+        // the network; the network call fails; the stale-fallback re-read (SECOND cache.getById
+        // call, from inside the catch block) hits a corrupt row and throws.
+        coEvery { cache.getById(testDeckId) } returns null andThenThrows RuntimeException("Corrupt blob")
+        coEvery { api.getDeckById(testDeckId) } throws RuntimeException("Network unreachable")
+
+        // Act — must not throw.
+        val result = repository.getDeckById(testDeckId)
+
+        // Assert — degrades to a readable error, never propagates the corrupt-row exception.
+        assertTrue(result is DataResult.Error)
+    }
+
+    @Test
+    fun `given HTTP error and a corrupt stale cache row when getDeckById then degrades to Error instead of throwing`() = runTest {
+        coEvery { cache.getById(testDeckId) } returns null andThenThrows RuntimeException("Corrupt blob")
+        coEvery { api.getDeckById(testDeckId) } throws buildResponseException(500)
+
+        val result = repository.getDeckById(testDeckId)
+
+        assertTrue(result is DataResult.Error)
+    }
+
+    @Test
+    fun `given the very first cache read is corrupt when getDeckById then degrades to Error instead of throwing`() = runTest {
+        // Arrange — the fresh-check read itself (before any network call) hits the corrupt row;
+        // the stale-fallback re-read triggered from the outer catch hits the SAME corrupt row again.
+        coEvery { cache.getById(testDeckId) } throws RuntimeException("Corrupt blob")
+
+        val result = repository.getDeckById(testDeckId)
+
+        assertTrue(result is DataResult.Error)
+        coVerify(exactly = 0) { api.getDeckById(any()) }
+    }
+
     // ── Group 4: Network error with no cache ────────────────────────────────
 
     @Test

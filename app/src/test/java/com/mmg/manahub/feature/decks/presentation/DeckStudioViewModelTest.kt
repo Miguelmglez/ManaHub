@@ -1241,7 +1241,7 @@ class DeckStudioViewModelTest {
             every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
             every { userCardRepository.observeCollection() } returns flowOf(listOf(userCardWith(elfCard)))
             coEvery { cardRepository.getCardById(elfCard.scryfallId) } returns DataResult.Success(elfCard)
-            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
+            coEvery { searchCardsUseCase("elf") } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false, totalCards = 1))
             val vm = createVm()
             advanceUntilIdle()
 
@@ -1277,7 +1277,7 @@ class DeckStudioViewModelTest {
         // Arrange
         every { deckRepository.observeDeckWithCards(DECK_ID) } returns flowOf(deckWithCards())
         every { userCardRepository.observeCollection() } returns flowOf(emptyList())
-        coEvery { searchCardsUseCase(any()) } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false))
+        coEvery { searchCardsUseCase(any()) } returns DataResult.Success(com.mmg.manahub.core.model.PaginatedCards(listOf(elfCard), false, totalCards = 1))
         val vm = createVm()
         advanceUntilIdle()
         vm.searchScryfallDirect("elf")

@@ -1002,7 +1002,7 @@ fun AppNavGraph(
                             popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
                         }
                     },
-                    onOnlineHostGameStart = { sessionId, mode, playerCount ->
+                    onOnlineHostGameStart = { sessionId, mode, playerCount, guestToken ->
                         val configs = (0 until playerCount).mapIndexed { i, _ ->
                             PlayerConfig(
                                 id        = i,
@@ -1011,12 +1011,12 @@ fun AppNavGraph(
                                 isAppUser = i == 0,
                             )
                         }
-                        gameVm.initFromOnlineSession(sessionId, 0, configs, mode)
+                        gameVm.initFromOnlineSession(sessionId, 0, configs, mode, guestToken = guestToken)
                         navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
                             popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
                         }
                     },
-                    onOnlineJoinGameStart = { sessionId, slotIndex, modeStr, playerCount ->
+                    onOnlineJoinGameStart = { sessionId, slotIndex, modeStr, playerCount, guestToken ->
                         val mode = runCatching { GameMode.valueOf(modeStr) }.getOrDefault(GameMode.STANDARD)
                         val configs = (0 until playerCount).mapIndexed { i, _ ->
                             PlayerConfig(
@@ -1026,7 +1026,7 @@ fun AppNavGraph(
                                 isAppUser = i == slotIndex,
                             )
                         }
-                        gameVm.initFromOnlineSession(sessionId, slotIndex, configs, mode)
+                        gameVm.initFromOnlineSession(sessionId, slotIndex, configs, mode, guestToken = guestToken)
                         navController.navigate(Screen.GamePlay.createRoute(mode.name, playerCount)) {
                             popUpTo(Screen.GameSetup.baseRoute) { inclusive = true }
                         }

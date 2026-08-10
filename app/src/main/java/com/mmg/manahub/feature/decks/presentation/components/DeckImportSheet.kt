@@ -17,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 
@@ -153,10 +153,8 @@ fun DeckImportSheet(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment     = Alignment.CenterVertically,
                 ) {
-                    CircularProgressIndicator(
-                        color    = mc.primaryAccent,
+                    MagicLoadingSpinner(
                         modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(

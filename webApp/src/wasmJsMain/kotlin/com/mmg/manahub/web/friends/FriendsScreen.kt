@@ -90,7 +90,7 @@ fun FriendsScreen(onFriendClick: (String) -> Unit = {}) {
         ) {
             Text(text = "Friends", style = typography.titleLarge, color = colors.textPrimary)
             Text(
-                text = "Sign in (guest sign-in counts) via the Account tab to add and manage friends.",
+                text = "Sign in via the Account tab to add and manage friends.",
                 style = typography.bodyMedium,
                 color = colors.textSecondary,
             )

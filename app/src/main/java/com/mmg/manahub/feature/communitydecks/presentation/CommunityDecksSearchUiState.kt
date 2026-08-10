@@ -25,7 +25,6 @@ enum class CommunityHubTab { DISCOVER, SEARCH }
  * both must independently agree on `3`, but they answer different questions.
  */
 const val MAX_COMMUNITY_CARD_FILTERS = 3
-
 /**
  * UI state for the Community Decks Hub (Discover + Search).
  *
@@ -71,11 +70,11 @@ data class CommunityDecksSearchUiState(
     val recentDecks: List<CommunityDeckSummary> = emptyList(),
     val updatedDecks: List<CommunityDeckSummary> = emptyList(),
     val primerDecks: List<CommunityDeckSummary> = emptyList(),
-    val featuredFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.STANDARD,
-    val featuredFormatDecks: List<CommunityDeckSummary> = emptyList(),
+    val selectedDiscoveryFormat: CommunityDeckFormatFilter = CommunityDeckFormatFilter.COMMANDER,
 
     // ── Search — advanced filters (Phase 2) ────────────────────────────────────────
     val advancedFilters: CommunityAdvancedFilters = CommunityAdvancedFilters(),
+    val selectedFormats: List<CommunityDeckFormatFilter> = emptyList(),
     val commanderQuery: String = "",
     val commanderResults: List<Card> = emptyList(),
     val isCommanderSearching: Boolean = false,
@@ -99,7 +98,7 @@ data class CommunityDecksSearchUiState(
  *   `com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl.searchDecksMultiCard`).
  */
 data class CommunityAdvancedFilters(
-    val format: CommunityDeckFormatFilter = CommunityDeckFormatFilter.ALL,
+    val formats: CommunityDeckFormatFilter =CommunityDeckFormatFilter.COMMANDER,
     val colors: Set<String> = emptySet(),
     val edhBracket: Int? = null,
     val commander: Card? = null,
@@ -116,7 +115,6 @@ data class CommunityAdvancedFilters(
      */
     val activeCount: Int
         get() = listOf(
-            format != CommunityDeckFormatFilter.ALL,
             colors.isNotEmpty(),
             edhBracket != null,
             commander != null,
@@ -140,7 +138,7 @@ fun CommunityAdvancedFilters.toSearchFilters(
     cardNames = cards.map { it.name },
     commanderName = commander?.name,
     ownerUsername = ownerUsername.takeIf { it.isNotBlank() },
-    deckFormatId = format.apiId,
+    deckFormatId = formats.apiId,
     edhBracket = edhBracket,
     colors = colors,
     size = deckSize.toIntOrNull(),
@@ -175,33 +173,19 @@ enum class CommunityDeckSort(val apiValue: String, @StringRes val labelRes: Int)
  * alphabetical order, which would scatter e.g. Commander/Commander 1v1/Duel Commander/Pauper
  * EDH/PreDH apart from each other.
  *
- * @property apiId the Archidekt `deckFormat` id, or `null` for [ALL] (no filter).
+ * @property apiId the Archidekt `deckFormat` id. There is no "ALL / no filter" case — every entry
+ *   maps to a concrete Archidekt format id, and [CommunityAdvancedFilters.formats] always holds a
+ *   real selection (defaulting to [COMMANDER]).
  */
-enum class CommunityDeckFormatFilter(val apiId: Int?, val label: String) {
-    ALL(null, "All Formats"),
+enum class CommunityDeckFormatFilter(val apiId: Int, val label: String) {
     STANDARD(1, "Standard"),
     PIONEER(15, "Pioneer"),
     MODERN(2, "Modern"),
     LEGACY(4, "Legacy"),
     VINTAGE(5, "Vintage"),
     PAUPER(6, "Pauper"),
-    COMMANDER(3, "Commander"),
-    COMMANDER_1V1(11, "Commander 1v1"),
-    DUEL_COMMANDER(12, "Duel Commander"),
-    PAUPER_EDH(17, "Pauper EDH"),
-    PREDH(23, "PreDH"),
-    BRAWL(13, "Brawl"),
-    HISTORIC_BRAWL(20, "Historic Brawl"),
-    HISTORIC(16, "Historic"),
-    ALCHEMY(18, "Alchemy"),
-    EXPLORER(19, "Explorer"),
-    TIMELESS(24, "Timeless"),
-    GLADIATOR(21, "Gladiator"),
-    OATHBREAKER(14, "Oathbreaker"),
-    PREMODERN(22, "Premodern"),
-    CANADIAN_HIGHLANDER(25, "Canadian Highlander"),
-    PENNY_DREADFUL(10, "Penny Dreadful"),
-    ;
+    COMMANDER(3, "Commander") ;
+
 
     companion object {
         /**
@@ -210,7 +194,6 @@ enum class CommunityDeckFormatFilter(val apiId: Int?, val label: String) {
          * number deterministically indexes into it.
          */
         val FEATURED_ROTATION: List<CommunityDeckFormatFilter> = listOf(
-            STANDARD, MODERN, PIONEER, PAUPER, LEGACY, VINTAGE, OATHBREAKER, BRAWL, HISTORIC,
-        )
+            STANDARD, MODERN, PIONEER, PAUPER, LEGACY, VINTAGE)
     }
 }

@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.addcard.presentation
 
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.model.AdvancedSearchQuery
@@ -8,6 +9,7 @@ import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.domain.usecase.card.GetSpotlightFeedUseCase
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.domain.usecase.search.BuildScryfallQueryUseCase
+import com.mmg.manahub.core.model.CollectionViewMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +42,8 @@ class AddCardViewModel(
     private var lastEffectiveQuery: String? = null
     private var currentSpotlightSetIndex: Int = 0
     private var hasMoreSpotlightSets: Boolean = true
+
+    val gridState = LazyGridState()
 
     init {
         viewModelScope.launch {
@@ -112,6 +116,7 @@ class AddCardViewModel(
                                     isSearching = false,
                                     error = null,
                                     hasMore = result.data.hasMore,
+                                    totalCards = result.data.totalCards,
                                     currentPage = 1
                                 )
                             }
@@ -169,6 +174,11 @@ class AddCardViewModel(
     fun onAdvancedQuerySearch(query: AdvancedSearchQuery) {
         _uiState.update { it.copy(activeQuery = query) }
         activeQueryFlow.value = query
+        
+        val nameCriterion = query.criteria.filterIsInstance<com.mmg.manahub.core.model.SearchCriterion.Name>().firstOrNull()
+        if (nameCriterion != null && nameCriterion.value.isNotBlank()) {
+            onQueryChange(nameCriterion.value)
+        }
     }
 
     fun onClearFilters() {
@@ -241,5 +251,9 @@ class AddCardViewModel(
                 }
             }
         }
+    }
+
+    fun onViewModeToggle(){
+        _uiState.update { it.copy(viewMode = if (it.viewMode == CollectionViewMode.GRID) CollectionViewMode.LIST else CollectionViewMode.GRID) }
     }
 }

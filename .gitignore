@@ -415,3 +415,4 @@ graphify-out/
 
 # User-collection test fixtures for the wizard quality harness (real user data - never commit)
 /testdata/
+/docs/adr/ADR-005-backend-call-budget.md

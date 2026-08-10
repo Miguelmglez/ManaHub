@@ -35,13 +35,14 @@ class AdvancedSearchViewModel(
         val nameValue: String = "",
         val nameExact: Boolean = false,
         val oracleText: String = "",
-        val cardType: String = "",
+        val cardType: Set<String> = emptySet(),
+        val cardTypeMatchAll: Boolean = true,
         val selectedColors: Set<String> = emptySet(),
         val colorsExact: Boolean = false,
         val useColorIdentity: Boolean = false,
         val manaCostValue: String = "",
         val manaCostOp: ComparisonOperator = ComparisonOperator.EQUAL,
-        val selectedRarity: String = "",
+        val selectedRarity: List<String> = emptyList(),
         val rarityOp: ComparisonOperator = ComparisonOperator.EQUAL,
         val selectedSets: Set<MagicSet> = emptySet(),
         val powerValue: String = "",
@@ -50,9 +51,8 @@ class AdvancedSearchViewModel(
         val toughnessOp: ComparisonOperator = ComparisonOperator.EQUAL,
         val priceMax: String = "",
         val priceCurrency: String = "eur",
-        val selectedFormat: String = "",
+        val selectedFormat: List<String> = emptyList(),
         val formatLegal: Boolean = true,
-        val keyword: String = "",
         val orderBy: SearchOrder = SearchOrder.NAME,
         val orderDirection: SearchDirection = SearchDirection.ASC,
         val builtQuery: String = "",
@@ -89,8 +89,8 @@ class AdvancedSearchViewModel(
             criteria.add(SearchCriterion.Name(s.nameValue, s.nameExact))
         if (s.oracleText.isNotBlank())
             criteria.add(SearchCriterion.OracleText(s.oracleText))
-        if (s.cardType.isNotBlank())
-            criteria.add(SearchCriterion.CardType(s.cardType))
+        if (s.cardType.isNotEmpty())
+            criteria.add(SearchCriterion.CardType(s.cardType, s.cardTypeMatchAll))
         if (s.selectedColors.isNotEmpty()) {
             if (s.useColorIdentity)
                 criteria.add(SearchCriterion.ColorIdentity(s.selectedColors, s.colorsExact))
@@ -100,8 +100,8 @@ class AdvancedSearchViewModel(
         s.manaCostValue.toIntOrNull()?.let {
             criteria.add(SearchCriterion.ManaCost(it, s.manaCostOp))
         }
-        if (s.selectedRarity.isNotBlank())
-            criteria.add(SearchCriterion.Rarity(s.selectedRarity, s.rarityOp))
+        if (s.selectedRarity.isNotEmpty())
+            criteria.add(SearchCriterion.Rarity(s.selectedRarity))
         if (s.selectedSets.isNotEmpty()) {
             criteria.add(SearchCriterion.CardSet(s.selectedSets.map { it.code }.toSet()))
         }
@@ -114,14 +114,10 @@ class AdvancedSearchViewModel(
         s.priceMax.toDoubleOrNull()?.let {
             criteria.add(SearchCriterion.Price(it, s.priceCurrency, ComparisonOperator.LESS_OR_EQUAL))
         }
-        if (s.selectedFormat.isNotBlank())
+        if (s.selectedFormat.isNotEmpty())
             criteria.add(SearchCriterion.Format(s.selectedFormat, s.formatLegal))
-        if (s.keyword.isNotBlank())
-            criteria.add(SearchCriterion.Keyword(s.keyword))
-        if (s.filterWishlist != null)
-            criteria.add(SearchCriterion.IsInWishlist(s.filterWishlist))
-        if (s.filterForTrade != null)
-            criteria.add(SearchCriterion.IsForTrade(s.filterForTrade))
+        if (s.filterWishlist == true || s.filterForTrade == true)
+            criteria.add(SearchCriterion.CollectionStatus(s.filterWishlist == true, s.filterForTrade == true))
         if (s.filterTags.isNotEmpty())
             criteria.add(SearchCriterion.HasTag(s.filterTags.toList()))
 
@@ -149,8 +145,15 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
-    fun setCardType(value: String) {
-        _uiState.update { it.copy(cardType = value) }
+    fun toggleCardType(type: String) {
+        val current = _uiState.value.cardType.toMutableSet()
+        if (current.contains(type)) current.remove(type) else current.add(type)
+        _uiState.update { it.copy(cardType = current) }
+        updateBuiltQuery()
+    }
+
+    fun setCardTypeMatchAll(matchAll: Boolean) {
+        _uiState.update { it.copy(cardTypeMatchAll = matchAll) }
         updateBuiltQuery()
     }
 
@@ -173,11 +176,6 @@ class AdvancedSearchViewModel(
 
     fun setManaCost(value: String, op: ComparisonOperator) {
         _uiState.update { it.copy(manaCostValue = value, manaCostOp = op) }
-        updateBuiltQuery()
-    }
-
-    fun setRarity(rarity: String, op: ComparisonOperator) {
-        _uiState.update { it.copy(selectedRarity = rarity, rarityOp = op) }
         updateBuiltQuery()
     }
 
@@ -212,13 +210,16 @@ class AdvancedSearchViewModel(
         updateBuiltQuery()
     }
 
-    fun setFormat(format: String, legal: Boolean) {
-        _uiState.update { it.copy(selectedFormat = format, formatLegal = legal) }
+
+    fun updateFormat(format: String) {
+        val current = _uiState.value.selectedFormat.toMutableList()
+        if (current.contains(format)) current.remove(format) else current.add(format)
+        _uiState.update { it.copy(selectedFormat = current) }
         updateBuiltQuery()
     }
 
-    fun setKeyword(value: String) {
-        _uiState.update { it.copy(keyword = value) }
+    fun updateLegalSwitch(legal: Boolean) {
+        _uiState.update { it.copy(formatLegal = legal) }
         updateBuiltQuery()
     }
 
@@ -241,6 +242,13 @@ class AdvancedSearchViewModel(
         val current = _uiState.value.filterTags.toMutableSet()
         if (current.contains(key)) current.remove(key) else current.add(key)
         _uiState.update { it.copy(filterTags = current) }
+        updateBuiltQuery()
+    }
+
+    fun updateRarity(rarity: String){
+        val current = _uiState.value.selectedRarity.toMutableList()
+        if (current.contains(rarity)) current.remove(rarity) else current.add(rarity)
+        _uiState.update { it.copy(selectedRarity = current) }
         updateBuiltQuery()
     }
 

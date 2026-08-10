@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +40,7 @@ import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
@@ -103,7 +103,7 @@ internal fun GeneratingContent(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(48.dp))
+            MagicLoadingSpinner(modifier = Modifier.size(48.dp))
             Spacer(Modifier.height(spacing.lg))
             Text(
                 text = uiState.buildStage?.label() ?: stringResource(R.string.deck_wizard_stage_validating),
