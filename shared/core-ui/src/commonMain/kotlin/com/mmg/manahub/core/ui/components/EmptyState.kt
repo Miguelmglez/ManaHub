@@ -39,6 +39,7 @@ fun EmptyState(
     subtitle: String? = null,
     icon: ImageVector? = null,
     actionLabel: String? = null,
+    enabled: Boolean = true,
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier.fillMaxSize(),
 ) {
@@ -77,7 +78,7 @@ fun EmptyState(
             )
         }
 
-        if (actionLabel != null && onAction != null) {
+        if (actionLabel != null && onAction != null && enabled) {
             Spacer(Modifier.height(20.dp))
             MagicCtaButton(
                 onClick = onAction,

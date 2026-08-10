@@ -28,7 +28,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +72,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -150,8 +150,7 @@ fun PlaytestSetupScreen(
                     .padding(padding),
             ) {
                 when {
-                    uiState.isLoading -> CircularProgressIndicator(
-                        color = mc.primaryAccent,
+                    uiState.isLoading -> MagicLoadingSpinner(
                         modifier = Modifier.align(Alignment.Center),
                     )
 
@@ -297,7 +296,7 @@ private fun SetupContent(
         Column(
             modifier = Modifier
                 .padding(horizontal = sp.md)
-                .padding(bottom = sp.md),
+                .padding(bottom = sp.xl),
             verticalArrangement = Arrangement.spacedBy(sp.md)
         ) {
 

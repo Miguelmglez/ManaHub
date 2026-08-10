@@ -29,8 +29,8 @@ import com.mmg.manahub.core.common.CrashReporter
  * same catch clause (which, on reflection, means the ORIGINAL `catch (e: Exception)` sites almost
  * certainly never fired on a genuine fetch failure either -- this was a pre-existing silent-failure
  * gap this fix surfaced, not one it introduced). Every current call site
- * (`AuthViewModel.signInAsGuest`, `CardSearchViewModel.addToCollection`, all six
- * `DeckEditorViewModel` mutation methods, `DeckListViewModel.createDeck`) uses `catch (e: Throwable)`.
+ * (`CardSearchViewModel.addToCollection`, all six `DeckEditorViewModel` mutation methods,
+ * `DeckListViewModel.createDeck`) uses `catch (e: Throwable)`.
  */
 fun Throwable.toUserFacingMessage(action: String, crashReporter: CrashReporter): String {
     crashReporter.recordException(this)

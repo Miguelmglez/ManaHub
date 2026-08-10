@@ -40,9 +40,9 @@ import org.koin.compose.viewmodel.koinViewModel
  *
  * Handles all four states (CLAUDE.md requirement): loading, error (a failed create, surfaced as a
  * banner above the list rather than replacing it -- the list itself may still be valid), empty
- * (no decks yet), and content. Requires a signed-in session (guest sign-in via the "Account" tab
- * counts) -- creating a deck while signed out surfaces [DeckRepository]'s own
- * `requireUserId()` error message in the error banner rather than silently failing.
+ * (no decks yet), and content. Requires a signed-in session -- creating a deck while signed out
+ * surfaces [DeckRepository]'s own `requireUserId()` error message in the error banner rather than
+ * silently failing.
  */
 @Composable
 fun DeckListScreen(onDeckClick: (String) -> Unit) {

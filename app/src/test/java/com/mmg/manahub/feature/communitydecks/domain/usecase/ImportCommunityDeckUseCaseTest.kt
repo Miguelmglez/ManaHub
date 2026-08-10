@@ -169,7 +169,7 @@ class ImportCommunityDeckUseCaseTest {
     }
 
     @Test
-    fun `given all cards resolve when invoke then each card is added to deck`() = runTest {
+    fun `given all cards resolve when invoke then all cards are written in one atomic replaceAllCards call`() = runTest {
         // Arrange
         val deck = buildCommunityDeck()
         coEvery { cardRepository.searchCardByName("Sol Ring") } returns
@@ -180,9 +180,20 @@ class ImportCommunityDeckUseCaseTest {
         // Act
         useCase(deck)
 
-        // Assert
-        coVerify { deckRepository.addCardToDeck(testDeckId, "sf-001", 1, false) }
-        coVerify { deckRepository.addCardToDeck(testDeckId, "sf-002", 1, false) }
+        // Assert — a brand-new deck (ImportCommunityDeckUseCase always imports into a NEW deck,
+        // targetDeckId == null) is written via ONE atomic ImportDeckCardsUseCase.replaceAllCards
+        // call, never N sequential addCardToDeck calls (resolve-then-write fix, 2026-07-22 — see
+        // feedback_community_deck_import_reliability_and_atomicity memory).
+        coVerify {
+            deckRepository.replaceAllCards(
+                deckId = testDeckId,
+                slots = listOf(
+                    Triple("sf-001", 1, false),
+                    Triple("sf-002", 1, false),
+                ),
+            )
+        }
+        coVerify(exactly = 0) { deckRepository.addCardToDeck(any(), any(), any(), any()) }
     }
 
     @Test
@@ -236,7 +247,7 @@ class ImportCommunityDeckUseCaseTest {
     }
 
     @Test
-    fun `given some cards fail when invoke then only resolved cards are added to deck`() = runTest {
+    fun `given some cards fail when invoke then only resolved cards are in the replaceAllCards slot list`() = runTest {
         // Arrange
         val deck = buildCommunityDeck(
             cards = listOf(buildCard("Sol Ring"), buildCard("Bad Card")),
@@ -249,9 +260,14 @@ class ImportCommunityDeckUseCaseTest {
         // Act
         useCase(deck)
 
-        // Assert
-        coVerify(exactly = 1) { deckRepository.addCardToDeck(testDeckId, "sf-001", any(), any()) }
-        coVerify(exactly = 1) { deckRepository.addCardToDeck(any(), any(), any(), any()) }
+        // Assert — the unresolved "Bad Card" is skipped entirely; the single atomic write only
+        // contains the resolved card.
+        coVerify {
+            deckRepository.replaceAllCards(
+                deckId = testDeckId,
+                slots = listOf(Triple("sf-001", 1, false)),
+            )
+        }
     }
 
     // ── Group 3: No cards resolve ───────────────────────────────────────────
@@ -358,7 +374,7 @@ class ImportCommunityDeckUseCaseTest {
     // ── Group 5: Sideboard categorization ───────────────────────────────────
 
     @Test
-    fun `given card with Sideboard category when invoke then card is added as sideboard`() = runTest {
+    fun `given card with Sideboard category when invoke then its replaceAllCards slot is marked sideboard`() = runTest {
         // Arrange
         val sideboardCard = buildCard("Negate", categories = listOf("Sideboard"))
         val deck = buildCommunityDeck(cards = listOf(sideboardCard))
@@ -369,19 +385,17 @@ class ImportCommunityDeckUseCaseTest {
         // Act
         useCase(deck)
 
-        // Assert
+        // Assert — Triple(scryfallId, quantity, isSideboard); isSideboard = true here.
         coVerify {
-            deckRepository.addCardToDeck(
+            deckRepository.replaceAllCards(
                 deckId = testDeckId,
-                scryfallId = "sf-negate",
-                quantity = 1,
-                isSideboard = true,
+                slots = listOf(Triple("sf-negate", 1, true)),
             )
         }
     }
 
     @Test
-    fun `given card without Sideboard category when invoke then card is added as mainboard`() = runTest {
+    fun `given card without Sideboard category when invoke then its replaceAllCards slot is marked mainboard`() = runTest {
         // Arrange
         val mainCard = buildCard("Lightning Bolt")
         val deck = buildCommunityDeck(cards = listOf(mainCard))
@@ -392,13 +406,11 @@ class ImportCommunityDeckUseCaseTest {
         // Act
         useCase(deck)
 
-        // Assert
+        // Assert — Triple(scryfallId, quantity, isSideboard); isSideboard = false here.
         coVerify {
-            deckRepository.addCardToDeck(
+            deckRepository.replaceAllCards(
                 deckId = testDeckId,
-                scryfallId = "sf-bolt",
-                quantity = 1,
-                isSideboard = false,
+                slots = listOf(Triple("sf-bolt", 1, false)),
             )
         }
     }
@@ -406,7 +418,7 @@ class ImportCommunityDeckUseCaseTest {
     // ── Group 6: Quantity is respected ───────────────────────────────────────
 
     @Test
-    fun `given card with quantity 4 when invoke then quantity is passed through`() = runTest {
+    fun `given card with quantity 4 when invoke then quantity is passed through to the replaceAllCards slot`() = runTest {
         // Arrange
         val card = buildCard("Lightning Bolt", quantity = 4)
         val deck = buildCommunityDeck(cards = listOf(card))
@@ -419,7 +431,10 @@ class ImportCommunityDeckUseCaseTest {
 
         // Assert
         coVerify {
-            deckRepository.addCardToDeck(testDeckId, "sf-bolt", 4, false)
+            deckRepository.replaceAllCards(
+                deckId = testDeckId,
+                slots = listOf(Triple("sf-bolt", 4, false)),
+            )
         }
     }
 
@@ -454,7 +469,11 @@ class ImportCommunityDeckUseCaseTest {
 
     @Test
     fun `given createDeck throws when invoke then returns Error`() = runTest {
-        // Arrange
+        // Arrange — resolution (Phase 1) runs BEFORE deck creation (Phase 2, resolve-then-write),
+        // so every card in the default fixture must resolve (or fail) cleanly here, or the
+        // resolution phase itself would throw an unrelated MockK "no answer found" exception before
+        // this test's actual scenario (createDeck failing) is ever reached.
+        coEvery { cardRepository.searchCardByName(any()) } returns DataResult.Error("Not found")
         coEvery { deckRepository.createDeck(any(), any(), any()) } throws
             RuntimeException("DB full")
 
@@ -469,12 +488,14 @@ class ImportCommunityDeckUseCaseTest {
     }
 
     @Test
-    fun `given addCardToDeck throws when invoke then returns Error`() = runTest {
-        // Arrange
+    fun `given replaceAllCards throws when invoke then returns Error`() = runTest {
+        // Arrange — a brand-new deck (targetDeckId == null, ImportCommunityDeckUseCase's only mode)
+        // writes via ONE atomic replaceAllCards call, never addCardToDeck; that is the call that can
+        // now fail the whole import.
         val deck = buildCommunityDeck(cards = listOf(buildCard("Sol Ring")))
         coEvery { cardRepository.searchCardByName("Sol Ring") } returns
             DataResult.Success(buildResolvedCard("sf-001"))
-        coEvery { deckRepository.addCardToDeck(any(), any(), any(), any()) } throws
+        coEvery { deckRepository.replaceAllCards(any(), any()) } throws
             RuntimeException("Write failed")
 
         // Act
@@ -487,7 +508,9 @@ class ImportCommunityDeckUseCaseTest {
 
     @Test
     fun `given exception with null message when invoke then returns fallback error`() = runTest {
-        // Arrange
+        // Arrange — see the "createDeck throws" test above for why every card must resolve/fail
+        // cleanly here (resolution now runs before deck creation).
+        coEvery { cardRepository.searchCardByName(any()) } returns DataResult.Error("Not found")
         coEvery { deckRepository.createDeck(any(), any(), any()) } throws RuntimeException()
 
         val deck = buildCommunityDeck()

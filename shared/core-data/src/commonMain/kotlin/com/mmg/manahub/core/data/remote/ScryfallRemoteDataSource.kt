@@ -141,7 +141,7 @@ class ScryfallRemoteDataSource(
                 }
                 val cards = response.data.toDomain()
                 cards.forEach { card -> cache.cards.put(card.scryfallId, card) }
-                com.mmg.manahub.core.model.PaginatedCards(cards, response.hasMore)
+                com.mmg.manahub.core.model.PaginatedCards(cards, response.hasMore, response.totalCards)
             }
             if (bypassCache) {
                 loader()

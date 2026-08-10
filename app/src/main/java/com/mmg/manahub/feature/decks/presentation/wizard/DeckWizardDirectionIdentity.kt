@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +64,7 @@ import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CircularDistribution
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.mtg_card_back
@@ -507,7 +507,7 @@ private fun CommanderPickerSection(
             placeholder = { Text(stringResource(R.string.deck_wizard_commander_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
             leadingIcon = {
                 if (uiState.isSearchingCommander) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
+                    MagicLoadingSpinner(modifier = Modifier.size(20.dp))
                 } else {
                     Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
                 }
@@ -660,7 +660,7 @@ private fun CollectionLeanSection(
 
         if (uiState.isLoadingProfile) {
             Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(24.dp))
+                MagicLoadingSpinner(modifier = Modifier.size(24.dp))
             }
             return@Column
         }
@@ -810,7 +810,7 @@ private fun SeedSearchInline(query: String, isSearching: Boolean, onQueryChange:
         singleLine = true,
         placeholder = { Text(stringResource(R.string.deck_seeds_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
         leadingIcon = {
-            if (isSearching) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = mc.primaryAccent, strokeWidth = 2.dp)
+            if (isSearching) MagicLoadingSpinner(modifier = Modifier.size(20.dp))
             else Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
         },
         shape = CardShape,
@@ -910,7 +910,7 @@ internal fun IdentityStepContent(
             if (uiState.isLoadingThemeTags) {
                 item(key = "theme_loading") {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(20.dp))
+                        MagicLoadingSpinner(modifier = Modifier.size(20.dp))
                     }
                 }
             } else if (resolvableThemeTags.isNotEmpty()) {

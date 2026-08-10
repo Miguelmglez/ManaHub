@@ -67,7 +67,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Whatshot
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -132,6 +131,7 @@ import com.mmg.manahub.core.ui.components.DraftSetCard
 import com.mmg.manahub.core.ui.components.NewsItemCard
 import com.mmg.manahub.core.ui.components.NewsItemOrientation
 import com.mmg.manahub.core.ui.components.OracleText
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
@@ -144,6 +144,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
+import com.mmg.manahub.feature.puzzle.presentation.PuzzleFeatureFlags
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -300,7 +301,7 @@ private fun WidgetLoading() {
             .heightIn(min = MediumMinHeight - 48.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(color = mc.primaryAccent, modifier = Modifier.size(28.dp))
+        MagicLoadingSpinner(modifier = Modifier.size(28.dp))
     }
 }
 
@@ -446,6 +447,11 @@ fun HomeWidgetHost(
     // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
     // in the persisted layout (so they reappear if re-enabled) but are not shown.
     if (widget.type.isGamification && !uiState.gamificationEnabled) return
+    // Daily Puzzle hidden for release (docs/hidden-features/daily-puzzle.md) — same treatment as
+    // gamification above: an existing board that already carries a DAILY_PUZZLE tile (persisted
+    // before the flag flipped) renders nothing rather than a broken/dead tile; the tile reappears
+    // once PuzzleFeatureFlags.PUZZLE_ENABLED flips back to true.
+    if (widget.type == HomeWidgetType.DAILY_PUZZLE && !PuzzleFeatureFlags.PUZZLE_ENABLED) return
     // Phase 5: silently hidden (never an error state) while there's no trending data yet / the
     // community engine is off / the Worker is unreachable — see HomeWidgetType.TRENDING_COMMANDERS'
     // KDoc.
@@ -2524,9 +2530,7 @@ private fun DiscoverCardsWidget(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
                     ) {
-                        CircularProgressIndicator(
-                            color = mc.primaryAccent,
-                            strokeWidth = 2.dp,
+                        MagicLoadingSpinner(
                             modifier = Modifier.size(16.dp),
                         )
                     }

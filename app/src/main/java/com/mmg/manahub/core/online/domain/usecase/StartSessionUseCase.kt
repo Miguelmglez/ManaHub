@@ -6,6 +6,6 @@ import javax.inject.Inject
 class StartSessionUseCase @Inject constructor(
     private val repository: OnlineSessionRepository,
 ) {
-    suspend operator fun invoke(sessionId: String): Result<Unit> =
-        repository.startSession(sessionId)
+    suspend operator fun invoke(sessionId: String, guestToken: String? = null): Result<Unit> =
+        repository.startSession(sessionId, guestToken)
 }

@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -104,6 +103,7 @@ import com.mmg.manahub.core.model.MtgColor
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.InlineErrorState
@@ -327,7 +327,7 @@ private fun CollectionStatsContent(
             if (uiState.isLoading) {
                 item(key = "collection_loading") {
                     Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = mc.primaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
             } else if (stats != null) {
@@ -2218,7 +2218,7 @@ private fun TradeStatsContent(
                 horizontalAlignment  = Alignment.CenterHorizontally,
                 verticalArrangement  = Arrangement.Center,
             ) {
-                CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
                 Spacer(Modifier.height(sp.md))
                 Text(
                     text  = stringResource(R.string.stats_trades_loading),

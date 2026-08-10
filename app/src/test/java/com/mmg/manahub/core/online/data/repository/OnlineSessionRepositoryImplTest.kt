@@ -7,14 +7,20 @@ import com.mmg.manahub.core.online.data.remote.dto.JoinSessionResponseDto
 import com.mmg.manahub.core.online.data.remote.dto.OnlineSessionDto
 import com.mmg.manahub.core.online.data.remote.dto.SessionSnapshotDto
 import com.mmg.manahub.core.online.data.remote.dto.SessionStateDto
+import com.mmg.manahub.core.online.domain.model.CreateSessionResult
+import com.mmg.manahub.core.online.domain.model.JoinSessionResult
 import com.mmg.manahub.core.online.domain.model.SessionEvent
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -86,10 +92,20 @@ class OnlineSessionRepositoryImplTest {
 
     @Before
     fun setUp() {
+        // OnlineSessionRepositoryImpl.<init> calls FirebaseCrashlytics.getInstance() as a field
+        // initializer (outside any runCatching), which throws IllegalStateException on a plain
+        // JVM unit test with no FirebaseApp — see CLAUDE.md testing conventions.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
         repository = OnlineSessionRepositoryImpl(
             remoteDataSource = remoteDataSource,
             realtimeClient   = realtimeClient,
         )
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -97,7 +113,7 @@ class OnlineSessionRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given remote returns CreateSessionResponseDto when createSession then returns Pair(sessionId, code)`() = runTest {
+    fun `given remote returns CreateSessionResponseDto when createSession then returns CreateSessionResult`() = runTest {
         // Arrange
         val dto = CreateSessionResponseDto(sessionId = SESSION_ID, code = SESSION_CODE)
         coEvery { remoteDataSource.createSession("COMMANDER", 4, null, any(), any()) } returns Result.success(dto)
@@ -107,7 +123,21 @@ class OnlineSessionRepositoryImplTest {
 
         // Assert
         assertTrue(result.isSuccess)
-        assertEquals(Pair(SESSION_ID, SESSION_CODE), result.getOrThrow())
+        assertEquals(CreateSessionResult(SESSION_ID, SESSION_CODE, null), result.getOrThrow())
+    }
+
+    @Test
+    fun `given remote returns a guest_token when createSession then it is forwarded in the domain result`() = runTest {
+        // Arrange — the caller had no Supabase Auth session at all (a guest); the RPC mints an
+        // opaque identity token instead of relying on auth.uid().
+        val dto = CreateSessionResponseDto(sessionId = SESSION_ID, code = SESSION_CODE, guestToken = "guest-tok-123")
+        coEvery { remoteDataSource.createSession(any(), any(), any(), any(), any()) } returns Result.success(dto)
+
+        // Act
+        val result = repository.createSession("STANDARD", 2, null, "Guest", "Crimson")
+
+        // Assert
+        assertEquals("guest-tok-123", result.getOrThrow().guestToken)
     }
 
     @Test
@@ -143,7 +173,7 @@ class OnlineSessionRepositoryImplTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given remote returns JoinSessionResponseDto when joinSession then returns Pair(sessionId, slotIndex)`() = runTest {
+    fun `given remote returns JoinSessionResponseDto when joinSession then returns JoinSessionResult`() = runTest {
         // Arrange
         val dto = JoinSessionResponseDto(sessionId = SESSION_ID, slotIndex = SLOT_INDEX)
         coEvery { remoteDataSource.joinSession(SESSION_CODE, "TestPlayer", "Crimson") } returns
@@ -154,7 +184,7 @@ class OnlineSessionRepositoryImplTest {
 
         // Assert
         assertTrue(result.isSuccess)
-        assertEquals(Pair(SESSION_ID, SLOT_INDEX), result.getOrThrow())
+        assertEquals(JoinSessionResult(SESSION_ID, SLOT_INDEX, null), result.getOrThrow())
     }
 
     @Test

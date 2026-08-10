@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 data class CardSearchUiState(
     val query: String = "",
     val cards: List<Card> = emptyList(),
+    val totalCards: Int = 0,
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = false,

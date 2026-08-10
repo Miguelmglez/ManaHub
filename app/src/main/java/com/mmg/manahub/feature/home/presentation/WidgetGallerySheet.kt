@@ -71,6 +71,7 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.puzzle.presentation.PuzzleFeatureFlags
 
 /**
  * Unified catalog for managing the dashboard layout.
@@ -205,15 +206,20 @@ fun WidgetGallerySheet(
                     // Hidden for release — see docs/gamification-hidden-for-release.md.
                     // When gamification is off, omit its widget types from the gallery entirely
                     // (instead of showing them as greyed/disabled rows).
+                    // Same treatment for the Daily Puzzle (docs/hidden-features/daily-puzzle.md):
+                    // DAILY_PUZZLE is gallery-only/opt-in to begin with (never in a default layout),
+                    // so omitting it here is the sole gate its "add" door needs.
                     val addedInOrder = localLayout
                         .filter { it.type.category == category }
                         .map { it.type }
                         .filter { gamificationEnabled || !it.isGamification }
+                        .filter { PuzzleFeatureFlags.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
                         .distinct()
 
                     val notAdded = HomeWidgetType.entries
                         .filter { it.category == category }
                         .filter { gamificationEnabled || !it.isGamification }
+                        .filter { PuzzleFeatureFlags.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
                         .filter { it !in addedTypes }
 
                     val widgets = (addedInOrder + notAdded).distinctBy { it.persistedId }

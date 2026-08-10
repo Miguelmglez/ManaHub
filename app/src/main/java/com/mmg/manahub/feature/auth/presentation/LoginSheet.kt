@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -69,6 +68,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 
 /**
  * Full-screen-height ModalBottomSheet that handles sign-in, sign-up,
@@ -458,10 +458,8 @@ private fun LoginSheetContent(
                 shape = RoundedCornerShape(12.dp),
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(
+                    MagicLoadingSpinner(
                         modifier = Modifier.size(20.dp),
-                        color = mc.background,
-                        strokeWidth = 2.dp,
                     )
                 } else {
                     Text(
@@ -917,10 +915,8 @@ private fun ResetPasswordDialog(
                     ),
                 ) {
                     if (isLoading) {
-                        CircularProgressIndicator(
+                        MagicLoadingSpinner(
                             modifier = Modifier.size(18.dp),
-                            color = mc.background,
-                            strokeWidth = 2.dp,
                         )
                     } else {
                         Text(

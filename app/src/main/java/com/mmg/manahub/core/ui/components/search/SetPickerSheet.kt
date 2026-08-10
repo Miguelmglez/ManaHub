@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -60,6 +59,10 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.SetType
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import org.koin.androidx.compose.koinViewModel
@@ -229,7 +232,7 @@ fun SetPickerSheet(
             when {
                 isWaitingForRestrictions || uiState.isLoading -> {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = mc.primaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
                 uiState.filteredSets.isEmpty() -> {
@@ -269,23 +272,20 @@ fun SetPickerSheet(
 
             // ── Done button (multi-select only; single-pick dismisses on tap) ──
             if (!singleSelection) {
-                Button(
+                MagicCtaButton(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                         .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = mc.primaryAccent),
-                ) {
-                    Text(
-                        if (selectedSetCodes.isEmpty())
-                            stringResource(R.string.action_close)
-                        else
-                            stringResource(R.string.advsearch_set_done, selectedSetCodes.size),
-                        style = ty.labelLarge,
+
+                    text = if (selectedSetCodes.isEmpty())
+                        stringResource(R.string.action_close)
+                    else
+                        stringResource(R.string.advsearch_set_done, selectedSetCodes.size),
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
                     )
-                }
             }
         }
     }

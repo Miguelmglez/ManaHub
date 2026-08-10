@@ -455,7 +455,7 @@ class DeckWizardViewModelTest {
         vm.onToggleIncludeOutsideCollection()
         assertTrue(vm.uiState.value.includeOutsideCollection)
         coEvery { searchCardsUseCase("is:commander Zada", any()) } returns DataResult.Success(
-            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false)
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(commander), hasMore = false, totalCards = 1)
         )
 
         vm.onCommanderQueryChange("Zada")
@@ -758,7 +758,7 @@ class DeckWizardViewModelTest {
     fun `an unowned combo card (the missing piece) resolves via a network search`() = runTest(dispatcher) {
         val basaltMonolith = card(id = "basalt-1", name = "Basalt Monolith")
         coEvery { searchCardsUseCase("Basalt Monolith", any()) } returns DataResult.Success(
-            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(basaltMonolith), hasMore = false)
+            com.mmg.manahub.core.model.PaginatedCards(cards = listOf(basaltMonolith), hasMore = false, totalCards = 1)
         )
 
         val vm = viewModel(mapOf("seeds" to "Basalt Monolith"))

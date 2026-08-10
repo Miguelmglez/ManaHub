@@ -94,7 +94,7 @@ import org.koin.dsl.module
 
 /**
  * Root Koin module for `:webApp`. W1 registered only the [KeyValueStore] wasmJs actual + the
- * showcase screen's ViewModel. Web roadmap W2a adds the real [SupabaseClient] (guest-only auth
+ * showcase screen's ViewModel. Web roadmap W2a adds the real [SupabaseClient] (email/password auth
  * for now -- Google OAuth is a separate follow-up) built through the same shared
  * `createManaHubSupabaseClient` factory Android uses (`shared/core-data` commonMain), differing
  * only in [WebSessionManager] (localStorage-backed, not Android Keystore), the wasmJs/js Ktor

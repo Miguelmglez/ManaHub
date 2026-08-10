@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * extracted here.
  *
  * No longer carries an `Error` case (removed in the email/password auth slice, 2026-08-05): every
- * action-specific failure (guest sign-in, sign-in, sign-up, password reset) now surfaces inline via
+ * action-specific failure (sign-in, sign-up, password reset) now surfaces inline via
  * [AuthFormState.formError]/[AuthFormState.infoMessage] instead of overloading the session-status
  * display with a transient action error.
  */
@@ -58,8 +58,10 @@ data class AuthFormState(
 
 /**
  * Backs [AuthScreen]. Web scope expansion (2026-08-05): adds real email/password sign-in, sign-up,
- * and password-reset on top of the pre-existing guest sign-in (W2a) -- Google OAuth remains a
- * deliberately separate follow-up (needs external OAuth client credentials this task doesn't have).
+ * and password-reset -- Google OAuth remains a deliberately separate follow-up (needs external
+ * OAuth client credentials this task doesn't have). Anonymous/guest sign-in was removed
+ * project-wide (Supabase Anonymous Sign-In elimination, 2026-08-10): no-account users are local
+ * storage only and never touch Supabase Auth.
  *
  * Routes every action through the shared `commonMain` [AuthRepository]/use-case layer (backed here
  * by `WebAuthRepository`, `shared/core-data` wasmJsMain) instead of calling the Supabase SDK
@@ -112,21 +114,6 @@ class AuthViewModel(
 
     fun onNicknameChanged(value: String) {
         _formState.update { it.copy(nickname = value, nicknameError = null, formError = null) }
-    }
-
-    /** Signs in anonymously (guest). No-ops on a double-tap while a sign-in is already in flight. */
-    fun signInAsGuest() {
-        if (_isSigningIn.value) return
-        viewModelScope.launch {
-            _isSigningIn.value = true
-            when (val result = authRepository.signInAnonymously()) {
-                is AuthResult.Success -> Unit // uiState updates via the sessionState collector above
-                is AuthResult.Error -> _formState.update {
-                    it.copy(formError = result.error.toUiMessage(), infoMessage = null)
-                }
-            }
-            _isSigningIn.value = false
-        }
     }
 
     /** Validates the current form, then submits sign-in or sign-up depending on [AuthFormState.mode]. */

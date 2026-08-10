@@ -495,13 +495,6 @@ class AuthRepositoryImpl(
         }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
     }
 
-    override suspend fun signInAnonymously(): AuthResult<Unit> = withContext(ioDispatcher) {
-        runCatching {
-            supabaseAuth.signInAnonymously()
-            AuthResult.Success(Unit)
-        }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
-    }
-
     override suspend fun signOut(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
             supabaseAuth.signOut()

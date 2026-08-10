@@ -78,7 +78,7 @@ fun TradesScreen(onProposalClick: (String) -> Unit, onNewProposal: () -> Unit = 
         if (!uiState.isSignedIn) {
             EmptyState(
                 title = "Sign in to trade",
-                subtitle = "Sign in (guest is fine) from the Account tab to see your trades, wishlist, and open-for-trade list.",
+                subtitle = "Sign in from the Account tab to see your trades, wishlist, and open-for-trade list.",
             )
             return@Column
         }

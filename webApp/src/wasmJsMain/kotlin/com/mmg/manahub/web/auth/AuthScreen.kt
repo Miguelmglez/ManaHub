@@ -38,15 +38,17 @@ import com.mmg.manahub.core.ui.theme.spacing
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Web auth screen (web roadmap W2a guest sign-in; email/password sign-in, sign-up, and password
- * reset added in the 2026-08-05 web scope expansion). Google OAuth remains a deliberately separate
- * follow-up task (needs external OAuth client credentials this task doesn't have), not added here.
+ * Web auth screen (email/password sign-in, sign-up, and password reset added in the 2026-08-05 web
+ * scope expansion). Google OAuth remains a deliberately separate follow-up task (needs external
+ * OAuth client credentials this task doesn't have), not added here. Anonymous/guest sign-in was
+ * removed project-wide (2026-08-10) -- no-account users are local storage only and never touch
+ * Supabase Auth.
  *
  * Rendered as [AuthViewModel]'s [AuthUiState] -- never the raw session object (see [AuthUiState]'s
  * KDoc for why: a `toString()` render would leak the raw JWT).
  *
- * The email/password form ([EmailPasswordForm]) and the guest button are only shown while signed
- * out -- there is nothing to sign in/up for once [AuthUiState.SignedIn].
+ * The email/password form ([EmailPasswordForm]) is only shown while signed out -- there is nothing
+ * to sign in/up for once [AuthUiState.SignedIn].
  *
  * Hosts the entry point into [com.mmg.manahub.web.settings.SettingsScreen] -- see
  * [com.mmg.manahub.web.navigation.SettingsRoute]'s KDoc for why Settings hangs off this screen
@@ -86,25 +88,6 @@ fun AuthScreen(
 
         if (uiState !is AuthUiState.SignedIn) {
             EmailPasswordForm(viewModel = viewModel, formState = formState, isBusy = isSigningIn)
-
-            HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
-
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.md)) {
-                Text(
-                    text = "Or continue as a guest -- your data stays on this device and browser " +
-                        "until you create a full account.",
-                    style = typography.bodyMedium,
-                    color = colors.textSecondary,
-                )
-                MagicCtaButton(
-                    onClick = viewModel::signInAsGuest,
-                    text = "Continue as guest",
-                    enabled = !isSigningIn,
-                    isLoading = isSigningIn,
-                    style = MagicCtaStyle.Outlined,
-                    color = MagicCtaColor.Neutral,
-                )
-            }
 
             HorizontalDivider(color = colors.surfaceVariant.copy(alpha = 0.5f))
         }

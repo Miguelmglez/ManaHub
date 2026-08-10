@@ -5,6 +5,9 @@ import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
 import com.mmg.manahub.core.data.remote.mapper.toDomain
 import com.mmg.manahub.core.model.ArchidektFormat
 import com.mmg.manahub.core.model.CommunityDeck
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 /**
@@ -40,9 +43,23 @@ fun ArchidektDeckDetailDto.toCacheEntity(): CommunityDeckCacheEntity = Community
 
 /**
  * Reconstructs a [CommunityDeck] from a cached row by deserializing the stored DTO blob.
- * Falls back to the denormalized columns only if the blob cannot be parsed.
+ *
+ * Returns `null` when [responseJson] cannot be parsed (corrupt/malformed blob — e.g. schema drift
+ * or a truncated write) rather than throwing. This function is NOT on the production `getById`
+ * read path today (see [com.mmg.manahub.feature.communitydecks.data.CommunityDeckCacheImpl], which
+ * decodes [ArchidektDeckDetailDto] directly and applies the same null-on-corrupt guard), but is
+ * kept null-safe for its own round-trip coverage (`CommunityDecksMappersTest`) and any future
+ * caller.
  */
-fun CommunityDeckCacheEntity.toDomain(): CommunityDeck {
+fun CommunityDeckCacheEntity.toDomain(): CommunityDeck? = try {
     val dto = communityDeckJson.decodeFromString(ArchidektDeckDetailDto.serializer(), responseJson)
-    return dto.toDomain()
+    dto.toDomain()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: SerializationException) {
+    recordNonFatal("community_deck_cache_corrupt", e)
+    null
+} catch (e: IllegalArgumentException) {
+    recordNonFatal("community_deck_cache_corrupt", e)
+    null
 }

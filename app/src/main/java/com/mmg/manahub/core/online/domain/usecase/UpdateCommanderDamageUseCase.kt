@@ -14,5 +14,6 @@ class UpdateCommanderDamageUseCase @Inject constructor(
         targetSlot: Int,
         sourceSlot: Int,
         delta: Int,
-    ): Result<Unit> = repository.updateCommanderDamage(sessionId, targetSlot, sourceSlot, delta)
+        guestToken: String? = null,
+    ): Result<Unit> = repository.updateCommanderDamage(sessionId, targetSlot, sourceSlot, delta, guestToken)
 }

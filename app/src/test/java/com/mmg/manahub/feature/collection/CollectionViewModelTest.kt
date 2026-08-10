@@ -561,8 +561,12 @@ class CollectionViewModelTest {
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
 
+        // SearchCriterion.Rarity is now a plain membership list (multi-select rarity chips in the
+        // advanced-search UI, see AdvancedSearchViewModel.kt / CollectionViewModel.compareRarity) —
+        // it no longer carries a ComparisonOperator; there is no ordered "at least this rarity"
+        // concept anymore, only "rarity is one of these values".
         val query = AdvancedSearchQuery(
-            criteria = listOf(SearchCriterion.Rarity("mythic", ComparisonOperator.EQUAL))
+            criteria = listOf(SearchCriterion.Rarity(listOf("mythic")))
         )
         viewModel.applyAdvancedFilters(query)
         advanceUntilIdle()
@@ -572,7 +576,7 @@ class CollectionViewModelTest {
     }
 
     @Test
-    fun `given Rarity GREATER_OR_EQUAL rare when applyAdvancedFilters then rare and mythic are included`() = runTest {
+    fun `given Rarity criterion listing rare and mythic when applyAdvancedFilters then only those rarities are included`() = runTest {
         val entries = listOf(
             buildEntry(scryfallId = "id-001", name = "Common",   rarity = "common"),
             buildEntry(scryfallId = "id-002", name = "Rare",     rarity = "rare"),
@@ -581,8 +585,11 @@ class CollectionViewModelTest {
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
 
+        // No ordered "GREATER_OR_EQUAL rare" operator exists anymore — the equivalent selection is
+        // expressed as an explicit multi-value list (mirrors a user checking both the Rare and
+        // Mythic chips in the advanced-search sheet).
         val query = AdvancedSearchQuery(
-            criteria = listOf(SearchCriterion.Rarity("rare", ComparisonOperator.GREATER_OR_EQUAL))
+            criteria = listOf(SearchCriterion.Rarity(listOf("rare", "mythic")))
         )
         viewModel.applyAdvancedFilters(query)
         advanceUntilIdle()
@@ -643,7 +650,7 @@ class CollectionViewModelTest {
         advanceUntilIdle()
 
         val query = AdvancedSearchQuery(
-            criteria = listOf(SearchCriterion.Format("modern", legal = true))
+            criteria = listOf(SearchCriterion.Format(listOf("modern"), legal = true))
         )
         viewModel.applyAdvancedFilters(query)
         advanceUntilIdle()
@@ -653,7 +660,7 @@ class CollectionViewModelTest {
     }
 
     @Test
-    fun `given IsForTrade criterion when applyAdvancedFilters then only trade cards are shown`() = runTest {
+    fun `given CollectionStatus forTrade criterion when applyAdvancedFilters then only trade cards are shown`() = runTest {
         val entries = listOf(
             buildEntry(scryfallId = "id-001", name = "For Trade",  isForTrade = true),
             buildEntry(scryfallId = "id-002", name = "Not Trade",  isForTrade = false),
@@ -661,8 +668,10 @@ class CollectionViewModelTest {
         viewModel = buildViewModel(entries)
         advanceUntilIdle()
 
+        // SearchCriterion.IsForTrade was folded into the combined local-only
+        // SearchCriterion.CollectionStatus(wishlist, forTrade) criterion.
         val query = AdvancedSearchQuery(
-            criteria = listOf(SearchCriterion.IsForTrade(true))
+            criteria = listOf(SearchCriterion.CollectionStatus(wishlist = false, forTrade = true))
         )
         viewModel.applyAdvancedFilters(query)
         advanceUntilIdle()
@@ -703,7 +712,7 @@ class CollectionViewModelTest {
         val query = AdvancedSearchQuery(
             criteria = listOf(
                 SearchCriterion.Colors(setOf("R")),
-                SearchCriterion.CardType("Instant"),
+                SearchCriterion.CardType(setOf("Instant")),
             )
         )
         viewModel.applyAdvancedFilters(query)

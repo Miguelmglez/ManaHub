@@ -98,7 +98,7 @@ fun CardGridItem(
                 }
 
                 AsyncImage(
-                    model = card.imageArtCrop ?: card.imageNormal,
+                    model = card.imageArtCrop,
                     contentDescription = card.name,
                     placeholder = painterResource(Res.drawable.mtg_card_back),
                     error = painterResource(Res.drawable.mtg_card_back),

@@ -52,7 +52,6 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -109,6 +108,7 @@ import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
@@ -187,6 +187,7 @@ fun CollectionScreen(
     if (showAdvancedSearch) {
         AdvancedSearchSheet(
             isCollectionMode = true,
+            getAvailableTags = viewModel::getAllCollectionTags,
             onDismiss = { showAdvancedSearch = false },
             onSearch = { advancedQuery, _ ->
                 viewModel.applyAdvancedFilters(advancedQuery)
@@ -405,7 +406,7 @@ private fun CardsTabContent(
     // Loading
     if (uiState.isLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = mc.primaryAccent)
+            MagicLoadingSpinner()
         }
         return
     }
@@ -689,7 +690,7 @@ private fun CardGrid(
         columns               = GridCells.Adaptive(minSize = 100.dp),
         state                 = state,
         contentPadding        = PaddingValues(start = 12.dp, top = topPadding + 12.dp, end = 12.dp, bottom = 80.dp),
-        verticalArrangement   = Arrangement.spacedBy(8.dp),
+        verticalArrangement   = Arrangement.spacedBy(2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (groupingMode == CollectionGroupingMode.NONE) {
@@ -757,7 +758,7 @@ private fun CardGridCell(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.75f)
+            .aspectRatio(0.88f)
     ) {
         AnimatedVisibility(
             visible = visible,

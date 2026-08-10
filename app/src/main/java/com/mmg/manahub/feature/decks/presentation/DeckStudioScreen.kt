@@ -88,6 +88,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.feature.decks.presentation.components.SynergyCardTile
 import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
@@ -928,7 +929,7 @@ private fun BuildTab(
     ) { isLoading ->
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
             }
         } else if (uiState.isEmptyDeck) {
             val currentFormat = uiState.deck?.format
@@ -1697,7 +1698,7 @@ private fun StrategiesTabContent(
 
         when {
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
             }
             discoveries.isEmpty() -> EmptyState(
                 title = stringResource(R.string.deck_studio_inspirations_empty_title),
@@ -1789,10 +1790,10 @@ private fun CombosTabContent(
 
     when {
         isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            MagicLoadingSpinner()
         }
         comboResult == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            MagicLoadingSpinner()
         }
         comboResult.complete.isEmpty() && comboResult.almostThere.isEmpty() -> EmptyState(
             title = stringResource(R.string.deck_studio_combos_empty_title),
@@ -1886,8 +1887,7 @@ private fun DoctorStagedProgressContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(spacing.lg),
         ) {
-            androidx.compose.material3.CircularProgressIndicator(
-                color = mc.primaryAccent,
+            MagicLoadingSpinner(
                 modifier = Modifier.size(48.dp),
             )
             Text(text = stage.label(), style = ty.titleMedium, color = mc.textPrimary)
@@ -1956,7 +1956,7 @@ private fun SuggestionsTab(
     // loadAnalysis has ever set a stage.
     if (uiState.isSuggestionsLoading && uiState.health == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+            MagicLoadingSpinner()
         }
         return
     }
@@ -2156,7 +2156,7 @@ private fun SuggestionsTab(
                     Modifier.fillMaxWidth().padding(vertical = spacing.xl),
                     contentAlignment = Alignment.Center,
                 ) {
-                    androidx.compose.material3.CircularProgressIndicator(color = mc.primaryAccent)
+                    MagicLoadingSpinner()
                 }
             }
             uiState.adds.isEmpty() -> item(key = "adds_empty") {
@@ -2201,7 +2201,7 @@ private fun SuggestionsTab(
                         Modifier.fillMaxWidth().padding(vertical = spacing.xl),
                         contentAlignment = Alignment.Center,
                     ) {
-                        androidx.compose.material3.CircularProgressIndicator(color = mc.secondaryAccent)
+                        MagicLoadingSpinner()
                     }
                 }
                 uiState.communityUnavailable -> item(key = "community_unavailable") {

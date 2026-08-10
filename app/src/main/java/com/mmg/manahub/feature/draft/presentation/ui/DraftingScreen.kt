@@ -54,7 +54,6 @@ import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -78,7 +77,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -102,6 +100,7 @@ import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.GroupingFlowSelector
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.components.OracleText
@@ -193,7 +192,7 @@ fun DraftingScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
             }
         }
 
@@ -276,28 +275,12 @@ private fun DraftingContent(
                     },
             ) {
                 if (secondsLeft != null) {
-                    val total = state.state.config.pickTimerSeconds ?: secondsLeft.coerceAtLeast(1)
-                    val progress = (secondsLeft.toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)
-                    val animatedProgress by animateFloatAsState(
-                        targetValue = progress,
-                        label = "timer_progress",
-                    )
-                    val barColor = if (isUrgent) mc.lifeNegative else mc.primaryAccent
-
-                    CircularProgressIndicator(
-                        progress = { animatedProgress },
+                    MagicLoadingSpinner(
                         modifier = Modifier.fillMaxSize(),
-                        color = barColor,
-                        trackColor = mc.surfaceVariant,
-                        strokeWidth = 3.dp,
-                        strokeCap = StrokeCap.Round,
                     )
                 } else {
-                    CircularProgressIndicator(
-                        progress = { 1f },
+                    MagicLoadingSpinner(
                         modifier = Modifier.fillMaxSize(),
-                        color = mc.surfaceVariant,
-                        strokeWidth = 2.dp,
                     )
                 }
 

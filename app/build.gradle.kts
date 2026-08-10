@@ -356,6 +356,9 @@ dependencies {
 
     // Stable collection types for Compose recomposition stability
     implementation(libs.kotlinx.collections.immutable)
+
+    // Lottie files for animated items
+    implementation(libs.lottie)
 }
 
 hilt {

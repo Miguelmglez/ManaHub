@@ -80,8 +80,9 @@ fun communityDecksKoinModule(
     // CrashReporter comes from coreBridgeKoinModule (WS2: cooldown-entered/exited telemetry).
     single { ArchidektRequestQueue(crashReporter = get()) }
 
-    // ── Cache abstraction (Room-backed on Android). ──
-    single<CommunityDeckCache> { CommunityDeckCacheImpl(cacheDao = get()) }
+    // ── Cache abstraction (Room-backed on Android). CrashReporter (coreBridgeKoinModule) records
+    //    a corrupt cache row as a non-fatal instead of letting the read throw (bug fix). ──
+    single<CommunityDeckCache> { CommunityDeckCacheImpl(cacheDao = get(), crashReporter = get()) }
 
     // ── Data layer. CommunityDeckCache + DeckRepository + CardRepository resolve via get() ──
     // (cache from this module; DeckRepository + CardRepository from coreBridgeKoinModule;

@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -41,6 +40,7 @@ import com.mmg.manahub.core.model.puzzle.PuzzleAttemptFeedback.Comparison
 import com.mmg.manahub.core.model.puzzle.PuzzleAttemptFeedback.MatchLevel
 import com.mmg.manahub.core.model.puzzle.PuzzleGuessResult
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
@@ -106,7 +106,7 @@ fun GuessCardWidgetContent(
                 singleLine = true,
                 trailingIcon = {
                     if (isSearchingSuggestions) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        MagicLoadingSpinner(modifier = Modifier.size(20.dp))
                     }
                 },
                 colors = OutlinedTextFieldDefaults.colors(

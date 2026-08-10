@@ -36,7 +36,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +68,7 @@ import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
@@ -210,7 +210,7 @@ fun TradeNegotiationDetailScreen(
                         .padding(innerPadding),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = mc.primaryAccent)
+                    MagicLoadingSpinner()
                 }
 
                 uiState.thread.isEmpty() -> Box(
@@ -420,10 +420,8 @@ private fun ProposalCard(
                         shape = ButtonShape,
                     ) {
                         if (isSyncingCollection) {
-                            CircularProgressIndicator(
+                            MagicLoadingSpinner(
                                 modifier = Modifier.size(18.dp),
-                                color = mc.background,
-                                strokeWidth = 2.dp,
                             )
                         } else {
                             Text(

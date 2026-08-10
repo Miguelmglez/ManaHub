@@ -27,16 +27,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,9 +80,11 @@ import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
-import com.mmg.manahub.core.ui.components.ManaHubSelector
+import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -162,14 +165,22 @@ fun CommunityDecksScreen(
                     contentPadding = padding,
                     onQueryChange = viewModel::onQueryChange,
                     onSearch = viewModel::search,
-                    onSortSelected = viewModel::onSortSelected,
+                    onSortSelectedUpdate = viewModel::onSortUpdated,
+                    onSearchFormatUpdate = viewModel::onSearchDeckFilterUpdated,
                     onLoadMore = viewModel::loadMore,
                     onDeckClick = viewModel::onDeckClick,
                     onShowAdvancedSearch = { showAdvancedSearch = true },
                 )
             } else {
-                Column(Modifier.fillMaxSize().padding(padding)) {
-                    CommunityHubTabRow(selected = uiState.hubTab, onSelect = viewModel::onSelectHubTab)
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                ) {
+                    CommunityHubTabRow(
+                        selected = uiState.hubTab,
+                        onSelect = viewModel::onSelectHubTab
+                    )
                     when (uiState.hubTab) {
                         CommunityHubTab.DISCOVER -> CommunityDiscoverBody(
                             state = uiState,
@@ -177,18 +188,21 @@ fun CommunityDecksScreen(
                             onTrendingCommanderClick = viewModel::onTrendingCommanderClick,
                             onTrendingCardClick = viewModel::onTrendingCardClick,
                             onDeckClick = viewModel::onDeckClick,
+                            onDiscoveryFormatUpdate = viewModel::onSelectDiscoveryFormat,
                             modifier = Modifier.weight(1f),
                         )
+
                         CommunityHubTab.SEARCH -> CommunityDecksSearchBody(
                             state = uiState,
                             contentPadding = PaddingValues(0.dp),
                             onQueryChange = viewModel::onQueryChange,
                             onSearch = viewModel::search,
-                            onSortSelected = viewModel::onSortSelected,
+                            onSortSelectedUpdate = viewModel::onSortUpdated,
+                            onSearchFormatUpdate = viewModel::onSearchDeckFilterUpdated,
                             onLoadMore = viewModel::loadMore,
                             onDeckClick = viewModel::onDeckClick,
                             onShowAdvancedSearch = { showAdvancedSearch = true },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -201,7 +215,6 @@ fun CommunityDecksScreen(
         CommunityAdvancedSearchSheet(
             state = uiState,
             onDismiss = { showAdvancedSearch = false },
-            onFormatSelected = viewModel::onFormatFilterSelected,
             onColorToggled = viewModel::onColorToggled,
             onBracketSelected = viewModel::onBracketSelected,
             onCommanderQueryChange = viewModel::onCommanderQueryChange,
@@ -226,7 +239,8 @@ private fun CommunityDecksSearchBody(
     contentPadding: PaddingValues,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    onSortSelected: (CommunityDeckSort) -> Unit,
+    onSortSelectedUpdate: (CommunityDeckSort) -> Unit,
+    onSearchFormatUpdate: (CommunityDeckFormatFilter) -> Unit,
     onLoadMore: () -> Unit,
     onDeckClick: (Int) -> Unit,
     onShowAdvancedSearch: () -> Unit,
@@ -282,11 +296,31 @@ private fun CommunityDecksSearchBody(
             }
         }
 
-        CommunityDeckSortSelector(
-            selected = state.selectedSort,
-            onSelect = onSortSelected,
-            modifier = Modifier.padding(horizontal = spacing.lg),
-        )
+
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+        ){
+
+            ManaHubBottomSheetSelector(
+                icon = Icons.AutoMirrored.Filled.Sort,
+                valueText =  stringResource(state.selectedSort.displayResId),
+                items = CommunityDeckSort.entries,
+                selectedItem = state.selectedSort,
+                onSelect =  onSortSelectedUpdate,
+                itemLabel = { stringResource(it.displayResId) },
+                modifier = Modifier.weight(1f),
+            )
+            ManaHubBottomSheetSelector(
+                icon = Icons.Default.Layers,
+                valueText =  stringResource(state.advancedFilters.formats.displayResId),
+                items = CommunityDeckFormatFilter.entries,
+                selectedItem = state.advancedFilters.formats,
+                onSelect =  onSearchFormatUpdate,
+                itemLabel = { stringResource(it.displayResId) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+
 
         Spacer(Modifier.height(spacing.sm))
 
@@ -346,24 +380,6 @@ private fun CommunityDeckSearchBar(
     )
 }
 
-/** Sort selector following the ManaHub design system. */
-@Composable
-private fun CommunityDeckSortSelector(
-    selected: CommunityDeckSort,
-    onSelect: (CommunityDeckSort) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    ManaHubSelector(
-        icon = Icons.AutoMirrored.Filled.Sort,
-        label = stringResource(R.string.community_deck_sort_label_base),
-        valueText = stringResource(selected.labelRes),
-        items = CommunityDeckSort.entries,
-        selectedItem = selected,
-        onSelect = onSelect,
-        itemLabel = { stringResource(it.labelRes) },
-        modifier = modifier,
-    )
-}
 
 /** Resolves the right state (initial / loading / error / empty / results). */
 @Composable
@@ -379,7 +395,7 @@ private fun CommunityDeckResultsContent(
     when {
         state.isLoading -> {
             Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = mc.primaryAccent)
+                MagicLoadingSpinner()
             }
         }
 
@@ -392,7 +408,10 @@ private fun CommunityDeckResultsContent(
                 FullErrorState(
                     message = stringResource(R.string.error_rate_limited_message),
                     retryLabel = if (remainingSeconds > 0) {
-                        stringResource(R.string.error_rate_limited_retry_countdown, remainingSeconds)
+                        stringResource(
+                            R.string.error_rate_limited_retry_countdown,
+                            remainingSeconds
+                        )
                     } else {
                         stringResource(R.string.retry)
                     },
@@ -489,232 +508,286 @@ private fun CommunityDeckResultsGrid(
     }
 }
 
-/** A "Load More" button that morphs into a small progress indicator while paging. */
-@Composable
-private fun LoadMoreFooter(
-    isLoadingMore: Boolean,
-    onLoadMore: () -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = spacing.md),
-        contentAlignment = Alignment.Center,
+    /** A "Load More" button that morphs into a small progress indicator while paging. */
+    @Composable
+    private fun LoadMoreFooter(
+        isLoadingMore: Boolean,
+        onLoadMore: () -> Unit,
     ) {
-        if (isLoadingMore) {
-            CircularProgressIndicator(
-                color = mc.primaryAccent,
-                modifier = Modifier.size(32.dp),
-            )
-        } else {
-            MagicCtaButton(
-                onClick = onLoadMore,
-                color = MagicCtaColor.Surface,
-                text = stringResource(R.string.community_deck_load_more),
-                modifier = Modifier.heightIn(min = 48.dp),
-            )
+        val mc = MaterialTheme.magicColors
+        val spacing = MaterialTheme.spacing
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = spacing.lg, horizontal = spacing.lg)
+                .padding(bottom = spacing.lg),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isLoadingMore) {
+                MagicLoadingSpinner()
+
+            } else {
+                MagicCtaButton(
+                    onClick = onLoadMore,
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Primary,
+                    text = stringResource(R.string.community_deck_load_more),
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
+            }
         }
     }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Community Hub — Discover (overhauled 2026-07-15 into a multi-section browse feed)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The Discover/Search tab row — only ever composed when [CommunityDecksSearchUiState.discoverEnabled]
- * is true (see the screen's flag-gate above). */
-@Composable
-private fun CommunityHubTabRow(
-    selected: CommunityHubTab,
-    onSelect: (CommunityHubTab) -> Unit,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    TabRow(
-        selectedTabIndex = selected.ordinal,
-        containerColor = mc.backgroundSecondary.copy(alpha = 0.9f),
-        contentColor = mc.primaryAccent,
-        divider = {}
+    /** The Discover/Search tab row — only ever composed when [CommunityDecksSearchUiState.discoverEnabled]
+     * is true (see the screen's flag-gate above). */
+    @Composable
+    private fun CommunityHubTabRow(
+        selected: CommunityHubTab,
+        onSelect: (CommunityHubTab) -> Unit,
     ) {
-        CommunityHubTab.entries.forEach { tab ->
-            Tab(
-                selected = tab == selected,
-                onClick = { onSelect(tab) },
-                text = {
-                    Text(
-                        text = stringResource(
-                            if (tab == CommunityHubTab.DISCOVER) R.string.community_hub_tab_discover
-                            else R.string.community_hub_tab_search
-                        ).uppercase(),
-                        style = ty.labelLarge,
-                    )
-                },
-            )
-        }
-    }
-}
-
-/**
- * The Discover section: trending commander/card full-image rows, plus popular / recent / recently
- * updated / primer / featured-format deck rows. Every sub-section renders independently and is
- * simply omitted when empty (a single upstream failure never hides the others); only when EVERY
- * section is empty does [CommunityDecksSearchUiState.discoverUnavailable] show one inline error.
- */
-@Composable
-private fun CommunityDiscoverBody(
-    state: CommunityDecksSearchUiState,
-    onRetry: () -> Unit,
-    onTrendingCommanderClick: (Card) -> Unit,
-    onTrendingCardClick: (Card) -> Unit,
-    onDeckClick: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-
-    val everythingEmpty = state.trendingCommanderCards.isEmpty() && state.trendingCardCards.isEmpty() &&
-        state.popularDecks.isEmpty() && state.recentDecks.isEmpty() && state.updatedDecks.isEmpty() &&
-        state.primerDecks.isEmpty() && state.featuredFormatDecks.isEmpty()
-
-    if (state.isDiscoverLoading && everythingEmpty) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = mc.primaryAccent)
-        }
-        return
-    }
-
-    if (state.discoverUnavailable) {
-        InlineErrorState(
-            message = stringResource(R.string.community_hub_discover_unavailable),
-            retryLabel = stringResource(R.string.retry),
-            onRetry = onRetry,
-            modifier = modifier.padding(spacing.lg),
-        )
-        return
-    }
-
-    // Resolved here (this function IS @Composable) rather than inside `discoverDeckSection`'s
-    // arguments — `LazyColumn`'s own trailing content lambda is a plain (non-@Composable)
-    // `LazyListScope.() -> Unit`; only the lambdas passed to its `item`/`items` builders are
-    // truly composable-scoped, so a `stringResource()` call can never sit directly in a
-    // `discoverDeckSection(...)` argument at that call site.
-    val popularTitle = stringResource(R.string.community_hub_popular_decks)
-    val recentTitle = stringResource(R.string.community_hub_recent_decks)
-    val updatedTitle = stringResource(R.string.community_hub_updated_decks)
-    val primerTitle = stringResource(R.string.community_hub_primer_decks)
-    val featuredTitle = stringResource(R.string.community_hub_featured_format, state.featuredFormat.label)
-
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = spacing.md, horizontal = spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(spacing.lg),
-    ) {
-        if (state.trendingCommanderCards.isNotEmpty()) {
-            item(key = "trending_commanders_header") {
-                DiscoverSectionHeader(stringResource(R.string.community_hub_trending_commanders))
-            }
-            item(key = "trending_commanders_row") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    items(state.trendingCommanderCards, key = { it.scryfallId }) { card ->
-                        CommunityTrendingCardTile(card = card, onClick = { onTrendingCommanderClick(card) })
-                    }
-                }
-            }
-        }
-
-        if (state.trendingCardCards.isNotEmpty()) {
-            item(key = "trending_cards_header") {
-                DiscoverSectionHeader(stringResource(R.string.community_hub_trending_cards))
-            }
-            item(key = "trending_cards_row") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    items(state.trendingCardCards, key = { it.scryfallId }) { card ->
-                        CommunityTrendingCardTile(card = card, onClick = { onTrendingCardClick(card) })
-                    }
-                }
-            }
-        }
-
-        discoverDeckSection(key = "popular", title = popularTitle, decks = state.popularDecks, onDeckClick = onDeckClick)
-        discoverDeckSection(key = "recent", title = recentTitle, decks = state.recentDecks, onDeckClick = onDeckClick)
-        discoverDeckSection(key = "updated", title = updatedTitle, decks = state.updatedDecks, onDeckClick = onDeckClick)
-        discoverDeckSection(key = "primer", title = primerTitle, decks = state.primerDecks, onDeckClick = onDeckClick)
-        discoverDeckSection(key = "featured", title = featuredTitle, decks = state.featuredFormatDecks, onDeckClick = onDeckClick)
-    }
-}
-
-/** One horizontal deck-row Discover section; omitted entirely when [decks] is empty. */
-private fun LazyListScope.discoverDeckSection(
-    key: String,
-    title: String,
-    decks: List<CommunityDeckSummary>,
-    onDeckClick: (Int) -> Unit,
-) {
-    if (decks.isEmpty()) return
-    item(key = "${key}_header") { DiscoverSectionHeader(title) }
-    item(key = "${key}_row") {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
-            items(decks, key = { "${key}_${it.archidektId}" }) { deck ->
-                DeckItem(
-                    deck = deck.toDeckSummary(),
-                    onClick = { onDeckClick(deck.archidektId) },
-                    reduced = true,
-                    ownerName = deck.owner.username,
-                    cardBackPainter = painterResource(Res.drawable.mtg_card_back),
-                    modifier = Modifier.width(160.dp),
+        val mc = MaterialTheme.magicColors
+        val ty = MaterialTheme.magicTypography
+        TabRow(
+            selectedTabIndex = selected.ordinal,
+            containerColor = mc.backgroundSecondary.copy(alpha = 0.9f),
+            contentColor = mc.primaryAccent,
+            divider = {}
+        ) {
+            CommunityHubTab.entries.forEach { tab ->
+                Tab(
+                    selected = tab == selected,
+                    onClick = { onSelect(tab) },
+                    text = {
+                        Text(
+                            text = stringResource(
+                                if (tab == CommunityHubTab.DISCOVER) R.string.community_hub_tab_discover
+                                else R.string.community_hub_tab_search
+                            ).uppercase(),
+                            style = ty.labelLarge,
+                        )
+                    },
                 )
             }
         }
     }
-}
 
-@Composable
-private fun DiscoverSectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.magicTypography.titleMedium,
-        color = MaterialTheme.magicColors.textPrimary,
-    )
-}
-
-/** One full-card-image trending tile (63:88 aspect) for the Commander/Card Discover rows. */
-@Composable
-private fun CommunityTrendingCardTile(card: Card, onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-
-    Box(
-        modifier = Modifier
-            .width(110.dp)
-            .aspectRatio(63f / 88f)
-            .clip(CardShape)
-            .background(mc.surfaceVariant)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+    /**
+     * The Discover section: trending commander/card full-image rows, plus popular / recent / recently
+     * updated / primer / featured-format deck rows. Every sub-section renders independently and is
+     * simply omitted when empty (a single upstream failure never hides the others); only when EVERY
+     * section is empty does [CommunityDecksSearchUiState.discoverUnavailable] show one inline error.
+     */
+    @Composable
+    private fun CommunityDiscoverBody(
+        state: CommunityDecksSearchUiState,
+        onRetry: () -> Unit,
+        onTrendingCommanderClick: (Card) -> Unit,
+        onTrendingCardClick: (Card) -> Unit,
+        onDeckClick: (Int) -> Unit,
+        onDiscoveryFormatUpdate: (CommunityDeckFormatFilter) -> Unit,
+        modifier: Modifier = Modifier,
     ) {
-        AsyncImage(
-            model = card.imageNormal,
-            contentDescription = card.name,
-            placeholder = painterResource(Res.drawable.mtg_card_back),
-            error = painterResource(Res.drawable.mtg_card_back),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
+        val mc = MaterialTheme.magicColors
+        val spacing = MaterialTheme.spacing
+
+        if (state.isDiscoverLoading) {
+            Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                MagicLoadingSpinner()
+            }
+            return
+        }
+
+        // `discoverUnavailable` (set in the ViewModel from the SAME six sections checked here)
+        // is the single source of truth for "everything came back empty" — previously a locally
+        // recomputed `everythingEmpty` check rendered its own EmptyState in ADDITION to this
+        // InlineErrorState (always simultaneously, since both conditions are equivalent by
+        // construction), stacking two empty-state UIs. Removed; this branch alone already covers
+        // the case, with a retry action the duplicate EmptyState didn't have.
+        if (state.discoverUnavailable) {
+            InlineErrorState(
+                message = stringResource(R.string.community_hub_discover_unavailable),
+                retryLabel = stringResource(R.string.retry),
+                onRetry = onRetry,
+                modifier = modifier.padding(spacing.lg),
+            )
+            return
+        }
+
+        // Resolved here (this function IS @Composable) rather than inside `discoverDeckSection`'s
+        // arguments — `LazyColumn`'s own trailing content lambda is a plain (non-@Composable)
+        // `LazyListScope.() -> Unit`; only the lambdas passed to its `item`/`items` builders are
+        // truly composable-scoped, so a `stringResource()` call can never sit directly in a
+        // `discoverDeckSection(...)` argument at that call site.
+        val popularTitle = stringResource(R.string.community_hub_popular_decks)
+        val recentTitle = stringResource(R.string.community_hub_recent_decks)
+        val updatedTitle = stringResource(R.string.community_hub_updated_decks)
+        val primerTitle = stringResource(R.string.community_hub_primer_decks)
+
+        LazyColumn(
+            modifier = modifier.fillMaxSize().padding(bottom = 16.dp),
+            contentPadding = PaddingValues(vertical = spacing.md, horizontal = spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(spacing.lg),
+        ) {
+            item(key = "format_filter") {
+                ManaHubBottomSheetSelector(
+                    icon = Icons.Default.Layers,
+                    valueText =  stringResource(state.selectedDiscoveryFormat.displayResId),
+                    items = CommunityDeckFormatFilter.entries,
+                    selectedItem = state.selectedDiscoveryFormat,
+                    onSelect =  onDiscoveryFormatUpdate,
+                    itemLabel = { stringResource(it.displayResId) },
+                    label = "Format:",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (state.trendingCommanderCards.isNotEmpty()) {
+                item(key = "trending_commanders_header") {
+                    DiscoverSectionHeader(stringResource(R.string.community_hub_trending_commanders))
+                }
+                item(key = "trending_commanders_row") {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                        items(state.trendingCommanderCards, key = { it.scryfallId }) { card ->
+                            CommunityTrendingCardTile(
+                                card = card,
+                                onClick = { onTrendingCommanderClick(card) })
+                        }
+                    }
+                }
+            }
+
+            if (state.trendingCardCards.isNotEmpty()) {
+                item(key = "trending_cards_header") {
+                    DiscoverSectionHeader(stringResource(R.string.community_hub_trending_cards))
+                }
+                item(key = "trending_cards_row") {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                        items(state.trendingCardCards, key = { it.scryfallId }) { card ->
+                            CommunityTrendingCardTile(
+                                card = card,
+                                onClick = { onTrendingCardClick(card) })
+                        }
+                    }
+                }
+            }
+
+            discoverDeckSection(
+                key = "popular",
+                title = popularTitle,
+                decks = state.popularDecks,
+                onDeckClick = onDeckClick
+            )
+            discoverDeckSection(
+                key = "recent",
+                title = recentTitle,
+                decks = state.recentDecks,
+                onDeckClick = onDeckClick
+            )
+            discoverDeckSection(
+                key = "updated",
+                title = updatedTitle,
+                decks = state.updatedDecks,
+                onDeckClick = onDeckClick
+            )
+            discoverDeckSection(
+                key = "primer",
+                title = primerTitle,
+                decks = state.primerDecks,
+                onDeckClick = onDeckClick
+            )
+
+        }
+    }
+
+    /** One horizontal deck-row Discover section; omitted entirely when [decks] is empty. */
+    internal fun LazyListScope.discoverDeckSection(
+        key: String,
+        title: String,
+        decks: List<CommunityDeckSummary>,
+        onDeckClick: (Int) -> Unit,
+    ) {
+        if (decks.isEmpty()) return
+        item(key = "${key}_header") { DiscoverSectionHeader(title) }
+        item(key = "${key}_row") {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm)) {
+                items(decks, key = { "${key}_${it.archidektId}" }) { deck ->
+                    DeckItem(
+                        deck = deck.toDeckSummary(),
+                        onClick = { onDeckClick(deck.archidektId) },
+                        reduced = true,
+                        ownerName = deck.owner.username,
+                        cardBackPainter = painterResource(Res.drawable.mtg_card_back),
+                        modifier = Modifier.width(160.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun DiscoverSectionHeader(text: String) {
+        Text(
+            text = text,
+            style = MaterialTheme.magicTypography.titleMedium,
+            color = MaterialTheme.magicColors.textPrimary,
         )
     }
+
+    /** One full-card-image trending tile (63:88 aspect) for the Commander/Card Discover rows. */
+    @Composable
+    private fun CommunityTrendingCardTile(card: Card, onClick: () -> Unit) {
+        val mc = MaterialTheme.magicColors
+
+        Box(
+            modifier = Modifier
+                .width(110.dp)
+                .aspectRatio(63f / 88f)
+                .clip(CardShape)
+                .background(mc.surfaceVariant)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = card.imageNormal,
+                contentDescription = card.name,
+                placeholder = painterResource(Res.drawable.mtg_card_back),
+                error = painterResource(Res.drawable.mtg_card_back),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    /** Lightweight mapping from the community result model to the standard deck list model. */
+    private fun CommunityDeckSummary.toDeckSummary(): DeckSummary = DeckSummary(
+        id = archidektId.toString(),
+        name = name,
+        description = null,
+        format = format,
+        coverCardId = null,
+        createdAt = runCatching { Instant.parse(createdAt).toEpochMilliseconds() }.getOrDefault(0L),
+        updatedAt = runCatching { Instant.parse(updatedAt).toEpochMilliseconds() }.getOrDefault(0L),
+        cardCount = size,
+        colorIdentity = colorIdentity.toSet(),
+        coverImageUrl = featuredImageUrl
+    )
+
+val CommunityDeckFormatFilter.displayResId get() = when (this) {
+    CommunityDeckFormatFilter.COMMANDER -> R.string.community_deck_format_commander
+    CommunityDeckFormatFilter.MODERN -> R.string.community_deck_format_modern
+    CommunityDeckFormatFilter.LEGACY -> R.string.community_deck_format_legacy
+    CommunityDeckFormatFilter.PAUPER -> R.string.community_deck_format_pauper
+    CommunityDeckFormatFilter.STANDARD -> R.string.community_deck_format_standard
+    CommunityDeckFormatFilter.PIONEER -> R.string.community_deck_format_pioneer
+    CommunityDeckFormatFilter.VINTAGE -> R.string.community_deck_format_vintage
 }
 
-/** Lightweight mapping from the community result model to the standard deck list model. */
-private fun CommunityDeckSummary.toDeckSummary(): DeckSummary = DeckSummary(
-    id = archidektId.toString(),
-    name = name,
-    description = null,
-    format = format,
-    coverCardId = null,
-    createdAt = runCatching { Instant.parse(createdAt).toEpochMilliseconds() }.getOrDefault(0L),
-    updatedAt = runCatching { Instant.parse(updatedAt).toEpochMilliseconds() }.getOrDefault(0L),
-    cardCount = size,
-    colorIdentity = colorIdentity.toSet(),
-    coverImageUrl = featuredImageUrl
-)
+val CommunityDeckSort.displayResId get() = when (this) {
+    CommunityDeckSort.RECENT -> R.string.community_deck_sort_recent
+    CommunityDeckSort.UPDATED -> R.string.community_deck_sort_updated
+    CommunityDeckSort.POPULAR -> R.string.community_deck_sort_popular
+}

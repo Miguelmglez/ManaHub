@@ -138,8 +138,8 @@ fun GameSetupScreen(
     viewModel: GameSetupViewModel,
     onBack: () -> Unit,
     onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate, GameSettings) -> Unit,
-    onOnlineHostGameStart: (sessionId: String, mode: GameMode, playerCount: Int) -> Unit,
-    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
+    onOnlineHostGameStart: (sessionId: String, mode: GameMode, playerCount: Int, guestToken: String?) -> Unit,
+    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int, guestToken: String?) -> Unit,
     onNavigateToTournamentSetup: () -> Unit,
     onNavigateToTournamentDetail: (Long) -> Unit,
     prefilledJoinCode: String? = null,
@@ -182,8 +182,8 @@ private fun GameSetupScreenContent(
     voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
     onBack: () -> Unit,
     onStartGame: (GameMode, List<PlayerConfig>, LayoutTemplate, GameSettings) -> Unit,
-    onOnlineHostGameStart: (sessionId: String, mode: GameMode, playerCount: Int) -> Unit,
-    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int) -> Unit,
+    onOnlineHostGameStart: (sessionId: String, mode: GameMode, playerCount: Int, guestToken: String?) -> Unit,
+    onOnlineJoinGameStart: (sessionId: String, slotIndex: Int, mode: String, playerCount: Int, guestToken: String?) -> Unit,
     onNavigateToTournamentSetup: () -> Unit,
     onNavigateToTournamentDetail: (Long) -> Unit,
     prefilledJoinCode: String?,
@@ -373,9 +373,9 @@ private fun GameSetupScreenContent(
                 initialDisplayName = uiState.playerConfigs.firstOrNull()?.name ?: "",
                 initialThemeKey = uiState.playerConfigs.firstOrNull()?.theme?.name ?: "Crimson",
                 onDismiss = { showOnlineHostSheet = false },
-                onGameStart = { sessionId, mode, playerCount ->
+                onGameStart = { sessionId, mode, playerCount, guestToken ->
                     showOnlineHostSheet = false
-                    onOnlineHostGameStart(sessionId, mode, playerCount)
+                    onOnlineHostGameStart(sessionId, mode, playerCount, guestToken)
                 },
             )
         }
@@ -386,9 +386,9 @@ private fun GameSetupScreenContent(
                 initialDisplayName = uiState.playerConfigs.firstOrNull()?.name ?: "",
                 initialThemeKey = uiState.playerConfigs.firstOrNull()?.theme?.name ?: "Crimson",
                 onDismiss = { showOnlineJoinSheet = false },
-                onGameStart = { sessionId, slotIndex, mode, playerCount ->
+                onGameStart = { sessionId, slotIndex, mode, playerCount, guestToken ->
                     showOnlineJoinSheet = false
-                    onOnlineJoinGameStart(sessionId, slotIndex, mode, playerCount)
+                    onOnlineJoinGameStart(sessionId, slotIndex, mode, playerCount, guestToken)
                 },
             )
         }
@@ -404,9 +404,9 @@ private fun GameSetupScreenContent(
                     onNavigateToTournamentDetail(id)
                 },
                 onNavigateToTournamentList = { showTournamentsSheet = false; onNavigateToTournamentSetup() },
-                onOnlineJoinGameStart = { sessionId, slotIndex, mode, playerCount ->
+                onOnlineJoinGameStart = { sessionId, slotIndex, mode, playerCount, guestToken ->
                     showTournamentsSheet = false
-                    onOnlineJoinGameStart(sessionId, slotIndex, mode, playerCount)
+                    onOnlineJoinGameStart(sessionId, slotIndex, mode, playerCount, guestToken)
                 },
             )
         }

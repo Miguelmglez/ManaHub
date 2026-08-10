@@ -84,6 +84,7 @@ class CommunityDecksSearchViewModelTest {
         name = "Test Deck",
         size = 100,
         format = "commander",
+        deckFormatId = 3,
         owner = CommunityDeckOwner(id = 1, username = "user", avatarUrl = ""),
         viewCount = 500,
         createdAt = "2024-01-01",
@@ -235,13 +236,17 @@ class CommunityDecksSearchViewModelTest {
         coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
         val vm = createViewModel()
         advanceUntilIdle()
-        vm.onFormatFilterSelected(CommunityDeckFormatFilter.COMMANDER)
+        // `formats` deliberately does NOT count as an "active filter" (it always holds a real
+        // value, defaulting to COMMANDER — see CommunityAdvancedFilters.activeCount's KDoc), so a
+        // criterion that DOES contribute (edhBracket) is used here instead to exercise this no-op
+        // guard's "blank query + a real active filter" branch.
+        vm.onBracketSelected(3)
 
         vm.search()
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.hasSearched)
-        coVerify(exactly = 1) { searchUseCase(match { it.deckFormatId == 3 }) }
+        coVerify(exactly = 1) { searchUseCase(match { it.edhBracket == 3 }) }
     }
 
     @Test
@@ -282,7 +287,7 @@ class CommunityDecksSearchViewModelTest {
     // ── Group 5: Sort re-triggers search ─────────────────────────────────────
 
     @Test
-    fun `given hasSearched when onSortSelected then search is re-triggered`() = runTest {
+    fun `given hasSearched when onSortUpdated then search is re-triggered`() = runTest {
         coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
         val vm = createViewModel()
         advanceUntilIdle()
@@ -290,7 +295,7 @@ class CommunityDecksSearchViewModelTest {
         vm.search()
         advanceUntilIdle()
 
-        vm.onSortSelected(CommunityDeckSort.RECENT)
+        vm.onSortUpdated(CommunityDeckSort.RECENT)
         advanceUntilIdle()
 
         coVerify(atLeast = 2) { searchUseCase(any()) }
@@ -298,11 +303,11 @@ class CommunityDecksSearchViewModelTest {
     }
 
     @Test
-    fun `given not searched yet when onSortSelected then search is not triggered`() = runTest {
+    fun `given not searched yet when onSortUpdated then search is not triggered`() = runTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        vm.onSortSelected(CommunityDeckSort.RECENT)
+        vm.onSortUpdated(CommunityDeckSort.RECENT)
         advanceUntilIdle()
 
         assertEquals(CommunityDeckSort.RECENT, vm.uiState.value.selectedSort)
@@ -440,7 +445,11 @@ class CommunityDecksSearchViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        vm.onFormatFilterSelected(CommunityDeckFormatFilter.COMMANDER)
+        // `formats` is set here too, but deliberately does NOT contribute to activeCount below —
+        // it always holds a real value (defaults to COMMANDER, no "no filter" state), so counting
+        // it would make the Tune-icon badge show "1" even with zero real filters applied. See
+        // CommunityAdvancedFilters.activeCount's KDoc.
+        vm.onSearchDeckFilterUpdated(CommunityDeckFormatFilter.STANDARD)
         vm.onColorToggled("U")
         vm.onColorToggled("W")
         vm.onBracketSelected(3)
@@ -449,27 +458,30 @@ class CommunityDecksSearchViewModelTest {
         vm.onPrimersOnlyToggled(true)
 
         val filters = vm.uiState.value.advancedFilters
-        assertEquals(CommunityDeckFormatFilter.COMMANDER, filters.format)
+        assertEquals(CommunityDeckFormatFilter.STANDARD, filters.formats)
         assertEquals(setOf("U", "W"), filters.colors)
         assertEquals(3, filters.edhBracket)
         assertEquals("archmage", filters.ownerUsername)
         assertEquals("100", filters.deckSize)
         assertTrue(filters.primersOnly)
-        // format + colors + bracket + username + size + primers = 6 distinct active filters.
-        assertEquals(6, filters.activeCount)
+        // colors + bracket + username + size + primers = 5 distinct active filters (format is
+        // excluded from the count, per the KDoc note above).
+        assertEquals(5, filters.activeCount)
     }
 
     @Test
     fun `given active filters when onClearAdvancedFilters then everything resets`() = runTest {
         val vm = createViewModel()
         advanceUntilIdle()
-        vm.onFormatFilterSelected(CommunityDeckFormatFilter.COMMANDER)
+        vm.onSearchDeckFilterUpdated(CommunityDeckFormatFilter.STANDARD)
         vm.onUsernameChanged("archmage")
 
         vm.onClearAdvancedFilters()
 
         assertEquals(0, vm.uiState.value.advancedFilters.activeCount)
-        assertEquals(CommunityDeckFormatFilter.ALL, vm.uiState.value.advancedFilters.format)
+        // CommunityDeckFormatFilter.ALL no longer exists — `formats` always holds a real value;
+        // a fresh CommunityAdvancedFilters() (post-clear) defaults it to COMMANDER.
+        assertEquals(CommunityDeckFormatFilter.COMMANDER, vm.uiState.value.advancedFilters.formats)
         assertEquals("", vm.uiState.value.advancedFilters.ownerUsername)
     }
 
@@ -478,7 +490,7 @@ class CommunityDecksSearchViewModelTest {
     @Test
     fun `given a 2+ char commander query when debounce elapses then results are populated`() = runTest {
         val atraxa = fakeCard("Atraxa, Praetors' Voice")
-        coEvery { searchCards("Atr", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(atraxa), hasMore = false))
+        coEvery { searchCards("Atr", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(atraxa), hasMore = false, totalCards = 1))
 
         val vm = createViewModel()
         advanceUntilIdle()
@@ -493,7 +505,7 @@ class CommunityDecksSearchViewModelTest {
     @Test
     fun `given a commander selection then the commander filter is set and the picker resets`() = runTest {
         val atraxa = fakeCard("Atraxa, Praetors' Voice")
-        coEvery { searchCards("Atr", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(atraxa), hasMore = false))
+        coEvery { searchCards("Atr", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(atraxa), hasMore = false, totalCards = 1))
         val vm = createViewModel()
         advanceUntilIdle()
         vm.onCommanderQueryChange("Atr")
@@ -551,7 +563,10 @@ class CommunityDecksSearchViewModelTest {
         assertTrue(state.recentDecks.isNotEmpty())
         assertTrue(state.updatedDecks.isNotEmpty())
         assertTrue(state.primerDecks.isNotEmpty())
-        assertTrue(state.featuredFormatDecks.isNotEmpty())
+        // The weekly-rotating "featured format" section (and its `featuredFormatDecks` field) was
+        // replaced by the interactive `selectedDiscoveryFormat` chip / `onSelectDiscoveryFormat` —
+        // the user picks the format directly rather than it auto-rotating. Default selection:
+        assertEquals(CommunityDeckFormatFilter.COMMANDER, state.selectedDiscoveryFormat)
     }
 
     @Test
@@ -672,7 +687,7 @@ class CommunityDecksSearchViewModelTest {
     @Test
     fun `given cards selected when onCardFilterSelected then the card picker query and results reset`() = runTest {
         val solRing = fakeCard("Sol Ring")
-        coEvery { searchCards("Sol", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(solRing), hasMore = false))
+        coEvery { searchCards("Sol", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(solRing), hasMore = false, totalCards = 1))
         val vm = createViewModel()
         advanceUntilIdle()
         vm.onCardQueryChange("Sol")
@@ -718,9 +733,11 @@ class CommunityDecksSearchViewModelTest {
 
         vm.onCardFilterSelected(fakeCard("Sol Ring"))
         vm.onCardFilterSelected(fakeCard("Lightning Bolt"))
-        vm.onFormatFilterSelected(CommunityDeckFormatFilter.COMMANDER)
+        // `formats` does not contribute to activeCount (see the note in the "several filters
+        // applied" test above) — a filter that DOES contribute (username) is used here instead.
+        vm.onUsernameChanged("archmage")
 
-        // 2 cards + 1 format = 3.
+        // 2 cards + 1 username = 3.
         assertEquals(3, vm.uiState.value.advancedFilters.activeCount)
     }
 

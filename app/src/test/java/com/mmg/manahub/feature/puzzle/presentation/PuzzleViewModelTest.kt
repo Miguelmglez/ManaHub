@@ -115,7 +115,7 @@ class PuzzleViewModelTest {
         coEvery { savePuzzleResultUseCase(any()) } returns Unit
         // Default stub for the debounced guess-suggestion search — several tests type into the
         // guess field, which schedules a search regardless of whether the assertions care about it.
-        coEvery { searchCardsUseCase(any()) } returns DataResult.Success(PaginatedCards(emptyList(), false))
+        coEvery { searchCardsUseCase(any()) } returns DataResult.Success(PaginatedCards(emptyList(), false, totalCards = 0))
     }
 
     @After

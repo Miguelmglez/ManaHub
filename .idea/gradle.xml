@@ -19,6 +19,7 @@
             <option value="$PROJECT_DIR$/shared/core-ui" />
             <option value="$PROJECT_DIR$/tools" />
             <option value="$PROJECT_DIR$/tools/tag-pipeline" />
+            <option value="$PROJECT_DIR$/webApp" />
           </set>
         </option>
       </GradleProjectSettings>

@@ -9,6 +9,6 @@ class AdvancePhaseUseCase @Inject constructor(
     suspend fun broadcast(sessionId: String, newPhase: String, activePlayerSlot: Int, turnNumber: Int) =
         repository.broadcastPhaseChange(sessionId, newPhase, activePlayerSlot, turnNumber)
 
-    suspend fun persist(sessionId: String): Result<Unit> =
-        repository.advancePhase(sessionId)
+    suspend fun persist(sessionId: String, guestToken: String? = null): Result<Unit> =
+        repository.advancePhase(sessionId, guestToken)
 }
