@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.auth.data.repository
 
 import android.util.Log
 import com.mmg.manahub.BuildConfig
+import com.mmg.manahub.core.common.decodeAmrIncludesRecoveryClaim
 import com.mmg.manahub.core.common.decodeIsAnonymousClaim
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.UserProfileClient
@@ -980,9 +981,16 @@ class AuthRepositoryImpl(
         is SessionStatus.Authenticated -> session.user
             ?.let { mapUserInfoToAuthUser(it) }
             // The JWT access token — not UserInfo — is where GoTrue's top-level `is_anonymous`
-            // claim actually lives. This is the ONE call site that corrects it, because this is
-            // the sole path that feeds `sessionState`, which every `.isAnonymous` consumer reads.
-            ?.copy(isAnonymous = decodeIsAnonymousClaim(session.accessToken))
+            // claim and the `amr` (Authentication Methods Reference) claim actually live. This is
+            // the ONE call site that corrects both, because this is the sole path that feeds
+            // `sessionState`, which every `.isAnonymous`/`.isRecoverySession` consumer reads.
+            // `isRecoverySession` is the security-critical signal that gates the no-nonce
+            // `confirmPasswordReset` path (see AuthUser.isRecoverySession's KDoc) — it must be set
+            // here, not derived from the attacker-controllable `type=recovery` deep-link marker.
+            ?.copy(
+                isAnonymous = decodeIsAnonymousClaim(session.accessToken),
+                isRecoverySession = decodeAmrIncludesRecoveryClaim(session.accessToken),
+            )
             ?.let { SessionState.Authenticated(it) }
             ?: SessionState.Unauthenticated
 

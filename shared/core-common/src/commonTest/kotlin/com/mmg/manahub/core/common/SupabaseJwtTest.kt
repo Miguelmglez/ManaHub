@@ -76,6 +76,91 @@ class SupabaseJwtTest {
         assertFalse(decodeIsAnonymousClaim("header.$payload.signature"))
     }
 
+    // ── decodeAmrIncludesRecoveryClaim ──────────────────────────────────────────
+
+    @Test
+    fun `given amr array with recovery method object when decoded then returns true`() {
+        val token = fakeJwt(
+            """{"sub":"user-1","amr":[{"method":"recovery","timestamp":1700000000}]}"""
+        )
+
+        assertTrue(decodeAmrIncludesRecoveryClaim(token))
+    }
+
+    @Test
+    fun `given amr array with recovery among multiple methods when decoded then returns true`() {
+        val token = fakeJwt(
+            """{"sub":"user-1","amr":[{"method":"password","timestamp":1},{"method":"recovery","timestamp":2}]}"""
+        )
+
+        assertTrue(decodeAmrIncludesRecoveryClaim(token))
+    }
+
+    @Test
+    fun `given amr array with only password method when decoded then returns false`() {
+        val token = fakeJwt(
+            """{"sub":"user-1","amr":[{"method":"password","timestamp":1700000000}]}"""
+        )
+
+        assertFalse(decodeAmrIncludesRecoveryClaim(token))
+    }
+
+    @Test
+    fun `given amr array with bare string recovery entry when decoded then returns true`() {
+        // Defensive fallback shape — not the documented Supabase encoding, but tolerated.
+        val token = fakeJwt("""{"sub":"user-1","amr":["recovery"]}""")
+
+        assertTrue(decodeAmrIncludesRecoveryClaim(token))
+    }
+
+    @Test
+    fun `given empty amr array when decoded then returns false`() {
+        val token = fakeJwt("""{"sub":"user-1","amr":[]}""")
+
+        assertFalse(decodeAmrIncludesRecoveryClaim(token))
+    }
+
+    @Test
+    fun `given no amr claim when decoded then returns false`() {
+        val token = fakeJwt("""{"sub":"user-1"}""")
+
+        assertFalse(decodeAmrIncludesRecoveryClaim(token))
+    }
+
+    @Test
+    fun `given amr claim that is not an array when decoded then returns false`() {
+        val token = fakeJwt("""{"sub":"user-1","amr":"recovery"}""")
+
+        assertFalse(decodeAmrIncludesRecoveryClaim(token))
+    }
+
+    @Test
+    fun `given null token when decoding amr claim then returns false`() {
+        assertFalse(decodeAmrIncludesRecoveryClaim(null))
+    }
+
+    @Test
+    fun `given blank token when decoding amr claim then returns false`() {
+        assertFalse(decodeAmrIncludesRecoveryClaim("   "))
+    }
+
+    @Test
+    fun `given malformed token with no dots when decoding amr claim then returns false`() {
+        assertFalse(decodeAmrIncludesRecoveryClaim("not-a-jwt"))
+    }
+
+    @Test
+    fun `given token with undecodable payload segment when decoding amr claim then returns false`() {
+        assertFalse(decodeAmrIncludesRecoveryClaim("header.%%%not-base64%%%.signature"))
+    }
+
+    @Test
+    fun `given token whose payload segment is not a JSON object when decoding amr claim then returns false`() {
+        val payload = encodeBase64Url("""["not","an","object"]""")
+
+        assertFalse(decodeAmrIncludesRecoveryClaim("header.$payload.signature"))
+    }
+
     private fun encodeBase64Url(text: String): String {
         val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
         val bytes = text.encodeToByteArray()

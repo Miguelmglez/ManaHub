@@ -175,6 +175,10 @@ class AuthViewModelTest {
                 "Google Sign-In cancelled"
         every { appContext.getString(com.mmg.manahub.R.string.auth_error_google_failed) } returns
                 "Error signing in with Google"
+
+        // Recovery-session gate (confirmPasswordReset) — shared with the "invalid/expired link" UI copy.
+        every { appContext.getString(com.mmg.manahub.R.string.account_mgmt_reset_link_invalid) } returns
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen."
     }
 
     private fun buildViewModel(): AuthViewModel = AuthViewModel(
@@ -1022,7 +1026,8 @@ class AuthViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given strong password when confirmPasswordReset then uiState transitions Loading then PasswordResetConfirmed`() = runTest {
+    fun `given strong password and genuine recovery session when confirmPasswordReset then uiState transitions Loading then PasswordResetConfirmed`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser.copy(isRecoverySession = true))
         coEvery { confirmPasswordResetUseCase("Password1!") } returns AuthResult.Success(Unit)
 
         viewModel.uiState.test {
@@ -1037,6 +1042,8 @@ class AuthViewModelTest {
 
     @Test
     fun `given weak password when confirmPasswordReset then uiState emits Error without Loading and use case is never called`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser.copy(isRecoverySession = true))
+
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
             viewModel.confirmPasswordReset("weak")
@@ -1048,7 +1055,8 @@ class AuthViewModelTest {
     }
 
     @Test
-    fun `given network error when confirmPasswordReset then uiState emits Error with network message`() = runTest {
+    fun `given network error and genuine recovery session when confirmPasswordReset then uiState emits Error with network message`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser.copy(isRecoverySession = true))
         coEvery { confirmPasswordResetUseCase(any()) } returns AuthResult.Error(AuthError.NetworkError)
 
         viewModel.uiState.test {
@@ -1059,6 +1067,61 @@ class AuthViewModelTest {
             assertEquals("No connection. Check your network", errorState.message)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── SECURITY: the isRecoverySession gate (forged manahub://auth?type=recovery deep link) ──
+
+    @Test
+    fun `given authenticated session without recovery amr claim when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
+        // Simulates a forged intent: the user has a normal, already-authenticated session (not one
+        // established via a genuine recovery-link/OTP exchange), so isRecoverySession is false.
+        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser.copy(isRecoverySession = false))
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals(
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
+                errorState.message,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
+    }
+
+    @Test
+    fun `given unauthenticated session when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
+        sessionStateFlow.value = SessionState.Unauthenticated
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals(
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
+                errorState.message,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
+    }
+
+    @Test
+    fun `given session still loading when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
+        sessionStateFlow.value = SessionState.Loading
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals(
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
+                errorState.message,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════

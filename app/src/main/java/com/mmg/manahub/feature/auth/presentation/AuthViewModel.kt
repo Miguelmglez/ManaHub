@@ -14,7 +14,9 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.auth.AuthError
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.AuthResult
+import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmEmailUpdateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
@@ -302,14 +304,31 @@ class AuthViewModel(
 
     /**
      * Confirms a "forgot password" reset from the recovery email deep link, WITHOUT a
-     * reauthentication code — distinct from [updatePassword]. The temporary recovery session is
-     * already active by the time the user reaches this screen (established when the deep link was
-     * caught), so only the new password needs validating client-side.
+     * reauthentication code — distinct from [updatePassword].
+     *
+     * SECURITY: merely being on a [SessionState.Authenticated] session is NOT proof this is a
+     * genuine recovery flow — `MainActivity`'s `manahub://auth?type=recovery` deep-link routing is
+     * driven by an attacker-controllable URI, so a forged intent from any installed app can land an
+     * already-logged-in user on this call with a normal (non-recovery) session. This is gated on
+     * [AuthUser.isRecoverySession] — the server-issued `amr` claim proving the CURRENT session was
+     * actually established via a real recovery-link/OTP exchange — BEFORE the use case (a no-nonce
+     * password change) is ever invoked. See [AuthRepository.confirmPasswordReset]'s KDoc.
+     *
      * Transitions to [AuthUiState.PasswordResetConfirmed] on success.
      */
     fun confirmPasswordReset(newPassword: String) {
         if (!isPasswordStrong(newPassword)) {
             _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_password_requirements))
+            return
+        }
+        val isGenuineRecoverySession =
+            (sessionState.value as? SessionState.Authenticated)?.user?.isRecoverySession == true
+        if (!isGenuineRecoverySession) {
+            // Reuse the same "reset link invalid/expired" copy the UI already shows for an
+            // unauthenticated session — a distinct message here would tell an attacker WHY the
+            // gate failed (not authenticated vs. authenticated-but-not-a-recovery-session), which
+            // is information this path must not leak.
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.account_mgmt_reset_link_invalid))
             return
         }
         authJob?.cancel()
