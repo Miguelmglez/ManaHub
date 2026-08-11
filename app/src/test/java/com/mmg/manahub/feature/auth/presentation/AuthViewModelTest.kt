@@ -9,14 +9,20 @@ import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.RequestReauthenticationUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.ResendConfirmationEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResetPasswordUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UnlinkIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdateEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdatePasswordUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -73,6 +79,12 @@ class AuthViewModelTest {
     private val resetPasswordUseCase    = mockk<ResetPasswordUseCase>()
     private val deleteAccountUseCase    = mockk<DeleteAccountUseCase>()
     private val updateNicknameUseCase   = mockk<UpdateNicknameUseCase>()
+    private val resendConfirmationEmailUseCase = mockk<ResendConfirmationEmailUseCase>()
+    private val requestReauthenticationUseCase = mockk<RequestReauthenticationUseCase>()
+    private val updateEmailUseCase             = mockk<UpdateEmailUseCase>()
+    private val updatePasswordUseCase          = mockk<UpdatePasswordUseCase>()
+    private val unlinkIdentityUseCase          = mockk<UnlinkIdentityUseCase>()
+    private val linkGoogleIdentityNativeUseCase = mockk<LinkGoogleIdentityNativeUseCase>()
 
     /**
      * Context mock that returns the actual English string values from strings.xml.
@@ -172,6 +184,12 @@ class AuthViewModelTest {
         resetPasswordUseCase      = resetPasswordUseCase,
         deleteAccountUseCase      = deleteAccountUseCase,
         updateNicknameUseCase     = updateNicknameUseCase,
+        resendConfirmationEmailUseCase = resendConfirmationEmailUseCase,
+        requestReauthenticationUseCase = requestReauthenticationUseCase,
+        updateEmailUseCase              = updateEmailUseCase,
+        updatePasswordUseCase           = updatePasswordUseCase,
+        unlinkIdentityUseCase           = unlinkIdentityUseCase,
+        linkGoogleIdentityNativeUseCase = linkGoogleIdentityNativeUseCase,
         analyticsHelper           = mockk(relaxed = true),
         appContext                 = appContext,
     )

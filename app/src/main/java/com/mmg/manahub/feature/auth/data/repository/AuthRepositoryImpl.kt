@@ -11,11 +11,13 @@ import com.mmg.manahub.core.data.remote.dto.UserProfileDto
 import com.mmg.manahub.feature.auth.data.remote.ProfileFetchResult
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.core.domain.auth.AuthError
+import com.mmg.manahub.core.domain.auth.AuthIdentity
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
@@ -42,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -455,6 +458,66 @@ class AuthRepositoryImpl(
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
 
+    override suspend fun resendConfirmationEmail(email: String): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseAuth.resendEmail(OtpType.Email.SIGNUP, email)
+                AuthResult.Success(Unit)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
+    override suspend fun requestReauthentication(): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseAuth.reauthenticate()
+                AuthResult.Success(Unit)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
+    override suspend fun updateEmail(newEmail: String, code: String): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                // updateCurrentUser defaults to true, so the SDK's own sessionStatus/currentUser
+                // reflect the new email in-place — sessionState re-emits without a manual signal.
+                supabaseAuth.updateUser {
+                    this.email = newEmail
+                    this.nonce = code
+                }
+                AuthResult.Success(Unit)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
+    override suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseAuth.updateUser {
+                    this.password = newPassword
+                    this.nonce = code
+                }
+                AuthResult.Success(Unit)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
+    override suspend fun unlinkIdentity(identityId: String): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                supabaseAuth.unlinkIdentity(identityId = identityId, updateLocalUser = true)
+                AuthResult.Success(Unit)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
+    override suspend fun linkGoogleIdentityNative(redirectUrl: String): AuthResult<String?> =
+        withContext(ioDispatcher) {
+            runCatching {
+                // The plain auth-kt module never launches a browser itself; it returns the
+                // authorization URL for the caller to open (e.g. via Custom Tabs). The
+                // OAuth-redirect callback is caught by MainActivity's already-wired
+                // supabaseClient.handleDeeplinks(intent), which completes the link.
+                val authorizationUrl = supabaseAuth.linkIdentity(Google, redirectUrl)
+                AuthResult.Success(authorizationUrl)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
     override suspend fun deleteAccount(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
             // Retrieve the current JWT to authenticate the Edge Function call.
@@ -641,8 +704,27 @@ class AuthRepositoryImpl(
             // the get_profile_by_user_id RPC or the complete_user_profile RPC.
             profileCompleted = false,
             // isAnonymous is intentionally left as the default (false) here — see the KDoc above.
+            emailConfirmedAt = userInfo.emailConfirmedAt,
+            createdAt = userInfo.createdAt,
+            identities = userInfo.identities?.map { it.toAuthIdentity() } ?: emptyList(),
         )
     }
+
+    /**
+     * Maps a Supabase [io.github.jan.supabase.auth.user.Identity] to the domain [AuthIdentity].
+     *
+     * [io.github.jan.supabase.auth.user.Identity.identityId] is nullable in the SDK model (unlike
+     * [io.github.jan.supabase.auth.user.Identity.id], which is guaranteed non-null) even though
+     * `Auth.unlinkIdentity(identityId: String, ...)` requires a non-null value — falls back to
+     * [io.github.jan.supabase.auth.user.Identity.id] to always produce a usable, non-null
+     * [AuthIdentity.identityId].
+     */
+    private fun io.github.jan.supabase.auth.user.Identity.toAuthIdentity(): AuthIdentity =
+        AuthIdentity(
+            identityId = identityId ?: id,
+            provider = provider,
+            createdAt = createdAt?.let { raw -> runCatching { Instant.parse(raw) }.getOrNull() },
+        )
 
     /**
      * Decodes the JWT payload of a Google ID token and extracts the `email` claim.

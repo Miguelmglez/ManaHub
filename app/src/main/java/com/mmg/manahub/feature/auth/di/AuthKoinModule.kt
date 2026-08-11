@@ -6,14 +6,20 @@ import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.RequestReauthenticationUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.ResendConfirmationEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResetPasswordUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UnlinkIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdateEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdatePasswordUseCase
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
@@ -36,11 +42,14 @@ import org.koin.dsl.module
  * ## Self-contained module (no bridge args)
  * Unlike the bridge-style island modules, [authKoinModule] takes NO constructor arguments. Every
  * dependency [AuthViewModel] needs is already resolvable from modules loaded earlier in `startKoin`:
- * - The ten auth use cases are stateless thin wrappers over [AuthRepository] (and, for
- *   [DeleteAccountUseCase], `PushTokenRepository`). They are not registered as `single` in any other
- *   loaded module, so they are declared here as `single { }` and constructed directly by Koin. The
- *   Koin-built copies are independent of, but equivalent to, the Hilt-built copies still used by the
- *   Hilt graph — exactly the pattern proven for the Trades use cases.
+ * - The sixteen auth use cases (ten original + six added by the account-management data-layer slice —
+ *   [ResendConfirmationEmailUseCase]/[RequestReauthenticationUseCase]/[UpdateEmailUseCase]/
+ *   [UpdatePasswordUseCase]/[UnlinkIdentityUseCase]/[LinkGoogleIdentityNativeUseCase]) are stateless
+ *   thin wrappers over [AuthRepository] (and, for [DeleteAccountUseCase], `PushTokenRepository`). They
+ *   are not registered as `single` in any other loaded module, so they are declared here as
+ *   `single { }` and constructed directly by Koin. The Koin-built copies are independent of, but
+ *   equivalent to, the Hilt-built copies still used by the Hilt graph — exactly the pattern proven
+ *   for the Trades use cases.
  * - `AuthRepository` and `AnalyticsHelper` are SHARED with other islands → bridged once in
  *   `coreBridgeKoinModule`, resolved here via `get()` (never re-registered — registering the same type
  *   in two loaded modules would throw `DefinitionOverrideException`).
@@ -191,9 +200,10 @@ fun authKoinModule(): Module = module {
         )
     }
 
-    // ── The ten stateless auth use cases. Each wraps AuthRepository (bridged in coreBridgeKoinModule,
-    //    resolved via get()); DeleteAccountUseCase also wraps PushTokenRepository (single in
-    //    settingsKoinModule). None are registered in any other loaded module → no DefinitionOverride. ──
+    // ── The sixteen stateless auth use cases. Each wraps AuthRepository (bridged in
+    //    coreBridgeKoinModule, resolved via get()); DeleteAccountUseCase also wraps
+    //    PushTokenRepository (single in settingsKoinModule). None are registered in any other
+    //    loaded module → no DefinitionOverride. ──
     single { SignInWithEmailUseCase(get()) }
     single { SignUpWithEmailUseCase(get()) }
     single { SignInWithGoogleUseCase(get()) }
@@ -204,6 +214,13 @@ fun authKoinModule(): Module = module {
     single { ResetPasswordUseCase(get()) }
     single { UpdateNicknameUseCase(get()) }
     single { DeleteAccountUseCase(get(), get()) }
+    // Account-management data-layer slice (Phase 1): the six new use cases.
+    single { ResendConfirmationEmailUseCase(get()) }
+    single { RequestReauthenticationUseCase(get()) }
+    single { UpdateEmailUseCase(get()) }
+    single { UpdatePasswordUseCase(get()) }
+    single { UnlinkIdentityUseCase(get()) }
+    single { LinkGoogleIdentityNativeUseCase(get()) }
 
     // ── The Koin island: AuthViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
@@ -218,6 +235,12 @@ fun authKoinModule(): Module = module {
             resetPasswordUseCase = get(),
             deleteAccountUseCase = get(),
             updateNicknameUseCase = get(),
+            resendConfirmationEmailUseCase = get(),
+            requestReauthenticationUseCase = get(),
+            updateEmailUseCase = get(),
+            updatePasswordUseCase = get(),
+            unlinkIdentityUseCase = get(),
+            linkGoogleIdentityNativeUseCase = get(),
             analyticsHelper = get(),
             appContext = androidContext(),
         )
