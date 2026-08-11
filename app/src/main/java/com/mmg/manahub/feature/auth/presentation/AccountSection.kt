@@ -106,14 +106,27 @@ fun AccountSection(
         }
 
         is SessionState.Authenticated -> {
-            AuthenticatedCard(
-                user = sessionState.user,
-                onManageAccountClick = onManageAccountClick,
-                onFetchShareLink = onFetchShareLink,
-                modifier = modifier,
-                displayName = playerName,
-                displayAvatarUrl = avatarUrl,
-            )
+            // Anonymous/guest sessions (auto-signed-in for Online Sessions) must never reach the
+            // authenticated identity card or its "Manage my account" CTA — that screen's Google
+            // identity-link action IS Supabase's anonymous-to-permanent conversion primitive, and
+            // converting a guest in place bypasses the server-side profile-creation trigger (see
+            // AccountManagementScreen's KDoc). Treat it exactly like Unauthenticated.
+            if (sessionState.user.isAnonymous) {
+                UnauthenticatedCard(
+                    onLoginClick = onLoginClick,
+                    onSignUpClick = onSignUpClick,
+                    modifier = modifier,
+                )
+            } else {
+                AuthenticatedCard(
+                    user = sessionState.user,
+                    onManageAccountClick = onManageAccountClick,
+                    onFetchShareLink = onFetchShareLink,
+                    modifier = modifier,
+                    displayName = playerName,
+                    displayAvatarUrl = avatarUrl,
+                )
+            }
         }
     }
 }

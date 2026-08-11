@@ -1022,4 +1022,19 @@ class AuthRepositoryImplTest {
         assertTrue(result is AuthResult.Error)
         assertEquals(AuthError.InvalidCredentials, (result as AuthResult.Error).error)
     }
+
+    @Test
+    fun `given server returns 429 when resendConfirmationEmail then returns Error with RateLimited`() = runTest {
+        // Edge-case audit fix: too many resend requests must surface a distinct RateLimited error,
+        // not fall through to the generic Unknown fallback.
+        val restException = mockk<RestException>(relaxed = true) {
+            every { statusCode } returns 429
+        }
+        coEvery { supabaseAuth.resendEmail(any(), any(), any()) } throws restException
+
+        val result = repository.resendConfirmationEmail("test@example.com")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.RateLimited, (result as AuthResult.Error).error)
+    }
 }

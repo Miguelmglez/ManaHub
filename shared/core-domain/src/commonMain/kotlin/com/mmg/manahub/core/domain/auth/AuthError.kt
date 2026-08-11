@@ -33,6 +33,12 @@ sealed class AuthError {
      */
     data object SingleIdentityNotDeletable : AuthError()
     /**
+     * Returned when the auth server rejects a request due to rate limiting (HTTP 429) — e.g. too
+     * many resend-confirmation-email requests in a short window. The UI should ask the user to
+     * wait before retrying rather than surfacing the generic [Unknown] message.
+     */
+    data object RateLimited : AuthError()
+    /**
      * Returned when a Google Sign-In attempt is made with an email that already exists
      * as an email/password account.
      *

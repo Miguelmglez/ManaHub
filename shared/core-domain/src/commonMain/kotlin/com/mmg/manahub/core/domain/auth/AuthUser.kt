@@ -51,6 +51,9 @@ data class AuthIdentity(
  * @param emailConfirmedAt When the user's email address was confirmed, or null if it has not been
  *   confirmed yet (ADR-003 server-side email confirmation).
  * @param createdAt When the underlying `auth.users` account was created.
+ * @param newEmail The pending new email address from an in-progress "change email" request that
+ *   has not yet been confirmed via both the old and new inbox links (Supabase's "Secure email
+ *   change"), or null when no change is pending. Sourced from GoTrue's `UserInfo.newEmail`.
  * @param identities Every authentication provider linked to this account. Empty when the SDK
  *   could not resolve any identity (should not normally happen for an authenticated session).
  */
@@ -66,5 +69,6 @@ data class AuthUser(
     val isRecoverySession: Boolean = false,
     val emailConfirmedAt: Instant? = null,
     val createdAt: Instant? = null,
+    val newEmail: String? = null,
     val identities: List<AuthIdentity> = emptyList(),
 )

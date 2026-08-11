@@ -161,8 +161,15 @@ fun AccountManagementScreen(
     // Defense-in-depth: leave the screen the moment the session is confirmed gone, regardless of
     // WHICH action caused it (signOut()'s uiState transition is Idle, not a dedicated state, so this
     // is the only reliable signal for that specific action; deleteAccount() reaches the same place).
+    // Also leaves when the session flips to an anonymous/guest Authenticated session — this screen
+    // is reachable only from an authenticated, non-anonymous state, but a mid-session downgrade
+    // (or a nav race with the AccountSection/Settings gates) must not leave a guest stranded here:
+    // this screen's Google identity-link action IS Supabase's anonymous-to-permanent conversion
+    // primitive and bypasses the server-side profile-creation trigger when done in place.
     LaunchedEffect(sessionState) {
-        if (sessionState is SessionState.Unauthenticated) {
+        val state = sessionState
+        val isAnonymousSession = state is SessionState.Authenticated && state.user.isAnonymous
+        if (state is SessionState.Unauthenticated || isAnonymousSession) {
             onSignedOut()
         }
     }
@@ -183,7 +190,15 @@ fun AccountManagementScreen(
             title = stringResource(R.string.account_mgmt_unlink_confirm_title),
             text = stringResource(R.string.account_mgmt_unlink_confirm_body, providerLabel),
             confirmLabel = stringResource(R.string.action_remove),
-            onConfirm = { authViewModel.unlinkIdentity(identity.identityId) },
+            onConfirm = {
+                // Dismiss synchronously on tap, matching the sign-out/delete-account dialogs below
+                // — otherwise a failed unlink leaves this dialog open with the resulting error toast
+                // rendered underneath it (the toast is anchored in the screen's own Box; this dialog
+                // is a real Android Dialog above everything).
+                val identityId = identity.identityId
+                identityPendingUnlink = null
+                authViewModel.unlinkIdentity(identityId)
+            },
             dismissLabel = stringResource(R.string.action_cancel),
             onDismiss = { identityPendingUnlink = null },
             confirmColor = MagicCtaColor.Error,
@@ -256,6 +271,7 @@ fun AccountManagementScreen(
                     // (shared:core-domain), so the Kotlin compiler cannot smart-cast its nullable
                     // properties across the module boundary even after a null check.
                     val userEmail = user.email
+                    val pendingNewEmail = user.newEmail
                     val hasEmailIdentity = user.identities.any { it.provider == "email" }
                     val hasGoogleIdentity = user.identities.any { it.provider == "google" }
                     val isEmailVerified = user.emailConfirmedAt != null
@@ -296,6 +312,9 @@ fun AccountManagementScreen(
                                 subtitle = userEmail,
                                 icon = Icons.Default.Email,
                                 onClick = onNavigateToUpdateEmail,
+                                pendingNote = pendingNewEmail?.let { pending ->
+                                    stringResource(R.string.account_mgmt_email_change_pending, pending)
+                                },
                             )
                         }
 
@@ -645,6 +664,7 @@ private fun AccountManagementRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    pendingNote: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -666,6 +686,18 @@ private fun AccountManagementRow(
                 Text(text = title, style = ty.bodyMedium, color = mc.textPrimary)
                 if (subtitle != null) {
                     Text(text = subtitle, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                // Pending "change email" confirmation note — set only when AuthUser.newEmail is
+                // non-null (an in-progress, not-yet-confirmed change via Supabase's "Secure email
+                // change", which double-confirms via links to both the old and new inbox).
+                if (pendingNote != null) {
+                    Text(
+                        text = pendingNote,
+                        style = ty.labelSmall,
+                        color = mc.primaryAccent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             Icon(

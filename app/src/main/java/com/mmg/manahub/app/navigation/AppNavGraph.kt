@@ -788,8 +788,15 @@ fun AppNavGraph(
                     // change" project setting already double-confirms the change server-side, so
                     // the reauth-code gate is skipped for this flow only (see the KDoc on
                     // AuthRepository.confirmEmailUpdate / Screen.SecurityCode).
-                    onNavigateToUpdateEmail = { navController.navigate(Screen.UpdateEmail.route) },
-                    onNavigateToSecurityCode = { navController.navigate(Screen.SecurityCode.route) },
+                    // launchSingleTop guards against a rapid double-tap pushing two destinations
+                    // onto the back stack — back-navigating out of a duplicate SecurityCodeScreen
+                    // would re-fire requestReauthentication() and invalidate the first nonce.
+                    onNavigateToUpdateEmail = {
+                        navController.navigate(Screen.UpdateEmail.route) { launchSingleTop = true }
+                    },
+                    onNavigateToSecurityCode = {
+                        navController.navigate(Screen.SecurityCode.route) { launchSingleTop = true }
+                    },
                     onSignedOut = {
                         // Sign-out/delete-account both leave the user unauthenticated — return to
                         // Profile's Unauthenticated card rather than staying on an account screen

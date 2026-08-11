@@ -1872,6 +1872,8 @@
     <string name="settings_data_source_value">Scryfall API</string>
     <string name="settings_manage_account">Manage account</string>
     <string name="settings_manage_account_subtitle">Email, password, sign-in methods, sign out</string>
+    <!-- Shown instead of settings_manage_account_subtitle when unauthenticated or on an anonymous/guest session -->
+    <string name="settings_manage_account_signin_required">Sign in to manage your account</string>
     <string name="settings_tag_dictionary">Tag Dictionary</string>
     <string name="settings_tag_dictionary_subtitle">Edit translations, detection patterns and auto-tagger thresholds.</string>
     <string name="settings_open_scryfall">Open Scryfall website</string>
@@ -2351,12 +2353,16 @@
 
     <!-- Single-identity-not-deletable error (GoTrue refuses to unlink an account's last identity) -->
     <string name="auth_error_single_identity_not_deletable">You need another sign-in method before removing this one.</string>
+    <!-- HTTP 429 from the auth server (e.g. too many resend-confirmation-email requests) -->
+    <string name="auth_error_rate_limited">Too many requests. Please wait a moment before trying again.</string>
 
     <!-- Account Management screen (Phase 4b) -->
     <string name="account_mgmt_title">Manage account</string>
     <string name="account_mgmt_joined">Joined %1$s</string>
     <string name="account_mgmt_change_email">Change email</string>
     <string name="account_mgmt_change_password">Change password</string>
+    <!-- Shown near the "Change email" row when AuthUser.newEmail is non-null: an in-progress change awaiting confirmation via both the old and new inbox links -->
+    <string name="account_mgmt_email_change_pending">Pending confirmation: %1$s</string>
     <string name="account_mgmt_set_password">Set a password</string>
     <string name="account_mgmt_set_password_subtitle">Add email/password sign-in to this Google account</string>
     <string name="account_mgmt_signin_methods_title">Sign-in methods</string>
