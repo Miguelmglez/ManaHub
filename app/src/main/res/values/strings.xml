@@ -2366,6 +2366,7 @@
     <string name="account_mgmt_set_password">Set a password</string>
     <string name="account_mgmt_set_password_subtitle">Add email/password sign-in to this Google account</string>
     <string name="account_mgmt_signin_methods_title">Sign-in methods</string>
+    <string name="account_mgmt_add_signin_method_title">Add another way to sign in</string>
     <string name="account_mgmt_danger_zone_title">Danger zone</string>
     <string name="account_mgmt_link_google">Link Google account</string>
     <string name="account_mgmt_provider_google">Google</string>
