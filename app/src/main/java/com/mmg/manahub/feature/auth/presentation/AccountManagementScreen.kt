@@ -6,11 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -318,21 +320,21 @@ fun AccountManagementScreen(
                             )
                         }
 
-                        item {
-                            AccountManagementRow(
-                                title = if (hasEmailIdentity) {
-                                    stringResource(R.string.account_mgmt_change_password)
-                                } else {
-                                    stringResource(R.string.account_mgmt_set_password)
-                                },
-                                subtitle = if (hasEmailIdentity) {
-                                    null
-                                } else {
-                                    stringResource(R.string.account_mgmt_set_password_subtitle)
-                                },
-                                icon = Icons.Default.Lock,
-                                onClick = onNavigateToSecurityCode,
-                            )
+                        // "Change password" is an ordinary account-detail row ONLY when the account
+                        // already has an email/password sign-in method. A Google-only account gets
+                        // its "Set a password" affordance below, grouped with "Link Google account"
+                        // under the "Add another way to sign in" label — moving it out of this
+                        // generic row group so the add-a-missing-method actions read as their own
+                        // thing instead of blending into ordinary settings rows.
+                        if (hasEmailIdentity) {
+                            item {
+                                AccountManagementRow(
+                                    title = stringResource(R.string.account_mgmt_change_password),
+                                    subtitle = null,
+                                    icon = Icons.Default.Lock,
+                                    onClick = onNavigateToSecurityCode,
+                                )
+                            }
                         }
 
                         item {
@@ -347,21 +349,47 @@ fun AccountManagementScreen(
                             )
                         }
 
-                        if (!hasGoogleIdentity) {
+                        // Surfaces both "add a missing sign-in method" actions together, right below
+                        // the sign-in-methods list, so they read as one deliberate group rather than
+                        // two settings rows a user has to notice independently.
+                        if (!hasEmailIdentity || !hasGoogleIdentity) {
                             item {
-                                Spacer(modifier = Modifier.height(sp.xxs))
-                                MagicCtaButton(
-                                    onClick = {
-                                        authViewModel.linkGoogleIdentityNative(MANAHUB_AUTH_REDIRECT_URL)
-                                    },
-                                    text = stringResource(R.string.account_mgmt_link_google),
-                                    style = MagicCtaStyle.Outlined,
-                                    color = MagicCtaColor.Primary,
-                                    icon = {
-                                        Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
+                                SectionLabel(stringResource(R.string.account_mgmt_add_signin_method_title))
+                            }
+                            item {
+                                AddSignInMethodGroup {
+                                    if (!hasEmailIdentity) {
+                                        MagicCtaButton(
+                                            onClick = onNavigateToSecurityCode,
+                                            text = stringResource(R.string.account_mgmt_set_password),
+                                            style = MagicCtaStyle.Outlined,
+                                            color = MagicCtaColor.Primary,
+                                            icon = {
+                                                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.account_mgmt_set_password_subtitle),
+                                            style = ty.labelSmall,
+                                            color = mc.textSecondary,
+                                        )
+                                    }
+                                    if (!hasGoogleIdentity) {
+                                        MagicCtaButton(
+                                            onClick = {
+                                                authViewModel.linkGoogleIdentityNative(MANAHUB_AUTH_REDIRECT_URL)
+                                            },
+                                            text = stringResource(R.string.account_mgmt_link_google),
+                                            style = MagicCtaStyle.Outlined,
+                                            color = MagicCtaColor.Primary,
+                                            icon = {
+                                                Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -717,6 +745,34 @@ private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.magicColors.textSecondary,
         modifier = modifier.padding(top = MaterialTheme.spacing.xs, bottom = MaterialTheme.spacing.xxs),
     )
+}
+
+/**
+ * Accent-bordered container for the "add a missing sign-in method" actions ("Set a password" /
+ * "Link Google account"). Visually ties them together as one group — a tonal fill + primary-accent
+ * border, distinct from the plain [MagicCtaButton] sign-out/delete-account rows in the danger zone
+ * below — so the affordance to add another way to sign in is noticeable rather than blending into
+ * the rest of the screen's settings rows.
+ */
+@Composable
+private fun AddSignInMethodGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val sp = MaterialTheme.spacing
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = mc.primaryAccent.copy(alpha = 0.06f),
+        shape = CardShape,
+        border = BorderStroke(width = 1.dp, color = mc.primaryAccent.copy(alpha = 0.3f)),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(sp.md),
+            verticalArrangement = Arrangement.spacedBy(sp.sm),
+            content = content,
+        )
+    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
