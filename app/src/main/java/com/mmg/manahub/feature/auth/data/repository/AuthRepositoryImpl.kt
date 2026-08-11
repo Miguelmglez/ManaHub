@@ -16,6 +16,7 @@ import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.util.recordNonFatal
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.SignOutScope
@@ -41,8 +42,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.buildJsonObject
@@ -77,6 +80,15 @@ class AuthRepositoryImpl(
     private val profileRefreshSignal = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /**
+     * Google-linked-identity tracking for [trackIdentityLinkEvents]. `null` until the first
+     * [SessionState.Authenticated] emission is observed in this process; reset to `null` on
+     * sign-out. A class-level field (not local to the flow) so it survives `sessionState`'s
+     * `WhileSubscribed(5_000)` restarts across collector churn — only a real sign-out or process
+     * restart should reset the baseline.
+     */
+    private var knownIdentityProviders: Set<String>? = null
+
+    /**
      * Session state flow enriched with `user_profiles` data.
      * Shared across all collectors via `stateIn` to avoid redundant DB calls.
      *
@@ -95,6 +107,12 @@ class AuthRepositoryImpl(
         profileRefreshSignal.onStart { emit(Unit) }
     ) { status, _ -> status }
         .map { status -> status.toSessionState() }
+        // [linkGoogleIdentityNative] only returns the OAuth authorization URL — the actual link
+        // completes asynchronously via MainActivity's `supabaseClient.handleDeeplinks(intent)`,
+        // which updates the SDK session and makes `sessionStatus` re-emit with the newly-linked
+        // identity. This is therefore the single reliable SUCCESS observation point for that flow
+        // (the SDK has no dedicated link-completed callback to hook instead).
+        .onEach { state -> trackIdentityLinkEvents(state) }
         .flatMapLatest { state ->
             if (state !is SessionState.Authenticated) {
                 flowOf(state)
@@ -483,6 +501,7 @@ class AuthRepositoryImpl(
                     this.email = newEmail
                     this.nonce = code
                 }
+                notifyAccountEvent(AccountNotificationEvent.EMAIL_CHANGED, providerMetadata("email"))
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
@@ -496,6 +515,7 @@ class AuthRepositoryImpl(
                 supabaseAuth.updateUser {
                     this.email = newEmail
                 }
+                notifyAccountEvent(AccountNotificationEvent.EMAIL_CHANGED, providerMetadata("email"))
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
@@ -507,6 +527,7 @@ class AuthRepositoryImpl(
                     this.password = newPassword
                     this.nonce = code
                 }
+                notifyAccountEvent(AccountNotificationEvent.PASSWORD_CHANGED, providerMetadata("email"))
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
@@ -514,7 +535,17 @@ class AuthRepositoryImpl(
     override suspend fun unlinkIdentity(identityId: String): AuthResult<Unit> =
         withContext(ioDispatcher) {
             runCatching {
+                // Resolve the identity's provider BEFORE unlinking — it disappears from the current
+                // user's identity list immediately after, and the notification metadata needs it.
+                val provider = supabaseAuth.currentUserOrNull()
+                    ?.identities
+                    ?.firstOrNull { (it.identityId ?: it.id) == identityId }
+                    ?.provider
+
                 supabaseAuth.unlinkIdentity(identityId = identityId, updateLocalUser = true)
+
+                notifyAccountEvent(AccountNotificationEvent.IDENTITY_REMOVED, providerMetadata(provider))
+
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
@@ -539,6 +570,7 @@ class AuthRepositoryImpl(
                 supabaseAuth.updateUser {
                     this.password = newPassword
                 }
+                notifyAccountEvent(AccountNotificationEvent.PASSWORD_CHANGED, providerMetadata("email"))
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
@@ -620,6 +652,107 @@ class AuthRepositoryImpl(
             }
         } catch (_: Exception) {
             // Non-fatal: DataStore write failures must not surface to the user.
+        }
+    }
+
+    /**
+     * Events accepted by the `send-account-notification` Edge Function's `event` field. Values
+     * match the deployed contract exactly — do not rename without updating the Edge Function.
+     */
+    private enum class AccountNotificationEvent(val value: String) {
+        PASSWORD_CHANGED("password_changed"),
+        EMAIL_CHANGED("email_changed"),
+        IDENTITY_LINKED("identity_linked"),
+        IDENTITY_REMOVED("identity_removed"),
+    }
+
+    /**
+     * Builds the `metadata` map for [notifyAccountEvent]. Returns an empty map when [provider] is
+     * null (e.g. the identity's provider could not be resolved) so the call still goes out rather
+     * than being dropped — the Edge Function's contract treats `metadata` as informational only.
+     */
+    private fun providerMetadata(provider: String?): Map<String, String> =
+        provider?.let { mapOf("provider" to it) } ?: emptyMap()
+
+    /**
+     * Tracks the authenticated user's identity providers across [sessionState] re-emissions to
+     * fire a best-effort `identity_linked` notification exactly once when a NEW Google identity
+     * appears on an ALREADY-known session — see the KDoc on the `.onEach` call site in
+     * [sessionState] for why this is the correct observation point for that flow's success.
+     *
+     * [knownIdentityProviders] being `null` guards against firing on a fresh sign-in/sign-up
+     * (where "google" appearing for the first time is not a LINK event, just a normal
+     * authentication), and is reset to `null` on sign-out so a different user signing in
+     * afterward starts from a clean baseline.
+     */
+    private fun trackIdentityLinkEvents(state: SessionState) {
+        if (state !is SessionState.Authenticated) {
+            knownIdentityProviders = null
+            return
+        }
+        val currentProviders = state.user.identities.map { it.provider }.toSet()
+        val previousProviders = knownIdentityProviders
+        if (previousProviders != null &&
+            "google" !in previousProviders &&
+            "google" in currentProviders
+        ) {
+            notifyAccountEvent(AccountNotificationEvent.IDENTITY_LINKED, providerMetadata("google"))
+        }
+        knownIdentityProviders = currentProviders
+    }
+
+    /**
+     * Fires a best-effort call to the `send-account-notification` Edge Function after a sensitive
+     * account operation has ALREADY succeeded (password/email change, identity link/unlink).
+     *
+     * Fire-and-forget by design: launches on [applicationScope] (never blocks the caller's
+     * suspend function) and swallows every failure — missing session, network error, non-2xx
+     * response — via [recordNonFatal]. A failed/undelivered notification email must NEVER be
+     * surfaced as if the underlying sensitive operation itself failed, since that operation
+     * already succeeded before this call is even made. Only the event type and a generic failure
+     * indicator are logged — never the access token, password, email, or reauthentication code.
+     *
+     * Reuses [supabaseOkHttpClient] (the same client [callSetGoogleAccountPasswordEdgeFunction]
+     * uses) with an explicit Authorization header carrying the CALLING USER's own access token —
+     * required by the Edge Function's contract to authorize the `user_id` it is told to notify.
+     */
+    private fun notifyAccountEvent(
+        event: AccountNotificationEvent,
+        metadata: Map<String, String> = emptyMap(),
+    ) {
+        applicationScope.launch(ioDispatcher) {
+            runCatching {
+                val accessToken = supabaseAuth.currentSessionOrNull()?.accessToken
+                    ?: return@runCatching
+                val userId = supabaseAuth.currentUserOrNull()?.id
+                    ?: return@runCatching
+
+                val metadataJson = JSONObject()
+                metadata.forEach { (key, value) -> metadataJson.put(key, value) }
+
+                val bodyJson = JSONObject()
+                    .put("user_id", userId)
+                    .put("event", event.value)
+                    .put("metadata", metadataJson)
+                    .toString()
+                    .toRequestBody("application/json".toMediaType())
+
+                val request = Request.Builder()
+                    .url("${BuildConfig.SUPABASE_URL}/functions/v1/send-account-notification")
+                    .addHeader("Authorization", "Bearer $accessToken")
+                    .post(bodyJson)
+                    .build()
+
+                supabaseOkHttpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        recordNonFatal(
+                            "send_account_notification_failed event_${event.value} http_${response.code}"
+                        )
+                    }
+                }
+            }.onFailure { e ->
+                recordNonFatal("send_account_notification_error event_${event.value}", e)
+            }
         }
     }
 
