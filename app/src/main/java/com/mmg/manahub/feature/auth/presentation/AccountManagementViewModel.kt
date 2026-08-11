@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -47,7 +48,13 @@ class AccountManagementViewModel(
      */
     suspend fun fetchShareLink(): Result<String> {
         val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
-            ?: return Result.failure(IllegalStateException("Not authenticated"))
+        if (userId == null) {
+            // Should be unreachable: this screen is only ever navigated to from an authenticated,
+            // non-anonymous session. Any occurrence signals a nav-gating regression, not a normal
+            // user-facing error — worth a NON_FATAL to catch it rather than a silent failed lookup.
+            recordNonFatal("account_mgmt_share_link_not_authenticated")
+            return Result.failure(IllegalStateException("Not authenticated"))
+        }
         return shareInviteUseCase(userId)
     }
 

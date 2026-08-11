@@ -61,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.auth.AuthIdentity
 import com.mmg.manahub.core.domain.auth.AuthUser
@@ -80,6 +81,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
+import com.mmg.manahub.core.util.recordNonFatal
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -130,32 +132,56 @@ fun AccountManagementScreen(
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    // Tracks WHICH danger-zone/sign-in-method action is currently in flight on the shared
+    // AuthViewModel.uiState, so the triggering row/button can disable itself (and, where it IS the
+    // action's own visible trigger, show a loading spinner) instead of staying tappable while a
+    // previous confirm is still resolving. Every confirmation dialog dismisses synchronously on tap
+    // (see the dialogs below) — without this, the row/button underneath stays enabled and a second
+    // tap fires a concurrent duplicate call before the first one resolves. Cleared on every terminal
+    // AuthUiState this screen's own actions can reach (Idle covers signOut(), which never transitions
+    // through the branches below).
+    var pendingAction by remember { mutableStateOf<String?>(null) }
+    val isActionPending = pendingAction != null
+
     val copiedMessage = stringResource(R.string.account_mgmt_gametag_copied)
     val emailSentMessage = stringResource(R.string.auth_email_confirmation_sent)
+
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: account_management")
+    }
 
     // Central reaction to every one-shot AuthUiState this screen's actions can produce. Each branch
     // resets back to Idle so the shared uiState never leaks a stale toast/dialog into a later action.
     LaunchedEffect(authUiState) {
         when (val state = authUiState) {
             is AuthUiState.EmailConfirmationSent -> {
+                pendingAction = null
                 toastState.show(emailSentMessage, MagicToastType.SUCCESS)
                 authViewModel.resetUiState()
             }
             is AuthUiState.IdentityUnlinked -> {
                 identityPendingUnlink = null
+                pendingAction = null
                 authViewModel.resetUiState()
             }
             is AuthUiState.GoogleIdentityLinkStarted -> {
+                pendingAction = null
                 state.authorizationUrl?.let { url -> launchCustomTab(context, url) }
                 authViewModel.resetUiState()
             }
             is AuthUiState.AccountDeleted -> {
+                pendingAction = null
                 authViewModel.resetUiState()
             }
             is AuthUiState.Error -> {
+                pendingAction = null
                 toastState.show(state.message, MagicToastType.ERROR)
                 authViewModel.resetUiState()
             }
+            // signOut() transitions Loading -> Idle directly (no dedicated terminal state) and this
+            // screen navigates away via the sessionState effect below once it completes — clearing
+            // here as well guards the rare case where the state settles on Idle without navigating.
+            AuthUiState.Idle -> pendingAction = null
             else -> Unit
         }
     }
@@ -199,11 +225,12 @@ fun AccountManagementScreen(
                 // is a real Android Dialog above everything).
                 val identityId = identity.identityId
                 identityPendingUnlink = null
+                pendingAction = "unlink:$identityId"
                 authViewModel.unlinkIdentity(identityId)
             },
             dismissLabel = stringResource(R.string.action_cancel),
             onDismiss = { identityPendingUnlink = null },
-            confirmColor = MagicCtaColor.Error,
+            confirmColor = MagicCtaColor.ErrorSolid,
         )
     }
 
@@ -215,6 +242,7 @@ fun AccountManagementScreen(
             confirmLabel = stringResource(R.string.auth_sign_out),
             onConfirm = {
                 showSignOutDialog = false
+                pendingAction = "sign_out"
                 authViewModel.signOut()
             },
             dismissLabel = stringResource(R.string.action_cancel),
@@ -230,11 +258,12 @@ fun AccountManagementScreen(
             confirmLabel = stringResource(R.string.auth_delete_account_confirm_btn),
             onConfirm = {
                 showDeleteDialog = false
+                pendingAction = "delete_account"
                 authViewModel.deleteAccount()
             },
             dismissLabel = stringResource(R.string.auth_cancel),
             onDismiss = { showDeleteDialog = false },
-            confirmColor = MagicCtaColor.Error,
+            confirmColor = MagicCtaColor.ErrorSolid,
         )
     }
 
@@ -300,7 +329,10 @@ fun AccountManagementScreen(
                             item {
                                 EmailVerificationCard(
                                     cooldownRemaining = resendCooldown,
+                                    isSending = pendingAction == "resend_email",
+                                    enabled = !isActionPending,
                                     onResend = {
+                                        pendingAction = "resend_email"
                                         viewModel.startResendCooldown()
                                         authViewModel.resendConfirmationEmail(userEmail)
                                     },
@@ -344,7 +376,9 @@ fun AccountManagementScreen(
                         items(user.identities, key = { it.identityId }) { identity ->
                             SignInMethodRow(
                                 identity = identity,
-                                removeEnabled = user.identities.size > 1,
+                                removeEnabled = user.identities.size > 1 && !isActionPending,
+                                isOnlyMethod = user.identities.size <= 1,
+                                isRemoving = pendingAction == "unlink:${identity.identityId}",
                                 onRemoveClick = { identityPendingUnlink = identity },
                             )
                         }
@@ -364,6 +398,7 @@ fun AccountManagementScreen(
                                             text = stringResource(R.string.account_mgmt_set_password),
                                             style = MagicCtaStyle.Outlined,
                                             color = MagicCtaColor.Primary,
+                                            enabled = !isActionPending,
                                             icon = {
                                                 Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
                                             },
@@ -378,11 +413,14 @@ fun AccountManagementScreen(
                                     if (!hasGoogleIdentity) {
                                         MagicCtaButton(
                                             onClick = {
+                                                pendingAction = "link_google"
                                                 authViewModel.linkGoogleIdentityNative(MANAHUB_AUTH_REDIRECT_URL)
                                             },
                                             text = stringResource(R.string.account_mgmt_link_google),
                                             style = MagicCtaStyle.Outlined,
                                             color = MagicCtaColor.Primary,
+                                            enabled = !isActionPending,
+                                            isLoading = pendingAction == "link_google",
                                             icon = {
                                                 Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
                                             },
@@ -403,6 +441,8 @@ fun AccountManagementScreen(
                                 text = stringResource(R.string.auth_sign_out),
                                 style = MagicCtaStyle.Outlined,
                                 color = MagicCtaColor.Primary,
+                                enabled = !isActionPending,
+                                isLoading = pendingAction == "sign_out",
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -413,6 +453,8 @@ fun AccountManagementScreen(
                                 text = stringResource(R.string.auth_delete_account),
                                 style = MagicCtaStyle.Ghost,
                                 color = MagicCtaColor.Error,
+                                enabled = !isActionPending,
+                                isLoading = pendingAction == "delete_account",
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
@@ -547,7 +589,7 @@ private fun IdentityHeader(
                         color = mc.primaryAccent,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = onShareClick, modifier = Modifier.size(40.dp)) {
+                    IconButton(onClick = onShareClick, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Icons.Default.Share,
                             contentDescription = stringResource(R.string.action_share),
@@ -566,6 +608,8 @@ private fun IdentityHeader(
 @Composable
 private fun EmailVerificationCard(
     cooldownRemaining: Int,
+    isSending: Boolean,
+    enabled: Boolean,
     onResend: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -608,8 +652,9 @@ private fun EmailVerificationCard(
                 onClick = onResend,
                 text = if (cooldownRemaining > 0) "${cooldownRemaining}s" else stringResource(R.string.account_mgmt_resend_email),
                 style = MagicCtaStyle.Outlined,
-                color = MagicCtaColor.Error,
-                enabled = cooldownRemaining == 0,
+                color = MagicCtaColor.Warning,
+                enabled = enabled && cooldownRemaining == 0,
+                isLoading = isSending,
             )
         }
     }
@@ -621,6 +666,8 @@ private fun EmailVerificationCard(
 private fun SignInMethodRow(
     identity: AuthIdentity,
     removeEnabled: Boolean,
+    isOnlyMethod: Boolean,
+    isRemoving: Boolean,
     onRemoveClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -664,7 +711,10 @@ private fun SignInMethodRow(
             Spacer(modifier = Modifier.width(sp.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = providerLabel, style = ty.bodyMedium, color = mc.textPrimary)
-                if (!removeEnabled) {
+                // Distinct from removeEnabled: removeEnabled also turns false while an UNRELATED
+                // action is in flight elsewhere on the screen, but this hint is specifically about
+                // "you only have one sign-in method" and must not flicker on during that window.
+                if (isOnlyMethod) {
                     Text(
                         text = stringResource(R.string.account_mgmt_only_signin_method),
                         style = ty.labelSmall,
@@ -678,6 +728,7 @@ private fun SignInMethodRow(
                 style = MagicCtaStyle.Ghost,
                 color = MagicCtaColor.Error,
                 enabled = removeEnabled,
+                isLoading = isRemoving,
             )
         }
     }
@@ -797,6 +848,10 @@ private fun launchCustomTab(context: Context, url: String) {
     } catch (_: Exception) {
         try {
             context.startActivity(Intent(Intent.ACTION_VIEW, uri))
-        } catch (_: Exception) { /* no handler available */ }
+        } catch (e: Exception) {
+            // Both Custom Tabs and a plain browser Intent failed — "Link Google account" silently
+            // dead-ends here with no toast (the OAuth authorization URL never opens).
+            recordNonFatal("account_mgmt_google_link_no_browser_handler", e)
+        }
     }
 }

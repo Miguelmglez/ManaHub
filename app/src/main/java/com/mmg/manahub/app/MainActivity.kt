@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
 import com.mmg.manahub.app.navigation.AppNavGraph
@@ -168,6 +169,14 @@ class MainActivity : ComponentActivity() {
     private fun handleSupabaseAuthDeepLink(intent: Intent) {
         if (!isSupabaseAuthDeepLink(intent)) return
         val isRecoveryClaim = isPasswordRecoveryDeepLink(intent)
+        // Entry breadcrumb + a filterable claim-type key set BEFORE the parse attempt, so it is
+        // attached context on the recordSafeNonFatal call below if parsing throws. Previously the
+        // ONLY signal on this whole path was the failure branch — there was no way to establish a
+        // baseline traffic volume or tell whether failures skew toward type=recovery specifically.
+        FirebaseCrashlytics.getInstance().apply {
+            log("auth_deeplink_received")
+            setCustomKey("auth_deeplink_is_recovery_claim", isRecoveryClaim)
+        }
         try {
             supabaseClient.handleDeeplinks(intent) {
                 // Reached only when handleDeeplinks actually imported a session from genuine
