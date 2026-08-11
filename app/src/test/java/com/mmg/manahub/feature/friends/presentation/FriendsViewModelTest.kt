@@ -12,6 +12,7 @@ import com.mmg.manahub.core.model.OutgoingFriendRequest
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
+import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -67,6 +68,7 @@ class FriendsViewModelTest {
     private val searchUseCase      = mockk<SearchUserByGameTagUseCase>()
     private val sendRequestUseCase = mockk<SendFriendRequestUseCase>()
     private val analyticsHelper    = mockk<AnalyticsHelper>(relaxed = true)
+    private val shareInviteUseCase = mockk<ShareInviteUseCase>()
 
     // Controls sessionState emissions
     private val sessionStateFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
@@ -119,6 +121,7 @@ class FriendsViewModelTest {
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
             analyticsHelper    = analyticsHelper,
+            shareInviteUseCase = shareInviteUseCase,
         )
     }
 
@@ -340,6 +343,7 @@ class FriendsViewModelTest {
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
             analyticsHelper    = analyticsHelper,
+            shareInviteUseCase = shareInviteUseCase,
         )
         advanceUntilIdle()
 
@@ -536,6 +540,7 @@ class FriendsViewModelTest {
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
             analyticsHelper    = analyticsHelper,
+            shareInviteUseCase = shareInviteUseCase,
         )
         advanceUntilIdle()
 
@@ -599,6 +604,7 @@ class FriendsViewModelTest {
             searchUseCase      = searchUseCase,
             sendRequestUseCase = sendRequestUseCase,
             analyticsHelper    = analyticsHelper,
+            shareInviteUseCase = shareInviteUseCase,
         )
         advanceUntilIdle()
 
