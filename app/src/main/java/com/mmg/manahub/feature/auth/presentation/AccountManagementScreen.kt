@@ -93,8 +93,13 @@ import org.koin.androidx.compose.koinViewModel
  * `AccountSection.kt` per the account-management redesign plan.
  *
  * @param onBack Pops this screen off the back stack.
- * @param onNavigateToSecurityCode Navigates to the reauthentication-code flow for the given
- *   [SecurityCodePurpose] (email or password change).
+ * @param onNavigateToUpdateEmail Navigates DIRECTLY to [UpdateEmailScreen] — "Change email" skips
+ *   the reauthentication-code gate because Supabase's "Secure email change" project setting
+ *   already double-confirms the change via links sent to both the old and new inbox (see the KDoc
+ *   on [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate]).
+ * @param onNavigateToSecurityCode Navigates to the reauthentication-code gate ahead of
+ *   [UpdatePasswordScreen] — "Change password"/"Set a password" only, since it has no equivalent
+ *   server-side double-confirm.
  * @param onSignedOut Invoked once the session is confirmed no longer authenticated (sign-out
  *   success or account deletion) — the caller should pop back to a non-account-gated destination.
  */
@@ -102,7 +107,8 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun AccountManagementScreen(
     onBack: () -> Unit,
-    onNavigateToSecurityCode: (SecurityCodePurpose) -> Unit,
+    onNavigateToUpdateEmail: () -> Unit,
+    onNavigateToSecurityCode: () -> Unit,
     onSignedOut: () -> Unit,
     authViewModel: AuthViewModel = koinViewModel(),
     viewModel: AccountManagementViewModel = koinViewModel(),
@@ -289,7 +295,7 @@ fun AccountManagementScreen(
                                 title = stringResource(R.string.account_mgmt_change_email),
                                 subtitle = userEmail,
                                 icon = Icons.Default.Email,
-                                onClick = { onNavigateToSecurityCode(SecurityCodePurpose.EMAIL) },
+                                onClick = onNavigateToUpdateEmail,
                             )
                         }
 
@@ -306,7 +312,7 @@ fun AccountManagementScreen(
                                     stringResource(R.string.account_mgmt_set_password_subtitle)
                                 },
                                 icon = Icons.Default.Lock,
-                                onClick = { onNavigateToSecurityCode(SecurityCodePurpose.PASSWORD) },
+                                onClick = onNavigateToSecurityCode,
                             )
                         }
 

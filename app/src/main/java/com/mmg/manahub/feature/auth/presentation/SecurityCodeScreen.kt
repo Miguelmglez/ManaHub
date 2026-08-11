@@ -49,31 +49,33 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 /**
- * Reauthentication-code gate shared by the "Change email" and "Change password" flows.
+ * Reauthentication-code gate ahead of the "Change password" / "Set a password" flow.
+ *
+ * "Change email" no longer goes through this screen: Supabase's "Secure email change" project
+ * setting already double-confirms an email change via links sent to both the old and new inbox, so
+ * the reauth-code gate would be redundant friction there (see the KDoc on
+ * [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate]). Password changes have no
+ * equivalent server-side double-confirm, so this gate stays in front of them.
  *
  * On first composition it fires [AuthViewModel.requestReauthentication] (sends a nonce to the
  * user's verified email) — this is the ONE call site that triggers the initial send, so navigating
  * here never double-sends. "Resend code" re-calls the same use case, gated by a 60s cooldown.
  *
  * The entered code is NOT verified here — the nonce is single-use and tied to the actual
- * `updateUser` call downstream (see [AuthRepository.updateEmail]/[updatePassword]'s KDoc). "Continue"
- * simply forwards the in-memory code to [onCodeConfirmed]; the caller (`AppNavGraph`) hands it to
- * [UpdateEmailScreen]/[UpdatePasswordScreen] via an in-memory hoisted handoff (never a nav-graph
- * string argument, never persisted) — the SAME pattern already used for `PlaytestSetup`.
+ * `updateUser` call downstream (see [AuthRepository.updatePassword]'s KDoc). "Continue" simply
+ * forwards the in-memory code to [onCodeConfirmed]; the caller (`AppNavGraph`) hands it to
+ * [UpdatePasswordScreen] via an in-memory hoisted handoff (never a nav-graph string argument, never
+ * persisted) — the SAME pattern already used for `PlaytestSetup`.
  *
  * On an invalid/expired-nonce error surfaced by the downstream update call, the caller pops back to
  * a FRESH instance of this screen, which re-triggers [AuthViewModel.requestReauthentication] via the
- * same `LaunchedEffect(Unit)` — see `UpdateEmailScreen`/`UpdatePasswordScreen`'s "Request a new code"
- * action.
+ * same `LaunchedEffect(Unit)` — see [UpdatePasswordScreen]'s "Request a new code" action.
  *
- * @param purpose Whether this code gates an email or a password change — drives the headline copy
- *   only; the reauthentication call itself is identical either way.
  * @param onCodeConfirmed Invoked with the user-entered code when "Continue" is tapped.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SecurityCodeScreen(
-    purpose: SecurityCodePurpose,
     onBack: () -> Unit,
     onCodeConfirmed: (code: String) -> Unit,
     authViewModel: AuthViewModel = koinViewModel(),
@@ -150,10 +152,7 @@ fun SecurityCodeScreen(
                 .padding(sp.lg),
         ) {
             Text(
-                text = when (purpose) {
-                    SecurityCodePurpose.EMAIL -> stringResource(R.string.account_mgmt_security_code_body_email)
-                    SecurityCodePurpose.PASSWORD -> stringResource(R.string.account_mgmt_security_code_body_password)
-                },
+                text = stringResource(R.string.account_mgmt_security_code_body),
                 style = ty.bodyMedium,
                 color = mc.textSecondary,
             )

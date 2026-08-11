@@ -487,6 +487,19 @@ class AuthRepositoryImpl(
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
 
+    override suspend fun confirmEmailUpdate(newEmail: String): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                // No nonce here: Supabase's "Secure email change" project setting double-confirms
+                // via links sent to BOTH the old and new inbox, which already protects this path
+                // (see the KDoc on AuthRepository.confirmEmailUpdate).
+                supabaseAuth.updateUser {
+                    this.email = newEmail
+                }
+                AuthResult.Success(Unit)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
     override suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit> =
         withContext(ioDispatcher) {
             runCatching {

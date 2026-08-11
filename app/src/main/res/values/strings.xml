@@ -2373,10 +2373,9 @@
     <string name="account_mgmt_resend_email">Resend email</string>
     <string name="account_mgmt_gametag_copied">Game tag copied to clipboard</string>
 
-    <!-- Reauthentication-code gate (shared by change-email / change-password) -->
+    <!-- Reauthentication-code gate (change-password / set-password only — change-email skips it) -->
     <string name="account_mgmt_security_code_title">Verify it\'s you</string>
-    <string name="account_mgmt_security_code_body_email">Enter the 6-digit code we sent to your email to continue changing your email address.</string>
-    <string name="account_mgmt_security_code_body_password">Enter the 6-digit code we sent to your email to continue changing your password.</string>
+    <string name="account_mgmt_security_code_body">Enter the 6-digit code we sent to your email to continue changing your password.</string>
     <string name="account_mgmt_security_code_field_label">6-digit code</string>
     <string name="account_mgmt_resend_code">Resend code</string>
     <string name="account_mgmt_resend_code_cooldown">Resend in %1$ds</string>
@@ -2384,7 +2383,7 @@
     <string name="account_mgmt_request_new_code">Request a new code</string>
 
     <!-- Change email / change password final steps -->
-    <string name="account_mgmt_update_email_body">Enter your new email address. We\'ll use the code you just verified to confirm the change.</string>
+    <string name="account_mgmt_update_email_body">Enter your new email address. You\'ll need to confirm this change from links sent to both your old and new email inbox.</string>
     <string name="account_mgmt_new_email_field">New email</string>
     <string name="account_mgmt_update_password_body">Enter your new password. We\'ll use the code you just verified to confirm the change.</string>
     <string name="account_mgmt_new_password_field">New password</string>

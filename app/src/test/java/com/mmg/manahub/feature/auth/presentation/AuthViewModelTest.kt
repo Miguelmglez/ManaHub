@@ -7,6 +7,7 @@ import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmEmailUpdateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
@@ -87,6 +88,7 @@ class AuthViewModelTest {
     private val unlinkIdentityUseCase          = mockk<UnlinkIdentityUseCase>()
     private val linkGoogleIdentityNativeUseCase = mockk<LinkGoogleIdentityNativeUseCase>()
     private val confirmPasswordResetUseCase = mockk<ConfirmPasswordResetUseCase>()
+    private val confirmEmailUpdateUseCase = mockk<ConfirmEmailUpdateUseCase>()
 
     /**
      * Context mock that returns the actual English string values from strings.xml.
@@ -193,6 +195,7 @@ class AuthViewModelTest {
         unlinkIdentityUseCase           = unlinkIdentityUseCase,
         linkGoogleIdentityNativeUseCase = linkGoogleIdentityNativeUseCase,
         confirmPasswordResetUseCase     = confirmPasswordResetUseCase,
+        confirmEmailUpdateUseCase       = confirmEmailUpdateUseCase,
         analyticsHelper           = mockk(relaxed = true),
         appContext                 = appContext,
     )
@@ -1051,6 +1054,76 @@ class AuthViewModelTest {
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
             viewModel.confirmPasswordReset("Password1!")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("No connection. Check your network", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 12 — confirmEmailUpdate ("Change email" without a reauth code — Secure Email Change)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given valid email when confirmEmailUpdate then uiState transitions Loading then EmailUpdated`() = runTest {
+        coEvery { confirmEmailUpdateUseCase("new@example.com") } returns AuthResult.Success(Unit)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmEmailUpdate("new@example.com")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            assertEquals(AuthUiState.EmailUpdated, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { confirmEmailUpdateUseCase("new@example.com") }
+    }
+
+    @Test
+    fun `given email with whitespace when confirmEmailUpdate then use case receives trimmed email`() = runTest {
+        coEvery { confirmEmailUpdateUseCase("new@example.com") } returns AuthResult.Success(Unit)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmEmailUpdate("  new@example.com  ")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            assertEquals(AuthUiState.EmailUpdated, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { confirmEmailUpdateUseCase("new@example.com") }
+    }
+
+    @Test
+    fun `given invalid email when confirmEmailUpdate then uiState emits Error without Loading and use case is never called`() = runTest {
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmEmailUpdate("not-an-email")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("Invalid email format", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmEmailUpdateUseCase(any()) }
+    }
+
+    @Test
+    fun `given blank email when confirmEmailUpdate then uiState emits Error and use case is never called`() = runTest {
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmEmailUpdate("   ")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("Invalid email format", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmEmailUpdateUseCase(any()) }
+    }
+
+    @Test
+    fun `given network error when confirmEmailUpdate then uiState emits Error with network message`() = runTest {
+        coEvery { confirmEmailUpdateUseCase(any()) } returns AuthResult.Error(AuthError.NetworkError)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmEmailUpdate("new@example.com")
             assertEquals(AuthUiState.Loading, awaitItem())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals("No connection. Check your network", errorState.message)

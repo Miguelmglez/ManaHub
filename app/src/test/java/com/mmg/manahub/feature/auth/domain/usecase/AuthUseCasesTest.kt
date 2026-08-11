@@ -498,4 +498,29 @@ class AuthUseCasesTest {
 
         assertEquals(networkError, result)
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 10 — ConfirmEmailUpdateUseCase
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `when ConfirmEmailUpdateUseCase invoked then delegates to repository_confirmEmailUpdate`() = runTest {
+        coEvery { repository.confirmEmailUpdate("new@example.com") } returns successUnit
+        val useCase = ConfirmEmailUpdateUseCase(repository)
+
+        val result = useCase("new@example.com")
+
+        coVerify(exactly = 1) { repository.confirmEmailUpdate("new@example.com") }
+        assertEquals(successUnit, result)
+    }
+
+    @Test
+    fun `given repository returns Error when ConfirmEmailUpdateUseCase invoked then propagates Error`() = runTest {
+        coEvery { repository.confirmEmailUpdate(any()) } returns networkError
+        val useCase = ConfirmEmailUpdateUseCase(repository)
+
+        val result = useCase("new@example.com")
+
+        assertEquals(networkError, result)
+    }
 }
