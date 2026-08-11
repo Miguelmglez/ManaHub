@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
@@ -28,13 +27,10 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +47,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -60,11 +55,14 @@ import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.ShareProfileSheet
+import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 
@@ -144,6 +142,7 @@ fun AccountSection(
 @Composable
 private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
+    val sp = MaterialTheme.spacing
 
     // Infinite alpha oscillation: 0.04 → 0.14 → 0.04
     val infiniteTransition = rememberInfiniteTransition(label = "skeleton_shimmer")
@@ -166,15 +165,15 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
             .border(
                 width = 1.dp,
                 color = mc.primaryAccent.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(16.dp),
+                shape = CardShape,
             ),
         color = mc.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(sp.lg),
         ) {
             // ── User Info placeholder ──────────────────────────────────────────────
             Row(
@@ -187,32 +186,32 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                         .clip(CircleShape)
                         .background(shimmerColor)
                 )
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(sp.lg))
                 Column(modifier = Modifier.weight(1f)) {
                     Box(
                         modifier = Modifier
                             .width(120.dp)
                             .height(20.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(SmallCardShape)
                             .background(shimmerColor)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(sp.sm))
                     Box(
                         modifier = Modifier
                             .width(160.dp)
                             .height(14.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(SmallCardShape)
                             .background(shimmerColor)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sp.xl))
 
             // ── Button Row placeholder ─────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(sp.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Primary button placeholder (weight(1f) mirrors Sign Out button)
@@ -220,7 +219,7 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(ButtonShape)
                         .background(shimmerColor),
                 )
                 // Secondary button placeholder (fixed width mirrors Delete Account)
@@ -228,7 +227,7 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .width(96.dp)
                         .height(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(ButtonShape)
                         .background(shimmerBase),
                 )
             }
@@ -246,21 +245,22 @@ private fun UnauthenticatedCard(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
                 color = mc.primaryAccent.copy(alpha = 0.3f),
-                shape = RoundedCornerShape(16.dp),
+                shape = CardShape,
             ),
         color = mc.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+                .padding(horizontal = sp.lg, vertical = sp.lg),
         ) {
 
             // ── Header ─────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ private fun UnauthenticatedCard(
                 color = mc.textPrimary,
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sp.xs))
 
             Text(
                 text = stringResource(R.string.auth_section_subtitle),
@@ -278,7 +278,7 @@ private fun UnauthenticatedCard(
                 color = mc.textSecondary,
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sp.lg))
 
             // ── Benefit list ───────────────────────────────────────────────────
             BenefitRow(
@@ -302,57 +302,29 @@ private fun UnauthenticatedCard(
                 text = stringResource(R.string.auth_benefit_future),
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(sp.xl))
 
-            // ── CTA: Create Account (gradient) ─────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            listOf(mc.primaryAccent, mc.secondaryAccent)
-                        )
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                TextButton(
-                    onClick = onSignUpClick,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_cta_create),
-                        style = ty.titleMedium,
-                        color = mc.background,
-                    )
-                }
-            }
+            // ── CTA: Create Account (filled) ─────────────────────────────────
+            MagicCtaButton(
+                onClick = onSignUpClick,
+                text = stringResource(R.string.auth_cta_create),
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(sp.md))
 
             // ── CTA: Sign In (outlined) ────────────────────────────────────────
-            OutlinedButton(
+            MagicCtaButton(
                 onClick = onLoginClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = mc.primaryAccent,
-                ),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = mc.primaryAccent,
-                ),
-            ) {
-                Text(
-                    text = stringResource(R.string.auth_cta_signin),
-                    style = ty.titleMedium,
-                )
-            }
+                text = stringResource(R.string.auth_cta_signin),
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sp.md))
 
             // ── No-account disclaimer ──────────────────────────────────────────
             Text(
@@ -376,11 +348,12 @@ private fun BenefitRow(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = sp.xs),
     ) {
         Icon(
             imageVector = icon,
@@ -388,7 +361,7 @@ private fun BenefitRow(
             tint = mc.primaryAccent,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(sp.sm))
         Text(
             text = text,
             style = ty.labelSmall,
@@ -526,7 +499,7 @@ private fun AuthenticatedCard(
                                     Text(
                                         text = gameTag,
                                         color = mc.primaryAccent,
-                                        style = ty.labelSmall.copy(fontSize = 10.sp),
+                                        style = ty.labelSmall,
                                     )
                                 }
                             }

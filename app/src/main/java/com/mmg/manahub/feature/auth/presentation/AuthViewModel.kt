@@ -13,6 +13,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.AuthResult
@@ -165,9 +166,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = resendConfirmationEmailUseCase(trimmedEmail)) {
-                is AuthResult.Success -> AuthUiState.EmailConfirmationSent
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_resend_confirmation_email_started")
+            when (val result = resendConfirmationEmailUseCase(trimmedEmail)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_resend_confirmation_email_succeeded")
+                    _uiState.value = AuthUiState.EmailConfirmationSent
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("resend_confirmation_email", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -181,9 +189,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = requestReauthenticationUseCase()) {
-                is AuthResult.Success -> AuthUiState.ReauthenticationSent
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_request_reauth_started")
+            when (val result = requestReauthenticationUseCase()) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_request_reauth_succeeded")
+                    _uiState.value = AuthUiState.ReauthenticationSent
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("request_reauth", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -207,9 +222,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = updateEmailUseCase(trimmedEmail, code)) {
-                is AuthResult.Success -> AuthUiState.EmailUpdated
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_update_email_started")
+            when (val result = updateEmailUseCase(trimmedEmail, code)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_update_email_succeeded")
+                    _uiState.value = AuthUiState.EmailUpdated
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("update_email", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -232,9 +254,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = updatePasswordUseCase(newPassword, code)) {
-                is AuthResult.Success -> AuthUiState.PasswordUpdated
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_update_password_started")
+            when (val result = updatePasswordUseCase(newPassword, code)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_update_password_succeeded")
+                    _uiState.value = AuthUiState.PasswordUpdated
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("update_password", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -259,9 +288,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = confirmEmailUpdateUseCase(trimmedEmail)) {
-                is AuthResult.Success -> AuthUiState.EmailUpdated
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_email_update_started")
+            when (val result = confirmEmailUpdateUseCase(trimmedEmail)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_email_update_succeeded")
+                    _uiState.value = AuthUiState.EmailUpdated
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("confirm_email_update", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -275,9 +311,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = unlinkIdentityUseCase(identityId)) {
-                is AuthResult.Success -> AuthUiState.IdentityUnlinked
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_unlink_identity_started")
+            when (val result = unlinkIdentityUseCase(identityId)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_unlink_identity_succeeded")
+                    _uiState.value = AuthUiState.IdentityUnlinked
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("unlink_identity", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -295,9 +338,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = linkGoogleIdentityNativeUseCase(redirectUrl)) {
-                is AuthResult.Success -> AuthUiState.GoogleIdentityLinkStarted(result.data)
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_link_google_identity_native_started")
+            when (val result = linkGoogleIdentityNativeUseCase(redirectUrl)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_link_google_identity_native_succeeded")
+                    _uiState.value = AuthUiState.GoogleIdentityLinkStarted(result.data)
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("link_google_identity_native", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -324,6 +374,12 @@ class AuthViewModel(
         val isGenuineRecoverySession =
             (sessionState.value as? SessionState.Authenticated)?.user?.isRecoverySession == true
         if (!isGenuineRecoverySession) {
+            // SECURITY telemetry: this is the actual authorization boundary behind the
+            // forged-manahub://auth?type=recovery-intent fix — it should fire ~0 times in normal
+            // operation. A dedicated NON_FATAL (distinct from ResetPasswordConfirmScreen's UI-layer
+            // key) makes a silent bypass attempt or a regression visible instead of invisible.
+            FirebaseCrashlytics.getInstance().log("password_reset_confirm_blocked_not_recovery_session")
+            recordNonFatal("account_mgmt_reset_vm_blocked_not_recovery_session")
             // Reuse the same "reset link invalid/expired" copy the UI already shows for an
             // unauthenticated session — a distinct message here would tell an attacker WHY the
             // gate failed (not authenticated vs. authenticated-but-not-a-recovery-session), which
@@ -334,9 +390,16 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = confirmPasswordResetUseCase(newPassword)) {
-                is AuthResult.Success -> AuthUiState.PasswordResetConfirmed
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_password_reset_started")
+            when (val result = confirmPasswordResetUseCase(newPassword)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_password_reset_succeeded")
+                    _uiState.value = AuthUiState.PasswordResetConfirmed
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("confirm_password_reset", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -476,6 +539,10 @@ class AuthViewModel(
 
     fun signOut() {
         viewModelScope.launch {
+            // Loading here lets AccountManagementScreen disable/spinner the Sign Out row while this
+            // is in flight — previously this function had no Loading handling at all, so a second tap
+            // before the coroutine completed could fire signOutUseCase() twice concurrently.
+            _uiState.value = AuthUiState.Loading
             signOutUseCase()
             // sessionState will emit Unauthenticated automatically via the SDK Flow
             _uiState.value = AuthUiState.Idle
@@ -541,9 +608,24 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = deleteAccountUseCase()) {
-                is AuthResult.Success -> AuthUiState.AccountDeleted
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_delete_requested")
+            when (val result = deleteAccountUseCase()) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_delete_succeeded")
+                    _uiState.value = AuthUiState.AccountDeleted
+                }
+                is AuthResult.Error -> {
+                    // The one irreversible action in this feature — record on ANY failure (not just
+                    // AuthError.Unknown, unlike recordUnexpectedAuthFailure's other 8 ops) since a
+                    // failed account deletion is always worth investigating regardless of error type.
+                    val errorType = result.error::class.simpleName ?: "Unknown"
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("account_delete_failed")
+                        setCustomKey("account_delete_error_type", errorType)
+                    }
+                    recordNonFatal("account_delete_failed_$errorType")
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -551,6 +633,31 @@ class AuthViewModel(
     /** Resets [uiState] back to [AuthUiState.Idle] so the sheet can be reused. */
     fun resetUiState() {
         _uiState.value = AuthUiState.Idle
+    }
+
+    /**
+     * Shared telemetry helper for the account-management critical ops (resendConfirmationEmail,
+     * requestReauthentication, updateEmail, updatePassword, confirmEmailUpdate, unlinkIdentity,
+     * linkGoogleIdentityNative, confirmPasswordReset). Sets a filterable context key with the
+     * failing [action] name and records a NON_FATAL only for the cases that should be empirically
+     * rare and are worth watching for regressions/drift:
+     * - [AuthError.Unknown]: the catch-all bucket — typed errors already have deterministic UI
+     *   messaging and don't need one.
+     * - [AuthError.SingleIdentityNotDeletable]: the client-side `removeEnabled` guard on
+     *   [unlinkIdentity]'s call sites should make this server rejection unreachable in normal use;
+     *   harmless to check unconditionally since no other op can ever produce it.
+     *
+     * Never logs the raw [AuthError.Unknown.message] (may carry server response text) — only the
+     * error class name.
+     */
+    private fun recordUnexpectedAuthFailure(action: String, error: AuthError) {
+        FirebaseCrashlytics.getInstance().apply {
+            log("account_mgmt_action_failed: $action (${error::class.simpleName})")
+            setCustomKey("account_mgmt_action", action)
+        }
+        if (error is AuthError.Unknown || error is AuthError.SingleIdentityNotDeletable) {
+            recordNonFatal("account_mgmt_unexpected_failure_$action")
+        }
     }
 
     // --- Helpers ---

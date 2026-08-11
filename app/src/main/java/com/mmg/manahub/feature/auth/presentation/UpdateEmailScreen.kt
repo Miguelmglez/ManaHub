@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
@@ -69,6 +70,10 @@ fun UpdateEmailScreen(
 
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     var newEmail by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: update_email")
+    }
 
     LaunchedEffect(authUiState) {
         if (authUiState is AuthUiState.EmailUpdated) {

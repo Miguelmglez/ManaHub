@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
@@ -47,6 +48,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.recordNonFatal
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -89,6 +91,10 @@ fun ResetPasswordConfirmScreen(
     var newPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     val passwordStrength = remember(newPassword) { PasswordStrength.from(newPassword) }
+
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: reset_password_confirm")
+    }
 
     LaunchedEffect(authUiState) {
         if (authUiState is AuthUiState.PasswordResetConfirmed) {
@@ -139,6 +145,12 @@ fun ResetPasswordConfirmScreen(
                 // already-authenticated (but non-recovery) session — render the same error state as
                 // an invalid/expired link rather than a functional-looking password form. See the
                 // SECURITY KDoc on this composable and on AuthViewModel.confirmPasswordReset.
+                // Distinct NON_FATAL key from the VM-layer gate (account_mgmt_reset_vm_blocked_...)
+                // so Crashlytics can tell which defense layer actually caught it.
+                LaunchedEffect(Unit) {
+                    FirebaseCrashlytics.getInstance().log("reset_password_confirm_screen_blocked_not_recovery_session")
+                    recordNonFatal("account_mgmt_reset_screen_blocked_not_recovery_session")
+                }
                 FullErrorState(
                     message = stringResource(R.string.account_mgmt_reset_link_invalid),
                     retryLabel = stringResource(R.string.account_mgmt_back_to_signin),

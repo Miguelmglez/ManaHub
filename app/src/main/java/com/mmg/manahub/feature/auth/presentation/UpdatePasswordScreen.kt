@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -44,6 +45,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.recordNonFatal
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -77,6 +79,10 @@ fun UpdatePasswordScreen(
     var newPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     val passwordStrength = remember(newPassword) { PasswordStrength.from(newPassword) }
+
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: update_password")
+    }
 
     LaunchedEffect(authUiState) {
         if (authUiState is AuthUiState.PasswordUpdated) {
@@ -112,6 +118,13 @@ fun UpdatePasswordScreen(
         },
     ) { padding ->
         if (code == null) {
+            // Process-death / back-stack restore: the in-memory reauth-code handoff from
+            // SecurityCodeScreen was lost — mirrors the PlaytestHand "pendingPlaytestSetup was
+            // null" guard, which per CLAUDE.md carries a dedicated non-fatal to quantify how often
+            // process death hits real users on this handoff.
+            LaunchedEffect(Unit) {
+                recordNonFatal("account_mgmt_password_code_handoff_lost")
+            }
             FullErrorState(
                 message = stringResource(R.string.account_mgmt_session_expired),
                 retryLabel = stringResource(R.string.account_mgmt_request_new_code),

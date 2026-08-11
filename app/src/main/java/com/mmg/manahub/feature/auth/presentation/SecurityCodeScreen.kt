@@ -37,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
@@ -101,6 +102,7 @@ fun SecurityCodeScreen(
     // The ONE call site for the initial send — fires once per fresh instance of this screen
     // (including a fresh instance reached by popping back after an invalid/expired-code error).
     LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: security_code")
         authViewModel.requestReauthentication()
         startCooldown()
     }
@@ -183,6 +185,7 @@ fun SecurityCodeScreen(
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                 MagicCtaButton(
                     onClick = {
+                        FirebaseCrashlytics.getInstance().log("security_code_resend_tapped")
                         authViewModel.requestReauthentication()
                         startCooldown()
                     },
@@ -200,7 +203,11 @@ fun SecurityCodeScreen(
             Spacer(modifier = Modifier.height(sp.xl))
 
             MagicCtaButton(
-                onClick = { onCodeConfirmed(code) },
+                onClick = {
+                    // Never log the actual 6-digit code — only that the tap happened.
+                    FirebaseCrashlytics.getInstance().log("security_code_submit_tapped")
+                    onCodeConfirmed(code)
+                },
                 text = stringResource(R.string.auth_btn_continue),
                 style = MagicCtaStyle.Filled,
                 color = MagicCtaColor.Primary,

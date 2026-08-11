@@ -674,7 +674,7 @@ class AuthViewModelTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `when signOut then uiState becomes Idle and signOutUseCase is called`() = runTest {
+    fun `when signOut then uiState transitions Loading then Idle and signOutUseCase is called`() = runTest {
         coEvery { signInWithEmailUseCase(any(), any()) } returns AuthResult.Success(dummyAuthUser)
         coEvery { signOutUseCase() } returns AuthResult.Success(Unit)
 
@@ -685,6 +685,10 @@ class AuthViewModelTest {
             awaitItem() // drain current Success state
             viewModel.signOut()
             advanceUntilIdle()
+            // signOut() now surfaces AuthUiState.Loading before Idle (design fix: lets
+            // AccountManagementScreen disable/spinner the Sign Out row while a request is in
+            // flight, preventing a second tap from firing signOutUseCase() concurrently).
+            assertEquals(AuthUiState.Loading, awaitItem())
             assertEquals(AuthUiState.Idle, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }

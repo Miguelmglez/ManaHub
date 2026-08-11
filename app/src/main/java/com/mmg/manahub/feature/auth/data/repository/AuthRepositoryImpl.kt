@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.auth.data.repository
 
 import android.util.Log
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.common.decodeAmrIncludesRecoveryClaim
 import com.mmg.manahub.core.common.decodeIsAnonymousClaim
@@ -697,6 +698,10 @@ class AuthRepositoryImpl(
             "google" !in previousProviders &&
             "google" in currentProviders
         ) {
+            // This IS the success-observation point for linkGoogleIdentityNative's OAuth-redirect
+            // flow — the SDK has no dedicated link-completed callback to hook instead (see the
+            // KDoc on the .onEach call site in sessionState above).
+            FirebaseCrashlytics.getInstance().log("google_identity_link_detected")
             notifyAccountEvent(AccountNotificationEvent.IDENTITY_LINKED, providerMetadata("google"))
         }
         knownIdentityProviders = currentProviders
@@ -746,12 +751,19 @@ class AuthRepositoryImpl(
 
                 supabaseOkHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
+                        // Filterable keys in addition to the message-baked values below, so
+                        // Crashlytics can aggregate/segment by event type and HTTP code.
+                        FirebaseCrashlytics.getInstance().apply {
+                            setCustomKey("account_notification_event", event.value)
+                            setCustomKey("account_notification_http_code", response.code)
+                        }
                         recordNonFatal(
                             "send_account_notification_failed event_${event.value} http_${response.code}"
                         )
                     }
                 }
             }.onFailure { e ->
+                FirebaseCrashlytics.getInstance().setCustomKey("account_notification_event", event.value)
                 recordNonFatal("send_account_notification_error event_${event.value}", e)
             }
         }
