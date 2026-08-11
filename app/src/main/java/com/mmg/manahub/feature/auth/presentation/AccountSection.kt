@@ -24,10 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +49,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +56,12 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.ShareProfileSheet
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -68,15 +73,23 @@ import com.mmg.manahub.core.domain.auth.SessionState
  *
  * - [SessionState.Loading]         → shimmer skeleton card while the session is being restored
  * - [SessionState.Unauthenticated] → feature-promotion card with login / sign-up CTAs
- * - [SessionState.Authenticated]   → compact user identity card with sign-out and delete-account options
+ * - [SessionState.Authenticated]   → user identity card with a "Manage my account" CTA (account
+ *   settings, sign-out and delete-account live on a dedicated screen owned by a later phase) and a
+ *   "Share my profile" CTA opening [ShareProfileSheet].
+ *
+ * @param onManageAccountClick invoked by the "Manage my account" CTA. The destination screen is not
+ *   wired yet (a later phase owns it) — the caller only needs to supply the callback for now.
+ * @param onFetchShareLink suspend lookup for the invite link, forwarded verbatim to
+ *   [ShareProfileSheet] (see that composable's KDoc for why this stays a lambda rather than a
+ *   ViewModel call).
  */
 @Composable
 fun AccountSection(
     sessionState: SessionState,
     onLoginClick: () -> Unit,
     onSignUpClick: () -> Unit,
-    onSignOutClick: () -> Unit,
-    onDeleteAccountClick: () -> Unit,
+    onManageAccountClick: () -> Unit,
+    onFetchShareLink: suspend () -> Result<String>,
     modifier: Modifier = Modifier,
     playerName: String? = null,
     avatarUrl: String? = null,
@@ -95,8 +108,8 @@ fun AccountSection(
         is SessionState.Authenticated -> {
             AuthenticatedCard(
                 user = sessionState.user,
-                onSignOutClick = onSignOutClick,
-                onDeleteAccountClick = onDeleteAccountClick,
+                onManageAccountClick = onManageAccountClick,
+                onFetchShareLink = onFetchShareLink,
                 modifier = modifier,
                 displayName = playerName,
                 displayAvatarUrl = avatarUrl,
@@ -376,8 +389,8 @@ private fun BenefitRow(
 @Composable
 private fun AuthenticatedCard(
     user: AuthUser,
-    onSignOutClick: () -> Unit,
-    onDeleteAccountClick: () -> Unit,
+    onManageAccountClick: () -> Unit,
+    onFetchShareLink: suspend () -> Result<String>,
     modifier: Modifier = Modifier,
     displayName: String? = null,
     displayAvatarUrl: String? = null,
@@ -391,49 +404,13 @@ private fun AuthenticatedCard(
     val avatarUrl = displayAvatarUrl ?: user.avatarUrl
     val gameTag = user.gameTag
 
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showShareSheet by remember { mutableStateOf(false) }
 
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.auth_delete_account_confirm_title),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.auth_delete_account_confirm_body),
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDeleteAccountClick()
-                    },
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_delete_account_confirm_btn),
-                        style = ty.labelMedium,
-                        color = Color.Red,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(
-                        text = stringResource(R.string.auth_cancel),
-                        style = ty.labelMedium,
-                        color = mc.textSecondary,
-                    )
-                }
-            },
-            containerColor = mc.surface,
+    if (showShareSheet) {
+        ShareProfileSheet(
+            gameTag = gameTag,
+            onFetchShareLink = onFetchShareLink,
+            onDismiss = { showShareSheet = false },
         )
     }
 
@@ -442,172 +419,153 @@ private fun AuthenticatedCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = mc.primaryAccent.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(16.dp),
+                color = mc.primaryAccent.copy(alpha = 0.25f),
+                shape = CardShape,
             ),
         color = mc.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
-            // ── User Info Section ──────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // ── Accent header band ───────────────────────────────────────────
+            // A soft gradient banner behind the avatar row gives the authenticated
+            // state a more prominent, "you belong here" identity treatment than a
+            // flat surface, while staying entirely token-driven (works on all 12
+            // palettes, including the light HallowedPrint theme).
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                mc.primaryAccent.copy(alpha = 0.16f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    )
+                    .padding(16.dp),
             ) {
-                // Avatar
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(mc.primaryAccent.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
+                // ── User Info Section ──────────────────────────────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (avatarUrl != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(avatarUrl)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        ThemeBackground(modifier = Modifier.fillMaxSize())
-                        Text(
-                            text = nickname.take(1).uppercase().ifEmpty { "✦" },
-                            style = ty.titleLarge.copy(color = mc.primaryAccent.copy(alpha = 0.7f)),
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                // Name & Email
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = nickname,
-                            style = ty.titleMedium,
-                            color = mc.textPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (gameTag != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = mc.primaryAccent.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(6.dp),
-                                    )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                            ) {
-                                Text(
-                                    text = gameTag,
-                                    color = mc.primaryAccent,
-                                    style = ty.labelSmall.copy(fontSize = 10.sp),
-                                )
-                            }
+                    // Avatar with a gradient accent ring
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 2.dp,
+                                brush = Brush.linearGradient(listOf(mc.primaryAccent, mc.secondaryAccent)),
+                                shape = CircleShape,
+                            )
+                            .padding(3.dp)
+                            .clip(CircleShape)
+                            .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (avatarUrl != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(avatarUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            )
+                        } else {
+                            ThemeBackground(modifier = Modifier.fillMaxSize())
+                            Text(
+                                text = nickname.take(1).uppercase().ifEmpty { "✦" },
+                                style = ty.titleLarge.copy(color = mc.primaryAccent.copy(alpha = 0.7f)),
+                            )
                         }
                     }
-                    val email: String? = user.email
-                    if (email != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = email,
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Name & Email
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = nickname,
+                                style = ty.titleMedium,
+                                color = mc.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (gameTag != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .border(
+                                            width = 1.dp,
+                                            color = mc.primaryAccent.copy(alpha = 0.4f),
+                                            shape = ChipShape,
+                                        )
+                                        .background(
+                                            color = mc.primaryAccent.copy(alpha = 0.12f),
+                                            shape = ChipShape,
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                                ) {
+                                    Text(
+                                        text = gameTag,
+                                        color = mc.primaryAccent,
+                                        style = ty.labelSmall.copy(fontSize = 10.sp),
+                                    )
+                                }
+                            }
+                        }
+                        val email: String? = user.email
+                        if (email != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = email,
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
 
-            // ── Share Game Tag button ─────────────────────────────────────────
-            if (gameTag != null) {
-                val context = LocalContext.current
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        val tagToCopy = gameTag.removePrefix("#")
-                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("Game Tag", tagToCopy)
-                        clipboard.setPrimaryClip(clip)
-                        
-                        // We use a simple toast if possible, but since we are in a Composable without direct toast state
-                        // we can either use a standard Android toast or just skip it if it's too complex to add now.
-                        // Standard Android toast is fine for a quick feedback.
-                        android.widget.Toast.makeText(
-                            context,
-                            context.getString(com.mmg.manahub.R.string.friends_gametag_copied),
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                // ── Action Buttons ───────────────────────────────────────────────
+                MagicCtaButton(
+                    onClick = onManageAccountClick,
+                    text = stringResource(R.string.auth_manage_account),
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    icon = {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
-                ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = mc.primaryAccent,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(com.mmg.manahub.R.string.friends_share_my_link),
-                        style = ty.labelLarge,
-                    )
-                }
-            }
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Action Buttons ─────────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Sign Out (Primary Outlined)
-                OutlinedButton(
-                    onClick = onSignOutClick,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.5.dp,
-                        color = mc.primaryAccent,
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = mc.primaryAccent,
-                    ),
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_sign_out),
-                        style = ty.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    )
-                }
-
-                // Delete Account (Ghost/Red)
-                TextButton(
-                    onClick = { showDeleteDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color.Red.copy(alpha = 0.7f)
-                    )
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_delete_account),
-                        style = ty.labelSmall,
-                    )
-                }
+                MagicCtaButton(
+                    onClick = { showShareSheet = true },
+                    text = stringResource(R.string.auth_share_my_profile),
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Primary,
+                    icon = {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

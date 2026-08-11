@@ -47,6 +47,13 @@ import org.koin.dsl.module
  * [com.mmg.manahub.core.domain.auth.AuthRepository] — are already bridged in `coreBridgeKoinModule`
  * (shared with other islands), so no new `ManaHubApp` bridging or module constructor param is needed.
  *
+ * ## Cross-island consumer: `ShareInviteUseCase` (Account/Share-profile slice)
+ * [ProfileViewModel] now resolves `ShareInviteUseCase` (a Friends-domain use case registered in
+ * `friendsKoinModule`, not here) via `get()` to back `ProfileViewModel.fetchShareLink()`, which feeds
+ * the "Share my profile" CTA on `AccountSection`/`ShareProfileSheet` hosted by `ProfileScreen`. No new
+ * registration is added here — `friendsKoinModule` and this module load together in the same
+ * `ManaHubApp` `modules(...)` call, so the definition is visible cross-module.
+ *
  * @return a Koin [Module] that provides the Profile-only bridged singletons and the [ProfileViewModel]
  *   / [ProfileEditViewModel] factories.
  */
@@ -71,6 +78,10 @@ fun profileKoinModule(
             authRepository = get(),
             gamificationRepository = get(),
             claimQuestRewardUseCase = get(),
+            // ShareInviteUseCase is registered in friendsKoinModule (Friends-only use case, only
+            // depends on the bridged FriendRepository) — resolved here via get() since both
+            // modules load together in ManaHubApp's single modules(...) call.
+            shareInviteUseCase = get(),
         )
     }
 
