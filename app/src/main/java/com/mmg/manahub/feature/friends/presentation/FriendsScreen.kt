@@ -37,10 +37,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,6 +54,7 @@ import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.ShareProfileSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -70,6 +73,15 @@ fun FriendsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
     val toastState = rememberMagicToastState()
+    var showShareSheet by remember { mutableStateOf(false) }
+
+    if (showShareSheet) {
+        ShareProfileSheet(
+            gameTag = uiState.gameTag,
+            onFetchShareLink = viewModel::fetchShareLink,
+            onDismiss = { showShareSheet = false },
+        )
+    }
 
     val errorMsg = stringResource(R.string.friends_error_generic)
     val sendErrorMsg = stringResource(R.string.friends_error_send)
@@ -262,13 +274,12 @@ fun FriendsScreen(
                     }
                 }
 
-                // Share Game Tag section — only visible when the game tag is ready
+                // Share profile section — only visible when the game tag is ready
                 if (uiState.gameTag != null) {
                     item {
-                        val context = LocalContext.current
                         Spacer(Modifier.height(4.dp))
                         MagicCtaButton(
-                            onClick = { viewModel.onCopyGameTagClicked(context) },
+                            onClick = { showShareSheet = true },
                             text = stringResource(R.string.friends_share_my_link),
                             style = MagicCtaStyle.Outlined,
                             icon = {

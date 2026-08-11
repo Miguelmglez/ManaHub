@@ -2290,6 +2290,9 @@
     <string name="auth_delete_account_confirm_btn">Delete Account</string>
     <string name="auth_email_confirmation_sent">Check your inbox to confirm your email!</string>
     <string name="auth_section_loading_description">Loading account information</string>
+    <!-- Authenticated AccountSection CTAs (sign-out/delete-account moved to a dedicated account-management screen, a later phase) -->
+    <string name="auth_manage_account">Manage my account</string>
+    <string name="auth_share_my_profile">Share my profile</string>
 
     <!-- Auth error messages (used by AuthViewModel.toUiMessage) -->
     <string name="auth_error_invalid_credentials">Incorrect email or password</string>
@@ -2371,8 +2374,15 @@
     <string name="friends_search_placeholder_no_hash">Game tag (e.g. A3KX9Z)</string>
     <!-- Invite link sharing -->
     <string name="friends_share_my_link">Share my Game Tag</string>
-    <string name="friends_gametag_copied">Game Tag copied to clipboard</string>
     <string name="friends_share_chooser_title">Share your ManaHub invite</string>
+    <!-- ShareProfileSheet (core/ui/components) — shared by AccountSection and FriendsScreen -->
+    <string name="share_profile_sheet_title">Invite a friend</string>
+    <string name="share_profile_option_gametag_title">Share by game tag</string>
+    <string name="share_profile_option_link_title">Share by link</string>
+    <string name="share_profile_option_link_subtitle">Send your invite link</string>
+    <string name="share_profile_link_error">Could not get your link. Tap to retry.</string>
+    <string name="share_profile_gametag_text">Add me on ManaHub! My game tag is %1$s</string>
+    <string name="share_profile_link_text">Join me on ManaHub! %1$s</string>
     <string name="friends_invite_self">That\'s your own invite link</string>
     <string name="friends_invite_invalid">Invitation is no longer valid</string>
     <string name="friends_invite_success">Now you are friends with %1$s</string>

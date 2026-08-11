@@ -1,9 +1,7 @@
 package com.mmg.manahub.feature.friends.presentation
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.util.CardConstants
@@ -15,6 +13,7 @@ import com.mmg.manahub.core.model.OutgoingFriendRequest
 import com.mmg.manahub.core.domain.repository.FriendRepository
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
+import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,7 +37,8 @@ class FriendsViewModel(
     private val authRepo: AuthRepository,
     private val searchUseCase: SearchUserByGameTagUseCase,
     private val sendRequestUseCase: SendFriendRequestUseCase,
-    private val analyticsHelper: AnalyticsHelper
+    private val analyticsHelper: AnalyticsHelper,
+    private val shareInviteUseCase: ShareInviteUseCase,
 ) : ViewModel() {
 
     data class UiState(
@@ -113,22 +113,15 @@ class FriendsViewModel(
     }
 
     /**
-     * Copies the current user's game tag (without the '#') to the clipboard.
-     * Does nothing if the game tag is not available.
+     * Resolves the current user's invite share link (wraps [ShareInviteUseCase] /
+     * `FriendRepository.getMyShareUrl`) for [com.mmg.manahub.core.ui.components.ShareProfileSheet].
+     * Fails fast when [_currentUserId] hasn't resolved yet — the sheet is only reachable once the
+     * game tag section is visible, which implies an authenticated session.
      */
-    fun onCopyGameTagClicked(context: Context) {
-        val tag = _uiState.value.gameTag?.removePrefix("#") ?: return
-        
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("Game Tag", tag)
-        clipboard.setPrimaryClip(clip)
-        
-        _uiState.update { 
-            it.copy(
-                toastMessage = context.getString(R.string.friends_gametag_copied),
-                toastType = MagicToastType.SUCCESS
-            )
-        }
+    suspend fun fetchShareLink(): Result<String> {
+        val userId = _currentUserId.value
+            ?: return Result.failure(IllegalStateException("Not authenticated"))
+        return shareInviteUseCase(userId)
     }
 
     fun onSearchQueryChange(query: String) {
