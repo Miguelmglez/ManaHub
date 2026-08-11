@@ -518,6 +518,18 @@ class AuthRepositoryImpl(
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
 
+    override suspend fun confirmPasswordReset(newPassword: String): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                // No nonce here: the recovery deep link already imported a fully-authenticated
+                // temporary session (see the KDoc on AuthRepository.confirmPasswordReset).
+                supabaseAuth.updateUser {
+                    this.password = newPassword
+                }
+                AuthResult.Success(Unit)
+            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+        }
+
     override suspend fun deleteAccount(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
             // Retrieve the current JWT to authenticate the Edge Function call.
@@ -763,6 +775,10 @@ class AuthRepositoryImpl(
             AuthErrorCode.UserNotFound -> AuthError.UserNotFound
             AuthErrorCode.SessionExpired,
             AuthErrorCode.SessionNotFound -> AuthError.SessionExpired
+            // GoTrue refuses to unlink an account's last remaining identity (422). Map it
+            // specifically so the UI can show a clear message instead of a generic error, even
+            // though the client-side disabled-button guard should prevent this in practice.
+            AuthErrorCode.SingleIdentityNotDeletable -> AuthError.SingleIdentityNotDeletable
             AuthErrorCode.EmailExists,
             AuthErrorCode.UserAlreadyExists ->
                 if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "")

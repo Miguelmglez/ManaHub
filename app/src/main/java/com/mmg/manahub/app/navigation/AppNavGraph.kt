@@ -86,6 +86,12 @@ import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
 import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
+import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
+import com.mmg.manahub.feature.auth.presentation.ResetPasswordConfirmScreen
+import com.mmg.manahub.feature.auth.presentation.SecurityCodePurpose
+import com.mmg.manahub.feature.auth.presentation.SecurityCodeScreen
+import com.mmg.manahub.feature.auth.presentation.UpdateEmailScreen
+import com.mmg.manahub.feature.auth.presentation.UpdatePasswordScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileTab
 import com.mmg.manahub.feature.puzzle.presentation.PuzzleScreen
@@ -197,6 +203,13 @@ fun AppNavGraph(
     var pendingTournamentId by remember { mutableStateOf<Long?>(null) }
     var pendingTournamentPlayers by remember { mutableStateOf<List<Long>>(emptyList()) }
     var pendingTournamentMode by remember { mutableStateOf<GameMode?>(null) }
+
+    // In-memory handoff for the reauthentication code entered on SecurityCodeScreen, consumed by
+    // UpdateEmailScreen/UpdatePasswordScreen. Mirrors the pendingPlaytestSetup pattern above:
+    // never a nav-graph string argument (which could end up in a screen-view analytics event or a
+    // saved instance-state bundle) — a plain in-memory var, cleared as soon as it's consumed.
+    // Null on process-death restore is handled by each consumer's own recoverable error state.
+    var pendingReauthCode by remember { mutableStateOf<String?>(null) }
 
     // hasActiveGame: true only while a game is actively running (not finished).
     // Stays true when the game is abandoned temporarily, allowing resume from Play FAB.
@@ -630,6 +643,7 @@ fun AppNavGraph(
                     onBack = { navController.popBackStack() },
                     onManageNewsSources = { navController.navigate(Screen.NewsSourcesSettings.route) },
                     onManageTagDictionary = { navController.navigate(Screen.TagDictionary.route) },
+                    onManageAccount = { navController.navigate(Screen.AccountManagement.route) },
                 )
             }
 
@@ -761,7 +775,110 @@ fun AppNavGraph(
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStatsClick = { navController.navigate(Screen.Stats.route) },
                     onFriendsClick = { navController.navigate(Screen.FriendsList.route) },
+                    onManageAccountClick = { navController.navigate(Screen.AccountManagement.route) },
                     initialTab = initialTab,
+                )
+            }
+
+            // ── Account management (Phase 4b) ───────────────────────────────────
+            composable(Screen.AccountManagement.route) {
+                AccountManagementScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToSecurityCode = { purpose ->
+                        navController.navigate(Screen.SecurityCode.createRoute(purpose))
+                    },
+                    onSignedOut = {
+                        // Sign-out/delete-account both leave the user unauthenticated — return to
+                        // Profile's Unauthenticated card rather than staying on an account screen
+                        // that no longer makes sense.
+                        navController.navigate(Screen.Profile.baseRoute) {
+                            popUpTo(Screen.AccountManagement.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.SecurityCode.route,
+                arguments = listOf(navArgument("purpose") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val purpose = SecurityCodePurpose.fromRouteArg(backStackEntry.arguments?.getString("purpose"))
+                SecurityCodeScreen(
+                    purpose = purpose,
+                    onBack = { navController.popBackStack() },
+                    onCodeConfirmed = { code ->
+                        pendingReauthCode = code
+                        val destination = when (purpose) {
+                            SecurityCodePurpose.EMAIL -> Screen.UpdateEmail.route
+                            SecurityCodePurpose.PASSWORD -> Screen.UpdatePassword.route
+                        }
+                        navController.navigate(destination)
+                    },
+                )
+            }
+
+            composable(Screen.UpdateEmail.route) {
+                UpdateEmailScreen(
+                    code = pendingReauthCode,
+                    onBack = { navController.popBackStack() },
+                    onRequestNewCode = {
+                        // Pop back to a FRESH SecurityCodeScreen instance, which re-fires
+                        // requestReauthentication() on its own LaunchedEffect(Unit).
+                        pendingReauthCode = null
+                        navController.popBackStack()
+                    },
+                    onEmailUpdated = {
+                        pendingReauthCode = null
+                        navController.popBackStack(Screen.AccountManagement.route, inclusive = false)
+                    },
+                )
+            }
+
+            composable(Screen.UpdatePassword.route) {
+                UpdatePasswordScreen(
+                    code = pendingReauthCode,
+                    onBack = { navController.popBackStack() },
+                    onRequestNewCode = {
+                        pendingReauthCode = null
+                        navController.popBackStack()
+                    },
+                    onPasswordUpdated = {
+                        pendingReauthCode = null
+                        navController.popBackStack(Screen.AccountManagement.route, inclusive = false)
+                    },
+                )
+            }
+
+            // ── "Forgot password" recovery-link completion ──────────────────────
+            //
+            // Supabase's IMPLICIT auth flow (this project's default — see SupabaseClientFactory.kt)
+            // delivers the recovery callback to `manahub://auth` with the session tokens AND
+            // `type=recovery` in the URL FRAGMENT (never a query param under implicit flow).
+            // MainActivity.isPasswordRecoveryDeepLink() parses that fragment; once it confirms the
+            // callback is a recovery (not a signup-confirmation or Google-link) callback, it:
+            //   1. Still calls supabaseClient.handleDeeplinks(intent) unconditionally (unchanged) —
+            //      this is what imports the temporary, fully-authenticated recovery UserSession.
+            //   2. ALSO enqueues "manahub://auth/recovery" via PushDeeplinkRouter — the SAME
+            //      Activity-to-Compose bridge FCM deep links already use (see the
+            //      PushDeeplinkRouter.setNavigator DisposableEffect above) — so Compose Navigation
+            //      routes here via navigate(Uri), never by matching the raw external intent (which
+            //      would otherwise collide with the OTHER manahub://auth consumers: signup email
+            //      confirmation and linkGoogleIdentityNative's OAuth-redirect callback).
+            composable(
+                route = Screen.ResetPasswordConfirm.route,
+                deepLinks = listOf(navDeepLink { uriPattern = "manahub://auth/recovery" }),
+            ) {
+                ResetPasswordConfirmScreen(
+                    onBack = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onPasswordReset = {
+                        navController.navigate(Screen.Profile.baseRoute) {
+                            popUpTo(Screen.ResetPasswordConfirm.route) { inclusive = true }
+                        }
+                    },
                 )
             }
 

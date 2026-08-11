@@ -89,6 +89,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onManageNewsSources: () -> Unit = {},
     onManageTagDictionary: () -> Unit = {},
+    onManageAccount: () -> Unit = {},
     // KMP migration — Phase 0 Spike D: Settings is the first "Koin island". This ViewModel is
     // resolved by Koin (koinViewModel()) while every other screen still uses hiltViewModel().
     viewModel: SettingsViewModel = koinViewModel(),
@@ -223,6 +224,35 @@ fun SettingsScreen(
                      tint = mc.textSecondary,
                  )
              }*/
+
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onManageAccount)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_manage_account),
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = mc.textPrimary,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.settings_manage_account_subtitle),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                )
+            }
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             Row(

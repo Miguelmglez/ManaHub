@@ -20,6 +20,8 @@ sealed class AuthUiState {
     data object PasswordUpdated : AuthUiState()
     /** Emitted after [AuthViewModel.unlinkIdentity] completes successfully. */
     data object IdentityUnlinked : AuthUiState()
+    /** Emitted after [AuthViewModel.confirmPasswordReset] completes successfully. */
+    data object PasswordResetConfirmed : AuthUiState()
     /**
      * Emitted after [AuthViewModel.linkGoogleIdentityNative] starts the OAuth-redirect flow. The
      * UI should open [authorizationUrl] (e.g. via Custom Tabs); the flow completes asynchronously

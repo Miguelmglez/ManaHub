@@ -4,6 +4,7 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
@@ -20,6 +21,7 @@ import com.mmg.manahub.feature.auth.domain.usecase.UnlinkIdentityUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdatePasswordUseCase
+import com.mmg.manahub.feature.auth.presentation.AccountManagementViewModel
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
@@ -42,9 +44,10 @@ import org.koin.dsl.module
  * ## Self-contained module (no bridge args)
  * Unlike the bridge-style island modules, [authKoinModule] takes NO constructor arguments. Every
  * dependency [AuthViewModel] needs is already resolvable from modules loaded earlier in `startKoin`:
- * - The sixteen auth use cases (ten original + six added by the account-management data-layer slice —
- *   [ResendConfirmationEmailUseCase]/[RequestReauthenticationUseCase]/[UpdateEmailUseCase]/
- *   [UpdatePasswordUseCase]/[UnlinkIdentityUseCase]/[LinkGoogleIdentityNativeUseCase]) are stateless
+ * - The seventeen auth use cases (ten original + six added by the account-management data-layer
+ *   slice — [ResendConfirmationEmailUseCase]/[RequestReauthenticationUseCase]/[UpdateEmailUseCase]/
+ *   [UpdatePasswordUseCase]/[UnlinkIdentityUseCase]/[LinkGoogleIdentityNativeUseCase] — plus
+ *   [ConfirmPasswordResetUseCase] added by the Phase 4b UI slice) are stateless
  *   thin wrappers over [AuthRepository] (and, for [DeleteAccountUseCase], `PushTokenRepository`). They
  *   are not registered as `single` in any other loaded module, so they are declared here as
  *   `single { }` and constructed directly by Koin. The Koin-built copies are independent of, but
@@ -221,6 +224,8 @@ fun authKoinModule(): Module = module {
     single { UpdatePasswordUseCase(get()) }
     single { UnlinkIdentityUseCase(get()) }
     single { LinkGoogleIdentityNativeUseCase(get()) }
+    // Phase 4b (account management): "forgot password" recovery-link completion, no reauth code.
+    single { ConfirmPasswordResetUseCase(get()) }
 
     // ── The Koin island: AuthViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
@@ -241,8 +246,21 @@ fun authKoinModule(): Module = module {
             updatePasswordUseCase = get(),
             unlinkIdentityUseCase = get(),
             linkGoogleIdentityNativeUseCase = get(),
+            confirmPasswordResetUseCase = get(),
             analyticsHelper = get(),
             appContext = androidContext(),
+        )
+    }
+
+    // ── AccountManagementScreen's screen-local ViewModel (Phase 4b). Owns the "share my profile"
+    //    link lookup (mirrors ProfileViewModel.fetchShareLink — same ShareInviteUseCase, cross-module
+    //    from friendsKoinModule) and the resend-confirmation-email cooldown timer. Everything else on
+    //    that screen (resend/unlink/link/sign-out/delete) goes straight through the entry-scoped
+    //    AuthViewModel, matching the existing Profile/LoginSheet pattern. ──
+    viewModel {
+        AccountManagementViewModel(
+            authRepository = get(),
+            shareInviteUseCase = get(),
         )
     }
 }

@@ -7,6 +7,7 @@ import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
@@ -85,6 +86,7 @@ class AuthViewModelTest {
     private val updatePasswordUseCase          = mockk<UpdatePasswordUseCase>()
     private val unlinkIdentityUseCase          = mockk<UnlinkIdentityUseCase>()
     private val linkGoogleIdentityNativeUseCase = mockk<LinkGoogleIdentityNativeUseCase>()
+    private val confirmPasswordResetUseCase = mockk<ConfirmPasswordResetUseCase>()
 
     /**
      * Context mock that returns the actual English string values from strings.xml.
@@ -190,6 +192,7 @@ class AuthViewModelTest {
         updatePasswordUseCase           = updatePasswordUseCase,
         unlinkIdentityUseCase           = unlinkIdentityUseCase,
         linkGoogleIdentityNativeUseCase = linkGoogleIdentityNativeUseCase,
+        confirmPasswordResetUseCase     = confirmPasswordResetUseCase,
         analyticsHelper           = mockk(relaxed = true),
         appContext                 = appContext,
     )
@@ -1009,6 +1012,50 @@ class AuthViewModelTest {
     fun `given password with only symbols when isPasswordStrong then returns false`() {
         // No letters at all — fails uppercase AND lowercase checks
         assertFalse(AuthViewModel.isPasswordStrong("!!!!!!!!!!"))
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 11 — confirmPasswordReset (recovery-link completion, no reauth code)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given strong password when confirmPasswordReset then uiState transitions Loading then PasswordResetConfirmed`() = runTest {
+        coEvery { confirmPasswordResetUseCase("Password1!") } returns AuthResult.Success(Unit)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            assertEquals(AuthUiState.PasswordResetConfirmed, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { confirmPasswordResetUseCase("Password1!") }
+    }
+
+    @Test
+    fun `given weak password when confirmPasswordReset then uiState emits Error without Loading and use case is never called`() = runTest {
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("weak")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("Password must include uppercase, lowercase, a number and a symbol", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
+    }
+
+    @Test
+    fun `given network error when confirmPasswordReset then uiState emits Error with network message`() = runTest {
+        coEvery { confirmPasswordResetUseCase(any()) } returns AuthResult.Error(AuthError.NetworkError)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("No connection. Check your network", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
 

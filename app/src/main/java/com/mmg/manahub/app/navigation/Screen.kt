@@ -135,6 +135,33 @@ sealed class Screen(val route: String) {
     }
     object FriendsList : Screen("profile/friends")
 
+    // ── Account management (Phase 4b) ─────────────────────────────────────────
+    /** Account settings hub — reachable from the "Manage my account" CTA on [AccountSection]. */
+    object AccountManagement : Screen("auth/manage")
+
+    /**
+     * Reauthentication-code gate shared by the change-email/change-password flows. The [purpose]
+     * arg is a controlled enum `routeArg` (see
+     * [com.mmg.manahub.feature.auth.presentation.SecurityCodePurpose]), never free text — callers
+     * always go through [createRoute].
+     */
+    object SecurityCode : Screen("auth/security_code/{purpose}") {
+        fun createRoute(purpose: com.mmg.manahub.feature.auth.presentation.SecurityCodePurpose) =
+            "auth/security_code/${purpose.routeArg}"
+    }
+
+    /** Final step of the "Change email" flow, reached only after [SecurityCode]. */
+    object UpdateEmail : Screen("auth/update_email")
+
+    /** Final step of the "Change password" / "Set a password" flow, reached only after [SecurityCode]. */
+    object UpdatePassword : Screen("auth/update_password")
+
+    /**
+     * "Forgot password" recovery-link completion. Deep-linked from `manahub://auth/recovery`
+     * (see `AppNavGraph.kt`'s deep-link wiring KDoc) — never reached via a normal `navigate()` call.
+     */
+    object ResetPasswordConfirm : Screen("auth/reset_password_confirm")
+
     /**
      * Phantom screen that processes an incoming friend invite link.
      * Deep link patterns: `https://manahub.app/invite/{code}` and `manahub://invite/{code}`.

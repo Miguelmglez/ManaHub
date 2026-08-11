@@ -1870,6 +1870,8 @@
     <string name="settings_version_label">Version</string>
     <string name="settings_data_source_label">Data</string>
     <string name="settings_data_source_value">Scryfall API</string>
+    <string name="settings_manage_account">Manage account</string>
+    <string name="settings_manage_account_subtitle">Email, password, sign-in methods, sign out</string>
     <string name="settings_tag_dictionary">Tag Dictionary</string>
     <string name="settings_tag_dictionary_subtitle">Edit translations, detection patterns and auto-tagger thresholds.</string>
     <string name="settings_open_scryfall">Open Scryfall website</string>
@@ -2346,6 +2348,53 @@
     <string name="auth_email_confirm_body">We sent a confirmation link to %1$s.\nTap it to activate your account.</string>
     <string name="auth_email_confirm_open_app">Open email app</string>
     <string name="auth_email_confirm_back">Back to Sign In</string>
+
+    <!-- Single-identity-not-deletable error (GoTrue refuses to unlink an account's last identity) -->
+    <string name="auth_error_single_identity_not_deletable">You need another sign-in method before removing this one.</string>
+
+    <!-- Account Management screen (Phase 4b) -->
+    <string name="account_mgmt_title">Manage account</string>
+    <string name="account_mgmt_joined">Joined %1$s</string>
+    <string name="account_mgmt_change_email">Change email</string>
+    <string name="account_mgmt_change_password">Change password</string>
+    <string name="account_mgmt_set_password">Set a password</string>
+    <string name="account_mgmt_set_password_subtitle">Add email/password sign-in to this Google account</string>
+    <string name="account_mgmt_signin_methods_title">Sign-in methods</string>
+    <string name="account_mgmt_danger_zone_title">Danger zone</string>
+    <string name="account_mgmt_link_google">Link Google account</string>
+    <string name="account_mgmt_provider_google">Google</string>
+    <string name="account_mgmt_provider_email">Email &amp; password</string>
+    <string name="account_mgmt_only_signin_method">This is your only sign-in method — add another before removing it</string>
+    <string name="account_mgmt_unlink_confirm_title">Remove sign-in method</string>
+    <string name="account_mgmt_unlink_confirm_body">Remove %1$s as a sign-in method for this account?</string>
+    <string name="account_mgmt_sign_out_confirm_body">Are you sure you want to sign out?</string>
+    <string name="account_mgmt_email_not_verified">Not verified</string>
+    <string name="account_mgmt_email_not_verified_body">Confirm your email address to secure your account.</string>
+    <string name="account_mgmt_resend_email">Resend email</string>
+    <string name="account_mgmt_gametag_copied">Game tag copied to clipboard</string>
+
+    <!-- Reauthentication-code gate (shared by change-email / change-password) -->
+    <string name="account_mgmt_security_code_title">Verify it\'s you</string>
+    <string name="account_mgmt_security_code_body_email">Enter the 6-digit code we sent to your email to continue changing your email address.</string>
+    <string name="account_mgmt_security_code_body_password">Enter the 6-digit code we sent to your email to continue changing your password.</string>
+    <string name="account_mgmt_security_code_field_label">6-digit code</string>
+    <string name="account_mgmt_resend_code">Resend code</string>
+    <string name="account_mgmt_resend_code_cooldown">Resend in %1$ds</string>
+    <string name="account_mgmt_session_expired">This step expired. Request a new code to continue.</string>
+    <string name="account_mgmt_request_new_code">Request a new code</string>
+
+    <!-- Change email / change password final steps -->
+    <string name="account_mgmt_update_email_body">Enter your new email address. We\'ll use the code you just verified to confirm the change.</string>
+    <string name="account_mgmt_new_email_field">New email</string>
+    <string name="account_mgmt_update_password_body">Enter your new password. We\'ll use the code you just verified to confirm the change.</string>
+    <string name="account_mgmt_new_password_field">New password</string>
+
+    <!-- Forgot-password recovery-link completion -->
+    <string name="account_mgmt_reset_password_title">Set new password</string>
+    <string name="account_mgmt_reset_password_body">Choose a new password for your account.</string>
+    <string name="account_mgmt_reset_password_cta">Set new password</string>
+    <string name="account_mgmt_reset_link_invalid">This reset link is invalid or has expired. Request a new one from the sign-in screen.</string>
+    <string name="account_mgmt_back_to_signin">Back to sign in</string>
 
     <!-- Friends feature -->
     <string name="friends_title">Friends</string>

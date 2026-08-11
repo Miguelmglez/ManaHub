@@ -20,10 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -655,74 +653,8 @@ private fun EmailConfirmationContent(
     }
 }
 
-// ── Password strength model ────────────────────────────────────────────────────
-
-/**
- * Immutable snapshot of which password requirements are currently satisfied.
- * Mirrors the server-side rules enforced by [AuthViewModel.isPasswordStrong].
- */
-private data class PasswordStrength(
-    val hasMinLength: Boolean,
-    val hasLowercase: Boolean,
-    val hasUppercase: Boolean,
-    val hasDigit: Boolean,
-    val hasSymbol: Boolean,
-) {
-    val allMet: Boolean
-        get() = hasMinLength && hasLowercase && hasUppercase && hasDigit && hasSymbol
-
-    companion object {
-        fun from(password: String) = PasswordStrength(
-            hasMinLength = password.length >= 8,
-            hasLowercase = password.any { it.isLowerCase() },
-            hasUppercase = password.any { it.isUpperCase() },
-            hasDigit     = password.any { it.isDigit() },
-            hasSymbol    = password.any { !it.isLetterOrDigit() },
-        )
-    }
-}
-
-// ── Password strength UI ───────────────────────────────────────────────────────
-
-@Composable
-private fun PasswordStrengthIndicator(strength: PasswordStrength) {
-    val ty = MaterialTheme.magicTypography
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        RequirementRow(stringResource(R.string.auth_password_requirement_length),   strength.hasMinLength, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_uppercase), strength.hasUppercase, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_lowercase), strength.hasLowercase, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_digit),     strength.hasDigit, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_symbol),    strength.hasSymbol, ty)
-    }
-}
-
-@Composable
-private fun RequirementRow(label: String, met: Boolean, ty: com.mmg.manahub.core.ui.theme.MagicTypography) {
-    val mc = MaterialTheme.magicColors
-    val color = if (met) mc.lifePositive else mc.textDisabled
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Icon(
-            imageVector = if (met) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(14.dp),
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = label,
-            color = color,
-            style = ty.labelSmall,
-        )
-    }
-}
+// ── Password strength model + UI moved to PasswordStrength.kt (same package) so
+//    UpdatePasswordScreen can share the exact same rules/UI instead of duplicating them. ──
 
 /**
  * Dialog shown when a Google Sign-In attempt collides with an existing email/password account.

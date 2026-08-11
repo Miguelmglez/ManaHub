@@ -473,4 +473,29 @@ class AuthUseCasesTest {
 
         coVerify(exactly = 1) { repository.updateNickname("") }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 9 — ConfirmPasswordResetUseCase
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `when ConfirmPasswordResetUseCase invoked then delegates to repository_confirmPasswordReset`() = runTest {
+        coEvery { repository.confirmPasswordReset("NewPassword1!") } returns successUnit
+        val useCase = ConfirmPasswordResetUseCase(repository)
+
+        val result = useCase("NewPassword1!")
+
+        coVerify(exactly = 1) { repository.confirmPasswordReset("NewPassword1!") }
+        assertEquals(successUnit, result)
+    }
+
+    @Test
+    fun `given repository returns Error when ConfirmPasswordResetUseCase invoked then propagates Error`() = runTest {
+        coEvery { repository.confirmPasswordReset(any()) } returns networkError
+        val useCase = ConfirmPasswordResetUseCase(repository)
+
+        val result = useCase("NewPassword1!")
+
+        assertEquals(networkError, result)
+    }
 }

@@ -154,4 +154,17 @@ interface AuthRepository {
      * @return The authorization URL to open, or null if the platform already launched it.
      */
     suspend fun linkGoogleIdentityNative(redirectUrl: String): AuthResult<String?>
+
+    /**
+     * Confirms a password change started via the "forgot password" email link, WITHOUT a
+     * reauthentication [code] — distinct from [updatePassword].
+     *
+     * Tapping the recovery link (`Auth.resetPasswordForEmail`) already establishes a temporary,
+     * fully-authenticated recovery session on-device (GoTrue mints a real access token for it), so
+     * no nonce/reauthentication step is needed here: the caller is already proven to own the
+     * mailbox. This calls `Auth.updateUser` with only the new password set.
+     *
+     * @param newPassword The new password, already validated by the caller.
+     */
+    suspend fun confirmPasswordReset(newPassword: String): AuthResult<Unit>
 }

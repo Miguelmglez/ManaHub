@@ -23,6 +23,16 @@ sealed class AuthError {
     /** Returned when the supplied nickname exceeds the 30-character limit. */
     data object NicknameTooLong : AuthError()
     /**
+     * Returned when [AuthRepository.unlinkIdentity] is called on the account's LAST remaining
+     * identity. GoTrue natively refuses to unlink a user's only identity (HTTP 422,
+     * `single_identity_not_deletable`) — every account must keep at least one sign-in method. The
+     * UI should surface a clear "you need another sign-in method first" message rather than the
+     * generic [Unknown] fallback, even though the client-side disabled-button guard
+     * (`identities.size <= 1`) should prevent this in the common case; this is the server-side
+     * safety net for that guard.
+     */
+    data object SingleIdentityNotDeletable : AuthError()
+    /**
      * Returned when a Google Sign-In attempt is made with an email that already exists
      * as an email/password account.
      *
