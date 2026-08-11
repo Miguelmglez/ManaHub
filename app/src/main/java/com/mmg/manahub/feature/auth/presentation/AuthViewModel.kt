@@ -586,6 +586,7 @@ class AuthViewModel(
         is AuthError.NicknameInappropriate -> appContext.getString(R.string.auth_error_nickname_inappropriate)
         is AuthError.NicknameTooLong -> appContext.getString(R.string.auth_error_nickname_too_long)
         is AuthError.SingleIdentityNotDeletable -> appContext.getString(R.string.auth_error_single_identity_not_deletable)
+        is AuthError.RateLimited -> appContext.getString(R.string.auth_error_rate_limited)
         // GoogleEmailConflict normally transitions to GoogleEmailConflictLinking state and never
         // reaches toUiMessage. This fallback covers any unexpected path that bypasses that handling.
         is AuthError.GoogleEmailConflict -> appContext.getString(R.string.auth_error_google_email_conflict)

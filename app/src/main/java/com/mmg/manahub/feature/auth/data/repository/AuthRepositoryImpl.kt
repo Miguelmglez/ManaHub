@@ -865,6 +865,7 @@ class AuthRepositoryImpl(
             // isAnonymous is intentionally left as the default (false) here — see the KDoc above.
             emailConfirmedAt = userInfo.emailConfirmedAt,
             createdAt = userInfo.createdAt,
+            newEmail = userInfo.newEmail,
             identities = userInfo.identities?.map { it.toAuthIdentity() } ?: emptyList(),
         )
     }
@@ -935,6 +936,7 @@ class AuthRepositoryImpl(
                 422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
                 404 -> AuthError.UserNotFound
                 401 -> AuthError.SessionExpired
+                429 -> AuthError.RateLimited
                 else -> AuthError.Unknown(message)
             }
         }
@@ -946,6 +948,7 @@ class AuthRepositoryImpl(
             422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
+            429 -> AuthError.RateLimited
             else -> AuthError.Unknown(message)
         }
 
@@ -954,6 +957,7 @@ class AuthRepositoryImpl(
             422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
+            429 -> AuthError.RateLimited
             else -> AuthError.Unknown(message)
         }
 

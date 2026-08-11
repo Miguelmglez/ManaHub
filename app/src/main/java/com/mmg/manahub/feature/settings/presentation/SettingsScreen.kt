@@ -96,6 +96,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
+    val isAuthenticated by viewModel.isAuthenticatedFlow.collectAsStateWithLifecycle()
     val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
     val pushEnabled by viewModel.pushNotificationsEnabled.collectAsStateWithLifecycle()
     val gamificationEnabled by viewModel.gamificationEnabled.collectAsStateWithLifecycle()
@@ -229,7 +230,13 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onManageAccount)
+                    // Anonymous/guest sessions (auto-signed-in for Online Sessions) must never
+                    // reach Account Management — its Google identity-link action IS Supabase's
+                    // anonymous-to-permanent conversion primitive and bypasses the server-side
+                    // profile-creation trigger when done in place. Disabled rather than hidden so
+                    // the row still communicates why (mirrors TagDictionaryScreen's read-only-row
+                    // pattern: `.clickable(enabled = ...)`).
+                    .clickable(enabled = isAuthenticated, onClick = onManageAccount)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -238,11 +245,17 @@ fun SettingsScreen(
                     Text(
                         stringResource(R.string.settings_manage_account),
                         style = MaterialTheme.magicTypography.bodyMedium,
-                        color = mc.textPrimary,
+                        color = if (isAuthenticated) mc.textPrimary else mc.textDisabled,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        stringResource(R.string.settings_manage_account_subtitle),
+                        stringResource(
+                            if (isAuthenticated) {
+                                R.string.settings_manage_account_subtitle
+                            } else {
+                                R.string.settings_manage_account_signin_required
+                            },
+                        ),
                         style = MaterialTheme.magicTypography.bodySmall,
                         color = mc.textSecondary,
                     )
@@ -250,7 +263,7 @@ fun SettingsScreen(
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = mc.textSecondary,
+                    tint = if (isAuthenticated) mc.textSecondary else mc.textDisabled,
                 )
             }
 
