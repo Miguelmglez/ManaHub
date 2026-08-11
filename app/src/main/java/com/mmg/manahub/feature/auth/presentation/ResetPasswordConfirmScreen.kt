@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -62,6 +63,15 @@ import org.koin.androidx.compose.koinViewModel
  *
  * If the link is invalid/expired (no recovery session materializes — [SessionState] never becomes
  * [SessionState.Authenticated]), this renders a recoverable error state instead of a broken form.
+ *
+ * SECURITY: an [SessionState.Authenticated] session alone is NOT proof this screen was reached via
+ * a genuine recovery link — `MainActivity`'s `type=recovery` deep-link check is driven by an
+ * attacker-controllable URI, so a forged intent can route an already-logged-in user here on a
+ * normal session. This screen therefore also checks [AuthUser.isRecoverySession] (the server-issued
+ * `amr` claim) and renders the SAME error state as an invalid/expired link when it is false — the
+ * password form is never shown for a non-recovery session. [AuthViewModel.confirmPasswordReset]
+ * enforces the identical check as the real security boundary; this is UI-level defense-in-depth so
+ * the user is never shown a form that would silently fail on submit.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,7 +134,18 @@ fun ResetPasswordConfirmScreen(
                 )
             }
 
-            is SessionState.Authenticated -> {
+            is SessionState.Authenticated -> if (!state.user.isRecoverySession) {
+                // SECURITY: reached via a forged manahub://auth?type=recovery deep link fired at an
+                // already-authenticated (but non-recovery) session — render the same error state as
+                // an invalid/expired link rather than a functional-looking password form. See the
+                // SECURITY KDoc on this composable and on AuthViewModel.confirmPasswordReset.
+                FullErrorState(
+                    message = stringResource(R.string.account_mgmt_reset_link_invalid),
+                    retryLabel = stringResource(R.string.account_mgmt_back_to_signin),
+                    onRetry = onBack,
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                )
+            } else {
                 val isLoading = authUiState is AuthUiState.Loading
                 val errorMessage = (authUiState as? AuthUiState.Error)?.message
 

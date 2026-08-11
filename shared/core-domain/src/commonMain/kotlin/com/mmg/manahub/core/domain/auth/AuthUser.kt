@@ -38,6 +38,16 @@ data class AuthIdentity(
  * @param isAnonymous True when this session was created via anonymous sign-in (Supabase anonymous
  *   auth). Anonymous users do not have a [user_profiles] row and cannot access account-gated
  *   features.
+ * @param isRecoverySession True only when this session's JWT carries a `"recovery"` entry in its
+ *   `amr` (Authentication Methods Reference) claim — i.e. it was established by exchanging a real
+ *   "forgot password" recovery-link/OTP token, not a normal password/OAuth/anonymous sign-in.
+ *   SECURITY: this is the ONLY reliable signal that a session is a genuine password-recovery
+ *   session; `AuthRepository.confirmPasswordReset` (a no-nonce password change) MUST gate on this
+ *   field rather than on [SessionState.Authenticated] alone, since the deep link that routes a
+ *   user to that confirmation screen carries an attacker-controllable `type=recovery` marker (see
+ *   `decodeAmrIncludesRecoveryClaim`'s KDoc in `core-common`). Defaults to `false` — every mapper
+ *   that cannot cheaply derive this from the session's raw access token (e.g. the web target) is
+ *   correct to leave it at the safe default rather than guess.
  * @param emailConfirmedAt When the user's email address was confirmed, or null if it has not been
  *   confirmed yet (ADR-003 server-side email confirmation).
  * @param createdAt When the underlying `auth.users` account was created.
@@ -53,6 +63,7 @@ data class AuthUser(
     val provider: String,
     val profileCompleted: Boolean = false,
     val isAnonymous: Boolean = false,
+    val isRecoverySession: Boolean = false,
     val emailConfirmedAt: Instant? = null,
     val createdAt: Instant? = null,
     val identities: List<AuthIdentity> = emptyList(),

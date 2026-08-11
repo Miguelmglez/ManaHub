@@ -159,10 +159,20 @@ interface AuthRepository {
      * Confirms a password change started via the "forgot password" email link, WITHOUT a
      * reauthentication [code] — distinct from [updatePassword].
      *
-     * Tapping the recovery link (`Auth.resetPasswordForEmail`) already establishes a temporary,
+     * Tapping the recovery link (`Auth.resetPasswordForEmail`) establishes a temporary,
      * fully-authenticated recovery session on-device (GoTrue mints a real access token for it), so
-     * no nonce/reauthentication step is needed here: the caller is already proven to own the
-     * mailbox. This calls `Auth.updateUser` with only the new password set.
+     * no nonce/reauthentication step is needed here. This calls `Auth.updateUser` with only the
+     * new password set.
+     *
+     * SECURITY (fixed — see `feedback_password_recovery_amr_gate` in
+     * `.claude/agent-memory/android-kotlin-architect/`): merely reaching this method proves
+     * NOTHING about how the current session was established, because `MainActivity`'s
+     * `manahub://auth?type=recovery` deep-link routing is driven by an attacker-controllable URI —
+     * any installed app can fire that intent at an already-authenticated user and land here via a
+     * forged "recovery" callback. The caller (`AuthViewModel.confirmPasswordReset`) MUST verify
+     * `AuthUser.isRecoverySession` on the CURRENT session before invoking this method; a session
+     * without that flag must never reach this call. Do not remove that gate under the assumption
+     * that reaching this screen/method is itself proof of a genuine recovery flow — it is not.
      *
      * @param newPassword The new password, already validated by the caller.
      */

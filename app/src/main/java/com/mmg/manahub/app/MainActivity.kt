@@ -27,6 +27,7 @@ import com.mmg.manahub.app.navigation.AppNavGraph
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.push.PushDeeplinkRouter
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
@@ -119,19 +120,66 @@ class MainActivity : ComponentActivity() {
     /**
      * Handles every `manahub://auth` callback (signup confirmation, Google identity-link OAuth
      * redirect, AND password recovery — all three share the scheme/host). [handleDeeplinks] always
-     * runs first (it is what imports the session — including the temporary, fully-authenticated
-     * recovery session GoTrue mints for a recovery callback). A recovery callback additionally
+     * runs first — it is what imports the session (including the temporary, fully-authenticated
+     * recovery session GoTrue mints for a recovery callback) — and a recovery callback additionally
      * routes into Compose Navigation via the existing [PushDeeplinkRouter] Activity→Compose bridge
      * (the same one FCM background deep links already use) — see `AppNavGraph.kt`'s
      * `Screen.ResetPasswordConfirm` composable KDoc for why a distinct `manahub://auth/recovery`
      * route (rather than matching the raw external intent) is required here.
+     *
+     * SECURITY — two layers of defense against a forged intent (this Activity's `manahub://auth`
+     * intent filter is `exported=true` with no path/signature restriction, so any installed app can
+     * send it an arbitrary `Intent`):
+     *
+     * 1. (Primary gate, enforced downstream) [isPasswordRecoveryDeepLink] only reflects what the
+     *    URI *claims* — it is attacker-controlled and proves nothing about the resulting session.
+     *    The actual authorization check is [AuthUser.isRecoverySession] (the server-issued `amr`
+     *    JWT claim), verified by `AuthViewModel.confirmPasswordReset` and
+     *    `ResetPasswordConfirmScreen` before any password change is allowed — see their SECURITY
+     *    KDocs. This method's `isRecoveryClaim` is only ever used to decide whether to attempt
+     *    navigation, never as proof of a genuine recovery flow.
+     * 2. (Defense-in-depth, this method) [PushDeeplinkRouter.enqueue] is called ONLY from inside
+     *    [handleDeeplinks]'s `onSessionSuccess` callback, which the SDK invokes ONLY after it has
+     *    actually parsed real tokens out of the intent and imported a session
+     *    (`Auth.parseFragmentAndImportSession` requires `access_token`/`refresh_token`/
+     *    `expires_in`/`token_type` to all be present in the fragment, or it throws before any
+     *    session is imported/callback fires — verified against `auth-kt` 3.1.4 sources). A forged
+     *    intent that merely sets `type=recovery` with no real tokens attached — e.g.
+     *    `Intent(ACTION_VIEW, "manahub://auth?type=recovery")` — never reaches `onSessionSuccess`,
+     *    so the recovery deep link is never even enqueued for that case. This narrows the window
+     *    before layer 1 even runs; it is NOT a substitute for layer 1 (a forged intent CAN carry a
+     *    real, currently-valid recovery token replayed from an intercepted email, which WOULD reach
+     *    `onSessionSuccess` — layer 1 is what actually stops that case, since the resulting
+     *    session's `amr` claim would legitimately say "recovery" and this is in fact then a real,
+     *    intended recovery flow).
+     *
+     * `onSessionSuccess` fires from the SDK's internal `authScope`, which this project leaves on
+     * its default `Dispatchers.Default` (no `coroutineDispatcher` override in
+     * `SupabaseClientFactory.kt`) — i.e. NOT the main thread. [PushDeeplinkRouter.enqueue] can
+     * synchronously call `NavController.navigate(...)`, which requires the main thread, so the
+     * enqueue is explicitly hopped via [runOnUiThread].
+     *
+     * The `try/catch` guards the synchronous half of [handleDeeplinks]: `parseSessionFromFragment`
+     * throws a plain `IllegalArgumentException` when the fragment is missing a required token field
+     * (exactly the forged, token-less `manahub://auth#type=recovery` case) — uncaught, this would
+     * crash the app from `onCreate`/`onNewIntent` on nothing more than a malicious intent from
+     * another app. [recordSafeNonFatal] logs the failure (never the token/intent data).
      */
     private fun handleSupabaseAuthDeepLink(intent: Intent) {
         if (!isSupabaseAuthDeepLink(intent)) return
-        val isRecovery = isPasswordRecoveryDeepLink(intent)
-        supabaseClient.handleDeeplinks(intent)
-        if (isRecovery) {
-            PushDeeplinkRouter.enqueue("manahub://auth/recovery")
+        val isRecoveryClaim = isPasswordRecoveryDeepLink(intent)
+        try {
+            supabaseClient.handleDeeplinks(intent) {
+                // Reached only when handleDeeplinks actually imported a session from genuine
+                // tokens present in this intent — see the SECURITY KDoc above (layer 2).
+                if (isRecoveryClaim) {
+                    runOnUiThread {
+                        PushDeeplinkRouter.enqueue("manahub://auth/recovery")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            recordSafeNonFatal("main_activity_auth_deeplink_parse_failed", e)
         }
     }
 
