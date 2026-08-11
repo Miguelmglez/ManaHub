@@ -227,6 +227,12 @@ class WebAuthRepository(
     override suspend fun linkGoogleIdentityNative(redirectUrl: String): AuthResult<String?> =
         unsupported("linkGoogleIdentityNative")
 
+    // Phase 4b (account management UI, Android-side) -- same build-compilation-only stub pattern
+    // as the six methods above: keeps :shared:core-data:compileKotlinWasmJs/:webApp green. A real
+    // web "forgot password" completion flow is kmp-web-fullstack-dev follow-up work, not done here.
+    override suspend fun confirmPasswordReset(newPassword: String): AuthResult<Unit> =
+        unsupported("confirmPasswordReset")
+
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private fun SessionStatus.toSessionState(): SessionState = when (this) {

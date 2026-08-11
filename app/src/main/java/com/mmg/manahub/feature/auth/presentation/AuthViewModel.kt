@@ -16,6 +16,7 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
@@ -58,6 +59,7 @@ class AuthViewModel(
     private val updatePasswordUseCase: UpdatePasswordUseCase,
     private val unlinkIdentityUseCase: UnlinkIdentityUseCase,
     private val linkGoogleIdentityNativeUseCase: LinkGoogleIdentityNativeUseCase,
+    private val confirmPasswordResetUseCase: ConfirmPasswordResetUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val appContext: Context,
 ) : ViewModel() {
@@ -264,6 +266,28 @@ class AuthViewModel(
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = linkGoogleIdentityNativeUseCase(redirectUrl)) {
                 is AuthResult.Success -> AuthUiState.GoogleIdentityLinkStarted(result.data)
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Confirms a "forgot password" reset from the recovery email deep link, WITHOUT a
+     * reauthentication code — distinct from [updatePassword]. The temporary recovery session is
+     * already active by the time the user reaches this screen (established when the deep link was
+     * caught), so only the new password needs validating client-side.
+     * Transitions to [AuthUiState.PasswordResetConfirmed] on success.
+     */
+    fun confirmPasswordReset(newPassword: String) {
+        if (!isPasswordStrong(newPassword)) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_password_requirements))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = confirmPasswordResetUseCase(newPassword)) {
+                is AuthResult.Success -> AuthUiState.PasswordResetConfirmed
                 is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
             }
         }
@@ -513,6 +537,7 @@ class AuthViewModel(
         is AuthError.EmailNotConfirmed -> appContext.getString(R.string.auth_error_email_not_confirmed)
         is AuthError.NicknameInappropriate -> appContext.getString(R.string.auth_error_nickname_inappropriate)
         is AuthError.NicknameTooLong -> appContext.getString(R.string.auth_error_nickname_too_long)
+        is AuthError.SingleIdentityNotDeletable -> appContext.getString(R.string.auth_error_single_identity_not_deletable)
         // GoogleEmailConflict normally transitions to GoogleEmailConflictLinking state and never
         // reaches toUiMessage. This fallback covers any unexpected path that bypasses that handling.
         is AuthError.GoogleEmailConflict -> appContext.getString(R.string.auth_error_google_email_conflict)

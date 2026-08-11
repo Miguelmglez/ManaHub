@@ -91,6 +91,50 @@ class MainActivity : ComponentActivity() {
         return uri.scheme == "manahub" && uri.host == "auth"
     }
 
+    /**
+     * True when [intent] is the Supabase auth deep link AND carries `type=recovery` — i.e. this is
+     * a "forgot password" recovery callback, distinct from the signup-confirmation and
+     * Google-identity-link callbacks that share the exact same `manahub://auth` scheme/host (see
+     * `SupabaseClientFactory.kt`'s `Auth { scheme = ...; host = "auth" }` config — path is
+     * unconstrained by the manifest intent filter, but neither of those two other callbacks ever
+     * carries `type=recovery`).
+     *
+     * Checks BOTH the query string and the URL fragment: this project's Supabase Auth plugin
+     * defaults to `FlowType.IMPLICIT` (no `flowType` override in `SupabaseClientFactory.kt`), which
+     * delivers `type=recovery` in the URL FRAGMENT (`#access_token=...&type=recovery`) — `Uri`
+     * parses fragments natively via [Uri.getFragment]. The query-param check is a defensive
+     * second path in case the project's flow type is ever switched to PKCE.
+     */
+    private fun isPasswordRecoveryDeepLink(intent: Intent): Boolean {
+        if (!isSupabaseAuthDeepLink(intent)) return false
+        val uri = intent.data ?: return false
+        val queryType = uri.getQueryParameter("type")
+        val fragmentType = uri.fragment
+            ?.split("&")
+            ?.firstOrNull { it.startsWith("type=") }
+            ?.substringAfter("type=")
+        return queryType == "recovery" || fragmentType == "recovery"
+    }
+
+    /**
+     * Handles every `manahub://auth` callback (signup confirmation, Google identity-link OAuth
+     * redirect, AND password recovery — all three share the scheme/host). [handleDeeplinks] always
+     * runs first (it is what imports the session — including the temporary, fully-authenticated
+     * recovery session GoTrue mints for a recovery callback). A recovery callback additionally
+     * routes into Compose Navigation via the existing [PushDeeplinkRouter] Activity→Compose bridge
+     * (the same one FCM background deep links already use) — see `AppNavGraph.kt`'s
+     * `Screen.ResetPasswordConfirm` composable KDoc for why a distinct `manahub://auth/recovery`
+     * route (rather than matching the raw external intent) is required here.
+     */
+    private fun handleSupabaseAuthDeepLink(intent: Intent) {
+        if (!isSupabaseAuthDeepLink(intent)) return
+        val isRecovery = isPasswordRecoveryDeepLink(intent)
+        supabaseClient.handleDeeplinks(intent)
+        if (isRecovery) {
+            PushDeeplinkRouter.enqueue("manahub://auth/recovery")
+        }
+    }
+
     override fun attachBaseContext(newBase: Context) {
         val langCode = newBase
             .getSharedPreferences("user_prefs_lang_sync", Context.MODE_PRIVATE)
@@ -120,9 +164,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (isSupabaseAuthDeepLink(intent)) {
-            supabaseClient.handleDeeplinks(intent)
-        }
+        handleSupabaseAuthDeepLink(intent)
         handlePushDeeplink(intent)
     }
 
@@ -133,9 +175,7 @@ class MainActivity : ComponentActivity() {
         splashScreen.setKeepOnScreenCondition { false }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (isSupabaseAuthDeepLink(intent)) {
-            supabaseClient.handleDeeplinks(intent)
-        }
+        handleSupabaseAuthDeepLink(intent)
         // Cold-start from a notification tap: buffered until AppNavGraph registers its navigator.
         handlePushDeeplink(intent)
 

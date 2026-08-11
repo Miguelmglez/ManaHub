@@ -110,6 +110,8 @@ fun ProfileScreen(
     onSettingsClick: () -> Unit,
     onStatsClick: () -> Unit,
     onFriendsClick: () -> Unit,
+    /** Navigates to the account-management screen (Phase 4b) — sign-out/delete-account/security live there. */
+    onManageAccountClick: () -> Unit,
     /** Initial tab to open on (deep-linked from Home widgets in Phase 2). Default = Overview. */
     initialTab: ProfileTab = ProfileTab.OVERVIEW,
 ) {
@@ -201,9 +203,10 @@ fun ProfileScreen(
                         loginSheetInitialTab = 1
                         showLoginSheet = true
                     },
-                    // TODO: wire to the dedicated account-management screen (sign-out / delete
-                    // account live there now) once a later phase adds that destination.
-                    onManageAccountClick = {},
+                    onManageAccountClick = {
+                        showAccountSheet = false
+                        onManageAccountClick()
+                    },
                     onFetchShareLink = viewModel::fetchShareLink,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     playerName = uiState.playerName,
