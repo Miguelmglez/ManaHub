@@ -16,6 +16,7 @@ import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmEmailUpdateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
@@ -60,6 +61,7 @@ class AuthViewModel(
     private val unlinkIdentityUseCase: UnlinkIdentityUseCase,
     private val linkGoogleIdentityNativeUseCase: LinkGoogleIdentityNativeUseCase,
     private val confirmPasswordResetUseCase: ConfirmPasswordResetUseCase,
+    private val confirmEmailUpdateUseCase: ConfirmEmailUpdateUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val appContext: Context,
 ) : ViewModel() {
@@ -230,6 +232,33 @@ class AuthViewModel(
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = updatePasswordUseCase(newPassword, code)) {
                 is AuthResult.Success -> AuthUiState.PasswordUpdated
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Changes the authenticated user's email address WITHOUT a reauthentication code — distinct
+     * from [updateEmail]. This is the "Change email" row's direct path on
+     * [AccountManagementScreen]: Supabase's "Secure email change" project setting double-confirms
+     * the change via links sent to both the old and the new inbox, so the extra reauth-code gate
+     * ahead of [updateEmail] is redundant friction here (see the KDoc on
+     * [AuthRepository.confirmEmailUpdate]).
+     * Transitions to [AuthUiState.EmailUpdated] on success — the SAME terminal state [updateEmail]
+     * uses, since both flows converge on the identical "email change requested" outcome from the
+     * UI's perspective.
+     */
+    fun confirmEmailUpdate(newEmail: String) {
+        val trimmedEmail = newEmail.trim()
+        if (trimmedEmail.isBlank() || !EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = confirmEmailUpdateUseCase(trimmedEmail)) {
+                is AuthResult.Success -> AuthUiState.EmailUpdated
                 is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
             }
         }

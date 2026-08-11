@@ -33,7 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
@@ -44,22 +43,23 @@ import org.koin.androidx.compose.koinViewModel
 
 /**
  * Final step of the "Change email" flow — collects the new address and calls
- * [AuthViewModel.updateEmail] with the [code] handed off from [SecurityCodeScreen].
+ * [AuthViewModel.confirmEmailUpdate].
  *
- * @param code The reauthentication nonce forwarded in-memory from `AppNavGraph`'s hoisted handoff
- *   state. Null means the handoff was lost (process death restoring this destination from the back
- *   stack) — mirrors the `PlaytestHand` "pendingPlaytestSetup was null" guard: rather than crash,
- *   this renders a recoverable error state that routes back to a fresh [SecurityCodeScreen].
- * @param onRequestNewCode Pops back to [SecurityCodeScreen], which fires a fresh
- *   [AuthViewModel.requestReauthentication] on recomposition.
+ * Reached DIRECTLY from [AccountManagementScreen]'s "Change email" row — unlike
+ * [UpdatePasswordScreen], this screen is NOT gated behind [SecurityCodeScreen]. Supabase's "Secure
+ * email change" project setting already double-confirms the change via links sent to both the old
+ * and the new email address, so the pre-change reauthentication-code gate would be redundant
+ * friction for this flow specifically (see the KDoc on
+ * [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate] for the full rationale).
+ * There is therefore no in-memory handoff and no process-death recovery state to render here — a
+ * plain form.
+ *
  * @param onEmailUpdated Invoked once [AuthUiState.EmailUpdated] is observed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpdateEmailScreen(
-    code: String?,
     onBack: () -> Unit,
-    onRequestNewCode: () -> Unit,
     onEmailUpdated: () -> Unit,
     authViewModel: AuthViewModel = koinViewModel(),
 ) {
@@ -103,16 +103,6 @@ fun UpdateEmailScreen(
             }
         },
     ) { padding ->
-        if (code == null) {
-            FullErrorState(
-                message = stringResource(R.string.account_mgmt_session_expired),
-                retryLabel = stringResource(R.string.account_mgmt_request_new_code),
-                onRetry = onRequestNewCode,
-                modifier = Modifier.fillMaxSize().padding(padding),
-            )
-            return@Scaffold
-        }
-
         val isLoading = authUiState is AuthUiState.Loading
         val errorMessage = (authUiState as? AuthUiState.Error)?.message
 
@@ -154,19 +144,12 @@ fun UpdateEmailScreen(
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(sp.sm))
                 Text(text = errorMessage, color = mc.lifeNegative, style = ty.labelMedium)
-                Spacer(modifier = Modifier.height(sp.xs))
-                MagicCtaButton(
-                    onClick = onRequestNewCode,
-                    text = stringResource(R.string.account_mgmt_request_new_code),
-                    style = MagicCtaStyle.Ghost,
-                    color = MagicCtaColor.Primary,
-                )
             }
 
             Spacer(modifier = Modifier.height(sp.xl))
 
             MagicCtaButton(
-                onClick = { authViewModel.updateEmail(newEmail, code) },
+                onClick = { authViewModel.confirmEmailUpdate(newEmail) },
                 text = stringResource(R.string.action_save),
                 style = MagicCtaStyle.Filled,
                 color = MagicCtaColor.Primary,

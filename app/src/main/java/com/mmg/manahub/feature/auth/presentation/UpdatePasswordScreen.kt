@@ -55,7 +55,10 @@ import org.koin.androidx.compose.koinViewModel
  * on a Google-only account is sufficient by itself to gain email/password sign-in — no separate
  * call needed) — the SAME flow, just reached via different copy on [AccountManagementScreen].
  *
- * @param code See [UpdateEmailScreen]'s KDoc for the process-death-guard rationale — identical here.
+ * @param code The reauthentication nonce forwarded in-memory from `AppNavGraph`'s hoisted handoff
+ *   state. Null means the handoff was lost (process death restoring this destination from the back
+ *   stack) — mirrors the `PlaytestHand` "pendingPlaytestSetup was null" guard: rather than crash,
+ *   this renders a recoverable error state that routes back to a fresh [SecurityCodeScreen].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

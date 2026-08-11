@@ -4,6 +4,7 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmEmailUpdateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
@@ -44,10 +45,11 @@ import org.koin.dsl.module
  * ## Self-contained module (no bridge args)
  * Unlike the bridge-style island modules, [authKoinModule] takes NO constructor arguments. Every
  * dependency [AuthViewModel] needs is already resolvable from modules loaded earlier in `startKoin`:
- * - The seventeen auth use cases (ten original + six added by the account-management data-layer
+ * - The eighteen auth use cases (ten original + six added by the account-management data-layer
  *   slice — [ResendConfirmationEmailUseCase]/[RequestReauthenticationUseCase]/[UpdateEmailUseCase]/
  *   [UpdatePasswordUseCase]/[UnlinkIdentityUseCase]/[LinkGoogleIdentityNativeUseCase] — plus
- *   [ConfirmPasswordResetUseCase] added by the Phase 4b UI slice) are stateless
+ *   [ConfirmPasswordResetUseCase] added by the Phase 4b UI slice and [ConfirmEmailUpdateUseCase]
+ *   added by the "Change email" reauth-gate simplification — see its KDoc) are stateless
  *   thin wrappers over [AuthRepository] (and, for [DeleteAccountUseCase], `PushTokenRepository`). They
  *   are not registered as `single` in any other loaded module, so they are declared here as
  *   `single { }` and constructed directly by Koin. The Koin-built copies are independent of, but
@@ -226,6 +228,9 @@ fun authKoinModule(): Module = module {
     single { LinkGoogleIdentityNativeUseCase(get()) }
     // Phase 4b (account management): "forgot password" recovery-link completion, no reauth code.
     single { ConfirmPasswordResetUseCase(get()) }
+    // "Change email" reauth-gate simplification: Secure Email Change already double-confirms, so
+    // this use case skips the reauthentication-code gate — see its KDoc.
+    single { ConfirmEmailUpdateUseCase(get()) }
 
     // ── The Koin island: AuthViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
@@ -247,6 +252,7 @@ fun authKoinModule(): Module = module {
             unlinkIdentityUseCase = get(),
             linkGoogleIdentityNativeUseCase = get(),
             confirmPasswordResetUseCase = get(),
+            confirmEmailUpdateUseCase = get(),
             analyticsHelper = get(),
             appContext = androidContext(),
         )

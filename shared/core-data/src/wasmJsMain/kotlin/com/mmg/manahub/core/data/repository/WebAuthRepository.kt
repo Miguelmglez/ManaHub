@@ -233,6 +233,13 @@ class WebAuthRepository(
     override suspend fun confirmPasswordReset(newPassword: String): AuthResult<Unit> =
         unsupported("confirmPasswordReset")
 
+    // Same build-compilation-only stub pattern -- "Change email" now skips the reauth-code gate on
+    // Android (Secure Email Change double-confirmation), see the KDoc on
+    // AuthRepository.confirmEmailUpdate. A real web implementation is kmp-web-fullstack-dev
+    // follow-up work, not done here.
+    override suspend fun confirmEmailUpdate(newEmail: String): AuthResult<Unit> =
+        unsupported("confirmEmailUpdate")
+
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private fun SessionStatus.toSessionState(): SessionState = when (this) {

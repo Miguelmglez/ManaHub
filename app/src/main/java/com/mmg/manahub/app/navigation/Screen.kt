@@ -140,17 +140,18 @@ sealed class Screen(val route: String) {
     object AccountManagement : Screen("auth/manage")
 
     /**
-     * Reauthentication-code gate shared by the change-email/change-password flows. The [purpose]
-     * arg is a controlled enum `routeArg` (see
-     * [com.mmg.manahub.feature.auth.presentation.SecurityCodePurpose]), never free text — callers
-     * always go through [createRoute].
+     * Reauthentication-code gate ahead of the "Change password" / "Set a password" flow only.
+     * "Change email" no longer routes through this screen — Supabase's "Secure email change"
+     * project setting already double-confirms an email change server-side, making the gate
+     * redundant there (see the KDoc on
+     * [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate]).
      */
-    object SecurityCode : Screen("auth/security_code/{purpose}") {
-        fun createRoute(purpose: com.mmg.manahub.feature.auth.presentation.SecurityCodePurpose) =
-            "auth/security_code/${purpose.routeArg}"
-    }
+    object SecurityCode : Screen("auth/security_code")
 
-    /** Final step of the "Change email" flow, reached only after [SecurityCode]. */
+    /**
+     * Final step of the "Change email" flow — reached DIRECTLY from [AccountManagement] (no
+     * [SecurityCode] hop; see that object's KDoc).
+     */
     object UpdateEmail : Screen("auth/update_email")
 
     /** Final step of the "Change password" / "Set a password" flow, reached only after [SecurityCode]. */

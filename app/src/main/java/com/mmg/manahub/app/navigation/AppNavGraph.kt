@@ -88,7 +88,6 @@ import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
 import com.mmg.manahub.feature.auth.presentation.ResetPasswordConfirmScreen
-import com.mmg.manahub.feature.auth.presentation.SecurityCodePurpose
 import com.mmg.manahub.feature.auth.presentation.SecurityCodeScreen
 import com.mmg.manahub.feature.auth.presentation.UpdateEmailScreen
 import com.mmg.manahub.feature.auth.presentation.UpdatePasswordScreen
@@ -205,10 +204,11 @@ fun AppNavGraph(
     var pendingTournamentMode by remember { mutableStateOf<GameMode?>(null) }
 
     // In-memory handoff for the reauthentication code entered on SecurityCodeScreen, consumed by
-    // UpdateEmailScreen/UpdatePasswordScreen. Mirrors the pendingPlaytestSetup pattern above:
-    // never a nav-graph string argument (which could end up in a screen-view analytics event or a
-    // saved instance-state bundle) — a plain in-memory var, cleared as soon as it's consumed.
-    // Null on process-death restore is handled by each consumer's own recoverable error state.
+    // UpdatePasswordScreen. Mirrors the pendingPlaytestSetup pattern above: never a nav-graph
+    // string argument (which could end up in a screen-view analytics event or a saved
+    // instance-state bundle) — a plain in-memory var, cleared as soon as it's consumed.
+    // Null on process-death restore is handled by UpdatePasswordScreen's own recoverable error
+    // state. "Change email" no longer uses this handoff — see Screen.SecurityCode's KDoc.
     var pendingReauthCode by remember { mutableStateOf<String?>(null) }
 
     // hasActiveGame: true only while a game is actively running (not finished).
@@ -784,9 +784,12 @@ fun AppNavGraph(
             composable(Screen.AccountManagement.route) {
                 AccountManagementScreen(
                     onBack = { navController.popBackStack() },
-                    onNavigateToSecurityCode = { purpose ->
-                        navController.navigate(Screen.SecurityCode.createRoute(purpose))
-                    },
+                    // "Change email" goes DIRECTLY to UpdateEmailScreen — Supabase's "Secure email
+                    // change" project setting already double-confirms the change server-side, so
+                    // the reauth-code gate is skipped for this flow only (see the KDoc on
+                    // AuthRepository.confirmEmailUpdate / Screen.SecurityCode).
+                    onNavigateToUpdateEmail = { navController.navigate(Screen.UpdateEmail.route) },
+                    onNavigateToSecurityCode = { navController.navigate(Screen.SecurityCode.route) },
                     onSignedOut = {
                         // Sign-out/delete-account both leave the user unauthenticated — return to
                         // Profile's Unauthenticated card rather than staying on an account screen
@@ -798,37 +801,20 @@ fun AppNavGraph(
                 )
             }
 
-            composable(
-                route = Screen.SecurityCode.route,
-                arguments = listOf(navArgument("purpose") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val purpose = SecurityCodePurpose.fromRouteArg(backStackEntry.arguments?.getString("purpose"))
+            composable(Screen.SecurityCode.route) {
                 SecurityCodeScreen(
-                    purpose = purpose,
                     onBack = { navController.popBackStack() },
                     onCodeConfirmed = { code ->
                         pendingReauthCode = code
-                        val destination = when (purpose) {
-                            SecurityCodePurpose.EMAIL -> Screen.UpdateEmail.route
-                            SecurityCodePurpose.PASSWORD -> Screen.UpdatePassword.route
-                        }
-                        navController.navigate(destination)
+                        navController.navigate(Screen.UpdatePassword.route)
                     },
                 )
             }
 
             composable(Screen.UpdateEmail.route) {
                 UpdateEmailScreen(
-                    code = pendingReauthCode,
                     onBack = { navController.popBackStack() },
-                    onRequestNewCode = {
-                        // Pop back to a FRESH SecurityCodeScreen instance, which re-fires
-                        // requestReauthentication() on its own LaunchedEffect(Unit).
-                        pendingReauthCode = null
-                        navController.popBackStack()
-                    },
                     onEmailUpdated = {
-                        pendingReauthCode = null
                         navController.popBackStack(Screen.AccountManagement.route, inclusive = false)
                     },
                 )

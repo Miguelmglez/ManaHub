@@ -167,4 +167,20 @@ interface AuthRepository {
      * @param newPassword The new password, already validated by the caller.
      */
     suspend fun confirmPasswordReset(newPassword: String): AuthResult<Unit>
+
+    /**
+     * Changes the authenticated user's email address WITHOUT a reauthentication [code] — distinct
+     * from [updateEmail].
+     *
+     * This is safe because the Supabase project has "Secure email change" enabled: GoTrue sends
+     * confirmation links to BOTH the old and the new email address, and the change only takes
+     * effect once both are confirmed. That double-confirmation already fully protects this path
+     * against an unauthorized change, which makes the reauthentication-code gate ahead of
+     * [updateEmail] redundant friction for email specifically — unlike [updatePassword], which has
+     * no equivalent server-side double-confirm and must keep the gate. This calls `Auth.updateUser`
+     * with only the new email set — no `nonce`.
+     *
+     * @param newEmail The new email address, already validated by the caller.
+     */
+    suspend fun confirmEmailUpdate(newEmail: String): AuthResult<Unit>
 }
