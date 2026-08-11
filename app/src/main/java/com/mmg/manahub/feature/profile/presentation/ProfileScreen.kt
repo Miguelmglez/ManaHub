@@ -201,8 +201,10 @@ fun ProfileScreen(
                         loginSheetInitialTab = 1
                         showLoginSheet = true
                     },
-                    onSignOutClick = { authViewModel.signOut() },
-                    onDeleteAccountClick = { authViewModel.deleteAccount() },
+                    // TODO: wire to the dedicated account-management screen (sign-out / delete
+                    // account live there now) once a later phase adds that destination.
+                    onManageAccountClick = {},
+                    onFetchShareLink = viewModel::fetchShareLink,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     playerName = uiState.playerName,
                     avatarUrl = uiState.avatarUrl,

@@ -24,6 +24,7 @@ import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import com.mmg.manahub.feature.settings.presentation.PreferencesState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -62,6 +63,7 @@ class ProfileViewModel(
     private val authRepository: AuthRepository,
     private val gamificationRepository: GamificationRepository,
     private val claimQuestRewardUseCase: ClaimQuestRewardUseCase,
+    private val shareInviteUseCase: ShareInviteUseCase,
 ) : ViewModel() {
 
     data class UiState(
@@ -365,6 +367,20 @@ class ProfileViewModel(
         }
     }
 
+
+    /**
+     * Resolves the current user's invite share link (wraps [ShareInviteUseCase] /
+     * `FriendRepository.getMyShareUrl`) for [com.mmg.manahub.core.ui.components.ShareProfileSheet],
+     * which is opened from [com.mmg.manahub.feature.auth.presentation.AccountSection] hosted by
+     * this screen. Fails fast (without hitting the network) when the session isn't authenticated —
+     * the sheet is only reachable from the authenticated card, so this is a defensive guard rather
+     * than an expected path.
+     */
+    suspend fun fetchShareLink(): Result<String> {
+        val userId = (authRepository.sessionState.value as? SessionState.Authenticated)?.user?.id
+            ?: return Result.failure(IllegalStateException("Not authenticated"))
+        return shareInviteUseCase(userId)
+    }
 
     /**
      * Claims a completed quest's XP reward (gamification Phase 2). Delegates to the idempotent

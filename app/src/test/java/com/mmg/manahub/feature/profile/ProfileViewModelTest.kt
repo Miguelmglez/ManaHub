@@ -21,6 +21,7 @@ import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
 import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.gamification.domain.model.ClaimResult
 import com.mmg.manahub.core.gamification.domain.usecase.ClaimQuestRewardUseCase
+import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.repository.FriendRepository
@@ -87,6 +88,7 @@ class ProfileViewModelTest {
     private val friendRepository         = mockk<FriendRepository>(relaxed = true)
     private val gamificationRepository   = mockk<GamificationRepository>(relaxed = true)
     private val claimQuestRewardUseCase  = mockk<ClaimQuestRewardUseCase>()
+    private val shareInviteUseCase       = mockk<ShareInviteUseCase>()
 
     // Mutable state flows used to drive ViewModel state changes in tests
     private val playerNameFlow    = MutableStateFlow("Wizard")
@@ -216,6 +218,7 @@ class ProfileViewModelTest {
         authRepository           = authRepository,
         gamificationRepository   = gamificationRepository,
         claimQuestRewardUseCase  = claimQuestRewardUseCase,
+        shareInviteUseCase       = shareInviteUseCase,
     )
 
     // ── Setup / Teardown ─────────────────────────────────────────────────────
