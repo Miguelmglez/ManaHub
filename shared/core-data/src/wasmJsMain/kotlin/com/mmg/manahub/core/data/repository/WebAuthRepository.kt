@@ -55,6 +55,14 @@ import kotlin.time.ExperimentalTime
  * is a real but lower-priority Profile-adjacent follow-up). Same "single Nothing-returning helper"
  * pattern [WebCardRepository]/[WebDeckRepository] already established for their own stubbed methods.
  *
+ * The account-management data-layer slice ([resendConfirmationEmail]/[requestReauthentication]/
+ * [updateEmail]/[updatePassword]/[unlinkIdentity]/[linkGoogleIdentityNative]) added six new
+ * [AuthRepository] members Android-side (Phase 1, data layer only). They are stubbed here with the
+ * SAME [unsupported] helper purely to keep `:shared:core-data:compileKotlinWasmJs`/`:webApp` green --
+ * this is a build-compilation fix, not a web design decision. A real web implementation (Custom-Tab-
+ * equivalent OAuth-redirect handling, reauthentication UX, etc.) is `kmp-web-fullstack-dev` follow-up
+ * work, not done here.
+ *
  * ## [sessionState] is JWT-metadata-only, NOT `user_profiles`-enriched
  * Android's `AuthRepositoryImpl.sessionState` does a second DB round-trip per auth transition to
  * enrich [AuthUser] with the server-side nickname/gameTag/profileCompleted from `user_profiles`
@@ -198,6 +206,26 @@ class WebAuthRepository(
         userProfileClient.updateAvatarUrl(UpdateAvatarUrlDto(newAvatarUrl = avatarUrl))
         AuthResult.Success(Unit)
     }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+
+    // ── Account-management data-layer slice (Phase 1) -- build-compilation stubs, see class KDoc. ──
+
+    override suspend fun resendConfirmationEmail(email: String): AuthResult<Unit> =
+        unsupported("resendConfirmationEmail")
+
+    override suspend fun requestReauthentication(): AuthResult<Unit> =
+        unsupported("requestReauthentication")
+
+    override suspend fun updateEmail(newEmail: String, code: String): AuthResult<Unit> =
+        unsupported("updateEmail")
+
+    override suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit> =
+        unsupported("updatePassword")
+
+    override suspend fun unlinkIdentity(identityId: String): AuthResult<Unit> =
+        unsupported("unlinkIdentity")
+
+    override suspend fun linkGoogleIdentityNative(redirectUrl: String): AuthResult<String?> =
+        unsupported("linkGoogleIdentityNative")
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 

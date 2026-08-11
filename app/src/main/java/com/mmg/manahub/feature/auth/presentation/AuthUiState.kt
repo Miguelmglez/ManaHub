@@ -12,6 +12,20 @@ sealed class AuthUiState {
     data object AccountDeleted : AuthUiState()
     /** Emitted after [AuthViewModel.updateNickname] completes successfully. */
     data object NicknameUpdated : AuthUiState()
+    /** Emitted after [AuthViewModel.requestReauthentication] sends a nonce successfully. */
+    data object ReauthenticationSent : AuthUiState()
+    /** Emitted after [AuthViewModel.updateEmail] completes successfully. */
+    data object EmailUpdated : AuthUiState()
+    /** Emitted after [AuthViewModel.updatePassword] completes successfully. */
+    data object PasswordUpdated : AuthUiState()
+    /** Emitted after [AuthViewModel.unlinkIdentity] completes successfully. */
+    data object IdentityUnlinked : AuthUiState()
+    /**
+     * Emitted after [AuthViewModel.linkGoogleIdentityNative] starts the OAuth-redirect flow. The
+     * UI should open [authorizationUrl] (e.g. via Custom Tabs); the flow completes asynchronously
+     * once `MainActivity` catches the `manahub://auth` deep-link callback.
+     */
+    data class GoogleIdentityLinkStarted(val authorizationUrl: String?) : AuthUiState()
     /**
      * Emitted when a Google Sign-In attempt succeeds at the OAuth level but no ManaHub
      * profile exists for this Google account. The UI should switch to the Create Account

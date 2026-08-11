@@ -93,4 +93,65 @@ interface AuthRepository {
      * Pass null to remove the avatar.
      */
     suspend fun updateAvatarUrl(avatarUrl: String?): AuthResult<Unit>
+
+    /**
+     * Resends the sign-up confirmation email (GoTrue `OtpType.Email.SIGNUP`).
+     *
+     * A user pending confirmation (see [AuthError.EmailConfirmationRequired]/
+     * [AuthError.EmailNotConfirmed]) has no active session yet, so — unlike every other member of
+     * this interface — this call cannot resolve the target address from
+     * `Auth.currentUserOrNull()`; [email] must be supplied by the caller (carried by the UI from
+     * the original sign-up/sign-in attempt).
+     *
+     * @param email The address to resend the confirmation link to.
+     */
+    suspend fun resendConfirmationEmail(email: String): AuthResult<Unit>
+
+    /**
+     * Sends a reauthentication nonce to the current user's verified email via `Auth.reauthenticate`.
+     * Required before a sensitive [updateEmail]/[updatePassword] call when server-side
+     * reauthentication is enabled (Phase 2 configures/verifies this on the Supabase project).
+     * The user enters the nonce they receive as the `code` parameter of the follow-up call.
+     */
+    suspend fun requestReauthentication(): AuthResult<Unit>
+
+    /**
+     * Changes the authenticated user's email address via `Auth.updateUser`.
+     *
+     * @param newEmail The new email address.
+     * @param code The reauthentication nonce obtained via [requestReauthentication] and entered
+     *   by the user. Never persisted to Room/DataStore — pass-through only.
+     */
+    suspend fun updateEmail(newEmail: String, code: String): AuthResult<Unit>
+
+    /**
+     * Changes the authenticated user's password via `Auth.updateUser`.
+     *
+     * @param newPassword The new password.
+     * @param code The reauthentication nonce obtained via [requestReauthentication] and entered
+     *   by the user. Never persisted to Room/DataStore — pass-through only.
+     */
+    suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit>
+
+    /**
+     * Unlinks an identity from the authenticated user's account via `Auth.unlinkIdentity`.
+     *
+     * @param identityId One of [AuthUser.identities]' [AuthIdentity.identityId] values.
+     */
+    suspend fun unlinkIdentity(identityId: String): AuthResult<Unit>
+
+    /**
+     * Links a Google identity to the authenticated user's account via the SDK's real
+     * `Auth.linkIdentity` OAuth-redirect endpoint — distinct from [linkGoogleIdentity], which is a
+     * same-email sign-in-then-link workaround built on the Credential-Manager ID-token flow.
+     *
+     * The plain `auth-kt` module does not launch a browser itself: it returns the authorization
+     * URL the caller must open (e.g. via Custom Tabs). The OAuth-redirect callback is caught by
+     * `supabaseClient.handleDeeplinks(intent)` (already wired in `MainActivity`), which completes
+     * the link once the user finishes the flow in the browser.
+     *
+     * @param redirectUrl The `manahub://auth` deep-link the OAuth flow returns to.
+     * @return The authorization URL to open, or null if the platform already launched it.
+     */
+    suspend fun linkGoogleIdentityNative(redirectUrl: String): AuthResult<String?>
 }

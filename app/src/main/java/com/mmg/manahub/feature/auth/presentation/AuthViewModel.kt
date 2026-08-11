@@ -18,14 +18,20 @@ import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.RequestReauthenticationUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.ResendConfirmationEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResetPasswordUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UnlinkIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdateEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdatePasswordUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +52,12 @@ class AuthViewModel(
     private val resetPasswordUseCase: ResetPasswordUseCase,
     private val deleteAccountUseCase: DeleteAccountUseCase,
     private val updateNicknameUseCase: UpdateNicknameUseCase,
+    private val resendConfirmationEmailUseCase: ResendConfirmationEmailUseCase,
+    private val requestReauthenticationUseCase: RequestReauthenticationUseCase,
+    private val updateEmailUseCase: UpdateEmailUseCase,
+    private val updatePasswordUseCase: UpdatePasswordUseCase,
+    private val unlinkIdentityUseCase: UnlinkIdentityUseCase,
+    private val linkGoogleIdentityNativeUseCase: LinkGoogleIdentityNativeUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val appContext: Context,
 ) : ViewModel() {
@@ -128,6 +140,130 @@ class AuthViewModel(
             _uiState.value = AuthUiState.Loading
             _uiState.value = when (val result = updateNicknameUseCase(nickname.trim())) {
                 is AuthResult.Success -> AuthUiState.NicknameUpdated
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Resends the sign-up confirmation email to [email].
+     * Transitions to [AuthUiState.EmailConfirmationSent] on success — the same state the initial
+     * sign-up confirmation flow uses, since the UI copy ("check your inbox") applies identically.
+     */
+    fun resendConfirmationEmail(email: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || !EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = resendConfirmationEmailUseCase(trimmedEmail)) {
+                is AuthResult.Success -> AuthUiState.EmailConfirmationSent
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Sends a reauthentication nonce to the current user's verified email.
+     * The user enters the received code as the `code` parameter of [updateEmail]/[updatePassword].
+     * Transitions to [AuthUiState.ReauthenticationSent] on success.
+     */
+    fun requestReauthentication() {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = requestReauthenticationUseCase()) {
+                is AuthResult.Success -> AuthUiState.ReauthenticationSent
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Changes the authenticated user's email address.
+     * Transitions to [AuthUiState.EmailUpdated] on success.
+     *
+     * @param code The reauthentication nonce obtained via [requestReauthentication].
+     */
+    fun updateEmail(newEmail: String, code: String) {
+        val trimmedEmail = newEmail.trim()
+        if (trimmedEmail.isBlank() || !EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
+            return
+        }
+        if (code.isBlank()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_credentials))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = updateEmailUseCase(trimmedEmail, code)) {
+                is AuthResult.Success -> AuthUiState.EmailUpdated
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Changes the authenticated user's password.
+     * Transitions to [AuthUiState.PasswordUpdated] on success.
+     *
+     * @param code The reauthentication nonce obtained via [requestReauthentication].
+     */
+    fun updatePassword(newPassword: String, code: String) {
+        if (!isPasswordStrong(newPassword)) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_password_requirements))
+            return
+        }
+        if (code.isBlank()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_credentials))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = updatePasswordUseCase(newPassword, code)) {
+                is AuthResult.Success -> AuthUiState.PasswordUpdated
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Unlinks [identityId] from the authenticated user's account.
+     * Transitions to [AuthUiState.IdentityUnlinked] on success.
+     */
+    fun unlinkIdentity(identityId: String) {
+        if (identityId.isBlank()) return
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = unlinkIdentityUseCase(identityId)) {
+                is AuthResult.Success -> AuthUiState.IdentityUnlinked
+                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Starts linking a Google identity to the authenticated user's account via the SDK's real
+     * OAuth-redirect flow — distinct from [linkGoogleIdentity], which links via the
+     * Credential-Manager ID-token workaround.
+     * Transitions to [AuthUiState.GoogleIdentityLinkStarted] on success; the UI opens the carried
+     * authorization URL (e.g. via Custom Tabs).
+     *
+     * @param redirectUrl The `manahub://auth` deep-link the OAuth flow returns to.
+     */
+    fun linkGoogleIdentityNative(redirectUrl: String) {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            _uiState.value = when (val result = linkGoogleIdentityNativeUseCase(redirectUrl)) {
+                is AuthResult.Success -> AuthUiState.GoogleIdentityLinkStarted(result.data)
                 is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
             }
         }

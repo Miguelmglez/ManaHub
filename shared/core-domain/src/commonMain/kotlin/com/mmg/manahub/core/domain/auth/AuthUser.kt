@@ -1,5 +1,24 @@
 package com.mmg.manahub.core.domain.auth
 
+import kotlinx.datetime.Instant
+
+/**
+ * A single authentication identity linked to an [AuthUser]'s account (e.g. "email" or "google").
+ * A user may carry more than one identity after using [AuthRepository.linkGoogleIdentity] or
+ * [AuthRepository.linkGoogleIdentityNative] to attach a second provider to an existing account.
+ *
+ * @param identityId Stable identifier for this identity row. Pass this to
+ *   [AuthRepository.unlinkIdentity] to remove the identity from the account.
+ * @param provider Provider name for this identity: "email" or "google".
+ * @param createdAt When this identity was linked to the account, or null if the timestamp could
+ *   not be parsed.
+ */
+data class AuthIdentity(
+    val identityId: String,
+    val provider: String,
+    val createdAt: Instant?,
+)
+
 /**
  * Domain representation of an authenticated user.
  *
@@ -8,7 +27,10 @@ package com.mmg.manahub.core.domain.auth
  * @param nickname User-chosen display name (max 30 chars). Falls back to email prefix if null.
  * @param gameTag Auto-generated server-side identifier (e.g. "#A3KX9Z"). Never editable by user.
  * @param avatarUrl URL of the user's avatar image, may be null.
- * @param provider Authentication provider: "email" or "google".
+ * @param provider Authentication provider: "email" or "google". Derived from
+ *   `identities.firstOrNull()?.provider` by the repository mapper — kept as a top-level field
+ *   (rather than requiring every call site to read [identities] instead) so existing consumers of
+ *   this field keep compiling unchanged.
  * @param profileCompleted Whether the user has finished the onboarding flow and chosen a nickname.
  *   The Supabase trigger [handle_new_user] creates the profile row with this field set to FALSE
  *   for every new auth.users entry (including Google OAuth). It is set to TRUE only after the
@@ -16,6 +38,11 @@ package com.mmg.manahub.core.domain.auth
  * @param isAnonymous True when this session was created via anonymous sign-in (Supabase anonymous
  *   auth). Anonymous users do not have a [user_profiles] row and cannot access account-gated
  *   features.
+ * @param emailConfirmedAt When the user's email address was confirmed, or null if it has not been
+ *   confirmed yet (ADR-003 server-side email confirmation).
+ * @param createdAt When the underlying `auth.users` account was created.
+ * @param identities Every authentication provider linked to this account. Empty when the SDK
+ *   could not resolve any identity (should not normally happen for an authenticated session).
  */
 data class AuthUser(
     val id: String,
@@ -26,4 +53,7 @@ data class AuthUser(
     val provider: String,
     val profileCompleted: Boolean = false,
     val isAnonymous: Boolean = false,
+    val emailConfirmedAt: Instant? = null,
+    val createdAt: Instant? = null,
+    val identities: List<AuthIdentity> = emptyList(),
 )

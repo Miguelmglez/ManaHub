@@ -57,8 +57,12 @@ kotlin {
                 // by use cases moved here (e.g. ImportCommunityDeckUseCase → CrashReporter).
                 implementation(project(":shared:core-common"))
                 implementation(libs.coroutines.core)
-                // Use cases use Clock.System.now() for event timestamps.
-                implementation(libs.kotlinx.datetime)
+                // api (not implementation): AuthUser/AuthIdentity (core.domain.auth) expose
+                // kotlinx.datetime.Instant in their public API (account-management data layer,
+                // Phase 1) — every module that depends on :shared:core-domain and reads those
+                // fields needs Instant on its own compile classpath transitively. Also used
+                // internally by use cases for Clock.System.now() event timestamps.
+                api(libs.kotlinx.datetime)
                 // Daily Puzzle feature (Batch B1): SubmitPuzzleGuessUseCase parses a Puzzle's raw
                 // payloadJson into a typed GuessCardPayload.
                 implementation(libs.kotlinx.serialization.json)
