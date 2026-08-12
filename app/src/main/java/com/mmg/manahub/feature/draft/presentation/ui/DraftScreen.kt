@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -18,11 +19,15 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,21 +35,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.DraftSetCard
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
-import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.feature.draft.presentation.viewmodel.DraftViewModel
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun DraftScreen(
+    onBack: () -> Unit,
     onSetClick: (setCode: String, setName: String, iconUri: String, releasedAt: String) -> Unit,
     viewModel: DraftViewModel = koinViewModel(),
 ) {
@@ -52,17 +58,48 @@ fun DraftScreen(
     val colors = MaterialTheme.magicColors
     val typography = MaterialTheme.magicTypography
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        ThemeBackground(modifier = Modifier.fillMaxSize())
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+    Scaffold(
+        topBar = {
+        Surface(
+            color = colors.backgroundSecondary,
+            shadowElevation = 4.dp,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        contentDescription = "Back",
+                        tint = colors.textPrimary,
+                        imageVector = Icons.AutoMirrored.Default.ArrowBack
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.draft_title),
+                    style = typography.titleLarge,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
+    },
+        containerColor = colors.background
+    )
+    { paddingValues ->
+        HexGridBackground(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.05f)
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
             // Toolbar
-            Text(
-                text = stringResource(R.string.draft_title),
-                style = typography.titleLarge,
-                color = colors.textPrimary,
-                modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp),
-            )
-
             if (state.isStale) {
                 InlineErrorState(
                     message = stringResource(R.string.draft_stale_data),
@@ -78,7 +115,7 @@ fun DraftScreen(
                 onValueChange = viewModel::onSearchQueryChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
                 placeholder = {
                     Text(
                         stringResource(R.string.draft_search_hint),
@@ -86,7 +123,11 @@ fun DraftScreen(
                     )
                 },
                 leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = colors.textDisabled)
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = colors.textDisabled
+                    )
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
@@ -116,6 +157,7 @@ fun DraftScreen(
                         }
                     }
                 }
+
                 state.error != null && state.sets.isEmpty() -> {
                     FullErrorState(
                         message = state.error ?: "",
@@ -123,15 +165,23 @@ fun DraftScreen(
                         onRetry = { viewModel.loadSets(forceRefresh = true) },
                     )
                 }
+
                 state.filteredSets.isEmpty() && state.searchQuery.isNotBlank() -> {
                     EmptyState(title = stringResource(R.string.draft_no_sets))
                 }
+
                 else -> {
-                    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                    val navBarBottom =
+                        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 12.dp + navBarBottom),
+                        contentPadding = PaddingValues(
+                            start = 12.dp,
+                            top = 12.dp,
+                            end = 12.dp,
+                            bottom = 12.dp + navBarBottom
+                        ),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -139,7 +189,12 @@ fun DraftScreen(
                             DraftSetCard(
                                 set = set,
                                 onClick = {
-                                    onSetClick(set.code, set.name, set.iconSvgUri, set.releasedAt)
+                                    onSetClick(
+                                        set.code,
+                                        set.name,
+                                        set.iconSvgUri,
+                                        set.releasedAt
+                                    )
                                 },
                             )
                         }

@@ -26,8 +26,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
@@ -69,6 +69,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,8 +79,10 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -87,8 +90,8 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.feature.auth.presentation.AccountSection
 import com.mmg.manahub.feature.auth.presentation.AuthUiState
 import com.mmg.manahub.feature.auth.presentation.AuthViewModel
@@ -114,6 +117,7 @@ fun ProfileScreen(
     onManageAccountClick: () -> Unit,
     /** Initial tab to open on (deep-linked from Home widgets in Phase 2). Default = Overview. */
     initialTab: ProfileTab = ProfileTab.OVERVIEW,
+    onBack:()->Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
@@ -207,6 +211,10 @@ fun ProfileScreen(
                         showAccountSheet = false
                         onManageAccountClick()
                     },
+                    onEditProfileClick = {
+                        showAccountSheet = false
+                        showProfileEdit = true
+                    },
                     onFetchShareLink = viewModel::fetchShareLink,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     playerName = uiState.playerName,
@@ -267,22 +275,19 @@ fun ProfileScreen(
                         .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Spacer(modifier = Modifier.width(12.dp))
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            tint = mc.textPrimary,
+                        )
+                    }
                     Text(
                         text = stringResource(R.string.profile_title),
                         style = MaterialTheme.magicTypography.titleLarge,
                         color = mc.textPrimary,
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = "Account",
-                        tint = if (sessionState is SessionState.Authenticated) mc.primaryAccent else mc.textPrimary,
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                            .size(24.dp)
-                            .clickable { showAccountSheet = true },
-                    )
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
@@ -319,7 +324,13 @@ fun ProfileScreen(
                 // Equipped cosmetics are purely additive overlays; pass NONE when gamification is off
                 // so the hero renders byte-for-byte as before.
                 equipped = if (uiState.gamificationEnabled) uiState.equipped else com.mmg.manahub.core.gamification.domain.model.EquippedCosmetics.NONE,
-                onEditClick = { showProfileEdit = true },
+                onEditClick = {
+                    if (sessionState is SessionState.Authenticated) {
+                        showAccountSheet = true
+                    } else {
+                        showProfileEdit = true
+                    }
+                },
             )
 
             // ── Tab row (only when gamification is enabled) ───────────────────
@@ -406,6 +417,10 @@ fun ProfileScreen(
                             }
                         },
                         onFeedbackClick = { showFeedbackSheet = true },
+                        onLoginClick = {
+                            loginSheetInitialTab = 0
+                            showLoginSheet = true
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -488,12 +503,15 @@ private fun OverviewTabContent(
     onUpdateClick: () -> Unit,
     onRateClick: () -> Unit,
     onFeedbackClick: () -> Unit,
+    onLoginClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier,
         contentPadding = contentPadding,
     ) {
+
+
         // ── Friends ───────────────────────────────────────────────────────
         if (sessionState is SessionState.Authenticated) {
             item {
@@ -555,9 +573,87 @@ private fun OverviewTabContent(
             )
         }
 
+        // ── Login CTA ─────────────────────────────────────────────────────
+        if (sessionState is SessionState.Unauthenticated) {
+            item {
+                LoginCtaCard(
+                    onClick = onLoginClick,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        }
+
         // ── Footer ────────────────────────────────────────────────────────
         item {
             AppInfoFooter(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        }
+    }
+}
+
+// ── Login CTA Card ─────────────────────────────────────────────────────────────
+
+/**
+ * A visually attractive card shown to unauthenticated users to encourage sign-in.
+ * Uses MagicCtaButton and a themed background to stand out.
+ */
+@Composable
+private fun LoginCtaCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = mc.surface,
+        tonalElevation = 2.dp,
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Background themed accent
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                mc.primaryAccent.copy(alpha = 0.08f),
+                                mc.background,
+                            ),
+                        ),
+                    ),
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(spacing.md),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = stringResource(R.string.auth_section_title),
+                        style = ty.titleMedium,
+                        color = mc.textPrimary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = stringResource(R.string.auth_section_subtitle),
+                        style = ty.bodyMedium,
+                        color = mc.textSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+                MagicCtaButton(
+                    onClick = onClick,
+                    text = stringResource(R.string.auth_cta_signin),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

@@ -51,6 +51,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
@@ -63,8 +65,6 @@ import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.core.domain.auth.AuthUser
-import com.mmg.manahub.core.domain.auth.SessionState
 
 /**
  * Profile-screen section that renders different content based on [sessionState]:
@@ -87,6 +87,7 @@ fun AccountSection(
     onLoginClick: () -> Unit,
     onSignUpClick: () -> Unit,
     onManageAccountClick: () -> Unit,
+    onEditProfileClick: () -> Unit,
     onFetchShareLink: suspend () -> Result<String>,
     modifier: Modifier = Modifier,
     playerName: String? = null,
@@ -119,6 +120,7 @@ fun AccountSection(
                 AuthenticatedCard(
                     user = sessionState.user,
                     onManageAccountClick = onManageAccountClick,
+                    onEditProfileClick = onEditProfileClick,
                     onFetchShareLink = onFetchShareLink,
                     modifier = modifier,
                     displayName = playerName,
@@ -376,6 +378,7 @@ private fun BenefitRow(
 private fun AuthenticatedCard(
     user: AuthUser,
     onManageAccountClick: () -> Unit,
+    onEditProfileClick: () -> Unit,
     onFetchShareLink: suspend () -> Result<String>,
     modifier: Modifier = Modifier,
     displayName: String? = null,
@@ -522,9 +525,26 @@ private fun AuthenticatedCard(
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 // ── Action Buttons ───────────────────────────────────────────────
                 MagicCtaButton(
+                    onClick = onEditProfileClick,
+                    text = stringResource(R.string.profile_edit_title),
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    icon = {
+                        Icon(
+                            Icons.Default.AccountCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                MagicCtaButton(
                     onClick = onManageAccountClick,
                     text = stringResource(R.string.auth_manage_account),
-                    style = MagicCtaStyle.Filled,
+                    style = MagicCtaStyle.Outlined,
                     color = MagicCtaColor.Primary,
                     icon = {
                         Icon(

@@ -212,6 +212,10 @@ sealed class Screen(val route: String) {
             "news/video/${Uri.encode(videoId)}?title=${Uri.encode(title)}"
     }
 
+    // ── Competitive ──────────────────────────────────────────────────────────────────
+
+    object Competitive : Screen("competitive")
+
     // ── Draft ─────────────────────────────────────────────────────────────────
     object Draft : Screen("draft")
     object DraftSetDetail : Screen("draft/{setCode}?setName={setName}&setIconUri={setIconUri}&setReleasedAt={setReleasedAt}") {
