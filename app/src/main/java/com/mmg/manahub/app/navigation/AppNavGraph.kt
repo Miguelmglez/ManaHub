@@ -3,10 +3,8 @@ package com.mmg.manahub.app.navigation
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.ComponentActivity
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -30,7 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -41,10 +39,12 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.core.push.ForegroundScreenTracker
 import com.mmg.manahub.core.push.PushDeeplinkRouter
-import androidx.compose.ui.res.painterResource
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -52,13 +52,17 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
+import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
+import com.mmg.manahub.feature.auth.presentation.ResetPasswordConfirmScreen
+import com.mmg.manahub.feature.auth.presentation.SecurityCodeScreen
+import com.mmg.manahub.feature.auth.presentation.UpdateEmailScreen
+import com.mmg.manahub.feature.auth.presentation.UpdatePasswordScreen
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
-import com.mmg.manahub.feature.collection.presentation.CollectionTab
-import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
-import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
+import com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen
+import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftSetupScreen
@@ -69,8 +73,6 @@ import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.core.model.LayoutTemplate
-import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.presentation.GamePlayScreen
 import com.mmg.manahub.feature.game.presentation.GameSettings
 import com.mmg.manahub.feature.game.presentation.GameSetupScreen
@@ -83,14 +85,9 @@ import com.mmg.manahub.feature.home.presentation.HomeScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
-import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
-import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
-import com.mmg.manahub.feature.auth.presentation.ResetPasswordConfirmScreen
-import com.mmg.manahub.feature.auth.presentation.SecurityCodeScreen
-import com.mmg.manahub.feature.auth.presentation.UpdateEmailScreen
-import com.mmg.manahub.feature.auth.presentation.UpdatePasswordScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileTab
 import com.mmg.manahub.feature.puzzle.presentation.PuzzleScreen
@@ -251,7 +248,9 @@ fun AppNavGraph(
         },
     ) { paddingValues ->
         SharedTransitionLayout {
-            Box(modifier = modifier.padding(paddingValues).fillMaxSize()) {
+            Box(modifier = modifier
+                .padding(paddingValues)
+                .fillMaxSize()) {
                 NavHost(
                     navController = navController,
                     startDestination = Screen.Home.route,
@@ -381,6 +380,9 @@ fun AppNavGraph(
                                             setReleasedAt = action.set.releasedAt,
                                         )
                                     )
+                                    is HomeAction.OpenCompetitive->{
+                                        navController.navigate(Screen.Competitive.route)
+                                    }
 
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
@@ -654,6 +656,8 @@ fun AppNavGraph(
             // ── News ──────────────────────────────────────────────────────────
             composable(Screen.News.route) {
                 NewsScreen(
+                    onBack = { navController.popBackStack() },
+
                     onVideoClick = { videoId, title ->
                         navController.navigate(Screen.NewsVideoPlayer.createRoute(videoId, title))
                     },
@@ -686,6 +690,7 @@ fun AppNavGraph(
             // ── Draft ─────────────────────────────────────────────────────────
             composable(Screen.Draft.route) {
                 DraftScreen(
+                    onBack = {navController.popBackStack()},
                     onSetClick = { setCode, setName, iconUri, releasedAt ->
                         navController.navigate(
                             Screen.DraftSetDetail.createRoute(setCode, setName, iconUri, releasedAt)
@@ -777,6 +782,7 @@ fun AppNavGraph(
                     onFriendsClick = { navController.navigate(Screen.FriendsList.route) },
                     onManageAccountClick = { navController.navigate(Screen.AccountManagement.route) },
                     initialTab = initialTab,
+                    onBack = { navController.popBackStack() }
                 )
             }
 
@@ -1344,6 +1350,15 @@ fun AppNavGraph(
                             }
                         }
                     },
+                )
+            }
+            composable(
+                route = Screen.Competitive.route,
+            ){
+                CompetitiveScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    }
                 )
             }
         }

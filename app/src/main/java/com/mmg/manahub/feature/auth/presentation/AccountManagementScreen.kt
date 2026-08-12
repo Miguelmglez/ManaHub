@@ -8,7 +8,6 @@ import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -463,7 +462,9 @@ fun AccountManagementScreen(
 
                 SessionState.Loading -> {
                     Box(
-                        modifier = Modifier.fillMaxSize().padding(padding),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator(color = mc.primaryAccent)
@@ -473,7 +474,9 @@ fun AccountManagementScreen(
                 SessionState.Unauthenticated -> {
                     // Handled by the LaunchedEffect(sessionState) above (onSignedOut); render nothing
                     // for the single frame before navigation completes.
-                    Box(modifier = Modifier.fillMaxSize().padding(padding))
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding))
                 }
             }
 
@@ -513,7 +516,9 @@ private fun IdentityHeader(
         color = mc.surface,
         shape = CardShape,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(sp.lg)) {
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .padding(sp.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -571,34 +576,21 @@ private fun IdentityHeader(
                     }
                 }
             }
-
-            if (gameTag != null) {
-                Spacer(modifier = Modifier.height(sp.md))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(ChipShape)
-                        .background(mc.primaryAccent.copy(alpha = 0.1f))
-                        .clickable { onCopyGameTag(gameTag) }
-                        .padding(horizontal = sp.md, vertical = sp.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = gameTag,
-                        style = ty.labelLarge,
-                        color = mc.primaryAccent,
-                        modifier = Modifier.weight(1f),
+            Spacer(modifier = Modifier.height(sp.xs))
+            MagicCtaButton(
+                onClick = onShareClick,
+                text = stringResource(R.string.auth_share_my_profile),
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Primary,
+                icon = {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
                     )
-                    IconButton(onClick = onShareClick, modifier = Modifier.size(48.dp)) {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = stringResource(R.string.action_share),
-                            tint = mc.primaryAccent,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-            }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -623,7 +615,9 @@ private fun EmailVerificationCard(
         shape = CardShape,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(sp.lg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -687,7 +681,9 @@ private fun SignInMethodRow(
         shape = CardShape,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(sp.md),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -756,7 +752,9 @@ private fun AccountManagementRow(
         color = mc.surface,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(sp.md),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(icon, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
@@ -819,7 +817,9 @@ private fun AddSignInMethodGroup(
         border = BorderStroke(width = 1.dp, color = mc.primaryAccent.copy(alpha = 0.3f)),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(sp.md),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.md),
             verticalArrangement = Arrangement.spacedBy(sp.sm),
             content = content,
         )

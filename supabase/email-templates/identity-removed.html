@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A sign-in method was removed from your ManaHub account</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0D0D1A;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0D0D1A;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#3D1B6E 0%,#1A1A4E 100%);border-radius:12px 12px 0 0;padding:36px 40px;text-align:center;">
+              <p style="margin:0 0 8px 0;font-size:28px;font-weight:700;color:#D4A017;letter-spacing:2px;">⚔ MANAHUB</p>
+              <p style="margin:0;font-size:13px;color:#A090C0;letter-spacing:1px;text-transform:uppercase;">Magic: The Gathering Companion</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#1A1A2E;padding:40px;">
+              <p style="margin:0 0 20px 0;font-size:22px;font-weight:600;color:#E8E8F0;">Sign-In Method Removed</p>
+              <p style="margin:0 0 16px 0;font-size:15px;color:#A0A0B8;line-height:1.6;">
+                Hi {{ .Nickname }}, <strong style="color:#E8E8F0;">{{ .Provider }}</strong> was unlinked from your
+                ManaHub account on {{ .Timestamp }}.
+              </p>
+              <p style="margin:0 0 32px 0;font-size:15px;color:#A0A0B8;line-height:1.6;">
+                If you made this change, no further action is needed.
+              </p>
+
+              <!-- Security alert -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background-color:#13132A;border-left:3px solid #D4A017;border-radius:0 6px 6px 0;padding:14px 16px;">
+                    <p style="margin:0;font-size:13px;color:#A0A0B8;line-height:1.5;">
+                      ⚠ <strong style="color:#E8E8F0;">Wasn't you?</strong> If you didn't make this change, your
+                      account may be compromised. Change your password immediately and review the sign-in methods
+                      linked to your account.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#13132A;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#404060;">
+                © 2026 ManaHub · Magic: The Gathering is © Wizards of the Coast
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
