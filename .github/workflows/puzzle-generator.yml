@@ -1,0 +1,38 @@
+name: Daily Puzzle Generator
+
+# Keeps a rolling buffer of published Daily Puzzles in R2 (manahub-assets, puzzle/*.json) so the
+# app never runs out of content. generate.mjs is idempotent: dates already in puzzle/index.json
+# are skipped, so re-running weekly with a wide --days window is cheap and safe.
+#
+# Requires the CLOUDFLARE_API_TOKEN repo secret (Cloudflare dashboard -> My Profile -> API Tokens
+# -> Create Token -> Edit Cloudflare Workers R2 Storage permission, scoped to the manahub-assets
+# bucket). Set it with `gh secret set CLOUDFLARE_API_TOKEN` -- never paste the token value into a
+# commit, issue, or chat.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # every Monday 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days to generate ahead of today'
+        required: false
+        default: '45'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate + upload puzzles
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node tools/puzzle-generator/generate.mjs --days "${{ github.event.inputs.days || '45' }}"
