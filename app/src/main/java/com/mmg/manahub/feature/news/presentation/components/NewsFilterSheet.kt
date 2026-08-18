@@ -58,6 +58,7 @@ import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.model.news.ContentSource
 import kotlinx.coroutines.launch
 
@@ -220,22 +221,20 @@ fun NewsFilterSheet(
                         title = stringResource(R.string.news_filter_sources),
                         icon = Icons.Default.RssFeed
                     ) {
+                        val spacing = MaterialTheme.spacing
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
                         ) {
-                            MagicCtaButton(
+                            MagicFilterChip(
+                                selected = false,
                                 onClick = { selectedSourceIds = allEnabledSourceIds },
-                                text = stringResource(R.string.news_filter_select_all),
-                                style = MagicCtaStyle.Ghost,
-                                modifier = Modifier.height(32.dp),
+                                label = stringResource(R.string.news_filter_select_all),
                             )
-                            MagicCtaButton(
+                            MagicFilterChip(
+                                selected = false,
                                 onClick = { selectedSourceIds = emptySet() },
-                                text = stringResource(R.string.news_filter_deselect_all),
-                                style = MagicCtaStyle.Ghost,
-                                color = MagicCtaColor.Neutral,
-                                modifier = Modifier.height(32.dp),
+                                label = stringResource(R.string.news_filter_deselect_all),
                             )
                         }
                         

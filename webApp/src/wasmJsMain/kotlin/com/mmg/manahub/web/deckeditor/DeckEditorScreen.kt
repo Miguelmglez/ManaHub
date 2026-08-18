@@ -41,6 +41,8 @@ import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.layout.ManaWindowSizeClass
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -249,14 +251,10 @@ private fun DeckMetadataSection(uiState: DeckEditorUiState, viewModel: DeckEdito
         ) {
             val selectedFormat = deck?.format?.let { raw -> DeckFormat.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } }
             EDITOR_FORMATS.forEach { format ->
-                FilterChip(
+                MagicFilterChip(
                     selected = format == selectedFormat,
                     onClick = { viewModel.changeFormat(format) },
-                    label = { Text(format.displayName) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = colors.primaryAccent.copy(alpha = 0.2f),
-                        selectedLabelColor = colors.primaryAccent,
-                    ),
+                    label = format.displayName,
                 )
             }
         }
