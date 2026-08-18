@@ -47,3 +47,27 @@ plugins.withType<org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnPlugin> {
 plugins.withType<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin> {
     the<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec>().download = false
 }
+
+// Auth SDK bump (supabase-bom 3.1.4 -> 3.5.0, 2026-08-13, UserUpdateBuilder.currentPassword):
+// supabase-kt >= 3.2.1 itself requires kotlinx-datetime 0.7.1, which Gradle's default
+// highest-version-wins conflict resolution silently applies PROJECT-WIDE, overriding this
+// project's own pinned `kotlinx-datetime = "0.6.2"` (gradle/libs.versions.toml) even for modules
+// that never touch Supabase. kotlinx-datetime 0.7.x turns its own `Clock`/`Instant` into
+// @Deprecated typealiases for `kotlin.time.Clock`/`kotlin.time.Instant` (stdlib types gated
+// `@SinceKotlin("2.3")`) — under this project's default Kotlin compiler apiVersion resolution,
+// every existing `Clock.System.now()`/`Clock.System.todayIn(...)` call site across the WHOLE app
+// (Decks, Gamification, Puzzle, Tournament, Trades, Friends, Home, ManaHubApp — none of them
+// Supabase-related) broke with "Unresolved reference 'System'", confirmed via a full
+// `:app:assembleDebug` after the bump. Force the datetime resolution back to the project's own
+// already-tested 0.6.2 so the auth SDK bump doesn't drag an unrelated, unvetted kotlinx-datetime
+// migration along with it — supabase-kt's own Instant/Clock usage stays internal to its compiled
+// jar and is not part of the public API surface this project's `AuthRepositoryImpl`/
+// `WebAuthRepository` consume (both parse timestamps from plain `String` fields, never receive a
+// supabase-kt-typed `Instant`/`Clock` value directly), so pinning back is safe.
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+        }
+    }
+}

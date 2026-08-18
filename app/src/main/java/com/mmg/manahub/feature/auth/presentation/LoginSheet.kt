@@ -16,14 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -34,9 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -56,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -63,12 +63,17 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.domain.auth.SessionState
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.theme.spacing
 
 /**
  * Full-screen-height ModalBottomSheet that handles sign-in, sign-up,
@@ -431,7 +436,7 @@ private fun LoginSheetContent(
             }
 
             // ── Primary CTA button ─────────────────────────────────────────────
-            Button(
+            MagicCtaButton(
                 onClick = {
                     if (selectedTab == 0) {
                         onSignIn(email, password)
@@ -443,32 +448,15 @@ private fun LoginSheetContent(
                         }
                     }
                 },
+                text = stringResource(R.string.auth_btn_continue),
                 enabled = !isLoading && email.isNotBlank() &&
-                    if (selectedTab == 1) passwordStrength.allMet && nickname.isNotBlank()
-                    else password.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.background,
-                    disabledContainerColor = mc.primaryAccent.copy(alpha = 0.4f),
-                    disabledContentColor = mc.background.copy(alpha = 0.6f),
-                ),
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                if (isLoading) {
-                    MagicLoadingSpinner(
-                        modifier = Modifier.size(20.dp),
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.auth_btn_continue),
-                        style = ty.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
+                        if (selectedTab == 1) passwordStrength.allMet && nickname.isNotBlank()
+                        else password.isNotBlank(),
+                isLoading = isLoading,
+                modifier = Modifier.fillMaxWidth(),
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Primary
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -496,7 +484,7 @@ private fun LoginSheetContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             // ── Google button ──────────────────────────────────────────────────
-            OutlinedButton(
+            MagicCtaButton(
                 onClick = {
                     if (selectedTab == 1) {
                         if (nickname.isBlank()) {
@@ -508,42 +496,29 @@ private fun LoginSheetContent(
                         onGoogleSignIn(context)
                     }
                 },
+                text = stringResource(R.string.auth_btn_google),
                 enabled = !isLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = mc.textSecondary.copy(alpha = 0.4f),
-                ),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = mc.textPrimary,
-                    disabledContentColor = mc.textSecondary,
-                ),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .background(
-                            color = Color(0xFFFFFFFF),
-                            shape = RoundedCornerShape(4.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                Text(
-                    text = "G",
-                    color = Color(0xFF4285F4),
-                    fontWeight = FontWeight.Bold,
-                    style = ty.bodyMedium,
-                )
+                modifier = Modifier.fillMaxWidth(),
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Neutral, 
+                tintIcon = false,
+                icon = {
+                    Surface(
+                        modifier = Modifier.size(20.dp),
+                        shape = CircleShape,
+                        color = Color.White,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_google),
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = Color.Unspecified
+                            )
+                        }
+                    }
                 }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = stringResource(R.string.auth_btn_google),
-                    style = ty.bodyMedium,
-                )
-            }
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -616,7 +591,11 @@ private fun EmailConfirmationContent(
             textAlign = TextAlign.Center,
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        EmailDeliveryNote(centered = true)
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Open email app button
         Button(
@@ -655,74 +634,8 @@ private fun EmailConfirmationContent(
     }
 }
 
-// ── Password strength model ────────────────────────────────────────────────────
-
-/**
- * Immutable snapshot of which password requirements are currently satisfied.
- * Mirrors the server-side rules enforced by [AuthViewModel.isPasswordStrong].
- */
-private data class PasswordStrength(
-    val hasMinLength: Boolean,
-    val hasLowercase: Boolean,
-    val hasUppercase: Boolean,
-    val hasDigit: Boolean,
-    val hasSymbol: Boolean,
-) {
-    val allMet: Boolean
-        get() = hasMinLength && hasLowercase && hasUppercase && hasDigit && hasSymbol
-
-    companion object {
-        fun from(password: String) = PasswordStrength(
-            hasMinLength = password.length >= 8,
-            hasLowercase = password.any { it.isLowerCase() },
-            hasUppercase = password.any { it.isUpperCase() },
-            hasDigit     = password.any { it.isDigit() },
-            hasSymbol    = password.any { !it.isLetterOrDigit() },
-        )
-    }
-}
-
-// ── Password strength UI ───────────────────────────────────────────────────────
-
-@Composable
-private fun PasswordStrengthIndicator(strength: PasswordStrength) {
-    val ty = MaterialTheme.magicTypography
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        RequirementRow(stringResource(R.string.auth_password_requirement_length),   strength.hasMinLength, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_uppercase), strength.hasUppercase, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_lowercase), strength.hasLowercase, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_digit),     strength.hasDigit, ty)
-        RequirementRow(stringResource(R.string.auth_password_requirement_symbol),    strength.hasSymbol, ty)
-    }
-}
-
-@Composable
-private fun RequirementRow(label: String, met: Boolean, ty: com.mmg.manahub.core.ui.theme.MagicTypography) {
-    val mc = MaterialTheme.magicColors
-    val color = if (met) mc.lifePositive else mc.textDisabled
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Icon(
-            imageVector = if (met) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(14.dp),
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = label,
-            color = color,
-            style = ty.labelSmall,
-        )
-    }
-}
+// ── Password strength model + UI moved to PasswordStrength.kt (same package) so
+//    UpdatePasswordScreen can share the exact same rules/UI instead of duplicating them. ──
 
 /**
  * Dialog shown when a Google Sign-In attempt collides with an existing email/password account.
@@ -738,30 +651,21 @@ private fun LinkGoogleIdentityDialog(
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    androidx.compose.material3.AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.surface,
-        titleContentColor = mc.textPrimary,
-        textContentColor = mc.textSecondary,
-        title = {
-            Text(
-                text = stringResource(R.string.auth_link_google_title),
-                style = ty.titleLarge,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
+        title = stringResource(R.string.auth_link_google_title),
+        content = {
             Column {
                 Text(
                     text = stringResource(R.string.auth_link_google_message, email),
                     color = mc.textSecondary,
-                    style = ty.bodyMedium,
+                    style = MaterialTheme.magicTypography.bodyMedium,
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(sp.md))
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
@@ -793,32 +697,21 @@ private fun LinkGoogleIdentityDialog(
                 )
             }
         },
-        confirmButton = {
-            Button(
+        buttons = {
+            MagicCtaButton(
                 onClick = { onLink(password) },
+                text = stringResource(R.string.auth_link_google_btn),
                 enabled = password.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.background,
-                    disabledContainerColor = mc.primaryAccent.copy(alpha = 0.4f),
-                    disabledContentColor = mc.background.copy(alpha = 0.6f),
-                ),
-            ) {
-                Text(
-                    text = stringResource(R.string.auth_link_google_btn),
-                    style = ty.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = stringResource(R.string.action_cancel),
-                    color = mc.textSecondary,
-                    style = ty.labelMedium,
-                )
-            }
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MagicCtaButton(
+                onClick = onDismiss,
+                text = stringResource(R.string.action_cancel),
+                style = MagicCtaStyle.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
         },
     )
 }
@@ -835,25 +728,31 @@ private fun ResetPasswordDialog(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     var resetEmail by remember { mutableStateOf("") }
     val isLoading = uiState is AuthUiState.Loading
     val resetSent = uiState is AuthUiState.ResetSent
     val errorMessage = (uiState as? AuthUiState.Error)?.message
 
-    androidx.compose.material3.AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.surface,
-        titleContentColor = mc.textPrimary,
-        textContentColor = mc.textSecondary,
-        title = {
-            Text(
-                text = stringResource(R.string.auth_reset_title),
-                style = ty.titleLarge,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
-            Column {
+        title = stringResource(R.string.auth_reset_title),
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
+                // Persistent (not a toast) guidance shown BEFORE the user requests the link, so
+                // the "you'll be signed out of every device" consequence is known up front —
+                // stays visible after sending too, since the dialog itself doesn't auto-close.
+                AuthFlowStepsCard(
+                    title = stringResource(R.string.auth_reset_steps_title),
+                    steps = listOf(
+                        stringResource(R.string.auth_reset_step_send),
+                        stringResource(R.string.auth_reset_step_open),
+                        stringResource(R.string.auth_reset_step_choose),
+                        stringResource(R.string.auth_reset_step_signout_all),
+                    ),
+                )
+                EmailDeliveryNote(includeLinkFacts = true)
+
                 if (resetSent) {
                     Text(
                         text = stringResource(R.string.auth_reset_sent),
@@ -861,12 +760,6 @@ private fun ResetPasswordDialog(
                         style = ty.bodyMedium,
                     )
                 } else {
-                    Text(
-                        text = stringResource(R.string.auth_reset_subtitle),
-                        color = mc.textSecondary,
-                        style = ty.bodyMedium,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = resetEmail,
                         onValueChange = { resetEmail = it },
@@ -886,7 +779,6 @@ private fun ResetPasswordDialog(
                         enabled = !isLoading,
                     )
                     if (errorMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = errorMessage,
                             color = mc.lifeNegative,
@@ -896,47 +788,30 @@ private fun ResetPasswordDialog(
                 }
             }
         },
-        confirmButton = {
+        buttons = {
             if (resetSent) {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = stringResource(R.string.action_close),
-                        color = mc.primaryAccent,
-                        style = ty.labelMedium,
-                    )
-                }
+                MagicCtaButton(
+                    onClick = onDismiss,
+                    text = stringResource(R.string.action_close),
+                    style = MagicCtaStyle.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             } else {
-                Button(
+                MagicCtaButton(
                     onClick = { onSend(resetEmail) },
+                    text = stringResource(R.string.auth_reset_btn),
                     enabled = !isLoading && resetEmail.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor = mc.background,
-                    ),
-                ) {
-                    if (isLoading) {
-                        MagicLoadingSpinner(
-                            modifier = Modifier.size(18.dp),
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.auth_reset_btn),
-                            style = ty.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
-        },
-        dismissButton = {
-            if (!resetSent) {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = stringResource(R.string.action_cancel),
-                        color = mc.textSecondary,
-                        style = ty.labelMedium,
-                    )
-                }
+                    isLoading = isLoading,
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                MagicCtaButton(
+                    onClick = onDismiss,
+                    text = stringResource(R.string.action_cancel),
+                    style = MagicCtaStyle.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
     )

@@ -89,12 +89,14 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onManageNewsSources: () -> Unit = {},
     onManageTagDictionary: () -> Unit = {},
+    onManageAccount: () -> Unit = {},
     // KMP migration — Phase 0 Spike D: Settings is the first "Koin island". This ViewModel is
     // resolved by Koin (koinViewModel()) while every other screen still uses hiltViewModel().
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
+    val isAuthenticated by viewModel.isAuthenticatedFlow.collectAsStateWithLifecycle()
     val prefsState by viewModel.prefsState.collectAsStateWithLifecycle()
     val pushEnabled by viewModel.pushNotificationsEnabled.collectAsStateWithLifecycle()
     val gamificationEnabled by viewModel.gamificationEnabled.collectAsStateWithLifecycle()
@@ -223,6 +225,47 @@ fun SettingsScreen(
                      tint = mc.textSecondary,
                  )
              }*/
+
+            HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Anonymous/guest sessions (auto-signed-in for Online Sessions) must never
+                    // reach Account Management — its Google identity-link action IS Supabase's
+                    // anonymous-to-permanent conversion primitive and bypasses the server-side
+                    // profile-creation trigger when done in place. Disabled rather than hidden so
+                    // the row still communicates why (mirrors TagDictionaryScreen's read-only-row
+                    // pattern: `.clickable(enabled = ...)`).
+                    .clickable(enabled = isAuthenticated, onClick = onManageAccount)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_manage_account),
+                        style = MaterialTheme.magicTypography.bodyMedium,
+                        color = if (isAuthenticated) mc.textPrimary else mc.textDisabled,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(
+                            if (isAuthenticated) {
+                                R.string.settings_manage_account_subtitle
+                            } else {
+                                R.string.settings_manage_account_signin_required
+                            },
+                        ),
+                        style = MaterialTheme.magicTypography.bodySmall,
+                        color = mc.textSecondary,
+                    )
+                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = if (isAuthenticated) mc.textSecondary else mc.textDisabled,
+                )
+            }
 
             HorizontalDivider(color = mc.surfaceVariant.copy(alpha = 0.5f))
             Row(

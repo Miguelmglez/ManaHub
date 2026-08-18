@@ -49,7 +49,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.model.AlmostCombo
 import com.mmg.manahub.feature.decks.domain.model.Combo
-import com.mmg.manahub.feature.decks.presentation.DeckFeatureFlags
+import com.mmg.manahub.core.FeatureFlags
 import org.jetbrains.compose.resources.painterResource
 
 /** Standard MTG card aspect ratio, shared by every combo card tile. */
@@ -84,7 +84,7 @@ internal fun ComboRow(
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
     modifier: Modifier = Modifier,
-    showUseAsSeed: Boolean = DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED,
+    showUseAsSeed: Boolean = FeatureFlags.Decks.DISCOVERY_BUILD_HANDOFF_ENABLED,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -161,7 +161,7 @@ internal fun AlmostComboRow(
     animatedVisibilityScope: AnimatedVisibilityScope?,
     modifier: Modifier = Modifier,
     // See ComboRow's showUseAsSeed KDoc (WS 1.3, D-E).
-    showUseAsSeed: Boolean = DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED,
+    showUseAsSeed: Boolean = FeatureFlags.Decks.DISCOVERY_BUILD_HANDOFF_ENABLED,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography

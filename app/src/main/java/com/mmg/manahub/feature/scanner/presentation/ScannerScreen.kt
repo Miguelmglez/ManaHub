@@ -113,6 +113,7 @@ import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardRarity
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.LanguageBadge
@@ -1046,7 +1047,7 @@ private fun DetectedCardOverlay(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MagicLoadingSpinner(modifier = Modifier.size(16.dp))
+                    MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
                     Text(text = stringResource(R.string.scanner_searching_indicator), style = ty.bodySmall, color = mc.textPrimary)
                 }
             } else {

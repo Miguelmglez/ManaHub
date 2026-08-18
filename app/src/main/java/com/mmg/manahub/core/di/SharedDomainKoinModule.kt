@@ -158,9 +158,7 @@ fun sharedDomainKoinModule(
     single {
         CompleteDraftUseCase(
             repository = get(),
-            deckBuilder = get(),
             ioDispatcher = Dispatchers.IO,
-            defaultDispatcher = Dispatchers.Default,
         )
     }
 

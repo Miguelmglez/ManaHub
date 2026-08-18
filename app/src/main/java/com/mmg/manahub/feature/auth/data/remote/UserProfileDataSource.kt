@@ -79,6 +79,43 @@ class UserProfileDataSource(
     }
 
     /**
+     * Fetches whether the current user has a real, user-manageable password set, via the
+     * self-scoped `get_my_has_password` RPC (SECURITY DEFINER) — mirrors
+     * `FriendRemoteDataSource.getMyReferralCode`'s pattern on this same table for the same
+     * reason: `user_profiles.has_password` is granted `SELECT` to `authenticated` cross-user, so
+     * it must never be read via [fetchProfile]'s direct table select (2026-08-17 security fix,
+     * see [UserProfileClient.getMyHasPassword]'s KDoc).
+     *
+     * Non-fatal, mirrors [fetchUserProfile]'s contract: returns `false` on any network/parse
+     * failure or invalid [userId], since this is a best-effort UI-gating signal
+     * (`AccountManagementScreen`'s "Change password" vs "Set a password" gate), not a security
+     * boundary — the RPC itself is what enforces the actual access control.
+     *
+     * @param userId Unused by the request itself (the RPC is self-scoped server-side via
+     *   `(select auth.uid())`, so the caller cannot request another user's value); kept as a
+     *   parameter to match this data source's other per-user fetch methods and for UUID
+     *   validation before making the call.
+     */
+    suspend fun fetchHasPassword(
+        @Suppress("UNUSED_PARAMETER") userId: String,
+    ): Boolean = withContext(ioDispatcher) {
+        if (!isValidUuid(userId)) {
+            if (BuildConfig.DEBUG) Log.w(TAG, "fetchHasPassword: invalid UUID '${userId.take(8)}'")
+            return@withContext false
+        }
+        try {
+            client.getMyHasPassword().firstOrNull()?.hasPassword ?: false
+        } catch (e: Exception) {
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "fetchHasPassword failed for user $userId", e)
+            } else {
+                Log.w(TAG, "fetchHasPassword failed: ${e.javaClass.simpleName}")
+            }
+            false
+        }
+    }
+
+    /**
      * Calls the `get_profile_by_user_id` RPC to fetch the profile for [userId].
      *
      * Unlike [fetchUserProfile] (which queries the table directly), this RPC is necessary
@@ -152,6 +189,12 @@ class UserProfileDataSource(
             // The RPC succeeded (no exception), so profile_completed is TRUE even if the
             // array is unexpectedly empty. Prefer the server value when available.
             profileCompleted = profileDto?.profileCompleted ?: true,
+            // has_password is never part of UserProfileDto (2026-08-17 security fix — see
+            // UserProfileClient.fetchProfile's KDoc) and a brand-new Google sign-up never has one
+            // at this point anyway, so this simply preserves the incoming value. Only the
+            // sessionState enrichment path (AuthRepositoryImpl) queries the real value via the
+            // self-scoped get_my_has_password RPC — see AuthUser.hasPassword's KDoc.
+            hasPassword = user.hasPassword,
         )
     }
 
@@ -182,6 +225,11 @@ class UserProfileDataSource(
             // Read back the full row to retrieve the server-generated game_tag.
             val profile = client.fetchProfile("eq.${user.id}").firstOrNull()
             if (profile != null) {
+                // has_password is never part of UserProfileDto (2026-08-17 security fix — see
+                // UserProfileClient.fetchProfile's KDoc); this is always a brand-new-or-fresh
+                // profile row here (a real password can only be set afterward, from Account
+                // Management), so simply preserving the incoming value is correct — the
+                // sessionState enrichment path is the sole source of truth for a live value.
                 user.copy(gameTag = profile.gameTag)
             } else {
                 user

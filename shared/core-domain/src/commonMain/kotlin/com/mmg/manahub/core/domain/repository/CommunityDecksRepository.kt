@@ -49,4 +49,12 @@ interface CommunityDecksRepository {
      * the full algorithm and its known top-~180-per-card approximation.
      */
     suspend fun searchDecks(filters: CommunityDeckSearchFilters): DataResult<CommunityDeckSearchResult>
+
+    /**
+     * Fetches Archidekt's closed deck-tag catalog (434 entries as of 2026-08-18, alphabetically
+     * ordered) for the Advanced Search sheet's "Deck tag" picker, which filters this list
+     * client-side. Not cached by the repository — the caller (`CommunityDecksSearchViewModel`)
+     * fetches this once, lazily, and holds it in UI state for the ViewModel's lifetime.
+     */
+    suspend fun getDeckTags(): DataResult<List<String>>
 }

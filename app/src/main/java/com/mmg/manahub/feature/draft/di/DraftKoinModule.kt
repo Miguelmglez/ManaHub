@@ -190,6 +190,7 @@ fun draftKoinModule(
             getDraftableSimSet = get(),
             analytics = get(),
             botDrafter = get(),
+            deckBuilder = get(),
             draftSimRepository = get(),
             defaultDispatcher = Dispatchers.Default,
         )

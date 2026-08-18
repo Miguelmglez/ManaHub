@@ -54,8 +54,8 @@ android {
         applicationId = "com.mmg.manahub"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0"
+        versionCode = 23
+        versionName = "2.3"
 
         buildConfigField(
             "String",
@@ -91,6 +91,18 @@ android {
             // concatenation (see its KDoc: "must end with `/`"), matching the CLOUDFLARE_WORKER_URL
             // convention above.
             "\"${localProperties.getProperty("COMMUNITY_WORKER_URL", "https://manahub-community.miguel-mglez.workers.dev/")}\""
+        )
+        buildConfigField(
+            "String",
+            "COMPETITIVE_WORKER_URL",
+            // The `manahub-competitive` Worker (Competitive feature, Phase 3) is NOT deployed yet
+            // as of this writing — KV/D1 provisioning + `wrangler deploy` are still pending, so this
+            // URL does not resolve to anything yet. Kept here anyway (same `localProperties`
+            // override pattern as CLOUDFLARE_WORKER_URL/COMMUNITY_WORKER_URL above) so the build
+            // compiles now and the real subdomain only needs a `local.properties` override (or this
+            // default updated) once deployed. Trailing slash required — CompetitiveApi builds
+            // request URLs via "${baseUrl}meta/..." / "${baseUrl}limited/..." string concatenation.
+            "\"${localProperties.getProperty("COMPETITIVE_WORKER_URL", "https://manahub-competitive.miguel-mglez.workers.dev/")}\""
         )
 
         ndk {

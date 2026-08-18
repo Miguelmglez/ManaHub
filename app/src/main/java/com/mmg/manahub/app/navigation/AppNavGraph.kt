@@ -2,11 +2,10 @@ package com.mmg.manahub.app.navigation
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,11 +25,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -40,11 +41,17 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import com.google.android.play.core.review.ReviewManagerFactory
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
+import com.mmg.manahub.core.data.local.UserPreferencesDataStore
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
+import com.mmg.manahub.core.model.PlaytestSetup
 import com.mmg.manahub.core.push.ForegroundScreenTracker
 import com.mmg.manahub.core.push.PushDeeplinkRouter
-import androidx.compose.ui.res.painterResource
-import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.MagicBottomBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
@@ -52,25 +59,28 @@ import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.feature.addcard.presentation.AddCardScreen
+import com.mmg.manahub.feature.auth.data.repository.AuthRepositoryImpl
+import com.mmg.manahub.feature.auth.presentation.AccountManagementScreen
+import com.mmg.manahub.feature.auth.presentation.ResetPasswordConfirmScreen
+import com.mmg.manahub.feature.auth.presentation.isActiveRecoveryFlow
+import com.mmg.manahub.feature.auth.presentation.UpdateEmailScreen
+import com.mmg.manahub.feature.auth.presentation.UpdatePasswordScreen
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.collection.presentation.CollectionScreen
-import com.mmg.manahub.feature.collection.presentation.CollectionTab
-import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
-import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckDetailScreen
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksScreen
-import com.mmg.manahub.feature.draft.presentation.ui.DraftResultScreen
+import com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen
+import com.mmg.manahub.feature.decks.presentation.DeckStudioScreen
+import com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftScreen
 import com.mmg.manahub.feature.draft.presentation.ui.DraftSetupScreen
-import com.mmg.manahub.feature.draft.presentation.ui.DraftingScreen
+import com.mmg.manahub.feature.draft.presentation.ui.DraftSimulatorScreen
 import com.mmg.manahub.feature.draft.presentation.ui.SetDraftDetailScreen
 import com.mmg.manahub.feature.friends.presentation.FriendsScreen
 import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherScreen
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.core.model.LayoutTemplate
-import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.presentation.GamePlayScreen
 import com.mmg.manahub.feature.game.presentation.GameSettings
 import com.mmg.manahub.feature.game.presentation.GameSetupScreen
@@ -80,10 +90,11 @@ import com.mmg.manahub.feature.game.presentation.PlayerConfig
 import com.mmg.manahub.feature.home.presentation.HomeAction
 import com.mmg.manahub.feature.home.presentation.HomeHeroState
 import com.mmg.manahub.feature.home.presentation.HomeScreen
+import com.mmg.manahub.feature.massiveadd.presentation.MassiveAddCardScreen
 import com.mmg.manahub.feature.news.presentation.NewsScreen
 import com.mmg.manahub.feature.news.presentation.NewsSourcesSettingsScreen
 import com.mmg.manahub.feature.news.presentation.VideoPlayerScreen
-import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.feature.playtest.presentation.hand.PlaytestHandScreen
 import com.mmg.manahub.feature.playtest.presentation.setup.PlaytestSetupScreen
 import com.mmg.manahub.feature.profile.presentation.ProfileScreen
@@ -101,7 +112,9 @@ import com.mmg.manahub.feature.tournament.presentation.TournamentViewModel
 import com.mmg.manahub.feature.trades.presentation.CreateTradeProposalScreen
 import com.mmg.manahub.feature.trades.presentation.TradeNegotiationDetailScreen
 import com.mmg.manahub.feature.trades.presentation.TradesSharedListScreen
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Bottom-bar visibility rules
@@ -113,6 +126,41 @@ private val bottomBarRoutes = setOf(
     Screen.Home.route,
     Screen.Collection.route,
 )
+
+/**
+ * Pure routing predicate for the password-recovery `LaunchedEffect` in [AppNavGraph] (CRITICAL fix,
+ * 2026-08-18; hardened 2026-08-18 — see `feature/auth/CLAUDE.md`'s "Routing to
+ * Screen.ResetPasswordConfirm" section, `feedback_supabase_deeplink_onsessionsuccess_race`, and
+ * `docs/plans/password-recovery-hardening-plan-2026-08-18.md`). Extracted to a top-level `internal`
+ * function, rather than left inline in the `LaunchedEffect` body, specifically so it is
+ * unit-testable with plain JUnit — `MainActivity`/`AppNavGraph` otherwise have NO test coverage (per
+ * the 2026-08-18 edge-case-tester audit that found the bugs this predicate exists to fix), and this
+ * is the one piece of that routing logic cheap to pull out into something a fast, Compose-free test
+ * can verify.
+ *
+ * @param sessionState The app's current [SessionState] (from `AuthRepository.sessionState`).
+ * @param currentRoute The nav-graph's current destination route, or `null` if none is composed yet.
+ * @param marker The pending-recovery marker as (sessionId, markedAtEpochMs), from
+ *   `UserPreferencesDataStore.pendingRecoveryMarkerFlow`, or `null` when no marker is armed. Passed
+ *   through to [isActiveRecoveryFlow] — see that function's KDoc for why `isRecoverySession` alone
+ *   (the pre-2026-08-18-hardening signal) is not sufficient: it also admits a signup-confirmation
+ *   session.
+ * @param nowEpochMs The current time, injected for deterministic unit testing.
+ * @return `true` only when [isActiveRecoveryFlow] holds AND the app is not already showing
+ *   [Screen.ResetPasswordConfirm] — this second condition is the re-entrancy guard (HIGH fix):
+ *   `AuthRepositoryImpl.sessionState`'s enrichment flow can emit the same recovery-authenticated
+ *   state more than once (a "fast" emit then an "enriched" emit), and without this check each
+ *   emission would independently trigger another `navigate(...)` call.
+ */
+internal fun shouldRouteToRecoveryScreen(
+    sessionState: SessionState,
+    currentRoute: String?,
+    marker: Pair<String, Long>?,
+    nowEpochMs: Long,
+): Boolean {
+    return isActiveRecoveryFlow(sessionState, marker, nowEpochMs) &&
+        currentRoute != Screen.ResetPasswordConfirm.route
+}
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -143,15 +191,69 @@ fun AppNavGraph(
     // The callback is cleared on dispose so neither the NavController nor the Activity leaks.
     DisposableEffect(navController) {
         PushDeeplinkRouter.setNavigator { deeplink ->
-            val uri = runCatching { android.net.Uri.parse(deeplink) }.getOrNull()
+            val uri = runCatching { Uri.parse(deeplink) }.getOrNull()
             if (uri == null || uri.scheme != "manahub") {
-                android.util.Log.w("AppNavGraph", "Rejected push deeplink with invalid scheme: $deeplink")
+                Log.w("AppNavGraph", "Rejected push deeplink with invalid scheme: $deeplink")
                 return@setNavigator
             }
             runCatching { navController.navigate(uri) }
-                .onFailure { android.util.Log.w("AppNavGraph", "Push deeplink nav failed: $deeplink", it) }
+                .onFailure { Log.w("AppNavGraph", "Push deeplink nav failed: $deeplink", it) }
         }
         onDispose { PushDeeplinkRouter.setNavigator(null) }
+    }
+
+    // ── Password-recovery routing (CRITICAL fix, 2026-08-18) ────────────────────────────
+    // This LaunchedEffect is now the SOLE trigger for routing to Screen.ResetPasswordConfirm —
+    // see MainActivity.handleSupabaseAuthDeepLink's KDoc and
+    // feedback_supabase_deeplink_onsessionsuccess_race for the full history. It replaces a prior
+    // MainActivity-side "wait on sessionState with a bounded timeout, then enqueue via
+    // PushDeeplinkRouter" fix that closed the original onSessionSuccess/importSession race but
+    // reopened a narrower version of it: handleDeeplinks() persists the recovery session
+    // (Keystore-backed SessionManager, autoLoadFromStorage = true) BEFORE that wait coroutine even
+    // starts, so a process death during the wait (e.g. the user backgrounds the app right after
+    // tapping the email link) silently dropped the enqueue while the session survived in storage —
+    // same end state as the original bug (landing on Home fully authenticated, no "set new
+    // password" form), different trigger.
+    //
+    // Observing AuthRepository.sessionState directly here — independent of MainActivity's intent
+    // handling, coroutine, or even the specific process incarnation that imported the session —
+    // makes that failure mode structurally impossible: whenever sessionState resolves to
+    // Authenticated(isRecoverySession = true), in ANY process (a fresh deep-link tap, a cold start
+    // that restored an already-persisted recovery session, or a warm resume), this effect routes
+    // the user. It also has no timeout, unlike the old MainActivity wait — a slow user_profiles
+    // enrichment fetch (AuthRepositoryImpl.sessionState's flatMapLatest, e.g. for a Google-provider
+    // account on a slow connection) simply delays routing instead of silently failing it.
+    //
+    // Re-entrancy guard (HIGH fix, 2026-08-18): sessionState can re-emit multiple times while
+    // still recovery-authenticated (AuthRepositoryImpl's enrichment flow emits a "fast" state and
+    // then an "enriched" one for the same recovery session). Checking the CURRENT destination
+    // before navigating — plus launchSingleTop as a second guard — makes every emission after the
+    // first a structural no-op instead of pushing a duplicate Screen.ResetPasswordConfirm entry
+    // onto the back stack (which would otherwise make "Back to sign in" pop to the wrong place on
+    // a double-tapped/duplicate email link). This is the single navigation trigger for this
+    // screen now — PushDeeplinkRouter is no longer involved in the recovery flow at all, so there
+    // is no second path that could race this one.
+    val authRepository: AuthRepository = koinInject()
+    val recoverySessionState by authRepository.sessionState.collectAsStateWithLifecycle()
+    // password-recovery-hardening-plan-2026-08-18 §3: isRecoverySession (amr) alone is not
+    // sufficient — GoTrue also tags a signup-confirmation session amr: otp. The pending-recovery
+    // marker is the second, app-side half of the gate — see UserPreferencesDataStore's KDoc and
+    // isActiveRecoveryFlow's KDoc in feature.auth.presentation.
+    val userPreferencesDataStore: UserPreferencesDataStore = koinInject()
+    val pendingRecoveryMarker by userPreferencesDataStore.pendingRecoveryMarkerFlow
+        .collectAsStateWithLifecycle(initialValue = null)
+    val recoveryCoroutineScope = rememberCoroutineScope()
+    LaunchedEffect(recoverySessionState, pendingRecoveryMarker) {
+        if (shouldRouteToRecoveryScreen(
+                recoverySessionState,
+                navController.currentDestination?.route,
+                pendingRecoveryMarker,
+                System.currentTimeMillis(),
+            )
+        ) {
+            FirebaseCrashlytics.getInstance().log("app_nav_graph_recovery_session_routed")
+            navController.navigate(Screen.ResetPasswordConfirm.route) { launchSingleTop = true }
+        }
     }
 
     // Toast for invite results — shown at the global level so it is visible regardless of
@@ -163,17 +265,17 @@ fun AppNavGraph(
             when (event) {
                 is InviteDispatcherViewModel.UiEvent.InviteAccepted -> {
                     val msg = if (event.inviterNickname != null) {
-                        context.getString(com.mmg.manahub.R.string.friends_invite_success, event.inviterNickname)
+                        context.getString(R.string.friends_invite_success, event.inviterNickname)
                     } else {
-                        context.getString(com.mmg.manahub.R.string.friends_invite_success_generic)
+                        context.getString(R.string.friends_invite_success_generic)
                     }
                     inviteToastState.show(msg, MagicToastType.SUCCESS)
                 }
                 is InviteDispatcherViewModel.UiEvent.InviteError -> {
                     val msg = when {
-                        event.isSelfInvite -> context.getString(com.mmg.manahub.R.string.friends_invite_self)
-                        event.isInvalidCode -> context.getString(com.mmg.manahub.R.string.friends_invite_invalid)
-                        else -> context.getString(com.mmg.manahub.R.string.friends_invite_error)
+                        event.isSelfInvite -> context.getString(R.string.friends_invite_self)
+                        event.isInvalidCode -> context.getString(R.string.friends_invite_invalid)
+                        else -> context.getString(R.string.friends_invite_error)
                     }
                     inviteToastState.show(msg, MagicToastType.ERROR)
                 }
@@ -197,6 +299,7 @@ fun AppNavGraph(
     var pendingTournamentId by remember { mutableStateOf<Long?>(null) }
     var pendingTournamentPlayers by remember { mutableStateOf<List<Long>>(emptyList()) }
     var pendingTournamentMode by remember { mutableStateOf<GameMode?>(null) }
+
 
     // hasActiveGame: true only while a game is actively running (not finished).
     // Stays true when the game is abandoned temporarily, allowing resume from Play FAB.
@@ -238,7 +341,9 @@ fun AppNavGraph(
         },
     ) { paddingValues ->
         SharedTransitionLayout {
-            Box(modifier = modifier.padding(paddingValues).fillMaxSize()) {
+            Box(modifier = modifier
+                .padding(paddingValues)
+                .fillMaxSize()) {
                 NavHost(
                     navController = navController,
                     startDestination = Screen.Home.route,
@@ -314,18 +419,18 @@ fun AppNavGraph(
                                     // handled inside HomeScreen / HomeViewModel.
                                     HomeAction.CustomizeQuickStart -> Unit
                                     HomeAction.RateApp -> {
-                                        val reviewManager = com.google.android.play.core.review.ReviewManagerFactory.create(context)
+                                        val reviewManager = ReviewManagerFactory.create(context)
                                         val request = reviewManager.requestReviewFlow()
                                         request.addOnCompleteListener { task ->
                                             if (task.isSuccessful) {
                                                 val reviewInfo = task.result
                                                 activity.let { reviewManager.launchReviewFlow(it, reviewInfo) }
                                             } else {
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${context.packageName}"))
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${context.packageName}"))
                                                 try {
                                                     context.startActivity(intent)
                                                 } catch (e: Exception) {
-                                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
                                                 }
                                             }
                                         }
@@ -354,10 +459,10 @@ fun AppNavGraph(
                                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                                 context.startActivity(intent)
                                             }.onFailure {
-                                                android.util.Log.w("AppNavGraph", "Could not open news URL: $url", it)
+                                                Log.w("AppNavGraph", "Could not open news URL: $url", it)
                                             }
                                         } else {
-                                            android.util.Log.w("AppNavGraph", "Rejected news URL with invalid/empty scheme: '$url'")
+                                            Log.w("AppNavGraph", "Rejected news URL with invalid/empty scheme: '$url'")
                                         }
                                     }
                                     is HomeAction.OpenDraftSetDetail -> navController.navigate(
@@ -368,7 +473,10 @@ fun AppNavGraph(
                                             setReleasedAt = action.set.releasedAt,
                                         )
                                     )
-
+                                    is HomeAction.OpenCompetitive->{
+                                        navController.navigate(Screen.Competitive.route)
+                                    }
+                                    is HomeAction.OpenMultiAdd-> navController.navigate(Screen.CollectionMassiveAddCard)
                                     // ── Widget board: handled in HomeScreen/VM ───────────
                                     HomeAction.OpenWidgetGallery,
                                     HomeAction.ResetLayout,
@@ -403,6 +511,15 @@ fun AppNavGraph(
                         ),
                     ) { backStackEntry ->
                         CollectionScreen(
+                            // G.1 fix: read the "tab" arg directly off THIS backStackEntry (always
+                            // reflects the current navigate() call, e.g. "decks" from the Draft
+                            // Simulator hand-off) rather than relying on CollectionViewModel's
+                            // SavedStateHandle-read-at-init (which freezes on the value seen the
+                            // FIRST time this destination's ViewModel was constructed — a restored
+                            // instance, per navigateTab's restoreState=true contract, keeps that
+                            // frozen value and never re-reads a fresh arg). See CollectionScreen's
+                            // initialTabArg LaunchedEffect for how this is applied.
+                            initialTabArg = backStackEntry.arguments?.getString("tab"),
                             onCardClick = { id, key ->
                                 navController.navigate(Screen.CollectionCardDetail.createRoute(id, key))
                             },
@@ -438,6 +555,17 @@ fun AppNavGraph(
                             },
                             sharedTransitionScope = this@SharedTransitionLayout,
                             animatedVisibilityScope = this@composable
+                        )
+                    }
+
+                    composable(Screen.CollectionMassiveAddCard.route) {
+                        MassiveAddCardScreen(
+                            onBack = { navController.popBackStack() },
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = this@composable,
+                            onNavigateToCardDetail = { scryfallId ->
+                                navController.navigate(Screen.CollectionCardDetail.createRoute(scryfallId))
+                            },
                         )
                     }
 
@@ -550,13 +678,47 @@ fun AppNavGraph(
                     navArgument("deckId") {
                         type = NavType.StringType
                         defaultValue = ""
-                    }
+                    },
+                    navArgument("fromDraft") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
                 ),
-            ) {
+            ) { backStackEntry ->
+                // E.10a: a deck reached via the Draft Simulator's "deck saved" hand-off has no
+                // useful `popBackStack()` target — Phase A/C's popUpTo already removed the
+                // setup/drafting entries, so a plain pop lands on Screen.Draft (the set browser),
+                // not where a user managing their new deck expects to end up. Route back to
+                // Collection's Decks tab instead; every other entry point is unaffected (fromDraft
+                // defaults false, keeping the exact popBackStack() behavior it always had).
+                //
+                // F.5 fix: this used to hand-roll its own popUpTo/navigate instead of reusing
+                // navigateTab (the ONE pattern every other bottom-tab transition in the app uses —
+                // MagicBottomBar's onHomeClick/onLibraryClick, and every other navigateTab call
+                // site). The hand-rolled version was missing `saveState = true` on the popUpTo and
+                // `restoreState = true` on the navigate — both present in navigateTab and in
+                // MagicBottomBar's own onLibraryClick — so a Collection entry pushed this way never
+                // entered the save/restore state-tracking contract the bottom bar's OWN Home/Library
+                // taps rely on immediately afterward (Compose Navigation's saveState/restoreState is
+                // keyed per DESTINATION and shared across every push/pop of that destination — an
+                // entry that bypasses it is exactly the kind of inconsistency that shows up as "the
+                // bottom bar stops responding" on a SUBSEQUENT tap, not on this navigation itself).
+                // It also targeted `Screen.Home.route` instead of `graph.startDestinationId` (the
+                // two resolve to the same destination today since Home IS the start destination, so
+                // this alone wasn't the defect — but drifting from the single canonical pattern is
+                // exactly how these two diverge again later). Reusing navigateTab structurally
+                // eliminates both: it's the same call already proven correct by every other tab
+                // transition in production.
+                val fromDraft = backStackEntry.arguments?.getBoolean("fromDraft") ?: false
+                val deckStudioOnBack: () -> Unit = if (fromDraft) {
+                    { navController.navigateTab(Screen.Collection.routeWithTab("decks")) }
+                } else {
+                    { navController.popBackStack() }
+                }
                 // The VM reads the optional deckId from SavedStateHandle ("" ⇒ fresh draft).
                 DeckStudioScreen(
                     viewModel = koinViewModel(),
-                    onBack = { navController.popBackStack() },
+                    onBack = deckStudioOnBack,
                     onCardClick = { id ->
                         navController.navigate(Screen.CollectionCardDetail.createRoute(id))
                     },
@@ -577,6 +739,9 @@ fun AppNavGraph(
                     onNavigateToWizard = { archetype, theme, tribe, colors, seeds ->
                         navController.navigate(Screen.DeckWizard.createRoute(archetype, theme, tribe, colors, seeds))
                     },
+                    onNavigateToMassiveAddCards = {
+                        navController.navigate(Screen.CollectionMassiveAddCard.route)
+                    },
                 )
             }
 
@@ -591,7 +756,7 @@ fun AppNavGraph(
                     navArgument("seeds") { type = NavType.StringType; defaultValue = ""; nullable = false },
                 ),
             ) {
-                com.mmg.manahub.feature.decks.presentation.wizard.DeckWizardScreen(
+                DeckWizardScreen(
                     onBack = { navController.popBackStack() },
                     onOpenDeckStudio = { deckId ->
                         // Replace the wizard on the back stack with Deck Studio so system back from
@@ -630,6 +795,7 @@ fun AppNavGraph(
                     onBack = { navController.popBackStack() },
                     onManageNewsSources = { navController.navigate(Screen.NewsSourcesSettings.route) },
                     onManageTagDictionary = { navController.navigate(Screen.TagDictionary.route) },
+                    onManageAccount = { navController.navigate(Screen.AccountManagement.route) },
                 )
             }
 
@@ -640,6 +806,8 @@ fun AppNavGraph(
             // ── News ──────────────────────────────────────────────────────────
             composable(Screen.News.route) {
                 NewsScreen(
+                    onBack = { navController.popBackStack() },
+
                     onVideoClick = { videoId, title ->
                         navController.navigate(Screen.NewsVideoPlayer.createRoute(videoId, title))
                     },
@@ -659,8 +827,8 @@ fun AppNavGraph(
                     navArgument("title") { type = NavType.StringType; defaultValue = "" },
                 ),
             ) { backStackEntry ->
-                val videoId = android.net.Uri.decode(backStackEntry.arguments?.getString("videoId") ?: return@composable)
-                val title = android.net.Uri.decode(backStackEntry.arguments?.getString("title") ?: "")
+                val videoId = Uri.decode(backStackEntry.arguments?.getString("videoId") ?: return@composable)
+                val title = Uri.decode(backStackEntry.arguments?.getString("title") ?: "")
                 VideoPlayerScreen(
                     videoId = videoId,
                     title = title,
@@ -672,6 +840,7 @@ fun AppNavGraph(
             // ── Draft ─────────────────────────────────────────────────────────
             composable(Screen.Draft.route) {
                 DraftScreen(
+                    onBack = {navController.popBackStack()},
                     onSetClick = { setCode, setName, iconUri, releasedAt ->
                         navController.navigate(
                             Screen.DraftSetDetail.createRoute(setCode, setName, iconUri, releasedAt)
@@ -714,28 +883,57 @@ fun AppNavGraph(
                 )
             }
 
+            // Phase C: Drafting + Result collapsed into one destination — DraftSimulatorScreen hosts
+            // both the active-draft "Picks" tab and the deck-preview/save "Deck" tab, switched via an
+            // in-screen TabRow instead of a second nav hop. See Screen.DraftSimDrafting's KDoc.
             composable(
                 route = Screen.DraftSimDrafting.route,
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
             ) {
-                val sessionId = it.arguments?.getString("sessionId") ?: return@composable
-                DraftingScreen(
-                    onNavigateToResult = {
-                        navController.navigate(Screen.DraftSimResult.createRoute(sessionId))
+                DraftSimulatorScreen(
+                    onDeckSaved = { deckId ->
+                        // Open the newly created deck in Deck Studio instead of discarding it —
+                        // pop the whole draft flow (setup/drafting) off the back stack so Deck
+                        // Studio replaces it, mirroring the wizard's "created X, now edit X"
+                        // pattern (Screen.DeckWizard -> Screen.DeckStudio, above). fromDraft=true
+                        // (E.10a) special-cases Deck Studio's own onBack to land on Collection's
+                        // Decks tab instead of Screen.Draft (the set browser) once the user leaves.
+                        navController.navigate(Screen.DeckStudio.createRoute(deckId, fromDraft = true)) {
+                            popUpTo(Screen.Draft.route) { inclusive = false }
+                        }
                     },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-
-            composable(
-                route = Screen.DraftSimResult.route,
-                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
-            ) {
-                DraftResultScreen(
-                    onDeckSaved = {
-                        navController.popBackStack(Screen.Draft.route, inclusive = false)
+                    // E.10b/E.10c: reached ONLY after DraftSimulatorScreen's own in-screen
+                    // MagicAlertDialog confirms the user actually wants to leave (cancel an
+                    // in-progress draft, or exit the Deck tab without saving) — this callback never
+                    // fires on a bare tap, only on confirm.
+                    //
+                    // F.6 fix: "go to the set browser list" (Screen.Draft) in the original brief was
+                    // a mistake — the correct target is the SPECIFIC set's detail page the user had
+                    // open before starting the draft (Screen.DraftSetDetail), which is still sitting
+                    // on the back stack below DraftSimSetup/DraftSimDrafting untouched (the nav chain
+                    // here is always Draft -> DraftSetDetail -> DraftSimSetup -> DraftSimDrafting —
+                    // DraftSimSetup only navigates forward to DraftSimDrafting, so DraftSetDetail is
+                    // always present). A pure popBackStack (not navigate+popUpTo) is the right tool:
+                    // it reveals that EXISTING entry with its original setCode/setName/etc. args
+                    // already resolved, instead of pushing a brand-new one that would need the args
+                    // re-supplied. The old `navigate(Screen.Draft.route){ popUpTo(Screen.Draft.route)
+                    // { inclusive = true } }` was doubly wrong: (1) wrong target, and (2) `navigate`
+                    // ALWAYS pushes a new entry after popping, even with a matching popUpTo — so if
+                    // Compose Navigation's popUpTo-target-not-found handling ever silently no-ops
+                    // (behavior that has varied across library versions) instead of throwing, the old
+                    // DraftSetDetail/DraftSimSetup/DraftSimDrafting entries would stay stacked
+                    // UNDER a freshly-pushed duplicate Screen.Draft, reachable again via further
+                    // system-back presses. A real `popBackStack(route, inclusive)` always REMOVES the
+                    // entries above the target, full stop — no ambiguity about whether the target was
+                    // found — which structurally rules out that stale-entry class of bug. The
+                    // defensive `popBackStack()` fallback only fires if DraftSetDetail is somehow not
+                    // on the stack (e.g. a future entry point that bypasses it), so cancelling never
+                    // strands the user.
+                    onBack = {
+                        if (!navController.popBackStack(Screen.DraftSetDetail.route, inclusive = false)) {
+                            navController.popBackStack()
+                        }
                     },
-                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -761,7 +959,166 @@ fun AppNavGraph(
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onStatsClick = { navController.navigate(Screen.Stats.route) },
                     onFriendsClick = { navController.navigate(Screen.FriendsList.route) },
+                    onManageAccountClick = { navController.navigate(Screen.AccountManagement.route) },
                     initialTab = initialTab,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // ── Account management (Phase 4b) ───────────────────────────────────
+            composable(Screen.AccountManagement.route) {
+                AccountManagementScreen(
+                    onBack = { navController.popBackStack() },
+                    // Both "Change email" and "Change password"/"Set a password" now navigate
+                    // DIRECTLY to their final-step screen — no intermediate reauthentication-code
+                    // gate. Email is protected by Supabase's "Secure email change" double-confirm
+                    // (see AuthRepository.confirmEmailUpdate's KDoc); password is protected by
+                    // Supabase's "Require current password when updating" setting, enforced
+                    // server-side on the updateUser call itself (see AuthRepository.updatePassword's
+                    // KDoc). launchSingleTop guards against a rapid double-tap pushing two
+                    // destinations onto the back stack.
+                    onNavigateToUpdateEmail = {
+                        navController.navigate(Screen.UpdateEmail.route) { launchSingleTop = true }
+                    },
+                    onNavigateToUpdatePassword = { requireCurrentPassword ->
+                        navController.navigate(
+                            Screen.UpdatePassword.routeWithRequireCurrentPassword(requireCurrentPassword)
+                        ) { launchSingleTop = true }
+                    },
+                    onSignedOut = {
+                        // Sign-out/delete-account both leave the user unauthenticated — return to
+                        // Profile's Unauthenticated card rather than staying on an account screen
+                        // that no longer makes sense.
+                        navController.navigate(Screen.Profile.baseRoute) {
+                            popUpTo(Screen.AccountManagement.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            composable(Screen.UpdateEmail.route) {
+                UpdateEmailScreen(
+                    onBack = { navController.popBackStack() },
+                    onEmailUpdated = {
+                        navController.popBackStack(Screen.AccountManagement.route, inclusive = false)
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.UpdatePassword.route,
+                arguments = listOf(
+                    navArgument("requireCurrentPassword") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
+                ),
+            ) { backStackEntry ->
+                val requireCurrentPassword =
+                    backStackEntry.arguments?.getBoolean("requireCurrentPassword") ?: false
+                UpdatePasswordScreen(
+                    requireCurrentPassword = requireCurrentPassword,
+                    onBack = { navController.popBackStack() },
+                    onPasswordUpdated = {
+                        navController.popBackStack(Screen.AccountManagement.route, inclusive = false)
+                    },
+                )
+            }
+
+            // ── "Forgot password" recovery-link completion ──────────────────────
+            //
+            // Supabase's IMPLICIT auth flow (this project's default — see SupabaseClientFactory.kt)
+            // delivers the recovery callback to `manahub://auth` with the session tokens AND
+            // `type=recovery` in the URL FRAGMENT (never a query param under implicit flow).
+            // MainActivity.handleSupabaseAuthDeepLink calls supabaseClient.handleDeeplinks(intent)
+            // unconditionally for every `manahub://auth` callback — this is what imports the
+            // temporary, fully-authenticated recovery UserSession.
+            //
+            // ROUTING (hardened 2026-08-18): reaching this screen is now driven ENTIRELY by the
+            // reactive `LaunchedEffect(recoverySessionState)` near the top of this function, which
+            // observes AuthRepository.sessionState directly and navigates here the instant it sees
+            // Authenticated(isRecoverySession = true) — see that effect's KDoc for the full
+            // rationale (it replaced a MainActivity-side PushDeeplinkRouter enqueue that was
+            // process-death-fragile). This destination no longer relies on the
+            // `manahub://auth/recovery` deep link below being triggered by anyone; the pattern is
+            // kept declared only as a harmless, unused secondary entry point (NavController deep
+            // link matching), not as the routing mechanism.
+            composable(
+                route = Screen.ResetPasswordConfirm.route,
+                deepLinks = listOf(navDeepLink { uriPattern = "manahub://auth/recovery" }),
+            ) {
+                ResetPasswordConfirmScreen(
+                    onBack = {
+                        // HARDENED 2026-08-17 → 2026-08-18 (password-recovery-hardening-plan
+                        // §3.4, the "onBack leaves an authenticated recovery session" fix): merely
+                        // popping the back stack (the 2026-08-17 defense-in-depth fix) left the
+                        // recovery session itself fully authenticated and active — a user tapping
+                        // Back landed on whatever screen was underneath (e.g. ProfileScreen),
+                        // rendered fully signed in via a session that was only ever supposed to be
+                        // good for setting a new password. Abandoning the flow must actually END
+                        // that session, not just navigate away from it.
+                        //
+                        // Clears the pending-recovery marker AND signs out with SignOutScope.LOCAL
+                        // (offline-safe, cannot fail, and does not revoke the user's sessions on
+                        // their other devices — deliberately NOT GLOBAL, see
+                        // AuthRepositoryImpl.abandonRecoverySession's KDoc). AuthRepositoryImpl is
+                        // resolved via a narrow downcast of the interface-typed koinInject() above:
+                        // this method is deliberately NOT on the AuthRepository interface (it is an
+                        // Android-deep-link-specific mechanism with no web equivalent yet — adding
+                        // it to the shared interface would force an unrelated no-op onto the web
+                        // target purely to satisfy the compiler). The downcast cannot fail in
+                        // practice (Koin's single<AuthRepository> binding always constructs
+                        // AuthRepositoryImpl here), but the fallback branch still clears the marker
+                        // directly so a future sessionState emission can never wrongly re-satisfy
+                        // isActiveRecoveryFlow via a stale marker even if it somehow did.
+                        // SEQUENCED, not fire-and-forget (T6 adversarial-audit MEDIUM fix,
+                        // 2026-08-18): this used to launch the cleanup and call navigate() on the
+                        // very next statement without awaiting it. The top-level
+                        // LaunchedEffect(recoverySessionState, pendingRecoveryMarker) is not scoped
+                        // to this destination and keeps observing — in the window after
+                        // navigate(Home) but before the marker-clear/sign-out actually committed,
+                        // currentRoute was Home (≠ ResetPasswordConfirm) while sessionState and the
+                        // marker were BOTH still valid, so shouldRouteToRecoveryScreen was satisfied
+                        // again and the effect yanked the user straight back onto the form — which
+                        // was still genuinely submittable, since nothing had been cleared yet. One
+                        // coroutine now runs the cleanup to completion FIRST and navigates only
+                        // after, mirroring confirmPasswordReset's success path, which already
+                        // completes its cleanup before ever returning to its caller.
+                        recoveryCoroutineScope.launch {
+                            val authRepositoryImpl = authRepository as? AuthRepositoryImpl
+                            if (authRepositoryImpl != null) {
+                                authRepositoryImpl.abandonRecoverySession()
+                            } else {
+                                FirebaseCrashlytics.getInstance()
+                                    .recordException(IllegalStateException("AuthRepository was not AuthRepositoryImpl in ResetPasswordConfirmScreen.onBack"))
+                                userPreferencesDataStore.clearPendingRecoveryMarker()
+                            }
+                            // Do NOT merely pop the back stack — that can land on a screen that
+                            // assumes an authenticated context (the exact bug this fix closes).
+                            // Always land on the app's unauthenticated entry point with a clean
+                            // stack, and only AFTER the cleanup above has actually committed.
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    onPasswordReset = {
+                        // The marker-clear + GLOBAL sign-out for a SUCCESSFUL reset already happened
+                        // inside AuthRepositoryImpl.confirmPasswordReset itself (before it returned
+                        // Success) — deliberately not repeated here, since gating a security-critical
+                        // state transition on this UI callback surviving to run is exactly the class
+                        // of process-death-fragile bug this whole plan exists to eliminate. This
+                        // callback is pure navigation + messaging.
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                        inviteToastState.show(
+                            context.getString(R.string.auth_error_password_set_session_revoked),
+                            MagicToastType.SUCCESS,
+                        )
+                    },
                 )
             }
 
@@ -1127,7 +1484,7 @@ fun AppNavGraph(
                 // bookmark/back-stack entry should read as "feature unavailable", not a silent
                 // no-op that looks like nothing happened.
                 LaunchedEffect(Unit) {
-                    if (!OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                    if (!FeatureFlags.Online.ONLINE_SESSIONS_ENABLED) {
                         inviteToastState.show(context.getString(R.string.online_sessions_unavailable), MagicToastType.INFO)
                     }
                     navController.navigate(Screen.GameSetup.baseRoute) {
@@ -1151,7 +1508,7 @@ fun AppNavGraph(
                 // of silently landing on GameSetup as if the manahub://join/{code} deep link never
                 // arrived — see OnlineFeatureFlags' KDoc.
                 LaunchedEffect(code) {
-                    val dest = if (!OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                    val dest = if (!FeatureFlags.Online.ONLINE_SESSIONS_ENABLED) {
                         if (code.isNotBlank()) {
                             inviteToastState.show(context.getString(R.string.online_sessions_unavailable), MagicToastType.INFO)
                         }
@@ -1203,11 +1560,11 @@ fun AppNavGraph(
                         }
                     }
                     FullErrorState(
-                        message    = androidx.compose.ui.res.stringResource(
-                            com.mmg.manahub.R.string.playtest_session_expired,
+                        message    = stringResource(
+                            R.string.playtest_session_expired,
                         ),
-                        retryLabel = androidx.compose.ui.res.stringResource(
-                            com.mmg.manahub.R.string.action_back,
+                        retryLabel = stringResource(
+                            R.string.action_back,
                         ),
                         onRetry    = { navController.popBackStack() },
                     )
@@ -1234,6 +1591,15 @@ fun AppNavGraph(
                             }
                         }
                     },
+                )
+            }
+            composable(
+                route = Screen.Competitive.route,
+            ){
+                CompetitiveScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    }
                 )
             }
         }

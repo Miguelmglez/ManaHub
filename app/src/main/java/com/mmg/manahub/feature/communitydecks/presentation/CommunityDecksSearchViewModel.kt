@@ -7,6 +7,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeckSummary
@@ -61,6 +62,7 @@ class CommunityDecksSearchViewModel(
     private val communityAggregateRepository: CommunityAggregateRepository,
     private val cardRepository: CardRepository,
     private val searchCards: SearchCardsUseCase,
+    private val communityDecksRepository: CommunityDecksRepository,
 ) : ViewModel() {
 
     private val crashlytics = FirebaseCrashlytics.getInstance()
@@ -86,6 +88,9 @@ class CommunityDecksSearchViewModel(
     private var loadMoreJob: Job? = null
     private var discoverJob: Job? = null
     private var discoverLoaded = false
+
+    /** Guards [onDeckTagPickerOpened]'s lazy, one-time fetch of Archidekt's closed tag catalog. */
+    private var deckTagsLoaded = false
 
     /** Debounced input flows for the two advanced-search card pickers (Commander / Card). */
     private val commanderQueryFlow = MutableStateFlow("")
@@ -244,11 +249,25 @@ class CommunityDecksSearchViewModel(
 
 
 
-    /** A trending commander tile tapped in Discover — switches to Search with the COMMANDER filter set. */
+    /**
+     * A trending commander tile tapped in Discover — switches to Search with the COMMANDER filter
+     * set. Also forces `formats = COMMANDER` (bug fix, edge-case audit 2026-08-18): without this,
+     * a deck-type selected elsewhere in the sheet (e.g. Modern) would stay applied, and
+     * [CommunityAdvancedFilters.toSearchFilters]'s format-gating would then silently drop
+     * `commanderName` from the request since `formats != COMMANDER` — the tap's clear intent ("show
+     * me Commander decks with this commander") must be honored end-to-end, not just the `commander`
+     * field in isolation.
+     */
     fun onTrendingCommanderClick(card: Card) {
         crashlytics.log("community_discover_term_click")
         _uiState.update {
-            it.copy(hubTab = CommunityHubTab.SEARCH, advancedFilters = it.advancedFilters.copy(commander = card))
+            it.copy(
+                hubTab = CommunityHubTab.SEARCH,
+                advancedFilters = it.advancedFilters.copy(
+                    commander = card,
+                    formats = CommunityDeckFormatFilter.COMMANDER,
+                ),
+            )
         }
         search()
     }
@@ -272,15 +291,56 @@ class CommunityDecksSearchViewModel(
         _uiState.update { it.copy(query = query) }
     }
 
-    /** Re-runs the search if one was already issued (so the new sort applies live). */
-    fun onSortUpdated(sort: CommunityDeckSort) {
-        _uiState.update { it.copy(selectedSort = sort) }
-        if (_uiState.value.hasSearched) search()
+    /**
+     * Updates the Search-tab sort field. Advanced Search sheet rework (2026-08-18): Sort now lives
+     * inside [com.mmg.manahub.feature.communitydecks.presentation.components.CommunityAdvancedSearchSheet]
+     * alongside every other advanced filter, so — unlike the old outside-the-sheet control — this
+     * only updates state and defers to the sheet's own Search button ([onApplyAdvancedFilters]).
+     */
+    fun onSortFieldSelected(field: CommunityDeckSortField) {
+        _uiState.update { it.copy(selectedSortField = field) }
     }
 
+    /** Updates the Search-tab sort direction. See [onSortFieldSelected]'s KDoc — same deferred semantics. */
+    fun onSortDirectionSelected(direction: CommunityDeckSortDirection) {
+        _uiState.update { it.copy(selectedSortDirection = direction) }
+    }
+
+    /**
+     * Updates the Search-tab deck-type (format) filter. Advanced Search sheet rework (2026-08-18):
+     * "Deck type" now lives inside the sheet as its own section, so — unlike the old outside-the-
+     * sheet control — this only updates state and defers to the sheet's own Search button.
+     *
+     * When switching AWAY from Commander, the Commander-only `commander`/`edhBracket` selections are
+     * cleared: their sheet sections are hidden for a non-Commander format (see
+     * `CommunityAdvancedSearchSheet`), and [CommunityAdvancedFilters.toSearchFilters] already refuses
+     * to send them for a non-Commander format — clearing them here keeps the Tune-icon `activeCount`
+     * badge in sync with what is actually visible/sent, rather than showing a stale hidden-filter
+     * count. Switching TO Commander restores nothing (already null from the earlier clear).
+     *
+     * Also resets the top-level `commanderQuery`/`commanderResults` (bug fix, edge-case audit
+     * 2026-08-18) — otherwise a Commander→other→Commander round-trip left a stale search-in-progress
+     * (typed text + result list) visible even though nothing was ever selected, since only
+     * `advancedFilters.commander` itself was being cleared. Mirrors [onClearAdvancedFilters]'s reset
+     * of the same fields, including the backing `commanderQueryFlow` debounce flow: a
+     * `MutableStateFlow` conflates equal values under `distinctUntilChanged()`, so leaving it at a
+     * stale value would silently suppress a legitimate re-search of the exact same text later.
+     */
     fun onSearchDeckFilterUpdated(format: CommunityDeckFormatFilter) {
-        _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(formats = format)) }
-        if (_uiState.value.hasSearched) search()
+        val switchingAwayFromCommander = format != CommunityDeckFormatFilter.COMMANDER
+        _uiState.update {
+            val filters = it.advancedFilters.copy(formats = format)
+            if (switchingAwayFromCommander) {
+                it.copy(
+                    advancedFilters = filters.copy(commander = null, edhBracket = null),
+                    commanderQuery = "",
+                    commanderResults = emptyList(),
+                )
+            } else {
+                it.copy(advancedFilters = filters)
+            }
+        }
+        if (switchingAwayFromCommander) commanderQueryFlow.value = ""
     }
 
     fun onSelectDiscoveryFormat(format: CommunityDeckFormatFilter){
@@ -293,11 +353,10 @@ class CommunityDecksSearchViewModel(
 
     }
     // ── Advanced search filters (Phase 2) ───────────────────────────────────────────
-    // NOTE: the advanced-search sheet's format selection is driven by `onSearchDeckFilterUpdated`
-    // (below, wired to the ManaHubBottomSheetSelector in the Search body) — a separate
-    // `onFormatFilterSelected` used to exist here wired to a `CommunityAdvancedSearchSheet` format
-    // callback that the sheet itself never actually invoked (dead code, removed in the same pass
-    // as this note).
+    // NOTE (Advanced Search sheet rework, 2026-08-18): "Deck format" (`onSearchDeckFilterUpdated`)
+    // and Sort (`onSortFieldSelected`/`onSortDirectionSelected`) now live INSIDE
+    // `CommunityAdvancedSearchSheet` as their own sections, same as every filter below — all defer
+    // to the sheet's own Search button (`onApplyAdvancedFilters`) rather than auto-triggering.
 
     fun onColorToggled(color: String) {
         _uiState.update {
@@ -322,6 +381,41 @@ class CommunityDecksSearchViewModel(
 
     fun onPrimersOnlyToggled(primersOnly: Boolean) {
         _uiState.update { it.copy(advancedFilters = it.advancedFilters.copy(primersOnly = primersOnly)) }
+    }
+
+    /**
+     * Lazily fetches Archidekt's closed deck-tag catalog the FIRST time the "Deck tag" picker is
+     * opened (mirrors [loadDiscover]'s `discoverLoaded` guard) — never eagerly in `init`, since most
+     * sessions never open this picker. A failure degrades to an empty list rather than surfacing an
+     * error (the picker itself shows "no tags available" for an empty list); it does not retry on
+     * every re-open, matching Discover's degrade-once semantics.
+     */
+    fun onDeckTagPickerOpened() {
+        if (deckTagsLoaded) return
+        deckTagsLoaded = true
+        viewModelScope.launch {
+            _uiState.update { it.copy(isDeckTagsLoading = true) }
+            val tags = when (val result = communityDecksRepository.getDeckTags()) {
+                is DataResult.Success -> result.data
+                is DataResult.Error -> {
+                    crashlytics.log("community_deck_tags_fetch_error: ${result.message.take(80)}")
+                    emptyList()
+                }
+            }
+            _uiState.update { it.copy(availableDeckTags = tags, isDeckTagsLoading = false) }
+        }
+    }
+
+    /**
+     * Updates the Deck-tag advanced filter. Same deferred-to-sheet-Search-button semantics as every
+     * other filter in this pass — never auto-triggers a search. Selecting the already-active tag
+     * again clears it (single-select toggle, mirrors the picker's "tap selected row to clear" UX).
+     */
+    fun onDeckTagSelected(tag: String?) {
+        _uiState.update {
+            val next = if (it.advancedFilters.deckTag == tag) null else tag
+            it.copy(advancedFilters = it.advancedFilters.copy(deckTag = next))
+        }
     }
 
     fun onCommanderQueryChange(query: String) {
@@ -440,7 +534,10 @@ class CommunityDecksSearchViewModel(
             _uiState.update { it.copy(isLoading = true, error = null, hasSearched = true, isLoadingMore = false) }
 
             crashlytics.setCustomKey("community_search_format", filters.formats.apiId)
-            crashlytics.setCustomKey("community_search_sort", state.selectedSort.name)
+            crashlytics.setCustomKey(
+                "community_search_sort",
+                "${state.selectedSortField.name}_${state.selectedSortDirection.name}",
+            )
             crashlytics.setCustomKey("community_search_query_len", deckName.length)
             // NOTE (Archidekt multi-card search expansion, 2026-07-24): the semantics of
             // `activeCount` shifted here — each selected card now counts individually (see
@@ -453,7 +550,7 @@ class CommunityDecksSearchViewModel(
 
             val dataFilters = filters.toSearchFilters(
                 deckName = deckName,
-                orderBy = state.selectedSort.apiValue,
+                orderBy = state.selectedSortField.apiValue(state.selectedSortDirection),
                 page = 1,
                 pageSize = SEARCH_PAGE_SIZE,
             )
@@ -500,7 +597,7 @@ class CommunityDecksSearchViewModel(
             val state = _uiState.value
             val dataFilters = state.advancedFilters.toSearchFilters(
                 deckName = state.query.trim(),
-                orderBy = state.selectedSort.apiValue,
+                orderBy = state.selectedSortField.apiValue(state.selectedSortDirection),
                 page = nextPage,
                 pageSize = SEARCH_PAGE_SIZE,
             )

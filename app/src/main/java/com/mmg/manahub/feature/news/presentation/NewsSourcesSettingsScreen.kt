@@ -26,8 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +50,7 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -339,25 +338,10 @@ private fun AddCustomSourceSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 NewsFilterPrefs.SUPPORTED_NEWS_LANGUAGES.forEach { code ->
-                    FilterChip(
+                    MagicFilterChip(
                         selected = state.language == code,
                         onClick = { onLanguageChanged(code) },
-                        label = { Text(stringResource(languageLabelRes(code)), style = mt.labelSmall) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-                            selectedLabelColor = mc.primaryAccent,
-                            containerColor = mc.surfaceVariant,
-                            labelColor = mc.textSecondary,
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            borderColor = mc.surfaceVariant.copy(alpha = 0.5f),
-                            selectedBorderColor = mc.primaryAccent,
-                            enabled = true,
-                            selected = state.language == code,
-                            borderWidth = 1.dp,
-                            selectedBorderWidth = 1.5.dp,
-                        ),
-                        shape = ChipShape,
+                        label = stringResource(languageLabelRes(code)),
                     )
                 }
             }

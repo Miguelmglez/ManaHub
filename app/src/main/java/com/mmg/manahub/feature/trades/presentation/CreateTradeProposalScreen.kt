@@ -77,6 +77,7 @@ import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.HexGridBackground
@@ -200,7 +201,7 @@ fun CreateTradeProposalScreen(
                         shape    = ButtonShape
                     ) {
                         if (uiState.isSaving) {
-                            MagicLoadingSpinner(modifier = Modifier.size(18.dp))
+                            MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
                         } else {
                             Text(
                                 stringResource(

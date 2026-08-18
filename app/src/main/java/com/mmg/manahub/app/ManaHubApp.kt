@@ -15,16 +15,16 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.messaging.FirebaseMessaging
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.app.di.coreBridgeKoinModule
+import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.local.PendingInviteStore
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
+import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.CommunityDeckCacheDao
-import com.mmg.manahub.core.data.local.dao.ComboCacheDao
-import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
-import com.mmg.manahub.core.data.local.dao.PuzzleDao
-import com.mmg.manahub.feature.puzzle.di.puzzleKoinModule
-import com.mmg.manahub.core.di.cardStrategyTagsKoinModule
+import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
 import com.mmg.manahub.core.data.local.dao.DeckDao
 import com.mmg.manahub.core.data.local.dao.DraftSessionDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
@@ -36,21 +36,26 @@ import com.mmg.manahub.core.data.local.dao.LocalOpenForTradeDao
 import com.mmg.manahub.core.data.local.dao.LocalWishlistDao
 import com.mmg.manahub.core.data.local.dao.NewsDao
 import com.mmg.manahub.core.data.local.dao.PlaytestDao
+import com.mmg.manahub.core.data.local.dao.PuzzleDao
 import com.mmg.manahub.core.data.local.dao.StatsDao
 import com.mmg.manahub.core.data.local.dao.SurveyAnswerDao
 import com.mmg.manahub.core.data.local.dao.SurveyCardImpactDao
 import com.mmg.manahub.core.data.local.dao.TournamentDao
 import com.mmg.manahub.core.data.local.dao.TradeCollectionSyncDao
-import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
-import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
-import com.mmg.manahub.core.domain.repository.CardRepository
-import com.mmg.manahub.core.domain.repository.PushTokenRepository
-import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.di.sharedDomainKoinModule
-import com.mmg.manahub.core.data.cache.ManaSymbolStore
 import com.mmg.manahub.core.data.network.ScryfallRequestQueue
 import com.mmg.manahub.core.data.remote.ScryfallClient
+import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.remote.push.PushTokenRemoteDataSource
 import com.mmg.manahub.core.data.usecase.symbols.SyncManaSymbolsUseCase
+import com.mmg.manahub.core.di.cardStrategyTagsKoinModule
+import com.mmg.manahub.core.di.sharedDomainKoinModule
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
+import com.mmg.manahub.core.domain.repository.PushTokenRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncManager
 import com.mmg.manahub.core.gamification.data.sync.GamificationSyncWorker
 import com.mmg.manahub.core.gamification.data.sync.QuestRotationWorker
@@ -61,30 +66,6 @@ import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
 import com.mmg.manahub.core.gamification.engine.AchievementBackfill
 import com.mmg.manahub.core.gamification.engine.EntitlementGranter
 import com.mmg.manahub.core.gamification.engine.QuestReconciler
-import com.mmg.manahub.core.push.di.pushKoinModule
-import com.mmg.manahub.core.sync.CardBackfillWorker
-import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
-import com.mmg.manahub.core.sync.CollectionSyncWorker
-import com.mmg.manahub.core.sync.PriceRefreshWorker
-import com.mmg.manahub.core.sync.SyncManager
-import com.mmg.manahub.core.sync.di.syncKoinModule
-import com.mmg.manahub.core.tagging.TagDictionaryRepository
-import com.mmg.manahub.core.domain.auth.SessionState
-import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.domain.repository.NotificationPrefsRepository
-import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
-import com.mmg.manahub.core.util.AnalyticsHelper
-import com.mmg.manahub.core.voice.domain.VoiceModelRepository
-import com.mmg.manahub.feature.addcard.di.addCardKoinModule
-import com.mmg.manahub.feature.auth.di.authKoinModule
-import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
-import com.mmg.manahub.feature.collection.di.collectionKoinModule
-import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
-import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
-import com.mmg.manahub.feature.decks.di.commanderSpellbookKoinModule
-import com.mmg.manahub.feature.decks.di.communityAggregateKoinModule
-import com.mmg.manahub.feature.decks.di.decksKoinModule
-import com.mmg.manahub.feature.draft.di.draftKoinModule
 import com.mmg.manahub.core.nearby.domain.repository.NearbySessionRepository
 import com.mmg.manahub.core.online.domain.usecase.AdvancePhaseUseCase
 import com.mmg.manahub.core.online.domain.usecase.ConfirmDefeatUseCase
@@ -96,14 +77,37 @@ import com.mmg.manahub.core.online.domain.usecase.ToggleLandPlayedUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCommanderDamageUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateCounterUseCase
 import com.mmg.manahub.core.online.domain.usecase.UpdateLifeUseCase
+import com.mmg.manahub.core.push.di.pushKoinModule
+import com.mmg.manahub.core.sync.CardBackfillWorker
+import com.mmg.manahub.core.sync.CollectionStatsSyncWorker
+import com.mmg.manahub.core.sync.CollectionSyncWorker
+import com.mmg.manahub.core.sync.PriceRefreshWorker
+import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.di.syncKoinModule
+import com.mmg.manahub.core.tagging.TagDictionaryRepository
+import com.mmg.manahub.core.ui.components.search.di.searchWidgetsKoinModule
+import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.voice.domain.VoiceCommandRecognizer
+import com.mmg.manahub.core.voice.domain.VoiceModelRepository
+import com.mmg.manahub.feature.addcard.di.addCardKoinModule
+import com.mmg.manahub.feature.auth.di.authKoinModule
+import com.mmg.manahub.feature.carddetail.di.cardDetailKoinModule
+import com.mmg.manahub.feature.collection.di.collectionKoinModule
+import com.mmg.manahub.feature.communitydecks.di.communityDecksKoinModule
+import com.mmg.manahub.feature.competitive.di.competitiveKoinModule
+import com.mmg.manahub.feature.decks.di.commanderSpellbookKoinModule
+import com.mmg.manahub.feature.decks.di.communityAggregateKoinModule
+import com.mmg.manahub.feature.decks.di.decksKoinModule
+import com.mmg.manahub.feature.draft.di.draftKoinModule
 import com.mmg.manahub.feature.friends.di.friendsKoinModule
-import com.mmg.manahub.feature.gamification.di.gamificationKoinModule
 import com.mmg.manahub.feature.game.di.gameKoinModule
+import com.mmg.manahub.feature.gamification.di.gamificationKoinModule
 import com.mmg.manahub.feature.home.di.homeKoinModule
+import com.mmg.manahub.feature.massiveadd.di.massiveAddCardKoinModule
 import com.mmg.manahub.feature.news.di.newsKoinModule
 import com.mmg.manahub.feature.playtest.di.playtestKoinModule
 import com.mmg.manahub.feature.profile.di.profileKoinModule
+import com.mmg.manahub.feature.puzzle.di.puzzleKoinModule
 import com.mmg.manahub.feature.settings.di.settingsKoinModule
 import com.mmg.manahub.feature.splash.di.splashKoinModule
 import com.mmg.manahub.feature.stats.di.statsKoinModule
@@ -114,12 +118,6 @@ import com.mmg.manahub.feature.trades.di.tradesKoinModule
 import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.github.jan.supabase.SupabaseClient
-import org.koin.android.ext.koin.androidContext
-import org.koin.android.ext.koin.androidLogger
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
-import org.koin.core.context.startKoin
-import org.koin.core.logger.Level
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -127,10 +125,16 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import okhttp3.OkHttpClient
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
+import okhttp3.OkHttpClient
+import org.koin.android.ext.koin.androidContext
+import org.koin.android.ext.koin.androidLogger
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import org.koin.core.context.startKoin
+import org.koin.core.logger.Level
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -256,6 +260,12 @@ class ManaHubApp : Application(), KoinComponent {
     // Commander Spellbook combo cache (Deck Engine Unification plan D7, Phase 4.3 — synergy
     // browser Combos tab) bridge dep. Unrelated to communityAggregateDao above.
     @Inject lateinit var comboCacheDao: ComboCacheDao
+
+    // Competitive feature (Phase 5) bridge deps: the two Room-owned cache DAOs for the
+    // `manahub-competitive` Cloudflare Worker's weekly meta snapshots + 17lands Limited ratings.
+    // Unrelated to communityAggregateDao/comboCacheDao above.
+    @Inject lateinit var competitiveMetaCacheDao: CompetitiveMetaCacheDao
+    @Inject lateinit var competitiveLimitedRatingsCacheDao: CompetitiveLimitedRatingsCacheDao
 
     // Card strategy tags cache (offline tag pipeline precomputed tags) — Deck Engine Unification
     // plan D8, Phase 5c. Serves cardStrategyTagsKoinModule (CardDetailViewModel's read point); the
@@ -524,6 +534,10 @@ class ManaHubApp : Application(), KoinComponent {
                 searchWidgetsKoinModule(),
                 gamificationKoinModule(),
                 decksKoinModule(),
+                competitiveKoinModule(
+                    metaCacheDao = competitiveMetaCacheDao,
+                    limitedRatingsCacheDao = competitiveLimitedRatingsCacheDao,
+                ),
                 gameKoinModule(
                     observeSession = observeSessionUseCase,
                     updateLife = updateLifeUseCase,
@@ -538,6 +552,7 @@ class ManaHubApp : Application(), KoinComponent {
                     nearbyRepository = nearbySessionRepository,
                     voiceCommandRecognizer = voiceCommandRecognizer,
                 ),
+                massiveAddCardKoinModule()
             )
         }
 

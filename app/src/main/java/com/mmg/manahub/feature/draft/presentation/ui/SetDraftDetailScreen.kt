@@ -86,7 +86,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.model.ArchetypeGuide
 import com.mmg.manahub.core.model.DraftVideo
 import com.mmg.manahub.core.model.MechanicGuide
-import com.mmg.manahub.feature.draft.presentation.DraftFeatureFlags
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailUiState
 import com.mmg.manahub.feature.draft.presentation.viewmodel.SetDraftDetailViewModel
 import kotlinx.datetime.LocalDate
@@ -173,8 +173,8 @@ fun SetDraftDetailScreen(
                     }
                 }
                 // Simulate Draft entry point — only when the set has a published booster config.
-                // HIDDEN for release behind DraftFeatureFlags.SIMULATOR_ENABLED (UI-only).
-                if (DraftFeatureFlags.SIMULATOR_ENABLED && state.boosterVersion != null) {
+                // HIDDEN for release behind FeatureFlags.Draft.SIMULATOR_ENABLED (UI-only).
+                if (FeatureFlags.Draft.SIMULATOR_ENABLED && state.boosterVersion != null) {
                     Surface(
                         onClick = { onSimulateDraft(state.setCode) },
                         shape = RoundedCornerShape(10.dp),

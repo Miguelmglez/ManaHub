@@ -40,6 +40,7 @@ import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -103,7 +104,7 @@ internal fun GeneratingContent(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            MagicLoadingSpinner(modifier = Modifier.size(48.dp))
+            MagicLoadingSpinner(size = MagicLoadingSize.Medium)
             Spacer(Modifier.height(spacing.lg))
             Text(
                 text = uiState.buildStage?.label() ?: stringResource(R.string.deck_wizard_stage_validating),

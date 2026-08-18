@@ -13,19 +13,30 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.R
 import com.mmg.manahub.core.util.AnalyticsHelper
+import com.mmg.manahub.core.util.recordNonFatal
 import com.mmg.manahub.core.domain.auth.AuthError
+import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.domain.auth.AuthResult
+import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.auth.domain.usecase.CancelPendingEmailChangeUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmEmailUpdateUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.ResendConfirmationEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResetPasswordUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithGoogleUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignOutUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignUpWithGoogleUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UnlinkIdentityUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdateEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.UpdateNicknameUseCase
+import com.mmg.manahub.feature.auth.domain.usecase.UpdatePasswordUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +45,71 @@ import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.regex.Pattern
+
+/**
+ * TTL for the pending-recovery marker consumed by [isActiveRecoveryFlow] — see
+ * `UserPreferencesDataStore`'s pending-recovery-marker KDoc for the full mechanism. A recovery
+ * link that was tapped and then left untouched for longer than this must re-require a fresh link
+ * rather than sit indefinitely armed (password-recovery-hardening-plan-2026-08-18 §3.1).
+ *
+ * CAVEAT (T6 adversarial-audit note, 2026-08-18): this is a UX nudge against a COOPERATIVE device,
+ * not a hard security boundary — it is measured against [System.currentTimeMillis], which is
+ * user-settable, so moving the device clock backward can extend this window. Not exploitable
+ * against a victim (only the device owner can move their own clock, and they already hold the
+ * live recovery session at that point regardless — the marker gates ROUTING/UI, it is not what
+ * makes the session valid). There is also no server-side recovery-session expiry on this Supabase
+ * plan (see plan §8.1) — the client-driven `signOut` calls in `confirmPasswordReset`/
+ * `abandonRecoverySession` are the only control that ever ends an abandoned recovery session, TTL
+ * expiry included. Do not treat this constant as a substitute for a real, tamper-resistant
+ * expiry — it is a courtesy timeout, not a lock.
+ */
+const val RECOVERY_MARKER_TTL_MS: Long = 15L * 60L * 1000L
+
+/**
+ * Pure predicate: true only when [sessionState] is a genuine, server-issued recovery-authenticated
+ * session **AND** an app-side "a recovery deep link produced THIS session" marker is present,
+ * bound to that exact session by id, and still within [RECOVERY_MARKER_TTL_MS].
+ *
+ * ## Why both halves are required (security)
+ * [AuthUser.isRecoverySession] (the JWT `amr` claim) is NECESSARY but not SUFFICIENT: verified
+ * live, GoTrue also tags a signup-email-confirmation session `amr: otp` — the exact value a real
+ * recovery-link consumption gets — so `amr` alone cannot distinguish "brand-new user confirming
+ * their email" from "a genuine forgot-password flow" (see `decodeAmrIndicatesRecoverySession`'s
+ * KDoc in `core-common` for the live-verified evidence). The marker alone is also not sufficient:
+ * it is app-side, locally-writable state, not a server-issued proof. Requiring BOTH — a
+ * server-issued `amr` claim AND a locally-armed, session-id-bound, time-bounded marker — is what
+ * blocks every threat in the table in `docs/plans/password-recovery-hardening-plan-2026-08-18.md`
+ * §3 (forged `manahub://auth?type=recovery` intent against an already-signed-in victim; a
+ * signup-confirmation link tap; a stale/reused marker from an earlier, already-consumed recovery).
+ *
+ * `amr` is also session-lifetime-sticky (GoTrue re-emits the same `amr` for a session's entire
+ * life, including after the password has already been changed via that same session) — this is
+ * why the marker is a CONSUMABLE, one-shot value: callers that clear it on every exit (success,
+ * Back/abandon, sign-out) are what stops [AuthUser.isRecoverySession] staying `true` forever from
+ * re-satisfying this predicate after the flow is actually over.
+ *
+ * @param sessionState The app's current [SessionState].
+ * @param marker The pending-recovery marker as (sessionId, markedAtEpochMs), from
+ *   `UserPreferencesDataStore.pendingRecoveryMarkerFlow`, or `null` when no marker is armed.
+ * @param nowEpochMs The current time, injected (not read internally) so this stays a pure,
+ *   deterministic function for unit testing — mirrors [shouldRouteToRecoveryScreen]'s pattern in
+ *   `AppNavGraph.kt`.
+ * @return `true` only when every condition holds. A `null`/mismatched/expired marker, a
+ *   non-`Authenticated` session, or `isRecoverySession == false` all fail closed to `false`.
+ */
+fun isActiveRecoveryFlow(
+    sessionState: SessionState,
+    marker: Pair<String, Long>?,
+    nowEpochMs: Long,
+): Boolean {
+    if (sessionState !is SessionState.Authenticated) return false
+    if (!sessionState.user.isRecoverySession) return false
+    if (marker == null) return false
+    val (markerSessionId, markedAtEpochMs) = marker
+    if (markerSessionId.isBlank() || markerSessionId != sessionState.user.sessionId) return false
+    val ageMs = nowEpochMs - markedAtEpochMs
+    return ageMs in 0..RECOVERY_MARKER_TTL_MS
+}
 
 class AuthViewModel(
     private val signInWithEmailUseCase: SignInWithEmailUseCase,
@@ -46,6 +122,14 @@ class AuthViewModel(
     private val resetPasswordUseCase: ResetPasswordUseCase,
     private val deleteAccountUseCase: DeleteAccountUseCase,
     private val updateNicknameUseCase: UpdateNicknameUseCase,
+    private val resendConfirmationEmailUseCase: ResendConfirmationEmailUseCase,
+    private val updateEmailUseCase: UpdateEmailUseCase,
+    private val updatePasswordUseCase: UpdatePasswordUseCase,
+    private val unlinkIdentityUseCase: UnlinkIdentityUseCase,
+    private val linkGoogleIdentityNativeUseCase: LinkGoogleIdentityNativeUseCase,
+    private val confirmPasswordResetUseCase: ConfirmPasswordResetUseCase,
+    private val confirmEmailUpdateUseCase: ConfirmEmailUpdateUseCase,
+    private val cancelPendingEmailChangeUseCase: CancelPendingEmailChangeUseCase,
     private val analyticsHelper: AnalyticsHelper,
     private val appContext: Context,
 ) : ViewModel() {
@@ -129,6 +213,284 @@ class AuthViewModel(
             _uiState.value = when (val result = updateNicknameUseCase(nickname.trim())) {
                 is AuthResult.Success -> AuthUiState.NicknameUpdated
                 is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            }
+        }
+    }
+
+    /**
+     * Resends the sign-up confirmation email to [email].
+     * Transitions to [AuthUiState.EmailConfirmationSent] on success — the same state the initial
+     * sign-up confirmation flow uses, since the UI copy ("check your inbox") applies identically.
+     */
+    fun resendConfirmationEmail(email: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || !EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_resend_confirmation_email_started")
+            when (val result = resendConfirmationEmailUseCase(trimmedEmail)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_resend_confirmation_email_succeeded")
+                    _uiState.value = AuthUiState.EmailConfirmationSent
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("resend_confirmation_email", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
+            }
+        }
+    }
+
+    /**
+     * Changes the authenticated user's email address.
+     * Transitions to [AuthUiState.EmailUpdated] on success.
+     *
+     * @param code A reauthentication nonce entered by the user.
+     */
+    fun updateEmail(newEmail: String, code: String) {
+        val trimmedEmail = newEmail.trim()
+        if (trimmedEmail.isBlank() || !EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
+            return
+        }
+        if (code.isBlank()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_credentials))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_update_email_started")
+            when (val result = updateEmailUseCase(trimmedEmail, code)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_update_email_succeeded")
+                    _uiState.value = AuthUiState.EmailUpdated
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("update_email", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
+            }
+        }
+    }
+
+    /**
+     * Changes the authenticated user's password — the SOLE screen/entry point for both "Change
+     * password" (account already has an email/password identity) and "Set a password" (Google-only
+     * account with none yet). Transitions to [AuthUiState.PasswordUpdated] on success.
+     *
+     * Architecture pivot: replaces the retired email-nonce reauthentication flow with Supabase's
+     * `current_password` mechanism (GoTrue's "Require current password when updating" project
+     * setting, confirmed ON) — see [com.mmg.manahub.core.domain.auth.AuthRepository.updatePassword]'s
+     * KDoc for the full rationale.
+     *
+     * @param currentPassword The account's current password — required (and validated non-blank
+     *   here) for "Change password". Pass `null` for "Set a password" on a Google-only account
+     *   with no password yet — [UpdatePasswordScreen] never even shows the field for it. This is
+     *   NOT simply "GoTrue skips the check": a Google-signup account already has a password set
+     *   server-side (see [com.mmg.manahub.core.domain.auth.AuthRepository.updatePassword]'s
+     *   KDoc), so the repository routes `null` through a different, Admin-API-backed call path
+     *   entirely rather than omitting `currentPassword` from the same self-service call. `null`
+     *   and `""` are therefore deliberately distinct here: only `null` means "not applicable"; a
+     *   blank non-null value means the field was shown but left empty, which fails validation
+     *   below.
+     */
+    fun updatePassword(newPassword: String, currentPassword: String?) {
+        if (!isPasswordStrong(newPassword)) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_password_requirements))
+            return
+        }
+        if (currentPassword != null && currentPassword.isBlank()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_current_password))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_update_password_started")
+            when (val result = updatePasswordUseCase(newPassword, currentPassword)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_update_password_succeeded")
+                    _uiState.value = AuthUiState.PasswordUpdated
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("update_password", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
+            }
+        }
+    }
+
+    /**
+     * Changes the authenticated user's email address WITHOUT a reauthentication code — distinct
+     * from [updateEmail]. This is the "Change email" row's direct path on
+     * [AccountManagementScreen]: Supabase's "Secure email change" project setting double-confirms
+     * the change via links sent to both the old and the new inbox, so the extra reauth-code gate
+     * ahead of [updateEmail] is redundant friction here (see the KDoc on
+     * [AuthRepository.confirmEmailUpdate]).
+     * Transitions to [AuthUiState.EmailUpdated] on success — the SAME terminal state [updateEmail]
+     * uses, since both flows converge on the identical "email change requested" outcome from the
+     * UI's perspective.
+     */
+    fun confirmEmailUpdate(newEmail: String) {
+        val trimmedEmail = newEmail.trim()
+        if (trimmedEmail.isBlank() || !EMAIL_PATTERN.matcher(trimmedEmail).matches()) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_invalid_email))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_email_update_started")
+            when (val result = confirmEmailUpdateUseCase(trimmedEmail)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_email_update_succeeded")
+                    _uiState.value = AuthUiState.EmailUpdated
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("confirm_email_update", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
+            }
+        }
+    }
+
+    /**
+     * Unlinks [identityId] from the authenticated user's account.
+     * Transitions to [AuthUiState.IdentityUnlinked] on success.
+     */
+    fun unlinkIdentity(identityId: String) {
+        if (identityId.isBlank()) return
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_unlink_identity_started")
+            when (val result = unlinkIdentityUseCase(identityId)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_unlink_identity_succeeded")
+                    _uiState.value = AuthUiState.IdentityUnlinked
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("unlink_identity", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
+            }
+        }
+    }
+
+    /**
+     * Cancels a pending "Change email" request (see [AuthUser.newEmail]).
+     * Transitions to [AuthUiState.EmailChangeCancelled] on success.
+     */
+    fun cancelPendingEmailChange() {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_cancel_email_change_started")
+            when (val result = cancelPendingEmailChangeUseCase()) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_cancel_email_change_succeeded")
+                    _uiState.value = AuthUiState.EmailChangeCancelled
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("cancel_email_change", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
+            }
+        }
+    }
+
+    /**
+     * Starts linking a Google identity to the authenticated user's account via the SDK's real
+     * OAuth-redirect flow — distinct from [linkGoogleIdentity], which links via the
+     * Credential-Manager ID-token workaround.
+     * Transitions to [AuthUiState.GoogleIdentityLinkStarted] on success; the UI opens the carried
+     * authorization URL (e.g. via Custom Tabs).
+     *
+     * @param redirectUrl The `manahub://auth` deep-link the OAuth flow returns to.
+     */
+    fun linkGoogleIdentityNative(redirectUrl: String) {
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_link_google_identity_native_started")
+            when (val result = linkGoogleIdentityNativeUseCase(redirectUrl)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_link_google_identity_native_succeeded")
+                    _uiState.value = AuthUiState.GoogleIdentityLinkStarted(result.data)
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("link_google_identity_native", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
+            }
+        }
+    }
+
+    /**
+     * Confirms a "forgot password" reset from the recovery email deep link, WITHOUT a
+     * reauthentication code — distinct from [updatePassword].
+     *
+     * SECURITY (hardened 2026-08-18 — see `docs/plans/password-recovery-hardening-plan-2026-08-18.md`
+     * §2.1/§3): merely being on a [SessionState.Authenticated] session with
+     * [AuthUser.isRecoverySession] true is NOT sufficient proof this is a genuine recovery flow.
+     * Two independent gaps: (1) `MainActivity`'s `manahub://auth?type=recovery` deep-link routing is
+     * driven by an attacker-controllable URI, so a forged intent from any installed app can land an
+     * already-logged-in user on this call with a normal session; (2) verified live, GoTrue also
+     * tags a signup-email-confirmation session `amr: otp` — the SAME value a genuine recovery-link
+     * consumption gets — so a brand-new user confirming their email produces a session that alone
+     * satisfies `isRecoverySession` too. This is why the gate below calls [isActiveRecoveryFlow],
+     * which additionally requires [recoveryMarker] (sourced by the caller from
+     * `UserPreferencesDataStore.pendingRecoveryMarkerFlow`, written ONLY by `MainActivity` when a
+     * genuine recovery deep link is imported) to be present, bound to the CURRENT session's id, and
+     * still within its TTL — proving the CURRENT session was actually established via a real
+     * recovery-link/OTP exchange, not a signup confirmation or a forged intent — BEFORE the use case
+     * (a no-nonce password change) is ever invoked. See [AuthRepository.confirmPasswordReset]'s KDoc
+     * and [isActiveRecoveryFlow]'s KDoc for the full rationale.
+     *
+     * @param recoveryMarker The pending-recovery marker as (sessionId, markedAtEpochMs) — the SAME
+     *   value [ResetPasswordConfirmScreen] already collected for its own render gate, passed
+     *   through rather than re-subscribed here so both checks observe an identical snapshot.
+     *
+     * Transitions to [AuthUiState.PasswordResetConfirmed] on success.
+     */
+    fun confirmPasswordReset(newPassword: String, recoveryMarker: Pair<String, Long>?) {
+        if (!isPasswordStrong(newPassword)) {
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.auth_error_password_requirements))
+            return
+        }
+        if (!isActiveRecoveryFlow(sessionState.value, recoveryMarker, System.currentTimeMillis())) {
+            // SECURITY telemetry: this is the actual authorization boundary behind both the
+            // forged-manahub://auth?type=recovery-intent fix AND the signup-confirmation-ambiguity
+            // fix — it should fire ~0 times in normal operation. A dedicated NON_FATAL (distinct
+            // from ResetPasswordConfirmScreen's UI-layer key) makes a silent bypass attempt or a
+            // regression visible instead of invisible.
+            FirebaseCrashlytics.getInstance().log("password_reset_confirm_blocked_not_recovery_session")
+            recordNonFatal("account_mgmt_reset_vm_blocked_not_recovery_session")
+            // Reuse the same "reset link invalid/expired" copy the UI already shows for an
+            // unauthenticated session — a distinct message here would tell an attacker WHY the
+            // gate failed (not authenticated vs. authenticated-but-not-a-recovery-session vs.
+            // missing/mismatched/expired marker), which is information this path must not leak.
+            _uiState.value = AuthUiState.Error(appContext.getString(R.string.account_mgmt_reset_link_invalid))
+            return
+        }
+        authJob?.cancel()
+        authJob = viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_password_reset_started")
+            when (val result = confirmPasswordResetUseCase(newPassword)) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_mgmt_confirm_password_reset_succeeded")
+                    _uiState.value = AuthUiState.PasswordResetConfirmed
+                }
+                is AuthResult.Error -> {
+                    recordUnexpectedAuthFailure("confirm_password_reset", result.error)
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -268,6 +630,10 @@ class AuthViewModel(
 
     fun signOut() {
         viewModelScope.launch {
+            // Loading here lets AccountManagementScreen disable/spinner the Sign Out row while this
+            // is in flight — previously this function had no Loading handling at all, so a second tap
+            // before the coroutine completed could fire signOutUseCase() twice concurrently.
+            _uiState.value = AuthUiState.Loading
             signOutUseCase()
             // sessionState will emit Unauthenticated automatically via the SDK Flow
             _uiState.value = AuthUiState.Idle
@@ -333,9 +699,24 @@ class AuthViewModel(
         authJob?.cancel()
         authJob = viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            _uiState.value = when (val result = deleteAccountUseCase()) {
-                is AuthResult.Success -> AuthUiState.AccountDeleted
-                is AuthResult.Error -> AuthUiState.Error(result.error.toUiMessage())
+            FirebaseCrashlytics.getInstance().log("account_delete_requested")
+            when (val result = deleteAccountUseCase()) {
+                is AuthResult.Success -> {
+                    FirebaseCrashlytics.getInstance().log("account_delete_succeeded")
+                    _uiState.value = AuthUiState.AccountDeleted
+                }
+                is AuthResult.Error -> {
+                    // The one irreversible action in this feature — record on ANY failure (not just
+                    // AuthError.Unknown, unlike recordUnexpectedAuthFailure's other 8 ops) since a
+                    // failed account deletion is always worth investigating regardless of error type.
+                    val errorType = result.error::class.simpleName ?: "Unknown"
+                    FirebaseCrashlytics.getInstance().apply {
+                        log("account_delete_failed")
+                        setCustomKey("account_delete_error_type", errorType)
+                    }
+                    recordNonFatal("account_delete_failed_$errorType")
+                    _uiState.value = AuthUiState.Error(result.error.toUiMessage())
+                }
             }
         }
     }
@@ -343,6 +724,31 @@ class AuthViewModel(
     /** Resets [uiState] back to [AuthUiState.Idle] so the sheet can be reused. */
     fun resetUiState() {
         _uiState.value = AuthUiState.Idle
+    }
+
+    /**
+     * Shared telemetry helper for the account-management critical ops (resendConfirmationEmail,
+     * updateEmail, updatePassword, confirmEmailUpdate, cancelPendingEmailChange, unlinkIdentity,
+     * linkGoogleIdentityNative, confirmPasswordReset). Sets a filterable context key with the
+     * failing [action] name and records a NON_FATAL only for the cases that should be empirically
+     * rare and are worth watching for regressions/drift:
+     * - [AuthError.Unknown]: the catch-all bucket — typed errors already have deterministic UI
+     *   messaging and don't need one.
+     * - [AuthError.SingleIdentityNotDeletable]: the client-side `removeEnabled` guard on
+     *   [unlinkIdentity]'s call sites should make this server rejection unreachable in normal use;
+     *   harmless to check unconditionally since no other op can ever produce it.
+     *
+     * Never logs the raw [AuthError.Unknown.message] (may carry server response text) — only the
+     * error class name.
+     */
+    private fun recordUnexpectedAuthFailure(action: String, error: AuthError) {
+        FirebaseCrashlytics.getInstance().apply {
+            log("account_mgmt_action_failed: $action (${error::class.simpleName})")
+            setCustomKey("account_mgmt_action", action)
+        }
+        if (error is AuthError.Unknown || error is AuthError.SingleIdentityNotDeletable) {
+            recordNonFatal("account_mgmt_unexpected_failure_$action")
+        }
     }
 
     // --- Helpers ---
@@ -369,6 +775,7 @@ class AuthViewModel(
 
     private fun AuthError.toUiMessage(): String = when (this) {
         is AuthError.InvalidCredentials -> appContext.getString(R.string.auth_error_invalid_credentials)
+        is AuthError.InvalidCurrentPassword -> appContext.getString(R.string.auth_error_invalid_current_password)
         is AuthError.EmailAlreadyInUse -> appContext.getString(R.string.auth_error_email_in_use)
         is AuthError.NetworkError -> appContext.getString(R.string.auth_error_network)
         is AuthError.SessionExpired -> appContext.getString(R.string.auth_error_session_expired)
@@ -377,12 +784,17 @@ class AuthViewModel(
         is AuthError.EmailNotConfirmed -> appContext.getString(R.string.auth_error_email_not_confirmed)
         is AuthError.NicknameInappropriate -> appContext.getString(R.string.auth_error_nickname_inappropriate)
         is AuthError.NicknameTooLong -> appContext.getString(R.string.auth_error_nickname_too_long)
+        is AuthError.SingleIdentityNotDeletable -> appContext.getString(R.string.auth_error_single_identity_not_deletable)
+        is AuthError.RateLimited -> appContext.getString(R.string.auth_error_rate_limited)
         // GoogleEmailConflict normally transitions to GoogleEmailConflictLinking state and never
         // reaches toUiMessage. This fallback covers any unexpected path that bypasses that handling.
         is AuthError.GoogleEmailConflict -> appContext.getString(R.string.auth_error_google_email_conflict)
         // NoProfileFound is handled as GoogleSignInNoProfile state — this fallback
         // covers any unexpected path where it reaches toUiMessage directly.
         is AuthError.NoProfileFound -> appContext.getString(R.string.auth_error_no_profile_found)
+        // "Set a password" succeeded server-side but GoTrue revoked the session as a side effect
+        // (2026-08-17 fix) — reassure the user their password WAS set, distinct from a failure.
+        is AuthError.PasswordUpdatedSessionRevoked -> appContext.getString(R.string.auth_error_password_set_session_revoked)
         // Never expose raw server error messages to the user — they may leak internal
         // stack traces, table names, or constraint names from Supabase/Postgres.
         is AuthError.Unknown -> appContext.getString(R.string.auth_error_unknown)

@@ -2,6 +2,7 @@ package com.mmg.manahub.core.data.remote
 
 import com.mmg.manahub.core.data.remote.dto.CompleteUserProfileDto
 import com.mmg.manahub.core.data.remote.dto.GetProfileByUserIdDto
+import com.mmg.manahub.core.data.remote.dto.HasPasswordDto
 import com.mmg.manahub.core.data.remote.dto.UpdateAvatarUrlDto
 import com.mmg.manahub.core.data.remote.dto.UpdateNicknameDto
 import com.mmg.manahub.core.data.remote.dto.UpsertUserProfileDto
@@ -31,7 +32,14 @@ class UserProfileClient(
     private val baseUrl: String,
 ) {
 
-    /** Fetches a single user profile row by id. */
+    /**
+     * Fetches a single user profile row by id.
+     *
+     * [select] deliberately does NOT include `has_password` (2026-08-17 security fix):
+     * that column is granted `SELECT` to `authenticated` cross-user, so reading it here would let
+     * any user read any OTHER user's `has_password`. Use [getMyHasPassword] instead, which is
+     * self-scoped server-side via the `get_my_has_password` RPC.
+     */
     suspend fun fetchProfile(
         idFilter: String,
         select: String = "id,nickname,game_tag,avatar_url,provider,profile_completed",
@@ -81,6 +89,31 @@ class UserProfileClient(
         httpClient.post("${baseUrl}rpc/complete_user_profile") {
             contentType(ContentType.Application.Json)
             setBody(body)
+        }.body()
+
+    /**
+     * Calls the parameterless `cancel_pending_email_change` RPC — clears `auth.users.email_change`
+     * for `(select auth.uid())` server-side. Verified as a safe no-op when nothing is pending.
+     * Throws on non-2xx (`expectSuccess = true`, see class KDoc).
+     */
+    suspend fun cancelPendingEmailChange() {
+        httpClient.post("${baseUrl}rpc/cancel_pending_email_change") {
+            contentType(ContentType.Application.Json)
+        }
+    }
+
+    /**
+     * Calls the self-scoped `get_my_has_password` RPC (SECURITY DEFINER) to read whether the
+     * current user has a real, user-manageable password set. Mirrors
+     * `FriendshipClient.getMyReferralCode`'s pattern on this same table, for the same reason:
+     * `user_profiles.has_password` is granted `SELECT` to `authenticated` cross-user, so it must
+     * never be read via a direct table select (see [fetchProfile]'s KDoc). The RPC is scoped to
+     * `(select auth.uid())` server-side, so the caller cannot request another user's value.
+     */
+    suspend fun getMyHasPassword(): List<HasPasswordDto> =
+        httpClient.post("${baseUrl}rpc/get_my_has_password") {
+            contentType(ContentType.Application.Json)
+            setBody("{}")
         }.body()
 
     /** Updates privacy visibility flags via PATCH. Only fields present in [body] are sent. */

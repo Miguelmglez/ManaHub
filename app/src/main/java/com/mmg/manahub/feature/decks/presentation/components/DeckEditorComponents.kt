@@ -80,8 +80,15 @@ import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.mtg_card_back
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import com.mmg.manahub.core.ui.components.manaColorFor
+import com.mmg.manahub.core.ui.theme.CardCornerRadius
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -133,14 +140,14 @@ fun CardRow(
     val spacing = MaterialTheme.spacing
     Surface(
         onClick = onClick,
-        shape = ChipShape,
+        shape = SmallCardShape,
         color = mc.surface,
-        modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) {}
+        modifier = modifier.fillMaxWidth().border(1.dp, mc.surfaceVariant.copy(alpha = 0.5f), SmallCardShape).semantics(mergeDescendants = true) {}
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+            horizontalArrangement = Arrangement.spacedBy(spacing.md)
         ) {
             AsyncImage(
                 model = null,
@@ -148,13 +155,16 @@ fun CardRow(
                 placeholder = painterResource(Res.drawable.mtg_card_back),
                 error = painterResource(Res.drawable.mtg_card_back),
                 fallback = painterResource(Res.drawable.mtg_card_back),
-                modifier = Modifier.size(width = 44.dp, height = 60.dp),
+                modifier = Modifier
+                    .size(width = 44.dp, height = 62.dp)
+                    .clip(SmallCardShape)
+                    .border(1.dp, mc.surfaceVariant, SmallCardShape),
                 contentScale = ContentScale.Crop
             )
             CardName(
                 name = stringResource(R.string.deck_default_name),
                 showFrontOnly = true,
-                style = ty.bodyMedium,
+                style = ty.titleMedium,
                 color = mc.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -162,11 +172,11 @@ fun CardRow(
             )
             if (entry.quantity > 1) {
                 Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.2f)) {
-                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs))
+                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp))
                 }
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -205,65 +215,165 @@ fun CardRow(
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
 
+    // Map card colors to theme colors for the visual accent
+    val cardColors = remember(card.colors) {
+        card.colors.map { manaColorFor(it, mc) }
+    }
+    val primaryAccentColor = cardColors.firstOrNull() ?: mc.surfaceVariant
+
     Surface(
         onClick = onClick,
-        shape = ChipShape,
-        color = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
-        modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) {}
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-        ) {
-            AsyncImage(
-                model = card.imageNormal,
-                contentDescription = null,
-                placeholder = painterResource(Res.drawable.mtg_card_back),
-                error = painterResource(Res.drawable.mtg_card_back),
-                fallback = painterResource(Res.drawable.mtg_card_back),
-                modifier = Modifier.size(width = 44.dp, height = 60.dp),
-                contentScale = ContentScale.Crop
+        shape = SmallCardShape,
+        color = mc.surface,
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (selected) {
+                    Modifier.coloredShadow(
+                        color = mc.primaryAccent,
+                        borderRadius = CardCornerRadius,
+                        blurRadius = 12.dp,
+                        spread = 0.8f
+                    ).border(2.dp, mc.primaryAccent, SmallCardShape)
+                } else {
+                    Modifier.border(1.dp, mc.surfaceVariant.copy(alpha = 0.5f), SmallCardShape)
+                }
             )
-            Box(Modifier.weight(1f).height(60.dp)) {
-                CardName(
-                    name          = card.name,
-                    showFrontOnly = true,
-                    style         = ty.bodyMedium,
-                    color         = mc.textPrimary,
-                    maxLines      = 1,
-                    overflow      = TextOverflow.Ellipsis,
-                    modifier      = Modifier.align(Alignment.TopStart)
+            .semantics(mergeDescendants = true) {}
+    ) {
+        Box(Modifier.fillMaxWidth().heightIn(min = 68.dp)) {
+            // 1. Subtle art-crop background texture
+            if (card.imageArtCrop != null) {
+                AsyncImage(
+                    model = card.imageArtCrop,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alpha = 0.08f,
+                    modifier = Modifier.matchParentSize()
                 )
-                Text(
-                    card.typeLine,
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.align(Alignment.CenterStart)
-                )
+            }
 
-                val manaCost = card.manaCost
-                if (manaCost != null) {
-                    ManaCostImages(
-                        manaCost = manaCost,
-                        symbolSize = 14.dp,
-                        modifier = Modifier.align(Alignment.BottomStart)
+            // 2. Subtle color gradient from the card's mana identity
+            if (cardColors.isNotEmpty()) {
+                val gradient = remember(cardColors) {
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            primaryAccentColor.copy(alpha = 0.12f),
+                            mc.surface.copy(alpha = 0f)
+                        )
                     )
                 }
+                Box(Modifier.matchParentSize().background(gradient))
             }
-            if (quantity > 1) {
-                Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.2f)) {
-                    Text("×$quantity", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.xs, vertical = spacing.xxs))
+
+            // 3. Color accent bar on the left
+            if (cardColors.isNotEmpty()) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(
+                            primaryAccentColor,
+                            shape = RoundedCornerShape(
+                                topStart = CardCornerRadius,
+                                bottomStart = CardCornerRadius
+                            )
+                        )
+                )
+            }
+
+            // 4. Content row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.md)
+            ) {
+                // Thumbnail with CardShape and a subtle border
+                AsyncImage(
+                    model = card.imageNormal,
+                    contentDescription = null,
+                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                    error = painterResource(Res.drawable.mtg_card_back),
+                    fallback = painterResource(Res.drawable.mtg_card_back),
+                    modifier = Modifier
+                        .size(width = 44.dp, height = 62.dp)
+                        .clip(CardShape)
+                        .border(1.dp, mc.surfaceVariant.copy(alpha = 0.8f), CardShape),
+                    contentScale = ContentScale.Crop
+                )
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CardName(
+                            name = card.name,
+                            showFrontOnly = true,
+                            style = ty.titleMedium,
+                            color = mc.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (isInCollection) {
+                            Spacer(Modifier.width(spacing.xs))
+                            Icon(
+                                Icons.Rounded.CollectionsBookmark,
+                                contentDescription = null,
+                                tint = mc.primaryAccent,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        card.typeLine,
+                        style = ty.bodySmall,
+                        color = mc.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    
+                    if (card.manaCost != null) {
+                        Spacer(Modifier.height(spacing.xxs))
+                        ManaCostImages(
+                            manaCost = card.manaCost!!,
+                            symbolSize = 14.dp
+                        )
+                    }
                 }
-            }
-            if (isInCollection) {
-                Icon(Icons.Rounded.CollectionsBookmark, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(14.dp))
-            }
-            if (onRemove != null) {
-                IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(16.dp))
+
+                // Trailing: Quantity and Remove
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+                ) {
+                    if (quantity > 1) {
+                        Surface(
+                            shape = ChipShape,
+                            color = mc.secondaryAccent.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                "×$quantity",
+                                style = ty.labelMedium,
+                                color = mc.secondaryAccent,
+                                modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    if (onRemove != null) {
+                        IconButton(
+                            onClick = onRemove,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = null,
+                                tint = mc.textDisabled,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

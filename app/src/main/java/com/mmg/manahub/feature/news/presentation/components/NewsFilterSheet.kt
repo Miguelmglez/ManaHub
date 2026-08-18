@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,8 +24,6 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +54,7 @@ import com.mmg.manahub.core.model.news.SourceType
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -125,14 +125,14 @@ fun NewsFilterSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+                .fillMaxHeight(0.92f)
                 .navigationBarsPadding(),
         ) {
             // ── Header ──────────────────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                    .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = ::handleDismiss) {
@@ -144,7 +144,7 @@ fun NewsFilterSheet(
                 }
                 Text(
                     text = stringResource(R.string.news_filter_title),
-                    style = ty.titleMedium,
+                    style = ty.titleLarge,
                     color = mc.textPrimary,
                     modifier = Modifier.weight(1f)
                 )
@@ -279,9 +279,7 @@ private fun TypeChip(
     selected: Boolean,
     onToggle: () -> Unit
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    FilterChip(
+    MagicFilterChip(
         selected = selected,
         onClick = onToggle,
         leadingIcon = {
@@ -291,60 +289,24 @@ private fun TypeChip(
                 modifier = Modifier.size(16.dp)
             )
         },
-        label = { Text(label, style = ty.labelSmall) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-            selectedLabelColor = mc.primaryAccent,
-            selectedLeadingIconColor = mc.primaryAccent,
-            containerColor = mc.surface,
-            labelColor = mc.textSecondary,
-            iconColor = mc.textDisabled,
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            borderColor = mc.surfaceVariant.copy(alpha = 0.5f),
-            selectedBorderColor = mc.primaryAccent,
-            enabled = true,
-            selected = selected,
-            borderWidth = 1.dp,
-            selectedBorderWidth = 1.5.dp
-        ),
-        shape = RoundedCornerShape(10.dp)
+        label = label,
     )
 }
 
 @Composable
 private fun LanguageChip(label: String, code: String, selected: Boolean, onToggle: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    FilterChip(
+    MagicFilterChip(
         selected = selected,
         onClick = onToggle,
-        label = { Text("$label (${code.uppercase()})", style = ty.labelSmall) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-            selectedLabelColor = mc.primaryAccent,
-            containerColor = mc.surface,
-            labelColor = mc.textSecondary,
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            borderColor = mc.surfaceVariant.copy(alpha = 0.5f),
-            selectedBorderColor = mc.primaryAccent,
-            enabled = true,
-            selected = selected,
-            borderWidth = 1.dp,
-            selectedBorderWidth = 1.5.dp
-        ),
-        shape = RoundedCornerShape(10.dp)
+        label = "$label (${code.uppercase()})",
     )
 }
 
 @Composable
 private fun SourceChip(source: ContentSource, selected: Boolean, onToggle: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
     val context = LocalContext.current
 
-    FilterChip(
+    MagicFilterChip(
         selected = selected,
         onClick = onToggle,
         leadingIcon = {
@@ -369,24 +331,7 @@ private fun SourceChip(source: ContentSource, selected: Boolean, onToggle: () ->
                 )
             }
         },
-        label = { Text(source.name, style = ty.labelSmall) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-            selectedLabelColor = mc.primaryAccent,
-            selectedLeadingIconColor = mc.primaryAccent,
-            containerColor = mc.surface,
-            labelColor = mc.textSecondary,
-            iconColor = mc.textDisabled,
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            borderColor = mc.surfaceVariant.copy(alpha = 0.5f),
-            selectedBorderColor = mc.primaryAccent,
-            enabled = true,
-            selected = selected,
-            borderWidth = 1.dp,
-            selectedBorderWidth = 1.5.dp
-        ),
-        shape = RoundedCornerShape(10.dp)
+        label = source.name,
     )
 }
 

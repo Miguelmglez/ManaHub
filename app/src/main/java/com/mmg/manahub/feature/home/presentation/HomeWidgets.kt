@@ -1,5 +1,9 @@
 package com.mmg.manahub.feature.home.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -7,17 +11,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +33,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -49,8 +46,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Group
@@ -99,9 +97,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import org.jetbrains.compose.resources.painterResource
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
@@ -111,10 +106,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import coil3.svg.SvgDecoder
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.svg.SvgDecoder
 import com.mmg.manahub.R
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
 import com.mmg.manahub.core.model.Friend
@@ -123,30 +119,34 @@ import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.TradeProposal
 import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.news.NewsItem
-import com.mmg.manahub.core.ui.isReducedMotionEnabled
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.DeckItem
 import com.mmg.manahub.core.ui.components.DraftSetCard
-import com.mmg.manahub.core.ui.components.NewsItemCard
-import com.mmg.manahub.core.ui.components.NewsItemOrientation
-import com.mmg.manahub.core.ui.components.OracleText
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.NewsItemCard
+import com.mmg.manahub.core.ui.components.NewsItemOrientation
+import com.mmg.manahub.core.ui.components.OracleText
 import com.mmg.manahub.core.ui.components.search.SetPickerSheet
+import com.mmg.manahub.core.ui.isReducedMotionEnabled
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
-import com.mmg.manahub.feature.puzzle.presentation.PuzzleFeatureFlags
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 import kotlin.random.Random
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -160,7 +160,7 @@ import kotlin.random.Random
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Minimum height for a MEDIUM widget — the only supported size after consolidation. */
-private val MediumMinHeight: Dp = 160.dp
+private val MediumMinHeight: Dp = 200.dp
 
 // ── F-12 (Home feature overhaul Phase 3 hygiene): named, documented font-size constants for the
 // few spots that don't fit an existing magicTypography token exactly. Hoisted here rather than
@@ -293,15 +293,12 @@ private fun WidgetSectionHeader(
 
 /** Centered loading spinner used while a data slice is null (not yet loaded). */
 @Composable
-private fun WidgetLoading() {
-    val mc = MaterialTheme.magicColors
+private fun WidgetLoading(modifier: Modifier = Modifier.fillMaxWidth()) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = MediumMinHeight - 48.dp),
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
-        MagicLoadingSpinner(modifier = Modifier.size(28.dp))
+        MagicLoadingSpinner(size = MagicLoadingSize.Small)
     }
 }
 
@@ -385,7 +382,7 @@ fun HomeBoardSkeleton(modifier: Modifier = Modifier) {
     val spacing = MaterialTheme.spacing
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(spacing.lg), // Match grid spacing
     ) {
         repeat(HOME_BOARD_SKELETON_BLOCK_COUNT) {
             HomeBoardSkeletonBlock()
@@ -413,7 +410,7 @@ private fun HomeBoardSkeletonBlock() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = MediumMinHeight)
+            .height(MediumMinHeight) // Use fixed height to prevent shifts
             .clip(CardShape)
             .background(mc.surfaceVariant.copy(alpha = alpha)),
     )
@@ -442,6 +439,9 @@ fun HomeWidgetHost(
     // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason as [trending];
     // see [com.mmg.manahub.feature.home.presentation.HomeViewModel.dailyPuzzleFlow]'s KDoc.
     dailyPuzzle: DailyPuzzleWidgetState? = null,
+    // Competitive feature, Phase 5 — kept OUTSIDE HomeUiState for the same reason as [trending];
+    // see [com.mmg.manahub.feature.home.presentation.HomeViewModel.competitiveEnabledFlow]'s KDoc.
+    competitiveEnabled: Boolean = false,
 ) {
     val spacing = MaterialTheme.spacing
     // Gamification widgets render nothing on the dashboard when the master toggle is off — they stay
@@ -450,8 +450,12 @@ fun HomeWidgetHost(
     // Daily Puzzle hidden for release (docs/hidden-features/daily-puzzle.md) — same treatment as
     // gamification above: an existing board that already carries a DAILY_PUZZLE tile (persisted
     // before the flag flipped) renders nothing rather than a broken/dead tile; the tile reappears
-    // once PuzzleFeatureFlags.PUZZLE_ENABLED flips back to true.
-    if (widget.type == HomeWidgetType.DAILY_PUZZLE && !PuzzleFeatureFlags.PUZZLE_ENABLED) return
+    // once FeatureFlags.Puzzle.PUZZLE_ENABLED flips back to true.
+    if (widget.type == HomeWidgetType.DAILY_PUZZLE && !FeatureFlags.Puzzle.PUZZLE_ENABLED) return
+    // Competitive feature, Phase 5 — same treatment: an existing board that already carries a
+    // COMPETITIVE tile (persisted before the flag was turned on, or before a later disable) renders
+    // nothing rather than a broken/dead tile; the tile reappears the instant the flag flips true.
+    if (widget.type == HomeWidgetType.COMPETITIVE && !competitiveEnabled) return
     // Phase 5: silently hidden (never an error state) while there's no trending data yet / the
     // community engine is off / the Worker is unreachable — see HomeWidgetType.TRENDING_COMMANDERS'
     // KDoc.
@@ -533,6 +537,10 @@ fun HomeWidgetHost(
                 HomeWidgetType.TRADES_HUB -> TradesHubWidget(uiState, onAction)
                 HomeWidgetType.TRENDING_COMMANDERS -> TrendingCommandersWidget(trending, onAction)
                 HomeWidgetType.DAILY_PUZZLE -> DailyPuzzleWidget(dailyPuzzle, onAction)
+                HomeWidgetType.COMPETITIVE -> CompetitiveWidget(onAction)
+/*
+                HomeWidgetType.MULTI_CARD_ADD-> CompetitiveWidget (onAction)
+*/
             }
         }
     }
@@ -564,6 +572,8 @@ private fun widgetHeaderTitleClickAction(type: HomeWidgetType): HomeAction? = wh
     HomeWidgetType.CARD_OF_THE_DAY,
     HomeWidgetType.RULES_TIP,
     HomeWidgetType.CONTEXT_HERO,
+    HomeWidgetType.COMPETITIVE,
+   // HomeWidgetType.MULTI_CARD_ADD,
     -> null
 }
 
@@ -672,6 +682,45 @@ private fun DailyPuzzleWidget(
 }
 
 /**
+ * Static launcher tile into the Competitive screen (metagame rankings, 17lands Limited ratings,
+ * event locator, Pro Tour news filter) — Competitive feature, Phase 5. Carries no widget-level
+ * data of its own (unlike [DailyPuzzleWidget]/[TrendingCommandersWidget]): the actual sections
+ * live on [com.mmg.manahub.feature.competitive.presentation.CompetitiveScreen] itself, so this
+ * tile is a single CTA card, mirroring [QuickActionsWidget]'s "whole body is one big tap target"
+ * shape.
+ */
+@Composable
+private fun CompetitiveWidget(onAction: (HomeAction) -> Unit) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+
+    WidgetShell(
+        onClick = { onAction(HomeAction.OpenCompetitive) },
+        onClickLabel = stringResourceSafe(R.string.widget_title_competitive),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResourceSafe(R.string.home_widget_desc_competitive),
+                style = ty.bodyMedium,
+                color = mc.textPrimary,
+                modifier = Modifier.weight(1f).padding(end = spacing.sm),
+            )
+            MagicCtaButton(
+                onClick = { onAction(HomeAction.OpenCompetitive) },
+                text = stringResourceSafe(R.string.widget_title_competitive),
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Gold,
+            )
+        }
+    }
+}
+
+/**
  * Resolves the trailing affordance shown in a widget's section header, or null when the widget
  * has none. Each branch is self-contained; the DISCOVER_CARDS branch hosts its own local
  * set-picker toggle state and the reusable [SetPickerSheet]; COMMUNITY_DECKS hosts its own local
@@ -758,6 +807,7 @@ private fun widgetHeaderTrailingContent(
             }
         }
     }
+
     else -> null
 }
 
@@ -1526,7 +1576,10 @@ private fun HomeProgressBar(
 @Composable
 private fun QuickActionsWidget(actions: List<QuickStartAction>, onAction: (HomeAction) -> Unit) {
     val spacing = MaterialTheme.spacing
-    val visible = actions.take(4)
+    val filteredActions = remember(actions) {
+        actions.filter { it != QuickStartAction.MULTI_ADD_CARD || FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED }
+    }
+    val visible = filteredActions.take(4)
     WidgetShell {
         visible.chunked(2).forEach { rowActions ->
             Row(
@@ -1904,7 +1957,7 @@ private fun GameStatsSlideContent(slide: GameStatsSlide, onAction: (HomeAction) 
                     ) {
                         Surface(
                             modifier = Modifier.size(56.dp),
-                            shape = CardShape,
+                            shape = SmallCardShape,
                             color = mc.lifeNegative.copy(alpha = 0.1f),
                             border = BorderStroke(1.dp, mc.lifeNegative.copy(alpha = 0.2f))
                         ) {
@@ -2292,7 +2345,7 @@ private fun StatBox(
     Surface(
         modifier = modifier,
         color = mc.surfaceVariant.copy(alpha = 0.4f),
-        shape = CardShape,
+        shape = SmallCardShape,
         border = BorderStroke(0.5.dp, mc.primaryAccent.copy(alpha = 0.1f))
     ) {
         Column(
@@ -2514,37 +2567,53 @@ private fun DiscoverCardsWidget(
     val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     WidgetShell(onClick = { onAction(HomeAction.SearchCard) }) {
-        when {
-            // Empty + loading: full spinner (initial load / a refresh that just cleared the row).
-            cards.isEmpty() && loadState == DiscoverLoadState.LOADING -> WidgetLoading()
-            // Empty + not loading: a failed/empty fetch shows a retry affordance.
-            cards.isEmpty() -> WidgetRetryBody(
-                message = stringResourceSafe(R.string.home_discover_unavailable),
-                onRetry = { onAction(HomeAction.RefreshDiscover) },
-            )
-            else -> {
-                // While cards are still streaming in, show a thin inline spinner above the row so a
-                // refresh that already has partial results still reads as "loading".
-                if (loadState == DiscoverLoadState.LOADING) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        MagicLoadingSpinner(
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(154.dp), // Fixed height matching card thumbs (110dp / 0.717)
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                // Empty + loading: Show spinner in the center of the fixed-height area.
+                cards.isEmpty() && loadState == DiscoverLoadState.LOADING -> {
+                    MagicLoadingSpinner(size = MagicLoadingSize.Medium)
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                    items(cards, key = { "discover|${it.id}" }) { card ->
-                        val uniqueKey = "discover|${card.id}"
-                        DiscoverCardThumb(
-                            card = card,
-                            onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            sharedTransitionKey = uniqueKey
-                        )
+                // Empty + not loading: Retry body.
+                cards.isEmpty() -> {
+                    WidgetRetryBody(
+                        message = stringResourceSafe(R.string.home_discover_unavailable),
+                        onRetry = { onAction(HomeAction.RefreshDiscover) },
+                    )
+                }
+                else -> {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        items(cards, key = { "discover|${it.id}" }) { card ->
+                            val uniqueKey = "discover|${card.id}"
+                            DiscoverCardThumb(
+                                card = card,
+                                onClick = { onAction(HomeAction.OpenCardDetail(card.scryfallId, uniqueKey)) },
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                                sharedTransitionKey = uniqueKey
+                            )
+                        }
+                    }
+
+                    // Background refresh: Overlay a small spinner so it doesn't push the list down.
+                    if (loadState == DiscoverLoadState.LOADING) {
+                        Surface(
+                            color = MaterialTheme.magicColors.background.copy(alpha = 0.7f),
+                            shape = CircleShape,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
+                            }
+                        }
                     }
                 }
             }
@@ -2567,7 +2636,7 @@ private fun DiscoverCardThumb(
             .width(110.dp)
             // Full MTG card aspect ratio (745:1040) so the whole card is shown.
             .aspectRatio(0.717f)
-            .clip(CardShape)
+            .clip(SmallCardShape)
             .then(
                 if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {
@@ -2576,7 +2645,7 @@ private fun DiscoverCardThumb(
                                 key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
                             ),
                             animatedVisibilityScope = animatedVisibilityScope,
-                            clipInOverlayDuringTransition = OverlayClip(CardShape),
+                            clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
                             renderInOverlayDuringTransition = true,
                         )
                     }
@@ -2616,55 +2685,60 @@ private fun RandomCardWidget(
 ) {
     val mc = MaterialTheme.magicColors
     WidgetShell(onClick = { card?.let { onAction(HomeAction.OpenCardDetail(it.scryfallId, "random_card|${it.scryfallId}")) } }) {
-        // Priority: LOADING → spinner (even over a previously-shown card, so refresh gives visible
-        // feedback); LOADED + card → full image; otherwise → retry affordance.
-        if (loadState == DiscoverLoadState.LOADING) {
-            WidgetLoading()
-            return@WidgetShell
-        }
-        if (card == null) {
-            WidgetRetryBody(
-                message = stringResourceSafe(R.string.home_discover_unavailable),
-                onRetry = { onAction(HomeAction.RefreshRandomCard) },
-            )
-            return@WidgetShell
-        }
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
             Box(
                 modifier = Modifier
-                    // Constrain the width so the full card shows at a pleasant size even on LARGE.
                     .fillMaxWidth(0.62f)
-                    // Full MTG card aspect ratio (745:1040).
-                    .aspectRatio(0.717f)
-                    .clip(CardShape)
-                    .then(
-                        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                            with(sharedTransitionScope) {
-                                Modifier.sharedBounds(
-                                    sharedContentState = rememberSharedContentState(
-                                        key = "random_card|${card.scryfallId}"
-                                    ),
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                    clipInOverlayDuringTransition = OverlayClip(CardShape),
-                                    renderInOverlayDuringTransition = true,
-                                )
-                            }
-                        } else Modifier
-                    )
-                    .background(mc.surfaceVariant),
+                    .aspectRatio(0.717f) // Keep footprint identical during load/fail/show
+                    .clip(SmallCardShape)
+                    .background(MaterialTheme.magicColors.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
-                if (card.imageUrl != null) {
-                    AsyncImage(
-                        model = card.imageUrl,
-                        contentDescription = card.name,
-                        placeholder = painterResource(Res.drawable.mtg_card_back),
-                        error = painterResource(Res.drawable.mtg_card_back),
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(Icons.Default.Style, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(32.dp))
+                when {
+                    loadState == DiscoverLoadState.LOADING -> {
+                        MagicLoadingSpinner(size = MagicLoadingSize.Medium)
+                    }
+                    card == null -> {
+                        WidgetRetryBody(
+                            message = stringResourceSafe(R.string.home_discover_unavailable),
+                            onRetry = { onAction(HomeAction.RefreshRandomCard) },
+                        )
+                    }
+                    else -> {
+                        Box(
+                            modifier = Modifier
+                                .then(
+                                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                                        with(sharedTransitionScope) {
+                                            Modifier.sharedBounds(
+                                                sharedContentState = rememberSharedContentState(
+                                                    key = "random_card|${card.scryfallId}"
+                                                ),
+                                                animatedVisibilityScope = animatedVisibilityScope,
+                                                clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                                                renderInOverlayDuringTransition = true,
+                                            )
+                                        }
+                                    } else Modifier
+                                )
+                        ) {
+                            if (card.imageUrl != null) {
+                                AsyncImage(
+                                    model = card.imageUrl,
+                                    contentDescription = card.name,
+                                    placeholder = painterResource(Res.drawable.mtg_card_back),
+                                    error = painterResource(Res.drawable.mtg_card_back),
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                Icon(Icons.Default.Style, contentDescription = null, tint = MaterialTheme.magicColors.textDisabled, modifier = Modifier.size(32.dp))
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2689,7 +2763,7 @@ private fun SeeAllTile(
         modifier = modifier
             .width(96.dp)
             .heightIn(min = 100.dp)
-            .clip(CardShape)
+            .clip(SmallCardShape)
             .background(
                 brush = Brush.radialGradient(
                     colors = listOf(
@@ -2875,7 +2949,7 @@ private fun RulesTipWidget() {
             val body = tip.body
             Surface(
                 color = mc.surfaceVariant.copy(alpha = 0.25f),
-                shape = CardShape,
+                shape = SmallCardShape,
                 border = BorderStroke(
                     width = 1.dp,
                     brush = Brush.verticalGradient(
@@ -3035,7 +3109,7 @@ private fun FriendsWidget(
                 Column(
                     modifier = Modifier
                         .width(72.dp)
-                        .clip(CardShape)
+                        .clip(SmallCardShape)
                         .clickable(onClick = { onAction(HomeAction.OpenFriends) }),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(spacing.xxs),
@@ -3228,11 +3302,11 @@ private fun CategorySelectionCard(
 
     Surface(
         color = if (isSelected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface.copy(alpha = 0.4f),
-        shape = CardShape,
+        shape = SmallCardShape,
         border = if (isSelected) BorderStroke(1.5.dp, mc.primaryAccent.copy(alpha = 0.5f)) else null,
         modifier = modifier
             .heightIn(min = 120.dp)
-            .clip(CardShape)
+            .clip(SmallCardShape)
             .clickable(
                 onClickLabel = stringResource(category.titleRes),
                 role = Role.Button,
@@ -3508,7 +3582,7 @@ private fun ClickableBox(onClick: () -> Unit, content: @Composable ColumnScopeMa
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clip(CardShape)
+            .clip(SmallCardShape)
             .clickable(onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
@@ -3576,7 +3650,7 @@ private fun ReducedTradeProposalRow(
     }
 
     Surface(
-        shape = CardShape,
+        shape = SmallCardShape,
         color = mc.surfaceVariant.copy(alpha = 0.3f),
         modifier = Modifier
             .fillMaxWidth()
@@ -3759,8 +3833,9 @@ private val QuickStartAction.navIcon: ImageVector
         QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
-        QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Group
+        QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Style
         QuickStartAction.SETTINGS -> Icons.Default.Settings
+        QuickStartAction.MULTI_ADD_CARD -> Icons.Default.CollectionsBookmark
     }
 
 /** Human label for a Quick Start action. */
@@ -3779,6 +3854,7 @@ private val QuickStartAction.navLabel: String
         QuickStartAction.TRADES -> stringResourceSafe(R.string.quick_start_trades)
         QuickStartAction.COMMUNITY_DECKS -> stringResourceSafe(R.string.quick_start_community)
         QuickStartAction.SETTINGS -> stringResourceSafe(R.string.quick_start_settings)
+        QuickStartAction.MULTI_ADD_CARD -> stringResourceSafe(R.string.quick_start_sheet_multi_add)
     }
 
 /** Maps a Quick Start action to its navigation intent. */
@@ -3794,6 +3870,8 @@ private fun QuickStartAction.toHomeActionNav(): HomeAction = when (this) {
     QuickStartAction.TRADES -> HomeAction.OpenTrades
     QuickStartAction.COMMUNITY_DECKS -> HomeAction.OpenCommunityDecks
     QuickStartAction.SETTINGS -> HomeAction.OpenSettings
+    QuickStartAction.MULTI_ADD_CARD -> HomeAction.OpenMultiAdd
+
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3822,6 +3900,8 @@ fun HomeWidgetContainer(
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
     // Daily Puzzle (ADR-006), Batch B2.
     dailyPuzzle: DailyPuzzleWidgetState? = null,
+    // Competitive feature, Phase 5.
+    competitiveEnabled: Boolean = false,
 ) {
     Box(modifier = modifier) {
         HomeWidgetHost(
@@ -3834,6 +3914,7 @@ fun HomeWidgetContainer(
             communityDecks = communityDecks,
             communityDecksCategory = communityDecksCategory,
             dailyPuzzle = dailyPuzzle,
+            competitiveEnabled = competitiveEnabled,
         )
     }
 }

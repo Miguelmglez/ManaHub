@@ -1,16 +1,18 @@
 package com.mmg.manahub.feature.scanner.presentation
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
-import com.mmg.manahub.core.model.Card
-import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.domain.usecase.collection.ScannedCardCommit
+import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.ANTI_DUPLICATE_MS
@@ -18,7 +20,6 @@ import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.H
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.PREF_FILE
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.PREF_KEY_QUEUE
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.STABILITY_FRAMES
-import com.mmg.manahub.core.model.WishlistEntry
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -181,7 +182,7 @@ class ScannerViewModel @Inject constructor(
             }
             array.put(obj)
         }
-        prefs.edit().putString(PREF_KEY_QUEUE, array.toString()).apply()
+        prefs.edit { putString(PREF_KEY_QUEUE, array.toString()) }
     }
 
     /**

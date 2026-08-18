@@ -13,6 +13,7 @@ import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.AuthConfig
+import io.github.jan.supabase.auth.SignOutScope
 import io.github.jan.supabase.auth.exception.AuthErrorCode
 import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -24,13 +25,16 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.statement.HttpResponse as KtorHttpResponse
 import io.ktor.http.HttpStatusCode
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.spyk
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,6 +50,7 @@ import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import java.io.IOException
@@ -86,6 +91,9 @@ class AuthRepositoryImplTest {
     // exercise it directly. Using relaxed avoids stub boilerplate while keeping the
     // constructor parameter satisfied.
     private val supabaseOkHttpClient        = mockk<OkHttpClient>(relaxed = true)
+    // Stored (not an anonymous inline mock) so tests can verify specific log/recordException calls
+    // -- e.g. the has_password-stale telemetry breadcrumb -- rather than only that SOME call was made.
+    private val crashlyticsMock              = mockk<FirebaseCrashlytics>(relaxed = true)
 
     // Controls the Auth.sessionStatus Flow across tests
     private val sessionStatusFlow = MutableStateFlow<SessionStatus>(SessionStatus.Initializing)
@@ -198,6 +206,15 @@ class AuthRepositoryImplTest {
 
     @Before
     fun setUp() {
+        // notifyAccountEvent (fired by updatePassword/updateEmail/unlinkIdentity/etc.) calls
+        // FirebaseCrashlytics.getInstance() on both its success-check and failure paths, outside
+        // any test-controllable seam — without this, any test exercising one of those ops crashes
+        // with "Default FirebaseApp is not initialized" the moment notifyAccountEvent's launch runs
+        // (applicationScope here is backed by the same UnconfinedTestDispatcher as ioDispatcher, so
+        // the launch executes synchronously within the test rather than in the background).
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns crashlyticsMock
+
         every { supabaseAuth.sessionStatus } returns sessionStatusFlow
         every { supabaseAuth.config } returns mockk<AuthConfig>(relaxed = true)
 
@@ -233,6 +250,11 @@ class AuthRepositoryImplTest {
             val userInfo = firstArg<UserInfo>()
             userMap[userInfo.id] ?: buildExpectedAuthUser(id = userInfo.id, email = userInfo.email)
         }
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -804,6 +826,48 @@ class AuthRepositoryImplTest {
         }
     }
 
+    @Test
+    fun `given user_profiles row has has_password true when sessionState enriches then AuthUser hasPassword is true`() = runTest {
+        // Bug 2 fix: hasPassword must flow through the same enrichment path as
+        // nickname/gameTag/avatarUrl/profileCompleted so the Account Management gate
+        // (hasEmailIdentity || user.hasPassword) sees a Google-only account's self-set password.
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            profileCompleted = true,
+        )
+        // has_password is now fetched via a separate self-scoped RPC (get_my_has_password),
+        // not as a field on the UserProfileDto returned by fetchUserProfile (2026-08-17 security
+        // fix) -- see UserProfileDataSource.fetchHasPassword's KDoc.
+        coEvery { userProfileDataSource.fetchHasPassword("user-uuid-001") } returns true
+
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertTrue(state is SessionState.Authenticated)
+        assertTrue((state as SessionState.Authenticated).user.hasPassword)
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 8 — getCurrentUser
     // ══════════════════════════════════════════════════════════════════════════
@@ -1021,5 +1085,767 @@ class AuthRepositoryImplTest {
 
         assertTrue(result is AuthResult.Error)
         assertEquals(AuthError.InvalidCredentials, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given server returns 429 when resendConfirmationEmail then returns Error with RateLimited`() = runTest {
+        // Edge-case audit fix: too many resend requests must surface a distinct RateLimited error,
+        // not fall through to the generic Unknown fallback.
+        val restException = mockk<RestException>(relaxed = true) {
+            every { statusCode } returns 429
+        }
+        coEvery { supabaseAuth.resendEmail(any(), any(), any()) } throws restException
+
+        val result = repository.resendConfirmationEmail("test@example.com")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.RateLimited, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given AuthRestException with BadJwt errorCode and statusCode 403 when signInWithEmail then returns SessionExpired not Unknown`() = runTest {
+        // 2026-08-17 fix: production auth_logs showed GoTrue rejecting a revoked session with
+        // HTTP 403 and error_code bad_jwt ("missing sub claim") -- BadJwt is not one of the
+        // explicitly-handled AuthErrorCode cases above, so this must fall through to the 403
+        // branch of the statusCode fallback, not the generic Unknown ("An unexpected error
+        // occurred") that made the original bug so confusing.
+        val authRestException = mockk<AuthRestException>(relaxed = true) {
+            every { errorCode } returns AuthErrorCode.BadJwt
+            every { statusCode } returns 403
+        }
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws authRestException
+
+        val result = repository.signInWithEmail("test@example.com", "Password1!")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.SessionExpired, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given plain RestException with statusCode 403 when signInWithEmail then returns SessionExpired`() = runTest {
+        val restException = mockk<RestException>(relaxed = true) {
+            every { statusCode } returns 403
+        }
+        coEvery { supabaseAuth.signInWith(any<Email>(), anyNullable(), anyNullable()) } throws restException
+
+        val result = repository.signInWithEmail("test@example.com", "Password1!")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.SessionExpired, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given ResponseException with statusCode 403 when resendConfirmationEmail then returns SessionExpired`() = runTest {
+        coEvery { supabaseAuth.resendEmail(any(), any(), any()) } throws ktorClientError(403)
+
+        val result = repository.resendConfirmationEmail("test@example.com")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.SessionExpired, (result as AuthResult.Error).error)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 8 — updatePassword (architecture pivot: current_password, no reauth code)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a current password when updatePassword then calls updateUser and returns Success`() = runTest {
+        coEvery { supabaseAuth.updateUser(any(), any(), any()) } returns mockk<UserInfo>(relaxed = true)
+
+        val result = repository.updatePassword("NewPassword1!", "OldPassword1!")
+
+        assertTrue(result is AuthResult.Success)
+        assertEquals(Unit, (result as AuthResult.Success).data)
+    }
+
+    @Test
+    fun `given null current password when updatePassword then calls set-account-password Edge Function not updateUser (Set a password flow)`() = runTest {
+        // 2026-08-14 fix: "Set a password" (currentPassword == null) is NOT simply "skip the
+        // current-password check" -- a Google-signup account already has a real password set
+        // server-side, so it must route through the Admin-API-backed set-account-password Edge
+        // Function instead of the self-service Auth.updateUser call.
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns true
+            every { code } returns 200
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repository.updatePassword("NewPassword1!", null)
+
+        assertTrue(result is AuthResult.Success)
+        verify(atLeast = 1) { supabaseOkHttpClient.newCall(any()) }
+        coVerify(exactly = 0) { supabaseAuth.updateUser(any(), any(), any()) }
+    }
+
+    @Test
+    fun `given null current password when updatePassword then does not call notifyAccountEvent (Edge Function relays its own notification)`() = runTest {
+        // The Edge Function itself does a best-effort relay to send-account-notification on
+        // success -- calling notifyAccountEvent client-side too would double the email. Since
+        // notifyAccountEvent is private, we assert indirectly: the OkHttp client is invoked
+        // exactly once (the set-account-password call), never twice.
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns true
+            every { code } returns 200
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        repository.updatePassword("NewPassword1!", null)
+
+        verify(exactly = 1) { supabaseOkHttpClient.newCall(any()) }
+    }
+
+    @Test
+    fun `given null current password when updatePassword succeeds then re-triggers user_profiles enrichment`() = runTest {
+        // Bug 2 fix: setAccountPasswordViaEdgeFunction is an Admin-API bypass -- GoTrue's own
+        // session never learns a password now exists, so sessionState would never pick up the
+        // freshly-written has_password=true unless the success branch emits into
+        // profileRefreshSignal like every other mutation method in this file. Verified indirectly
+        // via a second fetchUserProfile call, since profileRefreshSignal is private.
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            profileCompleted = true,
+        )
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        coVerify(exactly = 1) { userProfileDataSource.fetchUserProfile("user-uuid-001") }
+
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns true
+            every { code } returns 200
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repoForTest.updatePassword("NewPassword1!", null)
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        collectJob.cancel()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 2) { userProfileDataSource.fetchUserProfile("user-uuid-001") }
+    }
+
+    @Test
+    fun `given set-account-password succeeds but has_password DB write silently failed when updatePassword with null current password then records NON_FATAL telemetry and still returns Success`() = runTest {
+        // 2026-08-17 fix: HTTP 200 from set-account-password only proves admin.updateUserById
+        // succeeded -- the Edge Function's OWN best-effort has_password=true DB write is logged
+        // server-side only. Simulated here by fetchHasPassword (the separate self-scoped RPC
+        // has_password is now sourced from -- see UserProfileDataSource.fetchHasPassword's KDoc)
+        // returning false on EVERY call (including the one triggered by the post-success
+        // profileRefreshSignal), as if that write had failed -- the mismatch must be caught and
+        // telemetered, not silently lost.
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            profileCompleted = true,
+        )
+        coEvery { userProfileDataSource.fetchHasPassword("user-uuid-001") } returns false
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns true
+            every { code } returns 200
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repoForTest.updatePassword("NewPassword1!", null)
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        collectJob.cancel()
+
+        assertTrue(result is AuthResult.Success)
+        verify { crashlyticsMock.log("account_mgmt_set_password_has_password_flag_stale") }
+    }
+
+    @Test
+    fun `given set-account-password succeeds and has_password DB write actually landed when updatePassword with null current password then does not record stale telemetry`() = runTest {
+        // Companion to the stale-flag test above: when the refreshed profile correctly reports
+        // hasPassword=true, verifySetPasswordFlagLanded must NOT fire the NON_FATAL -- proves the
+        // mismatch check doesn't false-positive on the normal, healthy path.
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        // First call (initial sessionState enrichment, before the password is set) reports
+        // hasPassword=false; every call from then on (including the one triggered by the
+        // post-success profileRefreshSignal) reports hasPassword=true, as if the Edge Function's DB
+        // write landed correctly. has_password is now sourced from the separate self-scoped
+        // fetchHasPassword RPC call, not from the UserProfileDto returned by fetchUserProfile --
+        // see UserProfileDataSource.fetchHasPassword's KDoc.
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            profileCompleted = true,
+        )
+        coEvery { userProfileDataSource.fetchHasPassword("user-uuid-001") } returnsMany listOf(false, true)
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns true
+            every { code } returns 200
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repoForTest.updatePassword("NewPassword1!", null)
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        collectJob.cancel()
+
+        assertTrue(result is AuthResult.Success)
+        verify(exactly = 0) { crashlyticsMock.log("account_mgmt_set_password_has_password_flag_stale") }
+    }
+
+    @Test
+    fun `given IOException from set-account-password Edge Function when updatePassword with null current password then still re-triggers user_profiles enrichment before returning NetworkError`() = runTest {
+        // 2026-08-17 fix: the server-side password update (and its has_password write) both
+        // complete BEFORE the response streams back, so a dropped connection here is a classic
+        // false negative -- must not leave the client stuck on a stale hasPassword=false for the
+        // rest of the session. Verified indirectly via a second fetchUserProfile call, since
+        // profileRefreshSignal is private.
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            profileCompleted = true,
+        )
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        coVerify(exactly = 1) { userProfileDataSource.fetchUserProfile("user-uuid-001") }
+
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } throws IOException("Offline")
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repoForTest.updatePassword("NewPassword1!", null)
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        collectJob.cancel()
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.NetworkError, (result as AuthResult.Error).error)
+        coVerify(exactly = 2) { userProfileDataSource.fetchUserProfile("user-uuid-001") }
+    }
+
+    @Test
+    fun `given no active session when updatePassword with null current password then returns SessionExpired without calling Edge Function`() = runTest {
+        every { supabaseAuth.currentSessionOrNull() } returns null
+
+        val result = repository.updatePassword("NewPassword1!", null)
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.SessionExpired, (result as AuthResult.Error).error)
+        verify(exactly = 0) { supabaseOkHttpClient.newCall(any()) }
+    }
+
+    @Test
+    fun `given set-account-password Edge Function returns HTTP 401 when updatePassword with null current password then returns SessionExpired`() = runTest {
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns false
+            every { code } returns 401
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repository.updatePassword("NewPassword1!", null)
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.SessionExpired, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given set-account-password Edge Function returns HTTP 500 when updatePassword with null current password then returns Unknown`() = runTest {
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns false
+            every { code } returns 500
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repository.updatePassword("NewPassword1!", null)
+
+        assertTrue(result is AuthResult.Error)
+        assertTrue((result as AuthResult.Error).error is AuthError.Unknown)
+    }
+
+    @Test
+    fun `given network failure when updatePassword with null current password then returns NetworkError`() = runTest {
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } throws IOException("Offline")
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repository.updatePassword("NewPassword1!", null)
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.NetworkError, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given set-account-password succeeds and refreshCurrentSession succeeds when updatePassword with null current password then returns Success without signing out`() = runTest {
+        // 2026-08-17 fix (production incident, user b6c7f0f5-...): GoTrue can revoke the account's
+        // active session server-side as a side effect of the Admin-API password write. When the
+        // session survives (refreshCurrentSession succeeds), the flow must behave exactly as
+        // before -- Success, no forced sign-out.
+        //
+        // Uses a dedicated repoForTest (mirroring the has_password-mismatch tests above) rather
+        // than the shared `repository`: the success path calls verifySetPasswordFlagLanded, which
+        // AWAITS a real sessionState re-emission -- without an Authenticated session actually
+        // wired up and collected here, that await has nothing to observe and would otherwise only
+        // resolve via its own 3s real-time withTimeoutOrNull, which is not driven by this test's
+        // virtual clock (see the class KDoc on `testScheduler` for why bare `repository` +
+        // `runTest {}` doesn't auto-advance delays scheduled on it).
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            profileCompleted = true,
+        )
+        coEvery { userProfileDataSource.fetchHasPassword("user-uuid-001") } returns true
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        coEvery { supabaseAuth.refreshCurrentSession() } just Runs
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns true
+            every { code } returns 200
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repoForTest.updatePassword("NewPassword1!", null)
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        collectJob.cancel()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { supabaseAuth.refreshCurrentSession() }
+        coVerify(exactly = 0) { supabaseAuth.signOut(any()) }
+        verify(exactly = 0) { crashlyticsMock.log("account_mgmt_set_password_session_revoked") }
+    }
+
+    @Test
+    fun `given set-account-password succeeds but refreshCurrentSession fails when updatePassword with null current password then signs out locally and returns PasswordUpdatedSessionRevoked`() = runTest {
+        // The root-cause fix: HTTP 200 from set-account-password only proves the password WAS
+        // set -- it does NOT prove the session survived. When refreshCurrentSession (which
+        // exchanges the refresh token, unlike a plain GET /user resync) ALSO fails, the refresh
+        // token is revoked too and the session is unrecoverably dead. The repository must not
+        // leave that dead session in memory -- it must force a LOCAL sign-out and surface a
+        // distinct error so the caller can tell the user their password DID get set.
+        val fakeSession = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { accessToken } returns "fake-jwt-token"
+        }
+        every { supabaseAuth.currentSessionOrNull() } returns fakeSession
+        coEvery { supabaseAuth.refreshCurrentSession() } throws IOException("session_not_found")
+        val fakeOkResponse = mockk<OkHttpResponse>(relaxed = true) {
+            every { isSuccessful } returns true
+            every { code } returns 200
+            every { close() } just Runs
+        }
+        val fakeCall = mockk<Call>(relaxed = true) {
+            every { execute() } returns fakeOkResponse
+        }
+        every { supabaseOkHttpClient.newCall(any()) } returns fakeCall
+
+        val result = repository.updatePassword("NewPassword1!", null)
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.PasswordUpdatedSessionRevoked, (result as AuthResult.Error).error)
+        coVerify(exactly = 1) { supabaseAuth.signOut(SignOutScope.LOCAL) }
+        verify { crashlyticsMock.log("account_mgmt_set_password_session_revoked") }
+    }
+
+    @Test
+    fun `given current password supplied and AuthRestException InvalidCredentials when updatePassword then returns Error with InvalidCurrentPassword`() = runTest {
+        // GoTrue's "Require current password when updating" setting (confirmed ON) rejects a
+        // mismatch with the SAME invalid_credentials errorCode/400 used for a failed sign-in --
+        // must map to the distinct, context-correct InvalidCurrentPassword here, not the generic
+        // InvalidCredentials ("Incorrect email or password" reads wrong on this screen).
+        val authRestException = mockk<AuthRestException>(relaxed = true) {
+            every { errorCode } returns AuthErrorCode.InvalidCredentials
+            every { statusCode } returns 400
+        }
+        coEvery { supabaseAuth.updateUser(any(), any(), any()) } throws authRestException
+
+        val result = repository.updatePassword("NewPassword1!", "WrongPassword1!")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.InvalidCurrentPassword, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given network failure when updatePassword then returns Error with NetworkError`() = runTest {
+        coEvery { supabaseAuth.updateUser(any(), any(), any()) } throws IOException("Offline")
+
+        val result = repository.updatePassword("NewPassword1!", "OldPassword1!")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.NetworkError, (result as AuthResult.Error).error)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 12 — cancelPendingEmailChange
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given RPC succeeds when cancelPendingEmailChange then returns Success`() = runTest {
+        coEvery { userProfileClient.cancelPendingEmailChange() } just Runs
+
+        val result = repository.cancelPendingEmailChange()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { userProfileClient.cancelPendingEmailChange() }
+    }
+
+    @Test
+    fun `given RPC succeeds when cancelPendingEmailChange then forces a real GoTrue user resync`() = runTest {
+        // Bug 1 fix: the RPC alone never clears AuthUser.newEmail in the real session state --
+        // it only touches auth.users server-side. retrieveUserForCurrentSession(updateSession =
+        // true) is the call that actually refreshes sessionStatus (and therefore newEmail).
+        coEvery { userProfileClient.cancelPendingEmailChange() } just Runs
+        coEvery { supabaseAuth.retrieveUserForCurrentSession(true) } returns mockk(relaxed = true)
+
+        val result = repository.cancelPendingEmailChange()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { supabaseAuth.retrieveUserForCurrentSession(updateSession = true) }
+    }
+
+    @Test
+    fun `given retrieveUserForCurrentSession throws when cancelPendingEmailChange then still returns Success`() = runTest {
+        // The cancel RPC already succeeded server-side by the time the resync runs -- a resync
+        // hiccup (network blip, session momentarily unavailable) must not be reported as if the
+        // cancel itself failed.
+        coEvery { userProfileClient.cancelPendingEmailChange() } just Runs
+        coEvery { supabaseAuth.retrieveUserForCurrentSession(true) } throws IOException("Offline")
+
+        val result = repository.cancelPendingEmailChange()
+
+        assertTrue(result is AuthResult.Success)
+    }
+
+    @Test
+    fun `given RPC throws when cancelPendingEmailChange then returns mapped Error`() = runTest {
+        coEvery { userProfileClient.cancelPendingEmailChange() } throws ktorServerError(500)
+
+        val result = repository.cancelPendingEmailChange()
+
+        assertTrue(result is AuthResult.Error)
+        assertTrue((result as AuthResult.Error).error is AuthError.Unknown)
+    }
+
+    @Test
+    fun `given network failure when cancelPendingEmailChange then returns NetworkError`() = runTest {
+        coEvery { userProfileClient.cancelPendingEmailChange() } throws IOException("Offline")
+
+        val result = repository.cancelPendingEmailChange()
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.NetworkError, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given sessionStatus flips to NotAuthenticated during the resync when cancelPendingEmailChange then still returns Success and sessionState eventually reflects Unauthenticated`() = runTest {
+        // Simulates a concurrent session revocation racing the resync call (e.g. sign-out on
+        // another device, or deleteAccount racing this call). The cancel RPC itself already
+        // succeeded server-side and is unaffected by a session-side race -- but
+        // AccountManagementScreen's onSignedOut() effect must still fire once sessionState reflects
+        // the real revoked state, rather than leaving the screen stuck showing stale authenticated
+        // content.
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+        }
+        coEvery { userProfileDataSource.fetchUserProfile("user-uuid-001") } returns UserProfileDto(
+            id = "user-uuid-001",
+            profileCompleted = true,
+        )
+        coEvery { userProfileClient.cancelPendingEmailChange() } just Runs
+        coEvery { supabaseAuth.retrieveUserForCurrentSession(true) } coAnswers {
+            // Mirrors a real revoked session: the SDK flips sessionStatus BEFORE this call's own
+            // exception propagates back to the caller.
+            sessionStatusFlow.value = SessionStatus.NotAuthenticated(isSignOut = false)
+            throw IOException("Session revoked")
+        }
+
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+        val observedStates = mutableListOf<SessionState>()
+        val collectJob = launch { repoForTest.sessionState.collect { observedStates.add(it) } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val result = repoForTest.cancelPendingEmailChange()
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+        collectJob.cancel()
+
+        // The RPC itself succeeded -- a resync hiccup (session revoked mid-flight) must not be
+        // reported as if the cancel itself failed.
+        assertTrue(result is AuthResult.Success)
+        // sessionState must eventually reflect the real revoked state so onSignedOut() effects fire.
+        assertTrue(observedStates.last() is SessionState.Unauthenticated)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 15 — confirmPasswordReset / abandonRecoverySession (password-recovery-hardening-
+    //  plan-2026-08-18 §3.3/§3.4: marker-clear + scoped sign-out on every recovery-flow exit)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Base64url-encodes (RFC 4648 §5, no padding) a fake JWT carrying [payloadJson] as its payload. */
+    private fun fakeJwtWithPayload(payloadJson: String): String {
+        val encoder = java.util.Base64.getUrlEncoder().withoutPadding()
+        val header = encoder.encodeToString("""{"alg":"HS256","typ":"JWT"}""".toByteArray())
+        val payload = encoder.encodeToString(payloadJson.toByteArray())
+        return "$header.$payload.fake-signature"
+    }
+
+    @Test
+    fun `given successful password update when confirmPasswordReset then clears the recovery marker and signs out with GLOBAL scope`() = runTest {
+        coEvery { supabaseAuth.updateUser(any(), any(), any()) } returns mockk<UserInfo>(relaxed = true)
+        coEvery { supabaseAuth.signOut(any()) } just Runs
+
+        val result = repository.confirmPasswordReset("NewPassword1!")
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { userPreferencesDataStore.clearPendingRecoveryMarker() }
+        coVerify(exactly = 1) { supabaseAuth.signOut(SignOutScope.GLOBAL) }
+    }
+
+    @Test
+    fun `given successful password update but signOut fails when confirmPasswordReset then still returns Success (best-effort)`() = runTest {
+        // A completed password change must never be reported as failed just because the
+        // best-effort GLOBAL sign-out that follows it hiccups.
+        coEvery { supabaseAuth.updateUser(any(), any(), any()) } returns mockk<UserInfo>(relaxed = true)
+        coEvery { supabaseAuth.signOut(any()) } throws IOException("network blip")
+
+        val result = repository.confirmPasswordReset("NewPassword1!")
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { userPreferencesDataStore.clearPendingRecoveryMarker() }
+    }
+
+    @Test
+    fun `given updateUser fails when confirmPasswordReset then returns Error and never clears the marker or signs out`() = runTest {
+        // The marker-clear + sign-out must be conditioned on the password change actually
+        // succeeding -- a failed reset must leave the recovery flow's state untouched so the user
+        // can retry from the same screen/session.
+        coEvery { supabaseAuth.updateUser(any(), any(), any()) } throws IOException("Offline")
+
+        val result = repository.confirmPasswordReset("NewPassword1!")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.NetworkError, (result as AuthResult.Error).error)
+        coVerify(exactly = 0) { userPreferencesDataStore.clearPendingRecoveryMarker() }
+        coVerify(exactly = 0) { supabaseAuth.signOut(any()) }
+    }
+
+    @Test
+    fun `when abandonRecoverySession then clears the recovery marker and signs out with LOCAL scope`() = runTest {
+        coEvery { supabaseAuth.signOut(any()) } just Runs
+
+        val result = repository.abandonRecoverySession()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { userPreferencesDataStore.clearPendingRecoveryMarker() }
+        coVerify(exactly = 1) { supabaseAuth.signOut(SignOutScope.LOCAL) }
+    }
+
+    @Test
+    fun `given signOut fails when abandonRecoverySession then still returns Success (best-effort, marker already cleared)`() = runTest {
+        coEvery { supabaseAuth.signOut(any()) } throws IOException("network blip")
+
+        val result = repository.abandonRecoverySession()
+
+        assertTrue(result is AuthResult.Success)
+        coVerify(exactly = 1) { userPreferencesDataStore.clearPendingRecoveryMarker() }
+    }
+
+    @Test
+    fun `given a session JWT carrying a session_id claim when sessionState collected then AuthUser sessionId is decoded`() = runTest {
+        val userInfoMock = buildUserInfoMock()
+        every { userInfoMock.identities } returns null
+        every { userInfoMock.userMetadata } returns null
+        val fakeToken = fakeJwtWithPayload("""{"sub":"user-uuid-001","session_id":"session-xyz-789"}""")
+        val sessionMock = mockk<io.github.jan.supabase.auth.user.UserSession>(relaxed = true) {
+            every { user } returns userInfoMock
+            every { accessToken } returns fakeToken
+        }
+
+        val repoForTest = AuthRepositoryImpl(
+            supabaseAuth               = supabaseAuth,
+            userProfileDataSource      = userProfileDataSource,
+            userProfileClient          = userProfileClient,
+            userPreferencesDataStore   = userPreferencesDataStore,
+            supabaseOkHttpClient       = supabaseOkHttpClient,
+            applicationScope           = backgroundScope,
+            ioDispatcher               = UnconfinedTestDispatcher(testScheduler),
+        )
+        sessionStatusFlow.value = SessionStatus.Authenticated(sessionMock)
+
+        val collectJob = launch { repoForTest.sessionState.collect { } }
+        advanceUntilIdle()
+        testScheduler.runCurrent()
+
+        val state = repoForTest.sessionState.value
+        collectJob.cancel()
+
+        assertTrue(state is SessionState.Authenticated)
+        assertEquals("session-xyz-789", (state as SessionState.Authenticated).user.sessionId)
     }
 }
