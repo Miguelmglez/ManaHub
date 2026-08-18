@@ -20,6 +20,8 @@ import com.mmg.manahub.core.model.CardLanguage
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.PreferredCurrency
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -150,14 +152,10 @@ private fun <T> SettingsChoiceSection(
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             options.forEach { option ->
-                FilterChip(
+                MagicFilterChip(
                     selected = option == selected,
                     onClick = { onSelect(option) },
-                    label = { Text(optionLabel(option)) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = colors.primaryAccent.copy(alpha = 0.2f),
-                        selectedLabelColor = colors.primaryAccent,
-                    ),
+                    label = optionLabel(option),
                 )
             }
         }
