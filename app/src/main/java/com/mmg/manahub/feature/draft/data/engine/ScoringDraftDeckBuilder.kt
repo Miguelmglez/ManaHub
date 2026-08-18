@@ -21,6 +21,13 @@ import com.mmg.manahub.core.model.DraftSeat
  *    23 highest combined scores.
  * 3. Allocate 17 basic lands across the two colors proportionally to their commitment weights.
  *
+ * [buildBasicLands] only computes the proportional per-color COUNT — it does NOT resolve a real
+ * Scryfall id (the fake placeholder UUIDs this class used to emit never resolved to a real
+ * [com.mmg.manahub.core.model.Card] once persisted). [com.mmg.manahub.core.model.BasicLandSlot.scryfallId]
+ * is left empty here; the caller ([com.mmg.manahub.feature.draft.data.DraftSimRepositoryImpl
+ * .completeAndSaveDeck]) resolves the real id per basic-land name via `CardRepository` right
+ * before persisting.
+ *
  * KMP migration — Hilt→Koin cutover batch 3. Plain class (no `@Inject`); built as a native Koin
  * `single` in [com.mmg.manahub.feature.draft.di.draftKoinModule], sharing the SAME [DeckScorer]
  * singleton the Decks island builds (`feature.decks.di.decksKoinModule`).
@@ -54,7 +61,7 @@ class ScoringDraftDeckBuilder(
             }
             .take(MAINBOARD_SIZE)
 
-        val basics = buildBasicLands(topColorWeights)
+        val basics = buildBasicLands(topColorWeights, BASIC_LANDS_TOTAL)
 
         return DraftDeck(mainboard = mainboard, basics = basics)
     }
@@ -89,18 +96,24 @@ class ScoringDraftDeckBuilder(
     // ── Basic lands ──────────────────────────────────────────────────────────────
 
     /**
-     * Distributes [BASIC_LANDS_TOTAL] lands across the deck's colors proportionally to their
+     * Distributes [totalLandCount] lands across the deck's colors proportionally to their
      * weights. Counts are floored then the remainder is handed to the colors with the largest
-     * fractional parts so the total always sums to exactly [BASIC_LANDS_TOTAL]. A colorless deck
-     * (no weights) defaults to 17 Plains so the deck is still playable.
+     * fractional parts so the total always sums to exactly [totalLandCount]. A colorless deck
+     * (no weights) defaults to [totalLandCount] Plains so the deck is still playable.
+     *
+     * Public + parameterized (Phase D) so the Deck tab's "Magic Land Suggestions" autofill can
+     * call the SAME distribution math against a user-adjustable target instead of the fixed
+     * [BASIC_LANDS_TOTAL] default; [build] just forwards here with that constant.
      */
-    private fun buildBasicLands(colorWeights: Map<String, Float>): List<BasicLandSlot> {
+    override fun buildBasicLands(colorWeights: Map<String, Float>, totalLandCount: Int): List<BasicLandSlot> {
+        if (totalLandCount <= 0) return emptyList()
+
         if (colorWeights.isEmpty()) {
-            return listOf(landSlot("W", BASIC_LANDS_TOTAL))
+            return listOf(landSlot("W", totalLandCount))
         }
 
         val totalWeight = colorWeights.values.sum()
-        val raw = colorWeights.mapValues { (_, w) -> w / totalWeight * BASIC_LANDS_TOTAL }
+        val raw = colorWeights.mapValues { (_, w) -> w / totalWeight * totalLandCount }
         val floored = raw.mapValues { it.value.toInt() }.toMutableMap()
         var assigned = floored.values.sum()
 
@@ -109,7 +122,7 @@ class ScoringDraftDeckBuilder(
             .sortedByDescending { it.value - it.value.toInt() }
             .map { it.key }
         var i = 0
-        while (assigned < BASIC_LANDS_TOTAL && remainders.isNotEmpty()) {
+        while (assigned < totalLandCount && remainders.isNotEmpty()) {
             val color = remainders[i % remainders.size]
             floored[color] = (floored[color] ?: 0) + 1
             assigned++
@@ -121,10 +134,15 @@ class ScoringDraftDeckBuilder(
             .map { (color, count) -> landSlot(color, count) }
     }
 
+    /**
+     * Builds a [BasicLandSlot] for [colorLetter] with [count] copies. `scryfallId` is
+     * intentionally left empty — this class has no Scryfall/network access; the real id is
+     * resolved by the caller (see the class KDoc). Never reintroduce a hardcoded/placeholder id
+     * here (a prior version did, and those fake UUIDs never resolved to a real persisted card).
+     */
     private fun landSlot(colorLetter: String, count: Int): BasicLandSlot {
         val name = BASIC_LAND_NAME_BY_COLOR[colorLetter] ?: BASIC_LAND_NAMES.first()
-        val scryfallId = BASIC_LAND_ID_BY_NAME[name] ?: ""
-        return BasicLandSlot(scryfallId = scryfallId, name = name, count = count)
+        return BasicLandSlot(scryfallId = "", name = name, count = count)
     }
 
     private companion object {
@@ -139,19 +157,6 @@ class ScoringDraftDeckBuilder(
             "B" to "Swamp",
             "R" to "Mountain",
             "G" to "Forest",
-        )
-
-        /**
-         * Placeholder Scryfall IDs for the five basic lands. P4 will replace these with a proper
-         * set-aware lookup; P6 will verify them. Do not rely on these resolving to a specific
-         * printing.
-         */
-        val BASIC_LAND_ID_BY_NAME = mapOf(
-            "Plains" to "c7a4b9b5-1f85-4e15-b70d-8aa57ea95b8c",
-            "Island" to "9c4f0cca-3b77-4b0f-9e77-19b200e86da6",
-            "Swamp" to "a77e84c8-87c7-48ca-85a8-0bd77f5a9d85",
-            "Mountain" to "d2228f27-f0d2-4c4e-a1f1-6a52a2e3e8f8",
-            "Forest" to "1f16e66f-e0c9-48f5-baef-cb6a4ff8c2b4",
         )
     }
 }

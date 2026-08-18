@@ -7,7 +7,10 @@ import com.mmg.manahub.core.domain.auth.AuthRepository
  * Changes the authenticated user's email address.
  * Delegates to [AuthRepository.updateEmail], which calls `Auth.updateUser`.
  *
- * @param code The reauthentication nonce obtained via [RequestReauthenticationUseCase].
+ * NOTE: unreferenced by any current UI call site — [ConfirmEmailUpdateUseCase] backs the live
+ * "Change email" path. See [AuthRepository.updateEmail]'s KDoc.
+ *
+ * @param code A reauthentication nonce entered by the user.
  */
 class UpdateEmailUseCase(
     private val repository: AuthRepository

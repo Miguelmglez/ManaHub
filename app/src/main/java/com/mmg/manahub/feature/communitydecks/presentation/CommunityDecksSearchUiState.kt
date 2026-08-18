@@ -50,7 +50,8 @@ const val MAX_COMMUNITY_CARD_FILTERS = 3
  */
 data class CommunityDecksSearchUiState(
     val query: String = "",
-    val selectedSort: CommunityDeckSort = CommunityDeckSort.POPULAR,
+    val selectedSortField: CommunityDeckSortField = CommunityDeckSortField.VIEW_COUNT,
+    val selectedSortDirection: CommunityDeckSortDirection = CommunityDeckSortDirection.DESC,
     val results: List<CommunityDeckSummary> = emptyList(),
     val totalCount: Int = 0,
     val hasMore: Boolean = false,
@@ -81,21 +82,31 @@ data class CommunityDecksSearchUiState(
     val cardQuery: String = "",
     val cardResults: List<Card> = emptyList(),
     val isCardSearching: Boolean = false,
+
+    // ── Deck tag picker (Advanced Search sheet rework, 2026-08-18) ─────────────────
+    /** Archidekt's closed tag catalog, fetched ONCE lazily on the picker's first open. */
+    val availableDeckTags: List<String> = emptyList(),
+    val isDeckTagsLoading: Boolean = false,
 )
 
 /**
- * The applied advanced-search selection (Community Hub Discover/Search overhaul, Phase 2).
+ * The applied advanced-search selection (Community Hub Discover/Search overhaul, Phase 2; deck
+ * tag added in the Advanced Search sheet rework, 2026-08-18).
  *
  * Every field maps to a verified-working Archidekt `api/decks/v3/` filter (see
  * `docs/adr/ADR-004-community-api-contracts.md` §1b) except [deckSize], which is free text parsed
  * to an `Int?` only at request-build time (Archidekt's `size` filter is exact-equality only, there
- * is no comparator). Deliberately omits any deck-tag filter — `deckTags` always statement-timeouts.
+ * is no comparator).
  *
  * @property cards up to [MAX_COMMUNITY_CARD_FILTERS] cards the deck must ALL contain (Archidekt
  *   multi-card search expansion, 2026-07-24) — mapped 1:1 onto
  *   [CommunityDeckSearchFilters.cardNames] by [toSearchFilters]. `size <= 1` reaches Archidekt as
  *   a direct request; `size > 1` is fanned out and intersected client-side (see
  *   `com.mmg.manahub.core.data.repository.CommunityDecksRepositoryImpl.searchDecksMultiCard`).
+ * @property deckTag exact Archidekt deck-tag name (picked from the closed catalog, never free
+ *   text), mapped onto [CommunityDeckSearchFilters.deckTagName] by [toSearchFilters]. `null` means
+ *   no tag filter. This is the SINGULAR `deckTagName` API param (verified working 2026-08-18) —
+ *   NOT the dead plural `deckTags` param this app never sends.
  */
 data class CommunityAdvancedFilters(
     val formats: CommunityDeckFormatFilter =CommunityDeckFormatFilter.COMMANDER,
@@ -106,6 +117,7 @@ data class CommunityAdvancedFilters(
     val ownerUsername: String = "",
     val deckSize: String = "",
     val primersOnly: Boolean = false,
+    val deckTag: String? = null,
 ) {
     /**
      * Number of distinct filters currently active — drives the Tune-icon badge. Each selected
@@ -121,6 +133,7 @@ data class CommunityAdvancedFilters(
             ownerUsername.isNotBlank(),
             deckSize.isNotBlank(),
             primersOnly,
+            deckTag != null,
         ).count { it } + cards.size
 }
 
@@ -136,20 +149,31 @@ fun CommunityAdvancedFilters.toSearchFilters(
 ): CommunityDeckSearchFilters = CommunityDeckSearchFilters(
     deckName = deckName?.takeIf { it.isNotBlank() },
     cardNames = cards.map { it.name },
-    commanderName = commander?.name,
+    // Commander-only filters — the sheet hides both sections for a non-Commander format (see
+    // CommunityAdvancedSearchSheet), so the request must never carry a stale selection through
+    // from a previous format that WAS Commander.
+    commanderName = commander?.name?.takeIf { formats == CommunityDeckFormatFilter.COMMANDER },
     ownerUsername = ownerUsername.takeIf { it.isNotBlank() },
     deckFormatId = formats.apiId,
-    edhBracket = edhBracket,
+    edhBracket = edhBracket.takeIf { formats == CommunityDeckFormatFilter.COMMANDER },
     colors = colors,
     size = deckSize.toIntOrNull(),
     primersOnly = primersOnly,
+    deckTagName = deckTag,
     orderBy = orderBy,
     page = page,
     pageSize = pageSize,
 )
 
 /**
- * Sort options exposed to the user, mapped to Archidekt's `orderBy` API values.
+ * Fixed-ordering sort options used internally by Discover's section rows (popular/recent/updated),
+ * mapped to Archidekt's `orderBy` API values.
+ *
+ * **Discover-internal only** — this enum is consumed exclusively by [CommunityDecksSearchViewModel]'s
+ * `loadDiscover()`/`fetchDecks()` for the Discover tab's fixed section ordering. It is unrelated to
+ * the user-facing Search-tab sort picker in [CommunityAdvancedSearchSheet][com.mmg.manahub.feature.communitydecks.presentation.components.CommunityAdvancedSearchSheet],
+ * which is driven by [CommunityDeckSortField] + [CommunityDeckSortDirection] instead (Advanced
+ * Search sheet rework, 2026-08-18).
  *
  * @property apiValue the Archidekt `orderBy` query value (leading `-` = descending).
  * @property labelRes the user-facing label resource.
@@ -159,6 +183,40 @@ enum class CommunityDeckSort(val apiValue: String, @StringRes val labelRes: Int)
     RECENT("-createdAt", R.string.community_deck_sort_recent),
     UPDATED("-updatedAt", R.string.community_deck_sort_updated),
 }
+
+/**
+ * The user-facing Search-tab sort fields (Advanced Search sheet rework, 2026-08-18), reverse-
+ * engineered from Archidekt's own search UI (`archidekt.com/search/decks`). Skips their 7th field,
+ * "Help requested" — that's tied to a `deckHelp` niche filter this app doesn't expose.
+ *
+ * Paired with [CommunityDeckSortDirection] via [apiValue] to build the Archidekt `orderBy` value —
+ * unlike [CommunityDeckSort] (Discover-internal, direction baked into each constant), direction is
+ * a separate, independently toggled axis here.
+ *
+ * @property apiField the Archidekt `orderBy` field name (without the `-` direction prefix).
+ * @property labelRes the user-facing label resource.
+ */
+enum class CommunityDeckSortField(val apiField: String, @StringRes val labelRes: Int) {
+    NAME("name", R.string.community_advsearch_sort_name),
+    UPDATED_AT("updatedAt", R.string.community_advsearch_sort_updated),
+    CREATED_AT("createdAt", R.string.community_advsearch_sort_created),
+    VIEW_COUNT("viewCount", R.string.community_advsearch_sort_views),
+    SIZE("size", R.string.community_advsearch_sort_size),
+    EDH_BRACKET("edhBracket", R.string.community_advsearch_sort_bracket),
+}
+
+/** Sort direction paired with a [CommunityDeckSortField] to build the Archidekt `orderBy` value. */
+enum class CommunityDeckSortDirection { ASC, DESC }
+
+/**
+ * Combines a [CommunityDeckSortField] with a [CommunityDeckSortDirection] into the Archidekt
+ * `orderBy` query value: descending prepends `-` to the field name, ascending sends the bare field.
+ */
+fun CommunityDeckSortField.apiValue(direction: CommunityDeckSortDirection): String =
+    when (direction) {
+        CommunityDeckSortDirection.DESC -> "-$apiField"
+        CommunityDeckSortDirection.ASC -> apiField
+    }
 
 /**
  * Format filter options, mapped to Archidekt's numeric `deckFormat` ids.

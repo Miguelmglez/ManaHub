@@ -9,6 +9,7 @@ import com.mmg.manahub.core.data.local.entity.DraftSessionEntity
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
+import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.DeckRepository
 import com.mmg.manahub.core.data.remote.CloudflareContentClient
 import com.mmg.manahub.feature.draft.data.remote.dto.BoosterConfigDto
@@ -59,6 +60,7 @@ class DraftSimRepositoryImpl(
     private val getSetCardsPage: GetSetCardsPageUseCase,
     private val deckRepository: DeckRepository,
     private val draftSessionDao: DraftSessionDao,
+    private val cardRepository: CardRepository,
     private val gson: Gson,
     private val ioDispatcher: CoroutineDispatcher,
     private val crashReporter: CrashReporter,
@@ -69,8 +71,23 @@ class DraftSimRepositoryImpl(
          * Version of the serialised [DraftState] shape stored in `draft_sessions.stateJson`.
          * Bump this whenever DraftState (or any nested model) changes in a way that
          * breaks Gson deserialisation; sessions with a different version are discarded.
+         *
+         * v2 (Pick 2 mode): added [DraftConfig.picksPerTurn] / [DraftState.picksTakenInTurn].
+         * Gson would happily deserialize an old v1 session and default both new fields (1 / 0),
+         * which is harmless on its own — but bumping the version is still correct here because a
+         * v1 session's [DraftState] was persisted assuming exactly one pick per turn; silently
+         * resuming it as a "Pick 1"-shaped v2 session is fine, but any FUTURE shape change to
+         * this same generation would then not be distinguishable. Bump on every breaking shape
+         * change, not just non-nullable additions, so schema drift is caught deterministically.
+         *
+         * v3 (Phase G, G.4): added nullable [DraftState.curation] ([com.mmg.manahub.core.model.DraftCuration]).
+         * A v2 session deserialized as v3 would be harmless too (Gson defaults the missing field to
+         * null, and the ViewModel already treats a null `curation` as "nothing to re-seed, start
+         * from defaults" — the exact behavior a v2 session had anyway), but the same discipline as
+         * v2's note applies: bump on every shape change so drift stays deterministic rather than
+         * relying on every future field happening to be a safely-nullable Gson default.
          */
-        const val CURRENT_SCHEMA_VERSION = 1
+        const val CURRENT_SCHEMA_VERSION = 3
 
         /**
          * Allowlist for `booster.json`'s optional `extraPoolSets` field: each entry must be a
@@ -438,12 +455,50 @@ class DraftSimRepositoryImpl(
                     format = "DRAFT",
                 )
 
-                val slots = buildList {
-                    result.deck.mainboard.forEach { draftCard ->
-                        add(Triple(draftCard.card.scryfallId, 1, false))
+                // Resolve each basic land's real Scryfall id (ScoringDraftDeckBuilder only computes
+                // the proportional per-color COUNT — see BasicLandSlot KDoc), at most once per
+                // unique name for this single save operation.
+                val resolvedBasicIds = mutableMapOf<String, String?>()
+                suspend fun resolveBasicScryfallId(name: String): String? =
+                    resolvedBasicIds.getOrPut(name) {
+                        (cardRepository.searchCardByName(name) as? DataResult.Success)?.data?.scryfallId
                     }
+
+                val slots = buildList {
+                    // Bug fix: a drafted pool can contain multiple copies of the same card
+                    // (picked across separate packs) as separate DraftCard entries. Group by
+                    // scryfallId and sum into ONE slot per unique card — DeckDao.upsertDeckCards
+                    // upserts by (deckId, scryfallId, isSideboard), so emitting N separate
+                    // Triple(id, 1, false) entries for the same id collapsed down to the LAST
+                    // one written (quantity 1), silently losing the other copies.
+                    result.deck.mainboard
+                        .groupingBy { it.card.scryfallId }
+                        .eachCount()
+                        .forEach { (scryfallId, count) -> add(Triple(scryfallId, count, false)) }
+
+                    // Phase D: cards the user explicitly benched via the Deck tab's active/inactive
+                    // toggle. Same grouping/summing discipline as the mainboard above — a benched
+                    // card can also have been drafted as multiple separate DraftCard copies.
+                    result.deck.sideboard
+                        .groupingBy { it.card.scryfallId }
+                        .eachCount()
+                        .forEach { (scryfallId, count) -> add(Triple(scryfallId, count, true)) }
+
                     result.deck.basics.forEach { basic ->
-                        add(Triple(basic.scryfallId, basic.count, false))
+                        val scryfallId = resolveBasicScryfallId(basic.name)
+                        if (scryfallId != null) {
+                            add(Triple(scryfallId, basic.count, false))
+                        } else {
+                            // Every basic land name should always resolve via Scryfall; a failure
+                            // here is unexpected. Record it and drop the slot rather than persist
+                            // a card row with an empty scryfallId that can never resolve to a
+                            // real CardEntity.
+                            crashReporter.recordException(
+                                IllegalStateException(
+                                    "Failed to resolve basic land scryfallId for '${basic.name}'",
+                                ),
+                            )
+                        }
                     }
                 }
                 // If populating the deck fails, compensate by deleting the freshly-created empty
@@ -469,6 +524,22 @@ class DraftSimRepositoryImpl(
                 )
             }
         }
+
+    // -------------------------------------------------------------------------
+    // cancelSession
+    // -------------------------------------------------------------------------
+
+    override suspend fun cancelSession(state: DraftState) {
+        withContext(ioDispatcher) {
+            try {
+                draftSessionDao.deleteById(deriveSessionId(state))
+            } catch (e: Exception) {
+                // Best-effort cleanup: a failure here must never block the user's exit flow —
+                // record it and move on, mirroring markCompleteForSet's best-effort discipline.
+                crashReporter.recordException(e)
+            }
+        }
+    }
 
     /**
      * Marks any active session for [setCode] complete. The session id is derived

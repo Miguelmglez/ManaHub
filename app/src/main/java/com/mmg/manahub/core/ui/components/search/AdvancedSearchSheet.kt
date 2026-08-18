@@ -49,8 +49,6 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -104,6 +102,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -360,12 +359,10 @@ fun AdvancedSearchSheet(
                                 false to stringResource(R.string.advsearch_color_mode_color),
                                 true to stringResource(R.string.advsearch_color_mode_identity)
                             ).forEach { (isIdentity, label) ->
-                                FilterChip(
-                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.useColorIdentity == isIdentity, selectedBorderColor = mc.primaryAccent),
-                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
+                                MagicFilterChip(
                                     selected = uiState.useColorIdentity == isIdentity,
                                     onClick = { viewModel.setUseColorIdentity(isIdentity) },
-                                    label = { Text(label, style = ty.labelMedium) },
+                                    label = label,
                                 )
                             }
                         }
@@ -438,27 +435,15 @@ fun AdvancedSearchSheet(
                                     "mythic",
                                 ).forEach { rarity ->
                                     val isSelected = uiState.selectedRarity.contains(rarity)
-                                    FilterChip(
+                                    MagicFilterChip(
                                         selected = isSelected,
                                         onClick = { viewModel.updateRarity(rarity) },
-                                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, selectedBorderColor = mc.primaryAccent),
-                                        colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
-                                        label = {
-                                            Row(
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                            ) {
-                                                Text(
-                                                    stringResource(when (rarity) {
-                                                        "common"   -> R.string.stats_rarity_common
-                                                        "uncommon" -> R.string.stats_rarity_uncommon
-                                                        "rare"     -> R.string.stats_rarity_rare
-                                                        else       -> R.string.stats_rarity_mythic
-                                                    }),
-                                                    style = ty.labelMedium,
-                                                )
-                                            }
-                                        },
+                                        label = stringResource(when (rarity) {
+                                            "common"   -> R.string.stats_rarity_common
+                                            "uncommon" -> R.string.stats_rarity_uncommon
+                                            "rare"     -> R.string.stats_rarity_rare
+                                            else       -> R.string.stats_rarity_mythic
+                                        }),
                                     )
                                 }
                             }
@@ -696,12 +681,10 @@ fun AdvancedSearchSheet(
                                     "eur" to stringResource(R.string.price_symbol_eur),
                                     "usd" to stringResource(R.string.price_symbol_usd)
                                 ).forEach { (curr, symbol) ->
-                                    FilterChip(
-                                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.priceCurrency == curr, selectedBorderColor = mc.primaryAccent),
-                                        colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
+                                    MagicFilterChip(
                                         selected = uiState.priceCurrency == curr,
                                         onClick = { viewModel.setPrice(uiState.priceMax, curr) },
-                                        label = { Text(symbol, style = ty.labelLarge) },
+                                        label = symbol,
                                     )
                                 }
                             }
@@ -760,19 +743,12 @@ fun AdvancedSearchSheet(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             formatOptions.forEach { option ->
-                                FilterChip(
-                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.selectedFormat.contains(option.scryfallValue), selectedBorderColor = mc.primaryAccent),
-                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
+                                MagicFilterChip(
                                     selected = uiState.selectedFormat.contains(option.scryfallValue),
                                     onClick = {
                                        viewModel.updateFormat(option.scryfallValue)
                                     },
-                                    label = {
-                                        Text(
-                                            stringResource(option.labelRes),
-                                            style = ty.labelMedium,
-                                        )
-                                    },
+                                    label = stringResource(option.labelRes),
                                 )
                             }
                         }
@@ -795,9 +771,7 @@ fun AdvancedSearchSheet(
                                     stringResource(R.string.advsearch_filter_wishlist) to (uiState.filterWishlist == true),
                                     stringResource(R.string.advsearch_filter_for_trade) to (uiState.filterForTrade == true),
                                 ).forEachIndexed { index, (label, isSelected) ->
-                                    FilterChip(
-                                        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = isSelected, selectedBorderColor = mc.primaryAccent),
-                                        colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
+                                    MagicFilterChip(
                                         selected = isSelected,
                                         onClick = {
                                             if (index == 0)
@@ -805,7 +779,7 @@ fun AdvancedSearchSheet(
                                             else
                                                 viewModel.setFilterForTrade(if (isSelected) null else true)
                                         },
-                                        label = { Text(label, style = ty.labelMedium) },
+                                        label = label,
                                     )
                                 }
                             }
@@ -904,25 +878,18 @@ fun AdvancedSearchSheet(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             SearchOrder.entries.forEach { order ->
-                                FilterChip(
-                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.orderBy == order, selectedBorderColor = mc.primaryAccent),
-                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
+                                MagicFilterChip(
                                     selected = uiState.orderBy == order,
                                     onClick = { viewModel.setOrder(order, uiState.orderDirection) },
-                                    label = {
-                                        Text(
-                                            stringResource(when(order) {
-                                                SearchOrder.NAME -> R.string.advsearch_sort_name
-                                                SearchOrder.CMC -> R.string.advsearch_sort_cmc
-                                                SearchOrder.PRICE_EUR -> R.string.advsearch_sort_price_eur
-                                                SearchOrder.PRICE_USD -> R.string.advsearch_sort_price_usd
-                                                SearchOrder.RARITY -> R.string.advsearch_sort_rarity
-                                                SearchOrder.RELEASED -> R.string.advsearch_sort_released
-                                                SearchOrder.COLOR -> R.string.advsearch_sort_color
-                                            }),
-                                            style = ty.labelSmall,
-                                        )
-                                    },
+                                    label = stringResource(when(order) {
+                                        SearchOrder.NAME -> R.string.advsearch_sort_name
+                                        SearchOrder.CMC -> R.string.advsearch_sort_cmc
+                                        SearchOrder.PRICE_EUR -> R.string.advsearch_sort_price_eur
+                                        SearchOrder.PRICE_USD -> R.string.advsearch_sort_price_usd
+                                        SearchOrder.RARITY -> R.string.advsearch_sort_rarity
+                                        SearchOrder.RELEASED -> R.string.advsearch_sort_released
+                                        SearchOrder.COLOR -> R.string.advsearch_sort_color
+                                    }),
                                 )
                             }
                         }
@@ -931,12 +898,10 @@ fun AdvancedSearchSheet(
                                 SearchDirection.ASC to stringResource(R.string.advsearch_dir_asc),
                                 SearchDirection.DESC to stringResource(R.string.advsearch_dir_desc),
                             ).forEach { (dir, label) ->
-                                FilterChip(
-                                    border = FilterChipDefaults.filterChipBorder(enabled = true, selected = uiState.orderDirection == dir, selectedBorderColor = mc.primaryAccent),
-                                    colors = FilterChipDefaults.filterChipColors(containerColor = mc.surface, selectedContainerColor = mc.surface),
+                                MagicFilterChip(
                                     selected = uiState.orderDirection == dir,
                                     onClick = { viewModel.setOrder(uiState.orderBy, dir) },
-                                    label = { Text(label, style = ty.labelSmall) },
+                                    label = label,
                                 )
                             }
                         }

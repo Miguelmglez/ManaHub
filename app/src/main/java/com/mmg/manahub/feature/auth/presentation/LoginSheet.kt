@@ -67,10 +67,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -591,7 +591,11 @@ private fun EmailConfirmationContent(
             textAlign = TextAlign.Center,
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        EmailDeliveryNote(centered = true)
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Open email app button
         Button(
@@ -647,30 +651,21 @@ private fun LinkGoogleIdentityDialog(
     onDismiss: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    androidx.compose.material3.AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.surface,
-        titleContentColor = mc.textPrimary,
-        textContentColor = mc.textSecondary,
-        title = {
-            Text(
-                text = stringResource(R.string.auth_link_google_title),
-                style = ty.titleLarge,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
+        title = stringResource(R.string.auth_link_google_title),
+        content = {
             Column {
                 Text(
                     text = stringResource(R.string.auth_link_google_message, email),
                     color = mc.textSecondary,
-                    style = ty.bodyMedium,
+                    style = MaterialTheme.magicTypography.bodyMedium,
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(sp.md))
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
@@ -702,32 +697,21 @@ private fun LinkGoogleIdentityDialog(
                 )
             }
         },
-        confirmButton = {
-            Button(
+        buttons = {
+            MagicCtaButton(
                 onClick = { onLink(password) },
+                text = stringResource(R.string.auth_link_google_btn),
                 enabled = password.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = mc.primaryAccent,
-                    contentColor = mc.background,
-                    disabledContainerColor = mc.primaryAccent.copy(alpha = 0.4f),
-                    disabledContentColor = mc.background.copy(alpha = 0.6f),
-                ),
-            ) {
-                Text(
-                    text = stringResource(R.string.auth_link_google_btn),
-                    style = ty.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = stringResource(R.string.action_cancel),
-                    color = mc.textSecondary,
-                    style = ty.labelMedium,
-                )
-            }
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MagicCtaButton(
+                onClick = onDismiss,
+                text = stringResource(R.string.action_cancel),
+                style = MagicCtaStyle.Ghost,
+                modifier = Modifier.fillMaxWidth(),
+            )
         },
     )
 }
@@ -744,25 +728,31 @@ private fun ResetPasswordDialog(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     var resetEmail by remember { mutableStateOf("") }
     val isLoading = uiState is AuthUiState.Loading
     val resetSent = uiState is AuthUiState.ResetSent
     val errorMessage = (uiState as? AuthUiState.Error)?.message
 
-    androidx.compose.material3.AlertDialog(
+    MagicAlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = mc.surface,
-        titleContentColor = mc.textPrimary,
-        textContentColor = mc.textSecondary,
-        title = {
-            Text(
-                text = stringResource(R.string.auth_reset_title),
-                style = ty.titleLarge,
-                color = mc.textPrimary,
-            )
-        },
-        text = {
-            Column {
+        title = stringResource(R.string.auth_reset_title),
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(sp.md)) {
+                // Persistent (not a toast) guidance shown BEFORE the user requests the link, so
+                // the "you'll be signed out of every device" consequence is known up front —
+                // stays visible after sending too, since the dialog itself doesn't auto-close.
+                AuthFlowStepsCard(
+                    title = stringResource(R.string.auth_reset_steps_title),
+                    steps = listOf(
+                        stringResource(R.string.auth_reset_step_send),
+                        stringResource(R.string.auth_reset_step_open),
+                        stringResource(R.string.auth_reset_step_choose),
+                        stringResource(R.string.auth_reset_step_signout_all),
+                    ),
+                )
+                EmailDeliveryNote(includeLinkFacts = true)
+
                 if (resetSent) {
                     Text(
                         text = stringResource(R.string.auth_reset_sent),
@@ -770,12 +760,6 @@ private fun ResetPasswordDialog(
                         style = ty.bodyMedium,
                     )
                 } else {
-                    Text(
-                        text = stringResource(R.string.auth_reset_subtitle),
-                        color = mc.textSecondary,
-                        style = ty.bodyMedium,
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = resetEmail,
                         onValueChange = { resetEmail = it },
@@ -795,7 +779,6 @@ private fun ResetPasswordDialog(
                         enabled = !isLoading,
                     )
                     if (errorMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = errorMessage,
                             color = mc.lifeNegative,
@@ -805,47 +788,30 @@ private fun ResetPasswordDialog(
                 }
             }
         },
-        confirmButton = {
+        buttons = {
             if (resetSent) {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = stringResource(R.string.action_close),
-                        color = mc.primaryAccent,
-                        style = ty.labelMedium,
-                    )
-                }
+                MagicCtaButton(
+                    onClick = onDismiss,
+                    text = stringResource(R.string.action_close),
+                    style = MagicCtaStyle.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             } else {
-                Button(
+                MagicCtaButton(
                     onClick = { onSend(resetEmail) },
+                    text = stringResource(R.string.auth_reset_btn),
                     enabled = !isLoading && resetEmail.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = mc.primaryAccent,
-                        contentColor = mc.background,
-                    ),
-                ) {
-                    if (isLoading) {
-                        MagicLoadingSpinner(
-                            modifier = Modifier.size(18.dp),
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.auth_reset_btn),
-                            style = ty.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
-        },
-        dismissButton = {
-            if (!resetSent) {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = stringResource(R.string.action_cancel),
-                        color = mc.textSecondary,
-                        style = ty.labelMedium,
-                    )
-                }
+                    isLoading = isLoading,
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                MagicCtaButton(
+                    onClick = onDismiss,
+                    text = stringResource(R.string.action_cancel),
+                    style = MagicCtaStyle.Ghost,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
     )

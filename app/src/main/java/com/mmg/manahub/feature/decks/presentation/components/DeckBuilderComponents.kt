@@ -56,6 +56,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
@@ -443,7 +444,7 @@ fun CommanderSearchSheet(
                     modifier          = Modifier.fillMaxWidth().height(100.dp),
                     contentAlignment  = Alignment.Center,
                 ) {
-                    MagicLoadingSpinner(modifier = Modifier.size(32.dp))
+                    MagicLoadingSpinner(size = MagicLoadingSize.Small)
                 }
             } else {
                 LazyColumn(

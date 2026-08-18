@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -44,8 +45,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -53,8 +55,6 @@ import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,32 +87,31 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
-import com.mmg.manahub.feature.decks.presentation.components.SynergyCardTile
-import org.koin.androidx.compose.koinViewModel
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DeckCard
 import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
-import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
-import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
-import com.mmg.manahub.core.domain.usecase.decks.GetDeckGameStatsUseCase
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
-import com.mmg.manahub.core.ui.components.GroupingFlowSelector
+import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.ManaHubBottomSheetSelector
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.BottomSheetShape
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -121,13 +120,13 @@ import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
-import com.mmg.manahub.feature.decks.domain.model.AlmostCombo
-import com.mmg.manahub.feature.decks.domain.model.Combo
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
+import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
 import com.mmg.manahub.feature.decks.domain.template.partitionByAxis
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
+import com.mmg.manahub.feature.decks.presentation.components.AddSuggestionRow
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanChip
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanHint
 import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanSheetContent
@@ -135,27 +134,27 @@ import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardRow
 import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
+import com.mmg.manahub.feature.decks.presentation.components.CommunityAddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.CutSuggestionRow
 import com.mmg.manahub.feature.decks.presentation.components.DeckFormatChipRow
 import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckStatsCard
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
 import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
+import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
-import com.mmg.manahub.feature.decks.presentation.components.AddSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.components.CommunityAddSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.components.SimilarDeckCard
-import com.mmg.manahub.feature.decks.presentation.components.CutSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
 import com.mmg.manahub.feature.decks.presentation.components.RoleCoverageRow
+import com.mmg.manahub.feature.decks.presentation.components.SimilarDeckCard
+import com.mmg.manahub.feature.decks.presentation.components.SynergyCardTile
 import com.mmg.manahub.feature.decks.presentation.components.WarningChip
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
 import com.mmg.manahub.feature.decks.presentation.components.key
 import com.mmg.manahub.feature.decks.presentation.components.label
-import com.mmg.manahub.core.ui.components.InlineErrorState
-import androidx.compose.foundation.lazy.LazyRow
+import org.koin.androidx.compose.koinViewModel
+import androidx.compose.material.icons.filled.CollectionsBookmark
 
 /**
  * The unified "Deck Studio" editor surface (Phase 1).
@@ -203,7 +202,8 @@ fun DeckStudioScreen(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     viewModel: DeckStudioViewModel = koinViewModel(),
-) {
+    onNavigateToMassiveAddCards: (List<Card>) -> Unit = {},
+    ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val deckStats by viewModel.deckStatsFlow.collectAsStateWithLifecycle()
     val playerName by viewModel.playerNameFlow.collectAsStateWithLifecycle()
@@ -292,12 +292,8 @@ fun DeckStudioScreen(
     }
     BackHandler(onBack = handleBack)
 
-    // Deck Builder v2 (plan D10/§3.7): the single "Build from seed" entry point routes to the v2
-    // wizard -- shared by BOTH the top-bar overflow item and the empty-state primary button so
-    // the two never drift. The legacy seed sheet (`SeedsContent`/`BuildDeckFromSeedsUseCase`) was
-    // RETIRED in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28) -- this entry point's
-    // visibility is still gated on `DeckFeatureFlags.DECK_BUILDER_V2_ENABLED` (see `seedEnabled`
-    // below), but once visible it has exactly one destination.
+    val inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED
+    val seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED
     val handleBuildFromSeed: () -> Unit = {
         onNavigateToWizard(null, null, null, null, null)
     }
@@ -327,6 +323,7 @@ fun DeckStudioScreen(
                             context.startActivity(Intent.createChooser(intent, context.getString(R.string.deckbuilder_share_chooser)))
                         }
                     },
+                    onMassiveAdd = {onNavigateToMassiveAddCards(emptyList())},
                     shareEnabled = !uiState.isEmptyDeck,
                 )
             },
@@ -376,7 +373,7 @@ fun DeckStudioScreen(
                 // BUILD tab remains — a single-item TabRow looks broken, so it is not rendered.
                 val tabs = buildList {
                     add(DeckStudioTab.BUILD to stringResource(R.string.deck_studio_tab_build))
-                    if (DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED) {
+                    if (FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED) {
                         add(DeckStudioTab.SUGGESTIONS to stringResource(R.string.deck_studio_tab_suggestions))
                     }
                 }
@@ -730,6 +727,7 @@ private fun DeckStudioTopBar(
     onEdit: () -> Unit,
     onShare: () -> Unit,
     shareEnabled: Boolean,
+    onMassiveAdd: ()->Unit
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -802,7 +800,7 @@ private fun DeckStudioTopBar(
                     )
                     // Deck Builder v2 (plan D10/§3.7): visible when the v2 wizard is enabled. The
                     // legacy seed-sheet sibling flag was RETIRED in WS7.2 (2026-07-28).
-                    if (DeckFeatureFlags.DECK_BUILDER_V2_ENABLED) {
+                    if (FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -828,7 +826,7 @@ private fun DeckStudioTopBar(
                     // legacy discoverSynergies content's sibling flag was RETIRED in WS7.2
                     // (2026-07-28) -- the sheet's content (see the ModalBottomSheet above) has
                     // exactly one branch now.
-                    if (DeckFeatureFlags.DISCOVERIES_V2_ENABLED) {
+                    if (FeatureFlags.Decks.DISCOVERIES_V2_ENABLED) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -871,6 +869,30 @@ private fun DeckStudioTopBar(
                             onShare()
                         },
                     )
+
+                    if (FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Massive add",
+                                    style = ty.bodyMedium,
+                                    color = if (shareEnabled) mc.textPrimary else mc.textDisabled,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.CollectionsBookmark,
+                                    contentDescription = null,
+                                    tint = if (shareEnabled) mc.textSecondary else mc.textDisabled,
+                                )
+                            },
+                            enabled = shareEnabled,
+                            onClick = {
+                                showOverflow = false
+                                onMassiveAdd()
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -952,7 +974,12 @@ private fun BuildTab(
                 verticalArrangement = Arrangement.spacedBy(spacing.md),
             ) {
         item(key = "summary") {
-            val targetCount = if (isCommanderFormat) 100 else 60
+            // Derive the deck-size target from the deck's actual DeckFormat.targetDeckSize
+            // (DRAFT = 40, COMMANDER = 100, everything else = 60) instead of a Commander-only
+            // ternary, which silently mislabeled Draft decks (min 40) as "X/60".
+            val targetCount = uiState.deck?.format
+                ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
+                ?.targetDeckSize ?: 60
             val maxInCurve = uiState.manaCurve.values.maxOrNull() ?: 0
             val deckCards = (uiState.cards + listOfNotNull(uiState.commanderCard))
                 .filter { it.card != null && !it.isSideboard && !BasicLandCalculator.isLand(it.card!!) }
@@ -986,7 +1013,16 @@ private fun BuildTab(
 
         item(key = "grouping_selector") {
             Column(Modifier.padding(horizontal = spacing.lg).animateItem()) {
-                GroupingFlowSelector(selected = uiState.groupingMode, onSelect = onSetGroupingMode)
+                // F.4: migrated from GroupingFlowSelector (dropdown) to ManaHubBottomSheetSelector,
+                // the same modal-sheet picker CollectionScreen already uses for its sort/group pickers.
+                ManaHubBottomSheetSelector(
+                    icon = Icons.Default.Layers,
+                    valueText = stringResource(uiState.groupingMode.displayResId),
+                    items = GroupingMode.entries,
+                    selectedItem = uiState.groupingMode,
+                    onSelect = onSetGroupingMode,
+                    itemLabel = { stringResource(it.displayResId) },
+                )
             }
         }
 
@@ -1213,8 +1249,8 @@ private fun EmptyDeckState(
     // add-cards affordance). Unchanged from the previous layout. Each flag's legacy sibling
     // (DECK_STUDIO_BUILD_FROM_SEED_ENABLED / DECK_STUDIO_BROWSE_INSPIRATIONS_ENABLED) was RETIRED
     // in the Deck Wizard & Engine Rework plan, WS7.2 (2026-07-28).
-    val seedEnabled = DeckFeatureFlags.DECK_BUILDER_V2_ENABLED
-    val inspirationsEnabled = DeckFeatureFlags.DISCOVERIES_V2_ENABLED
+    val seedEnabled = FeatureFlags.Decks.DECK_BUILDER_V2_ENABLED
+    val inspirationsEnabled = FeatureFlags.Decks.DISCOVERIES_V2_ENABLED
     val importIsPrimary = !seedEnabled && !inspirationsEnabled
 
     LazyColumn(
@@ -1658,14 +1694,10 @@ private fun StrategiesTabContent(
                             // Defensive fallback -- every name in pickableCardNames comes from a
                             // DeckDiscoveryV2 member, which always carries a resolved Card, but
                             // keep a text chip so an unresolved name never silently vanishes.
-                            FilterChip(
+                            MagicFilterChip(
                                 selected = name in selectedCardNames,
                                 onClick = { onToggleSearchCard(name) },
-                                label = { Text(name, style = ty.labelMedium) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                                    selectedLabelColor = mc.primaryAccent,
-                                ),
+                                label = name,
                             )
                         }
                     }
@@ -2318,3 +2350,18 @@ private fun SuggestionsSectionHeader(text: String, color: androidx.compose.ui.gr
         color = color,
     )
 }
+
+/**
+ * Localized label for [GroupingMode] (F.4 — migrated from [GroupingFlowSelector]'s hardcoded
+ * English literals to [ManaHubBottomSheetSelector], which needs a [stringResource] per item, like
+ * `CollectionGroupingMode.displayResId` in `CollectionScreen.kt`). Kept PRIVATE and duplicated
+ * rather than shared with `DraftResultScreen`'s equivalent — a ~10-line enum-to-string mapping is
+ * not worth a cross-feature (decks <-> draft) dependency.
+ */
+private val GroupingMode.displayResId: Int
+    get() = when (this) {
+        GroupingMode.TYPE -> R.string.deckbuilder_group_type
+        GroupingMode.COLOR -> R.string.deckbuilder_group_color
+        GroupingMode.COST -> R.string.deckbuilder_group_cmc
+        GroupingMode.TAG -> R.string.deckbuilder_group_tag
+    }

@@ -12,14 +12,14 @@ sealed class AuthUiState {
     data object AccountDeleted : AuthUiState()
     /** Emitted after [AuthViewModel.updateNickname] completes successfully. */
     data object NicknameUpdated : AuthUiState()
-    /** Emitted after [AuthViewModel.requestReauthentication] sends a nonce successfully. */
-    data object ReauthenticationSent : AuthUiState()
     /** Emitted after [AuthViewModel.updateEmail] completes successfully. */
     data object EmailUpdated : AuthUiState()
     /** Emitted after [AuthViewModel.updatePassword] completes successfully. */
     data object PasswordUpdated : AuthUiState()
     /** Emitted after [AuthViewModel.unlinkIdentity] completes successfully. */
     data object IdentityUnlinked : AuthUiState()
+    /** Emitted after [AuthViewModel.cancelPendingEmailChange] completes successfully. */
+    data object EmailChangeCancelled : AuthUiState()
     /** Emitted after [AuthViewModel.confirmPasswordReset] completes successfully. */
     data object PasswordResetConfirmed : AuthUiState()
     /**

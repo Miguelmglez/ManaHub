@@ -1,5 +1,7 @@
 package com.mmg.manahub.feature.communitydecks.presentation.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +21,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Close
@@ -29,12 +34,13 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -43,6 +49,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -57,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -76,13 +84,19 @@ import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.ManaColorPicker
 import com.mmg.manahub.core.ui.components.search.SearchSection
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckFormatFilter
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckSortDirection
+import com.mmg.manahub.feature.communitydecks.presentation.CommunityDeckSortField
 import com.mmg.manahub.feature.communitydecks.presentation.CommunityDecksSearchUiState
 import com.mmg.manahub.feature.communitydecks.presentation.MAX_COMMUNITY_CARD_FILTERS
+import com.mmg.manahub.feature.communitydecks.presentation.displayResId
 import kotlinx.coroutines.launch
 
 /** One in-progress card inspection triggered from either the Commander or Card picker. */
@@ -94,13 +108,16 @@ private data class InspectingSession(
 )
 
 /**
- * Archidekt-style advanced search sheet for the Community Hub (Discover/Search overhaul, Phase 2).
+ * Archidekt-style advanced search sheet for the Community Hub (Discover/Search overhaul, Phase 2;
+ * Deck format + Sort moved in from outside the sheet, Advanced Search sheet rework, 2026-08-18).
  *
  * Modeled on the skeleton/visual language of [com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet]
  * (header with Close + Clear all, scrollable [SearchSection]s, big Search button) but exposes ONLY
  * the filters Archidekt's search API actually supports (see
  * `docs/adr/ADR-004-community-api-contracts.md` §1b) — deliberately no deck-tag filter (always
- * statement-timeouts) and colors are EXACT-match only (no include/at-most mode exists).
+ * statement-timeouts) and colors are EXACT-match only (no include/at-most mode exists). The
+ * Commander bracket and Commander sections only render when the Deck format section has
+ * [CommunityDeckFormatFilter.COMMANDER] selected.
  *
  * Fully driven by the parent [CommunityDecksSearchUiState] + callbacks — this composable holds no
  * business state of its own beyond the ephemeral card-inspection overlay (pure UI, not business
@@ -111,6 +128,7 @@ private data class InspectingSession(
 fun CommunityAdvancedSearchSheet(
     state: CommunityDecksSearchUiState,
     onDismiss: () -> Unit,
+    onDeckTypeSelected: (CommunityDeckFormatFilter) -> Unit,
     onColorToggled: (String) -> Unit,
     onBracketSelected: (Int?) -> Unit,
     onCommanderQueryChange: (String) -> Unit,
@@ -122,6 +140,10 @@ fun CommunityAdvancedSearchSheet(
     onUsernameChanged: (String) -> Unit,
     onDeckSizeChanged: (String) -> Unit,
     onPrimersOnlyToggled: (Boolean) -> Unit,
+    onDeckTagPickerOpened: () -> Unit,
+    onDeckTagSelected: (String?) -> Unit,
+    onSortFieldSelected: (CommunityDeckSortField) -> Unit,
+    onSortDirectionSelected: (CommunityDeckSortDirection) -> Unit,
     onClearAll: () -> Unit,
     onSearch: () -> Unit,
 ) {
@@ -134,6 +156,7 @@ fun CommunityAdvancedSearchSheet(
     var rootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var inspecting by remember { mutableStateOf<InspectingSession?>(null) }
     var isDismissingInspection by remember { mutableStateOf(false) }
+    var showDeckTagPicker by remember { mutableStateOf(false) }
 
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
@@ -214,6 +237,29 @@ fun CommunityAdvancedSearchSheet(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(vertical = 12.dp),
                 ) {
+                    // ── Deck format (Advanced Search sheet rework, 2026-08-18: moved in from the
+                    // ManaHubBottomSheetSelector that used to sit outside the sheet, in the Search
+                    // body's Row) — always one of the 7 formats selected, no "Any"/"All" option. ──
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.community_advsearch_section_format),
+                            icon = Icons.Default.Layers
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CommunityDeckFormatFilter.entries.forEach { format ->
+                                    MagicFilterChip(
+                                        selected = filters.formats == format,
+                                        onClick = { onDeckTypeSelected(format) },
+                                        label = stringResource(format.displayResId),
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // ── Colors ──
                     item {
                         SearchSection(
@@ -235,8 +281,9 @@ fun CommunityAdvancedSearchSheet(
                     }
 
 
-                    // ── Commander bracket ──
-                    item {
+                    // ── Commander bracket (Commander-only — hidden for every other format, per
+                    // Advanced Search sheet rework 2026-08-18) ──
+                    if (filters.formats == CommunityDeckFormatFilter.COMMANDER) item {
                         SearchSection(
                             title = stringResource(R.string.community_advsearch_section_bracket),
                             icon = Icons.Default.BarChart
@@ -245,29 +292,25 @@ fun CommunityAdvancedSearchSheet(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                FilterChip(
+                                MagicFilterChip(
                                     selected = filters.edhBracket == null,
                                     onClick = { onBracketSelected(null) },
-                                    label = {
-                                        Text(
-                                            stringResource(R.string.community_advsearch_bracket_any),
-                                            style = ty.labelMedium
-                                        )
-                                    },
+                                    label = stringResource(R.string.community_advsearch_bracket_any),
                                 )
                                 (1..5).forEach { bracket ->
-                                    FilterChip(
+                                    MagicFilterChip(
                                         selected = filters.edhBracket == bracket,
                                         onClick = { onBracketSelected(bracket) },
-                                        label = { Text("$bracket", style = ty.labelMedium) },
+                                        label = "$bracket",
                                     )
                                 }
                             }
                         }
                     }
 
-                    // ── Commander ──
-                    item {
+                    // ── Commander (Commander-only — hidden for every other format, per Advanced
+                    // Search sheet rework 2026-08-18) ──
+                    if (filters.formats == CommunityDeckFormatFilter.COMMANDER) item {
                         SearchSection(
                             title = stringResource(R.string.community_advsearch_section_commander),
                             icon = Icons.Default.AccountCircle
@@ -437,6 +480,72 @@ fun CommunityAdvancedSearchSheet(
                         }
                     }
 
+                    // ── Deck tag (Advanced Search sheet, 2026-08-18: `deckTagName` verified live as
+                    // a real, working, exact-match Archidekt filter — see CommunityDeckSearchFilters'
+                    // KDoc) — a Surface row that opens a search-filterable picker over the closed
+                    // 434-entry tag catalog, single-select, mirroring the reference AdvancedSearchSheet's
+                    // tag-picker Surface/chooser pattern. ──
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.community_advsearch_section_deck_tag),
+                            icon = Icons.Default.LocalOffer,
+                        ) {
+                            Surface(
+                                onClick = {
+                                    onDeckTagPickerOpened()
+                                    showDeckTagPicker = true
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = mc.surface,
+                                border = BorderStroke(
+                                    width = if (filters.deckTag != null) 1.5.dp else 0.5.dp,
+                                    color = if (filters.deckTag != null) mc.primaryAccent else mc.surfaceVariant,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = if (filters.deckTag != null) mc.primaryAccent else mc.textDisabled,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                    Text(
+                                        text = filters.deckTag
+                                            ?: stringResource(R.string.community_advsearch_deck_tag_placeholder),
+                                        style = ty.bodyLarge,
+                                        color = if (filters.deckTag != null) mc.primaryAccent else mc.textDisabled,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                    )
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = mc.textDisabled,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+
+                            if (showDeckTagPicker) {
+                                DeckTagPickerSheet(
+                                    availableTags = state.availableDeckTags,
+                                    selectedTag = filters.deckTag,
+                                    isLoading = state.isDeckTagsLoading,
+                                    onSelect = { tag ->
+                                        onDeckTagSelected(tag)
+                                        showDeckTagPicker = false
+                                    },
+                                    onDismiss = { showDeckTagPicker = false },
+                                )
+                            }
+                        }
+                    }
+
                     // ── Primers ──
                     item {
                         SearchSection(
@@ -458,6 +567,42 @@ fun CommunityAdvancedSearchSheet(
                                     onCheckedChange = onPrimersOnlyToggled,
                                     colors = SwitchDefaults.colors(checkedTrackColor = mc.primaryAccent),
                                 )
+                            }
+                        }
+                    }
+
+                    // ── Sort (Advanced Search sheet rework, 2026-08-18: moved in from the
+                    // ManaHubBottomSheetSelector that used to sit outside the sheet) — 6 Archidekt
+                    // sort fields + a separate ascending/descending toggle, mirroring the reference
+                    // AdvancedSearchSheet's Sort section. ──
+                    item {
+                        SearchSection(
+                            title = stringResource(R.string.community_advsearch_section_sort),
+                            icon = Icons.AutoMirrored.Filled.Sort,
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                CommunityDeckSortField.entries.forEach { field ->
+                                    MagicFilterChip(
+                                        selected = state.selectedSortField == field,
+                                        onClick = { onSortFieldSelected(field) },
+                                        label = stringResource(field.labelRes),
+                                    )
+                                }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf(
+                                    CommunityDeckSortDirection.ASC to stringResource(R.string.advsearch_dir_asc),
+                                    CommunityDeckSortDirection.DESC to stringResource(R.string.advsearch_dir_desc),
+                                ).forEach { (direction, label) ->
+                                    MagicFilterChip(
+                                        selected = state.selectedSortDirection == direction,
+                                        onClick = { onSortDirectionSelected(direction) },
+                                        label = label,
+                                    )
+                                }
                             }
                         }
                     }
@@ -505,6 +650,140 @@ fun CommunityAdvancedSearchSheet(
                         )
                     },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Single-select picker over Archidekt's closed deck-tag catalog (Advanced Search sheet, 2026-08-18).
+ * [availableTags] is the FULL cached catalog (up to 434 entries) — filtered CLIENT-SIDE by [query]
+ * rather than re-querying Archidekt per keystroke, since the catalog is small and fetched once.
+ * Tapping any row — including the currently selected one — invokes [onSelect] with that tag name;
+ * the caller ([CommunityAdvancedSearchSheet]'s toggle-clear logic, via the ViewModel's
+ * `onDeckTagSelected`) is what turns a re-tap of the selected row into a clear.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeckTagPickerSheet(
+    availableTags: List<String>,
+    selectedTag: String?,
+    isLoading: Boolean,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var query by remember { mutableStateOf("") }
+
+    val filteredTags = remember(availableTags, query) {
+        if (query.isBlank()) availableTags else availableTags.filter { it.contains(query, ignoreCase = true) }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.8f)
+                .navigationBarsPadding(),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.community_advsearch_close),
+                        tint = mc.textPrimary,
+                    )
+                }
+                Text(
+                    stringResource(R.string.community_advsearch_deck_tag_title),
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                placeholder = {
+                    Text(stringResource(R.string.community_advsearch_deck_tag_hint), color = mc.textDisabled)
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = magicOutlinedTextFieldColors(),
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MagicLoadingSpinner()
+                    }
+                }
+
+                filteredTags.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            stringResource(R.string.community_advsearch_deck_tag_empty),
+                            style = ty.bodyLarge,
+                            color = mc.textSecondary,
+                        )
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        items(items = filteredTags, key = { it }) { tag ->
+                            val isSelected = tag == selectedTag
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onSelect(tag) }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    tag,
+                                    style = ty.bodyLarge,
+                                    color = if (isSelected) mc.primaryAccent else mc.textPrimary,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

@@ -4,18 +4,14 @@ package com.mmg.manahub.feature.carddetail.presentation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,13 +61,11 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -102,9 +96,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import org.jetbrains.compose.resources.painterResource
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -112,16 +103,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.crossfade
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
-import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.SuggestedTag
@@ -129,18 +118,21 @@ import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.core.model.UserCard
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.UserDefinedTag
+import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.AddCardSheet
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.CardTagChip
-import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.FoilBadge
 import com.mmg.manahub.core.ui.components.FullScreenImageViewer
 import com.mmg.manahub.core.ui.components.LanguageBadge
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaColor
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.ui.components.ManaCostImages
@@ -150,17 +142,19 @@ import com.mmg.manahub.core.ui.components.StaleBadge
 import com.mmg.manahub.core.ui.components.TradeSelectionSheet
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.mtg_card_back
+import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
-import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.PriceFormatter
-import com.mmg.manahub.core.model.WishlistEntry
-import com.mmg.manahub.core.ui.theme.Spacing
-import com.mmg.manahub.core.ui.theme.spacing
+import org.jetbrains.compose.resources.painterResource
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -683,7 +677,7 @@ private fun CardDetailContent(
                                         key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
                                     ),
                                     animatedVisibilityScope = animatedVisibilityScope,
-                                    clipInOverlayDuringTransition = OverlayClip(CardShape),
+                                    clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
                                     boundsTransform = sharedBoundsTransform,
                                     renderInOverlayDuringTransition = true,
                                 )
@@ -936,7 +930,7 @@ private fun CardDetailContent(
                         Surface(
                             onClick = onShowVariantSelector,
                             color = MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.08f),
-                            shape = CardShape,
+                            shape = SmallCardShape,
                             border = BorderStroke(1.dp, MaterialTheme.magicColors.primaryAccent.copy(alpha = 0.2f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1425,7 +1419,7 @@ private fun CollectionCopyRow(
 
     Surface(
         color = mc.surface,
-        shape = CardShape,
+        shape = SmallCardShape,
     ) {
         Row(
             modifier = Modifier
@@ -1650,7 +1644,7 @@ private fun WishlistEntryRow(
 
     Surface(
         color = mc.surface,
-        shape = CardShape,
+        shape = SmallCardShape,
     ) {
         Row(
             modifier = Modifier
@@ -2153,6 +2147,12 @@ private fun TagPickerSheet(
 ) {
     val userTagKeys = currentUserTags.map { it.key }.toSet()
 
+    // Keys already visible on the card via either the "Auto-generated" or "Your tags" section —
+    // excluded from the "Built-in categories" manual-pick list below so a user can't add a
+    // duplicate chip for a key the card already carries (that section's own dedicated pick action
+    // stays the correct way to add/promote an auto tag).
+    val excludedBuiltInKeys = userTagKeys + cardAutoTags.map { it.key }.toSet()
+
     // Built-in categories (excluding CUSTOM which is the fallback for raw custom tags)
     val builtInCategories = TagCategory.entries.filter { it != TagCategory.CUSTOM }
 
@@ -2264,7 +2264,7 @@ private fun TagPickerSheet(
             // ── Built-in categories ──────────────────────────────────────────
             builtInCategories.forEach { category ->
                 val canonical =
-                    CardTag.canonical.filter { it.category == category && it.key !in userTagKeys }
+                    CardTag.canonical.filter { it.category == category && it.key !in excludedBuiltInKeys }
                 val userDefined =
                     userDefinedTags.filter { it.categoryKey == category.name }
                 val items = canonical.map {
@@ -2420,10 +2420,10 @@ private fun CustomTagCreatorSection(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 items(allCategories, key = { it }) { cat ->
-                    FilterChip(
+                    MagicFilterChip(
                         selected = cat == selectedCategoryKey,
                         onClick = { onCategorySelected(cat) },
-                        label = { Text(cat, style = MaterialTheme.magicTypography.labelSmall) },
+                        label = cat,
                     )
                 }
                 item {

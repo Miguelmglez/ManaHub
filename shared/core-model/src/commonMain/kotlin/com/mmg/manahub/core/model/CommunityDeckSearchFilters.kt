@@ -30,6 +30,11 @@ package com.mmg.manahub.core.model
  * @property size exact deck-card-count match (Archidekt `size`; `sizeComp` comparators are
  *   ignored server-side, so only equality is exposed here).
  * @property primersOnly when true, only decks with a primer (Archidekt `primers=true`).
+ * @property deckTagName exact deck-tag name (Archidekt `deckTagName`, singular) — verified live
+ *   2026-08-18 as a real, working, validated exact-match filter (a bad value returns a clean
+ *   `{"count":-1,"message":"No deck tag name \`X\` was found"}` from Archidekt). This is NOT the
+ *   same as `deckTags`/`tags`/`tagIds` (plural/alternate names), which stay dead/unexposed — see
+ *   [com.mmg.manahub.core.data.remote.ArchidektClient.searchDecks]'s KDoc.
  * @property orderBy Archidekt `orderBy` value; only `-viewCount`/`-createdAt`/`-updatedAt` are
  *   verified credible (see the ADR).
  * @property page 1-based page number.
@@ -47,6 +52,7 @@ data class CommunityDeckSearchFilters(
     val colors: Set<String> = emptySet(),
     val size: Int? = null,
     val primersOnly: Boolean = false,
+    val deckTagName: String? = null,
     val orderBy: String? = null,
     val page: Int = 1,
     val pageSize: Int = 20,

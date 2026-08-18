@@ -16,13 +16,19 @@ interface DraftEngine {
     fun start(set: DraftableSet, config: DraftConfig): DraftState
 
     /**
-     * Records the human's pick for [scryfallId], runs bot picks for all other seats,
-     * rotates packs (LEFT for odd rounds, RIGHT for even), and advances pickNumber/round.
+     * Records the human's picks for [scryfallIds] (one call = one turn's worth of picks, i.e.
+     * `1..config.picksPerTurn` ids — see [DraftState.picksTakenInTurn]). Once the human's picks
+     * for this turn are complete (either `config.picksPerTurn` cards were taken, or the pack ran
+     * out first), every other seat's bot takes the SAME number of cards this call took — so every
+     * seat's pack shrinks in lockstep — before packs rotate (LEFT for odd rounds, RIGHT for even)
+     * and pickNumber/round advance. If the turn is not yet complete (a partial-list call), only
+     * the human's pack/pool are updated and [DraftState.picksTakenInTurn] increments — no bot
+     * picks, no rotation, until a later call completes the turn.
      *
      * @param engine The set's archetype decision engine, or null when the set has none (bots then
      *   fall back to the heuristic drafter). The same [engine] is passed into every bot pick.
      */
-    fun applyHumanPick(state: DraftState, scryfallId: String, engine: EngineConfig?): DraftState
+    fun applyHumanPick(state: DraftState, scryfallIds: List<String>, engine: EngineConfig?): DraftState
 
     /**
      * Auto-picks for the human seat using the archetype-aware drafter, then delegates to

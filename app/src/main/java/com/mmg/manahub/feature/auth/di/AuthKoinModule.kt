@@ -4,13 +4,13 @@ import com.mmg.manahub.BuildConfig
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.installSupabaseAuthHeaders
 import com.mmg.manahub.feature.auth.data.remote.UserProfileDataSource
+import com.mmg.manahub.feature.auth.domain.usecase.CancelPendingEmailChangeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmEmailUpdateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
-import com.mmg.manahub.feature.auth.domain.usecase.RequestReauthenticationUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResendConfirmationEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResetPasswordUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
@@ -45,11 +45,12 @@ import org.koin.dsl.module
  * ## Self-contained module (no bridge args)
  * Unlike the bridge-style island modules, [authKoinModule] takes NO constructor arguments. Every
  * dependency [AuthViewModel] needs is already resolvable from modules loaded earlier in `startKoin`:
- * - The eighteen auth use cases (ten original + six added by the account-management data-layer
- *   slice — [ResendConfirmationEmailUseCase]/[RequestReauthenticationUseCase]/[UpdateEmailUseCase]/
+ * - The eighteen auth use cases (ten original + five added by the account-management data-layer
+ *   slice — [ResendConfirmationEmailUseCase]/[UpdateEmailUseCase]/
  *   [UpdatePasswordUseCase]/[UnlinkIdentityUseCase]/[LinkGoogleIdentityNativeUseCase] — plus
- *   [ConfirmPasswordResetUseCase] added by the Phase 4b UI slice and [ConfirmEmailUpdateUseCase]
- *   added by the "Change email" reauth-gate simplification — see its KDoc) are stateless
+ *   [ConfirmPasswordResetUseCase] added by the Phase 4b UI slice, [ConfirmEmailUpdateUseCase]
+ *   added by the "Change email" reauth-gate simplification, and [CancelPendingEmailChangeUseCase]
+ *   added by the 2026-08-14 fix batch — see their KDocs) are stateless
  *   thin wrappers over [AuthRepository] (and, for [DeleteAccountUseCase], `PushTokenRepository`). They
  *   are not registered as `single` in any other loaded module, so they are declared here as
  *   `single { }` and constructed directly by Koin. The Koin-built copies are independent of, but
@@ -219,9 +220,10 @@ fun authKoinModule(): Module = module {
     single { ResetPasswordUseCase(get()) }
     single { UpdateNicknameUseCase(get()) }
     single { DeleteAccountUseCase(get(), get()) }
-    // Account-management data-layer slice (Phase 1): the six new use cases.
+    // Account-management data-layer slice (Phase 1): the five new use cases. (Six originally —
+    // RequestReauthenticationUseCase was retired with the email-nonce reauthentication flow it
+    // existed for; see UpdatePasswordUseCase's KDoc for the current_password replacement.)
     single { ResendConfirmationEmailUseCase(get()) }
-    single { RequestReauthenticationUseCase(get()) }
     single { UpdateEmailUseCase(get()) }
     single { UpdatePasswordUseCase(get()) }
     single { UnlinkIdentityUseCase(get()) }
@@ -231,6 +233,8 @@ fun authKoinModule(): Module = module {
     // "Change email" reauth-gate simplification: Secure Email Change already double-confirms, so
     // this use case skips the reauthentication-code gate — see its KDoc.
     single { ConfirmEmailUpdateUseCase(get()) }
+    // Account-management fix batch (2026-08-14): "Cancel pending email change" affordance.
+    single { CancelPendingEmailChangeUseCase(get()) }
 
     // ── The Koin island: AuthViewModel is now resolved by Koin, not Hilt. ──
     viewModel {
@@ -246,13 +250,13 @@ fun authKoinModule(): Module = module {
             deleteAccountUseCase = get(),
             updateNicknameUseCase = get(),
             resendConfirmationEmailUseCase = get(),
-            requestReauthenticationUseCase = get(),
             updateEmailUseCase = get(),
             updatePasswordUseCase = get(),
             unlinkIdentityUseCase = get(),
             linkGoogleIdentityNativeUseCase = get(),
             confirmPasswordResetUseCase = get(),
             confirmEmailUpdateUseCase = get(),
+            cancelPendingEmailChangeUseCase = get(),
             analyticsHelper = get(),
             appContext = androidContext(),
         )

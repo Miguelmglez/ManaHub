@@ -368,6 +368,11 @@ graphify-out/
 # Node dependencies for Worker projects (manahub-community) — package.json is tracked, not the tree
 /cloudflare/**/node_modules/
 
+# Wrangler local secrets (standard Wrangler convention — real values only ever via
+# `wrangler secret put`, never committed; manahub-competitive is the first Worker to use secrets)
+/cloudflare/**/.dev.vars
+/cloudflare/**/.dev.vars.*
+
 # GitHub Pages site (separate git repo, not part of the app)
 /github-pages/
 /AGENTS.md

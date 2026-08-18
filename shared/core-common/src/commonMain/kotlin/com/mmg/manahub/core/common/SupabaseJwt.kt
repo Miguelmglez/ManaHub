@@ -55,9 +55,8 @@ fun decodeIsAnonymousClaim(accessToken: String?): Boolean {
 
 /**
  * Decodes the `amr` (Authentication Methods Reference) claim from a Supabase (GoTrue) JWT access
- * token and reports whether it contains a `"recovery"` entry — i.e. whether this session was
- * established via a genuine "forgot password" recovery-link/OTP exchange, as opposed to a normal
- * password/OAuth/anonymous sign-in.
+ * token and reports whether it indicates this session was established via a genuine "forgot
+ * password" recovery flow, as opposed to a normal password/OAuth/anonymous sign-in.
  *
  * ## Why this exists (security)
  * `manahub://auth` is an `exported=true` deep link with no path/signature restriction (required
@@ -67,14 +66,59 @@ fun decodeIsAnonymousClaim(accessToken: String?): Boolean {
  * about how the CURRENT session was actually established. Gating
  * `AuthRepository.confirmPasswordReset` (a no-nonce password change) on `SessionState
  * .Authenticated` alone would let an attacker walk an already-logged-in user straight to "set new
- * password" via a forged intent. `amr` is the server-issued, non-forgeable signal: GoTrue records
- * `{"method": "recovery", ...}` in this claim ONLY when the session was minted by exchanging a real
- * recovery-link token (`Auth.resetPasswordForEmail` → tap the emailed link → real `access_token` in
- * the deep link's fragment/query). This is a first-party-documented claim value (Supabase's
- * `jwt-fields` guide lists `"recovery"` as a standard `amr.method`), not a proposal — distinct from
- * the separate, still-open GoTrue feature request (supabase/supabase#45210) to have the SERVER
- * itself restrict what a recovery session's token can do; here we only need to read the claim that
- * already exists to gate our OWN client-side screen/ViewModel.
+ * password" via a forged intent. `amr` is the server-issued, non-forgeable signal.
+ *
+ * ## Matched values (corrected 2026-08-18 — verified against GoTrue's own Go source, not guessed)
+ * `github.com/supabase/auth` (GoTrue), `internal/models/factor.go`, defines an
+ * `AuthenticationMethod` enum whose `IsRecovery()` method — the EXACT logic GoTrue's own
+ * `Session.IsRecovery()` (`internal/models/sessions.go`) uses server-side — treats THREE values as
+ * equivalent for this purpose:
+ * ```go
+ * func (authMethod AuthenticationMethod) IsRecovery() bool {
+ *     switch authMethod {
+ *     case OTP, MagicLink, Recovery:
+ *         return true
+ *     default:
+ *         return false
+ *     }
+ * }
+ * ```
+ * These serialize to the JWT `amr[].method` strings `"otp"`, `"magiclink"`, and `"recovery"`
+ * respectively (`AuthenticationMethod.String()`, same file). A live-captured JWT from tapping a
+ * genuine recovery email link on this project showed `amr: [{"method":"otp",...}]` — GoTrue's
+ * `/verify?type=recovery` handler tags the resulting session with the underlying OTP verification
+ * mechanism (`"otp"`), not the request's own `type` param's string (`"recovery"`) — which is
+ * exactly why `IsRecovery()` was written to include `OTP` alongside the literal `Recovery` value.
+ * An earlier version of this function matched ONLY the literal string `"recovery"`, which never
+ * actually matches real recovery sessions minted by this flow — a fail-closed bug, not a security
+ * gap (it just meant genuine recovery links, not forged ones, were rejected).
+ *
+ * ## Signup-confirmation ambiguity is REAL — this claim alone is NOT sufficient authorization
+ * (corrected 2026-08-18; an earlier version of this KDoc claimed the opposite — that claim was
+ * disproven by live data and must not be resurrected). It is tempting to assume `EmailSignup`
+ * serializing to the distinct string `"email/signup"` means a signup-confirmation session's `amr`
+ * can never satisfy this check — but that assumption is about which STRING VALUE GoTrue could
+ * theoretically use, not about which one it ACTUALLY uses for the session it mints. Verified live
+ * against project `uimogilwuixgkgfcfmyb`'s `auth.mfa_amr_claims` ⋈ `auth.sessions` ⋈ `auth.users`:
+ * of five `otp`-tagged rows, THREE were signup-email confirmations (created within ~50ms of
+ * `email_confirmed_at`, `recovery_sent_at` NULL), not recoveries. `"email/signup"` never appears in
+ * this project's `mfa_amr_claims` at all — GoTrue's `/verify` handler issues the session with
+ * `models.OTP` for signup confirmation too, the same value it uses for a genuine recovery-link
+ * consumption. Consequence: a brand-new user tapping "Confirm your email" produces a session that
+ * satisfies [decodeAmrIndicatesRecoverySession] exactly as if it were a real recovery session.
+ *
+ * **This is why a caller of this function MUST additionally require a one-shot, app-side marker
+ * proving a genuine recovery deep link (not a signup-confirmation one) produced the CURRENT
+ * session**, matched by the session's own `session_id` claim (see the session-id-claim decoder in
+ * this file) and consumed on completion/abandon — `amr` alone gates nothing conclusively; it only
+ * narrows "some OTP-class exchange happened" versus "a password/OAuth sign-in happened". Do not
+ * remove or weaken the marker requirement on the theory that this function's matched-value set
+ * already excludes signup — it does not, in practice, on this project. Full evidence and design:
+ * `docs/plans/password-recovery-hardening-plan-2026-08-18.md` §2.1/§3.
+ *
+ * Source: `github.com/supabase/auth`, `internal/models/factor.go`
+ * (`AuthenticationMethod.IsRecovery()` / `.String()`) and `internal/models/sessions.go`
+ * (`Session.IsRecovery()`) — verify against upstream before changing this set again.
  *
  * ## Decoding approach
  * Same pattern as [decodeIsAnonymousClaim] (see its KDoc): hand-decode the JWT payload segment
@@ -88,13 +132,14 @@ fun decodeIsAnonymousClaim(accessToken: String?): Boolean {
  *
  * @param accessToken The session's JWT access token (e.g. `UserSession.accessToken`), or null.
  * @return `true` only when the decoded payload's `amr` array contains an entry whose `method` is
- *   exactly `"recovery"`. Returns `false` for a normal (non-recovery) session, a null/blank token,
- *   a malformed JWT, a missing/non-array `amr` claim, or any decode failure — this helper never
- *   throws, and a decode failure is treated as "not a recovery session" (fail closed: this claim
- *   gates a sensitive no-nonce password-change path, so an undecodable token must never be treated
- *   as proof of a genuine recovery flow).
+ *   `"recovery"`, `"otp"`, or `"magiclink"` (GoTrue's own `IsRecovery()` set — see above). Returns
+ *   `false` for a normal (non-recovery) session, a null/blank token, a malformed JWT, a
+ *   missing/non-array `amr` claim, or any decode failure — this helper never throws, and a decode
+ *   failure is treated as "not a recovery session" (fail closed: this claim gates a sensitive
+ *   no-nonce password-change path, so an undecodable token must never be treated as proof of a
+ *   genuine recovery flow).
  */
-fun decodeAmrIncludesRecoveryClaim(accessToken: String?): Boolean {
+fun decodeAmrIndicatesRecoverySession(accessToken: String?): Boolean {
     if (accessToken.isNullOrBlank()) return false
     val payloadSegment = accessToken.split(".").getOrNull(1) ?: return false
     return try {
@@ -104,12 +149,69 @@ fun decodeAmrIncludesRecoveryClaim(accessToken: String?): Boolean {
         amr.any { entry ->
             val method = (entry as? JsonObject)?.get("method")?.jsonPrimitive?.contentOrNull
                 ?: (entry as? JsonPrimitive)?.takeIf { it.isString }?.content
-            method == "recovery"
+            method in RECOVERY_AMR_METHODS
         }
     } catch (_: Exception) {
         // Malformed/undecodable token: fail closed (never treat garbage input as proof of a
         // genuine recovery session), consistent with decodeIsAnonymousClaim's error handling.
         false
+    }
+}
+
+/**
+ * The `amr[].method` string values GoTrue's own `AuthenticationMethod.IsRecovery()`
+ * (`github.com/supabase/auth`, `internal/models/factor.go`) treats as a genuine recovery session.
+ * See [decodeAmrIndicatesRecoverySession]'s KDoc for the full citation and rationale.
+ */
+private val RECOVERY_AMR_METHODS = setOf("recovery", "otp", "magiclink")
+
+/**
+ * Decodes the `session_id` claim from a Supabase (GoTrue) JWT access token.
+ *
+ * ## Why this exists
+ * [decodeAmrIndicatesRecoverySession] alone is NOT sufficient proof that the current session came
+ * from a genuine password-recovery deep link — see that function's KDoc for the live-verified
+ * signup-confirmation-ambiguity evidence. The app-side fix is a one-shot marker
+ * (`pending_recovery_session_id` + a timestamp, see `UserPreferencesDataStore` in the Android app
+ * module) written ONLY when a genuine recovery deep link is imported, bound to the specific session
+ * that resulted from it. Binding by `session_id` (rather than a plain boolean "a recovery happened
+ * recently" flag) is what makes the marker non-transferable: a marker written for one session can
+ * never validate a DIFFERENT session that happens to be current later (e.g. after a sign-out and a
+ * new sign-in, or a forged intent racing a real one). `session_id` is a top-level claim GoTrue puts
+ * on every access token, identifying the `auth.sessions` row the token was minted for — every
+ * refreshed token for that same session carries the same `session_id`, but a different session
+ * (even for the same user) gets a different one.
+ *
+ * ## Decoding approach
+ * Same pattern as [decodeIsAnonymousClaim] and [decodeAmrIndicatesRecoverySession] (see their
+ * KDocs): hand-decode the JWT payload segment rather than relying on a typed SDK claims model,
+ * since `UserSession`/`UserInfo` in this project's pinned supabase-kt version do not expose
+ * `session_id` as a typed property.
+ *
+ * Pure commonMain: only kotlin-stdlib + kotlinx.serialization.json, no `android.*`/`java.*`/browser
+ * API — safe to call from `androidMain`, `wasmJsMain`, or any future target.
+ *
+ * @param accessToken The session's JWT access token (e.g. `UserSession.accessToken`), or null.
+ * @return The decoded `session_id` claim value, or `null` for a null/blank token, a malformed JWT,
+ *   a missing/non-string `session_id` claim, or any decode failure — this helper never throws. A
+ *   `null` return must be treated as "no marker can ever match this session" by callers (fail
+ *   closed), never as "skip the check".
+ */
+fun decodeSessionIdClaim(accessToken: String?): String? {
+    if (accessToken.isNullOrBlank()) return null
+    val payloadSegment = accessToken.split(".").getOrNull(1) ?: return null
+    return try {
+        val payloadJson = decodeBase64UrlToString(payloadSegment)
+        val payload = Json.parseToJsonElement(payloadJson) as? JsonObject ?: return null
+        // Explicitly require a STRING primitive (not just any content via .contentOrNull, which
+        // would silently stringify a non-string value like a JSON number) — this claim gates a
+        // security-sensitive marker match, so a malformed/unexpected shape must fail closed rather
+        // than coerce.
+        (payload["session_id"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+    } catch (_: Exception) {
+        // Malformed/undecodable token: fail closed (null), consistent with the other decoders in
+        // this file — a decode failure must never be treated as "no marker check needed".
+        null
     }
 }
 

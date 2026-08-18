@@ -232,6 +232,7 @@ class AuthViewModel(
         is AuthError.NicknameInappropriate -> "This nickname contains inappropriate content. Please choose another."
         is AuthError.NicknameTooLong -> "Nickname must be 30 characters or less."
         is AuthError.SingleIdentityNotDeletable -> "You need another sign-in method before removing this one."
+        is AuthError.InvalidCurrentPassword -> "Current password is incorrect."
         is AuthError.RateLimited -> "Too many requests. Please wait a moment before trying again."
         is AuthError.GoogleEmailConflict -> "An account already exists with this email."
         is AuthError.NoProfileFound -> "No profile found for this account."

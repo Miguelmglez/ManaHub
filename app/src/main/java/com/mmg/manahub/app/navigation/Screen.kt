@@ -20,6 +20,8 @@ sealed class Screen(val route: String) {
         fun routeWithTab(tab: String) = "collection?tab=$tab"
     }
     object CollectionAddCard  : Screen("collection/add")
+    object CollectionMassiveAddCard  : Screen("collection/massiveAddCard")
+
     object CollectionScanner  : Screen("collection/scanner")
     object CollectionCardDetail : Screen("collection/detail/{scryfallId}?sharedTransitionKey={sharedTransitionKey}") {
         fun createRoute(scryfallId: String, sharedTransitionKey: String? = null) =
@@ -36,17 +38,31 @@ sealed class Screen(val route: String) {
      * card suggestions, and seed-based auto-build in a single destination.
      * The optional [deckId] query parameter opens an existing deck; when absent a
      * fresh draft is created.
+     *
+     * @property route also carries an optional `fromDraft` flag (Phase E, E.10a) — true ONLY when
+     *   this destination is reached from the Draft Simulator's "deck saved" hand-off. It exists
+     *   purely to special-case `onBack`'s target in `AppNavGraph` (the draft flow that would
+     *   otherwise be the natural "previous" back-stack entry lands on `Screen.Draft`, the set
+     *   browser — not a place a user managing a freshly-created deck expects to end up — so a
+     *   `fromDraft` open instead routes back to `Screen.Collection`'s Decks tab). Every other entry
+     *   point (Collection/Stats/Home/CardDetail/CommunityDeck import/Wizard hand-off) omits it and
+     *   keeps the plain `popBackStack()` behavior unchanged.
      */
-    object DeckStudio : Screen("deck/studio?deckId={deckId}") {
+    object DeckStudio : Screen("deck/studio?deckId={deckId}&fromDraft={fromDraft}") {
         /** Base route for the destination when no deck id is supplied (creates a fresh draft). */
         const val baseRoute = "deck/studio"
 
         /**
          * Builds the route. A non-empty [deckId] opens an existing deck in the studio;
-         * null/empty creates a new draft.
+         * null/empty creates a new draft. [fromDraft] defaults to false — pass true ONLY from the
+         * Draft Simulator's deck-saved hand-off (see the class KDoc).
          */
-        fun createRoute(deckId: String? = null) =
-            baseRoute + if (!deckId.isNullOrEmpty()) "?deckId=$deckId" else ""
+        fun createRoute(deckId: String? = null, fromDraft: Boolean = false): String {
+            val params = mutableListOf<String>()
+            if (!deckId.isNullOrEmpty()) params += "deckId=$deckId"
+            if (fromDraft) params += "fromDraft=true"
+            return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"
+        }
     }
 
     object DeckAddCards : Screen("collection/decks/{deckId}/add") {
@@ -140,26 +156,38 @@ sealed class Screen(val route: String) {
     object AccountManagement : Screen("auth/manage")
 
     /**
-     * Reauthentication-code gate ahead of the "Change password" / "Set a password" flow only.
-     * "Change email" no longer routes through this screen — Supabase's "Secure email change"
-     * project setting already double-confirms an email change server-side, making the gate
-     * redundant there (see the KDoc on
+     * Final step of the "Change email" flow — reached DIRECTLY from [AccountManagement]. "Change
+     * email" skips any reauthentication gate — Supabase's "Secure email change" project setting
+     * already double-confirms an email change server-side (see the KDoc on
      * [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate]).
-     */
-    object SecurityCode : Screen("auth/security_code")
-
-    /**
-     * Final step of the "Change email" flow — reached DIRECTLY from [AccountManagement] (no
-     * [SecurityCode] hop; see that object's KDoc).
      */
     object UpdateEmail : Screen("auth/update_email")
 
-    /** Final step of the "Change password" / "Set a password" flow, reached only after [SecurityCode]. */
-    object UpdatePassword : Screen("auth/update_password")
+    /**
+     * "Change password" / "Set a password" — reached DIRECTLY from [AccountManagement] (no
+     * intermediate reauthentication-code screen: Supabase's "Require current password when
+     * updating" project setting protects this server-side instead — see the KDoc on
+     * [com.mmg.manahub.core.domain.auth.AuthRepository.updatePassword]).
+     */
+    object UpdatePassword : Screen("auth/update_password?requireCurrentPassword={requireCurrentPassword}") {
+        /**
+         * Builds the route for [requireCurrentPassword]: true for "Change password" (account
+         * already has an email/password identity — GoTrue requires the current password), false
+         * for "Set a password" (Google-only account with none yet — GoTrue skips the check).
+         * A plain boolean nav argument is safe here — unlike the retired reauthentication code,
+         * it carries no sensitive data.
+         */
+        fun routeWithRequireCurrentPassword(requireCurrentPassword: Boolean) =
+            "auth/update_password?requireCurrentPassword=$requireCurrentPassword"
+    }
 
     /**
-     * "Forgot password" recovery-link completion. Deep-linked from `manahub://auth/recovery`
-     * (see `AppNavGraph.kt`'s deep-link wiring KDoc) — never reached via a normal `navigate()` call.
+     * "Forgot password" recovery-link completion. Reached via a plain `navigate(route)` call from
+     * `AppNavGraph.kt`'s reactive `LaunchedEffect(recoverySessionState)` (hardened 2026-08-18 —
+     * see that effect's KDoc), which fires whenever `AuthRepository.sessionState` reflects a
+     * recovery-authenticated session, regardless of how that session came to exist. The
+     * `manahub://auth/recovery` deep link pattern is still declared on the destination but is now
+     * an inert, unused secondary entry point — no code path enqueues it.
      */
     object ResetPasswordConfirm : Screen("auth/reset_password_confirm")
 
@@ -234,14 +262,14 @@ sealed class Screen(val route: String) {
         fun createRoute(setCode: String) = "draft/sim/setup/$setCode"
     }
 
-    /** Active drafting screen: pick cards pack by pack. */
+    /**
+     * Merged draft-flow screen: active drafting (Picks tab) and deck preview/save (Deck tab) in one
+     * destination (Phase C collapse — previously a separate `DraftSimResult` destination existed;
+     * that nav hop is gone, both panes now live under this single route and switch via an in-screen
+     * TabRow instead of `navController.navigate`).
+     */
     object DraftSimDrafting : Screen("draft/sim/drafting/{sessionId}") {
         fun createRoute(sessionId: String) = "draft/sim/drafting/$sessionId"
-    }
-
-    /** Result / deck-build screen after all packs are drafted. */
-    object DraftSimResult : Screen("draft/sim/result/{sessionId}") {
-        fun createRoute(sessionId: String) = "draft/sim/result/$sessionId"
     }
 
     // ── Online multiplayer lobby ──────────────────────────────────────────────

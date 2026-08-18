@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,26 +14,24 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -43,7 +40,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Search
@@ -51,23 +47,19 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -84,32 +76,29 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import org.jetbrains.compose.resources.painterResource
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.R
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.model.MagicSet
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.components.CardRarity
-import com.mmg.manahub.core.ui.components.MagicProgressBar
-import com.mmg.manahub.core.ui.components.ManaCostImages
-import com.mmg.manahub.core.ui.components.SetSymbol
-import com.mmg.manahub.core.data.network.RateLimitExhaustedException
-import com.mmg.manahub.core.model.CollectionViewMode
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
-import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.LanguageSelectorSheet
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.ManaCostImages
+import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -117,6 +106,8 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.CardConstants
 import com.mmg.manahub.core.util.PriceFormatter
+import org.jetbrains.compose.resources.painterResource
+import org.koin.androidx.compose.koinViewModel
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  AddCardScreen — search-first entry point for adding cards to the collection.
@@ -218,7 +209,6 @@ fun AddCardScreen(
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = animatedVisibilityScope,
                 onViewModeToggle = viewModel::onViewModeToggle,
-                gridState = viewModel.gridState
             )
 
             if (showAdvancedSearch) {
@@ -265,7 +255,6 @@ private fun SearchSurface(
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
     onViewModeToggle: () -> Unit,
-    gridState: LazyGridState,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -340,7 +329,7 @@ private fun SearchSurface(
                     focusedContainerColor = mc.surface,
                     unfocusedContainerColor = mc.surface,
                 ),
-                shape = CardShape,
+                shape = SmallCardShape,
             )
             BadgedBox(
                 badge = {
@@ -360,7 +349,7 @@ private fun SearchSurface(
                     },
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(CardShape)
+                        .clip(SmallCardShape)
                         .background(mc.primaryAccent.copy(alpha = 0.1f)),
                 ) {
                     Icon(
@@ -525,7 +514,6 @@ private fun SearchSurface(
                             onLoadNextPage = onLoadNextPage,
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
-                            gridState = gridState,
                         )
                     }
                     }
@@ -628,14 +616,14 @@ private fun SpotlightCardTile(
             .fillMaxWidth()
             // Full MTG card aspect ratio (745:1040) so the whole card is shown.
             .aspectRatio(0.717f)
-            .clip(CardShape)
+            .clip(SmallCardShape)
             .then(
                 if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {
                         Modifier.sharedBounds(
                             sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
                             animatedVisibilityScope = animatedVisibilityScope,
-                            clipInOverlayDuringTransition = OverlayClip(CardShape),
+                            clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
                             renderInOverlayDuringTransition = true,
                         )
                     }
@@ -671,7 +659,6 @@ private fun ResultsList(
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
 ) {
-    val mc = MaterialTheme.magicColors
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
@@ -723,7 +710,6 @@ private fun ResultsList(
 private fun ResultsGrid(
     results: List<Card>,
     uiState: AddCardUiState,
-    gridState: LazyGridState,
     hasMore: Boolean,
     contentPaddingBottom: Dp,
     onCardSelected: (Card) -> Unit,
@@ -746,7 +732,7 @@ private fun ResultsGrid(
 
     LazyVerticalGrid(
         columns               = GridCells.Adaptive(minSize = 100.dp),
-        state                 = gridState,
+        state                 = rememberLazyGridState(),
         contentPadding        = PaddingValues(top = 4.dp, bottom = 4.dp + contentPaddingBottom ),
         verticalArrangement   = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -895,7 +881,7 @@ private fun SearchResultItem(
 
     Surface(
         onClick = onClick,
-        shape = CardShape,
+        shape = SmallCardShape,
         color = mc.surface,
         border = BorderStroke(0.5.dp, mc.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),

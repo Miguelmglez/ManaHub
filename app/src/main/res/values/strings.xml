@@ -620,6 +620,7 @@
     <string name="deckbuilder_group_color">Color</string>
     <string name="deckbuilder_group_cmc">CMC</string>
     <string name="deckbuilder_group_rarity">Rarity</string>
+    <string name="deckbuilder_group_tag">Tag</string>
     <string name="deckbuilder_group_label">Group by:</string>
     <string name="deckbuilder_format_total_cards">Total: %1$d</string>
     <string name="deckbuilder_lands">Lands</string>
@@ -1136,8 +1137,8 @@
     <string name="gamesetup_land_reminder_subtitle">Show land-played indicator on active player</string>
     <string name="gamesetup_life_control_title">Life Control</string>
     <string name="gamesetup_life_control_subtitle">How to change life points</string>
-    <string name="gamesetup_life_control_swipe">Swipe</string>
-    <string name="gamesetup_life_control_swipe_hint">↕ Swipe up · down</string>
+    <string name="gamesetup_life_control_buttons">Buttons</string>
+    <string name="gamesetup_life_control_buttons_hint">Tap top / bottom</string>
     <string name="gamesetup_life_control_tap">Tap</string>
     <string name="gamesetup_life_control_tap_hint">Tap ▼ · Heart ▲</string>
     <string name="gamesetup_voice_land_reminder_title">Voice: Land reminder</string>
@@ -2225,9 +2226,14 @@
     <string name="draft_sim_timer_label">Pick timer</string>
     <string name="draft_sim_timer_off">Off</string>
     <string name="draft_sim_timer_seconds">%1$ds</string>
+    <string name="draft_sim_picks_per_turn_label">Picks per turn</string>
+    <string name="draft_sim_pick_1">Pick 1</string>
+    <string name="draft_sim_pick_2">Pick 2</string>
     <string name="draft_sim_building_title">Drafting complete</string>
+    <string name="draft_sim_deck_preview_title">Deck Preview</string>
     <string name="draft_sim_pool_panel_title">Your pool</string>
     <string name="draft_sim_basics_header">Basic Lands (%1$d)</string>
+    <string name="draft_sim_basics_group_title">Basic Lands</string>
     <string name="draft_sim_empty_pack">Pack is empty.</string>
     <string name="draft_sim_loading">Building draft…</string>
     <string name="draft_sim_error_generic">Something went wrong with the draft.</string>
@@ -2239,6 +2245,27 @@
     <string name="draft_sim_rarity_common">Common</string>
     <string name="draft_sim_pool_empty">Your pool is empty</string>
     <string name="draft_sim_pool_filter_showing">Showing %1$d / %2$d cards</string>
+    <string name="draft_sim_tab_picks">Picks</string>
+    <string name="draft_sim_tab_deck">Deck</string>
+    <string name="draft_sim_confirm_n_picks">Confirm %1$d picks</string>
+    <string name="draft_sim_draft_completed">Draft completed!</string>
+    <string name="draft_sim_move_to_sideboard">Move to sideboard</string>
+    <string name="draft_sim_move_to_mainboard">Move to mainboard</string>
+    <string name="draft_sim_keep_mainboard">Keep in Mainboard</string>
+    <string name="draft_sim_move_mainboard">Move to Mainboard</string>
+    <string name="draft_sim_keep_sideboard">Keep in Sideboard</string>
+    <string name="draft_sim_move_sideboard">Move to Sideboard</string>
+    <string name="draft_sim_land_suggestions">Magic Land Suggestions</string>
+    <string name="draft_sim_target_land_count">Target lands</string>
+    <string name="draft_sim_grouping_gated_hint">Finish drafting to curate your mainboard and save the deck.</string>
+    <string name="draft_sim_expand_group">Expand group</string>
+    <string name="draft_sim_collapse_group">Collapse group</string>
+    <string name="draft_sim_cancel_draft_title">Cancel this draft?</string>
+    <string name="draft_sim_cancel_draft_message">Leaving now will completely cancel the draft simulation in progress. Your picks so far will be lost.</string>
+    <string name="draft_sim_cancel_draft_confirm">Cancel Draft</string>
+    <string name="draft_sim_exit_without_saving_title">Exit without saving?</string>
+    <string name="draft_sim_exit_without_saving_message">Your drafted deck has not been saved yet. Leaving now will discard it.</string>
+    <string name="draft_sim_exit_without_saving_confirm">Exit Without Saving</string>
 
     <!-- Deck import / export -->
     <string name="deck_import_title">Import Deck</string>
@@ -2285,7 +2312,6 @@
     <string name="auth_btn_google">Continue with Google</string>
     <string name="auth_link_forgot">Forgot your password?</string>
     <string name="auth_reset_title">Reset Password</string>
-    <string name="auth_reset_subtitle">Enter your email to receive a reset link</string>
     <string name="auth_reset_btn">Send reset link</string>
     <string name="auth_reset_sent">Reset link sent! Check your inbox</string>
     <string name="auth_or_divider">or</string>
@@ -2294,7 +2320,8 @@
     <string name="auth_delete_account_confirm_title">Delete Account</string>
     <string name="auth_delete_account_confirm_body">Are you sure? This action cannot be undone. All your synced data will be permanently deleted.</string>
     <string name="auth_delete_account_confirm_btn">Delete Account</string>
-    <string name="auth_email_confirmation_sent">Check your inbox to confirm your email!</string>
+    <!-- Resend-confirmation toast — must convey sender + spam per the 2026-08-18 email-guidance hardening; %1$s is the sender brand name (auth_email_sender_name) -->
+    <string name="auth_email_confirmation_sent">Confirmation email sent — look for it from %1$s (check spam too).</string>
     <string name="auth_section_loading_description">Loading account information</string>
     <!-- Authenticated AccountSection CTAs (sign-out/delete-account moved to a dedicated account-management screen, a later phase) -->
     <string name="auth_manage_account">Manage my account</string>
@@ -2357,6 +2384,10 @@
     <string name="auth_error_single_identity_not_deletable">You need another sign-in method before removing this one.</string>
     <!-- HTTP 429 from the auth server (e.g. too many resend-confirmation-email requests) -->
     <string name="auth_error_rate_limited">Too many requests. Please wait a moment before trying again.</string>
+    <!-- Wrong current password on "Change password" (GoTrue's "Require current password when updating" check) -->
+    <string name="auth_error_invalid_current_password">Current password is incorrect.</string>
+    <!-- "Set a password" succeeded but GoTrue revoked the session server-side as a side effect (2026-08-17 fix) -->
+    <string name="auth_error_password_set_session_revoked">Password set successfully. For your security, please sign in again.</string>
 
     <!-- Account Management screen (Phase 4b) -->
     <string name="account_mgmt_title">Manage account</string>
@@ -2382,27 +2413,92 @@
     <string name="account_mgmt_resend_email">Resend email</string>
     <string name="account_mgmt_gametag_copied">Game tag copied to clipboard</string>
 
-    <!-- Reauthentication-code gate (change-password / set-password only — change-email skips it) -->
-    <string name="account_mgmt_security_code_title">Verify it\'s you</string>
-    <string name="account_mgmt_security_code_body">Enter the 6-digit code we sent to your email to continue changing your password.</string>
-    <string name="account_mgmt_security_code_field_label">6-digit code</string>
-    <string name="account_mgmt_resend_code">Resend code</string>
-    <string name="account_mgmt_resend_code_cooldown">Resend in %1$ds</string>
-    <string name="account_mgmt_session_expired">This step expired. Request a new code to continue.</string>
-    <string name="account_mgmt_request_new_code">Request a new code</string>
+    <!-- Cancel pending "Change email" (Fix 2, 2026-08-14) -->
+    <string name="account_mgmt_cancel_email_change_action">Cancel pending change</string>
+    <string name="account_mgmt_cancel_email_change_title">Cancel email change?</string>
+    <string name="account_mgmt_cancel_email_change_body">This cancels the pending email change and keeps your current email address. You can start a new change anytime.</string>
+    <string name="account_mgmt_cancel_email_change_success">Email change cancelled</string>
+
+    <!-- Deep-link (manahub://auth) callback failure toast — see AccountLinkFailureEvents KDoc for
+         why this copy is intentionally generic (not "Google linking failed" specifically) -->
+    <string name="account_mgmt_deeplink_action_failed">Couldn\'t complete that action. Please try again.</string>
 
     <!-- Change email / change password final steps -->
-    <string name="account_mgmt_update_email_body">Enter your new email address. You\'ll need to confirm this change from links sent to both your old and new email inbox.</string>
+    <!-- Trimmed 2026-08-18 (device-review polish): the mechanics ("confirm from both inboxes")
+         used to be restated here AND by account_mgmt_change_email_step_* below it — cut the
+         duplicated half, the step card now owns the mechanics. -->
+    <string name="account_mgmt_update_email_body">Enter your new email address.</string>
     <string name="account_mgmt_new_email_field">New email</string>
-    <string name="account_mgmt_update_password_body">Enter your new password. We\'ll use the code you just verified to confirm the change.</string>
+    <!-- "Change password" body (account already has a password — current-password field shown).
+         Trimmed 2026-08-18: was "Enter your current password and choose a new one." — a verbatim
+         duplicate of account_mgmt_change_password_step_current + _step_new below it. -->
+    <string name="account_mgmt_update_password_body">Update the password for this account.</string>
+    <!-- "Set a password" body (Google-only account, no current-password field shown). Trimmed
+         2026-08-18: was "Choose a password to add email/password sign-in to this account." — a
+         verbatim duplicate of account_mgmt_set_password_step_choose below it. -->
+    <string name="account_mgmt_set_password_body">Add email/password sign-in to this account.</string>
+    <string name="account_mgmt_current_password_field">Current password</string>
     <string name="account_mgmt_new_password_field">New password</string>
 
     <!-- Forgot-password recovery-link completion -->
     <string name="account_mgmt_reset_password_title">Set new password</string>
-    <string name="account_mgmt_reset_password_body">Choose a new password for your account.</string>
+    <!-- Trimmed 2026-08-18: was "Choose a new password for your account." — a verbatim duplicate
+         of account_mgmt_reset_confirm_step_choose below it. -->
+    <string name="account_mgmt_reset_password_body">Finish resetting your password.</string>
     <string name="account_mgmt_reset_password_cta">Set new password</string>
     <string name="account_mgmt_reset_link_invalid">This reset link is invalid or has expired. Request a new one from the sign-in screen.</string>
     <string name="account_mgmt_back_to_signin">Back to sign in</string>
+    <string name="account_mgmt_reset_abandon_confirm_title">Abandon password reset?</string>
+    <!-- 2026-08-18 UX hardening: states plainly that the current link is burned, not just "you'll need a new one" -->
+    <string name="account_mgmt_reset_abandon_confirm_body">This link stops working immediately — you\'ll need to request a new one to try resetting your password again.</string>
+
+    <!-- ═══════════════════════════════════════════
+         EMAIL DELIVERY GUIDANCE (2026-08-18 UX hardening)
+         Single source of truth for the sender brand name + the two facts every "we sent you an
+         email" wording must convey (look for ManaHub, check spam) — see AuthFlowStepsCard.kt's
+         EmailDeliveryNote composable, the sole consumer of these five strings. Never hardcode a
+         literal email address anywhere — the real sender address is a server-side secret and
+         Supabase's own auth mail may use a different address entirely.
+    ═══════════════════════════════════════════ -->
+    <string name="auth_email_sender_name" translatable="false">ManaHub</string>
+    <string name="auth_email_hint_sender">Look for an email from %1$s.</string>
+    <string name="auth_email_hint_spam">Can\'t find it? Check your spam or junk folder — our emails can land there.</string>
+    <!-- Verified 2026-08-18 against this project's Supabase auth settings (MAILER_OTP_EXP = 3600s) for the password-recovery link specifically -->
+    <string name="auth_email_hint_link_expiry">This link expires in 1 hour.</string>
+    <string name="auth_email_hint_link_single_use">The link works once — if it\'s already been used, request a new one.</string>
+
+    <!-- Change-email step guidance (UpdateEmailScreen, before the address is known) -->
+    <string name="account_mgmt_change_email_steps_title">How this works</string>
+    <string name="account_mgmt_change_email_step_send">We\'ll email a confirmation link to your current inbox and to the new address below.</string>
+    <string name="account_mgmt_change_email_step_confirm_current">Confirm the change from your CURRENT inbox.</string>
+    <string name="account_mgmt_change_email_step_confirm_new">Confirm the change from your NEW inbox.</string>
+    <string name="account_mgmt_change_email_step_pending">Until both are confirmed, your current email stays active — nothing changes yet.</string>
+
+    <!-- Change-email step guidance while a change is pending (AccountManagementScreen, address known) -->
+    <string name="account_mgmt_change_email_pending_title">Confirmation pending</string>
+    <string name="account_mgmt_change_email_pending_step_confirm_current">Confirm the change from your current inbox.</string>
+    <string name="account_mgmt_change_email_pending_step_confirm_new">Confirm the change from your new inbox (%1$s).</string>
+    <string name="account_mgmt_change_email_pending_step_note">Until both are done, your current email stays active — nothing changes yet.</string>
+
+    <!-- Change-password / set-password step guidance (UpdatePasswordScreen) -->
+    <string name="account_mgmt_change_password_steps_title">How this works</string>
+    <string name="account_mgmt_change_password_step_current">Enter your current password to confirm it\'s you.</string>
+    <string name="account_mgmt_change_password_step_new">Choose a new password meeting the requirements below.</string>
+    <string name="account_mgmt_change_password_step_immediate">Your password updates immediately — no email confirmation needed.</string>
+    <string name="account_mgmt_set_password_step_choose">Choose a password meeting the requirements below.</string>
+    <string name="account_mgmt_set_password_step_immediate">This becomes your sign-in password immediately — no email confirmation needed.</string>
+
+    <!-- Forgot-password step guidance, shown BEFORE the link is requested (LoginSheet's reset dialog) -->
+    <string name="auth_reset_steps_title">How this works</string>
+    <string name="auth_reset_step_send">We send a link to your email.</string>
+    <string name="auth_reset_step_open">Open the link on this device.</string>
+    <string name="auth_reset_step_choose">Choose a new password.</string>
+    <string name="auth_reset_step_signout_all">You\'ll be signed out of ALL devices — sign in again with your new password.</string>
+
+    <!-- Forgot-password step guidance, shown on the "set new password" screen after the link is tapped -->
+    <string name="account_mgmt_reset_confirm_steps_title">Before you continue</string>
+    <string name="account_mgmt_reset_confirm_step_choose">Enter a new password below.</string>
+    <string name="account_mgmt_reset_confirm_step_signout_all">You will be signed out of ALL devices, including this one — sign in again with your new password.</string>
 
     <!-- Friends feature -->
     <string name="friends_title">Friends</string>
@@ -3003,6 +3099,8 @@
     <string name="home_widget_desc_friends">Your friends and pending requests</string>
     <string name="home_widget_desc_community_decks">Browse popular community decks</string>
     <string name="home_widget_desc_daily_puzzle">Guess today\'s card from clues</string>
+    <string name="home_widget_desc_competitive">Metagame rankings, Limited ratings, and events</string>
+    <string name="home_widget_desc_multiple_add">Add multiple cards easily!</string>
 
     <!-- Home feature overhaul — Quick Start labels (widget tiles) -->
     <string name="quick_start_scan_card">Scan Card</string>
@@ -3014,8 +3112,9 @@
     <string name="quick_start_my_stats">My Stats</string>
     <string name="quick_start_friends">Friends</string>
     <string name="quick_start_trades">Trades</string>
-    <string name="quick_start_community">Community</string>
+    <string name="quick_start_community">Community decks</string>
     <string name="quick_start_settings">Settings</string>
+    <string name="quick_start_multi_add">Add cards</string>
 
     <!-- Home feature overhaul — Quick Start customization sheet -->
     <string name="quick_start_sheet_title">Pick 4 shortcuts</string>
@@ -3030,8 +3129,9 @@
     <string name="quick_start_sheet_stats">Stats</string>
     <string name="quick_start_sheet_friends">Friends</string>
     <string name="quick_start_sheet_trades">Trades</string>
-    <string name="quick_start_sheet_community">Community</string>
+    <string name="quick_start_sheet_community">Community Decks</string>
     <string name="quick_start_sheet_settings">Settings</string>
+    <string name="quick_start_sheet_multi_add">Add multiple cards</string>
 
     <!-- Home feature overhaul — account nudge card -->
     <string name="home_nudge_title">Protect &amp; connect</string>
@@ -3086,6 +3186,8 @@
     <string name="widget_title_community_decks">Community Decks</string>
     <!-- Daily Puzzle (ADR-006), Batch B2 — Home widget, gallery-only/opt-in. -->
     <string name="widget_title_daily_puzzle">Daily Puzzle</string>
+    <!-- Competitive feature, Phase 5 — Home widget, gallery-only/opt-in, flag-gated. -->
+    <string name="widget_title_competitive">Competitive</string>
     <string name="home_edit_widgets">Edit Widgets</string>
     <string name="widget_title_wishlist">Wishlist</string>
     <string name="widget_title_discover">Discover cards</string>
@@ -3103,6 +3205,9 @@
     <string name="widget_title_community_commanders">Top commanders</string>
     <string name="widget_title_community_meta">Community meta</string>
     <string name="widget_title_improve_game">Improve your game</string>
+
+    <string name="widget_title_multi_card_add">Multi Card Add</string>
+
 
     <!-- Home: account nudge messages -->
     <string name="home_nudge_collection">Back up your collection so it\'s safe across devices.</string>
@@ -3506,6 +3611,22 @@
     <string name="community_advsearch_cards_caption">Add up to 3 cards — decks must contain all of them</string>
     <string name="community_advsearch_cards_caption_multicard">Multi-card results are matched against each card\'s most popular decks and admit only 1 deck format</string>
     <string name="community_advsearch_card_remove">Remove %1$s</string>
+
+    <!-- Community Hub — Advanced Search sheet rework: Deck format + Sort moved into the sheet (2026-08-18) -->
+    <string name="community_advsearch_section_sort">Sort</string>
+    <string name="community_advsearch_sort_name">Alphabetical</string>
+    <string name="community_advsearch_sort_updated">Updated At</string>
+    <string name="community_advsearch_sort_created">Created At</string>
+    <string name="community_advsearch_sort_views">Views</string>
+    <string name="community_advsearch_sort_size">Size</string>
+    <string name="community_advsearch_sort_bracket">EDH Bracket</string>
+
+    <!-- Community Hub — Advanced Search sheet: Deck tag picker (2026-08-18, deckTagName verified live) -->
+    <string name="community_advsearch_section_deck_tag">Deck tag</string>
+    <string name="community_advsearch_deck_tag_hint">Search tags…</string>
+    <string name="community_advsearch_deck_tag_placeholder">Search by tag</string>
+    <string name="community_advsearch_deck_tag_empty">No tags found</string>
+    <string name="community_advsearch_deck_tag_title">Deck Tags</string>
 
     <!-- ══════════════════════════════════════════
          COLLECTION — dynamic grouping (Cards tab, "Group by")

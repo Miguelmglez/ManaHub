@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -36,6 +35,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Search
@@ -46,12 +46,9 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -74,23 +71,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.koin.androidx.compose.koinViewModel
 import coil3.compose.AsyncImage
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import org.koin.androidx.compose.koinViewModel
 import java.util.Calendar
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -122,6 +120,9 @@ fun HomeScreen(
     // Daily Puzzle (ADR-006), Batch B2 — kept OUTSIDE HomeUiState for the same reason, see
     // HomeViewModel.dailyPuzzleFlow's KDoc.
     val dailyPuzzle by viewModel.dailyPuzzleFlow.collectAsStateWithLifecycle()
+    // Competitive feature, Phase 5 — kept OUTSIDE HomeUiState for the same reason, see
+    // HomeViewModel.competitiveEnabledFlow's KDoc.
+    val competitiveEnabled by viewModel.competitiveEnabledFlow.collectAsStateWithLifecycle()
     var showCustomizeSheet by remember { mutableStateOf(false) }
     var showGallerySheet by remember { mutableStateOf(false) }
 
@@ -138,6 +139,7 @@ fun HomeScreen(
         communityDecks = communityDecks,
         communityDecksCategory = communityDecksCategory,
         dailyPuzzle = dailyPuzzle,
+        competitiveEnabled = competitiveEnabled,
         onAction = { action ->
             when (action) {
                 HomeAction.CustomizeQuickStart -> showCustomizeSheet = true
@@ -161,6 +163,7 @@ fun HomeScreen(
                 HomeAction.ResetLayout,
                 HomeAction.RetryDiscover,
                 HomeAction.RefreshDiscover,
+                HomeAction.OpenMultiAdd,
                 HomeAction.RefreshRandomCard,
                 is HomeAction.SelectDiscoverSet,
                 is HomeAction.SelectCommunityDecksCategory,
@@ -179,8 +182,15 @@ fun HomeScreen(
     if (showCustomizeSheet) {
         // Breadcrumb: the quick-start customize sheet was opened (fires once per open).
         LaunchedEffect(Unit) { FirebaseCrashlytics.getInstance().log("home_quick_start_customize_opened") }
+
+        val availableActions = remember {
+            QuickStartAction.entries.filter {
+                it != QuickStartAction.MULTI_ADD_CARD || FeatureFlags.MassiveAdd.MASSIVE_CARDS_ENABLED
+            }
+        }
+
         QuickStartCustomizeSheet(
-            allActions = QuickStartAction.entries,
+            allActions = availableActions,
             selectedActions = uiState.quickStartActions,
             onSave = { selected ->
                 viewModel.saveQuickStartActions(selected)
@@ -197,6 +207,7 @@ fun HomeScreen(
             currentLayout = uiState.layout,
             isAuthenticated = uiState.isAuthenticated,
             gamificationEnabled = uiState.gamificationEnabled,
+            competitiveEnabled = competitiveEnabled,
             onAddWidget = { type -> viewModel.onAction(HomeAction.AddWidget(type)) },
             onRemoveWidget = { type -> viewModel.onAction(HomeAction.RemoveWidget(type)) },
             onMoveWidget = { from, to -> viewModel.onAction(HomeAction.MoveWidget(from, to)) },
@@ -229,6 +240,8 @@ fun HomeScreen(
     communityDecksCategory: HomeCommunityDeckCategory = HomeCommunityDeckCategory.POPULAR,
     // Daily Puzzle (ADR-006), Batch B2.
     dailyPuzzle: DailyPuzzleWidgetState? = null,
+    // Competitive feature, Phase 5.
+    competitiveEnabled: Boolean = false,
 ) {
     val spacing = MaterialTheme.spacing
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -295,6 +308,7 @@ fun HomeScreen(
                     communityDecks = communityDecks,
                     communityDecksCategory = communityDecksCategory,
                     dailyPuzzle = dailyPuzzle,
+                    competitiveEnabled = competitiveEnabled,
                 )
             }
 
@@ -612,15 +626,13 @@ fun QuickStartCustomizeSheet(
                 ) {
                     rowActions.forEach { action ->
                         val isSelected = action in selection
-                        FilterChip(
+                        MagicFilterChip(
                             selected = isSelected,
                             onClick = {
                                 if (isSelected) selection.remove(action)
                                 else if (selection.size < 4) selection.add(action)
                             },
-                            label = {
-                                Text(action.label, style = ty.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
+                            label = action.label,
                             leadingIcon = {
                                 Icon(
                                     imageVector = if (isSelected) Icons.Default.Check else action.icon,
@@ -628,14 +640,7 @@ fun QuickStartCustomizeSheet(
                                     modifier = Modifier.size(18.dp),
                                 )
                             },
-                            shape = ChipShape,
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = mc.primaryAccent.copy(alpha = 0.20f),
-                                selectedLabelColor = mc.textPrimary,
-                                selectedLeadingIconColor = mc.primaryAccent,
-                                labelColor = mc.textSecondary,
-                            ),
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            modifier = Modifier.weight(1f),
                         )
                     }
                     if (rowActions.size == 1) Spacer(Modifier.weight(1f))
@@ -674,6 +679,7 @@ private val QuickStartAction.label: String
         QuickStartAction.TRADES -> stringResource(R.string.quick_start_sheet_trades)
         QuickStartAction.COMMUNITY_DECKS -> stringResource(R.string.quick_start_sheet_community)
         QuickStartAction.SETTINGS -> stringResource(R.string.quick_start_sheet_settings)
+        QuickStartAction.MULTI_ADD_CARD -> stringResource(R.string.quick_start_sheet_multi_add)
     }
 
 /** Icon for a Quick Start action (used by the customization sheet). */
@@ -688,6 +694,7 @@ private val QuickStartAction.icon: androidx.compose.ui.graphics.vector.ImageVect
         QuickStartAction.STATS -> Icons.Default.Insights
         QuickStartAction.FRIENDS -> Icons.Default.Group
         QuickStartAction.TRADES -> Icons.Default.SwapHoriz
-        QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Group
+        QuickStartAction.COMMUNITY_DECKS -> Icons.Default.Style
         QuickStartAction.SETTINGS -> Icons.Default.Settings
+        QuickStartAction.MULTI_ADD_CARD -> Icons.Default.CollectionsBookmark
     }

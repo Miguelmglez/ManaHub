@@ -315,6 +315,7 @@ fun coreBridgeKoinModule(
             getSetCardsPage = get(),
             deckRepository = get(),
             draftSessionDao = get(),
+            cardRepository = get(),
             gson = get(),
             ioDispatcher = Dispatchers.IO,
             crashReporter = get(),

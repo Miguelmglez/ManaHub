@@ -5,6 +5,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeckOwner
@@ -57,6 +58,7 @@ class CommunityDecksSearchViewModelConcurrencyTest {
     private val communityEngineEnabledFlow = MutableStateFlow(false)
     private val cardRepository: CardRepository = mockk()
     private val searchCards: SearchCardsUseCase = mockk()
+    private val communityDecksRepository: CommunityDecksRepository = mockk()
 
     private fun fakeCard(name: String, id: String = name) = Card(
         scryfallId = id, name = name, printedName = null,
@@ -103,6 +105,7 @@ class CommunityDecksSearchViewModelConcurrencyTest {
         val handle = SavedStateHandle()
         return CommunityDecksSearchViewModel(
             handle, searchUseCase, userPreferences, communityAggregateRepository, cardRepository, searchCards,
+            communityDecksRepository,
         )
     }
 
