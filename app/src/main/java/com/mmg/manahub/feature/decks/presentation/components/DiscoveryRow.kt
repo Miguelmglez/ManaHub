@@ -58,7 +58,7 @@ import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.decks.domain.template.DeckDiscoveryV2
-import com.mmg.manahub.feature.decks.presentation.DeckFeatureFlags
+import com.mmg.manahub.core.FeatureFlags
 import org.jetbrains.compose.resources.painterResource
 
 /** Minimum touch-target size so each art thumbnail is tappable (≥48dp). */
@@ -95,7 +95,7 @@ internal fun DiscoveryRowV2(
     onCardTap: (Card, Rect) -> Unit,
     onBuildThis: () -> Unit,
     modifier: Modifier = Modifier,
-    showBuildHandoff: Boolean = DeckFeatureFlags.DISCOVERY_BUILD_HANDOFF_ENABLED,
+    showBuildHandoff: Boolean = FeatureFlags.Decks.DISCOVERY_BUILD_HANDOFF_ENABLED,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography

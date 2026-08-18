@@ -108,30 +108,49 @@ interface AuthRepository {
     suspend fun resendConfirmationEmail(email: String): AuthResult<Unit>
 
     /**
-     * Sends a reauthentication nonce to the current user's verified email via `Auth.reauthenticate`.
-     * Required before a sensitive [updateEmail]/[updatePassword] call when server-side
-     * reauthentication is enabled (Phase 2 configures/verifies this on the Supabase project).
-     * The user enters the nonce they receive as the `code` parameter of the follow-up call.
-     */
-    suspend fun requestReauthentication(): AuthResult<Unit>
-
-    /**
      * Changes the authenticated user's email address via `Auth.updateUser`.
      *
+     * NOTE: unreferenced by any current UI call site — [confirmEmailUpdate] is the live "Change
+     * email" path (see its KDoc). Left as-is; not touched by the password reauth-gate removal
+     * that retired the sibling `requestReauthentication`-based flow for passwords.
+     *
      * @param newEmail The new email address.
-     * @param code The reauthentication nonce obtained via [requestReauthentication] and entered
-     *   by the user. Never persisted to Room/DataStore — pass-through only.
+     * @param code A reauthentication nonce entered by the user. Never persisted to
+     *   Room/DataStore — pass-through only.
      */
     suspend fun updateEmail(newEmail: String, code: String): AuthResult<Unit>
 
     /**
-     * Changes the authenticated user's password via `Auth.updateUser`.
+     * Changes the authenticated user's password.
+     *
+     * Architecture pivot (replaces the retired email-nonce reauthentication flow — GoTrue never
+     * validated the `nonce` field on `updateUser` calls on this project, which was the actual
+     * root cause of the "any code is accepted" bug). This project's Supabase dashboard has
+     * "Require current password when updating" ON, which GoTrue enforces server-side on every
+     * `Auth.updateUser` password change for an account that already HAS a password.
+     *
+     * [currentPassword] non-null ("Change password" flow, account already has an `email`
+     * identity) goes through the self-service `Auth.updateUser { password = ...; currentPassword
+     * = ... }` path; a mismatch surfaces as [AuthError.InvalidCurrentPassword].
+     *
+     * [currentPassword] `null` ("Set a password" flow) does NOT simply skip the current-password
+     * check on `Auth.updateUser` — an account signed up via Google already has a password set
+     * server-side by the `set-google-account-password` Edge Function (fired on every Google
+     * signup) even though it has no `email` identity, so GoTrue's "Require current password"
+     * gate legitimately rejects a null-current-password `Auth.updateUser` call for it. This case
+     * is instead routed through the `set-account-password` Edge Function, which uses the Admin
+     * API (`adminClient.auth.admin.updateUserById`) — an operation with no `current_password`
+     * gate at all — so it works uniformly whether the account secretly already has a password or
+     * genuinely has none.
      *
      * @param newPassword The new password.
-     * @param code The reauthentication nonce obtained via [requestReauthentication] and entered
-     *   by the user. Never persisted to Room/DataStore — pass-through only.
+     * @param currentPassword The account's current password, required for the "Change password"
+     *   flow (an account that already has an `email` identity). Pass `null` for the "Set a
+     *   password" flow (an account with no `email` identity yet, e.g. a Google-only account) —
+     *   see above for why that is NOT simply "skip the check" but a different call path entirely.
+     *   Never persisted to Room/DataStore — pass-through only.
      */
-    suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit>
+    suspend fun updatePassword(newPassword: String, currentPassword: String?): AuthResult<Unit>
 
     /**
      * Unlinks an identity from the authenticated user's account via `Auth.unlinkIdentity`.
@@ -193,4 +212,22 @@ interface AuthRepository {
      * @param newEmail The new email address, already validated by the caller.
      */
     suspend fun confirmEmailUpdate(newEmail: String): AuthResult<Unit>
+
+    /**
+     * Cancels a pending "Change email" request via the `cancel_pending_email_change` RPC.
+     *
+     * Until now there was no way to abort an in-flight [confirmEmailUpdate]/[updateEmail]
+     * confirmation once started (Supabase's "Secure email change" double-confirms via links to
+     * both the old and new inbox, and the pending change otherwise just sits there until
+     * confirmed or it expires). The RPC clears `auth.users.email_change` server-side for the
+     * calling user and is a verified no-op (no error, no side effect) when nothing is pending —
+     * safe to call unconditionally without a client-side "is something pending" guard, though
+     * gating the UI affordance on [AuthUser.newEmail] being non-null is still correct UX.
+     *
+     * The RPC returns `void` — it does not push an updated `newEmail` back through
+     * [sessionState] (GoTrue does not proactively re-sync `auth.users` changes made outside its
+     * own `updateUser` flow into the client's in-memory session). Callers should clear their own
+     * local "pending" UI state on success rather than waiting for [sessionState] to reflect it.
+     */
+    suspend fun cancelPendingEmailChange(): AuthResult<Unit>
 }

@@ -93,6 +93,22 @@ private val KEY_FIRST_STEPS_COMPLETION_SEEN = booleanPreferencesKey("home_first_
 /** Persisted category selection for the Home COMMUNITY_DECKS widget (Home widget board overhaul, TASK 5b). */
 private val KEY_HOME_COMMUNITY_DECKS_CATEGORY = stringPreferencesKey("home_community_decks_category")
 
+// ── Password-recovery marker (password-recovery-hardening-plan-2026-08-18, §3.1) ──────────
+//
+// One-shot, process-death-durable proof that a GENUINE password-recovery deep link (not a
+// signup-confirmation one — both can mint a session whose JWT `amr` claim is indistinguishable,
+// see AuthUser.isRecoverySession's KDoc) produced the session currently active on this device.
+// Written ONLY by MainActivity.handleSupabaseAuthDeepLink, ONLY when the incoming intent's `type`
+// query/fragment param is `recovery`. Bound to the session's own `session_id` JWT claim (not a
+// plain boolean) so a marker written for one session can never validate a DIFFERENT session that
+// happens to be current later. Consumed (cleared) on every exit from the recovery flow: success,
+// Back/abandon, any sign-out, or TTL expiry (15 min, enforced by the reader — see
+// `isActiveRecoveryFlow` in `feature.auth.presentation`) — this is what stops the marker's host
+// session (whose `isRecoverySession` amr flag never turns false on its own, since GoTrue re-emits
+// the same `amr` for the session's whole life) from re-satisfying the recovery gate forever.
+private val KEY_PENDING_RECOVERY_SESSION_ID = stringPreferencesKey("pending_recovery_session_id")
+private val KEY_PENDING_RECOVERY_MARKED_AT = longPreferencesKey("pending_recovery_marked_at")
+
 /** How long the account nudge stays suppressed after a dismissal. */
 private const val ACCOUNT_NUDGE_COOLDOWN_MS = 48L * 60L * 60L * 1000L // 48 hours
 
@@ -116,6 +132,19 @@ private val KEY_COMMUNITY_ENGINE_ENABLED = booleanPreferencesKey("community_engi
  * the user's true state.
  */
 private val KEY_GAMIFICATION_ENABLED = booleanPreferencesKey("gamification_enabled")
+/**
+ * Master switch for the Competitive feature (Phase 4: MTG metagame rankings / 17lands ratings
+ * screen). Backed by the `manahub-competitive` Cloudflare Worker, which refreshes its data
+ * entirely server-side via its own cron — the app only does on-demand, cache-first reads when
+ * this flag is on; there is no app-side scheduling to gate (unlike gamification's
+ * `QuestRotationWorker`). Default: false (new, still-partially-inactive feature), same posture
+ * as gamification's default-OFF and `PuzzleFeatureFlags.PUZZLE_ENABLED`.
+ */
+private val KEY_COMPETITIVE_ENABLED = booleanPreferencesKey("competitive_enabled")
+/** Last postal code the user typed into the Competitive screen's event-locator CTA (Phase 5). Not
+ * competitive-specific persistence infra — a single plain string field, so it reuses this
+ * general-purpose store rather than a dedicated abstraction. */
+private val KEY_COMPETITIVE_POSTAL_CODE = stringPreferencesKey("competitive_postal_code")
 /** One-shot flag: true once the Family-A achievement backfill has run (ADR-002 §4). Default: false. */
 private val KEY_GAMIFICATION_BACKFILL_DONE = booleanPreferencesKey("gamification_backfill_done")
 /** Per-install random id seeding deterministic quest generation for guests (ADR-002 §9). Not ANDROID_ID. */
@@ -616,6 +645,35 @@ class UserPreferencesDataStore @Inject constructor(
     }
 
     /**
+     * Master switch for the Competitive feature (metagame rankings / 17lands ratings). Default:
+     * false (OFF) — the feature is still being built out. Unlike gamification, there is no
+     * app-side engine to gate here: the `manahub-competitive` Cloudflare Worker refreshes its
+     * data entirely via its own server-side cron, so this flag only controls whether the UI is
+     * shown and whether the (not-yet-created) repository performs on-demand cache-first reads.
+     * A future `CompetitiveRepositoryImpl` will short-circuit every method to an error/empty
+     * result while this is off, same pattern as `CommunityAggregateRepositoryImpl`. To enable,
+     * flip the default to true / emit(true).
+     */
+    val competitiveEnabledFlow: Flow<Boolean> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_COMPETITIVE_ENABLED] ?: false }
+        .catch { emit(false) }
+
+    /** Persists the master Competitive feature switch. */
+    suspend fun setCompetitiveEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[KEY_COMPETITIVE_ENABLED] = enabled }
+    }
+
+    /** Last postal code typed into the Competitive screen's event-locator CTA. Empty until set. */
+    val competitivePostalCodeFlow: Flow<String> = context.userPrefsDataStore.data
+        .map { prefs -> prefs[KEY_COMPETITIVE_POSTAL_CODE] ?: "" }
+        .catch { emit("") }
+
+    /** Persists [postalCode] for the event-locator CTA. */
+    suspend fun setCompetitivePostalCode(postalCode: String) {
+        context.userPrefsDataStore.edit { it[KEY_COMPETITIVE_POSTAL_CODE] = postalCode }
+    }
+
+    /**
      * One-shot guard for the Family-A achievement backfill (ADR-002 §4). Emits false until the
      * backfill has run, then true forever — so retroactive unlocks are computed exactly once.
      */
@@ -1002,6 +1060,44 @@ class UserPreferencesDataStore @Inject constructor(
                 ?: mutableSetOf()
             current.add(stepId)
             prefs[KEY_FIRST_STEPS_SKIPPED] = current.joinToString(",")
+        }
+    }
+
+    // ── Password-recovery marker ──────────────────────────────────────────────
+    // See the KEY_PENDING_RECOVERY_SESSION_ID/KEY_PENDING_RECOVERY_MARKED_AT KDoc above for the
+    // full mechanism. The pair is represented as `String` (session id) to `Long` (marked-at epoch
+    // millis) rather than a dedicated data class so this data-layer file does not need to define or
+    // import a new cross-layer type solely for this — the presentation-layer predicate
+    // (`isActiveRecoveryFlow` in `feature.auth.presentation`) destructures it directly.
+
+    /**
+     * Emits the current pending-recovery marker as (sessionId, markedAtEpochMs), or `null` when no
+     * marker is set (including a partially-written/corrupt state — treated as absent, fail closed).
+     */
+    val pendingRecoveryMarkerFlow: Flow<Pair<String, Long>?> = context.userPrefsDataStore.data
+        .map { prefs ->
+            val sessionId = prefs[KEY_PENDING_RECOVERY_SESSION_ID]
+            val markedAt = prefs[KEY_PENDING_RECOVERY_MARKED_AT]
+            if (!sessionId.isNullOrBlank() && markedAt != null) sessionId to markedAt else null
+        }
+        .catch { emit(null) }
+
+    /** Arms the marker for [sessionId], marked at [markedAtEpochMs]. Overwrites any prior marker. */
+    suspend fun setPendingRecoveryMarker(sessionId: String, markedAtEpochMs: Long) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[KEY_PENDING_RECOVERY_SESSION_ID] = sessionId
+            prefs[KEY_PENDING_RECOVERY_MARKED_AT] = markedAtEpochMs
+        }
+    }
+
+    /**
+     * Consumes (clears) the marker. Idempotent — safe to call unconditionally on every exit path
+     * (success, Back/abandon, any sign-out) even when no marker is currently set.
+     */
+    suspend fun clearPendingRecoveryMarker() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(KEY_PENDING_RECOVERY_SESSION_ID)
+            prefs.remove(KEY_PENDING_RECOVERY_MARKED_AT)
         }
     }
 

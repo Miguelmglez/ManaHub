@@ -21,8 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.PullRefreshHeader
@@ -185,28 +184,16 @@ private fun FilterRow(
     selected: HistoryFilter,
     onSelect: (HistoryFilter) -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     LazyRow(
         contentPadding        = PaddingValues(horizontal = spacing.lg, vertical = spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         items(HistoryFilter.entries, key = { it.name }) { filter ->
-            FilterChip(
+            MagicFilterChip(
                 selected = filter == selected,
                 onClick  = { onSelect(filter) },
-                label    = {
-                    Text(
-                        text  = filter.label(),
-                        style = MaterialTheme.magicTypography.labelSmall,
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-                    selectedLabelColor     = mc.primaryAccent,
-                    containerColor         = mc.surface,
-                    labelColor             = mc.textSecondary,
-                ),
+                label    = filter.label(),
             )
         }
     }

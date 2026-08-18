@@ -686,20 +686,32 @@ class GameViewModel(
     // ── Online session ────────────────────────────────────────────────────────
 
     /**
-     * Builds a [GameUiState.gridAssignment] map that ensures the local player always appears in the
-     * FULL_WIDTH_BOTTOM slot. In a 2-player layout slot 0 is TOP (rotated 180°) and slot 1
-     * is BOTTOM (normal). Without this swap the host (slot 0) would be shown upside-down
-     * at the top while holding the device.
+     * Builds a [GameUiState.gridAssignment] map that ensures the device holder always appears in
+     * the FULL_WIDTH_BOTTOM slot — the only slot rendered unrotated (see
+     * [com.mmg.manahub.core.model.toDefaultDegrees]). Without this swap a device holder assigned
+     * to any other slot (e.g. FULL_WIDTH_TOP, rotated 180°) would see their own card upside-down.
      *
-     * Returns an empty map (identity) when no swap is needed or the layout has no BOTTOM slot.
+     * Shared by every entry point that seats a "local" player relative to the rest of the table:
+     * online sessions ([initFromOnlineSession]), nearby sessions ([initFromNearbySession]), and
+     * local pass-and-play games ([initFromConfigs]) — each passes the index of the player who is
+     * physically holding the device (`mySlotIndex` / `slotIndex` for networked games, the
+     * `isAppUser` player's index for local games).
+     *
+     * Layouts with no FULL_WIDTH_BOTTOM slot (e.g. the 4-player "2 each side" or 6-player "2 Rows
+     * of 3" defaults, where every seat is LEFT/RIGHT-rotated around a shared table with no seat
+     * facing the bottom of the screen) have no privileged unrotated seat to swap into — this
+     * correctly no-ops for those rather than picking an arbitrary rotated slot.
+     *
+     * Returns an empty map (identity) when no swap is needed, the index is unknown (-1), or the
+     * layout has no FULL_WIDTH_BOTTOM slot.
      */
-    private fun buildOnlineGridAssignment(layout: LayoutTemplate, mySlotIndex: Int): Map<Int, Int> {
-        if (mySlotIndex == -1) return emptyMap()
+    private fun buildBottomSlotGridAssignment(layout: LayoutTemplate, localSlotIndex: Int): Map<Int, Int> {
+        if (localSlotIndex == -1) return emptyMap()
         val bottomSlotPlayerId = layout.slots
             .firstOrNull { it.position == GridSlotPosition.FULL_WIDTH_BOTTOM }
             ?.playerId ?: return emptyMap()
-        if (mySlotIndex == bottomSlotPlayerId) return emptyMap()
-        return mapOf(bottomSlotPlayerId to mySlotIndex, mySlotIndex to bottomSlotPlayerId)
+        if (localSlotIndex == bottomSlotPlayerId) return emptyMap()
+        return mapOf(bottomSlotPlayerId to localSlotIndex, localSlotIndex to bottomSlotPlayerId)
     }
 
     fun initFromOnlineSession(
@@ -736,7 +748,7 @@ class GameViewModel(
             mode            = mode,
             activePlayerId  = players.first().id,
             activeLayout    = actualLayout,
-            gridAssignment  = buildOnlineGridAssignment(actualLayout, mySlotIndex),
+            gridAssignment  = buildBottomSlotGridAssignment(actualLayout, mySlotIndex),
             gameStartTime   = System.currentTimeMillis(),
             isGameRunning   = true,
             isOnlineSession = true,
@@ -967,7 +979,7 @@ class GameViewModel(
             mode            = mode,
             activePlayerId  = players.first().id,
             activeLayout    = actualLayout,
-            gridAssignment  = buildOnlineGridAssignment(actualLayout, slotIndex),
+            gridAssignment  = buildBottomSlotGridAssignment(actualLayout, slotIndex),
             gameStartTime   = System.currentTimeMillis(),
             isGameRunning   = true,
             isOnlineSession = true, // Reuse online flag for UI elements that assume networked game
@@ -1456,11 +1468,16 @@ class GameViewModel(
             )
         }
         val layout = selectedLayout ?: LayoutTemplates.getDefaultLayout(players.size)
+        // Local pass-and-play: seat the device holder (isAppUser) in the bottom, unrotated slot —
+        // mirrors the online/nearby swap so whichever config slot is flagged isAppUser doesn't end
+        // up rendered sideways or upside-down for the person actually holding the device.
+        val localSlotIndex = players.indexOfFirst { it.isAppUser }
         _uiState.update { it.copy(
             mode = mode,
             players = players,
             activePlayerId = players.first().id,
             activeLayout = layout,
+            gridAssignment = buildBottomSlotGridAssignment(layout, localSlotIndex),
             isGameRunning = true,
             gameSettings = settings,
         ) }

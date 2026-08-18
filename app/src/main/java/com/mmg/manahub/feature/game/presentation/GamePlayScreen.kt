@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -15,11 +14,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -28,7 +25,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,10 +33,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,8 +51,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -70,9 +64,9 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -81,7 +75,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SheetValue
@@ -96,7 +89,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -109,7 +101,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -120,34 +111,36 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
-import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.theme.PlayerTheme
+import com.mmg.manahub.core.model.CounterIconKey
+import com.mmg.manahub.core.model.GridSlotPosition
+import com.mmg.manahub.core.model.LayoutTemplate
+import com.mmg.manahub.core.model.LayoutTemplates
+import com.mmg.manahub.core.model.PlayerSlot
+import com.mmg.manahub.core.model.ScreenedGridSlotPosition
+import com.mmg.manahub.core.model.toDefaultDegrees
+import com.mmg.manahub.core.ui.components.LayoutTemplateSelector
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.ManaSymbolImage
+import com.mmg.manahub.core.ui.theme.PlayerTheme
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.model.CounterIconKey
-import com.mmg.manahub.core.model.PlayerSlot
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.game.domain.model.CounterType
 import com.mmg.manahub.feature.game.domain.model.GameMode
-import com.mmg.manahub.core.model.GridSlotPosition
-import com.mmg.manahub.core.model.LayoutTemplate
-import com.mmg.manahub.core.model.LayoutTemplates
 import com.mmg.manahub.feature.game.domain.model.Player
-import com.mmg.manahub.core.model.ScreenedGridSlotPosition
-import com.mmg.manahub.core.model.toDefaultDegrees
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Entry point (matches nav graph signature)
@@ -297,7 +290,7 @@ private fun GamePlayContent(
                     onFlipCoin = onFlipCoin,
                     onReset = { showResetDialog = true },
                     onAbandonGame = onAbandonGame,
-                    onExitGame = onExitGame,
+                    onExitGame = {showExitDialog = true},
                     onManagePlayers = {
                         managePlayersInitialTab = 0; showManagePlayersSheet = true
                     },
@@ -674,9 +667,16 @@ private fun GamePlayerGrid(
             onManagePlayers = onManagePlayers,
             onTournament = onTournament,
             turnNumber = turnNumber,
+            // fillMaxSize (not wrapContentSize) reserves a stable, already-large-enough area up
+            // front so GlobalToolsOverlay's own Box never has to resize itself between "central
+            // button only" and "button + expanded panel" — that container-resize race was the
+            // root cause of the expand-animation glitch (see feedback memory
+            // feedback_animatedvisibility_wrapcontentsize_resize_lag). A plain Box like this one
+            // has no clickable/pointerInput of its own, so it doesn't intercept touches outside
+            // its children's own clickable bounds — taps still reach the PlayerCards behind it.
             modifier = Modifier
                 .align(Alignment.Center)
-                .wrapContentSize(),
+                .fillMaxSize(),
         )
     }
 }
@@ -734,14 +734,39 @@ private fun PlayerCard(
             else -> CardTier.TINY
         }
 
+        // Dynamic font size to maximize space usage according to card size
+        val isTapMode = gameSettings.lifeControlMode == LifeControlMode.TAP
+        val isThreeDigits = player.life >= 100 || player.life <= -10
+        
+        val multiplier = when (tier) {
+            CardTier.LARGE -> if (isTapMode) 0.45f else 0.55f
+            CardTier.SMALL -> if (isTapMode) 0.55f else 0.65f
+            CardTier.TINY -> if (isTapMode) 0.60f else 0.70f
+        }
+        
+        // Scale down slightly if 3 digits to ensure it fits horizontally
+        val digitScale = if (isThreeDigits) 0.85f else 1.0f
+        val lifeFontSize = (minDim.value * multiplier * digitScale).sp
+
+        val lifeStyle = (if (tier == CardTier.LARGE)
+            MaterialTheme.magicTypography.lifeNumber
+        else
+            MaterialTheme.magicTypography.lifeNumberMd).copy(
+            fontSize = lifeFontSize,
+            lineHeight = lifeFontSize,
+            platformStyle = PlatformTextStyle(includeFontPadding = false),
+            lineHeightStyle = LineHeightStyle(
+                alignment = LineHeightStyle.Alignment.Center,
+                trim = LineHeightStyle.Trim.None
+            )
+        )
+
         val hPad = when (tier) {
             CardTier.LARGE -> 12.dp; CardTier.SMALL -> 8.dp; CardTier.TINY -> 4.dp
         }
         val vPad = when (tier) {
             CardTier.LARGE -> 6.dp; CardTier.SMALL -> 4.dp; CardTier.TINY -> 2.dp
         }
-
-        var dragAccumulator by remember(player.id) { mutableFloatStateOf(0f) }
 
         // Land played animation — triggers on false→true transition of [landPlayed].
         var showLandAnimation by remember(player.id) { mutableStateOf(false) }
@@ -900,65 +925,93 @@ private fun PlayerCard(
                             }
                         }
 
-                        if (gameSettings.lifeControlMode == LifeControlMode.SCROLL) {
-                            Box(
-                                modifier = Modifier
-                                    .pointerInput(player.id) {
-                                        detectVerticalDragGestures(
-                                            onVerticalDrag = { change, dragAmount ->
-                                                change.consume()
-                                                dragAccumulator += dragAmount
-                                                val threshold = 80f
-                                                if (dragAccumulator > threshold) {
-                                                    onLife(1)
-                                                    dragAccumulator = 0f
-                                                } else if (dragAccumulator < -threshold) {
-                                                    onLife(-1)
-                                                    dragAccumulator = 0f
-                                                }
-                                            },
-                                            onDragEnd = { dragAccumulator = 0f },
-                                            onDragCancel = { dragAccumulator = 0f }
-                                        )
-                                    },
-                                contentAlignment = Alignment.Center
+                        if (gameSettings.lifeControlMode == LifeControlMode.BUTTONS) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
-                                AnimatedContent(
-                                    targetState = player.life,
-                                    transitionSpec = {
-                                        if (targetState > initialState) {
-                                            (slideInVertically { height -> -height } + fadeIn()) togetherWith
-                                                    (slideOutVertically { height -> height } + fadeOut())
-                                        } else {
-                                            (slideInVertically { height -> height } + fadeIn()) togetherWith
-                                                    (slideOutVertically { height -> -height } + fadeOut())
-                                        }.using(SizeTransform(clip = false))
-                                    },
-                                    label = "lifeAnimation"
-                                ) { targetLife ->
-                                    Text(
-                                        text = targetLife.toString(),
-                                        style = (if (tier == CardTier.LARGE)
-                                            MaterialTheme.magicTypography.lifeNumber
-                                        else
-                                            MaterialTheme.magicTypography.lifeNumberMd).copy(
-                                            platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                            lineHeightStyle = LineHeightStyle(
-                                                alignment = LineHeightStyle.Alignment.Center,
-                                                trim = LineHeightStyle.Trim.None
-                                            )
-                                        ),
-                                        color = lifeColor,
-                                        maxLines = 1,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(horizontal = 24.dp),
+                                if (tier != CardTier.TINY) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = theme.accent.copy(alpha = 0.5f),
+                                        modifier = Modifier
+                                            .size(iconSize * 0.9f)
+                                            .clickable(
+                                                interactionSource = remember(player.id) { MutableInteractionSource() },
+                                                indication = null
+                                            ) { onLife(1) }
+                                    )
+                                }
+
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(vertical = MaterialTheme.spacing.xxs)
+                                ) {
+                                    AnimatedContent(
+                                        targetState = player.life,
+                                        transitionSpec = {
+                                            if (targetState > initialState) {
+                                                (slideInVertically { height -> -height } + fadeIn()) togetherWith
+                                                        (slideOutVertically { height -> height } + fadeOut())
+                                            } else {
+                                                (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                                        (slideOutVertically { height -> -height } + fadeOut())
+                                            }.using(SizeTransform(clip = false))
+                                        },
+                                        label = "lifeAnimation"
+                                    ) { targetLife ->
+                                        Text(
+                                            text = targetLife.toString(),
+                                            style = lifeStyle,
+                                            color = lifeColor,
+                                            maxLines = 1,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.sm),
+                                        )
+                                    }
+
+                                    // Top/Bottom tap zones
+                                    Column(modifier = Modifier.matchParentSize()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxWidth()
+                                                .clickable(
+                                                    interactionSource = remember(player.id) { MutableInteractionSource() },
+                                                    indication = null
+                                                ) { onLife(1) }
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxWidth()
+                                                .clickable(
+                                                    interactionSource = remember(player.id) { MutableInteractionSource() },
+                                                    indication = null
+                                                ) { onLife(-1) }
+                                        )
+                                    }
+                                }
+
+                                if (tier != CardTier.TINY) {
+                                    Icon(
+                                        imageVector = Icons.Default.Remove,
+                                        contentDescription = null,
+                                        tint = theme.accent.copy(alpha = 0.5f),
+                                        modifier = Modifier
+                                            .size(iconSize * 0.9f)
+                                            .clickable(
+                                                interactionSource = remember(player.id) { MutableInteractionSource() },
+                                                indication = null
+                                            ) { onLife(-1) }
                                     )
                                 }
                             }
 
                             Box(
                                 modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.CenterStart
+                                contentAlignment = Alignment.CenterStart,
                             ) {}
                         } else {
                             val numberScale = remember(player.id) { Animatable(1f) }
@@ -992,32 +1045,29 @@ private fun PlayerCard(
                                 prevLife.intValue = player.life
                             }
 
+                            // Whole number is a single tap zone: tapping the number ALWAYS
+                            // decreases life. The heart icon below (onLife(+1)) is the increase
+                            // affordance — see the "tap: delta < 0 is on number, delta > 0 is on
+                            // heart" design intent noted in GameSetupScreen's preview comment.
+                            // A defaultMinSize keeps the touch target >= 48dp on TINY/SMALL tiers
+                            // without visually growing the (scaled) text.
                             Box(
+                                contentAlignment = Alignment.Center,
                                 modifier = Modifier
+                                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                                     .clickable(
                                         interactionSource = remember(player.id) { MutableInteractionSource() },
                                         indication = null,
-                                        onClick = { onLife(-1) },
-                                    ),
-                                contentAlignment = Alignment.Center,
+                                    ) { onLife(-1) },
                             ) {
                                 Text(
                                     text = player.life.toString(),
-                                    style = (if (tier == CardTier.LARGE)
-                                        MaterialTheme.magicTypography.lifeNumber
-                                    else
-                                        MaterialTheme.magicTypography.lifeNumberMd).copy(
-                                        platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                        lineHeightStyle = LineHeightStyle(
-                                            alignment = LineHeightStyle.Alignment.Center,
-                                            trim = LineHeightStyle.Trim.None
-                                        )
-                                    ),
+                                    style = lifeStyle,
                                     color = lifeColor,
                                     maxLines = 1,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier
-                                        .padding(horizontal = 24.dp)
+                                        .padding(horizontal = MaterialTheme.spacing.sm)
                                         .graphicsLayer {
                                             scaleX = numberScale.value
                                             scaleY = numberScale.value
@@ -2273,39 +2323,11 @@ private fun ManageTab(
             val availableLayouts = remember(playerCount) {
                 LayoutTemplates.getLayoutsForCount(playerCount)
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                availableLayouts.forEach { layout ->
-                    val isSelected = layout == activeLayout
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isSelected) mc.primaryAccent.copy(alpha = 0.20f) else mc.surface,
-                        border = BorderStroke(
-                            width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) mc.primaryAccent else mc.surfaceVariant,
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(64.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { onSelectLayout(layout) },
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = layout.name,
-                                style = MaterialTheme.magicTypography.labelMedium,
-                                color = if (isSelected) mc.primaryAccent else mc.textSecondary,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(8.dp),
-                            )
-                        }
-                    }
-                }
-            }
+            LayoutTemplateSelector(
+                availableLayouts = availableLayouts,
+                activeLayout = activeLayout,
+                onSelectLayout = onSelectLayout,
+            )
         }
 
         // 2. Interactive Mini-Grid

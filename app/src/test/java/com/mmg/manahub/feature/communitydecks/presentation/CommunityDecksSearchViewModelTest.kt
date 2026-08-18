@@ -6,6 +6,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.CommunityAggregateRepository
+import com.mmg.manahub.core.domain.repository.CommunityDecksRepository
 import com.mmg.manahub.core.domain.usecase.card.SearchCardsUseCase
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CommunityDeckOwner
@@ -62,6 +63,7 @@ class CommunityDecksSearchViewModelTest {
     private val communityEngineEnabledFlow = MutableStateFlow(false)
     private val cardRepository: CardRepository = mockk()
     private val searchCards: SearchCardsUseCase = mockk()
+    private val communityDecksRepository: CommunityDecksRepository = mockk()
 
     // ── Fixtures ────────────────────────────────────────────────────────────
 
@@ -129,6 +131,7 @@ class CommunityDecksSearchViewModelTest {
         }
         return CommunityDecksSearchViewModel(
             handle, searchUseCase, userPreferences, communityAggregateRepository, cardRepository, searchCards,
+            communityDecksRepository,
         )
     }
 
@@ -284,10 +287,12 @@ class CommunityDecksSearchViewModelTest {
         assertEquals("Search failed: 500", state.error)
     }
 
-    // ── Group 5: Sort re-triggers search ─────────────────────────────────────
+    // ── Group 5: Sort updates state only (Advanced Search sheet rework, 2026-08-18 — Sort now
+    //    lives inside CommunityAdvancedSearchSheet and defers to its Search button, same as every
+    //    other advanced filter; it no longer auto-triggers a search) ─────────
 
     @Test
-    fun `given hasSearched when onSortUpdated then search is re-triggered`() = runTest {
+    fun `given hasSearched when onSortFieldSelected then state updates but search is not re-triggered`() = runTest {
         coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
         val vm = createViewModel()
         advanceUntilIdle()
@@ -295,23 +300,27 @@ class CommunityDecksSearchViewModelTest {
         vm.search()
         advanceUntilIdle()
 
-        vm.onSortUpdated(CommunityDeckSort.RECENT)
+        vm.onSortFieldSelected(CommunityDeckSortField.CREATED_AT)
         advanceUntilIdle()
 
-        coVerify(atLeast = 2) { searchUseCase(any()) }
-        assertEquals(CommunityDeckSort.RECENT, vm.uiState.value.selectedSort)
+        assertEquals(CommunityDeckSortField.CREATED_AT, vm.uiState.value.selectedSortField)
+        coVerify(exactly = 1) { searchUseCase(any()) }
     }
 
     @Test
-    fun `given not searched yet when onSortUpdated then search is not triggered`() = runTest {
+    fun `given hasSearched when onSortDirectionSelected then state updates but search is not re-triggered`() = runTest {
+        coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
         val vm = createViewModel()
         advanceUntilIdle()
-
-        vm.onSortUpdated(CommunityDeckSort.RECENT)
+        vm.onQueryChange("Sol Ring")
+        vm.search()
         advanceUntilIdle()
 
-        assertEquals(CommunityDeckSort.RECENT, vm.uiState.value.selectedSort)
-        coVerify(exactly = 0) { searchUseCase(any()) }
+        vm.onSortDirectionSelected(CommunityDeckSortDirection.ASC)
+        advanceUntilIdle()
+
+        assertEquals(CommunityDeckSortDirection.ASC, vm.uiState.value.selectedSortDirection)
+        coVerify(exactly = 1) { searchUseCase(any()) }
     }
 
     // ── Group 6: loadMore ────────────────────────────────────────────────────
@@ -532,6 +541,48 @@ class CommunityDecksSearchViewModelTest {
         assertNull(vm.uiState.value.advancedFilters.commander)
     }
 
+    @Test
+    fun `given commander query typed then format switched away then commanderQuery and commanderResults are cleared`() = runTest {
+        val atraxa = fakeCard("Atraxa, Praetors' Voice")
+        coEvery { searchCards("Atr", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(atraxa), hasMore = false, totalCards = 1))
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onCommanderQueryChange("Atr")
+        advanceUntilIdle() // past debounce
+        assertTrue(vm.uiState.value.commanderResults.isNotEmpty())
+
+        vm.onSearchDeckFilterUpdated(CommunityDeckFormatFilter.MODERN)
+
+        assertEquals("", vm.uiState.value.commanderQuery)
+        assertTrue(vm.uiState.value.commanderResults.isEmpty())
+    }
+
+    @Test
+    fun `given commander query typed then format switched away then re-entering the same query re-searches`() = runTest {
+        // Regression guard for the commanderQueryFlow reset (Fix 2, edge-case audit 2026-08-18):
+        // MutableStateFlow conflates equal values under distinctUntilChanged, so if the debounce
+        // flow itself weren't reset alongside the visible uiState fields, re-typing the EXACT same
+        // query right after the round-trip would be silently suppressed as a duplicate emission.
+        val atraxa = fakeCard("Atraxa, Praetors' Voice")
+        coEvery { searchCards("Atr", 1) } returns DataResult.Success(PaginatedCards(cards = listOf(atraxa), hasMore = false, totalCards = 1))
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onCommanderQueryChange("Atr")
+        advanceUntilIdle()
+        vm.onSearchDeckFilterUpdated(CommunityDeckFormatFilter.MODERN)
+        vm.onSearchDeckFilterUpdated(CommunityDeckFormatFilter.COMMANDER)
+        // Let the "" reset actually propagate through the debounce/distinctUntilChanged pipeline
+        // (mirrors real usage — there's always some elapsed time between toggling deck type and
+        // re-typing) before re-entering the same query below.
+        advanceUntilIdle()
+
+        vm.onCommanderQueryChange("Atr")
+        advanceUntilIdle()
+
+        assertEquals(listOf(atraxa), vm.uiState.value.commanderResults)
+        coVerify(exactly = 2) { searchCards("Atr", 1) }
+    }
+
     // ── Group 12: Discover — parallel section load + degradation ─────────────
 
     private fun enableDiscoverAndCreate(): CommunityDecksSearchViewModel {
@@ -614,6 +665,32 @@ class CommunityDecksSearchViewModelTest {
         assertEquals(CommunityHubTab.SEARCH, state.hubTab)
         assertEquals(atraxa, state.advancedFilters.commander)
         coVerify { searchUseCase(match { it.commanderName == "Atraxa, Praetors' Voice" }) }
+    }
+
+    @Test
+    fun `given format switched away from Commander when a trending commander tile is tapped then formats is reset to Commander and commanderName reaches the request`() = runTest {
+        val atraxa = fakeCard("Atraxa, Praetors' Voice")
+        coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        // Deck type left on a non-Commander format (e.g. selected in the sheet earlier).
+        vm.onSearchDeckFilterUpdated(CommunityDeckFormatFilter.MODERN)
+
+        vm.onTrendingCommanderClick(atraxa)
+        advanceUntilIdle()
+
+        val filters = vm.uiState.value.advancedFilters
+        assertEquals(CommunityDeckFormatFilter.COMMANDER, filters.formats)
+        assertEquals(atraxa, filters.commander)
+        coVerify {
+            searchUseCase(
+                match {
+                    it.commanderName == "Atraxa, Praetors' Voice" &&
+                        it.deckFormatId == CommunityDeckFormatFilter.COMMANDER.apiId
+                },
+            )
+        }
     }
 
     @Test
@@ -807,5 +884,112 @@ class CommunityDecksSearchViewModelTest {
 
         // Exactly the one search() call — loadMore never issued a second one.
         coVerify(exactly = 1) { searchUseCase(any()) }
+    }
+
+    // ── Group 18: Deck tag picker — lazy fetch + selection + activeCount (Advanced Search sheet
+    //    rework, 2026-08-18: `deckTagName` verified live as a real, working, exact-match filter) ──
+
+    @Test
+    fun `given the deck tag picker has never been opened when onDeckTagPickerOpened then the catalog is fetched`() = runTest {
+        coEvery { communityDecksRepository.getDeckTags() } returns DataResult.Success(listOf("Aggro", "Combo"))
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onDeckTagPickerOpened()
+        advanceUntilIdle()
+
+        assertEquals(listOf("Aggro", "Combo"), vm.uiState.value.availableDeckTags)
+        assertFalse(vm.uiState.value.isDeckTagsLoading)
+        coVerify(exactly = 1) { communityDecksRepository.getDeckTags() }
+    }
+
+    @Test
+    fun `given the deck tag picker already opened once when onDeckTagPickerOpened again then the catalog is not re-fetched`() = runTest {
+        coEvery { communityDecksRepository.getDeckTags() } returns DataResult.Success(listOf("Aggro"))
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onDeckTagPickerOpened()
+        advanceUntilIdle()
+
+        vm.onDeckTagPickerOpened()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { communityDecksRepository.getDeckTags() }
+    }
+
+    @Test
+    fun `given a catalog fetch failure when onDeckTagPickerOpened then availableDeckTags degrades to empty`() = runTest {
+        coEvery { communityDecksRepository.getDeckTags() } returns DataResult.Error("boom")
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onDeckTagPickerOpened()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.availableDeckTags.isEmpty())
+        assertFalse(vm.uiState.value.isDeckTagsLoading)
+    }
+
+    @Test
+    fun `given no tag selected when onDeckTagSelected then the filter is set and activeCount increments`() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.onDeckTagSelected("Aggro")
+
+        assertEquals("Aggro", vm.uiState.value.advancedFilters.deckTag)
+        assertEquals(1, vm.uiState.value.advancedFilters.activeCount)
+    }
+
+    @Test
+    fun `given a tag already selected when onDeckTagSelected with the same tag then it is cleared`() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onDeckTagSelected("Aggro")
+
+        vm.onDeckTagSelected("Aggro")
+
+        assertNull(vm.uiState.value.advancedFilters.deckTag)
+        assertEquals(0, vm.uiState.value.advancedFilters.activeCount)
+    }
+
+    @Test
+    fun `given a tag already selected when onDeckTagSelected with a different tag then it replaces the selection`() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onDeckTagSelected("Aggro")
+
+        vm.onDeckTagSelected("Combo")
+
+        assertEquals("Combo", vm.uiState.value.advancedFilters.deckTag)
+        assertEquals(1, vm.uiState.value.advancedFilters.activeCount)
+    }
+
+    @Test
+    fun `given hasSearched when onDeckTagSelected then search is not re-triggered`() = runTest {
+        coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onQueryChange("Sol Ring")
+        vm.search()
+        advanceUntilIdle()
+
+        vm.onDeckTagSelected("Aggro")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { searchUseCase(any()) }
+    }
+
+    @Test
+    fun `given a selected deck tag when search then deckTagName is passed through`() = runTest {
+        coEvery { searchUseCase(any()) } returns DataResult.Success(testSearchResult)
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.onDeckTagSelected("Aggro")
+
+        vm.search()
+        advanceUntilIdle()
+
+        coVerify { searchUseCase(match { it.deckTagName == "Aggro" }) }
     }
 }

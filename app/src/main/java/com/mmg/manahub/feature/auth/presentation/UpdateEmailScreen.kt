@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.auth.presentation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,6 +39,9 @@ import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -46,14 +51,13 @@ import org.koin.androidx.compose.koinViewModel
  * Final step of the "Change email" flow — collects the new address and calls
  * [AuthViewModel.confirmEmailUpdate].
  *
- * Reached DIRECTLY from [AccountManagementScreen]'s "Change email" row — unlike
- * [UpdatePasswordScreen], this screen is NOT gated behind [SecurityCodeScreen]. Supabase's "Secure
- * email change" project setting already double-confirms the change via links sent to both the old
- * and the new email address, so the pre-change reauthentication-code gate would be redundant
- * friction for this flow specifically (see the KDoc on
+ * Reached DIRECTLY from [AccountManagementScreen]'s "Change email" row — no reauthentication gate
+ * of any kind. Supabase's "Secure email change" project setting already double-confirms the
+ * change via links sent to both the old and the new email address, so a pre-change gate would be
+ * redundant friction for this flow specifically (see the KDoc on
  * [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate] for the full rationale).
- * There is therefore no in-memory handoff and no process-death recovery state to render here — a
- * plain form.
+ * [AuthFlowStepsCard] spells out that two-confirmation mechanic up front, persistently — it does
+ * NOT disappear like a toast would, since the user is about to leave the app to check mail.
  *
  * @param onEmailUpdated Invoked once [AuthUiState.EmailUpdated] is observed.
  */
@@ -70,14 +74,22 @@ fun UpdateEmailScreen(
 
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     var newEmail by remember { mutableStateOf("") }
+    val toastState = rememberMagicToastState()
 
     LaunchedEffect(Unit) {
         FirebaseCrashlytics.getInstance().log("screen_viewed: update_email")
     }
 
+    // Errors surface via toast (matches AccountManagementScreen's pattern) so the persistent step
+    // guidance below always stays the primary, non-vanishing content on this screen.
     LaunchedEffect(authUiState) {
-        if (authUiState is AuthUiState.EmailUpdated) {
-            onEmailUpdated()
+        when (val state = authUiState) {
+            is AuthUiState.EmailUpdated -> onEmailUpdated()
+            is AuthUiState.Error -> {
+                toastState.show(state.message, MagicToastType.ERROR)
+                authViewModel.resetUiState()
+            }
+            else -> Unit
         }
     }
 
@@ -109,7 +121,6 @@ fun UpdateEmailScreen(
         },
     ) { padding ->
         val isLoading = authUiState is AuthUiState.Loading
-        val errorMessage = (authUiState as? AuthUiState.Error)?.message
 
         val fieldColors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = mc.primaryAccent,
@@ -121,46 +132,66 @@ fun UpdateEmailScreen(
             unfocusedTextColor = mc.textPrimary,
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(sp.lg),
-        ) {
-            Text(
-                text = stringResource(R.string.account_mgmt_update_email_body),
-                style = ty.bodyMedium,
-                color = mc.textSecondary,
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(sp.lg),
+            ) {
+                Text(
+                    text = stringResource(R.string.account_mgmt_update_email_body),
+                    style = ty.bodyMedium,
+                    color = mc.textSecondary,
+                )
 
-            Spacer(modifier = Modifier.height(sp.xl))
+                Spacer(modifier = Modifier.height(sp.md))
 
-            OutlinedTextField(
-                value = newEmail,
-                onValueChange = { newEmail = it },
-                label = { Text(stringResource(R.string.account_mgmt_new_email_field)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                colors = fieldColors,
-                enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth(),
-            )
+                AuthFlowStepsCard(
+                    title = stringResource(R.string.account_mgmt_change_email_steps_title),
+                    steps = listOf(
+                        stringResource(R.string.account_mgmt_change_email_step_send),
+                        stringResource(R.string.account_mgmt_change_email_step_confirm_current),
+                        stringResource(R.string.account_mgmt_change_email_step_confirm_new),
+                        stringResource(R.string.account_mgmt_change_email_step_pending),
+                    ),
+                )
 
-            if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(sp.sm))
-                Text(text = errorMessage, color = mc.lifeNegative, style = ty.labelMedium)
+
+                EmailDeliveryNote()
+
+                Spacer(modifier = Modifier.height(sp.lg))
+
+                OutlinedTextField(
+                    value = newEmail,
+                    onValueChange = { newEmail = it },
+                    label = { Text(stringResource(R.string.account_mgmt_new_email_field)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    colors = fieldColors,
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(modifier = Modifier.height(sp.xl))
+
+                MagicCtaButton(
+                    onClick = { authViewModel.confirmEmailUpdate(newEmail) },
+                    text = stringResource(R.string.action_save),
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    isLoading = isLoading,
+                    enabled = newEmail.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
-            Spacer(modifier = Modifier.height(sp.xl))
-
-            MagicCtaButton(
-                onClick = { authViewModel.confirmEmailUpdate(newEmail) },
-                text = stringResource(R.string.action_save),
-                style = MagicCtaStyle.Filled,
-                color = MagicCtaColor.Primary,
-                isLoading = isLoading,
-                enabled = newEmail.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
+            MagicToastHost(
+                state = toastState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
             )
         }
     }

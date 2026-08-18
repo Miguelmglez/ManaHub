@@ -77,6 +77,12 @@ private const val CARD_ASPECT_RATIO = 63f / 88f
  * @param onAnimationEnd Called after the entry/exit animation completes.
  * @param isTappedExtractor Whether the item should appear tapped (rotated).
  * @param actions Composable slot for buttons to be shown below the card, receives current item.
+ * @param actionsIndexed Additive alternative to [actions] for callers that need the CURRENT PAGE
+ *   INDEX (not just the item) — e.g. a caller whose `items` list can contain duplicate-`equals()`
+ *   entries (so `items.indexOf(item)` inside [actions] would always resolve to the FIRST match,
+ *   never the one actually being paged). When both the overlay's own pager position and the item
+ *   are needed, prefer this over deriving an index yourself. Mutually additive with [actions] — a
+ *   caller passes at most one of the two; both are invoked if both happen to be non-null.
  */
 @Composable
 fun <T> MagicCardInspectionOverlay(
@@ -93,6 +99,7 @@ fun <T> MagicCardInspectionOverlay(
     onAnimationEnd: () -> Unit = {},
     isTappedExtractor: (T) -> Boolean = { _ -> false },
     actions: @Composable (ColumnScope.(T) -> Unit)? = null,
+    actionsIndexed: @Composable (ColumnScope.(T, Int) -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val sp = MaterialTheme.spacing
@@ -290,7 +297,7 @@ fun <T> MagicCardInspectionOverlay(
                 }
 
                 // Action buttons below the card
-                if (actions != null && buttonsAlpha > 0f) {
+                if ((actions != null || actionsIndexed != null) && buttonsAlpha > 0f) {
                     val currentItem = items.getOrNull(pagerState.currentPage)
                     if (currentItem != null) {
                         Column(
@@ -304,7 +311,8 @@ fun <T> MagicCardInspectionOverlay(
                             verticalArrangement = Arrangement.spacedBy(sp.sm),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            actions(currentItem)
+                            if (actions != null) actions(currentItem)
+                            if (actionsIndexed != null) actionsIndexed(currentItem, pagerState.currentPage)
                         }
                     }
                 }

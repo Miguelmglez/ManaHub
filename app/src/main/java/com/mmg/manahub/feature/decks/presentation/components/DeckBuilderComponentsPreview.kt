@@ -70,3 +70,77 @@ fun CommanderBannerPreview() {
         }
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun CardRowPreview() {
+    val sampleCard = Card(
+        scryfallId = "1",
+        name = "Kenrith, the Returned King",
+        printedName = null,
+        manaCost = "{4}{W}",
+        cmc = 5.0,
+        colors = listOf("W", "U", "B", "R", "G"),
+        colorIdentity = listOf("W", "U", "B", "R", "G"),
+        typeLine = "Legendary Creature — Human Noble",
+        printedTypeLine = null,
+        oracleText = "...",
+        printedText = null,
+        keywords = emptyList(),
+        power = "5",
+        toughness = "5",
+        loyalty = null,
+        setCode = "eld",
+        setName = "Throne of Eldraine",
+        collectorNumber = "303",
+        rarity = "mythic",
+        releasedAt = "2019-10-04",
+        frameEffects = emptyList(),
+        promoTypes = emptyList(),
+        lang = "en",
+        imageNormal = null,
+        imageArtCrop = null,
+        imageBackNormal = null,
+        priceUsd = 0.0,
+        priceUsdFoil = null,
+        priceEur = 0.0,
+        priceEurFoil = null,
+        legalityStandard = "not_legal",
+        legalityPioneer = "legal",
+        legalityModern = "legal",
+        legalityCommander = "legal",
+        flavorText = null,
+        artist = "Kieran Yanner",
+        scryfallUri = "https://scryfall.com/card/eld/303"
+    )
+
+    MagicTheme {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                CardRow(
+                    card = sampleCard,
+                    isInCollection = true,
+                    onClick = {},
+                    onRemove = {},
+                    quantity = 1
+                )
+                Spacer(Modifier.height(8.dp))
+                CardRow(
+                    card = sampleCard.copy(colors = listOf("R")),
+                    isInCollection = false,
+                    onClick = {},
+                    onRemove = {},
+                    quantity = 4
+                )
+                Spacer(Modifier.height(8.dp))
+                CardRow(
+                    card = sampleCard.copy(colors = emptyList()),
+                    isInCollection = false,
+                    onClick = {},
+                    onRemove = null,
+                    selected = true
+                )
+            }
+        }
+    }
+}

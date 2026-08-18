@@ -132,9 +132,8 @@ private class FakeAuthRepository(initialState: SessionState = SessionState.Unaut
     override suspend fun linkGoogleIdentity(email: String, password: String, pendingIdToken: String, pendingNonce: String): AuthResult<AuthUser> = error("unused")
     override suspend fun updateAvatarUrl(avatarUrl: String?): AuthResult<Unit> = error("unused")
     override suspend fun resendConfirmationEmail(email: String): AuthResult<Unit> = error("unused")
-    override suspend fun requestReauthentication(): AuthResult<Unit> = error("unused")
     override suspend fun updateEmail(newEmail: String, code: String): AuthResult<Unit> = error("unused")
-    override suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit> = error("unused")
+    override suspend fun updatePassword(newPassword: String, currentPassword: String?): AuthResult<Unit> = error("unused")
     override suspend fun unlinkIdentity(identityId: String): AuthResult<Unit> = error("unused")
     override suspend fun linkGoogleIdentityNative(redirectUrl: String): AuthResult<String?> = error("unused")
 }

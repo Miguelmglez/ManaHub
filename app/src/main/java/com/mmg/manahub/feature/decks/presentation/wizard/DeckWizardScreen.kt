@@ -70,6 +70,7 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -449,7 +450,7 @@ private fun FormatCard(format: DeckFormat, selected: Boolean, comingSoon: Boolea
     Surface(
         onClick = onClick,
         enabled = !comingSoon,
-        shape = CardShape,
+        shape = SmallCardShape,
         color = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
         border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent) else null,
         modifier = Modifier.fillMaxWidth(),
@@ -557,7 +558,7 @@ private fun ReviewStepContent(
                 }
             }
 
-            Surface(shape = CardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = SmallCardShape, color = mc.backgroundSecondary, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(spacing.lg), verticalArrangement = Arrangement.spacedBy(spacing.md)) {
                     ReviewRow(stringResource(R.string.deck_wizard_review_format), uiState.selectedFormat?.displayName ?: "—")
                     ReviewChipRow(
@@ -577,7 +578,7 @@ private fun ReviewStepContent(
 
             Surface(
                 onClick = onToggleFillLands,
-                shape = CardShape,
+                shape = SmallCardShape,
                 color = mc.surface,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -609,7 +610,7 @@ private fun ReviewStepContent(
             if (uiState.communityEngineAvailable) {
                 Surface(
                     onClick = onToggleUseCommunityData,
-                    shape = CardShape,
+                    shape = SmallCardShape,
                     color = mc.surface,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -635,7 +636,7 @@ private fun ReviewStepContent(
                 }
             }
 
-            Surface(shape = CardShape, color = mc.goldMtg.copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = SmallCardShape, color = mc.goldMtg.copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(spacing.md), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.goldMtg, modifier = Modifier.size(20.dp))
                     Text(
@@ -684,7 +685,7 @@ private fun ReviewSeedCardTile(card: Card) {
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .size(width = 72.dp, height = 100.dp)
-            .clip(CardShape)
+            .clip(SmallCardShape)
             .background(mc.surfaceVariant),
     )
 }

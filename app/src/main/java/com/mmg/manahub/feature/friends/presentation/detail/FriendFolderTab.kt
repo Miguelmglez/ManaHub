@@ -12,8 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardListItem
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingFooter
 import com.mmg.manahub.core.ui.components.MagicProgressBar
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -67,30 +66,11 @@ fun FriendFolderTab(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             subTabs.forEach { subTab ->
-                FilterChip(
+                MagicFilterChip(
                     modifier = Modifier.weight(1f),
                     selected = uiState.folderSubTab == subTab,
                     onClick = { viewModel.selectFolderSubTab(subTab) },
-                    label = {
-                        Text(
-                            text = subTabLabel(subTab),
-                            style = MaterialTheme.magicTypography.labelMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-                        selectedLabelColor = mc.primaryAccent,
-                        containerColor = mc.surface,
-                        labelColor = mc.textSecondary,
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = uiState.folderSubTab == subTab,
-                        borderColor = mc.surfaceVariant,
-                        selectedBorderColor = mc.primaryAccent
-                    )
+                    label = subTabLabel(subTab),
                 )
             }
         }

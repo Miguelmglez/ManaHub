@@ -1,0 +1,48 @@
+# Cloudflare Worker: manahub-competitive
+#
+# Serves read-only, cached competitive-metagame data (weekly archetype/meta snapshots derived
+# from MTGO/TopDeck.gg/Spicerack decklists, plus a 17lands Limited card-ratings mirror) for
+# ManaHub's Competitive feature (see docs/competitive-feature-research.md). No auth, no PII,
+# GET only. Mirrors the manahub-community Worker's structure/conventions.
+#
+# NOT PROVISIONED YET — the KV namespace id / D1 database id below are placeholders. Run:
+#   npx wrangler kv namespace create COMPETITIVE_KV
+#   npx wrangler d1 create manahub-competitive-db
+# then paste the real ids in and apply src/schema.sql:
+#   npx wrangler d1 execute manahub-competitive-db --file=src/schema.sql
+name = "manahub-competitive"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "COMPETITIVE_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+
+[[d1_databases]]
+binding = "COMPETITIVE_DB"
+database_name = "manahub-competitive-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Daily cron: compute/refresh the weekly meta snapshot per supported format and prune old D1
+# weekly rows. NOT scheduled/deployed by this change — defining the trigger here is
+# config-as-code only; `wrangler deploy` is what actually activates it (same convention as
+# manahub-community's wrangler.toml).
+[triggers]
+crons = ["0 12 * * *"]
+
+# Secrets (NEVER put real values in this file or in git) — set via `wrangler secret put <NAME>`
+# once research-doc §7 action items are done:
+#   TOPDECK_API_KEY     — TopDeck.gg developer API key
+#   SPICERACK_API_KEY   — Spicerack org-admin API key
+#   DAYBREAK_SERVICE_ID — Daybreak Census service id (MTGO league data)
+# Fetchers in src/lib/sources/{topdeck,spicerack}.ts no-op with a `skipped: true` result when
+# their secret is absent — no code change needed once a secret is set, only `wrangler secret put`.
+# src/lib/sources/mtgo.ts stays in skip-mode until the mtgo.com JSON contract is verified
+# (research-doc §7 action item 6) and confirmed back to the implementer.
+
+# Cloudflare rate-limit rule (dashboard-side, NOT provisioned by this file): add a per-IP rate
+# limit on this Worker's route (e.g. 60 req/min, GET only, path prefix /meta/ and /limited/) to
+# protect the free-tier subrequest/CPU budget — same manual step manahub-community's wrangler.toml
+# documents; a human must add it after deploy.

@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +61,7 @@ import com.mmg.manahub.core.model.SetType
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -202,24 +202,17 @@ fun SetPickerSheet(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 item {
-                    FilterChip(
+                    MagicFilterChip(
                         selected = uiState.selectedTypes.isEmpty(),
                         onClick = viewModel::clearFilters,
-                        label = {
-                            Text(
-                                stringResource(R.string.collection_filter_all),
-                                style = ty.labelSmall,
-                            )
-                        },
+                        label = stringResource(R.string.collection_filter_all),
                     )
                 }
                 items(PLAYABLE_SET_TYPES.toList(), key = { it.name }) { type ->
-                    FilterChip(
+                    MagicFilterChip(
                         selected = uiState.selectedTypes.contains(type),
                         onClick = { viewModel.toggleTypeFilter(type) },
-                        label = {
-                            Text(stringResource(type.labelRes()), style = ty.labelSmall)
-                        },
+                        label = stringResource(type.labelRes()),
                     )
                 }
             }

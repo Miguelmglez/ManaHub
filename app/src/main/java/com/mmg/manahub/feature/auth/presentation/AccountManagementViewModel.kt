@@ -22,8 +22,7 @@ import kotlinx.coroutines.launch
  *   registration KDoc for why this is safe to resolve here without a duplicate definition).
  * - The 60-second cooldown after tapping "Resend confirmation email", so the user cannot spam the
  *   resend endpoint. A minimal ViewModel-owned countdown (no dedicated cooldown UI component exists
- *   in this codebase yet) rather than a shared abstraction — this is the only screen that needs it
- *   today; see [SecurityCodeScreen] for the sibling cooldown used there.
+ *   in this codebase yet) rather than a shared abstraction — this is the only screen that needs it.
  *
  * Every other action on the screen (resend the actual email, unlink/link an identity, sign out,
  * delete the account) goes straight through the screen's own entry-scoped [AuthViewModel] instance,

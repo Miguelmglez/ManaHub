@@ -35,4 +35,15 @@ interface DraftSimRepository {
      * @return UUID of the created deck on success.
      */
     suspend fun completeAndSaveDeck(result: DraftResult): DataResult<String>
+
+    /**
+     * Deletes the persisted session matching [state]'s set+mode, if one exists.
+     *
+     * Phase E (2026-08-16): used when the user explicitly cancels an in-progress draft (exit
+     * confirmation while DRAFTING) or backs out before saving (exit confirmation on the Deck tab)
+     * — without this, an abandoned session would still be offered as "resume draft" the next time
+     * the user opens Draft Setup for the same set. Best-effort from the caller's perspective: a
+     * session that no longer exists (already completed/never saved) is a silent no-op.
+     */
+    suspend fun cancelSession(state: DraftState)
 }

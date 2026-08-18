@@ -54,8 +54,6 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,7 +76,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
@@ -94,6 +91,7 @@ import coil3.compose.AsyncImage
 import org.koin.androidx.compose.koinViewModel
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.model.Deck
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -998,38 +996,17 @@ private fun ChipFlowRow(
     selected: String?,
     onSelect: (String) -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(ContentGap),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         options.forEach { (value, label) ->
             val isSelected = selected == value
-            val chipAlpha by animateFloatAsState(if (isSelected) 1f else 0.7f, label = "chip_alpha")
-            val chipScale by animateFloatAsState(if (isSelected) 1.05f else 1f, label = "chip_scale")
 
-            FilterChip(
+            MagicFilterChip(
                 selected = isSelected,
                 onClick = { onSelect(value) },
-                label = { Text(label, style = ty.labelMedium) },
-                modifier = Modifier
-                    .graphicsLayer(scaleX = chipScale, scaleY = chipScale)
-                    .alpha(chipAlpha),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                    selectedLabelColor = mc.primaryAccent,
-                    selectedLeadingIconColor = mc.primaryAccent,
-                    containerColor = mc.surfaceVariant.copy(alpha = 0.4f),
-                    labelColor = mc.textSecondary,
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = isSelected,
-                    borderColor = mc.surfaceVariant.copy(alpha = 0.5f),
-                    selectedBorderColor = mc.primaryAccent.copy(alpha = 0.5f),
-                )
+                label = label,
             )
         }
     }

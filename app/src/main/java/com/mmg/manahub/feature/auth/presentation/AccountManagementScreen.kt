@@ -81,6 +81,7 @@ import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.util.TimeAgoFormatter
 import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -100,9 +101,13 @@ import org.koin.androidx.compose.koinViewModel
  *   the reauthentication-code gate because Supabase's "Secure email change" project setting
  *   already double-confirms the change via links sent to both the old and new inbox (see the KDoc
  *   on [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate]).
- * @param onNavigateToSecurityCode Navigates to the reauthentication-code gate ahead of
- *   [UpdatePasswordScreen] — "Change password"/"Set a password" only, since it has no equivalent
- *   server-side double-confirm.
+ * @param onNavigateToUpdatePassword Navigates DIRECTLY to [UpdatePasswordScreen] for "Change
+ *   password"/"Set a password" — no intermediate reauthentication-code gate; Supabase's "Require
+ *   current password when updating" project setting protects the change server-side instead (see
+ *   the KDoc on [com.mmg.manahub.core.domain.auth.AuthRepository.updatePassword]). The
+ *   `requireCurrentPassword` argument mirrors this screen's own `canChangePassword` check
+ *   (`hasEmailIdentity || user.hasPassword` — see `canChangePassword`'s declaration KDoc below for
+ *   why `hasEmailIdentity` alone is not sufficient).
  * @param onSignedOut Invoked once the session is confirmed no longer authenticated (sign-out
  *   success or account deletion) — the caller should pop back to a non-account-gated destination.
  */
@@ -111,7 +116,7 @@ import org.koin.androidx.compose.koinViewModel
 fun AccountManagementScreen(
     onBack: () -> Unit,
     onNavigateToUpdateEmail: () -> Unit,
-    onNavigateToSecurityCode: () -> Unit,
+    onNavigateToUpdatePassword: (requireCurrentPassword: Boolean) -> Unit,
     onSignedOut: () -> Unit,
     authViewModel: AuthViewModel = koinViewModel(),
     viewModel: AccountManagementViewModel = koinViewModel(),
@@ -130,6 +135,16 @@ fun AccountManagementScreen(
     var identityPendingUnlink by remember { mutableStateOf<AuthIdentity?>(null) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showCancelEmailChangeDialog by remember { mutableStateOf(false) }
+    // Local override for the "pending email change" note (Fix 2): cancelPendingEmailChange's RPC
+    // returns void and does NOT push an updated AuthUser.newEmail through sessionState (GoTrue
+    // does not proactively re-sync auth.users changes made outside its own updateUser flow into
+    // the client's in-memory session — see AuthRepository.cancelPendingEmailChange's KDoc). Hiding
+    // the note locally on success avoids waiting on a session refresh that may not happen for a
+    // while. Reset by the LaunchedEffect(user.newEmail) below whenever the REAL session value
+    // changes — either because it eventually caught up (became null) or because a new pending
+    // change started (a different non-null value).
+    var emailChangeCancelledLocally by remember { mutableStateOf(false) }
 
     // Tracks WHICH danger-zone/sign-in-method action is currently in flight on the shared
     // AuthViewModel.uiState, so the triggering row/button can disable itself (and, where it IS the
@@ -143,10 +158,25 @@ fun AccountManagementScreen(
     val isActionPending = pendingAction != null
 
     val copiedMessage = stringResource(R.string.account_mgmt_gametag_copied)
-    val emailSentMessage = stringResource(R.string.auth_email_confirmation_sent)
+    val emailSentMessage = stringResource(
+        R.string.auth_email_confirmation_sent,
+        stringResource(R.string.auth_email_sender_name),
+    )
+    val emailChangeCancelledMessage = stringResource(R.string.account_mgmt_cancel_email_change_success)
+    val deeplinkFailedMessage = stringResource(R.string.account_mgmt_deeplink_action_failed)
 
     LaunchedEffect(Unit) {
         FirebaseCrashlytics.getInstance().log("screen_viewed: account_management")
+    }
+
+    // Fix 3: surfaces a failed manahub://auth deep-link callback (e.g. a rejected "Link Google
+    // account" OAuth redirect) as a toast while this screen is foregrounded — see
+    // AccountLinkFailureEvents' KDoc for why this is scoped to the app-foregrounded case only.
+    LaunchedEffect(Unit) {
+        AccountLinkFailureEvents.failures.collectLatest {
+            FirebaseCrashlytics.getInstance().log("account_mgmt_deeplink_failure_toast_shown")
+            toastState.show(deeplinkFailedMessage, MagicToastType.ERROR)
+        }
     }
 
     // Central reaction to every one-shot AuthUiState this screen's actions can produce. Each branch
@@ -161,6 +191,12 @@ fun AccountManagementScreen(
             is AuthUiState.IdentityUnlinked -> {
                 identityPendingUnlink = null
                 pendingAction = null
+                authViewModel.resetUiState()
+            }
+            is AuthUiState.EmailChangeCancelled -> {
+                pendingAction = null
+                emailChangeCancelledLocally = true
+                toastState.show(emailChangeCancelledMessage, MagicToastType.SUCCESS)
                 authViewModel.resetUiState()
             }
             is AuthUiState.GoogleIdentityLinkStarted -> {
@@ -249,6 +285,23 @@ fun AccountManagementScreen(
         )
     }
 
+    if (showCancelEmailChangeDialog) {
+        MagicAlertDialog(
+            onDismissRequest = { showCancelEmailChangeDialog = false },
+            title = stringResource(R.string.account_mgmt_cancel_email_change_title),
+            text = stringResource(R.string.account_mgmt_cancel_email_change_body),
+            confirmLabel = stringResource(R.string.account_mgmt_cancel_email_change_action),
+            onConfirm = {
+                showCancelEmailChangeDialog = false
+                pendingAction = "cancel_email_change"
+                authViewModel.cancelPendingEmailChange()
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = { showCancelEmailChangeDialog = false },
+            confirmColor = MagicCtaColor.ErrorSolid,
+        )
+    }
+
     if (showDeleteDialog) {
         MagicAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -305,6 +358,19 @@ fun AccountManagementScreen(
                     val hasEmailIdentity = user.identities.any { it.provider == "email" }
                     val hasGoogleIdentity = user.identities.any { it.provider == "google" }
                     val isEmailVerified = user.emailConfirmedAt != null
+                    // "Can this account reach a Change-password screen?" is broader than
+                    // hasEmailIdentity: a Google-only account that used "Set a password" has a real,
+                    // user-manageable password (AuthUser.hasPassword, from user_profiles.has_password)
+                    // but NEVER gets an `email` identity — the Admin-API set-account-password Edge
+                    // Function that sets it does not create one. See AuthUser.hasPassword's KDoc.
+                    val canChangePassword = hasEmailIdentity || user.hasPassword
+
+                    // Drops the local cancel-success override the moment the REAL session value
+                    // changes — see emailChangeCancelledLocally's declaration KDoc above.
+                    LaunchedEffect(pendingNewEmail) {
+                        emailChangeCancelledLocally = false
+                    }
+                    val showPendingEmailNote = pendingNewEmail != null && !emailChangeCancelledLocally
 
                     LazyColumn(
                         modifier = Modifier
@@ -345,10 +411,46 @@ fun AccountManagementScreen(
                                 subtitle = userEmail,
                                 icon = Icons.Default.Email,
                                 onClick = onNavigateToUpdateEmail,
-                                pendingNote = pendingNewEmail?.let { pending ->
-                                    stringResource(R.string.account_mgmt_email_change_pending, pending)
-                                },
+                                pendingNote = pendingNewEmail
+                                    ?.takeIf { !emailChangeCancelledLocally }
+                                    ?.let { pending ->
+                                        stringResource(R.string.account_mgmt_email_change_pending, pending)
+                                    },
                             )
+                        }
+
+                        if (showPendingEmailNote) {
+                            // Extends the one-line "Pending confirmation: <address>" note on the
+                            // row above into the full step guidance — a user who leaves and comes
+                            // back still sees exactly what is outstanding on BOTH inboxes (Secure
+                            // Email Change requires confirming from each before anything changes).
+                            item {
+                                AuthFlowStepsCard(
+                                    title = stringResource(R.string.account_mgmt_change_email_pending_title),
+                                    steps = listOf(
+                                        stringResource(R.string.account_mgmt_change_email_pending_step_confirm_current),
+                                        stringResource(
+                                            R.string.account_mgmt_change_email_pending_step_confirm_new,
+                                            pendingNewEmail.orEmpty(),
+                                        ),
+                                        stringResource(R.string.account_mgmt_change_email_pending_step_note),
+                                    ),
+                                )
+                            }
+                            item {
+                                EmailDeliveryNote()
+                            }
+                            item {
+                                MagicCtaButton(
+                                    onClick = { showCancelEmailChangeDialog = true },
+                                    text = stringResource(R.string.account_mgmt_cancel_email_change_action),
+                                    style = MagicCtaStyle.Ghost,
+                                    color = MagicCtaColor.Error,
+                                    enabled = !isActionPending,
+                                    isLoading = pendingAction == "cancel_email_change",
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
 
                         // "Change password" is an ordinary account-detail row ONLY when the account
@@ -357,13 +459,13 @@ fun AccountManagementScreen(
                         // under the "Add another way to sign in" label — moving it out of this
                         // generic row group so the add-a-missing-method actions read as their own
                         // thing instead of blending into ordinary settings rows.
-                        if (hasEmailIdentity) {
+                        if (canChangePassword) {
                             item {
                                 AccountManagementRow(
                                     title = stringResource(R.string.account_mgmt_change_password),
                                     subtitle = null,
                                     icon = Icons.Default.Lock,
-                                    onClick = onNavigateToSecurityCode,
+                                    onClick = { onNavigateToUpdatePassword(true) },
                                 )
                             }
                         }
@@ -385,15 +487,15 @@ fun AccountManagementScreen(
                         // Surfaces both "add a missing sign-in method" actions together, right below
                         // the sign-in-methods list, so they read as one deliberate group rather than
                         // two settings rows a user has to notice independently.
-                        if (!hasEmailIdentity || !hasGoogleIdentity) {
+                        if (!canChangePassword || !hasGoogleIdentity) {
                             item {
                                 SectionLabel(stringResource(R.string.account_mgmt_add_signin_method_title))
                             }
                             item {
                                 AddSignInMethodGroup {
-                                    if (!hasEmailIdentity) {
+                                    if (!canChangePassword) {
                                         MagicCtaButton(
-                                            onClick = onNavigateToSecurityCode,
+                                            onClick = { onNavigateToUpdatePassword(false) },
                                             text = stringResource(R.string.account_mgmt_set_password),
                                             style = MagicCtaStyle.Outlined,
                                             color = MagicCtaColor.Primary,
@@ -640,6 +742,8 @@ private fun EmailVerificationCard(
                     style = ty.bodySmall,
                     color = mc.textSecondary,
                 )
+                Spacer(modifier = Modifier.height(sp.xs))
+                EmailDeliveryNote()
             }
             Spacer(modifier = Modifier.width(sp.md))
             MagicCtaButton(

@@ -1,0 +1,22 @@
+{
+  "name": "manahub-competitive",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker aggregating competitive MTG metagame data (MTGO decklists, TopDeck.gg, Spicerack, 17lands) for ManaHub's Competitive feature. Read-only public GET endpoints, no auth, no PII.",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260101.0",
+    "@types/node": "^22.0.0",
+    "miniflare": "^3.20250101.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^3.90.0"
+  }
+}

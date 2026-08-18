@@ -77,6 +77,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.AddCardRow
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
+import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -241,7 +243,7 @@ fun CardSearchSheet(
                                 else -> isSearchingScryfall
                             }
                         }
-                        if (isSearching) MagicLoadingSpinner(Modifier.size(20.dp))
+                        if (isSearching) MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
                         else Icon(Icons.Default.Search, null, tint = mc.textSecondary)
                     },
                     trailingIcon = if (query.isNotEmpty()) {

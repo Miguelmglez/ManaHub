@@ -128,7 +128,7 @@ class BotHarnessTest {
             val humanPack = state.packsInFlight[humanIndex]
             if (humanPack == null || humanPack.cards.isEmpty()) break
             val pick = drafter.pick(humanSeat, humanPack, state.round, state.pickNumber, engine = null)
-            state = engine.applyHumanPick(state, pick.card.scryfallId, engine = null)
+            state = engine.applyHumanPick(state, listOf(pick.card.scryfallId), engine = null)
             guard++
         }
 

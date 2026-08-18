@@ -32,7 +32,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -165,8 +164,6 @@ fun CommunityDecksScreen(
                     contentPadding = padding,
                     onQueryChange = viewModel::onQueryChange,
                     onSearch = viewModel::search,
-                    onSortSelectedUpdate = viewModel::onSortUpdated,
-                    onSearchFormatUpdate = viewModel::onSearchDeckFilterUpdated,
                     onLoadMore = viewModel::loadMore,
                     onDeckClick = viewModel::onDeckClick,
                     onShowAdvancedSearch = { showAdvancedSearch = true },
@@ -197,8 +194,6 @@ fun CommunityDecksScreen(
                             contentPadding = PaddingValues(0.dp),
                             onQueryChange = viewModel::onQueryChange,
                             onSearch = viewModel::search,
-                            onSortSelectedUpdate = viewModel::onSortUpdated,
-                            onSearchFormatUpdate = viewModel::onSearchDeckFilterUpdated,
                             onLoadMore = viewModel::loadMore,
                             onDeckClick = viewModel::onDeckClick,
                             onShowAdvancedSearch = { showAdvancedSearch = true },
@@ -215,6 +210,7 @@ fun CommunityDecksScreen(
         CommunityAdvancedSearchSheet(
             state = uiState,
             onDismiss = { showAdvancedSearch = false },
+            onDeckTypeSelected = viewModel::onSearchDeckFilterUpdated,
             onColorToggled = viewModel::onColorToggled,
             onBracketSelected = viewModel::onBracketSelected,
             onCommanderQueryChange = viewModel::onCommanderQueryChange,
@@ -226,6 +222,10 @@ fun CommunityDecksScreen(
             onUsernameChanged = viewModel::onUsernameChanged,
             onDeckSizeChanged = viewModel::onDeckSizeChanged,
             onPrimersOnlyToggled = viewModel::onPrimersOnlyToggled,
+            onDeckTagPickerOpened = viewModel::onDeckTagPickerOpened,
+            onDeckTagSelected = viewModel::onDeckTagSelected,
+            onSortFieldSelected = viewModel::onSortFieldSelected,
+            onSortDirectionSelected = viewModel::onSortDirectionSelected,
             onClearAll = viewModel::onClearAdvancedFilters,
             onSearch = viewModel::onApplyAdvancedFilters,
         )
@@ -239,8 +239,6 @@ private fun CommunityDecksSearchBody(
     contentPadding: PaddingValues,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    onSortSelectedUpdate: (CommunityDeckSort) -> Unit,
-    onSearchFormatUpdate: (CommunityDeckFormatFilter) -> Unit,
     onLoadMore: () -> Unit,
     onDeckClick: (Int) -> Unit,
     onShowAdvancedSearch: () -> Unit,
@@ -295,32 +293,6 @@ private fun CommunityDecksSearchBody(
                 }
             }
         }
-
-
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
-        ){
-
-            ManaHubBottomSheetSelector(
-                icon = Icons.AutoMirrored.Filled.Sort,
-                valueText =  stringResource(state.selectedSort.displayResId),
-                items = CommunityDeckSort.entries,
-                selectedItem = state.selectedSort,
-                onSelect =  onSortSelectedUpdate,
-                itemLabel = { stringResource(it.displayResId) },
-                modifier = Modifier.weight(1f),
-            )
-            ManaHubBottomSheetSelector(
-                icon = Icons.Default.Layers,
-                valueText =  stringResource(state.advancedFilters.formats.displayResId),
-                items = CommunityDeckFormatFilter.entries,
-                selectedItem = state.advancedFilters.formats,
-                onSelect =  onSearchFormatUpdate,
-                itemLabel = { stringResource(it.displayResId) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-
 
         Spacer(Modifier.height(spacing.sm))
 
@@ -784,10 +756,4 @@ val CommunityDeckFormatFilter.displayResId get() = when (this) {
     CommunityDeckFormatFilter.STANDARD -> R.string.community_deck_format_standard
     CommunityDeckFormatFilter.PIONEER -> R.string.community_deck_format_pioneer
     CommunityDeckFormatFilter.VINTAGE -> R.string.community_deck_format_vintage
-}
-
-val CommunityDeckSort.displayResId get() = when (this) {
-    CommunityDeckSort.RECENT -> R.string.community_deck_sort_recent
-    CommunityDeckSort.UPDATED -> R.string.community_deck_sort_updated
-    CommunityDeckSort.POPULAR -> R.string.community_deck_sort_popular
 }

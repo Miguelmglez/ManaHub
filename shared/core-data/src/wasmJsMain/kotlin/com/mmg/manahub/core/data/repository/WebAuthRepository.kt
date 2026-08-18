@@ -55,13 +55,15 @@ import kotlin.time.ExperimentalTime
  * is a real but lower-priority Profile-adjacent follow-up). Same "single Nothing-returning helper"
  * pattern [WebCardRepository]/[WebDeckRepository] already established for their own stubbed methods.
  *
- * The account-management data-layer slice ([resendConfirmationEmail]/[requestReauthentication]/
- * [updateEmail]/[updatePassword]/[unlinkIdentity]/[linkGoogleIdentityNative]) added six new
- * [AuthRepository] members Android-side (Phase 1, data layer only). They are stubbed here with the
- * SAME [unsupported] helper purely to keep `:shared:core-data:compileKotlinWasmJs`/`:webApp` green --
- * this is a build-compilation fix, not a web design decision. A real web implementation (Custom-Tab-
- * equivalent OAuth-redirect handling, reauthentication UX, etc.) is `kmp-web-fullstack-dev` follow-up
- * work, not done here.
+ * The account-management data-layer slice ([resendConfirmationEmail]/[updateEmail]/[updatePassword]/
+ * [unlinkIdentity]/[linkGoogleIdentityNative]) added five new [AuthRepository] members Android-side
+ * (Phase 1, data layer only). They are stubbed here with the SAME [unsupported] helper purely to
+ * keep `:shared:core-data:compileKotlinWasmJs`/`:webApp` green -- this is a build-compilation fix,
+ * not a web design decision. A real web implementation (Custom-Tab-equivalent OAuth-redirect
+ * handling, current-password UX, etc.) is `kmp-web-fullstack-dev` follow-up work, not done here.
+ * (`requestReauthentication` was part of this slice originally but was retired outright, along with
+ * the Android-side email-nonce reauth flow it existed for -- GoTrue never validated that nonce
+ * server-side, so `updatePassword` now uses Supabase's own `current_password` mechanism instead.)
  *
  * ## [sessionState] is JWT-metadata-only, NOT `user_profiles`-enriched
  * Android's `AuthRepositoryImpl.sessionState` does a second DB round-trip per auth transition to
@@ -212,13 +214,10 @@ class WebAuthRepository(
     override suspend fun resendConfirmationEmail(email: String): AuthResult<Unit> =
         unsupported("resendConfirmationEmail")
 
-    override suspend fun requestReauthentication(): AuthResult<Unit> =
-        unsupported("requestReauthentication")
-
     override suspend fun updateEmail(newEmail: String, code: String): AuthResult<Unit> =
         unsupported("updateEmail")
 
-    override suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit> =
+    override suspend fun updatePassword(newPassword: String, currentPassword: String?): AuthResult<Unit> =
         unsupported("updatePassword")
 
     override suspend fun unlinkIdentity(identityId: String): AuthResult<Unit> =
@@ -239,6 +238,13 @@ class WebAuthRepository(
     // follow-up work, not done here.
     override suspend fun confirmEmailUpdate(newEmail: String): AuthResult<Unit> =
         unsupported("confirmEmailUpdate")
+
+    // Account-management fix batch (2026-08-14, Android-side) -- same build-compilation-only stub
+    // pattern as the methods above: keeps :shared:core-data:compileKotlinWasmJs/:webApp green after
+    // AuthRepository gained cancelPendingEmailChange. A real web "cancel pending email change"
+    // affordance is kmp-web-fullstack-dev follow-up work, not done here.
+    override suspend fun cancelPendingEmailChange(): AuthResult<Unit> =
+        unsupported("cancelPendingEmailChange")
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 

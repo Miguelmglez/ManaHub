@@ -22,8 +22,6 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -48,6 +46,7 @@ import com.mmg.manahub.core.ui.components.AvatarImage
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.CopyBadge
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -173,7 +172,6 @@ private fun TradesSubNavigation(
     selectedTab: TradesMainTab,
     onTabSelected: (TradesMainTab) -> Unit,
 ) {
-    val mc = MaterialTheme.magicColors
     val spacing = MaterialTheme.spacing
     Row(
         modifier = Modifier
@@ -187,30 +185,11 @@ private fun TradesSubNavigation(
                 TradesMainTab.FRIENDS -> stringResource(R.string.trades_toggle_friends)
                 TradesMainTab.HISTORY -> stringResource(R.string.trades_tab_history)
             }
-            FilterChip(
+            MagicFilterChip(
                 modifier = Modifier.weight(1f),
                 selected = selectedTab == tab,
                 onClick = { onTabSelected(tab) },
-                label = {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.magicTypography.labelMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = mc.primaryAccent.copy(alpha = 0.15f),
-                    selectedLabelColor = mc.primaryAccent,
-                    containerColor = mc.surface,
-                    labelColor = mc.textSecondary,
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = selectedTab == tab,
-                    borderColor = mc.surfaceVariant,
-                    selectedBorderColor = mc.primaryAccent
-                )
+                label = label,
             )
         }
     }

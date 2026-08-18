@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Test Bolt",
+    "color": "R",
+    "rarity": "common",
+    "avg_seen": 3.2,
+    "avg_pick": 2.8,
+    "play_rate": 0.45,
+    "win_rate": 0.582,
+    "opening_hand_win_rate": 0.6,
+    "drawn_win_rate": 0.57,
+    "ever_drawn_win_rate": 0.582,
+    "drawn_improvement_win_rate": 0.03,
+    "game_count": 12000,
+    "url": "https://cards.example/test-bolt.png"
+  },
+  {
+    "name": "Test Bear",
+    "color": "G",
+    "rarity": "common",
+    "avg_seen": 8.1,
+    "avg_pick": 7.9,
+    "play_rate": 0.2,
+    "win_rate": 0.51,
+    "opening_hand_win_rate": 0.51,
+    "drawn_win_rate": 0.5,
+    "ever_drawn_win_rate": 0.505,
+    "drawn_improvement_win_rate": -0.005,
+    "game_count": 8000,
+    "url": "https://cards.example/test-bear.png"
+  }
+]

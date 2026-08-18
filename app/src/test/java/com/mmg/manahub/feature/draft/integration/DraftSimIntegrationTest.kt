@@ -58,7 +58,7 @@ class DraftSimIntegrationTest {
             val humanPack = state.packsInFlight[0] ?: break
             val card = humanPack.cards.firstOrNull() ?: break
             state = withContext(Dispatchers.Default) {
-                engine.applyHumanPick(state, card.card.scryfallId, engine = null)
+                engine.applyHumanPick(state, listOf(card.card.scryfallId), engine = null)
             }
             fakeRepo.saveSession(state)
         }
@@ -123,5 +123,9 @@ private class FakeDraftSimRepository : DraftSimRepository {
         val deckId = "deck-${result.seat.index}-${System.currentTimeMillis()}"
         savedDecks += deckId
         return DataResult.Success(deckId)
+    }
+
+    override suspend fun cancelSession(state: DraftState) {
+        sessions.remove("${state.config.setCode}-${state.config.mode.name}")
     }
 }

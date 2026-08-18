@@ -3,8 +3,9 @@ package com.mmg.manahub.feature.auth.data.repository
 import android.util.Log
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.BuildConfig
-import com.mmg.manahub.core.common.decodeAmrIncludesRecoveryClaim
+import com.mmg.manahub.core.common.decodeAmrIndicatesRecoverySession
 import com.mmg.manahub.core.common.decodeIsAnonymousClaim
+import com.mmg.manahub.core.common.decodeSessionIdClaim
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.data.remote.UserProfileClient
 import com.mmg.manahub.core.data.remote.dto.UpdateAvatarUrlDto
@@ -19,6 +20,7 @@ import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
 import com.mmg.manahub.core.domain.auth.AuthRepository
 import com.mmg.manahub.core.util.recordNonFatal
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.SignOutScope
@@ -35,11 +37,14 @@ import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -49,6 +54,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -136,11 +142,21 @@ class AuthRepositoryImpl(
                     try {
                         val profile = userProfileDataSource.fetchUserProfile(state.user.id)
                         if (profile != null) {
+                            // has_password is fetched via a SEPARATE self-scoped RPC
+                            // (get_my_has_password), never as part of the profile row itself
+                            // (2026-08-17 security fix): user_profiles.has_password is granted
+                            // SELECT to `authenticated` cross-user, so it can no longer be part
+                            // of UserProfileClient.fetchProfile's select list — see
+                            // UserProfileDataSource.fetchHasPassword's KDoc. Non-fatal: defaults
+                            // to false on any failure, matching this whole enrichment block's
+                            // best-effort contract.
+                            val hasPassword = userProfileDataSource.fetchHasPassword(state.user.id)
                             val enrichedUser = state.user.copy(
                                 nickname = profile.nickname ?: state.user.nickname,
                                 gameTag = profile.gameTag ?: state.user.gameTag,
                                 avatarUrl = profile.avatarUrl,
                                 profileCompleted = profile.profileCompleted,
+                                hasPassword = hasPassword,
                             )
                             syncToDataStore(enrichedUser)
                             emit(SessionState.Authenticated(enrichedUser))
@@ -410,8 +426,12 @@ class AuthRepositoryImpl(
             // profile_completed and would bypass the onboarding gate.
             val profileUser = userProfileDataSource.completeUserProfile(baseUser)
 
-            // Fire-and-forget Edge Function to assign a random password, enabling
-            // email/password sign-in as a fallback and triggering the welcome email.
+            // Calls the Edge Function to assign a random password, enabling email/password
+            // sign-in as a fallback and triggering the welcome email. NOT fire-and-forget: this
+            // is a synchronous, blocking OkHttp call (execute(), not enqueue()) awaited inline
+            // within this coroutine — see callSetGoogleAccountPasswordEdgeFunction's KDoc. Its
+            // failures are swallowed (logged in debug only) so a notification/Edge Function
+            // hiccup never fails the sign-up itself, which has already succeeded by this point.
             callSetGoogleAccountPasswordEdgeFunction()
 
             syncToDataStore(profileUser)
@@ -486,14 +506,6 @@ class AuthRepositoryImpl(
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
 
-    override suspend fun requestReauthentication(): AuthResult<Unit> =
-        withContext(ioDispatcher) {
-            runCatching {
-                supabaseAuth.reauthenticate()
-                AuthResult.Success(Unit)
-            }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
-        }
-
     override suspend fun updateEmail(newEmail: String, code: String): AuthResult<Unit> =
         withContext(ioDispatcher) {
             runCatching {
@@ -522,14 +534,88 @@ class AuthRepositoryImpl(
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
 
-    override suspend fun updatePassword(newPassword: String, code: String): AuthResult<Unit> =
+    override suspend fun updatePassword(
+        newPassword: String,
+        currentPassword: String?,
+    ): AuthResult<Unit> =
         withContext(ioDispatcher) {
+            if (currentPassword == null) {
+                // "Set a password" flow. This is NOT simply "GoTrue skips the current-password
+                // check" — an account created via signUpWithGoogle already has a REAL password set
+                // server-side by set-google-account-password (fired on every Google signup) even
+                // though it has no `email` identity (the GoTrue experimental flag that would create
+                // one is off, dashboard-only to toggle). The self-service Auth.updateUser call
+                // below therefore legitimately gets rejected by "Require current password when
+                // updating" for that case (surfaced by the SDK as a generic 400, since
+                // AuthErrorCode.CurrentPasswordRequired isn't in this SDK version). Route through
+                // the Admin-API-backed set-account-password Edge Function instead, which has no
+                // current_password gate at all and works uniformly whether the account secretly
+                // already has a password or genuinely has none.
+                return@withContext setAccountPasswordViaEdgeFunction(newPassword)
+            }
             runCatching {
                 supabaseAuth.updateUser {
                     this.password = newPassword
-                    this.nonce = code
+                    this.currentPassword = currentPassword
                 }
                 notifyAccountEvent(AccountNotificationEvent.PASSWORD_CHANGED, providerMetadata("email"))
+                AuthResult.Success(Unit)
+            }.getOrElse { e ->
+                // "Change password" flow (account already has an `email` identity). GoTrue's
+                // "Require current password when updating" project setting (confirmed ON) rejects
+                // a mismatch with the SAME invalid_credentials errorCode/400 status it uses for a
+                // failed sign-in. Map it to the distinct, context-correct
+                // AuthError.InvalidCurrentPassword here rather than falling through to
+                // toAuthError()'s generic InvalidCredentials branch, whose "Incorrect email or
+                // password" copy reads wrong on a "Change password" screen.
+                if (e is AuthRestException && e.errorCode == AuthErrorCode.InvalidCredentials) {
+                    AuthResult.Error(AuthError.InvalidCurrentPassword)
+                } else {
+                    AuthResult.Error(e.toAuthError())
+                }
+            }
+        }
+
+    override suspend fun cancelPendingEmailChange(): AuthResult<Unit> =
+        withContext(ioDispatcher) {
+            runCatching {
+                userProfileClient.cancelPendingEmailChange()
+
+                // The RPC only clears `auth.users.email_change` server-side — it never pushes an
+                // updated session through the SDK, and `AuthUser.newEmail` is sourced from GoTrue's
+                // OWN cached UserInfo (not `user_profiles`), so `profileRefreshSignal` alone cannot
+                // fix it (that signal only re-triggers the `user_profiles` fetch — see the KDoc on
+                // `sessionState`). `retrieveUserForCurrentSession(updateSession = true)` forces a
+                // genuine GoTrue re-fetch and, per its own KDoc, updates `sessionStatus` when it is
+                // currently `Authenticated` — which `sessionState`'s `combine()` reacts to, clearing
+                // `newEmail` in the REAL session state (not just the UI's local
+                // `emailChangeCancelledLocally` override). Best-effort: the cancel RPC already
+                // succeeded, so a resync hiccup here must not turn this into an Error result — the
+                // stale note would then only persist until the SDK's own next token refresh, same
+                // as before this fix, rather than being a regression. recordSafeNonFatal (not
+                // recordNonFatal) is required here: [e] originates from an external SDK/network
+                // call, not a developer-controlled message, so its raw text could carry sensitive
+                // data (2026-08-17 review fix).
+                val resync = runCatching { supabaseAuth.retrieveUserForCurrentSession(updateSession = true) }
+                resync.onFailure { e ->
+                    recordSafeNonFatal("account_mgmt_cancel_email_change_resync_failed", e)
+                }
+
+                // user_profiles fields (nickname/gameTag/avatarUrl/profileCompleted/hasPassword)
+                // stay in sync too, mirroring every other mutation method in this file. Skipped when
+                // the resync above already succeeded (2026-08-17 optimization): a successful
+                // updateSession = true resync updates sessionStatus, which sessionState's own
+                // combine() reacts to by re-running the SAME user_profiles enrichment fetch this
+                // signal exists to trigger (the flatMapLatest block re-runs on ANY combine()
+                // re-emission, regardless of which upstream flow caused it) — firing both nearly
+                // simultaneously doesn't corrupt anything, it just very likely cancels and re-issues
+                // the in-flight fetchUserProfile call the resync's own re-emission already started.
+                // Fire it only as a fallback when the resync failed, so user_profiles fields still
+                // get a chance to sync even though sessionStatus itself never budged.
+                if (resync.isFailure) {
+                    profileRefreshSignal.tryEmit(Unit)
+                }
+
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
@@ -573,9 +659,78 @@ class AuthRepositoryImpl(
                     this.password = newPassword
                 }
                 notifyAccountEvent(AccountNotificationEvent.PASSWORD_CHANGED, providerMetadata("email"))
+                // password-recovery-hardening-plan-2026-08-18 §3.3/§3.4: a successful reset is one
+                // of the four marker-consuming exits. Clearing BEFORE signing out (not after) means
+                // a failure mid-way can never leave an armed marker with no session. GLOBAL scope is
+                // deliberate here (unlike abandonRecoverySession's LOCAL): a completed password
+                // change must invalidate every other session carrying the OLD password, and it
+                // guarantees the next session this account establishes carries a clean `amr:
+                // password` instead of a stale `otp`/`recovery`/`magiclink` one.
+                //
+                // BOTH steps are individually best-effort (runCatching each, not just the sign-out):
+                // the password change already succeeded server-side by this point, so neither a
+                // DataStore hiccup clearing the marker NOR a sign-out hiccup may turn this into
+                // AuthResult.Error — that would misreport a successful mutation as failed. Each is
+                // independent of the other so one failing never skips the other (a clear failure
+                // must not skip the sign-out, and vice versa) — mirrors deleteAccount's
+                // runCatching-wrapped LOCAL sign-out below.
+                //
+                // NonCancellable (T6 adversarial-audit HIGH fix, 2026-08-18): the caller chain is
+                // AuthViewModel.confirmPasswordReset -> viewModelScope.launch, and
+                // ResetPasswordConfirmScreen resolves that ViewModel with a bare koinViewModel() —
+                // nav-entry-scoped, so its scope is cancelled the moment the NavBackStackEntry is
+                // popped (system back, process death, or entry reclamation). Without this guard, a
+                // cancellation landing AFTER updateUser committed server-side but BEFORE this cleanup
+                // finished would leave: password changed, marker STILL armed, old recovery session
+                // STILL authenticated locally — both halves of isActiveRecoveryFlow still hold, so
+                // the reactive routing effect sends the user straight back to a form that is
+                // genuinely still submittable (the S2 sticky-loop bug, reached via an ordinary
+                // cancellation race instead of a design gap). withContext(NonCancellable) makes this
+                // cleanup pair run to completion regardless of the caller's own cancellation,
+                // preserving the clear-before-sign-out ordering documented above.
+                withContext(NonCancellable) {
+                    runCatching { userPreferencesDataStore.clearPendingRecoveryMarker() }
+                    runCatching { supabaseAuth.signOut(SignOutScope.GLOBAL) }
+                }
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
+
+    /**
+     * Abandons an in-progress "forgot password" recovery flow — called when the user taps Back on
+     * [com.mmg.manahub.feature.auth.presentation.ResetPasswordConfirmScreen] instead of completing
+     * it (password-recovery-hardening-plan-2026-08-18 §3.4). Clears the pending-recovery marker
+     * (see [UserPreferencesDataStore]'s KDoc) and signs out with [SignOutScope.LOCAL] — offline-safe,
+     * cannot fail, and discards the only copy of this recovery session's refresh token, making the
+     * session unreachable (mirrors [deleteAccount]'s LOCAL-scope rationale). Deliberately LOCAL, not
+     * GLOBAL: abandoning a reset on this device must not revoke the user's sessions on their other
+     * devices.
+     *
+     * Deliberately NOT part of the [AuthRepository] interface: the marker this clears is an
+     * Android-deep-link-specific mechanism (written by `MainActivity`'s Android intent handling, via
+     * [UserPreferencesDataStore]) with no web target/equivalent yet, so adding it to the shared
+     * interface would force an unrelated no-op implementation onto the web target
+     * (`WebAuthRepository`) purely to satisfy the compiler. `AppNavGraph` resolves this concrete
+     * class from its `koinInject<AuthRepository>()` via a narrow, documented downcast — see that
+     * call site's KDoc.
+     */
+    suspend fun abandonRecoverySession(): AuthResult<Unit> = withContext(ioDispatcher) {
+        runCatching {
+            // Same independent-best-effort shape as confirmPasswordReset's marker-clear/sign-out
+            // pair above (2026-08-18 review fix): a DataStore hiccup clearing the marker must not
+            // skip the LOCAL sign-out, and neither failure may surface as AuthResult.Error — there
+            // is no server-side mutation here to "fail" in the first place, abandoning is always a
+            // local, best-effort cleanup. Also NonCancellable for the same reason as
+            // confirmPasswordReset's cleanup above (T6 fix): the caller
+            // (AppNavGraph.onBack, via a coroutine scope that can itself be torn down by navigation
+            // or an Activity recreation) must not be able to interrupt this cleanup partway through.
+            withContext(NonCancellable) {
+                runCatching { userPreferencesDataStore.clearPendingRecoveryMarker() }
+                runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+            }
+            AuthResult.Success(Unit)
+        }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
+    }
 
     override suspend fun deleteAccount(): AuthResult<Unit> = withContext(ioDispatcher) {
         runCatching {
@@ -630,7 +785,12 @@ class AuthRepositoryImpl(
     override suspend fun resetPassword(email: String): AuthResult<Unit> =
         withContext(ioDispatcher) {
             runCatching {
-                supabaseAuth.resetPasswordForEmail(email)
+                // Explicit redirectUrl (2026-08-17) instead of relying on the SDK's
+                // defaultRedirectUrl() resolving from the Auth plugin's configured scheme/host.
+                // Confirmed correct today via live auth_logs, but that was an implicit dependency
+                // on Supabase Dashboard config that could silently drift — especially once a web
+                // target redirect URL also exists in the same Supabase project.
+                supabaseAuth.resetPasswordForEmail(email, redirectUrl = "manahub://auth")
                 AuthResult.Success(Unit)
             }.getOrElse { e -> AuthResult.Error(e.toAuthError()) }
         }
@@ -774,7 +934,12 @@ class AuthRepositoryImpl(
      * password to the newly created Google account. This allows the user to also sign in
      * via email/password if needed, and triggers a welcome email from Supabase.
      *
-     * This is fire-and-forget: failures are logged but never surfaced to the caller.
+     * NOT fire-and-forget: this makes a synchronous, blocking `OkHttpClient.Call.execute()`
+     * call (not `enqueue()`, not `applicationScope.launch`) and is awaited inline within the
+     * caller's ([signUpWithGoogle]'s) coroutine before it returns. What IS true is that its
+     * *result* is fire-and-forget from the caller's perspective — failures are only logged
+     * (debug builds) and never surfaced as an error to the UI, since the sign-up itself has
+     * already succeeded by the time this runs.
      * The supabaseOkHttpClient already injects apikey + Authorization headers automatically.
      */
     private fun callSetGoogleAccountPasswordEdgeFunction() {
@@ -795,6 +960,171 @@ class AuthRepositoryImpl(
             if (BuildConfig.DEBUG) {
                 Log.w(TAG, "set-google-account-password call failed", e)
             }
+        }
+    }
+
+    /**
+     * Calls the `set-account-password` Edge Function — the "Set a password" flow's actual
+     * operation (see [updatePassword]'s KDoc for why this exists instead of a plain
+     * `Auth.updateUser` call). Unlike [callSetGoogleAccountPasswordEdgeFunction], this is NOT
+     * fire-and-forget: the caller is waiting on this result, so it maps the HTTP response to a
+     * real [AuthResult] rather than swallowing failures.
+     *
+     * The Edge Function itself does a best-effort relay to `send-account-notification`
+     * (`event: "password_changed"`) on success — do not also call [notifyAccountEvent] here, or
+     * the user would get the notification email twice.
+     *
+     * On a successful write, this ALSO verifies the local session survived the Admin-API call by
+     * attempting [Auth.refreshCurrentSession] — see [AuthError.PasswordUpdatedSessionRevoked]'s
+     * KDoc for the production incident (2026-08-17) that made this necessary: GoTrue revokes the
+     * account's active session server-side as a side effect of `admin.updateUserById`, and without
+     * this check that revocation was invisible until the user's NEXT authenticated action failed
+     * with a confusing generic error.
+     */
+    private suspend fun setAccountPasswordViaEdgeFunction(newPassword: String): AuthResult<Unit> {
+        val accessToken = supabaseAuth.currentSessionOrNull()?.accessToken
+            ?: return AuthResult.Error(AuthError.SessionExpired)
+
+        // kotlinx.serialization's buildJsonObject (not org.json.JSONObject, unlike the sibling
+        // Edge Function helpers below) -- this call is awaited and its result matters, so it must
+        // behave identically under JVM unit tests, where org.json is the Android SDK stub jar
+        // (`isReturnDefaultValues = true` in app/build.gradle.kts makes JSONObject.put() return
+        // null instead of throwing, which then NPEs on .toString()). The sibling Edge Function
+        // calls get away with org.json because they are wrapped in their own outer try/catch that
+        // silently swallows exactly this kind of failure -- fine for a fire-and-forget call, wrong
+        // for this one.
+        val body = buildJsonObject { put("password", newPassword) }.toString()
+            .toRequestBody("application/json".toMediaType())
+        val request = Request.Builder()
+            .url("${BuildConfig.SUPABASE_URL}/functions/v1/set-account-password")
+            .addHeader("Authorization", "Bearer $accessToken")
+            .post(body)
+            .build()
+
+        return try {
+            supabaseOkHttpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    // This Admin-API call bypasses supabaseAuth.updateUser entirely, so GoTrue's
+                    // local session never learns a password now exists on its own. Worse than that
+                    // (2026-08-17 production incident, confirmed via auth_logs for a project test
+                    // account): GoTrue actively REVOKES the account's
+                    // active session server-side as a side effect of the admin.updateUserById
+                    // password write — the very next GET /user 403s with session_not_found, and
+                    // every authenticated call after that degrades further to bad_jwt "missing sub
+                    // claim". A plain profileRefreshSignal emit cannot fix this: that only
+                    // re-triggers the user_profiles enrichment fetch, which itself now fails
+                    // silently (swallowed by sessionState's own try/catch) against the dead token,
+                    // leaving a session that LOOKS authenticated in memory but rejects every real
+                    // call — including the user's very next "Change password" attempt.
+                    //
+                    // refreshCurrentSession() exchanges the REFRESH token for a new session (a
+                    // genuine POST /token?grant_type=refresh_token, distinct from
+                    // retrieveUserForCurrentSession's GET /user) — this is the only call that can
+                    // actually prove/repair the session at this point.
+                    val previousSessionState = sessionState.value
+                    val refreshResult = runCatching { supabaseAuth.refreshCurrentSession() }
+                    if (refreshResult.isSuccess) {
+                        // Deliberately UNCONDITIONAL, unlike cancelPendingEmailChange's
+                        // resync-success skip: this repository has no reliable way to observe
+                        // (nor, in tests, to simulate) refreshCurrentSession's internal session
+                        // re-import actually reaching sessionState's own combine() on the same
+                        // tick — relying on that side effect alone would make the mismatch
+                        // detection below flaky. Re-trigger the same user_profiles-enrichment path
+                        // every other mutation in this file uses so sessionState.hasPassword flips
+                        // deterministically.
+                        profileRefreshSignal.tryEmit(Unit)
+                        // Best-effort mismatch detection (2026-08-17 review finding): HTTP 200 here
+                        // only proves admin.updateUserById succeeded — it does NOT prove the Edge
+                        // Function's OWN best-effort has_password=true DB write also succeeded
+                        // (that failure is logged server-side only). Without this check, a write
+                        // failure was completely silent: the password change genuinely worked, but
+                        // AccountManagementScreen's canChangePassword gate would stay stuck on "Set
+                        // a password" forever. See verifySetPasswordFlagLanded's KDoc for why this
+                        // awaits sessionState rather than issuing a second direct fetch.
+                        verifySetPasswordFlagLanded(previousSessionState)
+                        AuthResult.Success(Unit)
+                    } else {
+                        // The refresh token is ALSO revoked — this session is unrecoverably dead.
+                        // Do not leave it sitting in memory looking valid: every subsequent
+                        // authenticated call (starting with the user's very next tap, e.g. a fresh
+                        // "Change password" attempt) would otherwise fail with a confusing
+                        // session_not_found/bad_jwt error that toAuthError() used to flatten to a
+                        // generic "An unexpected error occurred" (see the 403 fix on toAuthError
+                        // above — now-fixed defensive backstop, not the primary fix). Sign out
+                        // LOCALLY (no network call with an already-dead token, mirroring
+                        // deleteAccount's identical LOCAL-scope rationale) so sessionState flips to
+                        // Unauthenticated and AccountManagementScreen's existing
+                        // LaunchedEffect(sessionState) navigates the user out on its own, then
+                        // surface a distinct result so the caller can tell the user their password
+                        // WAS set — this must never read as a generic failure.
+                        recordNonFatal("account_mgmt_set_password_session_revoked")
+                        runCatching { supabaseAuth.signOut(SignOutScope.LOCAL) }
+                        AuthResult.Error(AuthError.PasswordUpdatedSessionRevoked)
+                    }
+                } else {
+                    if (BuildConfig.DEBUG) {
+                        val errorBody = runCatching { response.body?.string() }.getOrNull()
+                        Log.w(TAG, "set-account-password failed HTTP ${response.code}: $errorBody")
+                    }
+                    AuthResult.Error(
+                        when (response.code) {
+                            // Bad/missing JWT — the caller's session likely expired mid-flow.
+                            401 -> AuthError.SessionExpired
+                            // 400 (bad/too short/too long password) should already be unreachable
+                            // client-side (isPasswordStrong() is enforced in the ViewModel before
+                            // this is ever called), and 500 is an admin-API failure server-side —
+                            // neither has a more specific AuthError to map onto.
+                            else -> AuthError.Unknown("HTTP ${response.code}")
+                        }
+                    )
+                }
+            }
+        } catch (e: IOException) {
+            // A dropped connection here does NOT prove the change failed (2026-08-17 review
+            // finding): the server-side password update and its has_password write both complete
+            // BEFORE the response streams back, so a drop after processing but before we read it is
+            // a classic false negative. Best-effort: fire the same refresh signal the success path
+            // uses, so if the write actually landed, the next natural profile fetch (or the user
+            // reopening this screen) picks up the corrected hasPassword=true instead of staying
+            // stuck wrong for the rest of the session. This does not fully solve a same-session
+            // retry racing a duplicate password overwrite -- that would need an idempotency key on
+            // the Edge Function (out of scope here).
+            profileRefreshSignal.tryEmit(Unit)
+            AuthResult.Error(AuthError.NetworkError)
+        }
+    }
+
+    /**
+     * Best-effort mismatch check for the "Set a password" flow (2026-08-17 review finding): a
+     * successful [setAccountPasswordViaEdgeFunction] response (HTTP 200) only proves
+     * `admin.updateUserById` succeeded — it does NOT prove the Edge Function's OWN best-effort
+     * `user_profiles.has_password = true` write also succeeded (that failure is logged
+     * server-side only). Without this check, a write failure there was completely silent: the
+     * password change genuinely worked, but `AccountManagementScreen`'s `canChangePassword` gate
+     * would stay stuck reporting "Set a password" forever.
+     *
+     * Awaits the NEXT [sessionState] re-emission distinct from [previousSessionState] — triggered
+     * by the [profileRefreshSignal] emit the caller already fired — rather than issuing a second
+     * direct profile fetch, so this reuses the SAME enrichment round-trip instead of doubling
+     * network calls. Identity comparison (`!==`), not structural equality, is required:
+     * [sessionState]'s enrichment `flow{}` builds a brand-new [SessionState.Authenticated] instance
+     * on every run regardless of whether any field actually changed, so exactly the mismatch case
+     * this function exists to catch (a re-emission whose `hasPassword` is STILL `false`, all other
+     * fields unchanged) would never satisfy a structural `!=` check against [previousSessionState].
+     *
+     * Bounded by [SET_PASSWORD_VERIFY_TIMEOUT_MS] so a slow/hung re-enrichment can never delay the
+     * caller's already-successful [AuthResult] — this is a pure telemetry check, never a gate. Never
+     * turns this into an [AuthResult.Error]: the password update itself genuinely succeeded, only
+     * the UI-hint flag may be stale.
+     */
+    private suspend fun verifySetPasswordFlagLanded(previousSessionState: SessionState) {
+        val refreshedState = withTimeoutOrNull(SET_PASSWORD_VERIFY_TIMEOUT_MS) {
+            sessionState
+                .filterIsInstance<SessionState.Authenticated>()
+                .first { it !== previousSessionState }
+        }
+        if (refreshedState != null && !refreshedState.user.hasPassword) {
+            recordNonFatal("account_mgmt_set_password_has_password_flag_stale")
         }
     }
 
@@ -875,8 +1205,15 @@ class AuthRepositoryImpl(
             // the get_profile_by_user_id RPC or the complete_user_profile RPC.
             profileCompleted = false,
             // isAnonymous is intentionally left as the default (false) here — see the KDoc above.
-            emailConfirmedAt = userInfo.emailConfirmedAt,
-            createdAt = userInfo.createdAt,
+            // Bridged via epoch millis: supabase-kt 3.5.0's UserInfo.emailConfirmedAt/createdAt are
+            // compiled against kotlinx-datetime 0.7.1, where Instant is a typealias for
+            // kotlin.time.Instant — a DIFFERENT type from this project's own pinned
+            // kotlinx.datetime.Instant (0.6.2, forced back project-wide in the root build.gradle.kts
+            // to avoid an unrelated, unvetted kotlinx-datetime migration riding along with the auth
+            // SDK bump — see that file's comment). Millisecond precision is sufficient here; these
+            // fields are only used for "joined on"/confirmation-status display.
+            emailConfirmedAt = userInfo.emailConfirmedAt?.let { Instant.fromEpochMilliseconds(it.toEpochMilliseconds()) },
+            createdAt = userInfo.createdAt?.let { Instant.fromEpochMilliseconds(it.toEpochMilliseconds()) },
             newEmail = userInfo.newEmail,
             identities = userInfo.identities?.map { it.toAuthIdentity() } ?: emptyList(),
         )
@@ -948,6 +1285,12 @@ class AuthRepositoryImpl(
                 422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
                 404 -> AuthError.UserNotFound
                 401 -> AuthError.SessionExpired
+                // A bare 403 with no more specific AuthErrorCode above (e.g. GoTrue's
+                // session_not_found/bad_jwt responses after a server-side session revocation —
+                // see the 2026-08-17 production incident documented on
+                // AuthError.PasswordUpdatedSessionRevoked) always means "this session is no
+                // longer valid" — never the generic Unknown fallback.
+                403 -> AuthError.SessionExpired
                 429 -> AuthError.RateLimited
                 else -> AuthError.Unknown(message)
             }
@@ -960,6 +1303,8 @@ class AuthRepositoryImpl(
             422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
+            // See the matching 403 case in the AuthRestException branch above.
+            403 -> AuthError.SessionExpired
             429 -> AuthError.RateLimited
             else -> AuthError.Unknown(message)
         }
@@ -969,6 +1314,8 @@ class AuthRepositoryImpl(
             422 -> if (isGoogleSignIn) AuthError.GoogleEmailConflict("", "", "") else AuthError.EmailAlreadyInUse
             404 -> AuthError.UserNotFound
             401 -> AuthError.SessionExpired
+            // See the matching 403 case in the AuthRestException branch above.
+            403 -> AuthError.SessionExpired
             429 -> AuthError.RateLimited
             else -> AuthError.Unknown(message)
         }
@@ -991,6 +1338,12 @@ class AuthRepositoryImpl(
          * with the anon key.
          */
         private const val PROFILE_FETCH_RETRY_DELAY_MS = 400L
+
+        /**
+         * Timeout bound for [verifySetPasswordFlagLanded]'s best-effort `sessionState` await.
+         * Purely a telemetry check, never a gate — see that function's KDoc.
+         */
+        private const val SET_PASSWORD_VERIFY_TIMEOUT_MS = 3_000L
     }
 
     private fun SessionStatus.toSessionState(): SessionState = when (this) {
@@ -1005,7 +1358,11 @@ class AuthRepositoryImpl(
             // here, not derived from the attacker-controllable `type=recovery` deep-link marker.
             ?.copy(
                 isAnonymous = decodeIsAnonymousClaim(session.accessToken),
-                isRecoverySession = decodeAmrIncludesRecoveryClaim(session.accessToken),
+                isRecoverySession = decodeAmrIndicatesRecoverySession(session.accessToken),
+                // The `session_id` claim, paired with isRecoverySession by the app-side recovery
+                // marker (see UserPreferencesDataStore's KDoc), is what makes the marker
+                // non-transferable across sessions — see AuthUser.sessionId's KDoc.
+                sessionId = decodeSessionIdClaim(session.accessToken),
             )
             ?.let { SessionState.Authenticated(it) }
             ?: SessionState.Unauthenticated

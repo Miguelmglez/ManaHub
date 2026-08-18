@@ -14,6 +14,7 @@ import com.mmg.manahub.core.model.DraftCard
 import com.mmg.manahub.core.model.DraftConfig
 import com.mmg.manahub.core.model.DraftMode
 import com.mmg.manahub.core.model.DraftSeat
+import com.mmg.manahub.core.model.DraftState
 import com.mmg.manahub.core.model.DraftStatus
 import com.mmg.manahub.core.model.DraftableSet
 import com.mmg.manahub.core.model.PassDirection
@@ -96,7 +97,7 @@ class DefaultDraftEngineTest {
             val humanIndex = state.seats.indexOfFirst { it.isHuman }
             val pack = state.packsInFlight[humanIndex] ?: break
             val firstCard = pack.cards.firstOrNull() ?: break
-            state = engine.applyHumanPick(state, firstCard.card.scryfallId, engine = null)
+            state = engine.applyHumanPick(state, listOf(firstCard.card.scryfallId), engine = null)
         }
         return state
     }
@@ -134,7 +135,7 @@ class DefaultDraftEngineTest {
         repeat(packSize) {
             val humanIndex = state.seats.indexOfFirst { it.isHuman }
             val card = state.packsInFlight[humanIndex]!!.cards.firstOrNull() ?: return
-            state = engine.applyHumanPick(state, card.card.scryfallId, engine = null)
+            state = engine.applyHumanPick(state, listOf(card.card.scryfallId), engine = null)
         }
 
         if (state.round > 1) {
@@ -178,7 +179,7 @@ class DefaultDraftEngineTest {
             val humanIndex = state.seats.indexOfFirst { it.isHuman }
             val pack = state.packsInFlight[humanIndex] ?: break
             val firstCard = pack.cards.firstOrNull() ?: break
-            state = engine.applyHumanPick(state, firstCard.card.scryfallId, engine = null)
+            state = engine.applyHumanPick(state, listOf(firstCard.card.scryfallId), engine = null)
             guard++
         }
 
@@ -217,5 +218,91 @@ class DefaultDraftEngineTest {
         val humanSeat = state.seats.first { it.isHuman }
         val packSize = 14
         assertEquals(6 * packSize, humanSeat.pool.size)
+    }
+
+    // ── Pick 2 mode (picksPerTurn) ──────────────────────────────────────────────
+
+    @Test
+    fun picksPerTurn1_resetsPicksTakenInTurnEveryCall() {
+        // Regression: Pick-1 (the default) must behave byte-identical to before — one
+        // applyHumanPick call always completes the turn (rotates), leaving picksTakenInTurn at 0.
+        var state = engine.start(set, config) // config.picksPerTurn defaults to 1
+        val humanIndex = state.seats.indexOfFirst { it.isHuman }
+        val firstCard = state.packsInFlight[humanIndex]!!.cards.first()
+        state = engine.applyHumanPick(state, listOf(firstCard.card.scryfallId), engine = null)
+
+        assertEquals(0, state.picksTakenInTurn)
+        assertEquals(1, state.seats.first { it.isHuman }.pool.size)
+    }
+
+    @Test
+    fun picksPerTurn2_oddPackFinalTurnTakesExactlyOneCardBeforeRotating() {
+        // A 3-seat, 1-pack, 3-card-per-pack table with picksPerTurn=2: turn 1 takes 2 (rotates,
+        // 1 card left in every pack); turn 2 can only take the 1 remaining card even though 2 ids
+        // are requested, and that short turn still rotates/completes the round.
+        val picksPerTurnConfig = DraftConfig(
+            "TST", DraftMode.DRAFT, seatCount = 3, packCount = 1, picksPerTurn = 2,
+        )
+        val packSize = 3
+        fun packFor(seatIdx: Int) = BoosterPack(
+            "pack-$seatIdx",
+            (0 until packSize).map { DraftCard(fakeCard(seatIdx * 100 + it)) },
+        )
+        var state = DraftState(
+            config = picksPerTurnConfig,
+            round = 1,
+            pickNumber = 1,
+            seats = List(3) { i -> DraftSeat(index = i, isHuman = i == 0) },
+            packsInFlight = (0 until 3).associateWith { packFor(it) },
+            passDirection = PassDirection.LEFT,
+            status = DraftStatus.DRAFTING,
+        )
+
+        val firstTwoIds = state.packsInFlight[0]!!.cards.take(2).map { it.card.scryfallId }
+        state = engine.applyHumanPick(state, firstTwoIds, engine = null)
+
+        // Turn 1 took exactly picksPerTurn (2) cards from every seat and rotated.
+        assertEquals(0, state.picksTakenInTurn)
+        assertTrue(
+            "All packs must stay in lockstep after rotation",
+            state.packsInFlight.values.all { it.cards.size == 1 },
+        )
+
+        // Turn 2: only 1 card remains, but we (defensively) request 2 ids — only the 1 available
+        // card is taken, and the short turn still completes the round (packCount=1 -> BUILDING).
+        val remainingId = state.packsInFlight[0]!!.cards.first().card.scryfallId
+        state = engine.applyHumanPick(state, listOf(remainingId, "does-not-exist"), engine = null)
+
+        val humanSeat = state.seats.first { it.isHuman }
+        assertEquals("Human should have taken all $packSize cards", packSize, humanSeat.pool.size)
+        assertEquals(DraftStatus.BUILDING, state.status)
+    }
+
+    @Test
+    fun picksPerTurn2_allSeatsStayInLockstepThroughFullDraft() {
+        // Full 8-seat, 3-pack draft with picksPerTurn=2 (packSize=14 divides evenly by 2, so
+        // every turn takes exactly 2 — no odd-final-turn case here, see the dedicated test above).
+        val picksPerTurnConfig = config.copy(picksPerTurn = 2)
+        var state = engine.start(set, picksPerTurnConfig)
+        var guard = 0
+        while (!engine.isComplete(state) && guard < 1_000) {
+            val humanIndex = state.seats.indexOfFirst { it.isHuman }
+            val pack = state.packsInFlight[humanIndex] ?: break
+            val ids = pack.cards.take(2).map { it.card.scryfallId }
+            if (ids.isEmpty()) break
+            state = engine.applyHumanPick(state, ids, engine = null)
+
+            // Every seat's in-flight pack must be the same size after each call, whether or not
+            // this particular call rotated (a partial-turn call would also keep lockstep because
+            // only the human — never a bot — picks mid-turn, and no bot pack is touched then).
+            val sizes = state.packsInFlight.values.map { it.cards.size }.toSet()
+            assertTrue("All packs must be the same size, got $sizes", sizes.size <= 1)
+            guard++
+        }
+
+        assertEquals(DraftStatus.BUILDING, state.status)
+        val humanSeat = state.seats.first { it.isHuman }
+        val packSize = 14
+        assertEquals(config.packCount * packSize, humanSeat.pool.size)
     }
 }

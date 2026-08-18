@@ -7,13 +7,13 @@ import com.mmg.manahub.core.domain.auth.AuthError
 import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.AuthUser
 import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.feature.auth.domain.usecase.CancelPendingEmailChangeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmEmailUpdateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ConfirmPasswordResetUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.DeleteAccountUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.GetSessionStateUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityNativeUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.LinkGoogleIdentityUseCase
-import com.mmg.manahub.feature.auth.domain.usecase.RequestReauthenticationUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResendConfirmationEmailUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.ResetPasswordUseCase
 import com.mmg.manahub.feature.auth.domain.usecase.SignInWithEmailUseCase
@@ -82,13 +82,13 @@ class AuthViewModelTest {
     private val deleteAccountUseCase    = mockk<DeleteAccountUseCase>()
     private val updateNicknameUseCase   = mockk<UpdateNicknameUseCase>()
     private val resendConfirmationEmailUseCase = mockk<ResendConfirmationEmailUseCase>()
-    private val requestReauthenticationUseCase = mockk<RequestReauthenticationUseCase>()
     private val updateEmailUseCase             = mockk<UpdateEmailUseCase>()
     private val updatePasswordUseCase          = mockk<UpdatePasswordUseCase>()
     private val unlinkIdentityUseCase          = mockk<UnlinkIdentityUseCase>()
     private val linkGoogleIdentityNativeUseCase = mockk<LinkGoogleIdentityNativeUseCase>()
     private val confirmPasswordResetUseCase = mockk<ConfirmPasswordResetUseCase>()
     private val confirmEmailUpdateUseCase = mockk<ConfirmEmailUpdateUseCase>()
+    private val cancelPendingEmailChangeUseCase = mockk<CancelPendingEmailChangeUseCase>()
 
     /**
      * Context mock that returns the actual English string values from strings.xml.
@@ -179,6 +179,11 @@ class AuthViewModelTest {
         // Recovery-session gate (confirmPasswordReset) — shared with the "invalid/expired link" UI copy.
         every { appContext.getString(com.mmg.manahub.R.string.account_mgmt_reset_link_invalid) } returns
                 "This reset link is invalid or has expired. Request a new one from the sign-in screen."
+
+        // Wrong current password on "Change password" (architecture pivot away from the retired
+        // email-nonce reauthentication flow — see updatePassword's KDoc).
+        every { appContext.getString(com.mmg.manahub.R.string.auth_error_invalid_current_password) } returns
+                "Current password is incorrect."
     }
 
     private fun buildViewModel(): AuthViewModel = AuthViewModel(
@@ -193,13 +198,13 @@ class AuthViewModelTest {
         deleteAccountUseCase      = deleteAccountUseCase,
         updateNicknameUseCase     = updateNicknameUseCase,
         resendConfirmationEmailUseCase = resendConfirmationEmailUseCase,
-        requestReauthenticationUseCase = requestReauthenticationUseCase,
         updateEmailUseCase              = updateEmailUseCase,
         updatePasswordUseCase           = updatePasswordUseCase,
         unlinkIdentityUseCase           = unlinkIdentityUseCase,
         linkGoogleIdentityNativeUseCase = linkGoogleIdentityNativeUseCase,
         confirmPasswordResetUseCase     = confirmPasswordResetUseCase,
         confirmEmailUpdateUseCase       = confirmEmailUpdateUseCase,
+        cancelPendingEmailChangeUseCase = cancelPendingEmailChangeUseCase,
         analyticsHelper           = mockk(relaxed = true),
         appContext                 = appContext,
     )
@@ -1027,16 +1032,28 @@ class AuthViewModelTest {
 
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 11 — confirmPasswordReset (recovery-link completion, no reauth code)
+    //
+    //  Hardened 2026-08-18 (password-recovery-hardening-plan-2026-08-18.md): the gate is now
+    //  isActiveRecoveryFlow(sessionState, marker, now) — isRecoverySession (amr) alone is
+    //  NECESSARY but not SUFFICIENT, since GoTrue also tags a signup-email-confirmation session
+    //  amr: otp. A matching (sessionId, markedAtEpochMs) marker — the same value
+    //  ResetPasswordConfirmScreen collects from UserPreferencesDataStore.pendingRecoveryMarkerFlow
+    //  and passes through — is now also required.
     // ══════════════════════════════════════════════════════════════════════════
 
+    private val recoverySessionId = "session-abc-123"
+    private fun validRecoveryMarker(): Pair<String, Long> = recoverySessionId to System.currentTimeMillis()
+
     @Test
-    fun `given strong password and genuine recovery session when confirmPasswordReset then uiState transitions Loading then PasswordResetConfirmed`() = runTest {
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser.copy(isRecoverySession = true))
+    fun `given strong password, genuine recovery session, and matching marker when confirmPasswordReset then uiState transitions Loading then PasswordResetConfirmed`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(
+            dummyAuthUser.copy(isRecoverySession = true, sessionId = recoverySessionId)
+        )
         coEvery { confirmPasswordResetUseCase("Password1!") } returns AuthResult.Success(Unit)
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.confirmPasswordReset("Password1!")
+            viewModel.confirmPasswordReset("Password1!", validRecoveryMarker())
             assertEquals(AuthUiState.Loading, awaitItem())
             assertEquals(AuthUiState.PasswordResetConfirmed, awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -1046,11 +1063,13 @@ class AuthViewModelTest {
 
     @Test
     fun `given weak password when confirmPasswordReset then uiState emits Error without Loading and use case is never called`() = runTest {
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser.copy(isRecoverySession = true))
+        sessionStateFlow.value = SessionState.Authenticated(
+            dummyAuthUser.copy(isRecoverySession = true, sessionId = recoverySessionId)
+        )
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.confirmPasswordReset("weak")
+            viewModel.confirmPasswordReset("weak", validRecoveryMarker())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals("Password must include uppercase, lowercase, a number and a symbol", errorState.message)
             cancelAndIgnoreRemainingEvents()
@@ -1059,13 +1078,15 @@ class AuthViewModelTest {
     }
 
     @Test
-    fun `given network error and genuine recovery session when confirmPasswordReset then uiState emits Error with network message`() = runTest {
-        sessionStateFlow.value = SessionState.Authenticated(dummyAuthUser.copy(isRecoverySession = true))
+    fun `given network error, genuine recovery session, and matching marker when confirmPasswordReset then uiState emits Error with network message`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(
+            dummyAuthUser.copy(isRecoverySession = true, sessionId = recoverySessionId)
+        )
         coEvery { confirmPasswordResetUseCase(any()) } returns AuthResult.Error(AuthError.NetworkError)
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.confirmPasswordReset("Password1!")
+            viewModel.confirmPasswordReset("Password1!", validRecoveryMarker())
             assertEquals(AuthUiState.Loading, awaitItem())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals("No connection. Check your network", errorState.message)
@@ -1073,7 +1094,7 @@ class AuthViewModelTest {
         }
     }
 
-    // ── SECURITY: the isRecoverySession gate (forged manahub://auth?type=recovery deep link) ──
+    // ── SECURITY: isActiveRecoveryFlow gate (forged intent / signup-confirmation / marker) ──
 
     @Test
     fun `given authenticated session without recovery amr claim when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
@@ -1083,7 +1104,102 @@ class AuthViewModelTest {
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.confirmPasswordReset("Password1!")
+            viewModel.confirmPasswordReset("Password1!", validRecoveryMarker())
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals(
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
+                errorState.message,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
+    }
+
+    @Test
+    fun `given signup-confirmation-shaped session (amr indicates recovery but no marker armed) when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
+        // The S1 finding (password-recovery-hardening-plan-2026-08-18 §2.1): a signup-email-
+        // confirmation session's amr claim is indistinguishable from a genuine recovery session's
+        // (both "otp") -- isRecoverySession alone would have wrongly admitted this. MainActivity
+        // never arms a marker for a signup-confirmation deep link (only type=recovery does), so
+        // marker == null here is exactly what that call site produces for this case.
+        sessionStateFlow.value = SessionState.Authenticated(
+            dummyAuthUser.copy(isRecoverySession = true, sessionId = recoverySessionId)
+        )
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!", recoveryMarker = null)
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals(
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
+                errorState.message,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
+    }
+
+    @Test
+    fun `given email-change-confirmation-shaped session (amr otp, valid session, no marker armed) when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
+        // password-recovery-hardening-plan-2026-08-18 §7.2 / plan task T5: structurally IDENTICAL
+        // to the signup-confirmation case above (amr: otp, authenticated, no marker), but named and
+        // covered deliberately rather than by coincidence -- email_change confirmation is the ONE
+        // of these ambiguous-amr paths that actually reaches manahub://auth in production (signup
+        // confirmation redirects to a web page, never to the app deep link). A user mid-way through
+        // "Change email" who lands here on the CURRENT (still fully valid, non-recovery) session
+        // must see the same invalid-link rejection as any other non-recovery amr:otp session --
+        // MainActivity never arms a marker outside a type=recovery deep link, so this must gate shut
+        // exactly like the signup case, and the gate must NEVER be "fixed" by treating amr:otp +
+        // marker-absent as a sign-out condition (that would abort a legitimate in-flight email
+        // change instead of a recovery attempt -- see MainActivity.handleSupabaseAuthDeepLink's
+        // MARKER WRITE KDoc for why that alternative was explicitly rejected).
+        sessionStateFlow.value = SessionState.Authenticated(
+            dummyAuthUser.copy(isRecoverySession = true, sessionId = recoverySessionId)
+        )
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!", recoveryMarker = null)
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals(
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
+                errorState.message,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
+    }
+
+    @Test
+    fun `given marker present but bound to a different sessionId when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(
+            dummyAuthUser.copy(isRecoverySession = true, sessionId = recoverySessionId)
+        )
+        val markerForADifferentSession = "some-other-session-id" to System.currentTimeMillis()
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!", markerForADifferentSession)
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals(
+                "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
+                errorState.message,
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { confirmPasswordResetUseCase(any()) }
+    }
+
+    @Test
+    fun `given expired marker when confirmPasswordReset then uiState emits invalid-link Error and use case is never called`() = runTest {
+        sessionStateFlow.value = SessionState.Authenticated(
+            dummyAuthUser.copy(isRecoverySession = true, sessionId = recoverySessionId)
+        )
+        val expiredMarker = recoverySessionId to (System.currentTimeMillis() - RECOVERY_MARKER_TTL_MS - 1)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.confirmPasswordReset("Password1!", expiredMarker)
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals(
                 "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
@@ -1100,7 +1216,7 @@ class AuthViewModelTest {
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.confirmPasswordReset("Password1!")
+            viewModel.confirmPasswordReset("Password1!", validRecoveryMarker())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals(
                 "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
@@ -1117,7 +1233,7 @@ class AuthViewModelTest {
 
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
-            viewModel.confirmPasswordReset("Password1!")
+            viewModel.confirmPasswordReset("Password1!", validRecoveryMarker())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals(
                 "This reset link is invalid or has expired. Request a new one from the sign-in screen.",
@@ -1191,6 +1307,122 @@ class AuthViewModelTest {
         viewModel.uiState.test {
             assertEquals(AuthUiState.Idle, awaitItem())
             viewModel.confirmEmailUpdate("new@example.com")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("No connection. Check your network", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 13 — updatePassword (architecture pivot: current_password, no reauth code)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given strong password and current password when updatePassword then uiState transitions Loading then PasswordUpdated and use case receives both`() = runTest {
+        coEvery { updatePasswordUseCase("Password1!", "OldPassword1!") } returns AuthResult.Success(Unit)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.updatePassword(newPassword = "Password1!", currentPassword = "OldPassword1!")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            assertEquals(AuthUiState.PasswordUpdated, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { updatePasswordUseCase("Password1!", "OldPassword1!") }
+    }
+
+    @Test
+    fun `given null current password when updatePassword then use case is called with null (Set a password flow)`() = runTest {
+        coEvery { updatePasswordUseCase("Password1!", null) } returns AuthResult.Success(Unit)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.updatePassword(newPassword = "Password1!", currentPassword = null)
+            assertEquals(AuthUiState.Loading, awaitItem())
+            assertEquals(AuthUiState.PasswordUpdated, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { updatePasswordUseCase("Password1!", null) }
+    }
+
+    @Test
+    fun `given weak new password when updatePassword then uiState emits Error without Loading and use case is never called`() = runTest {
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.updatePassword(newPassword = "weak", currentPassword = "OldPassword1!")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("Password must include uppercase, lowercase, a number and a symbol", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { updatePasswordUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `given blank current password when updatePassword then uiState emits invalid-current-password Error and use case is never called`() = runTest {
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.updatePassword(newPassword = "Password1!", currentPassword = "")
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("Current password is incorrect.", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { updatePasswordUseCase(any(), any()) }
+    }
+
+    @Test
+    fun `given repository returns InvalidCurrentPassword when updatePassword then uiState emits the current-password-specific Error`() = runTest {
+        coEvery { updatePasswordUseCase(any(), any()) } returns AuthResult.Error(AuthError.InvalidCurrentPassword)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.updatePassword(newPassword = "Password1!", currentPassword = "WrongPassword1!")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("Current password is incorrect.", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `given network error when updatePassword then uiState emits Error with network message`() = runTest {
+        coEvery { updatePasswordUseCase(any(), any()) } returns AuthResult.Error(AuthError.NetworkError)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.updatePassword(newPassword = "Password1!", currentPassword = "OldPassword1!")
+            assertEquals(AuthUiState.Loading, awaitItem())
+            val errorState = awaitItem() as AuthUiState.Error
+            assertEquals("No connection. Check your network", errorState.message)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 14 — cancelPendingEmailChange
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `when cancelPendingEmailChange then uiState transitions Loading then EmailChangeCancelled`() = runTest {
+        coEvery { cancelPendingEmailChangeUseCase() } returns AuthResult.Success(Unit)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.cancelPendingEmailChange()
+            assertEquals(AuthUiState.Loading, awaitItem())
+            assertEquals(AuthUiState.EmailChangeCancelled, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { cancelPendingEmailChangeUseCase() }
+    }
+
+    @Test
+    fun `given repository returns Error when cancelPendingEmailChange then uiState emits Error`() = runTest {
+        coEvery { cancelPendingEmailChangeUseCase() } returns AuthResult.Error(AuthError.NetworkError)
+
+        viewModel.uiState.test {
+            assertEquals(AuthUiState.Idle, awaitItem())
+            viewModel.cancelPendingEmailChange()
             assertEquals(AuthUiState.Loading, awaitItem())
             val errorState = awaitItem() as AuthUiState.Error
             assertEquals("No connection. Check your network", errorState.message)

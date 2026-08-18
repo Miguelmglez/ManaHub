@@ -29,13 +29,18 @@
   `TagDictionary.get()` must fall back to `CardTag(key, TagCategory.TYPE)` on a miss, never drop the
   tag — dropping silently loses every TYPE tag (`CardStrategyTagsRepositoryImpl.toFound()` did exactly
   this until 2026-07-23; see `feedback_card_strategy_tags_type_dictionary_miss` in memory).
-- **Collection's TAG grouping (`CollectionGroupingMode.TAG`) is deliberately restricted to
-  `TagCategory.STRATEGY` tags only** — a scope difference from CardDetail/Deck Studio, which show
-  every category (color-coded). This is intentional, not an oversight left over from the
-  TYPE-tag-miss fix above: do not widen `groupCollection()`'s TAG branch
+- **Collection's TAG grouping (`CollectionGroupingMode.TAG`) is deliberately restricted to the
+  "identity" categories — `TagCategory.STRATEGY`/`ARCHETYPE`/`TRIBAL`** (the same
+  `IDENTITY_CATEGORIES` set used deck-engine-wide in `shared/core-domain`, e.g. `DeckScorer`,
+  `InferDeckIdentityUseCase`) — a scope difference from CardDetail/Deck Studio, which show every
+  category (color-coded). TYPE/KEYWORD/ROLE/CUSTOM stay excluded on purpose, ROLE included, since
+  functional-role tags ("removal"/"tutor") aren't a deck-identity signal and would flood the section
+  list the same way TYPE tags would. Widened from STRATEGY-only on 2026-08-17 (ARCHETYPE/TRIBAL-only
+  cards were incorrectly falling into "untagged" after the Phase 0.2 ROLE-key expansion made
+  STRATEGY-only cards rarer) — do not widen `groupCollection()`'s TAG branch
   (`shared/core-model/.../CollectionGrouping.kt`) or `CollectionScreen.kt`'s `collectionGroupLabel()`
-  to all categories.
+  beyond this three-category set.
 - → memory: `project_tagging_engine_v2`, `feedback_tag_dictionary_archetype_audit`,
   `project_strategy_tags_backfill_2026-07-22`, `feedback_card_strategy_tags_type_dictionary_miss`,
-  `project_card_tag_category_colors_2026-07-23`, `feedback_collection_tag_grouping_strategy_only`
+  `project_card_tag_category_colors_2026-07-23`, `feedback_collection_tag_grouping_identity_categories`
 

@@ -47,10 +47,14 @@ import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
 import com.mmg.manahub.core.data.local.dao.PuzzleDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
 import com.mmg.manahub.core.data.local.entity.CommunityAggregateEntity
 import com.mmg.manahub.core.data.local.entity.ComboCacheEntity
 import com.mmg.manahub.core.data.local.entity.CardStrategyTagsCacheEntity
 import com.mmg.manahub.core.data.local.entity.PuzzleResultEntity
+import com.mmg.manahub.core.data.local.entity.CompetitiveMetaCacheEntity
+import com.mmg.manahub.core.data.local.entity.CompetitiveLimitedRatingsCacheEntity
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.entity.DraftSetEntity
 import com.mmg.manahub.core.data.local.dao.FriendDao
@@ -115,8 +119,12 @@ import com.mmg.manahub.core.data.local.entity.TradeCollectionSyncEntity
         CardStrategyTagsCacheEntity::class,
         // Daily Puzzle feature, Batch B1 foundation (v50)
         PuzzleResultEntity::class,
+        // Competitive feature, Phase 2 — weekly metagame rankings + 17lands Limited card
+        // ratings caches, backed by the manahub-competitive Cloudflare Worker (v51)
+        CompetitiveMetaCacheEntity::class,
+        CompetitiveLimitedRatingsCacheEntity::class,
     ],
-    version = 50,
+    version = 51,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -170,4 +178,16 @@ abstract class MtgDatabase : RoomDatabase() {
 
     /** Daily-puzzle attempt/result history (Daily Puzzle feature, Batch B1 foundation, v50). */
     abstract fun puzzleDao(): PuzzleDao
+
+    /**
+     * Cache of fetched weekly MTG metagame rankings snapshots (Competitive feature, Phase 2,
+     * v51), served by the `manahub-competitive` Cloudflare Worker.
+     */
+    abstract fun competitiveMetaCacheDao(): CompetitiveMetaCacheDao
+
+    /**
+     * Cache of fetched 17lands Limited card-ratings snapshots (Competitive feature, Phase 2,
+     * v51), served by the `manahub-competitive` Cloudflare Worker.
+     */
+    abstract fun competitiveLimitedRatingsCacheDao(): CompetitiveLimitedRatingsCacheDao
 }

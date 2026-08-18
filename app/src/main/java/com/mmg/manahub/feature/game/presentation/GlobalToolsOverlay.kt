@@ -1,18 +1,15 @@
 package com.mmg.manahub.feature.game.presentation
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +106,47 @@ fun GlobalToolsOverlay(
 ) {
     val mc = MaterialTheme.magicColors
     val mt = MaterialTheme.magicTypography
+    val density = LocalDensity.current
+
+    // ── Transition for expansion ──
+    val transition = updateTransition(
+        targetState = state.isExpanded,
+        label = "tools_expansion"
+    )
+
+    val panelAlpha by transition.animateFloat(
+        transitionSpec = {
+            if (initialState == false && targetState == true) {
+                tween(durationMillis = 300, easing = FastOutSlowInEasing)
+            } else {
+                tween(durationMillis = 250, easing = FastOutSlowInEasing)
+            }
+        },
+        label = "panel_alpha"
+    ) { expanded -> if (expanded) 1f else 0f }
+
+    val panelScale by transition.animateFloat(
+        transitionSpec = {
+            if (initialState == false && targetState == true) {
+                tween(durationMillis = 350, easing = FastOutSlowInEasing)
+            } else {
+                tween(durationMillis = 250, easing = FastOutSlowInEasing)
+            }
+        },
+        label = "panel_scale"
+    ) { expanded -> if (expanded) 1f else 0.85f }
+
+    val panelOffset by transition.animateDp(
+        transitionSpec = {
+            tween(durationMillis = 350, easing = FastOutSlowInEasing)
+        },
+        label = "panel_offset"
+    ) { expanded -> if (expanded) (-80).dp else (-40).dp }
+
+    val buttonRotation by transition.animateFloat(
+        transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+        label = "button_rotation"
+    ) { expanded -> if (expanded) 135f else 0f }
 
     // ── Pulse animation for central button ──
     val pulseTransition = rememberInfiniteTransition(label = "central_pulse")
@@ -130,6 +169,14 @@ fun GlobalToolsOverlay(
         label = "pulse_scale"
     )
 
+    // The caller now hands us an already-generously-sized modifier (fillMaxSize, not
+    // wrapContentSize) so this Box never needs to resize itself between "button only" and
+    // "button + expanded panel" — see GamePlayerGrid's GlobalToolsOverlay call site. That removes
+    // the container-resize race entirely: the panel's own scaleIn/fadeIn AnimatedVisibility below
+    // is the only thing animating, and it animates within a bound that's already large enough, so
+    // there's nothing to clip mid-transition. (A prior attempt used Modifier.animateContentSize()
+    // here — reverted: it clips content to the CURRENTLY-ANIMATING interpolated size every frame,
+    // which looked like the panel being progressively cut off rather than smoothly growing.)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier,
@@ -141,9 +188,10 @@ fun GlobalToolsOverlay(
                 .graphicsLayer {
                     scaleX = pulseScale
                     scaleY = pulseScale
+                    rotationZ = buttonRotation
                 }
                 .coloredShadow(
-                    color = mc.primaryAccent.copy(alpha = pulseAlpha * 0.6f),
+                    color = mc.primaryAccent.copy(alpha = pulseAlpha * 0.6f * (1f - panelAlpha.coerceIn(0f, 1f))),
                     blurRadius = 24.dp,
                     borderRadius = 18.dp
                 )
@@ -164,10 +212,15 @@ fun GlobalToolsOverlay(
                     onClick = onToggle
                 ),
         ) {
+            val iconSize by animateFloatAsState(
+                targetValue = if (state.isExpanded) 20f else 14f,
+                animationSpec = tween(300),
+                label = "icon_size"
+            )
             Text(
                 text = if (state.isExpanded) stringResource(R.string.game_cross_symbol) else stringResource(R.string.game_star_symbol),
                 style = mt.titleMedium.copy(
-                    fontSize = if (state.isExpanded) 20.sp else 14.sp,
+                    fontSize = iconSize.sp,
                     lineHeight = 14.sp,
                     fontWeight = FontWeight.Bold
                 ),
@@ -178,127 +231,125 @@ fun GlobalToolsOverlay(
         }
 
         // ── Expanded panel ────────────────────────────────────────────────────
-        AnimatedVisibility(
-            visible = state.isExpanded,
-            enter = scaleIn(
-                tween(300, easing = FastOutSlowInEasing),
-                initialScale = 0.8f,
-                transformOrigin = TransformOrigin.Center
-            ) + fadeIn(tween(250)),
-            exit = scaleOut(
-                tween(250, easing = FastOutSlowInEasing),
-                targetScale = 0.8f,
-                transformOrigin = TransformOrigin.Center
-            ) + fadeOut(tween(200)),
-        ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = mc.backgroundSecondary.copy(alpha = 0.95f),
-                border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.35f)),
-                shadowElevation = 12.dp,
+        if (panelAlpha > 0f) {
+            Box(
                 modifier = Modifier
-                    .widthIn(min = 220.dp)
-                    .offset(y = (-80).dp)
-                    .coloredShadow(
-                        color = mc.primaryAccent.copy(alpha = 0.15f),
-                        blurRadius = 40.dp,
-                        borderRadius = 24.dp
-                    ),
+                    .graphicsLayer {
+                        alpha = panelAlpha
+                        scaleX = panelScale
+                        scaleY = panelScale
+                        translationY = with(density) { panelOffset.toPx() }
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // ── Close button (top-right) ──────────────────────────────
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_close),
-                            contentDescription = stringResource(R.string.game_tools_close_desc),
-                            tint = mc.primaryAccent.copy(alpha = 0.50f),
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .size(24.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = onToggle,
-                                )
-                        )
-                    }
-
-                    // ── Dice + Coin row ───────────────────────────────────────
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(
-                            16.dp, Alignment.CenterHorizontally
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = mc.backgroundSecondary.copy(alpha = 0.95f),
+                    border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.35f)),
+                    shadowElevation = 12.dp,
+                    modifier = Modifier
+                        .widthIn(min = 220.dp)
+                        .coloredShadow(
+                            color = mc.primaryAccent.copy(alpha = 0.15f * panelAlpha),
+                            blurRadius = 40.dp,
+                            borderRadius = 24.dp
                         ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        AnimatedDice(
-                            result = state.lastDiceResult,
-                            isRolling = state.isRollingDice,
-                            onClick = onRollDice,
-                        )
-                        AnimatedCoin(
-                            result = state.lastCoinResult,
-                            isFlipping = state.isFlippingCoin,
-                            onClick = onFlipCoin,
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.size(4.dp))
-
-                    // ── Primary Actions ───────────────────────────────────────
+                ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        ToolsActionRow(
-                            icon = Icons.Default.People,
-                            label = stringResource(R.string.game_tools_manage_players),
-                            onClick = { onManagePlayers(); onToggle() },
-                        )
-
-                        if (onTournament != null) {
-                            ToolsActionRow(
-                                icon = Icons.Default.EmojiEvents,
-                                label = stringResource(R.string.game_tools_tournament),
-                                onClick = { onTournament(); onToggle() },
+                        // ── Close button (top-right) ──────────────────────────────
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_close),
+                                contentDescription = stringResource(R.string.game_tools_close_desc),
+                                tint = mc.primaryAccent.copy(alpha = 0.50f),
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .size(24.dp)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = onToggle,
+                                    )
                             )
                         }
-                    }
 
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        color = mc.primaryAccent.copy(alpha = 0.15f),
-                    )
+                        // ── Dice + Coin row ───────────────────────────────────────
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(
+                                16.dp, Alignment.CenterHorizontally
+                            ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            AnimatedDice(
+                                result = state.lastDiceResult,
+                                isRolling = state.isRollingDice,
+                                onClick = onRollDice,
+                            )
+                            AnimatedCoin(
+                                result = state.lastCoinResult,
+                                isFlipping = state.isFlippingCoin,
+                                onClick = onFlipCoin,
+                            )
+                        }
 
-                    // ── Game Control Actions ──────────────────────────────────
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        QuickActionCircle(
-                            icon = Icons.Default.Pause,
-                            label = stringResource(R.string.game_tools_abandon),
-                            onClick = { onAbandonGame(); onToggle() },
+                        Spacer(modifier = Modifier.size(4.dp))
+
+                        // ── Primary Actions ───────────────────────────────────────
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            ToolsActionRow(
+                                icon = Icons.Default.People,
+                                label = stringResource(R.string.game_tools_manage_players),
+                                onClick = { onManagePlayers(); onToggle() },
+                            )
+
+                            if (onTournament != null) {
+                                ToolsActionRow(
+                                    icon = Icons.Default.EmojiEvents,
+                                    label = stringResource(R.string.game_tools_tournament),
+                                    onClick = { onTournament(); onToggle() },
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = mc.primaryAccent.copy(alpha = 0.15f),
                         )
 
-                        QuickActionCircle(
-                            icon = Icons.Default.Refresh,
-                            label = stringResource(R.string.game_tools_reset),
-                            onClick = { onReset(); onToggle() },
-                        )
+                        // ── Game Control Actions ──────────────────────────────────
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            QuickActionCircle(
+                                icon = Icons.Default.Pause,
+                                label = stringResource(R.string.game_tools_abandon),
+                                onClick = { onAbandonGame(); onToggle() },
+                            )
 
-                        QuickActionCircle(
-                            icon = Icons.Default.ExitToApp,
-                            label = stringResource(R.string.game_tools_exit_game),
-                            tint = mc.lifeNegative,
-                            onClick = { onExitGame(); onToggle() },
-                        )
+                            QuickActionCircle(
+                                icon = Icons.Default.Refresh,
+                                label = stringResource(R.string.game_tools_reset),
+                                onClick = { onReset(); onToggle() },
+                            )
+
+                            QuickActionCircle(
+                                icon = Icons.Default.ExitToApp,
+                                label = stringResource(R.string.game_tools_exit_game),
+                                tint = mc.lifeNegative,
+                                onClick = { onExitGame(); onToggle() },
+                            )
+                        }
                     }
                 }
             }

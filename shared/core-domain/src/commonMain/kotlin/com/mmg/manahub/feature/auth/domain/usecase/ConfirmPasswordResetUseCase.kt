@@ -4,10 +4,10 @@ import com.mmg.manahub.core.domain.auth.AuthResult
 import com.mmg.manahub.core.domain.auth.AuthRepository
 
 /**
- * Confirms a "forgot password" reset from the email deep link, WITHOUT a reauthentication code.
+ * Confirms a "forgot password" reset from the email deep link, WITHOUT a current-password check.
  * Delegates to [AuthRepository.confirmPasswordReset], which calls `Auth.updateUser` against the
  * temporary recovery session GoTrue establishes when the user taps the recovery link — distinct
- * from [UpdatePasswordUseCase], which requires a [RequestReauthenticationUseCase] nonce.
+ * from [UpdatePasswordUseCase], which requires the account's current password (see its KDoc).
  */
 class ConfirmPasswordResetUseCase(
     private val repository: AuthRepository
