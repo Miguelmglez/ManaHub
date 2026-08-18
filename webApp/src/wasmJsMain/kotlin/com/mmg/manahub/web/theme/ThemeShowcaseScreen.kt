@@ -24,6 +24,7 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.MagicCard
 import com.mmg.manahub.core.ui.layout.AdaptiveCardGrid
 import com.mmg.manahub.core.ui.layout.ManaWindowSizeClass
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.theme.AppTheme
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -139,10 +140,10 @@ fun ThemeShowcaseScreen(
             ) {
                 ALL_THEMES.forEach { theme ->
                     val label = theme::class.simpleName.orEmpty()
-                    FilterChip(
+                    MagicFilterChip(
                         selected = theme == selectedTheme,
                         onClick = { onThemeSelected(theme) },
-                        label = { Text(label) },
+                        label = label,
                     )
                 }
             }

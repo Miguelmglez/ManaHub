@@ -36,8 +36,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,6 +70,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.MagicColors
@@ -260,25 +259,10 @@ private fun FormatSelectorRow(
 
 @Composable
 private fun FormatChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    FilterChip(
+    MagicFilterChip(
         selected = isSelected,
         onClick = onClick,
-        label = { Text(label, style = ty.labelLarge) },
-        shape = ChipShape,
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = mc.primaryAccent,
-            selectedLabelColor = mc.onAccent,
-            containerColor = mc.surfaceVariant.copy(alpha = 0.5f),
-            labelColor = mc.textSecondary,
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = isSelected,
-            selectedBorderColor = mc.primaryAccent,
-        ),
-        modifier = Modifier.heightIn(min = 48.dp),
+        label = label,
     )
 }
 
