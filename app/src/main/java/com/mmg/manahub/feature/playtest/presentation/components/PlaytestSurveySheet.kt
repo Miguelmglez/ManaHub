@@ -32,8 +32,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.theme.magicColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -256,18 +255,10 @@ private fun SurveyQuestionWidget(
             is AnswerOption.SingleChoice -> {
                 val selected = answers[question.id]
                 option.options.forEach { choice ->
-                    FilterChip(
+                    MagicFilterChip(
                         selected = choice.id == selected,
                         onClick  = { onAnswer(question.id, choice.id) },
-                        label    = {
-                            Text(choice.label, style = ty.labelSmall)
-                        },
-                        colors   = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                            selectedLabelColor     = mc.primaryAccent,
-                            containerColor         = mc.surface,
-                            labelColor             = mc.textSecondary,
-                        ),
+                        label    = choice.label,
                     )
                 }
             }
@@ -281,20 +272,14 @@ private fun SurveyQuestionWidget(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     option.options.forEach { choice ->
-                        FilterChip(
+                        MagicFilterChip(
                             selected = choice.id in selectedIds,
                             onClick  = {
                                 val updated = selectedIds.toMutableSet()
                                 if (choice.id in updated) updated.remove(choice.id) else updated.add(choice.id)
                                 onAnswer(question.id, updated.joinToString(","))
                             },
-                            label = { Text(choice.label, style = ty.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                                selectedLabelColor     = mc.primaryAccent,
-                                containerColor         = mc.surface,
-                                labelColor             = mc.textSecondary,
-                            ),
+                            label = choice.label,
                         )
                     }
                 }
@@ -359,17 +344,11 @@ private fun SurveyQuestionWidget(
                                     .clip(RoundedCornerShape(6.dp)),
                             )
                             listOf("KEY", "AVG", "WEAK").forEach { impact ->
-                                FilterChip(
+                                MagicFilterChip(
                                     selected = cardAnswer == impact,
                                     onClick  = { onAnswer(cardQuestionId, impact) },
-                                    label    = { Text(impact, style = ty.labelSmall) },
+                                    label    = impact,
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors   = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = mc.primaryAccent.copy(alpha = 0.2f),
-                                        selectedLabelColor     = mc.primaryAccent,
-                                        containerColor         = mc.surface,
-                                        labelColor             = mc.textSecondary,
-                                    ),
                                 )
                             }
                         }

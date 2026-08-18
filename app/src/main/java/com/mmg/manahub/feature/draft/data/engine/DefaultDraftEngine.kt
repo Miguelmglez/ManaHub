@@ -4,6 +4,7 @@ import com.mmg.manahub.core.domain.engine.BoosterGenerator
 import com.mmg.manahub.core.domain.engine.BotDrafter
 import com.mmg.manahub.core.domain.engine.DraftEngine
 import com.mmg.manahub.core.model.BoosterPack
+import com.mmg.manahub.core.model.DraftCard
 import com.mmg.manahub.core.model.DraftConfig
 import com.mmg.manahub.core.model.DraftMode
 import com.mmg.manahub.core.model.DraftSeat
@@ -79,39 +80,94 @@ class DefaultDraftEngine(
         )
     }
 
-    override fun applyHumanPick(state: DraftState, scryfallId: String, engine: EngineConfig?): DraftState {
+    override fun applyHumanPick(
+        state: DraftState,
+        scryfallIds: List<String>,
+        engine: EngineConfig?,
+    ): DraftState {
         val seatCount = state.seats.size
         val humanIndex = state.seats.indexOfFirst { it.isHuman }.takeIf { it >= 0 } ?: 0
 
-        // 1. Remove the human's pick from their pack and add to pool
-        val humanPack = state.packsInFlight[humanIndex]
-            ?: return state
-        val pickedCard = humanPack.cards.firstOrNull { it.card.scryfallId == scryfallId }
-            ?: humanPack.cards.firstOrNull()
-            ?: return state
-        val humanPackAfter = humanPack.copy(cards = humanPack.cards - pickedCard)
+        val humanPack = state.packsInFlight[humanIndex] ?: return state
+        if (humanPack.cards.isEmpty()) return state
 
-        // 2. Bot picks: for each non-human seat, pick one card
+        // 1. Apply each requested id against a shrinking local copy of the human's pack, capped at
+        // config.picksPerTurn cards taken THIS TURN (defensive against a caller passing more ids
+        // than the turn allows) and at the pack running out first (odd-sized final turn).
+        var remainingHumanCards = humanPack.cards
+        val pickedByHuman = mutableListOf<DraftCard>()
+        var picksTakenInTurn = state.picksTakenInTurn
+        for (id in scryfallIds) {
+            if (picksTakenInTurn >= state.config.picksPerTurn) break
+            if (remainingHumanCards.isEmpty()) break
+            val pickedCard = remainingHumanCards.firstOrNull { it.card.scryfallId == id }
+                ?: remainingHumanCards.firstOrNull()
+                ?: break
+            pickedByHuman += pickedCard
+            remainingHumanCards = remainingHumanCards - pickedCard
+            picksTakenInTurn++
+        }
+        // Nothing could be picked (e.g. an empty id list) — return state unchanged.
+        if (pickedByHuman.isEmpty()) return state
+        val humanPicksThisCall = pickedByHuman.size
+
         val newSeats = state.seats.toMutableList()
         val newPacksInFlight = state.packsInFlight.toMutableMap()
-        newPacksInFlight[humanIndex] = humanPackAfter
+        newPacksInFlight[humanIndex] = humanPack.copy(cards = remainingHumanCards)
         newSeats[humanIndex] = newSeats[humanIndex].copy(
-            pool = newSeats[humanIndex].pool + pickedCard,
+            pool = newSeats[humanIndex].pool + pickedByHuman,
         )
 
+        // 2. The turn is complete once picksPerTurn is reached OR the human's pack is exhausted
+        // first (the odd-sized final turn of a round). Every seat's pack is the same size at the
+        // start of a turn (lockstep invariant), so the human running out is equivalent to "any
+        // seat's pack is exhausted first".
+        val turnComplete = picksTakenInTurn >= state.config.picksPerTurn ||
+            remainingHumanCards.isEmpty()
+
+        if (!turnComplete) {
+            // Partial turn (defensive — Phase C's UI always sends a full turn's worth in one
+            // call): only the human has picked so far. No bot picks, no rotation yet.
+            return state.copy(
+                seats = newSeats,
+                packsInFlight = newPacksInFlight,
+                picksTakenInTurn = picksTakenInTurn,
+            )
+        }
+
+        // 3. Bot picks: every non-human seat takes the SAME number of cards the human took this
+        // call (capped by that bot's own remaining cards), so every seat's pack shrinks in
+        // lockstep. Each bot pick is applied against a shrinking local copy of its own pack/pool
+        // so a multi-card turn lets the bot's later picks see its own earlier picks this turn.
         for (i in state.seats.indices) {
             if (i == humanIndex) continue
             val pack = newPacksInFlight[i] ?: continue
             if (pack.cards.isEmpty()) continue
-            val botPick = botDrafter.pick(newSeats[i], pack, state.round, state.pickNumber, engine)
-            newPacksInFlight[i] = pack.copy(cards = pack.cards - botPick)
-            newSeats[i] = newSeats[i].copy(pool = newSeats[i].pool + botPick)
+
+            var botCards = pack.cards
+            var botSeat = newSeats[i]
+            val botPickCount = minOf(humanPicksThisCall, botCards.size)
+            var taken = 0
+            while (taken < botPickCount && botCards.isNotEmpty()) {
+                val botPick = botDrafter.pick(
+                    botSeat,
+                    BoosterPack(pack.id, botCards),
+                    state.round,
+                    state.pickNumber,
+                    engine,
+                )
+                botCards = botCards - botPick
+                botSeat = botSeat.copy(pool = botSeat.pool + botPick)
+                taken++
+            }
+            newPacksInFlight[i] = pack.copy(cards = botCards)
+            newSeats[i] = botSeat
         }
 
-        // 3. Rotate packs
+        // 4. Rotate packs
         val rotatedPacks = rotatePacks(newPacksInFlight, seatCount, state.passDirection)
 
-        // 4. Advance pick number; check if round is over.
+        // 5. Advance pick number; check if round is over.
         // Inspect ALL packs, not an arbitrary one — HashMap iteration order is not deterministic,
         // so firstOrNull() could sample a pack that is out of sync with the rest.
         val roundOver = rotatedPacks.isEmpty() ||
@@ -122,9 +178,10 @@ class DefaultDraftEngine(
                 seats = newSeats,
                 packsInFlight = rotatedPacks,
                 pickNumber = state.pickNumber + 1,
+                picksTakenInTurn = 0,
             )
         } else {
-            advanceRound(state, newSeats, rotatedPacks)
+            advanceRound(state, newSeats, rotatedPacks).copy(picksTakenInTurn = 0)
         }
     }
 
@@ -182,14 +239,39 @@ class DefaultDraftEngine(
 
     override fun autoPick(state: DraftState, engine: EngineConfig?): DraftState {
         val humanIndex = state.seats.indexOfFirst { it.isHuman }.takeIf { it >= 0 } ?: 0
-        val humanSeat = state.seats[humanIndex]
         val pack = state.packsInFlight[humanIndex] ?: return state
         // Never call the drafter with an empty pack — it would throw. An empty in-flight pack means
         // there is nothing to pick this beat, so leave the state unchanged.
         if (pack.cards.isEmpty()) return state
+
+        // Pick up to picksPerTurn cards (capped by the pack's remaining size, same as the odd-sized
+        // final turn of a round) via the drafter, in a loop against a shrinking local copy so a
+        // multi-card auto-pick lets each subsequent pick see the human seat's own earlier picks
+        // this turn — then delegate the resulting id list to applyHumanPick for the real bookkeeping
+        // (bot picks + rotation).
+        val picksRemaining = (state.config.picksPerTurn - state.picksTakenInTurn).coerceAtLeast(0)
+        val pickCount = minOf(picksRemaining, pack.cards.size)
+        if (pickCount == 0) return state
+
+        var remainingCards = pack.cards
         // The human seat carries no diversity prior, so this suggestion is neutral.
-        val best = botDrafter.pick(humanSeat, pack, state.round, state.pickNumber, engine)
-        return applyHumanPick(state, best.card.scryfallId, engine)
+        var seatState = state.seats[humanIndex]
+        val ids = mutableListOf<String>()
+        var taken = 0
+        while (taken < pickCount && remainingCards.isNotEmpty()) {
+            val best = botDrafter.pick(
+                seatState,
+                BoosterPack(pack.id, remainingCards),
+                state.round,
+                state.pickNumber,
+                engine,
+            )
+            ids += best.card.scryfallId
+            remainingCards = remainingCards - best
+            seatState = seatState.copy(pool = seatState.pool + best)
+            taken++
+        }
+        return applyHumanPick(state, ids, engine)
     }
 
     override fun isComplete(state: DraftState): Boolean =

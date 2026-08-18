@@ -63,8 +63,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -105,6 +103,8 @@ import com.mmg.manahub.core.ui.components.CardGridItem
 import com.mmg.manahub.core.ui.components.CardListItem
 import com.mmg.manahub.core.ui.components.EmptyState
 import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.ManaTabItem
+import com.mmg.manahub.core.ui.components.ManaTabRow
 import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaColor
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
@@ -127,11 +127,6 @@ import com.mmg.manahub.feature.decks.presentation.DeckListScreen
 import com.mmg.manahub.feature.trades.presentation.TradesScreen
 import java.util.Locale
 
-// ── Sub-tab index constants ───────────────────────────────────────────────────
-private const val TAB_CARDS  = 0
-private const val TAB_DECKS  = 1
-private const val TAB_TRADES = 2
-
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CollectionScreen(
@@ -147,9 +142,33 @@ fun CollectionScreen(
     advancedSearchViewModel:  AdvancedSearchViewModel = koinViewModel(),
     sharedTransitionScope:    SharedTransitionScope? = null,
     animatedVisibilityScope:  AnimatedVisibilityScope? = null,
+    /**
+     * The route's raw `tab` query arg ("decks"/"trades"/"cards"/null), read fresh off the current
+     * [androidx.navigation.NavBackStackEntry] by the caller (see `AppNavGraph`'s Collection
+     * `composable {}` block). G.1 fix: [CollectionViewModel] only applies this arg ONCE, in its
+     * `init` block via `SavedStateHandle` — correct for a freshly-constructed instance, but a
+     * hand-off that reaches Collection through `navigateTab`'s `restoreState = true` (e.g. the
+     * Draft Simulator "deck saved" flow) reuses a PREVIOUSLY SAVED ViewModel instance whose `init`
+     * never re-runs, so the frozen tab from whenever that instance was first built silently wins
+     * over the fresh arg. Re-applying the arg here, keyed to it and driven by the live
+     * backStackEntry (not the ViewModel's frozen SavedStateHandle read), forces the correct tab on
+     * EVERY entry into this destination — including a restored one — while a plain bottom-bar tap
+     * (which never sends a `tab` arg) leaves whatever tab the user was last on untouched.
+     */
+    initialTabArg:            String? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdvancedSearch by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialTabArg) {
+        val forcedTab = when (initialTabArg?.lowercase()) {
+            "decks" -> CollectionTab.DECKS
+            "trades" -> CollectionTab.TRADES
+            "cards" -> CollectionTab.CARDS
+            else -> null // No explicit arg (e.g. a normal bottom-bar tap) — keep the current tab.
+        }
+        if (forcedTab != null) viewModel.onTabSelected(forcedTab)
+    }
 
     CollectionContent(
         uiState               = uiState,
@@ -277,49 +296,26 @@ private fun CollectionContent(
                     .fillMaxSize()
                     .padding(padding),
             ) {
-                // ── Cards / Decks / Trades sub-tabs ──────────────────────────────
-                val selectedTabIndex = when (uiState.selectedTab) {
-                    CollectionTab.CARDS  -> TAB_CARDS
-                    CollectionTab.DECKS  -> TAB_DECKS
-                    CollectionTab.TRADES -> TAB_TRADES
-                }
-                TabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    containerColor   = mc.backgroundSecondary.copy(alpha = 0.9f),
-                    contentColor     = mc.primaryAccent,
-                    divider = {}
-                ) {
-                    Tab(
-                        selected = uiState.selectedTab == CollectionTab.CARDS,
-                        onClick  = { onTabSelected(CollectionTab.CARDS) },
-                        text     = {
-                            Text(
-                                text  = stringResource(R.string.collection_tab_cards).uppercase(Locale.getDefault()),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        },
-                    )
-                    Tab(
-                        selected = uiState.selectedTab == CollectionTab.DECKS,
-                        onClick  = { onTabSelected(CollectionTab.DECKS) },
-                        text     = {
-                            Text(
-                                text  = stringResource(R.string.collection_tab_decks).uppercase(Locale.getDefault()),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        },
-                    )
-                    Tab(
-                        selected = uiState.selectedTab == CollectionTab.TRADES,
-                        onClick  = { onTabSelected(CollectionTab.TRADES) },
-                        text     = {
-                            Text(
-                                text  = stringResource(R.string.collection_tab_trades).uppercase(Locale.getDefault()),
-                                style = MaterialTheme.magicTypography.labelLarge,
-                            )
-                        },
-                    )
-                }
+                // ── Cards / Decks / Trades sub-tabs (E.8: shared ManaTabRow) ──────
+                ManaTabRow(
+                    items = listOf(
+                        ManaTabItem(
+                            label = stringResource(R.string.collection_tab_cards).uppercase(Locale.getDefault()),
+                            selected = uiState.selectedTab == CollectionTab.CARDS,
+                            onClick = { onTabSelected(CollectionTab.CARDS) },
+                        ),
+                        ManaTabItem(
+                            label = stringResource(R.string.collection_tab_decks).uppercase(Locale.getDefault()),
+                            selected = uiState.selectedTab == CollectionTab.DECKS,
+                            onClick = { onTabSelected(CollectionTab.DECKS) },
+                        ),
+                        ManaTabItem(
+                            label = stringResource(R.string.collection_tab_trades).uppercase(Locale.getDefault()),
+                            selected = uiState.selectedTab == CollectionTab.TRADES,
+                            onClick = { onTabSelected(CollectionTab.TRADES) },
+                        ),
+                    ),
+                )
 
                 // "Sync your collection" banner — below tabs so it doesn't obscure navigation.
                 // Stays visible during SYNCING so the spinner is shown inline in the list.
@@ -1025,12 +1021,18 @@ private fun collectionGroupLabel(
         if (labelToken == "untagged") {
             stringResource(R.string.deckbuilder_group_untagged)
         } else {
-            // Filtered to STRATEGY here too — defense-in-depth mirroring groupCollection()'s
-            // restriction (CollectionGrouping.kt), so this lookup can never resolve `labelToken`
-            // against a same-key, different-category CardTag.
+            // Filtered to the same STRATEGY/ARCHETYPE/TRIBAL "identity" categories here too —
+            // defense-in-depth mirroring groupCollection()'s restriction (CollectionGrouping.kt),
+            // so this lookup can never resolve `labelToken` against a same-key, different-category
+            // CardTag (e.g. a TYPE or ROLE tag that happens to share a key).
             val tag = items.firstNotNullOfOrNull { group ->
                 (group.card.tags + group.card.userTags)
-                    .find { it.key == labelToken && it.category == TagCategory.STRATEGY }
+                    .find {
+                        it.key == labelToken &&
+                            (it.category == TagCategory.STRATEGY ||
+                                it.category == TagCategory.ARCHETYPE ||
+                                it.category == TagCategory.TRIBAL)
+                    }
             }
             tag?.label() ?: labelToken.replace('_', ' ').replaceFirstChar { it.uppercase() }
         }

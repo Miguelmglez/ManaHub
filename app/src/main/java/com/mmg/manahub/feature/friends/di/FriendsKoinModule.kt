@@ -9,6 +9,7 @@ import com.mmg.manahub.feature.friends.domain.usecase.GetFriendCollectionUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.GetFriendsUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SearchUserByGameTagUseCase
 import com.mmg.manahub.feature.friends.domain.usecase.SendFriendRequestUseCase
+import com.mmg.manahub.feature.friends.domain.usecase.ShareInviteUseCase
 import com.mmg.manahub.feature.friends.presentation.FriendsViewModel
 import com.mmg.manahub.feature.friends.presentation.detail.FriendDetailViewModel
 import com.mmg.manahub.feature.friends.presentation.invite.InviteDispatcherViewModel
@@ -21,7 +22,7 @@ import org.koin.dsl.module
  * KMP migration — Phase 1 Hilt→Koin cutover. The Friends feature is the ninth "Koin island" and the
  * heaviest so far (~24 transitive deps). It is also the second MULTI-ViewModel island (after
  * CommunityDecks): all THREE of its ViewModels are migrated together so no call-site is left half-wired:
- * - [FriendsViewModel] — the friends list / search screen (5 ctor deps).
+ * - [FriendsViewModel] — the friends list / search screen (6 ctor deps).
  * - [FriendDetailViewModel] — a friend's collection / stats / history (5 ctor deps; reads a `"userId"`
  *   nav arg from a Koin-injected `SavedStateHandle`).
  * - [InviteDispatcherViewModel] — processes invite deep links (3 ctor deps; **Activity-scoped** —
@@ -41,7 +42,7 @@ import org.koin.dsl.module
  * - `AuthRepository` — shared with Settings + Profile + Home + CardDetail.
  * - `AnalyticsHelper` — shared with Settings + CardDetail.
  *
- * The five use cases all depend only on `FriendRepository` (resolved via the bridge `get()`), so they
+ * The six use cases all depend only on `FriendRepository` (resolved via the bridge `get()`), so they
  * are simple Koin factories registered as `single { }` here. `TradesRepository` was originally a
  * Friends-only `single` here; the Trades island PROMOTED it into `coreBridgeKoinModule` (shared with
  * Trades + the still-Hilt Home/FriendDetail), so it is now resolved via `get()` and this module was
@@ -54,6 +55,12 @@ import org.koin.dsl.module
  * it belongs with its sibling Friends use cases rather than as a one-off cross-feature registration in
  * an unrelated module — and registering a Friends-domain use case anywhere else risks a future
  * `DefinitionOverrideException` if Friends ever adds its own definition.
+ *
+ * ## Cross-island consumer: `ShareInviteUseCase`
+ * [ShareInviteUseCase] is likewise consumed by `ProfileViewModel` (`profileKoinModule`) via `get()` to
+ * back the "Share my profile" CTA on `AccountSection`/`ShareProfileSheet`. Same rationale as
+ * `GetFriendsUseCase` above: it depends only on the bridged `FriendRepository`, so it is registered here
+ * once and resolved cross-module — never re-registered in `profileKoinModule`.
  *
  * ## KMP migration — Hilt→Koin cutover batch 4
  * [FriendshipClient] and [FriendRemoteDataSource] are now NATIVELY Koin-built here (the feature-private
@@ -97,6 +104,9 @@ fun friendsKoinModule(
     single { AcceptInviteUseCase(get()) }
     // Consumed cross-module by TradesViewModel (tradesKoinModule) via get() — see KDoc above.
     single { GetFriendsUseCase(get()) }
+    // Consumed cross-module by ProfileViewModel (profileKoinModule) via get() — backs
+    // ProfileViewModel.fetchShareLink(), which feeds AccountSection's "Share my profile" CTA.
+    single { ShareInviteUseCase(get()) }
 
     // ── The Koin island: all three Friends ViewModels are now resolved by Koin, not Hilt. ──
     viewModel {
@@ -106,6 +116,7 @@ fun friendsKoinModule(
             searchUseCase = get(),
             sendRequestUseCase = get(),
             analyticsHelper = get(),
+            shareInviteUseCase = get(),
         )
     }
     viewModel {

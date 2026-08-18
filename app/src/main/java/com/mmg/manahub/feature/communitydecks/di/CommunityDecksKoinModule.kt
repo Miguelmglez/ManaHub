@@ -132,6 +132,10 @@ fun communityDecksKoinModule(
             // (a global `single` in SharedDomainKoinModule) backs the advanced-search Commander/Card pickers.
             cardRepository = get(),
             searchCards = get(),
+            // Advanced Search sheet rework (2026-08-18): resolved directly (no dedicated use case,
+            // same pattern as communityAggregateRepository/cardRepository above) — backs the lazy
+            // "Deck tag" catalog fetch (getDeckTags()).
+            communityDecksRepository = get(),
         )
     }
     viewModel {

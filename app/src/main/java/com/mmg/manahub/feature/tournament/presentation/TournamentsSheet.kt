@@ -53,7 +53,7 @@ import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
 import org.koin.androidx.compose.koinViewModel
 
@@ -158,7 +158,7 @@ fun TournamentsSheet(
 
                 // Online tournament rows — hidden while online sessions are flag-disabled. Local
                 // tournament creation (above) is unaffected.
-                if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                if (FeatureFlags.Online.ONLINE_SESSIONS_ENABLED) {
                     SheetActionRow(
                         emoji = "🏆",
                         title = stringResource(R.string.tournaments_sheet_host_online_title),

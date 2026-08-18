@@ -39,4 +39,11 @@ interface DraftSessionDao {
     /** Purges all finished sessions (housekeeping). */
     @Query("DELETE FROM draft_sessions WHERE status = 'COMPLETE'")
     suspend fun deleteCompleted()
+
+    /**
+     * Deletes a single session by id — used when the user explicitly cancels an in-progress
+     * draft (Phase E exit-confirmation flows) so it is never offered for "resume draft" again.
+     */
+    @Query("DELETE FROM draft_sessions WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

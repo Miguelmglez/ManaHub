@@ -40,6 +40,7 @@ import com.mmg.manahub.core.model.puzzle.PuzzleAttemptFeedback.Comparison
 import com.mmg.manahub.core.model.puzzle.PuzzleAttemptFeedback.MatchLevel
 import com.mmg.manahub.core.model.puzzle.PuzzleGuessResult
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -106,7 +107,7 @@ fun GuessCardWidgetContent(
                 singleLine = true,
                 trailingIcon = {
                     if (isSearchingSuggestions) {
-                        MagicLoadingSpinner(modifier = Modifier.size(20.dp))
+                        MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
                     }
                 },
                 colors = OutlinedTextFieldDefaults.colors(

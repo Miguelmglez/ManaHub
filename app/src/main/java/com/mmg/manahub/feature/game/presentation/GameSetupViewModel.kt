@@ -35,7 +35,7 @@ data class PlayerConfig(
     val isDefaultName: Boolean = false,
 )
 
-enum class LifeControlMode { SCROLL, TAP }
+enum class LifeControlMode { BUTTONS, TAP }
 
 data class GameSettings(
     val landReminderEnabled: Boolean     = false,
@@ -193,6 +193,16 @@ class GameSetupViewModel(
         _uiState.update { it.copy(
             gameSettings = it.gameSettings.copy(lifeControlMode = mode)
         )}
+    }
+
+    /**
+     * Explicitly selects [layout] as the player-seating arrangement for the game about to start.
+     * [onPlayerCountChange] already resets [GameSetupUiState.selectedLayout] to the default for
+     * the new count whenever the player count changes — this is the separate explicit-pick path,
+     * used by the layout tile picker in the Settings section.
+     */
+    fun onSelectLayout(layout: LayoutTemplate) {
+        _uiState.update { it.copy(selectedLayout = layout) }
     }
 
 

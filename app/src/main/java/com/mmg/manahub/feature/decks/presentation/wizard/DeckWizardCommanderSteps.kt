@@ -46,6 +46,7 @@ import com.mmg.manahub.core.model.DeckCardSource
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.ManaColorPicker
+import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
@@ -169,7 +170,7 @@ internal fun CommanderPickStepContent(
                         placeholder = { Text(stringResource(R.string.deck_wizard_commander_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
                         leadingIcon = {
                             if (uiState.isSearchingCommander) {
-                                MagicLoadingSpinner(modifier = Modifier.size(20.dp))
+                                MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
                             } else {
                                 Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
                             }
@@ -476,7 +477,7 @@ internal fun ManualAddsStepContent(
                     placeholder = { Text(stringResource(R.string.deck_wizard_manual_adds_search_hint), style = ty.bodyMedium, color = mc.textDisabled) },
                     leadingIcon = {
                         if (uiState.isSearchingManualAdds) {
-                            MagicLoadingSpinner(modifier = Modifier.size(20.dp))
+                            MagicLoadingSpinner(size = MagicLoadingSize.XSmall)
                         } else {
                             Icon(Icons.Default.Search, contentDescription = null, tint = mc.textSecondary)
                         }

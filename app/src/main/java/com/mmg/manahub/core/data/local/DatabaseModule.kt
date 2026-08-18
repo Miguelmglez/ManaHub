@@ -24,6 +24,8 @@ import com.mmg.manahub.core.data.local.dao.CommunityAggregateDao
 import com.mmg.manahub.core.data.local.dao.ComboCacheDao
 import com.mmg.manahub.core.data.local.dao.CardStrategyTagsCacheDao
 import com.mmg.manahub.core.data.local.dao.PuzzleDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveMetaCacheDao
+import com.mmg.manahub.core.data.local.dao.CompetitiveLimitedRatingsCacheDao
 import com.mmg.manahub.core.data.local.dao.DraftSetDao
 import com.mmg.manahub.core.data.local.dao.FriendDao
 import com.mmg.manahub.core.data.local.dao.NewsDao
@@ -139,6 +141,11 @@ object DatabaseModule {
                 // reason). Additive: creates the puzzle_results table (Daily Puzzle
                 // feature, Batch B1 foundation).
                 MIGRATION_49_50,
+                // v50 → v51 lives as a top-level `val` in Migration_50_51.kt (same
+                // reason). Additive: creates the competitive_meta_cache and
+                // competitive_limited_ratings_cache tables (Competitive feature,
+                // Phase 2, manahub-competitive Cloudflare Worker).
+                MIGRATION_50_51,
             )
             .build()
 
@@ -767,4 +774,6 @@ object DatabaseModule {
     @Provides fun provideComboCacheDao(db: MtgDatabase): ComboCacheDao = db.comboCacheDao()
     @Provides fun provideCardStrategyTagsCacheDao(db: MtgDatabase): CardStrategyTagsCacheDao = db.cardStrategyTagsCacheDao()
     @Provides fun providePuzzleDao(db: MtgDatabase): PuzzleDao = db.puzzleDao()
+    @Provides fun provideCompetitiveMetaCacheDao(db: MtgDatabase): CompetitiveMetaCacheDao = db.competitiveMetaCacheDao()
+    @Provides fun provideCompetitiveLimitedRatingsCacheDao(db: MtgDatabase): CompetitiveLimitedRatingsCacheDao = db.competitiveLimitedRatingsCacheDao()
 }

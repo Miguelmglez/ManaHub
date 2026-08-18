@@ -19,22 +19,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,34 +45,50 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.ShareProfileSheet
+import com.mmg.manahub.core.ui.theme.ButtonShape
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
-import com.mmg.manahub.core.domain.auth.AuthUser
-import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.ui.theme.spacing
 
 /**
  * Profile-screen section that renders different content based on [sessionState]:
  *
  * - [SessionState.Loading]         → shimmer skeleton card while the session is being restored
  * - [SessionState.Unauthenticated] → feature-promotion card with login / sign-up CTAs
- * - [SessionState.Authenticated]   → compact user identity card with sign-out and delete-account options
+ * - [SessionState.Authenticated]   → user identity card with a "Manage my account" CTA (account
+ *   settings, sign-out and delete-account live on a dedicated screen owned by a later phase) and a
+ *   "Share my profile" CTA opening [ShareProfileSheet].
+ *
+ * @param onManageAccountClick invoked by the "Manage my account" CTA. The destination screen is not
+ *   wired yet (a later phase owns it) — the caller only needs to supply the callback for now.
+ * @param onFetchShareLink suspend lookup for the invite link, forwarded verbatim to
+ *   [ShareProfileSheet] (see that composable's KDoc for why this stays a lambda rather than a
+ *   ViewModel call).
  */
 @Composable
 fun AccountSection(
     sessionState: SessionState,
     onLoginClick: () -> Unit,
     onSignUpClick: () -> Unit,
-    onSignOutClick: () -> Unit,
-    onDeleteAccountClick: () -> Unit,
+    onManageAccountClick: () -> Unit,
+    onEditProfileClick: () -> Unit,
+    onFetchShareLink: suspend () -> Result<String>,
     modifier: Modifier = Modifier,
     playerName: String? = null,
     avatarUrl: String? = null,
@@ -93,14 +105,28 @@ fun AccountSection(
         }
 
         is SessionState.Authenticated -> {
-            AuthenticatedCard(
-                user = sessionState.user,
-                onSignOutClick = onSignOutClick,
-                onDeleteAccountClick = onDeleteAccountClick,
-                modifier = modifier,
-                displayName = playerName,
-                displayAvatarUrl = avatarUrl,
-            )
+            // Anonymous/guest sessions (auto-signed-in for Online Sessions) must never reach the
+            // authenticated identity card or its "Manage my account" CTA — that screen's Google
+            // identity-link action IS Supabase's anonymous-to-permanent conversion primitive, and
+            // converting a guest in place bypasses the server-side profile-creation trigger (see
+            // AccountManagementScreen's KDoc). Treat it exactly like Unauthenticated.
+            if (sessionState.user.isAnonymous) {
+                UnauthenticatedCard(
+                    onLoginClick = onLoginClick,
+                    onSignUpClick = onSignUpClick,
+                    modifier = modifier,
+                )
+            } else {
+                AuthenticatedCard(
+                    user = sessionState.user,
+                    onManageAccountClick = onManageAccountClick,
+                    onEditProfileClick = onEditProfileClick,
+                    onFetchShareLink = onFetchShareLink,
+                    modifier = modifier,
+                    displayName = playerName,
+                    displayAvatarUrl = avatarUrl,
+                )
+            }
         }
     }
 }
@@ -118,6 +144,7 @@ fun AccountSection(
 @Composable
 private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
     val mc = MaterialTheme.magicColors
+    val sp = MaterialTheme.spacing
 
     // Infinite alpha oscillation: 0.04 → 0.14 → 0.04
     val infiniteTransition = rememberInfiniteTransition(label = "skeleton_shimmer")
@@ -140,15 +167,15 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
             .border(
                 width = 1.dp,
                 color = mc.primaryAccent.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(16.dp),
+                shape = CardShape,
             ),
         color = mc.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(sp.lg),
         ) {
             // ── User Info placeholder ──────────────────────────────────────────────
             Row(
@@ -161,32 +188,32 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                         .clip(CircleShape)
                         .background(shimmerColor)
                 )
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(sp.lg))
                 Column(modifier = Modifier.weight(1f)) {
                     Box(
                         modifier = Modifier
                             .width(120.dp)
                             .height(20.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(SmallCardShape)
                             .background(shimmerColor)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(sp.sm))
                     Box(
                         modifier = Modifier
                             .width(160.dp)
                             .height(14.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(SmallCardShape)
                             .background(shimmerColor)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sp.xl))
 
             // ── Button Row placeholder ─────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(sp.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Primary button placeholder (weight(1f) mirrors Sign Out button)
@@ -194,7 +221,7 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .weight(1f)
                         .height(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(ButtonShape)
                         .background(shimmerColor),
                 )
                 // Secondary button placeholder (fixed width mirrors Delete Account)
@@ -202,7 +229,7 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .width(96.dp)
                         .height(36.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(ButtonShape)
                         .background(shimmerBase),
                 )
             }
@@ -220,21 +247,22 @@ private fun UnauthenticatedCard(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
                 color = mc.primaryAccent.copy(alpha = 0.3f),
-                shape = RoundedCornerShape(16.dp),
+                shape = CardShape,
             ),
         color = mc.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+                .padding(horizontal = sp.lg, vertical = sp.lg),
         ) {
 
             // ── Header ─────────────────────────────────────────────────────────
@@ -244,7 +272,7 @@ private fun UnauthenticatedCard(
                 color = mc.textPrimary,
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sp.xs))
 
             Text(
                 text = stringResource(R.string.auth_section_subtitle),
@@ -252,7 +280,7 @@ private fun UnauthenticatedCard(
                 color = mc.textSecondary,
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sp.lg))
 
             // ── Benefit list ───────────────────────────────────────────────────
             BenefitRow(
@@ -276,57 +304,29 @@ private fun UnauthenticatedCard(
                 text = stringResource(R.string.auth_benefit_future),
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(sp.xl))
 
-            // ── CTA: Create Account (gradient) ─────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            listOf(mc.primaryAccent, mc.secondaryAccent)
-                        )
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                TextButton(
-                    onClick = onSignUpClick,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_cta_create),
-                        style = ty.titleMedium,
-                        color = mc.background,
-                    )
-                }
-            }
+            // ── CTA: Create Account (filled) ─────────────────────────────────
+            MagicCtaButton(
+                onClick = onSignUpClick,
+                text = stringResource(R.string.auth_cta_create),
+                style = MagicCtaStyle.Filled,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(sp.md))
 
             // ── CTA: Sign In (outlined) ────────────────────────────────────────
-            OutlinedButton(
+            MagicCtaButton(
                 onClick = onLoginClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = mc.primaryAccent,
-                ),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = mc.primaryAccent,
-                ),
-            ) {
-                Text(
-                    text = stringResource(R.string.auth_cta_signin),
-                    style = ty.titleMedium,
-                )
-            }
+                text = stringResource(R.string.auth_cta_signin),
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Primary,
+                modifier = Modifier.fillMaxWidth(),
+            )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sp.md))
 
             // ── No-account disclaimer ──────────────────────────────────────────
             Text(
@@ -350,11 +350,12 @@ private fun BenefitRow(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = sp.xs),
     ) {
         Icon(
             imageVector = icon,
@@ -362,7 +363,7 @@ private fun BenefitRow(
             tint = mc.primaryAccent,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(sp.sm))
         Text(
             text = text,
             style = ty.labelSmall,
@@ -376,8 +377,9 @@ private fun BenefitRow(
 @Composable
 private fun AuthenticatedCard(
     user: AuthUser,
-    onSignOutClick: () -> Unit,
-    onDeleteAccountClick: () -> Unit,
+    onManageAccountClick: () -> Unit,
+    onEditProfileClick: () -> Unit,
+    onFetchShareLink: suspend () -> Result<String>,
     modifier: Modifier = Modifier,
     displayName: String? = null,
     displayAvatarUrl: String? = null,
@@ -391,49 +393,13 @@ private fun AuthenticatedCard(
     val avatarUrl = displayAvatarUrl ?: user.avatarUrl
     val gameTag = user.gameTag
 
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showShareSheet by remember { mutableStateOf(false) }
 
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = {
-                Text(
-                    text = stringResource(R.string.auth_delete_account_confirm_title),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.auth_delete_account_confirm_body),
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDeleteAccountClick()
-                    },
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_delete_account_confirm_btn),
-                        style = ty.labelMedium,
-                        color = Color.Red,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(
-                        text = stringResource(R.string.auth_cancel),
-                        style = ty.labelMedium,
-                        color = mc.textSecondary,
-                    )
-                }
-            },
-            containerColor = mc.surface,
+    if (showShareSheet) {
+        ShareProfileSheet(
+            gameTag = gameTag,
+            onFetchShareLink = onFetchShareLink,
+            onDismiss = { showShareSheet = false },
         )
     }
 
@@ -442,172 +408,170 @@ private fun AuthenticatedCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = mc.primaryAccent.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(16.dp),
+                color = mc.primaryAccent.copy(alpha = 0.25f),
+                shape = CardShape,
             ),
         color = mc.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
-            // ── User Info Section ──────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // ── Accent header band ───────────────────────────────────────────
+            // A soft gradient banner behind the avatar row gives the authenticated
+            // state a more prominent, "you belong here" identity treatment than a
+            // flat surface, while staying entirely token-driven (works on all 12
+            // palettes, including the light HallowedPrint theme).
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                mc.primaryAccent.copy(alpha = 0.16f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    )
+                    .padding(16.dp),
             ) {
-                // Avatar
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(mc.primaryAccent.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
+                // ── User Info Section ──────────────────────────────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (avatarUrl != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(avatarUrl)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        ThemeBackground(modifier = Modifier.fillMaxSize())
-                        Text(
-                            text = nickname.take(1).uppercase().ifEmpty { "✦" },
-                            style = ty.titleLarge.copy(color = mc.primaryAccent.copy(alpha = 0.7f)),
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                // Name & Email
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = nickname,
-                            style = ty.titleMedium,
-                            color = mc.textPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (gameTag != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = mc.primaryAccent.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(6.dp),
-                                    )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                            ) {
-                                Text(
-                                    text = gameTag,
-                                    color = mc.primaryAccent,
-                                    style = ty.labelSmall.copy(fontSize = 10.sp),
-                                )
-                            }
+                    // Avatar with a gradient accent ring
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 2.dp,
+                                brush = Brush.linearGradient(listOf(mc.primaryAccent, mc.secondaryAccent)),
+                                shape = CircleShape,
+                            )
+                            .padding(3.dp)
+                            .clip(CircleShape)
+                            .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (avatarUrl != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(avatarUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            )
+                        } else {
+                            ThemeBackground(modifier = Modifier.fillMaxSize())
+                            Text(
+                                text = nickname.take(1).uppercase().ifEmpty { "✦" },
+                                style = ty.titleLarge.copy(color = mc.primaryAccent.copy(alpha = 0.7f)),
+                            )
                         }
                     }
-                    val email: String? = user.email
-                    if (email != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = email,
-                            style = ty.bodySmall,
-                            color = mc.textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Name & Email
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = nickname,
+                                style = ty.titleMedium,
+                                color = mc.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (gameTag != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .border(
+                                            width = 1.dp,
+                                            color = mc.primaryAccent.copy(alpha = 0.4f),
+                                            shape = ChipShape,
+                                        )
+                                        .background(
+                                            color = mc.primaryAccent.copy(alpha = 0.12f),
+                                            shape = ChipShape,
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                                ) {
+                                    Text(
+                                        text = gameTag,
+                                        color = mc.primaryAccent,
+                                        style = ty.labelSmall,
+                                    )
+                                }
+                            }
+                        }
+                        val email: String? = user.email
+                        if (email != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = email,
+                                style = ty.bodySmall,
+                                color = mc.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
 
-            // ── Share Game Tag button ─────────────────────────────────────────
-            if (gameTag != null) {
-                val context = LocalContext.current
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        val tagToCopy = gameTag.removePrefix("#")
-                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("Game Tag", tagToCopy)
-                        clipboard.setPrimaryClip(clip)
-                        
-                        // We use a simple toast if possible, but since we are in a Composable without direct toast state
-                        // we can either use a standard Android toast or just skip it if it's too complex to add now.
-                        // Standard Android toast is fine for a quick feedback.
-                        android.widget.Toast.makeText(
-                            context,
-                            context.getString(com.mmg.manahub.R.string.friends_gametag_copied),
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                // ── Action Buttons ───────────────────────────────────────────────
+                MagicCtaButton(
+                    onClick = onEditProfileClick,
+                    text = stringResource(R.string.profile_edit_title),
+                    style = MagicCtaStyle.Filled,
+                    color = MagicCtaColor.Primary,
+                    icon = {
+                        Icon(
+                            Icons.Default.AccountCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, mc.primaryAccent),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = mc.primaryAccent),
-                ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = mc.primaryAccent,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(com.mmg.manahub.R.string.friends_share_my_link),
-                        style = ty.labelLarge,
-                    )
-                }
-            }
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Action Buttons ─────────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Sign Out (Primary Outlined)
-                OutlinedButton(
-                    onClick = onSignOutClick,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.5.dp,
-                        color = mc.primaryAccent,
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = mc.primaryAccent,
-                    ),
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_sign_out),
-                        style = ty.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    )
-                }
+                MagicCtaButton(
+                    onClick = onManageAccountClick,
+                    text = stringResource(R.string.auth_manage_account),
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Primary,
+                    icon = {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-                // Delete Account (Ghost/Red)
-                TextButton(
-                    onClick = { showDeleteDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color.Red.copy(alpha = 0.7f)
-                    )
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_delete_account),
-                        style = ty.labelSmall,
-                    )
-                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                MagicCtaButton(
+                    onClick = { showShareSheet = true },
+                    text = stringResource(R.string.auth_share_my_profile),
+                    style = MagicCtaStyle.Outlined,
+                    color = MagicCtaColor.Primary,
+                    icon = {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

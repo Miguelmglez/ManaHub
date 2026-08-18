@@ -24,25 +24,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
-import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaColor
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -73,11 +64,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import org.jetbrains.compose.resources.painterResource
-import com.mmg.manahub.core.ui.Res
-import com.mmg.manahub.core.ui.mtg_card_back
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -90,14 +77,20 @@ import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.PlayCard
 import com.mmg.manahub.core.model.PlayZone
 import com.mmg.manahub.core.model.PlaytestSetup
+import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.MagicCard
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
-import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.feature.playtest.presentation.components.CommandZoneArea
+import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
 
 private val FIELD_CARD_WIDTH = 80.dp
@@ -771,8 +764,8 @@ private fun LibraryPile(
                         onRegister(coords)
                     }
                 }
-                .shadow(4.dp, CardShape)
-                .clip(CardShape)
+                .shadow(4.dp, SmallCardShape)
+                .clip(SmallCardShape)
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = { onDrawCard() })
                 },
@@ -820,9 +813,9 @@ private fun GraveyardPile(
                         onRegister(coords)
                     }
                 }
-                .then(if (isHovered) Modifier.border(2.dp, mc.primaryAccent, CardShape) else Modifier)
-                .background(mc.surfaceVariant, CardShape)
-                .clip(CardShape)
+                .then(if (isHovered) Modifier.border(2.dp, mc.primaryAccent, SmallCardShape) else Modifier)
+                .background(mc.surfaceVariant, SmallCardShape)
+                .clip(SmallCardShape)
                 .clickable(enabled = graveyard.isNotEmpty()) { onCardClick(graveyard, cardRect) },
             contentAlignment = Alignment.Center,
         ) {
@@ -873,9 +866,9 @@ private fun ExilePile(
                         onRegister(coords)
                     }
                 }
-                .then(if (isHovered) Modifier.border(2.dp, mc.primaryAccent, CardShape) else Modifier)
-                .background(mc.surfaceVariant, CardShape)
-                .clip(CardShape)
+                .then(if (isHovered) Modifier.border(2.dp, mc.primaryAccent, SmallCardShape) else Modifier)
+                .background(mc.surfaceVariant, SmallCardShape)
+                .clip(SmallCardShape)
                 .clickable(enabled = exile.isNotEmpty()) { onCardClick(exile, cardRect) },
             contentAlignment = Alignment.Center,
         ) {
@@ -955,10 +948,10 @@ private fun FreeFormFieldZone(
                 }
             }
             .then(
-                if (isHovered) Modifier.border(2.dp, mc.primaryAccent, CardShape)
+                if (isHovered) Modifier.border(2.dp, mc.primaryAccent, SmallCardShape)
                 else Modifier
             )
-            .background(mc.surfaceVariant.copy(alpha = 0.3f), CardShape)
+            .background(mc.surfaceVariant.copy(alpha = 0.3f), SmallCardShape)
             .drawBehind {
                 val stroke = Stroke(
                     width = 1.5f.dp.toPx(),
@@ -1069,7 +1062,7 @@ private fun HandStrip(
                 }
             }
             .then(
-                if (isHovered) Modifier.border(2.dp, mc.primaryAccent.copy(alpha = 0.5f), CardShape)
+                if (isHovered) Modifier.border(2.dp, mc.primaryAccent.copy(alpha = 0.5f), SmallCardShape)
                 else Modifier
             )
     ) {

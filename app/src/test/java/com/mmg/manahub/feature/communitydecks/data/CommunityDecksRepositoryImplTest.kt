@@ -10,6 +10,7 @@ import com.mmg.manahub.core.data.remote.dto.ArchidektCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektCardEntryDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckDetailDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektDeckSummaryDto
+import com.mmg.manahub.core.data.remote.dto.ArchidektDeckTagDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektOracleCardDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektOwnerDto
 import com.mmg.manahub.core.data.remote.dto.ArchidektSearchResultDto
@@ -745,5 +746,50 @@ class CommunityDecksRepositoryImplTest {
 
         assertTrue(result is DataResult.Error)
         assertEquals("Too many requests. Please try again later.", (result as DataResult.Error).message)
+    }
+
+    // ── Group 15: getDeckTags (Advanced Search sheet rework, 2026-08-18) ───────────
+
+    @Test
+    fun `given successful API response when getDeckTags then returns the mapped name list`() = runTest {
+        coEvery { api.getDeckTags() } returns listOf(
+            ArchidektDeckTagDto(id = 1, name = "Aggro"),
+            ArchidektDeckTagDto(id = 2, name = "Combo"),
+        )
+
+        val result = repository.getDeckTags()
+
+        assertTrue(result is DataResult.Success)
+        assertEquals(listOf("Aggro", "Combo"), (result as DataResult.Success).data)
+    }
+
+    @Test
+    fun `given HTTP 429 when getDeckTags then returns rate limit error`() = runTest {
+        coEvery { api.getDeckTags() } throws buildResponseException(429)
+
+        val result = repository.getDeckTags()
+
+        assertTrue(result is DataResult.Error)
+        assertEquals("Too many requests. Please try again later.", (result as DataResult.Error).message)
+    }
+
+    @Test
+    fun `given HTTP 500 when getDeckTags then returns a failed-to-load error`() = runTest {
+        coEvery { api.getDeckTags() } throws buildResponseException(500)
+
+        val result = repository.getDeckTags()
+
+        assertTrue(result is DataResult.Error)
+        assertEquals("Failed to load deck tags: 500", (result as DataResult.Error).message)
+    }
+
+    @Test
+    fun `given a generic exception when getDeckTags then returns error with message`() = runTest {
+        coEvery { api.getDeckTags() } throws RuntimeException("network down")
+
+        val result = repository.getDeckTags()
+
+        assertTrue(result is DataResult.Error)
+        assertEquals("network down", (result as DataResult.Error).message)
     }
 }

@@ -6,17 +6,32 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-import com.mmg.manahub.core.sync.SyncManager
-import com.mmg.manahub.core.sync.SyncState
-import com.mmg.manahub.feature.game.domain.model.DeckStats
-import com.mmg.manahub.feature.game.domain.model.EliminationStats
-import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
 import com.mmg.manahub.core.data.remote.ScryfallRemoteDataSource
+import com.mmg.manahub.core.data.repository.TradesRepository
+import com.mmg.manahub.core.domain.auth.AuthRepository
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.domain.repository.DeckRepository
+import com.mmg.manahub.core.domain.repository.DraftRepository
+import com.mmg.manahub.core.domain.repository.DraftSimRepository
+import com.mmg.manahub.core.domain.repository.FriendRepository
+import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
+import com.mmg.manahub.core.domain.repository.PlaytestRepository
+import com.mmg.manahub.core.domain.repository.StatsRepository
+import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
+import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.repository.WishlistRepository
+import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
+import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
+import com.mmg.manahub.core.gamification.domain.model.QuestBoard
+import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
+import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
+import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
 import com.mmg.manahub.core.model.CollectionStats
 import com.mmg.manahub.core.model.CommunityDeckSearchFilters
 import com.mmg.manahub.core.model.CommunityDeckSummary
 import com.mmg.manahub.core.model.DeckSummary
 import com.mmg.manahub.core.model.DraftSet
+import com.mmg.manahub.core.model.DraftState
 import com.mmg.manahub.core.model.Friend
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.MtgColor
@@ -25,45 +40,32 @@ import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
 import com.mmg.manahub.core.model.PreferredCurrency
 import com.mmg.manahub.core.model.QuickStartAction
 import com.mmg.manahub.core.model.Rarity
+import com.mmg.manahub.core.model.TradeProposal
+import com.mmg.manahub.core.model.TradeStatus
 import com.mmg.manahub.core.model.TradeSuggestion
 import com.mmg.manahub.core.model.WidgetSize
+import com.mmg.manahub.core.model.news.ContentSource
 import com.mmg.manahub.core.model.news.NewsFilterPrefs
 import com.mmg.manahub.core.model.news.NewsItem
 import com.mmg.manahub.core.model.news.SourceType
-import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
-import com.mmg.manahub.core.domain.repository.DeckRepository
-import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
-import com.mmg.manahub.core.domain.repository.StatsRepository
-import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
-import com.mmg.manahub.core.gamification.domain.model.PlayerProgression
-import com.mmg.manahub.core.gamification.domain.model.QuestBoard
-import com.mmg.manahub.core.gamification.domain.model.QuestUiModel
-import com.mmg.manahub.core.gamification.domain.model.StreakUiModel
-import com.mmg.manahub.core.gamification.domain.repository.GamificationRepository
+import com.mmg.manahub.core.sync.SyncManager
+import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.core.util.recordSafeNonFatal
-import com.mmg.manahub.core.domain.auth.SessionState
-import com.mmg.manahub.core.domain.auth.AuthRepository
-import com.mmg.manahub.core.model.DraftState
-import com.mmg.manahub.core.model.DraftStatus
-import com.mmg.manahub.core.domain.repository.DraftRepository
-import com.mmg.manahub.core.domain.repository.DraftSimRepository
-import com.mmg.manahub.core.domain.usecase.home.GetAccountNudgeUseCase
+import com.mmg.manahub.feature.communitydecks.domain.usecase.SearchCommunityDecksUseCase
+import com.mmg.manahub.feature.game.domain.model.DeckStats
+import com.mmg.manahub.feature.game.domain.model.EliminationStats
+import com.mmg.manahub.feature.game.domain.model.SessionHistoryEntry
+import com.mmg.manahub.feature.game.domain.repository.GameSessionRepository
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.DISCOVER_RANDOM_QUERY
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.HOME_TRADE_SUGGESTION_PREVIEW_LIMIT
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.HOME_TRADE_THREAD_HYDRATE_LIMIT
 import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.MAX_NEWS
-import com.mmg.manahub.core.model.news.ContentSource
+import com.mmg.manahub.feature.home.presentation.HomeViewModel.Companion.SYNC_WINDOW_LOG_THRESHOLD_MS
 import com.mmg.manahub.feature.news.domain.usecase.GetNewsFeedUseCase
 import com.mmg.manahub.feature.news.domain.usecase.ManageSourcesUseCase
 import com.mmg.manahub.feature.news.domain.usecase.RefreshNewsFeedUseCase
-import com.mmg.manahub.core.domain.repository.WishlistRepository
-import com.mmg.manahub.core.domain.repository.UserCardRepository
-import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
-import com.mmg.manahub.core.domain.repository.TradeSuggestionsRepository
-import com.mmg.manahub.core.domain.repository.FriendRepository
-import com.mmg.manahub.core.domain.repository.PlaytestRepository
-import com.mmg.manahub.core.data.repository.TradesRepository
-import com.mmg.manahub.core.model.TradeProposal
-import com.mmg.manahub.core.model.TradeStatus
+import com.mmg.manahub.feature.tournament.domain.repository.TournamentRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -76,8 +78,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
@@ -85,7 +87,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.toLocalDateTime
@@ -1137,6 +1138,20 @@ class HomeViewModel(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = DailyPuzzleWidgetState.Loading,
         )
+
+    /**
+     * Whether the [HomeWidgetType.COMPETITIVE] tile is visible (Competitive feature, Phase 5).
+     * Kept as an INDEPENDENT `StateFlow`, mirroring [trendingFlow]/[dailyPuzzleFlow]'s documented
+     * rationale: this is a single reactive boolean with no dependency on anything else in
+     * [HomeUiState], and the main combine chain is already the most error-prone surface in this
+     * ViewModel. Unlike [DAILY_PUZZLE]'s compile-time [com.mmg.manahub.feature.puzzle.presentation
+     * .PuzzleFeatureFlags] gate, this reads the runtime `competitiveEnabledFlow` DataStore flag —
+     * so re-enabling it takes effect immediately, without a rebuild.
+     */
+    val competitiveEnabledFlow: StateFlow<Boolean> =
+        userPrefsDataStore.competitiveEnabledFlow
+            .catch { emit(false) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /**
      * Waits for [syncManager]'s sync state to leave [SyncState.SYNCING] before the caller proceeds

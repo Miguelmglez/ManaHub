@@ -1,0 +1,961 @@
+package com.mmg.manahub.feature.auth.presentation
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.R
+import com.mmg.manahub.core.domain.auth.AuthIdentity
+import com.mmg.manahub.core.domain.auth.AuthUser
+import com.mmg.manahub.core.domain.auth.SessionState
+import com.mmg.manahub.core.ui.components.MagicAlertDialog
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
+import com.mmg.manahub.core.ui.components.MagicToastHost
+import com.mmg.manahub.core.ui.components.MagicToastType
+import com.mmg.manahub.core.ui.components.ShareProfileSheet
+import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.ThemeBackground
+import com.mmg.manahub.core.ui.theme.magicColors
+import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.core.util.TimeAgoFormatter
+import com.mmg.manahub.core.util.recordNonFatal
+import kotlinx.coroutines.flow.collectLatest
+import org.koin.androidx.compose.koinViewModel
+
+/**
+ * Account settings hub for an authenticated user — the destination behind the "Manage my account"
+ * CTA on [AccountSection] (Phase 4a). Reachable ONLY while authenticated: [Screen.AccountManagement]
+ * is never a nav target for an unauthenticated/loading session, but this screen still defends
+ * against a mid-session sign-out (e.g. triggered from another surface) by calling [onSignedOut]
+ * once [SessionState] flips away from [SessionState.Authenticated].
+ *
+ * Sections top to bottom: identity header (avatar/nickname/gameTag/join date/email), email
+ * verification status, change-email/change-password rows, sign-in methods (with remove/link
+ * actions), and the danger zone (sign out / delete account) — moved here from the old
+ * `AccountSection.kt` per the account-management redesign plan.
+ *
+ * @param onBack Pops this screen off the back stack.
+ * @param onNavigateToUpdateEmail Navigates DIRECTLY to [UpdateEmailScreen] — "Change email" skips
+ *   the reauthentication-code gate because Supabase's "Secure email change" project setting
+ *   already double-confirms the change via links sent to both the old and new inbox (see the KDoc
+ *   on [com.mmg.manahub.core.domain.auth.AuthRepository.confirmEmailUpdate]).
+ * @param onNavigateToUpdatePassword Navigates DIRECTLY to [UpdatePasswordScreen] for "Change
+ *   password"/"Set a password" — no intermediate reauthentication-code gate; Supabase's "Require
+ *   current password when updating" project setting protects the change server-side instead (see
+ *   the KDoc on [com.mmg.manahub.core.domain.auth.AuthRepository.updatePassword]). The
+ *   `requireCurrentPassword` argument mirrors this screen's own `canChangePassword` check
+ *   (`hasEmailIdentity || user.hasPassword` — see `canChangePassword`'s declaration KDoc below for
+ *   why `hasEmailIdentity` alone is not sufficient).
+ * @param onSignedOut Invoked once the session is confirmed no longer authenticated (sign-out
+ *   success or account deletion) — the caller should pop back to a non-account-gated destination.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountManagementScreen(
+    onBack: () -> Unit,
+    onNavigateToUpdateEmail: () -> Unit,
+    onNavigateToUpdatePassword: (requireCurrentPassword: Boolean) -> Unit,
+    onSignedOut: () -> Unit,
+    authViewModel: AuthViewModel = koinViewModel(),
+    viewModel: AccountManagementViewModel = koinViewModel(),
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
+    val context = LocalContext.current
+
+    val sessionState by authViewModel.sessionState.collectAsStateWithLifecycle()
+    val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
+    val resendCooldown by viewModel.resendCooldownRemaining.collectAsStateWithLifecycle()
+
+    val toastState = rememberMagicToastState()
+    var showShareSheet by remember { mutableStateOf(false) }
+    var identityPendingUnlink by remember { mutableStateOf<AuthIdentity?>(null) }
+    var showSignOutDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showCancelEmailChangeDialog by remember { mutableStateOf(false) }
+    // Local override for the "pending email change" note (Fix 2): cancelPendingEmailChange's RPC
+    // returns void and does NOT push an updated AuthUser.newEmail through sessionState (GoTrue
+    // does not proactively re-sync auth.users changes made outside its own updateUser flow into
+    // the client's in-memory session — see AuthRepository.cancelPendingEmailChange's KDoc). Hiding
+    // the note locally on success avoids waiting on a session refresh that may not happen for a
+    // while. Reset by the LaunchedEffect(user.newEmail) below whenever the REAL session value
+    // changes — either because it eventually caught up (became null) or because a new pending
+    // change started (a different non-null value).
+    var emailChangeCancelledLocally by remember { mutableStateOf(false) }
+
+    // Tracks WHICH danger-zone/sign-in-method action is currently in flight on the shared
+    // AuthViewModel.uiState, so the triggering row/button can disable itself (and, where it IS the
+    // action's own visible trigger, show a loading spinner) instead of staying tappable while a
+    // previous confirm is still resolving. Every confirmation dialog dismisses synchronously on tap
+    // (see the dialogs below) — without this, the row/button underneath stays enabled and a second
+    // tap fires a concurrent duplicate call before the first one resolves. Cleared on every terminal
+    // AuthUiState this screen's own actions can reach (Idle covers signOut(), which never transitions
+    // through the branches below).
+    var pendingAction by remember { mutableStateOf<String?>(null) }
+    val isActionPending = pendingAction != null
+
+    val copiedMessage = stringResource(R.string.account_mgmt_gametag_copied)
+    val emailSentMessage = stringResource(
+        R.string.auth_email_confirmation_sent,
+        stringResource(R.string.auth_email_sender_name),
+    )
+    val emailChangeCancelledMessage = stringResource(R.string.account_mgmt_cancel_email_change_success)
+    val deeplinkFailedMessage = stringResource(R.string.account_mgmt_deeplink_action_failed)
+
+    LaunchedEffect(Unit) {
+        FirebaseCrashlytics.getInstance().log("screen_viewed: account_management")
+    }
+
+    // Fix 3: surfaces a failed manahub://auth deep-link callback (e.g. a rejected "Link Google
+    // account" OAuth redirect) as a toast while this screen is foregrounded — see
+    // AccountLinkFailureEvents' KDoc for why this is scoped to the app-foregrounded case only.
+    LaunchedEffect(Unit) {
+        AccountLinkFailureEvents.failures.collectLatest {
+            FirebaseCrashlytics.getInstance().log("account_mgmt_deeplink_failure_toast_shown")
+            toastState.show(deeplinkFailedMessage, MagicToastType.ERROR)
+        }
+    }
+
+    // Central reaction to every one-shot AuthUiState this screen's actions can produce. Each branch
+    // resets back to Idle so the shared uiState never leaks a stale toast/dialog into a later action.
+    LaunchedEffect(authUiState) {
+        when (val state = authUiState) {
+            is AuthUiState.EmailConfirmationSent -> {
+                pendingAction = null
+                toastState.show(emailSentMessage, MagicToastType.SUCCESS)
+                authViewModel.resetUiState()
+            }
+            is AuthUiState.IdentityUnlinked -> {
+                identityPendingUnlink = null
+                pendingAction = null
+                authViewModel.resetUiState()
+            }
+            is AuthUiState.EmailChangeCancelled -> {
+                pendingAction = null
+                emailChangeCancelledLocally = true
+                toastState.show(emailChangeCancelledMessage, MagicToastType.SUCCESS)
+                authViewModel.resetUiState()
+            }
+            is AuthUiState.GoogleIdentityLinkStarted -> {
+                pendingAction = null
+                state.authorizationUrl?.let { url -> launchCustomTab(context, url) }
+                authViewModel.resetUiState()
+            }
+            is AuthUiState.AccountDeleted -> {
+                pendingAction = null
+                authViewModel.resetUiState()
+            }
+            is AuthUiState.Error -> {
+                pendingAction = null
+                toastState.show(state.message, MagicToastType.ERROR)
+                authViewModel.resetUiState()
+            }
+            // signOut() transitions Loading -> Idle directly (no dedicated terminal state) and this
+            // screen navigates away via the sessionState effect below once it completes — clearing
+            // here as well guards the rare case where the state settles on Idle without navigating.
+            AuthUiState.Idle -> pendingAction = null
+            else -> Unit
+        }
+    }
+
+    // Defense-in-depth: leave the screen the moment the session is confirmed gone, regardless of
+    // WHICH action caused it (signOut()'s uiState transition is Idle, not a dedicated state, so this
+    // is the only reliable signal for that specific action; deleteAccount() reaches the same place).
+    // Also leaves when the session flips to an anonymous/guest Authenticated session — this screen
+    // is reachable only from an authenticated, non-anonymous state, but a mid-session downgrade
+    // (or a nav race with the AccountSection/Settings gates) must not leave a guest stranded here:
+    // this screen's Google identity-link action IS Supabase's anonymous-to-permanent conversion
+    // primitive and bypasses the server-side profile-creation trigger when done in place.
+    LaunchedEffect(sessionState) {
+        val state = sessionState
+        val isAnonymousSession = state is SessionState.Authenticated && state.user.isAnonymous
+        if (state is SessionState.Unauthenticated || isAnonymousSession) {
+            onSignedOut()
+        }
+    }
+
+    if (showShareSheet) {
+        val user = (sessionState as? SessionState.Authenticated)?.user
+        ShareProfileSheet(
+            gameTag = user?.gameTag,
+            onFetchShareLink = viewModel::fetchShareLink,
+            onDismiss = { showShareSheet = false },
+        )
+    }
+
+    identityPendingUnlink?.let { identity ->
+        val providerLabel = identity.provider.replaceFirstChar { it.uppercase() }
+        MagicAlertDialog(
+            onDismissRequest = { identityPendingUnlink = null },
+            title = stringResource(R.string.account_mgmt_unlink_confirm_title),
+            text = stringResource(R.string.account_mgmt_unlink_confirm_body, providerLabel),
+            confirmLabel = stringResource(R.string.action_remove),
+            onConfirm = {
+                // Dismiss synchronously on tap, matching the sign-out/delete-account dialogs below
+                // — otherwise a failed unlink leaves this dialog open with the resulting error toast
+                // rendered underneath it (the toast is anchored in the screen's own Box; this dialog
+                // is a real Android Dialog above everything).
+                val identityId = identity.identityId
+                identityPendingUnlink = null
+                pendingAction = "unlink:$identityId"
+                authViewModel.unlinkIdentity(identityId)
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = { identityPendingUnlink = null },
+            confirmColor = MagicCtaColor.ErrorSolid,
+        )
+    }
+
+    if (showSignOutDialog) {
+        MagicAlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = stringResource(R.string.auth_sign_out),
+            text = stringResource(R.string.account_mgmt_sign_out_confirm_body),
+            confirmLabel = stringResource(R.string.auth_sign_out),
+            onConfirm = {
+                showSignOutDialog = false
+                pendingAction = "sign_out"
+                authViewModel.signOut()
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = { showSignOutDialog = false },
+        )
+    }
+
+    if (showCancelEmailChangeDialog) {
+        MagicAlertDialog(
+            onDismissRequest = { showCancelEmailChangeDialog = false },
+            title = stringResource(R.string.account_mgmt_cancel_email_change_title),
+            text = stringResource(R.string.account_mgmt_cancel_email_change_body),
+            confirmLabel = stringResource(R.string.account_mgmt_cancel_email_change_action),
+            onConfirm = {
+                showCancelEmailChangeDialog = false
+                pendingAction = "cancel_email_change"
+                authViewModel.cancelPendingEmailChange()
+            },
+            dismissLabel = stringResource(R.string.action_cancel),
+            onDismiss = { showCancelEmailChangeDialog = false },
+            confirmColor = MagicCtaColor.ErrorSolid,
+        )
+    }
+
+    if (showDeleteDialog) {
+        MagicAlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = stringResource(R.string.auth_delete_account_confirm_title),
+            text = stringResource(R.string.auth_delete_account_confirm_body),
+            confirmLabel = stringResource(R.string.auth_delete_account_confirm_btn),
+            onConfirm = {
+                showDeleteDialog = false
+                pendingAction = "delete_account"
+                authViewModel.deleteAccount()
+            },
+            dismissLabel = stringResource(R.string.auth_cancel),
+            onDismiss = { showDeleteDialog = false },
+            confirmColor = MagicCtaColor.ErrorSolid,
+        )
+    }
+
+    Scaffold(
+        contentWindowInsets = WindowInsets(0),
+        topBar = {
+            Surface(color = mc.backgroundSecondary) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = sp.xxs, vertical = sp.xxs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                            tint = mc.textPrimary,
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.account_mgmt_title),
+                        style = ty.titleLarge,
+                        color = mc.textPrimary,
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (val state = sessionState) {
+                is SessionState.Authenticated -> {
+                    val user = state.user
+                    // Captured into local vals: AuthUser is declared in a different Gradle module
+                    // (shared:core-domain), so the Kotlin compiler cannot smart-cast its nullable
+                    // properties across the module boundary even after a null check.
+                    val userEmail = user.email
+                    val pendingNewEmail = user.newEmail
+                    val hasEmailIdentity = user.identities.any { it.provider == "email" }
+                    val hasGoogleIdentity = user.identities.any { it.provider == "google" }
+                    val isEmailVerified = user.emailConfirmedAt != null
+                    // "Can this account reach a Change-password screen?" is broader than
+                    // hasEmailIdentity: a Google-only account that used "Set a password" has a real,
+                    // user-manageable password (AuthUser.hasPassword, from user_profiles.has_password)
+                    // but NEVER gets an `email` identity — the Admin-API set-account-password Edge
+                    // Function that sets it does not create one. See AuthUser.hasPassword's KDoc.
+                    val canChangePassword = hasEmailIdentity || user.hasPassword
+
+                    // Drops the local cancel-success override the moment the REAL session value
+                    // changes — see emailChangeCancelledLocally's declaration KDoc above.
+                    LaunchedEffect(pendingNewEmail) {
+                        emailChangeCancelledLocally = false
+                    }
+                    val showPendingEmailNote = pendingNewEmail != null && !emailChangeCancelledLocally
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentPadding = PaddingValues(horizontal = sp.lg, vertical = sp.lg),
+                        verticalArrangement = Arrangement.spacedBy(sp.lg),
+                    ) {
+                        item {
+                            IdentityHeader(
+                                user = user,
+                                onCopyGameTag = { tag ->
+                                    copyToClipboard(context, tag)
+                                    toastState.show(copiedMessage, MagicToastType.SUCCESS)
+                                },
+                                onShareClick = { showShareSheet = true },
+                            )
+                        }
+
+                        if (!isEmailVerified && userEmail != null) {
+                            item {
+                                EmailVerificationCard(
+                                    cooldownRemaining = resendCooldown,
+                                    isSending = pendingAction == "resend_email",
+                                    enabled = !isActionPending,
+                                    onResend = {
+                                        pendingAction = "resend_email"
+                                        viewModel.startResendCooldown()
+                                        authViewModel.resendConfirmationEmail(userEmail)
+                                    },
+                                )
+                            }
+                        }
+
+                        item {
+                            AccountManagementRow(
+                                title = stringResource(R.string.account_mgmt_change_email),
+                                subtitle = userEmail,
+                                icon = Icons.Default.Email,
+                                onClick = onNavigateToUpdateEmail,
+                                pendingNote = pendingNewEmail
+                                    ?.takeIf { !emailChangeCancelledLocally }
+                                    ?.let { pending ->
+                                        stringResource(R.string.account_mgmt_email_change_pending, pending)
+                                    },
+                            )
+                        }
+
+                        if (showPendingEmailNote) {
+                            // Extends the one-line "Pending confirmation: <address>" note on the
+                            // row above into the full step guidance — a user who leaves and comes
+                            // back still sees exactly what is outstanding on BOTH inboxes (Secure
+                            // Email Change requires confirming from each before anything changes).
+                            item {
+                                AuthFlowStepsCard(
+                                    title = stringResource(R.string.account_mgmt_change_email_pending_title),
+                                    steps = listOf(
+                                        stringResource(R.string.account_mgmt_change_email_pending_step_confirm_current),
+                                        stringResource(
+                                            R.string.account_mgmt_change_email_pending_step_confirm_new,
+                                            pendingNewEmail.orEmpty(),
+                                        ),
+                                        stringResource(R.string.account_mgmt_change_email_pending_step_note),
+                                    ),
+                                )
+                            }
+                            item {
+                                EmailDeliveryNote()
+                            }
+                            item {
+                                MagicCtaButton(
+                                    onClick = { showCancelEmailChangeDialog = true },
+                                    text = stringResource(R.string.account_mgmt_cancel_email_change_action),
+                                    style = MagicCtaStyle.Ghost,
+                                    color = MagicCtaColor.Error,
+                                    enabled = !isActionPending,
+                                    isLoading = pendingAction == "cancel_email_change",
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+
+                        // "Change password" is an ordinary account-detail row ONLY when the account
+                        // already has an email/password sign-in method. A Google-only account gets
+                        // its "Set a password" affordance below, grouped with "Link Google account"
+                        // under the "Add another way to sign in" label — moving it out of this
+                        // generic row group so the add-a-missing-method actions read as their own
+                        // thing instead of blending into ordinary settings rows.
+                        if (canChangePassword) {
+                            item {
+                                AccountManagementRow(
+                                    title = stringResource(R.string.account_mgmt_change_password),
+                                    subtitle = null,
+                                    icon = Icons.Default.Lock,
+                                    onClick = { onNavigateToUpdatePassword(true) },
+                                )
+                            }
+                        }
+
+                        item {
+                            SectionLabel(stringResource(R.string.account_mgmt_signin_methods_title))
+                        }
+
+                        items(user.identities, key = { it.identityId }) { identity ->
+                            SignInMethodRow(
+                                identity = identity,
+                                removeEnabled = user.identities.size > 1 && !isActionPending,
+                                isOnlyMethod = user.identities.size <= 1,
+                                isRemoving = pendingAction == "unlink:${identity.identityId}",
+                                onRemoveClick = { identityPendingUnlink = identity },
+                            )
+                        }
+
+                        // Surfaces both "add a missing sign-in method" actions together, right below
+                        // the sign-in-methods list, so they read as one deliberate group rather than
+                        // two settings rows a user has to notice independently.
+                        if (!canChangePassword || !hasGoogleIdentity) {
+                            item {
+                                SectionLabel(stringResource(R.string.account_mgmt_add_signin_method_title))
+                            }
+                            item {
+                                AddSignInMethodGroup {
+                                    if (!canChangePassword) {
+                                        MagicCtaButton(
+                                            onClick = { onNavigateToUpdatePassword(false) },
+                                            text = stringResource(R.string.account_mgmt_set_password),
+                                            style = MagicCtaStyle.Outlined,
+                                            color = MagicCtaColor.Primary,
+                                            enabled = !isActionPending,
+                                            icon = {
+                                                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.account_mgmt_set_password_subtitle),
+                                            style = ty.labelSmall,
+                                            color = mc.textSecondary,
+                                        )
+                                    }
+                                    if (!hasGoogleIdentity) {
+                                        MagicCtaButton(
+                                            onClick = {
+                                                pendingAction = "link_google"
+                                                authViewModel.linkGoogleIdentityNative(MANAHUB_AUTH_REDIRECT_URL)
+                                            },
+                                            text = stringResource(R.string.account_mgmt_link_google),
+                                            style = MagicCtaStyle.Outlined,
+                                            color = MagicCtaColor.Primary,
+                                            enabled = !isActionPending,
+                                            isLoading = pendingAction == "link_google",
+                                            icon = {
+                                                Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            SectionLabel(stringResource(R.string.account_mgmt_danger_zone_title))
+                        }
+
+                        item {
+                            MagicCtaButton(
+                                onClick = { showSignOutDialog = true },
+                                text = stringResource(R.string.auth_sign_out),
+                                style = MagicCtaStyle.Outlined,
+                                color = MagicCtaColor.Primary,
+                                enabled = !isActionPending,
+                                isLoading = pendingAction == "sign_out",
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+
+                        item {
+                            MagicCtaButton(
+                                onClick = { showDeleteDialog = true },
+                                text = stringResource(R.string.auth_delete_account),
+                                style = MagicCtaStyle.Ghost,
+                                color = MagicCtaColor.Error,
+                                enabled = !isActionPending,
+                                isLoading = pendingAction == "delete_account",
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+
+                SessionState.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = mc.primaryAccent)
+                    }
+                }
+
+                SessionState.Unauthenticated -> {
+                    // Handled by the LaunchedEffect(sessionState) above (onSignedOut); render nothing
+                    // for the single frame before navigation completes.
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding))
+                }
+            }
+
+            MagicToastHost(
+                state = toastState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
+            )
+        }
+    }
+}
+
+// ── Identity header ───────────────────────────────────────────────────────────
+
+@Composable
+private fun IdentityHeader(
+    user: AuthUser,
+    onCopyGameTag: (String) -> Unit,
+    onShareClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
+    // Captured into local vals: AuthUser is declared in a different Gradle module
+    // (shared:core-domain), so the compiler cannot smart-cast its nullable properties across the
+    // module boundary even after a null check.
+    val email = user.email
+    val gameTag = user.gameTag
+    val nickname = user.nickname ?: email?.substringBefore('@') ?: "Player"
+    val joinedLabel = user.createdAt?.let { TimeAgoFormatter.format(it.toEpochMilliseconds()) }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth(),
+        color = mc.surface,
+        shape = CardShape,
+    ) {
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .padding(sp.lg)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (user.avatarUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(user.avatarUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        ThemeBackground(modifier = Modifier.fillMaxSize())
+                        Text(
+                            text = nickname.take(1).uppercase().ifEmpty { "✦" },
+                            style = ty.titleLarge.copy(color = mc.primaryAccent.copy(alpha = 0.7f)),
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(sp.md))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = nickname,
+                        style = ty.titleMedium,
+                        color = mc.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (email != null) {
+                        Spacer(modifier = Modifier.height(sp.xxs))
+                        Text(
+                            text = email,
+                            style = ty.bodySmall,
+                            color = mc.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (joinedLabel != null) {
+                        Spacer(modifier = Modifier.height(sp.xxs))
+                        Text(
+                            text = stringResource(R.string.account_mgmt_joined, joinedLabel),
+                            style = ty.labelSmall,
+                            color = mc.textDisabled,
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(sp.xs))
+            MagicCtaButton(
+                onClick = onShareClick,
+                text = stringResource(R.string.auth_share_my_profile),
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Primary,
+                icon = {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+// ── Email verification ──────────────────────────────────────────────────────
+
+@Composable
+private fun EmailVerificationCard(
+    cooldownRemaining: Int,
+    isSending: Boolean,
+    enabled: Boolean,
+    onResend: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = mc.lifeNegative.copy(alpha = 0.08f),
+        shape = CardShape,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.lg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = mc.lifeNegative.copy(alpha = 0.15f),
+                        shape = ChipShape,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.account_mgmt_email_not_verified),
+                            style = ty.labelSmall,
+                            color = mc.lifeNegative,
+                            modifier = Modifier.padding(horizontal = sp.sm, vertical = sp.xxs),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(sp.xs))
+                Text(
+                    text = stringResource(R.string.account_mgmt_email_not_verified_body),
+                    style = ty.bodySmall,
+                    color = mc.textSecondary,
+                )
+                Spacer(modifier = Modifier.height(sp.xs))
+                EmailDeliveryNote()
+            }
+            Spacer(modifier = Modifier.width(sp.md))
+            MagicCtaButton(
+                onClick = onResend,
+                text = if (cooldownRemaining > 0) "${cooldownRemaining}s" else stringResource(R.string.account_mgmt_resend_email),
+                style = MagicCtaStyle.Outlined,
+                color = MagicCtaColor.Warning,
+                enabled = enabled && cooldownRemaining == 0,
+                isLoading = isSending,
+            )
+        }
+    }
+}
+
+// ── Sign-in methods ───────────────────────────────────────────────────────────
+
+@Composable
+private fun SignInMethodRow(
+    identity: AuthIdentity,
+    removeEnabled: Boolean,
+    isOnlyMethod: Boolean,
+    isRemoving: Boolean,
+    onRemoveClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
+    val isGoogle = identity.provider == "google"
+    val providerLabel = if (isGoogle) {
+        stringResource(R.string.account_mgmt_provider_google)
+    } else {
+        stringResource(R.string.account_mgmt_provider_email)
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = mc.surface,
+        shape = CardShape,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(mc.primaryAccent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isGoogle) {
+                    Text("G", style = ty.labelLarge, color = mc.primaryAccent)
+                } else {
+                    Icon(
+                        Icons.Default.Email,
+                        contentDescription = null,
+                        tint = mc.primaryAccent,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(sp.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = providerLabel, style = ty.bodyMedium, color = mc.textPrimary)
+                // Distinct from removeEnabled: removeEnabled also turns false while an UNRELATED
+                // action is in flight elsewhere on the screen, but this hint is specifically about
+                // "you only have one sign-in method" and must not flicker on during that window.
+                if (isOnlyMethod) {
+                    Text(
+                        text = stringResource(R.string.account_mgmt_only_signin_method),
+                        style = ty.labelSmall,
+                        color = mc.textDisabled,
+                    )
+                }
+            }
+            MagicCtaButton(
+                onClick = onRemoveClick,
+                text = stringResource(R.string.action_remove),
+                style = MagicCtaStyle.Ghost,
+                color = MagicCtaColor.Error,
+                enabled = removeEnabled,
+                isLoading = isRemoving,
+            )
+        }
+    }
+}
+
+// ── Generic clickable row (Change email / Change password) ────────────────────
+
+@Composable
+private fun AccountManagementRow(
+    title: String,
+    subtitle: String?,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    pendingNote: String? = null,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sp = MaterialTheme.spacing
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = CardShape,
+        color = mc.surface,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = mc.primaryAccent, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(sp.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = ty.bodyMedium, color = mc.textPrimary)
+                if (subtitle != null) {
+                    Text(text = subtitle, style = ty.labelSmall, color = mc.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                // Pending "change email" confirmation note — set only when AuthUser.newEmail is
+                // non-null (an in-progress, not-yet-confirmed change via Supabase's "Secure email
+                // change", which double-confirms via links to both the old and new inbox).
+                if (pendingNote != null) {
+                    Text(
+                        text = pendingNote,
+                        style = ty.labelSmall,
+                        color = mc.primaryAccent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = mc.textDisabled,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.magicTypography.labelLarge,
+        color = MaterialTheme.magicColors.textSecondary,
+        modifier = modifier.padding(top = MaterialTheme.spacing.xs, bottom = MaterialTheme.spacing.xxs),
+    )
+}
+
+/**
+ * Accent-bordered container for the "add a missing sign-in method" actions ("Set a password" /
+ * "Link Google account"). Visually ties them together as one group — a tonal fill + primary-accent
+ * border, distinct from the plain [MagicCtaButton] sign-out/delete-account rows in the danger zone
+ * below — so the affordance to add another way to sign in is noticeable rather than blending into
+ * the rest of the screen's settings rows.
+ */
+@Composable
+private fun AddSignInMethodGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val sp = MaterialTheme.spacing
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = mc.primaryAccent.copy(alpha = 0.06f),
+        shape = CardShape,
+        border = BorderStroke(width = 1.dp, color = mc.primaryAccent.copy(alpha = 0.3f)),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sp.md),
+            verticalArrangement = Arrangement.spacedBy(sp.sm),
+            content = content,
+        )
+    }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** The `manahub://auth` OAuth-redirect deep link — see `AuthRepository.linkGoogleIdentityNative`. */
+private const val MANAHUB_AUTH_REDIRECT_URL = "manahub://auth"
+
+private fun copyToClipboard(context: Context, text: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("Game Tag", text.removePrefix("#")))
+}
+
+/** Opens [url] in a Custom Tab, falling back to a plain browser Intent if none is available. */
+private fun launchCustomTab(context: Context, url: String) {
+    val uri = Uri.parse(url)
+    if (uri.scheme != "https" && uri.scheme != "http") return
+    try {
+        CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+            .launchUrl(context, uri)
+    } catch (_: Exception) {
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (e: Exception) {
+            // Both Custom Tabs and a plain browser Intent failed — "Link Google account" silently
+            // dead-ends here with no toast (the OAuth authorization URL never opens).
+            recordNonFatal("account_mgmt_google_link_no_browser_handler", e)
+        }
+    }
+}

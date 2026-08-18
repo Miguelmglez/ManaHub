@@ -5,6 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,12 +49,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.FullErrorState
+import com.mmg.manahub.core.ui.components.HexGridBackground
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicCtaColor
+import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
 import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -70,6 +77,12 @@ private val TIMER_PRESETS = listOf(0, 15, 30, 60)
 private const val MIN_PLAYERS = 2
 private const val MAX_PLAYERS = 10
 private const val DEFAULT_PLAYERS = 8
+
+/** Valid `DraftConfig.picksPerTurn` values offered by the setup form. */
+private val PICKS_PER_TURN_OPTIONS = listOf(1, 2)
+
+/** Touch target height for each Picks-per-turn option — clears the 48dp minimum. */
+private val PicksPerTurnOptionHeight = 48.dp
 
 /**
  * Size of the small inline info icon in the player-count selector. Sits between the spacing tokens
@@ -97,6 +110,7 @@ fun DraftSetupScreen(
 
     var timerIndex by remember { mutableStateOf(0) }
     var playerCount by remember { mutableStateOf(DEFAULT_PLAYERS) }
+    var picksPerTurn by remember { mutableStateOf(1) }
 
     // Navigate to drafting once a draft begins.
     LaunchedEffect(state) {
@@ -114,10 +128,17 @@ fun DraftSetupScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         ThemeBackground(modifier = Modifier.fillMaxSize())
+        HexGridBackground(
+            modifier = Modifier.fillMaxSize(),
+            color = mc.primaryAccent.copy(alpha = 0.05f)
+        )
+        
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Top bar
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = sp.sm, vertical = sp.sm),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = sp.sm, vertical = sp.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
@@ -135,12 +156,20 @@ fun DraftSetupScreen(
                 )
                 if (state is DraftSimUiState.SetupReady) {
                     Spacer(Modifier.weight(1f))
-                    SetSymbol(
-                        setCode = (state as DraftSimUiState.SetupReady).setCode,
-                        rarity = CardRarity.RARE,
-                        size = 32.dp,
-                        modifier = Modifier.padding(end = sp.md)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(end = sp.lg)
+                            .size(44.dp)
+                            .clip(ChipShape)
+                            .background(mc.primaryAccent.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SetSymbol(
+                            setCode = (state as DraftSimUiState.SetupReady).setCode,
+                            rarity = CardRarity.RARE,
+                            size = 28.dp,
+                        )
+                    }
                 }
             }
 
@@ -164,6 +193,8 @@ fun DraftSetupScreen(
                             onPlayerCountChanged = { playerCount = it },
                             timerIndex = timerIndex,
                             onTimerChanged = { timerIndex = it },
+                            picksPerTurn = picksPerTurn,
+                            onPicksPerTurnChanged = { picksPerTurn = it },
                             onStart = {
                                 val pickTimer = TIMER_PRESETS[timerIndex].takeIf { it > 0 }
                                 viewModel.startDraft(
@@ -173,6 +204,7 @@ fun DraftSetupScreen(
                                         seatCount = playerCount,
                                         packCount = 3,
                                         pickTimerSeconds = pickTimer,
+                                        picksPerTurn = picksPerTurn,
                                     )
                                 )
                             },
@@ -204,6 +236,8 @@ private fun SetupForm(
     onPlayerCountChanged: (Int) -> Unit,
     timerIndex: Int,
     onTimerChanged: (Int) -> Unit,
+    picksPerTurn: Int,
+    onPicksPerTurnChanged: (Int) -> Unit,
     onStart: () -> Unit,
     startEnabled: Boolean,
 ) {
@@ -320,47 +354,69 @@ private fun SetupForm(
             }
         }
 
-        Spacer(Modifier.weight(1f))
-
-        Button(
-            onClick = onStart,
-            enabled = startEnabled,
+        // Picks per turn
+        SectionLabel(stringResource(R.string.draft_sim_picks_per_turn_label))
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp)
-                .padding(bottom = sp.lg)
-                .graphicsLayer {
-                    shadowElevation = 8.dp.toPx()
-                    shape = ButtonShape
-                    clip = true
-                },
-            shape = ButtonShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = mc.primaryAccent,
-                disabledContainerColor = mc.surfaceVariant
-            ),
+                .background(mc.surface, CardShape)
+                .padding(sp.sm),
+            horizontalArrangement = Arrangement.spacedBy(sp.sm),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                // Subtle shimmer background could be added here if we had a dedicated modifier
-                Text(
-                    text = stringResource(R.string.draft_sim_start_button).uppercase(),
-                    style = ty.labelLarge,
-                    color = if (startEnabled) mc.background else mc.textDisabled,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 2.sp
-                )
+            PICKS_PER_TURN_OPTIONS.forEach { value ->
+                val selected = picksPerTurn == value
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(PicksPerTurnOptionHeight)
+                        .clip(ChipShape)
+                        .background(
+                            if (selected) mc.primaryAccent.copy(alpha = 0.15f)
+                            else Color.Transparent
+                        )
+                        .then(
+                            if (selected) Modifier.border(1.dp, mc.primaryAccent, ChipShape)
+                            else Modifier
+                        )
+                        .clickable { onPicksPerTurnChanged(value) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (value == 1) R.string.draft_sim_pick_1 else R.string.draft_sim_pick_2
+                        ),
+                        style = ty.labelLarge,
+                        color = if (selected) mc.primaryAccent else mc.textSecondary,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
             }
         }
+
+        Spacer(Modifier.weight(1f))
+
+        MagicCtaButton(
+            onClick = onStart,
+            text = stringResource(R.string.draft_sim_start_button),
+            enabled = startEnabled,
+            style = MagicCtaStyle.Filled,
+            color = MagicCtaColor.Primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = sp.xl)
+        )
     }
 }
 
 @Composable
 private fun SectionLabel(text: String) {
     Text(
-        text = text,
-        style = MaterialTheme.magicTypography.labelLarge,
-        color = MaterialTheme.magicColors.textPrimary,
-        fontWeight = FontWeight.Bold,
+        text = text.uppercase(),
+        style = MaterialTheme.magicTypography.labelMedium,
+        color = MaterialTheme.magicColors.goldMtg,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(start = 4.dp)
     )
 }
 

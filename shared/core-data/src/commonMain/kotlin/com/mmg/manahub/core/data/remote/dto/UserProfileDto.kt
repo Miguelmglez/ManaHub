@@ -20,6 +20,21 @@ data class UserProfileDto(
 )
 
 /**
+ * Response DTO for the self-scoped `get_my_has_password` RPC (SECURITY DEFINER).
+ *
+ * `user_profiles.has_password` is granted `SELECT` to `authenticated` **cross-user** — any user
+ * could read any OTHER user's `has_password` via a direct table select, a metadata leak with no
+ * legitimate use (2026-08-17 security fix). It must therefore never be part of
+ * [UserProfileClient.fetchProfile]'s (or any other direct table select's) `select` list; it is
+ * only ever fetched via this RPC, which is scoped to `(select auth.uid())` server-side. Mirrors
+ * [ReferralCodeDto]'s pattern on this same table for the same reason.
+ */
+@Serializable
+data class HasPasswordDto(
+    @SerialName("has_password") val hasPassword: Boolean? = null,
+)
+
+/**
  * DTO sent to the upsert endpoint on `user_profiles`.
  * The `game_tag` column is intentionally omitted — it is auto-generated server-side.
  */

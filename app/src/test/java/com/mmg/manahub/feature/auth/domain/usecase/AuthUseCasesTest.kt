@@ -473,4 +473,129 @@ class AuthUseCasesTest {
 
         coVerify(exactly = 1) { repository.updateNickname("") }
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 9 — ConfirmPasswordResetUseCase
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `when ConfirmPasswordResetUseCase invoked then delegates to repository_confirmPasswordReset`() = runTest {
+        coEvery { repository.confirmPasswordReset("NewPassword1!") } returns successUnit
+        val useCase = ConfirmPasswordResetUseCase(repository)
+
+        val result = useCase("NewPassword1!")
+
+        coVerify(exactly = 1) { repository.confirmPasswordReset("NewPassword1!") }
+        assertEquals(successUnit, result)
+    }
+
+    @Test
+    fun `given repository returns Error when ConfirmPasswordResetUseCase invoked then propagates Error`() = runTest {
+        coEvery { repository.confirmPasswordReset(any()) } returns networkError
+        val useCase = ConfirmPasswordResetUseCase(repository)
+
+        val result = useCase("NewPassword1!")
+
+        assertEquals(networkError, result)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 10 — ConfirmEmailUpdateUseCase
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `when ConfirmEmailUpdateUseCase invoked then delegates to repository_confirmEmailUpdate`() = runTest {
+        coEvery { repository.confirmEmailUpdate("new@example.com") } returns successUnit
+        val useCase = ConfirmEmailUpdateUseCase(repository)
+
+        val result = useCase("new@example.com")
+
+        coVerify(exactly = 1) { repository.confirmEmailUpdate("new@example.com") }
+        assertEquals(successUnit, result)
+    }
+
+    @Test
+    fun `given repository returns Error when ConfirmEmailUpdateUseCase invoked then propagates Error`() = runTest {
+        coEvery { repository.confirmEmailUpdate(any()) } returns networkError
+        val useCase = ConfirmEmailUpdateUseCase(repository)
+
+        val result = useCase("new@example.com")
+
+        assertEquals(networkError, result)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 11 — UpdatePasswordUseCase (architecture pivot: current_password, no reauth code)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `given a current password when UpdatePasswordUseCase invoked then delegates to repository_updatePassword with both values`() = runTest {
+        coEvery { repository.updatePassword("NewPassword1!", "OldPassword1!") } returns successUnit
+        val useCase = UpdatePasswordUseCase(repository)
+
+        val result = useCase("NewPassword1!", "OldPassword1!")
+
+        coVerify(exactly = 1) { repository.updatePassword("NewPassword1!", "OldPassword1!") }
+        assertEquals(successUnit, result)
+    }
+
+    @Test
+    fun `given a null current password when UpdatePasswordUseCase invoked then forwards null unchanged (Set a password flow)`() = runTest {
+        // The use case is a thin proxy — it must not substitute a default for the "Set a password"
+        // (Google-only account, no current password to verify) case.
+        coEvery { repository.updatePassword("NewPassword1!", null) } returns successUnit
+        val useCase = UpdatePasswordUseCase(repository)
+
+        val result = useCase("NewPassword1!", null)
+
+        coVerify(exactly = 1) { repository.updatePassword("NewPassword1!", null) }
+        assertEquals(successUnit, result)
+    }
+
+    @Test
+    fun `given repository returns InvalidCurrentPassword when UpdatePasswordUseCase invoked then propagates Error`() = runTest {
+        val error = AuthResult.Error(AuthError.InvalidCurrentPassword)
+        coEvery { repository.updatePassword(any(), any()) } returns error
+        val useCase = UpdatePasswordUseCase(repository)
+
+        val result = useCase("NewPassword1!", "WrongPassword1!")
+
+        assertTrue(result is AuthResult.Error)
+        assertEquals(AuthError.InvalidCurrentPassword, (result as AuthResult.Error).error)
+    }
+
+    @Test
+    fun `given repository returns Error when UpdatePasswordUseCase invoked then propagates Error`() = runTest {
+        coEvery { repository.updatePassword(any(), anyNullable()) } returns networkError
+        val useCase = UpdatePasswordUseCase(repository)
+
+        val result = useCase("NewPassword1!", "OldPassword1!")
+
+        assertEquals(networkError, result)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 12 — CancelPendingEmailChangeUseCase
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `when CancelPendingEmailChangeUseCase invoked then delegates to repository_cancelPendingEmailChange`() = runTest {
+        coEvery { repository.cancelPendingEmailChange() } returns successUnit
+        val useCase = CancelPendingEmailChangeUseCase(repository)
+
+        val result = useCase()
+
+        coVerify(exactly = 1) { repository.cancelPendingEmailChange() }
+        assertEquals(successUnit, result)
+    }
+
+    @Test
+    fun `given repository returns Error when CancelPendingEmailChangeUseCase invoked then propagates Error`() = runTest {
+        coEvery { repository.cancelPendingEmailChange() } returns networkError
+        val useCase = CancelPendingEmailChangeUseCase(repository)
+
+        val result = useCase()
+
+        assertEquals(networkError, result)
+    }
 }

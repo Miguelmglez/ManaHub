@@ -203,6 +203,30 @@ class CommunityDecksRepositoryImpl(
         }
     }
 
+    override suspend fun getDeckTags(): DataResult<List<String>> = withContext(dispatcherProvider.io) {
+        try {
+            val tags = requestQueue.execute { api.getDeckTags() }
+            DataResult.Success(tags.map { it.name })
+        } catch (e: ResponseException) {
+            val statusCode = e.response.status.value
+            crashReporter.log("community_deck_tags_fetch")
+            crashReporter.recordException(e)
+            crashReporter.setCustomKey("community_deck_tags_http_code", statusCode.toString())
+            val message = when (statusCode) {
+                429 -> "Too many requests. Please try again later."
+                else -> "Failed to load deck tags: $statusCode"
+            }
+            DataResult.Error(message)
+        } catch (e: Exception) {
+            // Coroutine cancellation (e.g. the sheet was dismissed before the fetch resolved) is
+            // not a fetch failure — rethrow, same rule as getDeckById/searchDecks above.
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            crashReporter.log("community_deck_tags_fetch")
+            crashReporter.recordException(e)
+            DataResult.Error(e.message ?: "Failed to load deck tags")
+        }
+    }
+
     /**
      * Multi-card fan-out for [searchDecks] (Archidekt multi-card search expansion, 2026-07-24).
      *

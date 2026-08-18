@@ -11,8 +11,10 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -30,6 +32,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -47,13 +50,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.RecordVoiceOver
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -77,6 +82,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -89,11 +95,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.GameModeSelector
+import com.mmg.manahub.core.ui.components.LayoutTemplateSelector
 import com.mmg.manahub.core.ui.components.HexGridBackground
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCtaButton
@@ -103,13 +111,15 @@ import com.mmg.manahub.core.ui.components.PlayerEditSheet
 import com.mmg.manahub.core.ui.theme.PlayerThemeColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
+import com.mmg.manahub.core.ui.theme.spacing
 import com.mmg.manahub.core.voice.domain.CommandGrammar
 import com.mmg.manahub.core.voice.domain.VoiceCommand
 import com.mmg.manahub.core.voice.domain.VoiceLanguage
 import com.mmg.manahub.core.voice.domain.VoiceModelState
 import com.mmg.manahub.feature.game.domain.model.GameMode
 import com.mmg.manahub.core.model.LayoutTemplate
-import com.mmg.manahub.feature.online.presentation.OnlineFeatureFlags
+import com.mmg.manahub.core.model.LayoutTemplates
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineHostSheet
 import com.mmg.manahub.feature.online.presentation.lobby.OnlineJoinSheet
 import com.mmg.manahub.feature.tournament.presentation.TournamentsSheet
@@ -163,6 +173,7 @@ fun GameSetupScreen(
         prefilledJoinCode = prefilledJoinCode,
         onModeChange = viewModel::onModeChange,
         onPlayerCountChange = viewModel::onPlayerCountChange,
+        onLayoutSelect = viewModel::onSelectLayout,
         onUpdatePlayerName = viewModel::updatePlayerName,
         onUpdatePlayerTheme = viewModel::updatePlayerTheme,
         onToggleLandReminder = viewModel::toggleLandReminder,
@@ -189,6 +200,7 @@ private fun GameSetupScreenContent(
     prefilledJoinCode: String?,
     onModeChange: (GameMode) -> Unit,
     onPlayerCountChange: (Int) -> Unit,
+    onLayoutSelect: (LayoutTemplate) -> Unit,
     onUpdatePlayerName: (Int, String) -> Unit,
     onUpdatePlayerTheme: (Int, PlayerThemeColors) -> Unit,
     onToggleLandReminder: () -> Unit,
@@ -217,7 +229,7 @@ private fun GameSetupScreenContent(
     // online sessions are flag-disabled, but guard here too so this composable never auto-opens
     // an online sheet regardless of how prefilledJoinCode was populated.
     LaunchedEffect(prefilledJoinCode) {
-        if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED && !prefilledJoinCode.isNullOrBlank()) {
+        if (FeatureFlags.Online.ONLINE_SESSIONS_ENABLED && !prefilledJoinCode.isNullOrBlank()) {
             showOnlineJoinSheet = true
         }
     }
@@ -303,6 +315,9 @@ private fun GameSetupScreenContent(
                         SettingsSection(
                             gameSettings = uiState.gameSettings,
                             voiceModelStates = voiceModelStates,
+                            playerCount = uiState.playerCount,
+                            selectedLayout = uiState.selectedLayout,
+                            onSelectLayout = onLayoutSelect,
                             onToggleLandReminder = onToggleLandReminder,
                             onToggleVoiceLandReminder = onToggleVoiceLandReminder,
                             onToggleVoiceEndTurn = onToggleVoiceEndTurn,
@@ -342,7 +357,7 @@ private fun GameSetupScreenContent(
                         // commented out above), so there is no local pass-and-play option this
                         // button would otherwise expose. Local same-device play stays reachable via
                         // the "Begin Game" button above, unaffected by this flag.
-                        if (OnlineFeatureFlags.ONLINE_SESSIONS_ENABLED) {
+                        if (FeatureFlags.Online.ONLINE_SESSIONS_ENABLED) {
                             MagicCtaButton(
                                 onClick = { showFriendsSheet = true },
                                 text = stringResource(R.string.gamesetup_play_with_friends),
@@ -636,13 +651,18 @@ private fun FriendsSheetRow(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Settings section (UNCHANGED — do not modify)
+//  Settings section — collapsible (default collapsed; several sections already
+//  sit above the fold on this setup screen, so keeping this closed by default
+//  reduces initial clutter, matching a typical "Settings" disclosure pattern).
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun SettingsSection(
     gameSettings: GameSettings,
     voiceModelStates: Map<VoiceLanguage, VoiceModelState>,
+    playerCount: Int,
+    selectedLayout: LayoutTemplate,
+    onSelectLayout: (LayoutTemplate) -> Unit,
     onToggleLandReminder: () -> Unit,
     onToggleVoiceLandReminder: () -> Unit,
     onToggleVoiceEndTurn: () -> Unit,
@@ -650,35 +670,85 @@ private fun SettingsSection(
     onLifeControlModeChange: (LifeControlMode) -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(R.string.gamesetup_settings_title),
-            style = MaterialTheme.magicTypography.titleMedium,
-            color = mc.textSecondary,
-        )
-        Column(
+    var expanded by remember { mutableStateOf(false) }
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(250),
+        label = "settingsChevronRotation",
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs)) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(mc.surface.copy(alpha = 0.5f))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .heightIn(min = 48.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { expanded = !expanded },
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xs),
         ) {
-            LifeControlSelector(
-                selectedMode = gameSettings.lifeControlMode,
-                onModeChange = onLifeControlModeChange,
+            Text(
+                text = stringResource(R.string.gamesetup_settings_title),
+                style = MaterialTheme.magicTypography.titleMedium,
+                color = mc.textSecondary,
+                modifier = Modifier.weight(1f),
             )
-            LandReminderToggle(
-                enabled = gameSettings.landReminderEnabled,
-                onToggle = onToggleLandReminder,
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = mc.textSecondary,
+                modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
             )
-            VoiceControlsSection(
-                gameSettings = gameSettings,
-                voiceModelStates = voiceModelStates,
-                onToggleLandVoice = onToggleVoiceLandReminder,
-                onToggleEndTurnVoice = onToggleVoiceEndTurn,
-                onOpenVoiceLanguages = onOpenVoiceLanguages,
-            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(tween(250)) + fadeIn(tween(250)),
+            exit = shrinkVertically(tween(200)) + fadeOut(tween(150)),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(mc.surface.copy(alpha = 0.5f))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // ── Player layout (game-structure setting, same category as life control) ──
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.game_manage_layout_title),
+                        style = MaterialTheme.magicTypography.titleMedium,
+                        color = mc.textPrimary,
+                    )
+                    val availableLayouts = remember(playerCount) {
+                        LayoutTemplates.getLayoutsForCount(playerCount)
+                    }
+                    LayoutTemplateSelector(
+                        availableLayouts = availableLayouts,
+                        activeLayout = selectedLayout,
+                        onSelectLayout = onSelectLayout,
+                    )
+                }
+                LifeControlSelector(
+                    selectedMode = gameSettings.lifeControlMode,
+                    onModeChange = onLifeControlModeChange,
+                )
+                LandReminderToggle(
+                    enabled = gameSettings.landReminderEnabled,
+                    onToggle = onToggleLandReminder,
+                )
+                VoiceControlsSection(
+                    gameSettings = gameSettings,
+                    voiceModelStates = voiceModelStates,
+                    onToggleLandVoice = onToggleVoiceLandReminder,
+                    onToggleEndTurnVoice = onToggleVoiceEndTurn,
+                    onOpenVoiceLanguages = onOpenVoiceLanguages,
+                )
+            }
         }
     }
 }
@@ -748,16 +818,14 @@ private fun LifeControlSelector(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             LifeControlOptionTile(
                 mode = LifeControlMode.TAP,
-                label = stringResource(R.string.gamesetup_life_control_tap),
                 selected = selectedMode == LifeControlMode.TAP,
                 onClick = { onModeChange(LifeControlMode.TAP) },
                 modifier = Modifier.weight(1f),
             )
             LifeControlOptionTile(
-                mode = LifeControlMode.SCROLL,
-                label = stringResource(R.string.gamesetup_life_control_swipe),
-                selected = selectedMode == LifeControlMode.SCROLL,
-                onClick = { onModeChange(LifeControlMode.SCROLL) },
+                mode = LifeControlMode.BUTTONS,
+                selected = selectedMode == LifeControlMode.BUTTONS,
+                onClick = { onModeChange(LifeControlMode.BUTTONS) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -767,7 +835,6 @@ private fun LifeControlSelector(
 @Composable
 private fun LifeControlOptionTile(
     mode: LifeControlMode,
-    label: String,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -783,33 +850,23 @@ private fun LifeControlOptionTile(
         animationSpec = tween(300),
         label = "tileBg",
     )
-    val titleColor by animateColorAsState(
-        targetValue = if (selected) mc.primaryAccent else mc.textSecondary,
-        animationSpec = tween(300),
-        label = "tileTitle",
-    )
     Surface(
         modifier = modifier
+            .height(84.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         color = bgColor,
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(if (selected) 2.dp else 1.dp, borderColor),
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .fillMaxSize()
+                .padding(MaterialTheme.spacing.sm),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.magicTypography.titleMedium,
-                color = titleColor,
-            )
-            if (mode == LifeControlMode.SCROLL) {
-                ScrollModePreview()
+            if (mode == LifeControlMode.BUTTONS) {
+                ButtonsModePreview()
             } else {
                 TapModePreview()
             }
@@ -818,55 +875,96 @@ private fun LifeControlOptionTile(
 }
 
 @Composable
-private fun ScrollModePreview() {
+private fun ButtonsModePreview() {
     val mc = MaterialTheme.magicColors
-    var lifeValue by remember { mutableStateOf(20) }
+    var lifeValue by remember { mutableIntStateOf(20) }
     var isGoingUp by remember { mutableStateOf(true) }
+    
+    val tapScale = remember { Animatable(1f) }
+    val tapAlpha = remember { Animatable(0f) }
+    val tapYOffset = remember { mutableStateOf(0.dp) }
 
     LaunchedEffect(Unit) {
-        val sequence = listOf(21, 20, 19, 20)
-        val goingUp = listOf(true, false, false, true)
+        val sequence = listOf(21, 22, 21, 20)
+        val goingUp = listOf(true, true, false, false)
         var index = 0
         while (true) {
-            delay(1500L)
+            delay(1200L)
             isGoingUp = goingUp[index]
             lifeValue = sequence[index]
+            
+            // Animation for the "tap"
+            tapYOffset.value = if (isGoingUp) (-20).dp else 20.dp
+            launch {
+                tapAlpha.snapTo(0.6f)
+                tapScale.snapTo(0.6f)
+                tapScale.animateTo(1.2f, tween(300))
+                tapAlpha.animateTo(0f, tween(300))
+            }
+            
             index = (index + 1) % sequence.size
         }
     }
 
-    AnimatedContent(
-        targetState = lifeValue,
-        transitionSpec = {
-            if (isGoingUp) {
-                (slideInVertically { h -> -h } + fadeIn()) togetherWith
-                    (slideOutVertically { h -> h } + fadeOut())
-            } else {
-                (slideInVertically { h -> h } + fadeIn()) togetherWith
-                    (slideOutVertically { h -> -h } + fadeOut())
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(Icons.Default.Add, null, tint = mc.textDisabled, modifier = Modifier.size(12.dp))
+        Box(contentAlignment = Alignment.Center) {
+            // Tap indicator
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(0, tapYOffset.value.roundToPx()) }
+                    .size(32.dp)
+                    .graphicsLayer {
+                        scaleX = tapScale.value
+                        scaleY = tapScale.value
+                        alpha = tapAlpha.value
+                    }
+                    .background(mc.primaryAccent.copy(alpha = 0.4f), CircleShape)
+            )
+
+            AnimatedContent(
+                targetState = lifeValue,
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        (slideInVertically { h -> -h } + fadeIn()) togetherWith
+                                (slideOutVertically { h -> h } + fadeOut())
+                    } else {
+                        (slideInVertically { h -> h } + fadeIn()) togetherWith
+                                (slideOutVertically { h -> -h } + fadeOut())
+                    }
+                },
+                label = "buttonsPreviewLife",
+            ) { life ->
+                Text(
+                    text = life.toString(),
+                    style = MaterialTheme.magicTypography.titleLarge,
+                    color = mc.textPrimary,
+                )
             }
-        },
-        label = "scrollPreviewLife",
-    ) { life ->
-        Text(
-            text = life.toString(),
-            style = MaterialTheme.magicTypography.displayMedium,
-            color = mc.textPrimary,
-        )
+        }
+        Icon(Icons.Default.Remove, null, tint = mc.textDisabled, modifier = Modifier.size(12.dp))
     }
 }
 
 @Composable
 private fun TapModePreview() {
     val mc = MaterialTheme.magicColors
-    var lifeValue by remember { mutableStateOf(20) }
-    var lastDelta by remember { mutableStateOf(0) }
-    var pulseTrigger by remember { mutableStateOf(0) }
+    var lifeValue by remember { mutableIntStateOf(20) }
+    var lastDelta by remember { mutableIntStateOf(0) }
+    var pulseTrigger by remember { mutableIntStateOf(0) }
 
     val numberScale = remember { Animatable(1f) }
     val heartScale = remember { Animatable(1f) }
     val floatY = remember { Animatable(0f) }
     val floatAlpha = remember { Animatable(0f) }
+    
+    val tapScale = remember { Animatable(1f) }
+    val tapAlpha = remember { Animatable(0f) }
+    val tapXOffset = remember { mutableStateOf(0.dp) }
+    val tapYOffset = remember { mutableStateOf(0.dp) }
 
     val scope = rememberCoroutineScope()
 
@@ -876,9 +974,28 @@ private fun TapModePreview() {
         while (true) {
             delay(1400L)
             val next = sequence[index]
-            lastDelta = next - lifeValue
+            val delta = next - lifeValue
+            
+            // Animation for the "tap": delta < 0 is on number, delta > 0 is on heart
+            if (delta > 0) {
+                tapXOffset.value = 18.dp
+                tapYOffset.value = 0.dp
+            } else {
+                tapXOffset.value = (-10).dp
+                tapYOffset.value = 0.dp
+            }
+
+            lastDelta = delta
             lifeValue = next
             pulseTrigger++
+            
+            launch {
+                tapAlpha.snapTo(0.5f)
+                tapScale.snapTo(0.6f)
+                tapScale.animateTo(1.1f, tween(250))
+                tapAlpha.animateTo(0f, tween(250))
+            }
+            
             index = (index + 1) % sequence.size
         }
     }
@@ -903,30 +1020,45 @@ private fun TapModePreview() {
         floatAlpha.animateTo(0f, tween(700, delayMillis = 200))
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = lifeValue.toString(),
-            style = MaterialTheme.magicTypography.displayMedium,
-            color = mc.textPrimary,
-            modifier = Modifier.graphicsLayer {
-                scaleX = numberScale.value
-                scaleY = numberScale.value
-            },
-        )
-        Icon(
-            imageVector = Icons.Default.Favorite,
-            contentDescription = null,
-            tint = mc.lifePositive,
+    Box(contentAlignment = Alignment.Center) {
+        // Tap indicator
+        Box(
             modifier = Modifier
-                .size(16.dp)
+                .offset { IntOffset(tapXOffset.value.roundToPx(), tapYOffset.value.roundToPx()) }
+                .size(30.dp)
                 .graphicsLayer {
-                    scaleX = heartScale.value
-                    scaleY = heartScale.value
-                },
+                    scaleX = tapScale.value
+                    scaleY = tapScale.value
+                    alpha = tapAlpha.value
+                }
+                .background(mc.primaryAccent.copy(alpha = 0.3f), CircleShape)
         )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = lifeValue.toString(),
+                style = MaterialTheme.magicTypography.titleLarge,
+                color = mc.textPrimary,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = numberScale.value
+                    scaleY = numberScale.value
+                },
+            )
+            Icon(
+                imageVector = Icons.Default.Favorite,
+                contentDescription = null,
+                tint = mc.lifePositive,
+                modifier = Modifier
+                    .size(16.dp)
+                    .graphicsLayer {
+                        scaleX = heartScale.value
+                        scaleY = heartScale.value
+                    },
+            )
+        }
     }
 }
 

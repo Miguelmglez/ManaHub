@@ -71,6 +71,7 @@ import com.mmg.manahub.core.ui.components.OracleText
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -201,8 +202,8 @@ internal fun CardDetailSheet(
                             modifier = Modifier
                                 .fillMaxWidth(0.8f)
                                 .aspectRatio(0.716f)
-                                .clip(CardShape),
-                            shape = CardShape,
+                                .clip(SmallCardShape),
+                            shape = SmallCardShape,
                             shadowElevation = 8.dp,
                             tonalElevation = 4.dp,
                             border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))
@@ -369,8 +370,8 @@ internal fun CardDetailSheet(
                             modifier = Modifier
                                 .fillMaxWidth(0.8f)
                                 .aspectRatio(0.716f)
-                                .clip(CardShape),
-                            shape = CardShape,
+                                .clip(SmallCardShape),
+                            shape = SmallCardShape,
                             shadowElevation = 8.dp,
                             tonalElevation = 4.dp,
                             border = BorderStroke(1.dp, mc.surfaceVariant.copy(alpha = 0.5f))

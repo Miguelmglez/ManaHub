@@ -29,8 +29,6 @@ import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,15 +61,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicCtaColor
-import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.puzzle.presentation.PuzzleFeatureFlags
+import com.mmg.manahub.core.FeatureFlags
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 
 /**
  * Unified catalog for managing the dashboard layout.
@@ -87,6 +84,7 @@ fun WidgetGallerySheet(
     currentLayout: List<WidgetInstance>,
     isAuthenticated: Boolean,
     gamificationEnabled: Boolean,
+    competitiveEnabled: Boolean,
     onAddWidget: (HomeWidgetType) -> Unit,
     onRemoveWidget: (HomeWidgetType) -> Unit,
     onMoveWidget: (from: Int, to: Int) -> Unit,
@@ -209,17 +207,23 @@ fun WidgetGallerySheet(
                     // Same treatment for the Daily Puzzle (docs/hidden-features/daily-puzzle.md):
                     // DAILY_PUZZLE is gallery-only/opt-in to begin with (never in a default layout),
                     // so omitting it here is the sole gate its "add" door needs.
+                    // Same treatment for the Competitive feature (Phase 5): COMPETITIVE is gallery-
+                    // only/opt-in to begin with (never in a default layout), gated by the runtime
+                    // `competitiveEnabledFlow` DataStore flag rather than a compile-time constant —
+                    // see HomeWidgetType.COMPETITIVE's KDoc.
                     val addedInOrder = localLayout
                         .filter { it.type.category == category }
                         .map { it.type }
                         .filter { gamificationEnabled || !it.isGamification }
-                        .filter { PuzzleFeatureFlags.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
+                        .filter { FeatureFlags.Puzzle.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
+                        .filter { competitiveEnabled || it != HomeWidgetType.COMPETITIVE }
                         .distinct()
 
                     val notAdded = HomeWidgetType.entries
                         .filter { it.category == category }
                         .filter { gamificationEnabled || !it.isGamification }
-                        .filter { PuzzleFeatureFlags.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
+                        .filter { FeatureFlags.Puzzle.PUZZLE_ENABLED || it != HomeWidgetType.DAILY_PUZZLE }
+                        .filter { competitiveEnabled || it != HomeWidgetType.COMPETITIVE }
                         .filter { it !in addedTypes }
 
                     val widgets = (addedInOrder + notAdded).distinctBy { it.persistedId }
@@ -435,7 +439,7 @@ private fun CatalogRow(
 
     Surface(
         color = if (isFixed) mc.surfaceVariant.copy(alpha = 0.5f) else mc.surface,
-        shape = CardShape,
+        shape = SmallCardShape,
         // The whole added row is the long-press drag target now (the standalone ≡ handle icon
         // was removed) — dragHandleModifier carries the pointerInput when draggable.
         modifier = modifier
@@ -600,4 +604,7 @@ private val HomeWidgetType.description: String
         HomeWidgetType.TRENDING_COMMANDERS -> stringResource(R.string.home_widget_desc_trending_commanders)
         HomeWidgetType.COMMUNITY_DECKS -> stringResource(R.string.home_widget_desc_community_decks)
         HomeWidgetType.DAILY_PUZZLE -> stringResource(R.string.home_widget_desc_daily_puzzle)
+        HomeWidgetType.COMPETITIVE -> stringResource(R.string.home_widget_desc_competitive)
+       // HomeWidgetType.MULTI_CARD_ADD -> stringResource(R.string.home_widget_desc_multiple_add)
+
     }

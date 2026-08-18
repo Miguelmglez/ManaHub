@@ -12,6 +12,7 @@
 
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 
 const BULK_DATA_INDEX_URL = 'https://api.scryfall.com/bulk-data';
 const USER_AGENT = 'ManaHubPuzzleGenerator/1 (+https://github.com/manahub)';
@@ -35,15 +36,34 @@ export async function loadOracleCardsSnapshot(cacheDir, pinnedDate) {
   if (!indexRes.ok) throw new Error(`HTTP ${indexRes.status} fetching ${BULK_DATA_INDEX_URL}`);
   const index = await indexRes.json();
   const entry = index.data?.find((d) => d.type === 'oracle_cards');
-  if (!entry?.download_uri) throw new Error('oracle_cards entry not found in bulk-data index');
+  // Scryfall is standardizing on `jsonl_download_uri` (gzip'd JSON-Lines) and no longer always
+  // populates the legacy `download_uri` (plain JSON-array) field -- mirrors the same fallback
+  // order already used by tools/tag-pipeline's ScryfallBulkClient.kt.
+  const jsonlUri = entry?.jsonl_download_uri;
+  const legacyUri = entry?.download_uri;
+  if (!jsonlUri && !legacyUri) throw new Error('oracle_cards entry not found in bulk-data index');
 
-  console.error(`snapshot: downloading ${entry.download_uri} ...`);
-  const dataRes = await fetch(entry.download_uri, { headers: { 'User-Agent': USER_AGENT } });
-  if (!dataRes.ok) throw new Error(`HTTP ${dataRes.status} fetching ${entry.download_uri}`);
-  const text = await dataRes.text();
+  let cards;
+  if (jsonlUri) {
+    console.error(`snapshot: downloading ${jsonlUri} ...`);
+    const dataRes = await fetch(jsonlUri, { headers: { 'User-Agent': USER_AGENT } });
+    if (!dataRes.ok) throw new Error(`HTTP ${dataRes.status} fetching ${jsonlUri}`);
+    const gz = Buffer.from(await dataRes.arrayBuffer());
+    const jsonl = gunzipSync(gz).toString('utf-8');
+    cards = jsonl
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line));
+  } else {
+    console.error(`snapshot: downloading ${legacyUri} ...`);
+    const dataRes = await fetch(legacyUri, { headers: { 'User-Agent': USER_AGENT } });
+    if (!dataRes.ok) throw new Error(`HTTP ${dataRes.status} fetching ${legacyUri}`);
+    cards = JSON.parse(await dataRes.text());
+  }
 
+  const text = JSON.stringify(cards);
   writeFileSync(cacheFile, text, 'utf-8');
-  console.error(`snapshot: cached ${cacheFile} (${(text.length / 1_000_000).toFixed(1)} MB)`);
+  console.error(`snapshot: cached ${cacheFile} (${(text.length / 1_000_000).toFixed(1)} MB, ${cards.length} cards)`);
 
-  return JSON.parse(text);
+  return cards;
 }
