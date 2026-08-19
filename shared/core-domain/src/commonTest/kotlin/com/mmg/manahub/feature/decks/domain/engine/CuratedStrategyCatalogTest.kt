@@ -114,14 +114,31 @@ class CuratedStrategyCatalogTest {
     }
 
     @Test
-    fun `nearestFor returns null Custom sentinel for GENERIC`() {
-        // v1 deliberately ships no GENERIC/"Balanced" catalog entry (plan open question 3, Phase 3
-        // concern) -- GENERIC always falls through to the Custom sentinel today.
-        assertNull(CuratedStrategyCatalog.nearestFor(ArchetypeId.GENERIC, emptyList()))
+    fun `nearestFor returns the balanced entry for GENERIC with no themes`() {
+        // Closes Wave 1 open question 3: a fresh/unpinned deck (GENERIC, no themes) now maps to
+        // the "balanced" catalog entry via exact match, instead of falling through to the
+        // "Custom" sentinel.
+        val result = CuratedStrategyCatalog.nearestFor(ArchetypeId.GENERIC, emptyList())
+        assertEquals("balanced", assertNotNull(result).id)
+    }
+
+    @Test
+    fun `nearestFor returns null Custom sentinel for GENERIC with a theme attached`() {
+        // (GENERIC, [ARISTOCRATS]) is technically StrategyCatalog.isValidCombination-valid (GENERIC
+        // is compatible with every theme), but no catalog entry exists for it -- and it must NOT
+        // fall back to "balanced" the way other archetypes fall back to their pure entry, since
+        // "balanced" specifically means "no plan pinned at all". This is a deliberate legacy/
+        // incoherent-state case that should read as "Custom", not be coerced into "Balanced".
+        assertNull(CuratedStrategyCatalog.nearestFor(ArchetypeId.GENERIC, listOf(ThemeId.ARISTOCRATS)))
     }
 
     @Test
     fun `nearestFor returns null Custom sentinel for a null archetype`() {
         assertNull(CuratedStrategyCatalog.nearestFor(null, emptyList()))
+    }
+
+    @Test
+    fun `catalog has 29 entries -- 7 pure archetypes plus 22 themed presets`() {
+        assertEquals(29, CuratedStrategyCatalog.ALL.size)
     }
 }

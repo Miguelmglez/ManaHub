@@ -317,6 +317,17 @@ object AnalysisEngine {
      * [DeckRole]-based, so nothing here needed to be "ported onto RoleKey space": the seedTags
      * pipeline and pin-folding basis are UNCHANGED, both flow in through [profile.tagFingerprint]
      * exactly as they did for the legacy engine).
+     *
+     * INFO: this is the weakest-calibrated of the 5 pillars — the Wave 1 calibration pass
+     * (`docs/plans/deck-analysis-engine-v2-progress.md`, Phase 4 calibration entry) recorded a
+     * well-built, realistic-density Azorius/UW CONTROL Commander fixture scoring SYNERGY=27 (vs.
+     * MANA_BASE 84 / CURVE 94 / PLAN_ROLES 76 / LEGALITY 100 on the same deck), noting the gap as
+     * "untuned tag-fingerprint alignment" and accepting it for that pass since the total still
+     * landed inside the documented 65-95 "well-built, on-plan deck" band. [SYNERGY_ALIGNMENT_THRESHOLD]
+     * and [SYNERGY_DENSITY_FLOOR] were carried over unchanged from the legacy engine and have not
+     * been retuned against Engine v2's fixture set. Do not treat a low SYNERGY subscore alone as
+     * a reliable "this deck lacks synergy" signal until a dedicated retune workstream revisits
+     * this pillar.
      */
     private fun evaluateSynergy(nonLand: List<DeckEntry>, nonLandCount: Int, profile: DeckProfile): PillarResult {
         val findings = mutableListOf<Finding>()

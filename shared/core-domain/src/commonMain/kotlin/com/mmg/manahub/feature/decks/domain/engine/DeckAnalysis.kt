@@ -170,8 +170,11 @@ data class PillarResult(
  * themes PLUS the nearest [CuratedStrategy] for display (Phase 1's `nearestFor` mapper).
  *
  * @property curatedStrategyId [CuratedStrategy.id] of the nearest curated match, or `null` for the
- *           "Custom" sentinel (an unrecognized/incoherent legacy pin, or a GENERIC/no-theme deck
- *           with no pure-archetype catalog entry — see [CuratedStrategyCatalog.nearestFor]'s KDoc).
+ *           "Custom" sentinel. A GENERIC archetype with NO theme now DOES map to a catalog entry
+ *           (`"balanced"`); `null` instead covers a `null` archetype, GENERIC paired with one or
+ *           more themes (an incoherent/unusual legacy pin — deliberately excluded from the
+ *           "balanced" match, see [CuratedStrategyCatalog.nearestFor]'s KDoc), or any other
+ *           archetype/theme combination with no matching catalog entry.
  * @property displayName player-facing name: the curated match's [CuratedStrategy.displayName] when
  *           one exists, else a plan-label fallback (see [ResolvedArchetypeSkeleton.planLabel]) or
  *           "Custom".

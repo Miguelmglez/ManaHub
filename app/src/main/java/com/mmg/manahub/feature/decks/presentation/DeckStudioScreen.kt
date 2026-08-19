@@ -99,6 +99,7 @@ import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
 import com.mmg.manahub.core.ui.components.CardSearchSheet
 import com.mmg.manahub.core.ui.components.EmptyState
+import com.mmg.manahub.core.ui.components.FullErrorState
 import com.mmg.manahub.core.ui.components.InlineErrorState
 import com.mmg.manahub.core.ui.components.MagicAlertDialog
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
@@ -481,6 +482,7 @@ fun DeckStudioScreen(
                             onViewCommunityDecksForCard = onNavigateToCommunityDecksByCard,
                             onOpenSimilarDeck = onNavigateToCommunityDeckDetail,
                             onToggleIncludeOutsideCollection = viewModel::onToggleIncludeOutsideCollection,
+                            onRetryAnalysis = viewModel::retryAnalysis,
                         )
                     }
                 }
@@ -1975,6 +1977,11 @@ private fun SuggestionsTab(
     // Deck Wizard & Engine Rework plan WS8.2 -- no-op default, same "never re-plumb every call
     // site" precedent as the Motor B params above.
     onToggleIncludeOutsideCollection: (Boolean) -> Unit = {},
+    // Deck Analysis Engine v2 Wave 2 (A2) -- retries a v2-engine-failure (health != null but
+    // health.analysis == null, see the FullErrorState branch below) by re-invoking the SAME
+    // DeckDoctorOrchestrator.loadAnalysis entry point onSelectTab already uses, bypassing its
+    // isLoaded gate (a caught engine failure still marks the pass isLoaded == true).
+    onRetryAnalysis: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
 
@@ -2004,6 +2011,21 @@ private fun SuggestionsTab(
             title = stringResource(R.string.deck_studio_suggestions_coming_soon_title),
             subtitle = stringResource(R.string.deck_studio_suggestions_coming_soon_subtitle),
             icon = Icons.Default.AutoAwesome,
+        )
+        return
+    }
+    // Deck Analysis Engine v2 Wave 2 (A2): distinct from "not loaded yet" above -- health was
+    // computed (the full loadAnalysis pass finished, doctorStage is null by this point) but the
+    // v2 pillar engine itself threw, and EvaluateDeckUseCase's runCatching guard degraded
+    // health.analysis to null (logged as deck_analysis_v2_engine_failed). Rendering the
+    // "coming soon" EmptyState here would be misleading -- this is a real failure, not a feature
+    // that hasn't run yet -- so this gets its own FullErrorState with a retry that re-triggers
+    // the SAME analysis pass, not just a local UI reset.
+    if (health.analysis == null) {
+        FullErrorState(
+            message = stringResource(R.string.deck_analysis_error_message),
+            retryLabel = stringResource(R.string.action_retry),
+            onRetry = onRetryAnalysis,
         )
         return
     }

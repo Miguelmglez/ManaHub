@@ -13,11 +13,15 @@ import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.entry
 import com.mmg.manahub.feature.decks.domain.engine.fixedPower
 import com.mmg.manahub.feature.decks.domain.engine.landCard
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -119,5 +123,46 @@ class EvaluateDeckUseCaseTest {
         assertEquals(1, explore.size)
         assertEquals("deck_doctor", explore.single().featureKey)
         collector.cancel()
+    }
+
+    // ── Deck Analysis Engine v2 Wave 2 (A2) ─────────────────────────────────────────────────
+    // The runCatching guard around evaluateDeckUseCaseV2 (see this class's KDoc, "Phase 4
+    // resilience fix") has no coverage from Wave 1 -- this is that coverage. It also doubles as
+    // the state-shape proof the Analysis tab's error branch depends on: a v2 engine failure must
+    // produce a `DeckHealth` where `health` itself is non-null (legacy `evaluation`/`profile`
+    // still compute fine) but `health.analysis` is null -- DISTINCT from the "not loaded yet"
+    // case, where `uiState.health` itself is null. DeckDoctorOrchestrator/DeckStudioViewModel
+    // pass this exact `DeckHealth` through unmodified into `uiState.health`, so proving the shape
+    // here proves the UI-facing state the Analysis tab branches on.
+
+    @Test
+    fun `a v2 engine failure degrades analysis to null without crashing the whole evaluation`() = runTest(dispatcher) {
+        val failingV2 = mockk<EvaluateDeckUseCaseV2>()
+        every {
+            failingV2.invoke(any(), any(), any(), any(), any(), any())
+        } throws IllegalStateException("boom")
+
+        val useCaseWithFailingV2 = EvaluateDeckUseCase(
+            deckScorer = scorer,
+            progressionEventBus = eventBus,
+            ioDispatcher = dispatcher,
+            evaluateDeckUseCaseV2 = failingV2,
+        )
+
+        val mainboard = listOf(entry(card(id = "c1"))) + (1..37).map { entry(landCard(id = "land-$it")) }
+
+        // Must not throw/propagate: DeckDoctorOrchestrator.loadAnalysis has no try/catch of its
+        // own around this call (see the KDoc above) -- an uncaught exception here would crash
+        // the whole app, not just the Analysis tab.
+        val result = useCaseWithFailingV2(mainboard, DeckFormat.COMMANDER)
+
+        // The legacy path (what the whole rest of this test class already exercises) is
+        // completely unaffected by the v2 failure -- `health` itself is a real, non-null result.
+        assertNotNull(result.evaluation)
+        assertNotNull(result.profile)
+        // The v2-only field degrades to null -- this is the "health present, analysis null"
+        // shape the Analysis tab's FullErrorState branch keys off, distinct from
+        // `uiState.health == null` (which means no full analysis pass has completed at all).
+        assertNull(result.analysis)
     }
 }

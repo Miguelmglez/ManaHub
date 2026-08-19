@@ -67,7 +67,7 @@ data class CuratedStrategy(
 )
 
 /**
- * The v1 curated strategy list (plan §3.2/§4 Phase 1) -- 6 pure archetypes + 22 themed presets,
+ * The v1 curated strategy list (plan §3.2/§4 Phase 1) -- 7 pure archetypes + 22 themed presets,
  * every entry validated against [StrategyCatalog.isValidCombination] by
  * `CuratedStrategyCatalogTest`. See this file's header for placement/scope and the plan doc's
  * Appendix A for the full per-entry curation rationale.
@@ -85,13 +85,27 @@ object CuratedStrategyCatalog {
     private val COMMANDER_ONLY: Set<ArchetypeFormat> = setOf(ArchetypeFormat.COMMANDER)
 
     /**
-     * The full v1 catalog, in declaration order: 6 pure archetypes first, then 22 themed
+     * The full v1 catalog, in declaration order: 7 pure archetypes first, then 22 themed
      * presets (declaration order mirrors the plan §3.2 list order; the future picker's "Core
      * plans" / "Build-around themes" grouping, plan §3.4, is a Phase 3 UI concern layered on top,
      * not encoded here).
      */
     val ALL: List<CuratedStrategy> = listOf(
         // ── Pure archetypes (both formats) ──────────────────────────────────────────────────
+        // The neutral "no specific plan" default -- resolves via ArchetypeSkeletonResolver's own
+        // GENERIC base band (every resolve() starts from GENERIC before archetype/theme overrides
+        // apply), so no new engine data is introduced. Closes Wave 1 open question 3 (plan
+        // docs/plans/deck-analysis-engine-v2-plan.md): previously GENERIC had no catalog entry and
+        // nearestFor() fell through to null ("Custom"), a confusing default for a brand-new,
+        // never-pinned deck.
+        CuratedStrategy(
+            id = "balanced",
+            displayName = "Balanced",
+            description = StrategyCatalog.description(ArchetypeId.GENERIC),
+            archetype = ArchetypeId.GENERIC,
+            themes = emptyList(),
+            formats = BOTH_FORMATS,
+        ),
         CuratedStrategy(
             id = "aggro",
             displayName = ArchetypeId.AGGRO.displayName,
@@ -349,21 +363,30 @@ object CuratedStrategyCatalog {
  * Resolution order:
  * 1. Exact match: a catalog entry with the SAME [archetype] and the SAME theme SET (order-
  *    insensitive -- inference's own ordering is "by descending confidence", which is not part of
- *    a strategy's identity).
+ *    a strategy's identity). This now also covers `(`[ArchetypeId.GENERIC]`, emptyList())` --
+ *    the "balanced" entry added to close Wave 1 open question 3 -- since that entry's own
+ *    (archetype, themes) IS `(GENERIC, emptyList())`, no special-casing is needed for it here.
  * 2. Fallback: the PURE-archetype catalog entry for [archetype] (an entry with that archetype and
  *    an empty theme list) -- covers "confident archetype, but the detected theme combination
  *    itself isn't curated" (e.g. 2 confident themes that don't form a single curated preset).
- * 3. No match at all (unrecognized/`null`/[ArchetypeId.GENERIC] archetype, or an archetype this
- *    v1 catalog offers no pure entry for) -- returns `null`, the "Custom" sentinel. `null` over a
- *    dedicated marker type: every OTHER call site in this package that resolves an enum/string to
- *    a catalog value uses a plain nullable return for "no match" (see [ThemeId.fromDisplayName]),
- *    so this keeps the same, already-established convention rather than introducing a second
- *    "not found" shape into the same file. Callers that need a player-facing "Custom" label
- *    (Phase 3's picker) render that themselves off the `null`.
+ *    [ArchetypeId.GENERIC] is deliberately EXCLUDED from this fallback (see step 3) even though it
+ *    now has a pure entry ("balanced") -- unlike every other archetype, GENERIC's pure entry means
+ *    literally "no plan pinned", so a GENERIC pin that carries a theme must NOT be coerced into
+ *    "balanced"; it's an incoherent/unusual legacy state that should read as "Custom" instead.
+ * 3. No match at all -- returns `null`, the "Custom" sentinel. Applies to: a `null` archetype, OR
+ *    [ArchetypeId.GENERIC] paired with one or more themes (see step 2's rationale -- this is the
+ *    one case where an archetype has a pure catalog entry but still doesn't participate in the
+ *    generic pure-archetype fallback). `null` over a dedicated marker type: every OTHER call site
+ *    in this package that resolves an enum/string to a catalog value uses a plain nullable return
+ *    for "no match" (see [ThemeId.fromDisplayName]), so this keeps the same, already-established
+ *    convention rather than introducing a second "not found" shape into the same file. Callers
+ *    that need a player-facing "Custom" label (Phase 3's picker) render that themselves off the
+ *    `null`.
  */
 fun CuratedStrategyCatalog.nearestFor(archetype: ArchetypeId?, themes: List<ThemeId>): CuratedStrategy? {
     val themeSet = themes.toSet()
     val exact = ALL.firstOrNull { it.archetype == archetype && it.themes.toSet() == themeSet }
     if (exact != null) return exact
+    if (archetype == null || archetype == ArchetypeId.GENERIC) return null
     return ALL.firstOrNull { it.archetype == archetype && it.themes.isEmpty() }
 }

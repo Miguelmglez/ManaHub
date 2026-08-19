@@ -901,6 +901,11 @@
     <string name="deck_studio_import_in_progress">Import in progress…</string>
     <string name="deck_studio_suggestions_coming_soon_title">Suggestions coming soon</string>
     <string name="deck_studio_suggestions_coming_soon_subtitle">Deck Doctor analysis arrives in a future update.</string>
+    <!-- Deck Analysis Engine v2 Wave 2 (A2): shown when health is present but health.analysis is
+         null, i.e. the v2 pillar engine threw and EvaluateDeckUseCase's runCatching guard
+         degraded it (logged as deck_analysis_v2_engine_failed). Distinct from the "coming soon"
+         copy above, which means analysis has not run at all yet. -->
+    <string name="deck_analysis_error_message">Analysis couldn\'t complete. Something went wrong evaluating this deck.</string>
     <string name="deck_studio_seed_coming_soon">Build from seed arrives in a future update.</string>
     <string name="deck_studio_inspirations_coming_soon">Inspirations arrive in a future update.</string>
     <string name="deck_studio_create_failed">Couldn\'t create the deck. Please try again.</string>

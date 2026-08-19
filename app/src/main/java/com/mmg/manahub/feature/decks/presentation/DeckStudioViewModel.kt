@@ -936,6 +936,19 @@ class DeckStudioViewModel(
             deckDoctorOrchestrator.loadAnalysis(deckId, _uiState.value.budgetConstraints)
         }
     }
+
+    /**
+     * Deck Analysis Engine v2 Wave 2 (A2): re-triggers the full [DeckDoctorOrchestrator.loadAnalysis]
+     * pass from the Analysis tab's error state (`health != null` but `health.analysis == null` --
+     * a caught v2-engine failure). Unlike [onSelectTab]'s lazy first-load, this does NOT gate on
+     * [DeckDoctorOrchestrator.state]'s `isLoaded` flag: a caught engine failure still completes the
+     * pass and sets `isLoaded = true`, so that gate would silently no-op a retry tap forever.
+     */
+    fun retryAnalysis() {
+        if (::deckId.isInitialized) {
+            deckDoctorOrchestrator.loadAnalysis(deckId, _uiState.value.budgetConstraints)
+        }
+    }
     fun toggleMainboard() = _uiState.update { it.copy(mainboardExpanded = !it.mainboardExpanded) }
     fun toggleSideboard() = _uiState.update { it.copy(sideboardExpanded = !it.sideboardExpanded) }
     fun setGroupingMode(mode: GroupingMode) = _uiState.update { it.copy(groupingMode = mode) }

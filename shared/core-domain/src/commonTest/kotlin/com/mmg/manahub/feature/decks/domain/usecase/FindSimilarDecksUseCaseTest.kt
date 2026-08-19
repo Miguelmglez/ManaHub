@@ -11,11 +11,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-private fun deckSummary(id: Int, name: String, colors: List<String>, viewCount: Int) = CommunityDeckSummary(
+private fun deckSummary(id: Int, name: String, colors: List<String>, viewCount: Int, deckFormatId: Int = 3) = CommunityDeckSummary(
     archidektId = id,
     name = name,
     size = 100,
     format = "commander",
+    deckFormatId = deckFormatId,
     owner = CommunityDeckOwner(id = 1, username = "owner-$id", avatarUrl = ""),
     viewCount = viewCount,
     createdAt = "",
@@ -32,6 +33,7 @@ private class FakeCommunityDecksRepository(
         lastQuery = filters.cardNames.firstOrNull()
         return result
     }
+    override suspend fun getDeckTags(): DataResult<List<String>> = error("unused")
 }
 
 /**
