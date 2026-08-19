@@ -4,11 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.mmg.manahub.R
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CurveShape
 import com.mmg.manahub.feature.decks.domain.engine.DeckRole
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
+import com.mmg.manahub.feature.decks.domain.engine.Finding
+import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.RoleKey
 import com.mmg.manahub.feature.decks.domain.engine.ScoreReason
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
+import kotlin.math.roundToInt
 
 /**
  * Presentation-side localization for the scoring engine's structured outputs.
@@ -121,6 +125,99 @@ val DeckWarning.key: String
 
 /** One-decimal CMC formatting, locale-stable. */
 private fun formatCmc(value: Double): String = String.format(java.util.Locale.US, "%.1f", value)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Deck Analysis Engine v2 (Phase 3 UI) — Finding / PillarId localization
+//
+//  Mirrors DeckWarning.label()/.key above exactly (same pattern, new sealed type): the engine
+//  (AnalysisEngine) stays string-free and emits [Finding] values; this mapper turns them into the
+//  ALREADY-AUTHORED `deck_analysis_finding_*` strings.xml copy (Phase 2 landed the strings, this
+//  phase is the first consumer).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** User-facing message for a [Finding]. */
+@Composable
+fun Finding.label(): String = when (this) {
+    is Finding.LandCountOffTarget ->
+        stringResource(R.string.deck_analysis_finding_land_count_off_target, current, karstenTarget, bandMin, bandMax)
+    is Finding.ColorSourceShortage ->
+        stringResource(R.string.deck_analysis_finding_color_source_shortage, color.displayName, have, need)
+    is Finding.UnfixedSplash ->
+        stringResource(R.string.deck_analysis_finding_unfixed_splash, color.displayName)
+    is Finding.ManaFixShortage ->
+        stringResource(R.string.deck_analysis_finding_mana_fix_shortage, current, min)
+    is Finding.LandMixOffTarget ->
+        stringResource(
+            R.string.deck_analysis_finding_land_mix_off_target,
+            (basicsRatio * 100).roundToInt(),
+            (targetMin * 100).roundToInt(),
+            (targetMax * 100).roundToInt(),
+        )
+    is Finding.CurveOffBand ->
+        stringResource(R.string.deck_analysis_finding_curve_off_band, formatCmc(avgMv), formatCmc(bandMin), formatCmc(bandMax))
+    is Finding.CurveShapeMismatch ->
+        stringResource(R.string.deck_analysis_finding_curve_shape_mismatch, shape.displayLabel())
+    is Finding.RoleGap ->
+        stringResource(R.string.deck_analysis_finding_role_gap, label, current, min)
+    is Finding.AntiRoleOverMax ->
+        stringResource(R.string.deck_analysis_finding_anti_role_over_max, label, current, max)
+    is Finding.LowSynergyDensity ->
+        stringResource(R.string.deck_analysis_finding_low_synergy_density, (density * 100).roundToInt())
+    is Finding.DeckTooSmall ->
+        stringResource(R.string.deck_analysis_finding_deck_too_small, current, minimum)
+    is Finding.TooManyCopies ->
+        stringResource(R.string.deck_analysis_finding_too_many_copies, cardName, copies, maxCopies)
+    is Finding.SingletonViolation ->
+        stringResource(R.string.deck_analysis_finding_singleton_violation, cardName, copies)
+    is Finding.OffColorIdentity ->
+        stringResource(R.string.deck_analysis_finding_off_color_identity, cardName)
+    is Finding.IllegalCard ->
+        stringResource(R.string.deck_analysis_finding_illegal_card, cardName)
+    is Finding.UnresolvedCards ->
+        stringResource(R.string.deck_analysis_finding_unresolved_cards, count)
+}
+
+/** Stable identity for a [Finding], used as a LazyColumn key. */
+val Finding.key: String
+    get() = when (this) {
+        is Finding.LandCountOffTarget -> "land_count_off_target"
+        is Finding.ColorSourceShortage -> "color_source_shortage_${color.name}"
+        is Finding.UnfixedSplash -> "unfixed_splash_${color.name}"
+        is Finding.ManaFixShortage -> "mana_fix_shortage"
+        is Finding.LandMixOffTarget -> "land_mix_off_target"
+        is Finding.CurveOffBand -> "curve_off_band"
+        is Finding.CurveShapeMismatch -> "curve_shape_mismatch"
+        is Finding.RoleGap -> "role_gap_$roleKey"
+        is Finding.AntiRoleOverMax -> "anti_role_over_max_$roleKey"
+        is Finding.LowSynergyDensity -> "low_synergy_density"
+        is Finding.DeckTooSmall -> "deck_too_small"
+        is Finding.TooManyCopies -> "too_many_copies_$cardName"
+        is Finding.SingletonViolation -> "singleton_violation_$cardName"
+        is Finding.OffColorIdentity -> "off_color_identity_$cardName"
+        is Finding.IllegalCard -> "illegal_card_$cardName"
+        is Finding.UnresolvedCards -> "unresolved_cards"
+    }
+
+/** English-only display word for a [CurveShape] — a closed, 3-value engine enum with no
+ * `displayName` of its own (mirrors [RoleKey.archetypeRoleLabel]'s "plain function, not a
+ * `stringResource`" precedent for small closed vocabularies below). */
+private fun CurveShape.displayLabel(): String = when (this) {
+    CurveShape.FRONT -> "front-loaded"
+    CurveShape.BELL -> "bell-shaped"
+    CurveShape.BACK -> "back-loaded"
+}
+
+/** Human-readable display name for a [PillarId] (Phase 3's pillar-tile row, plan §3.4 item 3). */
+@Composable
+fun PillarId.label(): String = stringResource(
+    when (this) {
+        PillarId.MANA_BASE -> R.string.deck_analysis_pillar_mana_base
+        PillarId.CURVE -> R.string.deck_analysis_pillar_curve
+        PillarId.PLAN_ROLES -> R.string.deck_analysis_pillar_plan_roles
+        PillarId.SYNERGY -> R.string.deck_analysis_pillar_synergy
+        PillarId.LEGALITY -> R.string.deck_analysis_pillar_legality
+    }
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ScoreReason localization (Cut / Add suggestion tags)

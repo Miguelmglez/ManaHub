@@ -1,9 +1,63 @@
 ### Deck Studio (`feature/decks/presentation/DeckStudio*`)
-**Suggestions tab (`DeckFeatureFlags.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED`) is currently `true`** —
-it went through a hide/re-enable cycle (hidden 2026-07-14, re-enabled for the Community/Archetype
-plan, hidden again 2026-07-21, re-enabled during the Deck Wizard & Engine Rework campaign); flip to
-`false` to hide it again. Manual editing and Import are unaffected either way. See
-`docs/hidden-features/deck-studio-suggestions.md`.
+**Suggestions tab (`FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_TAB_ENABLED`, in
+`core/FeatureFlags.kt` — NOT the stale `feature/decks/presentation/DeckFeatureFlags.kt` path this
+doc used to cite) is currently `true`** — it went through a hide/re-enable cycle (hidden
+2026-07-14, re-enabled for the Community/Archetype plan, hidden again 2026-07-21, re-enabled during
+the Deck Wizard & Engine Rework campaign); flip to `false` to hide it again. Manual editing and
+Import are unaffected either way. The tab's user-facing label is **"Analysis"** (Deck Analysis
+Engine v2, 2026-08-19 — see below); the flag/enum/class names are still `SUGGESTIONS`-prefixed
+(string-only rename). See `docs/hidden-features/deck-studio-suggestions.md`.
+
+**Deck Analysis Engine v2 (2026-08-19).** Score/Role-Coverage/Findings are now ONE unified
+pipeline, all deriving from the resolved strategy skeleton (RoleKey vocabulary) — replacing the
+old split where `healthScore`/`roleCoverage` came from the legacy `DeckRole`-keyed `DeckScorer`
+while warnings alone came from the archetype-aware `ArchetypeEvaluator` (the bug where changing
+archetype/themes moved warnings but never the score). Landed ADDITIVELY, not a hard swap:
+`DeckHealth.analysis: DeckAnalysis?` (new) sits alongside the untouched legacy
+`DeckHealth.evaluation` (dormant — no longer read by any UI, kept compiling for the still-flagged-
+off suggestion use cases below). New engine, pure `commonMain`,
+`shared/core-domain/.../feature/decks/domain/engine/`:
+- `CuratedStrategyCatalog.kt` — 28 curated strategies (6 pure archetypes + 22 themed presets), each
+  resolving to an (ArchetypeId, themes[, tribe]) composition validated against
+  `StrategyCatalog.isValidCombination()`; `nearestFor()` maps an (archetype, themes) pair (e.g. from
+  inference) to the nearest catalog entry, `null` = "Custom" (unmatched legacy pin).
+- `DeckAnalysis.kt` — result models: `DeckAnalysis`, `PillarResult`, `PillarId` (MANA_BASE / CURVE /
+  PLAN_ROLES / SYNERGY / LEGALITY), `Finding` (sealed, 17 variants, severity-tiered BLOCKER/
+  WARNING/INFO), `RoleCoverageEntry`, `AnalysisWeights` (defaults 0.20/0.15/0.35/0.15/0.15,
+  `planRoles` heaviest since that role table IS the score's literal explanation — reasoning as KDoc
+  on the class, overridable via the existing `ScoreWeightOverrides` DataStore mechanism, extended
+  not duplicated).
+- `AnalysisEngine.kt` — the 5 pillar evaluators + score composition + finding budget (top 3 per
+  pillar + collapsed count, BLOCKERs never collapse). `ILLEGAL_DECK_SCORE_CAP = 40` (flat cap, no
+  severity gradient within P5 — reasoning as KDoc, reviewed during calibration, kept as-is).
+  Calibrated 2026-08-19 against 2 realistic-density Commander fixtures (~65 real cards + 35-38 real
+  lands, `DeckAnalysisEngineCalibrationTest.kt`) to a documented 65-95 "well-built, on-plan deck"
+  band — the original sparse golden fixtures (`DeckAnalysisEngineGoldenTest.kt`, ~17-28 real cards
+  padded to 100 with basics) score artificially low (50-64) purely from the land-count skew; that's
+  expected and doesn't indicate a miscalibration — those fixtures only assert RELATIVE behavior
+  (strategy-switch deltas, anti-role firing, illegal-cap), never absolute score bands.
+- `usecase/EvaluateDeckUseCaseV2.kt` — thin wrapper around `AnalysisEngine.evaluate()`, called from
+  inside `EvaluateDeckUseCase` (which still also runs the legacy path for the dormant `.evaluation`
+  field). The v2 call is wrapped in `runCatching` (optional `crashReporter` param, appended last) —
+  it is new, uncalibrated-in-production code, so a pillar-evaluator exception degrades to
+  `analysis = null` instead of propagating uncaught through `DeckDoctorOrchestrator.loadAnalysis`'s
+  `scope.launch` and crashing the whole app.
+- UI: `CuratedStrategyPickerSheet.kt` (replaces the deleted `ArchetypePlanSheet.kt` — flat curated
+  list, grouped "Core plans"/"Build-around themes", search, tribe sub-picker, Auto-detect) +
+  `HealthComponents.kt`'s `PillarTile`/`RoleCoverageEntryRow`/`FindingRow` (replace the deleted
+  legacy `RoleCoverageRow`/`WarningChip`). **Do not name a new component `StrategyPickerSheet`** —
+  that name is already taken by an unrelated 3-axis archetype/theme/tribe picker from the Deck
+  Wizard Rework plan (WS1.2), still live in `DeckWizardCommanderSteps.kt`.
+- Cuts/Adds/Community/Similar-decks (Motor A/B, the "make suggestions" half of Deck Doctor) are
+  UNCHANGED and stay behind their own new flag,
+  `FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED` (default `false`, independent of the
+  tab-level flag above) — gated both in `DeckStudioScreen.kt`'s UI and in
+  `DeckDoctorOrchestrator.loadAnalysis`'s stage pipeline (zero Scryfall/Worker calls reachable from
+  suggestions while off, per ADR-005). See `docs/hidden-features/deck-studio-suggestions.md`.
+- Telemetry: `deck_analysis_strategy_pick`, `deck_analysis_completed` (score bucket + weakest-pillar
+  id/score, ONLY on the full `loadAnalysis` pass, never `recomputeIncremental`),
+  `deck_analysis_picker_abandoned`, `deck_analysis_v2_engine_failed` (non-fatal). → memory:
+  `project_deck_analysis_engine_v2`
 
 **Deck Builder v2 wizard (`Screen.DeckWizard`) and Discoveries v2 (`DiscoverSynergiesV2UseCase`,
 identity-only clustering) are the SOLE "Build from seed" / "Browse inspirations" entry points** —

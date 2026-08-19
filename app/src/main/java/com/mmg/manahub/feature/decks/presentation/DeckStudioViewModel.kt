@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
+import com.mmg.manahub.core.FeatureFlags
 import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 import com.mmg.manahub.core.model.AddCardRow
@@ -30,6 +31,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckImportExportHelper
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
@@ -406,6 +408,7 @@ class DeckStudioViewModel(
         findSimilarDecksUseCase = findSimilarDecksUseCase,
         isCommunityEngineEnabled = { userPreferences.communityEngineEnabledFlow.first() },
         candidatePoolGenerator = candidatePoolGenerator,
+        isSuggestionsEngineEnabled = { FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED },
     )
 
     /**
@@ -1568,15 +1571,35 @@ class DeckStudioViewModel(
      * [DeckDoctorOrchestrator.setArchetypeOverride], which writes through the repository and
      * re-runs a full analysis. A no-op when `deckId` never resolved (defensive — the chip is
      * only reachable once the deck has loaded).
+     *
+     * @param tribe Deck Analysis Engine v2 Phase 3 — forwarded to
+     *        [DeckDoctorOrchestrator.setArchetypeOverride]'s own `tribe` param (the curated
+     *        strategy picker's tribe sub-pick); `null` for every non-tribal strategy.
      */
-    fun onSetArchetypeOverride(archetypeId: ArchetypeId?, themes: List<ThemeId>) {
+    fun onSetArchetypeOverride(archetypeId: ArchetypeId?, themes: List<ThemeId>, tribe: String? = null) {
         if (!::deckId.isInitialized) return
-        deckDoctorOrchestrator.setArchetypeOverride(deckId, _uiState.value.budgetConstraints, archetypeId, themes)
+        deckDoctorOrchestrator.setArchetypeOverride(deckId, _uiState.value.budgetConstraints, archetypeId, themes, tribe)
+    }
+
+    /**
+     * Deck Analysis Engine v2 Phase 3 — convenience wrapper the [CuratedStrategyPickerSheet]
+     * ([com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet]) calls
+     * directly with the [CuratedStrategy] the player tapped, instead of unpacking its
+     * archetype/themes at the call site.
+     */
+    fun onApplyCuratedStrategy(strategy: CuratedStrategy, tribe: String?) {
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_id", strategy.id)
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_tribe", tribe ?: "none")
+        crashReporter.log("deck_analysis_strategy_pick")
+        onSetArchetypeOverride(strategy.archetype, strategy.themes, tribe)
     }
 
     /** "Auto-detect" — clears the pin and re-infers the archetype/themes from the live deck. */
     fun onClearArchetypeOverride() {
         if (!::deckId.isInitialized) return
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_id", "auto_detect")
+        crashReporter.setCustomKey("deck_analysis_strategy_pick_tribe", "none")
+        crashReporter.log("deck_analysis_strategy_pick")
         deckDoctorOrchestrator.clearArchetypeOverride(deckId, _uiState.value.budgetConstraints)
     }
 

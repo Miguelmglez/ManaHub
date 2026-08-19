@@ -1768,27 +1768,33 @@ class DeckStudioViewModelTest {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `when suggestAddsFromCollectionUseCase throws then ExternalPoolFailed event is emitted`() =
+    fun `when DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED is off, Motor A never runs and no ExternalPoolFailed event fires`() =
         runTest(dispatcher) {
-            // Arrange
+            // Arrange — Deck Analysis Engine v2 Phase 0 carve-out
+            // (docs/plans/deck-analysis-engine-v2-plan.md, section 4/"Phase 0"):
+            // FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED is false, so
+            // DeckDoctorOrchestrator.loadAnalysis() never calls recomputeAddsInternal (Motor A) —
+            // even with the collection-adds use case rigged to throw, the call path is unreachable
+            // and no ExternalPoolFailed event fires. This supersedes the pre-Phase-0 version of this
+            // test, which asserted the opposite (Motor A reachable, event emitted on failure) — that
+            // behavior returns once the flag flips back on in a later phase.
             stubResolvableDeck()
             coEvery { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) } throws
                 RuntimeException("Unexpected Motor A failure")
             val vm = createVmWithMockedAdds()
             advanceUntilIdle()
 
-            // Assert — ExternalPoolFailed emitted.
+            // Act — Assert no event is emitted.
             vm.events.test {
                 vm.onSelectTab(DeckStudioTab.SUGGESTIONS)
                 advanceUntilIdle()
-                val event = awaitItem()
-                assertTrue(
-                    "ExternalPoolFailed event must be emitted when adds use case throws",
-                    event is DeckStudioEvent.ExternalPoolFailed,
-                )
-                cancelAndIgnoreRemainingEvents()
+                expectNoEvents()
             }
-            assertFalse("isAddsLoading must be false after failure", vm.uiState.value.isAddsLoading)
+
+            // Assert — Motor A's use case was never invoked, and adds stay empty/not-loading.
+            coVerify(exactly = 0) { mockSuggestAddsFromCollectionUseCase(any(), any(), any(), any(), any(), any()) }
+            assertFalse("isAddsLoading must be false", vm.uiState.value.isAddsLoading)
+            assertTrue("adds must stay empty while the engine flag is off", vm.uiState.value.adds.isEmpty())
         }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import com.mmg.manahub.feature.decks.domain.engine.RoleClassifier
 import com.mmg.manahub.feature.decks.domain.usecase.CandidatePoolGenerator
 import com.mmg.manahub.feature.decks.domain.usecase.DeckstatsFetcher
 import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase
+import com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCaseV2
 import com.mmg.manahub.feature.decks.domain.usecase.FindSimilarDecksUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckCardsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.ImportDeckUseCase
@@ -109,7 +110,22 @@ fun decksKoinModule(): Module = module {
     // Deck Doctor Community/Archetype plan, Phase 1.4: the archetype/theme classifier. Stateless
     // and pure — a single shared instance is safe.
     single { InferDeckArchetypeUseCase() }
-    single { EvaluateDeckUseCase(deckScorer = get(), progressionEventBus = get(), inferDeckArchetypeUseCase = get()) }
+    // Deck Analysis Engine v2 (Phase 2) -- the new unified pillar pipeline. Shares the same
+    // ManaBaseAnalyzer singleton DeckScorer/SuggestCutsUseCase already use above (P1 reuses it
+    // verbatim, never a second instance).
+    single { EvaluateDeckUseCaseV2(manaBaseAnalyzer = get()) }
+    single {
+        EvaluateDeckUseCase(
+            deckScorer = get(),
+            progressionEventBus = get(),
+            inferDeckArchetypeUseCase = get(),
+            evaluateDeckUseCaseV2 = get(),
+            // Deck Analysis Engine v2 Phase 4 (telemetry/resilience) -- crashReporter comes from
+            // coreBridgeKoinModule (single<CrashReporter>), same pattern as every other feature
+            // module's crashReporter injection (see e.g. PuzzleKoinModule/GamificationEngineKoinModule).
+            crashReporter = get(),
+        )
+    }
     single { SuggestAddsUseCase(deckScorer = get()) }
     // WS9.5 (Deck Wizard & Engine Rework plan): the manabase-aware cut penalty needs the SAME
     // shared ManaBaseAnalyzer singleton SuggestAddsFromCollectionUseCase already uses below.

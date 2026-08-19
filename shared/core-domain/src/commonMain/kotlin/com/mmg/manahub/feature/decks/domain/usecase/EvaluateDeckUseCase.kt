@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
+import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
@@ -12,7 +13,9 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeRoleClassifier
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver
+import com.mmg.manahub.feature.decks.domain.engine.AnalysisWeights
 import com.mmg.manahub.feature.decks.domain.engine.CurveExemption
+import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
@@ -56,6 +59,18 @@ import kotlinx.datetime.Clock
  * warnings with the archetype-aware equivalents (D18 land union rule, archetype curve band, the
  * new [RoleKey][com.mmg.manahub.feature.decks.domain.engine.RoleKey]-keyed role-gap/anti-role
  * warnings) while leaving construction/mana-base/synergy warnings from the base evaluation intact.
+ *
+ * ## Deck Analysis Engine v2 (Phase 2) — [DeckHealth.analysis], additive
+ * Every invocation ALSO runs [evaluateDeckUseCaseV2] (the new, unified pillar pipeline — see its
+ * KDoc) on top of the SAME [DeckProfile]/[ArchetypeResolution] this class already computes for the
+ * legacy path above, and attaches the result as [DeckHealth.analysis]. This is a **wrap, not a
+ * replace**: the legacy `evaluation`/`profile`/`archetypeResolution` fields above stay computed
+ * EXACTLY as before (byte-identical) because the currently-live `DeckStudioScreen` Suggestions tab
+ * (health ring, role coverage, warnings) still reads them directly — only the Cuts/Adds/Community
+ * sections are hidden behind `DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED` (Phase 0), not the health
+ * display. `DeckHealth.analysis` is inert extra data until the Phase 3 UI migration consumes it.
+ * Unlike the legacy path, [evaluateDeckUseCaseV2] runs UNCONDITIONALLY (even GENERIC/no-themes and
+ * Draft) — see [AnalysisEngine][com.mmg.manahub.feature.decks.domain.engine.AnalysisEngine]'s KDoc.
  */
 class EvaluateDeckUseCase(
     private val deckScorer: DeckScorer,
@@ -65,6 +80,15 @@ class EvaluateDeckUseCase(
     // param is appended LAST instead of being inserted before it.
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val inferDeckArchetypeUseCase: InferDeckArchetypeUseCase = InferDeckArchetypeUseCase(),
+    // Deck Analysis Engine v2 Phase 2 — appended LAST (same "new optional params go at the end"
+    // rule as [inferDeckArchetypeUseCase] above) so no existing positional-arg call site changes.
+    private val evaluateDeckUseCaseV2: EvaluateDeckUseCaseV2 = EvaluateDeckUseCaseV2(),
+    // Deck Analysis Engine v2 Phase 4 (telemetry/resilience) — nullable-defaulted, appended LAST,
+    // mirrors [com.mmg.manahub.feature.decks.domain.template.DeckTemplateResolver]'s own
+    // [CrashReporter] param so no existing positional-arg test/call site breaks. Lets [invoke] guard
+    // the still-freshly-calibrated [evaluateDeckUseCaseV2] call (see its own KDoc there) without
+    // forcing every caller/test to supply a reporter.
+    private val crashReporter: CrashReporter? = null,
 ) {
 
     /** Stable, code-side slug identifying the Deck Doctor feature for exploration quests. */
@@ -93,10 +117,14 @@ class EvaluateDeckUseCase(
      *        still honored, layered on the INFERRED macro). Unrecognized entries are dropped.
      * @param commanderTags the resolved commander card's tags (A.6 "commander tags" classifier
      *        signal); empty for non-Commander decks or an unresolved commander.
+     * @param analysisWeights the (optionally debug-tuned) [AnalysisWeights] threaded through to
+     *        [evaluateDeckUseCaseV2] (Deck Analysis Engine v2 Phase 2). The default keeps every
+     *        caller byte-identical to pre-Phase-2 behavior for the LEGACY `evaluation`/`profile`
+     *        fields — only the new, additive [DeckHealth.analysis] field is affected.
      * @return a [DeckHealth] bundling the [DeckEvaluation], the [DeckProfile] it was built from,
-     *         and the resolved [ArchetypeResolution] (always present — GENERIC/no-themes when the
+     *         the resolved [ArchetypeResolution] (always present — GENERIC/no-themes when the
      *         deck carries no archetype signal, so the Studio header chip always has something to
-     *         render).
+     *         render), and the v2 [DeckAnalysis] (always present, see [DeckHealth.analysis]'s KDoc).
      */
     suspend operator fun invoke(
         mainboard: List<DeckEntry>,
@@ -107,6 +135,7 @@ class EvaluateDeckUseCase(
         archetypeOverride: String? = null,
         themesOverride: List<String> = emptyList(),
         commanderTags: List<CardTag> = emptyList(),
+        analysisWeights: AnalysisWeights = AnalysisWeights(),
     ): DeckHealth = withContext(ioDispatcher) {
         val colorIdentity = deriveColorIdentity(mainboard, commanderIdentity)
 
@@ -126,7 +155,9 @@ class EvaluateDeckUseCase(
         // domain event for the EXPLORATION quest (`daily_explore_deck_doctor`). Emitted here (not the
         // ViewModel) per ADR-002 §1; the per-day idempotency key (FeatureExplored) means re-running on
         // a cut/add the same day advances the quest at most once. The emit grants 0 XP (no ledger row);
-        // it is fire-and-forget on the bus and never affects the returned analysis.
+        // it is fire-and-forget on the bus and never affects the returned analysis. Fires EXACTLY ONCE
+        // per invoke() call — the v2 pipeline below reuses this SAME call's profile/resolution, it
+        // does not trigger a second emit.
         progressionEventBus.emit(
             ProgressionEvent.FeatureExplored(
                 featureKey = FEATURE_DECK_DOCTOR,
@@ -135,21 +166,54 @@ class EvaluateDeckUseCase(
         )
 
         val archetypeFormat = ArchetypeFormat.of(format)
+        // The resolution used by BOTH the legacy layer below and the v2 pipeline — computed once,
+        // GENERIC/no-themes for Draft (no archetype skeleton exists for it, mirrors the pre-Phase-1
+        // Draft short-circuit).
+        val resolution = if (archetypeFormat == null) {
+            ArchetypeResolution(ArchetypeId.GENERIC, emptyList(), isManualOverride = false, confidence = 0f)
+        } else {
+            resolveArchetype(mainboard, archetypeFormat, archetypeOverride, themesOverride, commanderTags)
+        }
+
+        // Deck Analysis Engine v2 (Phase 2) — runs UNCONDITIONALLY (even GENERIC/no-themes, even
+        // Draft), unlike the legacy layer below which zero-regression-skips those cases. See this
+        // class's KDoc "Deck Analysis Engine v2" section for why this is purely additive.
+        //
+        // Phase 4 resilience fix: [AnalysisEngine] is brand-new (Phase 2, not yet exercised against
+        // a real production-diversity corpus at the time this guard was added) and runs with NO
+        // try/catch anywhere between it and the ViewModel's `viewModelScope`
+        // ([com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator.loadAnalysis]'s
+        // `scope.launch` has none either) -- an uncaught exception in any of its 5 pillar evaluators
+        // would crash the WHOLE app, not just the Analysis tab. [DeckHealth.analysis] is already
+        // nullable (see its own KDoc), so a `null` fallback here needs no consumer change; every
+        // OTHER field this method computes (the legacy `evaluation`/`profile`/`archetypeResolution`)
+        // stays fully unaffected by a v2 failure.
+        val analysis: DeckAnalysis? = runCatching {
+            evaluateDeckUseCaseV2(
+                mainboard = mainboard,
+                format = format,
+                colorIdentity = colorIdentity,
+                profile = profile,
+                resolution = resolution,
+                weights = analysisWeights,
+            )
+        }.onFailure { t ->
+            crashReporter?.setCustomKey("deck_analysis_format", format.name)
+            crashReporter?.setCustomKey("deck_analysis_error_type", t::class.simpleName ?: "Unknown")
+            crashReporter?.log("deck_analysis_v2_engine_failed")
+            crashReporter?.recordException(RuntimeException("[EvaluateDeckUseCase] deck_analysis_v2_engine_failed", t))
+        }.getOrNull()
+
         if (archetypeFormat == null) {
             // Draft has no archetype skeleton (Appendix A defines none) — always the pre-Phase-1
             // GENERIC/no-themes path, verbatim base evaluation.
-            return@withContext DeckHealth(
-                evaluation = evaluation,
-                profile = profile,
-                archetypeResolution = ArchetypeResolution(ArchetypeId.GENERIC, emptyList(), isManualOverride = false, confidence = 0f),
-            )
+            return@withContext DeckHealth(evaluation = evaluation, profile = profile, archetypeResolution = resolution, analysis = analysis)
         }
 
-        val resolution = resolveArchetype(mainboard, archetypeFormat, archetypeOverride, themesOverride, commanderTags)
         if (resolution.macro == ArchetypeId.GENERIC && resolution.themes.isEmpty()) {
             // Zero-regression path (1.4/1.8 exit criterion): GENERIC-with-no-themes returns the
             // BASE evaluation untouched — no archetype warnings computed or substituted.
-            return@withContext DeckHealth(evaluation = evaluation, profile = profile, archetypeResolution = resolution)
+            return@withContext DeckHealth(evaluation = evaluation, profile = profile, archetypeResolution = resolution, analysis = analysis)
         }
 
         val archetypeEvaluation = applyArchetypeLayer(
@@ -160,7 +224,7 @@ class EvaluateDeckUseCase(
             colorIdentity = colorIdentity,
             resolution = resolution,
         )
-        DeckHealth(evaluation = archetypeEvaluation, profile = profile, archetypeResolution = resolution)
+        DeckHealth(evaluation = archetypeEvaluation, profile = profile, archetypeResolution = resolution, analysis = analysis)
     }
 
     /** Override wins when set and recognized; otherwise runs [InferDeckArchetypeUseCase]. */
@@ -291,9 +355,18 @@ data class ArchetypeResolution(
  * Result of [EvaluateDeckUseCase]: the deck [evaluation] plus the [profile] it was derived from
  * (exposed because the Health UI renders role ideals / skeleton, which live on the profile), plus
  * the [archetypeResolution] used to compute [evaluation]'s archetype-aware warnings (if any).
+ *
+ * @property analysis Deck Analysis Engine v2 (Phase 2) — the new, unified pillar-based
+ *           [DeckAnalysis], ADDITIVE to [evaluation]/[profile]/[archetypeResolution] above (a
+ *           "wrap, not replace" — see [EvaluateDeckUseCase]'s KDoc). [EvaluateDeckUseCase.invoke]
+ *           ALWAYS populates this with a real value; it stays nullable only so any OTHER
+ *           [DeckHealth] construction site (tests, future callers) keeps compiling without having
+ *           to fabricate a [DeckAnalysis]. Null-safe consumers should treat `null` as "not yet
+ *           evaluated by the v2 pipeline", never as an error state.
  */
 data class DeckHealth(
     val evaluation: DeckEvaluation,
     val profile: DeckProfile,
     val archetypeResolution: ArchetypeResolution = ArchetypeResolution(ArchetypeId.GENERIC, emptyList(), isManualOverride = false, confidence = 0f),
+    val analysis: DeckAnalysis? = null,
 )

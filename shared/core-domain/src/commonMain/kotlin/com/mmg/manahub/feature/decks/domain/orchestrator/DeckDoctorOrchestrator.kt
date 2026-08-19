@@ -22,10 +22,13 @@ import com.mmg.manahub.feature.decks.domain.engine.CardFit
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckIdentitySeedTags
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
+import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
+import com.mmg.manahub.feature.decks.domain.engine.toAnalysisWeights
 import com.mmg.manahub.feature.decks.domain.engine.toScoreWeights
+import com.mmg.manahub.feature.decks.domain.engine.withUnresolvedFinding
 import com.mmg.manahub.feature.decks.domain.usecase.AddOrigin
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.domain.usecase.BudgetConstraints
@@ -256,6 +259,12 @@ class DeckDoctorOrchestrator(
     // no-op: [DeckDoctorState.includeOutsideCollection] can still be toggled on by the UI, but
     // [recomputeAddsInternal] simply never finds a generator to call, so `adds` stays Motor-A-only.
     private val candidatePoolGenerator: CandidatePoolGenerator? = null,
+    /** Deck Analysis Engine v2 Phase 0 carve-out: `FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED`
+     * lives in the `:app` module and can't be imported here (commonMain layering) — the host supplies it
+     * as a plain lambda, same pattern as [isCommunityEngineEnabled]. Defaults to `true` (today's behavior)
+     * so the existing test constructor call site and any future un-migrated caller keep working unchanged;
+     * the real Android host wires the actual (currently `false`) flag value explicitly. */
+    private val isSuggestionsEngineEnabled: () -> Boolean = { true },
 ) {
 
     private val _state = MutableStateFlow(DeckDoctorState())
@@ -397,7 +406,8 @@ class DeckDoctorOrchestrator(
             val seedCards = inferenceSeeds(commanderCard, mainboardEntries)
             val inferredSeedTags = inferDeckIdentityUseCase(seedCards).seedTags
             val seedTags = (inferredSeedTags + pinSeedTags(archetypeOverride, themesOverride, tribeOverride)).distinct()
-            val weights = weightsProvider().toScoreWeights()
+            val weightOverrides = weightsProvider()
+            val weights = weightOverrides.toScoreWeights()
 
             val health = evaluateDeckUseCase(
                 mainboard = mainboardEntries,
@@ -408,14 +418,23 @@ class DeckDoctorOrchestrator(
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
                 commanderTags = commanderTags,
+                // Deck Analysis Engine v2 Phase 2 -- same DataStore-backed debug-tuning mechanism,
+                // extended (not duplicated) to also carry the 5 pillar weights.
+                analysisWeights = weightOverrides.toAnalysisWeights(),
             )
-            val cuts = suggestCutsUseCase(
-                mainboard = mainboardEntries,
-                profile = health.profile,
-                protectedIds = cutProtectedIds(commanderId, strategyLocked, wizardSourcedIds),
-                weights = weights,
-                resolvedSkeleton = resolveArchetypeSkeleton(health),
-            )
+            // Deck Analysis Engine v2 Phase 0 carve-out: skip Cuts entirely (no candidate pool scan)
+            // while the flag is off -- see [isSuggestionsEngineEnabled]'s KDoc.
+            val cuts = if (isSuggestionsEngineEnabled()) {
+                suggestCutsUseCase(
+                    mainboard = mainboardEntries,
+                    profile = health.profile,
+                    protectedIds = cutProtectedIds(commanderId, strategyLocked, wizardSourcedIds),
+                    weights = weights,
+                    resolvedSkeleton = resolveArchetypeSkeleton(health),
+                )
+            } else {
+                emptyList()
+            }
 
             val collectionCards = collection.map { it.card }
             val wishlistIds = wishlistRepository.observeLocal().first().map { it.cardId }.toSet()
@@ -453,6 +472,19 @@ class DeckDoctorOrchestrator(
                 )
             }
             crashReporter.log("deck_studio_suggestions_analysis_succeeded")
+            // Deck Analysis Engine v2 Phase 4 (telemetry): score/quality signal for a FULL analysis
+            // pass only -- never fired from [recomputeIncremental] (every card add/cut would be far
+            // too frequent for a breadcrumb). `health.analysis` can be null here if the v2 engine
+            // itself failed (see [EvaluateDeckUseCase]'s own runCatching guard) -- simply skip the
+            // event rather than logging a synthetic/placeholder score.
+            health.analysis?.let { analysis ->
+                val weakestPillar = analysis.pillars.minByOrNull { it.subscore }
+                crashReporter.setCustomKey("deck_analysis_score_bucket", scoreBucket(analysis.totalScore))
+                crashReporter.setCustomKey("deck_analysis_pillar_min_id", weakestPillar?.id?.name ?: "none")
+                crashReporter.setCustomKey("deck_analysis_pillar_min_score", weakestPillar?.subscore?.toString() ?: "0")
+                crashReporter.setCustomKey("deck_analysis_strategy_id", analysis.strategy.curatedStrategyId ?: "custom")
+                crashReporter.log("deck_analysis_completed")
+            }
 
             _state.update {
                 it.copy(
@@ -462,11 +494,19 @@ class DeckDoctorOrchestrator(
                     strategyLocked = strategyLocked,
                 )
             }
-            recomputeAddsInternal(constraints, emitStages = true, ownerGeneration = myGeneration)
-            // Motor B (Phase 4): fetched once per full analysis, not on every incremental add/cut
-            // (see [recomputeCommunityInternal]'s KDoc for why) — [onAddCard]/[onCutCard] instead
-            // locally filter the already-fetched lists.
-            recomputeCommunityInternal(ownerGeneration = myGeneration)
+            // Deck Analysis Engine v2 Phase 0 carve-out: neither Motor A (recomputeAddsInternal,
+            // which owns the Scryfall/CandidatePoolGenerator backstop) nor Motor B
+            // (recomputeCommunityInternal, community aggregate + similar-decks) ever launches while
+            // the flag is off -- zero network/Worker calls from a hidden section.
+            // isSuggestionsLoading is already false in the `_state.update` above regardless, so the
+            // staged-progress UI never hangs waiting for these.
+            if (isSuggestionsEngineEnabled()) {
+                recomputeAddsInternal(constraints, emitStages = true, ownerGeneration = myGeneration)
+                // Motor B (Phase 4): fetched once per full analysis, not on every incremental add/cut
+                // (see [recomputeCommunityInternal]'s KDoc for why) — [onAddCard]/[onCutCard] instead
+                // locally filter the already-fetched lists.
+                recomputeCommunityInternal(ownerGeneration = myGeneration)
+            }
         }
     }
 
@@ -808,7 +848,8 @@ class DeckDoctorOrchestrator(
         val context = analysisCache ?: return
         scope.launch {
             val mainboard = context.workingMainboard
-            val weights = weightsProvider().toScoreWeights()
+            val weightOverrides = weightsProvider()
+            val weights = weightOverrides.toScoreWeights()
             val health = evaluateDeckUseCase(
                 mainboard = mainboard,
                 format = context.format,
@@ -818,6 +859,7 @@ class DeckDoctorOrchestrator(
                 archetypeOverride = context.archetypeOverride,
                 themesOverride = context.themesOverride,
                 commanderTags = context.commanderTags,
+                analysisWeights = weightOverrides.toAnalysisWeights(),
             )
             val cuts = suggestCutsUseCase(
                 mainboard = mainboard,
@@ -1021,16 +1063,30 @@ class DeckDoctorOrchestrator(
     // ── Archetype override (Phase 1.7 Studio UI entry point) ───────────────────────
 
     /**
-     * Pins (or, when both params are null/empty, clears) the deck's archetype/theme override —
-     * writes through [DeckRepository.updateArchetypeOverride] then re-runs a FULL [loadAnalysis]
-     * (a macro/theme change reshapes the whole resolved skeleton, so an incremental recompute is
-     * not enough — mirrors [changeFormat]'s "cheap enough to just reload" precedent).
+     * Pins (or, when [archetypeId]/[themes] are both null/empty, clears) the deck's archetype/theme
+     * override — writes through [DeckRepository.updateArchetypeOverride] then re-runs a FULL
+     * [loadAnalysis] (a macro/theme change reshapes the whole resolved skeleton, so an incremental
+     * recompute is not enough — mirrors [changeFormat]'s "cheap enough to just reload" precedent).
      *
      * @param archetypeId `null` clears the macro pin (back to inference); a non-null value pins it.
      * @param themes at most 2 (the caller — the Studio bottom sheet — already enforces this cap);
      *        empty clears the theme pin.
+     * @param tribe Deck Analysis Engine v2 Phase 3 -- the curated strategy picker's tribe sub-pick
+     *        (only meaningful when a [ThemeId.TRIBAL]-requiring strategy is applied), written through
+     *        the SEPARATE [DeckRepository.updateTribeOverride] column (mirrors the wizard's own
+     *        `updateArchetypeOverride` + `updateTribeOverride` pair, see [DeckWizardViewModel]).
+     *        Defaults to `null` so every pre-Phase-3 call site (the legacy `ArchetypePlanSheet`,
+     *        which has no tribe UI, and existing tests) keeps clearing/leaving the tribe pin exactly
+     *        as before -- `null` here always clears the tribe column, which is also the CORRECT
+     *        behavior for a non-tribal strategy pick or "Auto-detect" ([clearArchetypeOverride]).
      */
-    fun setArchetypeOverride(deckId: String, constraints: BudgetConstraints, archetypeId: ArchetypeId?, themes: List<ThemeId>) {
+    fun setArchetypeOverride(
+        deckId: String,
+        constraints: BudgetConstraints,
+        archetypeId: ArchetypeId?,
+        themes: List<ThemeId>,
+        tribe: String? = null,
+    ) {
         scope.launch {
             runCatching {
                 deckRepository.updateArchetypeOverride(
@@ -1038,6 +1094,7 @@ class DeckDoctorOrchestrator(
                     archetypeOverride = archetypeId?.name,
                     themesOverride = themes.take(2).map { it.name },
                 )
+                deckRepository.updateTribeOverride(deckId, tribe)
             }.onFailure {
                 crashReporter.log("deck_studio_archetype_override_failed")
                 crashReporter.recordException(RuntimeException("[DeckDoctorOrchestrator] deck_studio_archetype_override_failed", it))
@@ -1082,13 +1139,26 @@ class DeckDoctorOrchestrator(
     private fun cutProtectedIds(commanderId: String?, strategyLocked: Boolean, wizardSourcedIds: Set<String>): Set<String> =
         setOfNotNull(commanderId) + (if (strategyLocked) wizardSourcedIds else emptySet())
 
-    /** Appends a [DeckWarning.UnresolvedCards] when one or more mainboard slots failed to resolve. */
+    /** Appends a [DeckWarning.UnresolvedCards] (legacy) / [Finding.UnresolvedCards] (Deck Analysis
+     * Engine v2) when one or more mainboard slots failed to resolve — kept in sync across both
+     * result shapes so neither the legacy health display nor the v2 pipeline silently hides a
+     * partial evaluation. */
     private fun withUnresolvedWarning(health: DeckHealth, unresolvedCount: Int): DeckHealth {
         if (unresolvedCount <= 0) return health
         val withWarning = health.evaluation.copy(
             warnings = health.evaluation.warnings + DeckWarning.UnresolvedCards(unresolvedCount)
         )
-        return health.copy(evaluation = withWarning)
+        return health.copy(evaluation = withWarning, analysis = health.analysis?.withUnresolvedFinding(unresolvedCount))
+    }
+
+    /** Deck Analysis Engine v2 Phase 4 (telemetry): buckets a raw 0-100 [DeckAnalysis.totalScore]
+     * into a coarse string for the `deck_analysis_completed` breadcrumb -- never the raw score
+     * itself, per the project's telemetry granularity discipline. */
+    private fun scoreBucket(totalScore: Int): String = when {
+        totalScore < 40 -> "0-39"
+        totalScore < 60 -> "40-59"
+        totalScore < 80 -> "60-79"
+        else -> "80-100"
     }
 
     private companion object {

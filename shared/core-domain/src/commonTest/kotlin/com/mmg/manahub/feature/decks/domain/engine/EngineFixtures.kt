@@ -36,6 +36,17 @@ fun card(
      * `manaFixMatcher`/[BuildDeckFromTemplateUseCase]'s fixing-land filter without needing every
      * existing call site to opt in (defaults to "" -- no production, matching [Card]'s own default). */
     producedMana: String = "",
+    /** Deck Analysis Engine v2 Phase 2 -- per-format legality overrides for the P5
+     * legality/construction pillar's golden tests (e.g. a banned-in-Commander card). Every legality
+     * field defaults to "legal" (matching every pre-Phase-2 call site's expectation); only the
+     * fields a test cares about need overriding. */
+    legalityCommander: String = "legal",
+    legalityStandard: String = "legal",
+    legalityPioneer: String = "legal",
+    legalityModern: String = "legal",
+    legalityLegacy: String = "legal",
+    legalityVintage: String = "legal",
+    legalityPauper: String = "legal",
 ): Card = Card(
     scryfallId = id,
     name = name,
@@ -67,13 +78,13 @@ fun card(
     priceUsdFoil = null,
     priceEur = null,
     priceEurFoil = null,
-    legalityStandard = "legal",
-    legalityPioneer = "legal",
-    legalityModern = "legal",
-    legalityCommander = "legal",
-    legalityLegacy = "legal",
-    legalityVintage = "legal",
-    legalityPauper = "legal",
+    legalityStandard = legalityStandard,
+    legalityPioneer = legalityPioneer,
+    legalityModern = legalityModern,
+    legalityCommander = legalityCommander,
+    legalityLegacy = legalityLegacy,
+    legalityVintage = legalityVintage,
+    legalityPauper = legalityPauper,
     flavorText = null,
     artist = null,
     scryfallUri = "https://scryfall.com/card/tst/1",

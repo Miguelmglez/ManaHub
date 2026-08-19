@@ -117,9 +117,10 @@ import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
-import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
 import com.mmg.manahub.feature.decks.domain.engine.CardFit
-import com.mmg.manahub.feature.decks.domain.engine.ThemeId
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
+import com.mmg.manahub.feature.decks.domain.engine.PillarId
+import com.mmg.manahub.feature.decks.domain.engine.TribeDeriver
 import com.mmg.manahub.feature.decks.domain.model.ComboResult
 import com.mmg.manahub.feature.decks.domain.orchestrator.DoctorAnalysisStage
 import com.mmg.manahub.feature.decks.domain.template.DiscoverySearchFilter
@@ -127,28 +128,32 @@ import com.mmg.manahub.feature.decks.domain.template.partitionByAxis
 import com.mmg.manahub.feature.decks.domain.usecase.AddSuggestion
 import com.mmg.manahub.feature.decks.presentation.components.AddBasicLandsRow
 import com.mmg.manahub.feature.decks.presentation.components.AddSuggestionRow
-import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanChip
-import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanHint
-import com.mmg.manahub.feature.decks.presentation.components.ArchetypePlanSheetContent
 import com.mmg.manahub.feature.decks.presentation.components.BasicLandsSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardDetailSheet
 import com.mmg.manahub.feature.decks.presentation.components.CardRow
+import com.mmg.manahub.feature.decks.presentation.components.CollapsedFindingsCaption
 import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
 import com.mmg.manahub.feature.decks.presentation.components.CommunityAddSuggestionRow
+import com.mmg.manahub.feature.decks.presentation.components.CuratedStrategyPickerSheet
 import com.mmg.manahub.feature.decks.presentation.components.CutSuggestionRow
 import com.mmg.manahub.feature.decks.presentation.components.DeckFormatChipRow
 import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
 import com.mmg.manahub.feature.decks.presentation.components.DeckStatsCard
 import com.mmg.manahub.feature.decks.presentation.components.DeckSummaryCard
 import com.mmg.manahub.feature.decks.presentation.components.EditDeckSheet
+import com.mmg.manahub.feature.decks.presentation.components.ExpandChevron
+import com.mmg.manahub.feature.decks.presentation.components.FindingRow
 import com.mmg.manahub.feature.decks.presentation.components.GroupHeader
 import com.mmg.manahub.feature.decks.presentation.components.HealthScoreRing
 import com.mmg.manahub.feature.decks.presentation.components.MagicLandSuggestionStatic
 import com.mmg.manahub.feature.decks.presentation.components.MovementRow
-import com.mmg.manahub.feature.decks.presentation.components.RoleCoverageRow
+import com.mmg.manahub.feature.decks.presentation.components.PillarTile
+import com.mmg.manahub.feature.decks.presentation.components.RoleCoverageEntryRow
 import com.mmg.manahub.feature.decks.presentation.components.SimilarDeckCard
+import com.mmg.manahub.feature.decks.presentation.components.StrategyPlanChip
+import com.mmg.manahub.feature.decks.presentation.components.StrategyPlanHint
 import com.mmg.manahub.feature.decks.presentation.components.SynergyCardTile
-import com.mmg.manahub.feature.decks.presentation.components.WarningChip
+import com.mmg.manahub.feature.decks.presentation.components.TribeOption
 import com.mmg.manahub.feature.decks.presentation.components.WarningOverlay
 import com.mmg.manahub.feature.decks.presentation.components.groupCards
 import com.mmg.manahub.feature.decks.presentation.components.key
@@ -457,8 +462,8 @@ fun DeckStudioScreen(
                             onClearBudget = viewModel::onClearBudget,
                             onAdd = { s -> viewModel.onAddSuggestion(s.fit.card.scryfallId, s.fit.card.name) },
                             onCut = { fit -> viewModel.onCutSuggestion(fit.card.scryfallId, fit.card.name) },
-                            onApplyArchetypePlan = { macro, themes ->
-                                viewModel.onSetArchetypeOverride(macro, themes)
+                            onApplyCuratedStrategy = { strategy, tribe ->
+                                viewModel.onApplyCuratedStrategy(strategy, tribe)
                                 toastState.show(archetypePlanUpdatedMsg, MagicToastType.SUCCESS)
                             },
                             onAutoDetectArchetypePlan = {
@@ -1956,7 +1961,7 @@ private fun SuggestionsTab(
     onClearBudget: () -> Unit,
     onAdd: (AddSuggestion) -> Unit,
     onCut: (CardFit) -> Unit,
-    onApplyArchetypePlan: (ArchetypeId, List<ThemeId>) -> Unit,
+    onApplyCuratedStrategy: (CuratedStrategy, String?) -> Unit,
     onAutoDetectArchetypePlan: () -> Unit,
     // Deck Engine Unification (D4) — explicit "Unlock strategy" action, gated behind a confirmation
     // dialog owned by this composable (see the `strategyLocked` banner below).
@@ -2003,10 +2008,23 @@ private fun SuggestionsTab(
         return
     }
 
-    val evaluation = health.evaluation
+    // Deck Analysis Engine v2 Phase 3: the v2 unified result (score/pillars/strategy) that this
+    // whole tab now reads from -- see this phase's report for why `health.evaluation` (the legacy
+    // score/roleCoverage/warnings) is no longer read anywhere in this composable.
+    val analysis = health.analysis
     val spacing = MaterialTheme.spacing
-    var showArchetypeSheet by remember { mutableStateOf(false) }
+    var showStrategySheet by remember { mutableStateOf(false) }
+    // Deck Analysis Engine v2 Phase 4 (telemetry): disambiguates a genuine picker abandon (swipe/
+    // backdrop tap with no pick) from the sheet's own internal dismiss that immediately follows a
+    // successful apply/auto-detect (same onDismissRequest/onDismiss callback fires for both) --
+    // reset to false every time the sheet is (re)opened, flipped true inside the onApply/onAutoDetect
+    // wrappers below BEFORE delegating to the real handlers.
+    var strategyPicked by remember { mutableStateOf(false) }
     var showUnlockConfirmDialog by remember { mutableStateOf(false) }
+    // Which single pillar tile is expanded (plan §3.4 item 3) -- Plan roles starts expanded by
+    // default (plan §3.4 item 4: "always expanded by default"), tapping any tile (including the
+    // already-expanded one, to collapse it) reassigns this.
+    var expandedPillar by remember { mutableStateOf<PillarId?>(PillarId.PLAN_ROLES) }
     // Deck Engine Unification (D4): the deck's own persisted flag (Deck.strategyLocked), not the
     // orchestrator's own async-loaded DeckDoctorState.strategyLocked -- uiState.deck is always
     // current (observed live), so the "Deck plan" editor gate can never lag one analysis cycle
@@ -2018,23 +2036,51 @@ private fun SuggestionsTab(
     val communitySourceLabel = uiState.deck?.name.orEmpty()
         .ifBlank { stringResource(R.string.deck_studio_suggestions_community_header) }
 
+    // Deck Analysis Engine v2 Phase 3: tribe candidates for CuratedStrategyPickerSheet's
+    // requiresTribe sub-step -- derived from the LIVE deck's own tag fingerprint (already computed
+    // by DeckScorer.profile, zero extra classification/network work), never a fresh commander-only
+    // derivation (that pipeline, DeriveCommanderStrategiesUseCase, is wizard-only and needs an
+    // EDHREC fetch this analysis-only picker has no reason to pull in). Capitalized-only labels
+    // ("Elf", not "Elves") mirror that same use case's own `displayLabel` precedent.
+    val availableTribes = remember(health.profile) {
+        health.profile.tagFingerprint.keys
+            .filter { it.startsWith(TribeDeriver.TRIBE_PREFIX) }
+            .sortedByDescending { health.profile.tagFingerprint[it] ?: 0f }
+            .map { fingerprintKey ->
+                TribeOption(
+                    key = fingerprintKey,
+                    label = fingerprintKey.removePrefix(TribeDeriver.TRIBE_PREFIX).replaceFirstChar { it.uppercase() },
+                )
+            }
+    }
+
     // Deck Engine Unification (D4): the "Deck plan" editor sheet is only reachable while unlocked
-    // -- showArchetypeSheet can only ever flip true from the (now-hidden) chip's onClick below, but
+    // -- showStrategySheet can only ever flip true from the (now-hidden) chip's onClick below, but
     // this guard is defensive against a stray state carried across a locked->unlocked transition.
-    if (showArchetypeSheet && !strategyLocked) {
-        val archetypeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    if (showStrategySheet && !strategyLocked) {
+        val strategySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        // Deck Analysis Engine v2 Phase 4 (telemetry): a genuine abandon (swipe/backdrop tap without
+        // picking anything) -- see `strategyPicked`'s own KDoc above for why this needs the flag.
+        val onStrategySheetDismiss = {
+            if (!strategyPicked) FirebaseCrashlytics.getInstance().log("deck_analysis_picker_abandoned")
+            showStrategySheet = false
+        }
         ModalBottomSheet(
-            onDismissRequest = { showArchetypeSheet = false },
-            sheetState = archetypeSheetState,
+            onDismissRequest = onStrategySheetDismiss,
+            sheetState = strategySheetState,
             shape = BottomSheetShape,
             containerColor = mc.background,
         ) {
-            ArchetypePlanSheetContent(
-                initialMacro = health.archetypeResolution.macro,
-                initialThemes = health.archetypeResolution.themes,
-                onApply = onApplyArchetypePlan,
-                onAutoDetect = onAutoDetectArchetypePlan,
-                onDismiss = { showArchetypeSheet = false },
+            CuratedStrategyPickerSheet(
+                currentFormat = uiState.deck?.format
+                    ?.let { fmt -> DeckFormat.entries.firstOrNull { it.name.equals(fmt, ignoreCase = true) } }
+                    ?: DeckFormat.COMMANDER,
+                selectedStrategyId = analysis?.strategy?.curatedStrategyId,
+                availableTribes = availableTribes,
+                onApply = { strategy, tribe -> strategyPicked = true; onApplyCuratedStrategy(strategy, tribe) },
+                onAutoDetect = { strategyPicked = true; onAutoDetectArchetypePlan() },
+                onDismiss = onStrategySheetDismiss,
+                currentStrategyName = analysis?.strategy?.displayName,
             )
         }
     }
@@ -2064,9 +2110,9 @@ private fun SuggestionsTab(
         contentPadding = PaddingValues(spacing.lg),
         verticalArrangement = Arrangement.spacedBy(spacing.md),
     ) {
-        // ── Archetype plan chip (Phase 1.7) — hidden while strategyLocked (D4): editing the deck
-        // plan on a wizard-built deck would contradict the strategy it was built for. A dedicated
-        // banner (below) explains why and offers the explicit unlock action instead. ───────────
+        // ── Strategy plan chip (plan §3.4 item 1-2) — hidden while strategyLocked (D4): editing
+        // the deck plan on a wizard-built deck would contradict the strategy it was built for. A
+        // dedicated banner (below) explains why and offers the explicit unlock action instead. ──
         if (strategyLocked) {
             item(key = "strategy_locked_banner") {
                 StrategyLockedBanner(onUnlockClick = {
@@ -2074,46 +2120,82 @@ private fun SuggestionsTab(
                     showUnlockConfirmDialog = true
                 })
             }
-        } else {
-        item(key = "archetype_plan_chip") {
-            ArchetypePlanChip(
-                macro = health.archetypeResolution.macro,
-                themes = health.archetypeResolution.themes,
-                isManualOverride = health.archetypeResolution.isManualOverride,
-                onClick = { showArchetypeSheet = true },
-            )
-        }
-        if (!health.archetypeResolution.isManualOverride &&
-            health.archetypeResolution.macro == ArchetypeId.GENERIC &&
-            health.archetypeResolution.themes.isEmpty()
-        ) {
-            item(key = "archetype_plan_hint") {
-                ArchetypePlanHint(onClick = { showArchetypeSheet = true })
+        } else if (analysis != null) {
+            item(key = "strategy_plan_chip") {
+                StrategyPlanChip(strategy = analysis.strategy, onClick = { showStrategySheet = true })
             }
-        }
-        }
-
-        // ── Health summary ────────────────────────────────────────────────────
-        item(key = "health_ring") {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                HealthScoreRing(score = evaluation.healthScore)
-            }
-        }
-        item(key = "health_roles_header") {
-            SuggestionsSectionHeader(stringResource(R.string.deck_health_section_roles), mc.primaryAccent)
-        }
-        items(evaluation.roleCoverage, key = { "role_${it.role.name}" }) { coverage ->
-            RoleCoverageRow(coverage = coverage)
-        }
-        if (evaluation.warnings.isNotEmpty()) {
-            item(key = "health_warnings_header") {
-                SuggestionsSectionHeader(stringResource(R.string.deck_health_section_warnings), mc.lifeNegative)
-            }
-            items(evaluation.warnings.distinctBy { it.key }, key = { "warn_${it.key}" }) { warning ->
-                WarningChip(text = warning.label())
+            // No confident curated match AND still auto-detected (v2's "Custom"/no-match sentinel,
+            // CuratedStrategyCatalog.nearestFor) — mirrors the retired ArchetypePlanHint's own
+            // "GENERIC + no themes + not manual" gate, translated onto the v2 strategy shape.
+            if (!analysis.strategy.isManualOverride && analysis.strategy.curatedStrategyId == null) {
+                item(key = "strategy_plan_hint") {
+                    StrategyPlanHint(onClick = { showStrategySheet = true })
+                }
             }
         }
 
+        // ── Score ring + pillar row + expanded pillar detail (plan §3.4 items 2-4) ─────────────
+        if (analysis != null) {
+            item(key = "analysis_score_ring") {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    HealthScoreRing(score = analysis.totalScore)
+                }
+            }
+            item(key = "analysis_pillar_row") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    analysis.pillars.forEach { pillar ->
+                        PillarTile(
+                            pillar = pillar,
+                            expanded = expandedPillar == pillar.id,
+                            onClick = { expandedPillar = if (expandedPillar == pillar.id) null else pillar.id },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+
+            val expanded = analysis.pillars.firstOrNull { it.id == expandedPillar }
+            if (expanded != null) {
+                item(key = "analysis_pillar_detail_header") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SuggestionsSectionHeader(expanded.id.label(), mc.primaryAccent)
+                        ExpandChevron(expanded = true)
+                    }
+                }
+                // Plan-role table (plan §3.4 item 4) — PLAN_ROLES only; every other pillar has an
+                // empty PillarResult.roleCoverage by construction (AnalysisEngine).
+                if (expanded.roleCoverage.isNotEmpty()) {
+                    items(expanded.roleCoverage, key = { "pillar_role_${it.roleKey}" }) { entry ->
+                        RoleCoverageEntryRow(entry = entry)
+                    }
+                }
+                // Severity-tinted findings for this pillar (plan §3.4 item 5) — already budgeted
+                // to ≤3 (BLOCKERs uncapped) by AnalysisEngine; collapsedFindingsCount below is the
+                // "N more" caption for anything past the budget.
+                if (expanded.findings.isNotEmpty()) {
+                    items(expanded.findings, key = { "pillar_finding_${expanded.id}_${it.key}" }) { finding ->
+                        FindingRow(finding = finding)
+                    }
+                }
+                if (expanded.collapsedFindingsCount > 0) {
+                    item(key = "pillar_collapsed_${expanded.id}") {
+                        CollapsedFindingsCaption(count = expanded.collapsedFindingsCount)
+                    }
+                }
+            }
+        }
+
+        // Deck Analysis Engine v2 Phase 0 carve-out: Cuts/Adds/Motor B/Similar-decks are hidden
+        // while DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED is off (the v2 rewrite is in progress) — the
+        // plan chip and Health section above stay visible. See FeatureFlags.Decks KDoc.
+        if (FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED) {
         // ── Cuts ────────────────────────────────────────────────────────────────
         item(key = "cuts_header") {
             SuggestionsSectionHeader(stringResource(R.string.deck_studio_suggestions_tab_cuts), mc.lifeNegative)
@@ -2288,6 +2370,7 @@ private fun SuggestionsTab(
                 }
             }
         }
+        } // FeatureFlags.Decks.DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED
     }
 }
 

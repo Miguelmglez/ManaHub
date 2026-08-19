@@ -27,6 +27,31 @@ import com.mmg.manahub.core.model.Card
 //  threshold was considered and rejected as out of Phase-1 scope: it would require
 //  re-classifying every mainboard card against the full tag dictionary on every
 //  analysis instead of trusting the already-persisted `tags`/`suggestedTags`).
+//
+//  ── Classifier audit (Deck Analysis Engine v2 plan, Phase 2 §1, 2026-08-19) ──────────────────
+//  This audit compares [ROLE_SPECS] matcher coverage against the legacy TagDictionary-backed
+//  [RoleClassifier] for the same conceptual roles, now that this classifier becomes the SOLE
+//  source of role counts on the analysis path (it was built for warnings, where a weaker matcher
+//  was less visible; see this file's own header above).
+//
+//  FINDING: [LEGACY_ROLE_MAP] already reuses [RoleClassifier]'s tag + oracle-fallback
+//  classification WHOLESALE for ramp/card_draw/removal_spot/removal_mass/tutor — no gap there.
+//  Of the remaining [ROLE_SPECS] entries, TWO were weaker than the legacy signal: `"counterspell"`
+//  and `"protection"` were plain [tagMatcher] lookups (`DIRECT_TAG_ROLES`) — CONFIRMED/SUGGESTED-
+//  tag-only, with no oracle-text safety net — while [RoleClassifier]'s `INTERACTION` role already
+//  has a validated oracle fallback for BOTH (`COUNTER_SPELL` — "counter target ... spell",
+//  confidence 0.9; `GRANT_PROTECTION` — "gains/have/has hexproof/indestructible/protection
+//  from/shroud", confidence 0.6). A tag-less counterspell/protection-granting card (an unresolved
+//  suggestion, a brand-new printing the tag dictionary has not caught up to yet) would silently
+//  undercount in the v2 plan-roles pillar even though the legacy engine already recognizes it.
+//  FIX: folded the SAME two regexes into [counterspellMatcher]/[protectionMatcher] below as a
+//  fallback under the tag hit (D11 discipline preserved: a confirmed/suggested tag hit is always
+//  full/its-own confidence; the oracle fallback only fires when no tag signal exists at all).
+//
+//  Every other [ROLE_SPECS] entry (`sac_outlet`, `death_payoff`, `finisher`, `threat_early`,
+//  `equipment_or_aura`, `mana_fix`, `recursion`, `evasion`, …) has NO legacy [DeckRole] counterpart
+//  to compare against (the legacy 11-value enum simply does not model these Appendix A roles), so
+//  there is nothing to fold in for them — they stay exactly as Phase 1 built them.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 object ArchetypeRoleClassifier {
@@ -73,8 +98,9 @@ object ArchetypeRoleClassifier {
         "enchantment_payoff" to "Enchantment Payoff",
         "artifact_payoff" to "Artifact Payoff",
         "tribe_payoff" to "Tribe Payoff",
-        "counterspell" to "Counterspell",
-        "protection" to "Protection",
+        // "counterspell"/"protection" REMOVED from here (classifier audit, Phase 2 §1) -- they now
+        // get a dedicated matcher with an oracle-text fallback (see ROLE_SPECS below), not a bare
+        // tagMatcher, so a tag-less card is not silently undercounted.
         "recursion" to "Recursion",
         "evasion" to "Evasion",
     )
@@ -92,6 +118,11 @@ object ArchetypeRoleClassifier {
         add(RoleSpec("threat_early", "Early Threat", ::threatEarlyMatcher))
         add(RoleSpec("equipment_or_aura", "Equipment / Aura", ::equipmentOrAuraMatcher))
         add(RoleSpec(ArchetypeData.MANA_FIX_KEY, "Mana Fixing", ::manaFixMatcher))
+        // Classifier audit fix (Phase 2 §1) -- tag hit first, oracle-text fallback second (mirrors
+        // RoleClassifier's own validated INTERACTION patterns, folded in rather than duplicated at
+        // a weaker confidence).
+        add(RoleSpec("counterspell", "Counterspell", ::counterspellMatcher))
+        add(RoleSpec("protection", "Protection", ::protectionMatcher))
     }
 
     /**
@@ -205,11 +236,45 @@ object ArchetypeRoleClassifier {
         return tagMatcher(ArchetypeData.MANA_FIX_KEY)(card)
     }
 
+    /**
+     * Classifier audit fix (Phase 2 §1): a confirmed/suggested `counterspell` tag hit wins outright
+     * (D11 confidence discipline, [tagMatcher]); otherwise falls back to [COUNTER_SPELL_ORACLE] at
+     * [COUNTERSPELL_ORACLE_CONFIDENCE] — the SAME pattern/confidence [RoleClassifier]'s own
+     * INTERACTION role already validates, so a tag-less counterspell is no longer invisible here.
+     */
+    private fun counterspellMatcher(card: Card): Float {
+        val tagHit = tagMatcher("counterspell")(card)
+        if (tagHit > 0f) return tagHit
+        val oracle = card.oracleText?.lowercase().orEmpty()
+        return if (COUNTER_SPELL_ORACLE.containsMatchIn(oracle)) COUNTERSPELL_ORACLE_CONFIDENCE else 0f
+    }
+
+    /**
+     * Classifier audit fix (Phase 2 §1): mirrors [counterspellMatcher] for the `protection` role,
+     * falling back to [GRANT_PROTECTION_ORACLE] (the same oracle pattern [RoleClassifier]'s
+     * INTERACTION role already validates) when no tag exists.
+     */
+    private fun protectionMatcher(card: Card): Float {
+        val tagHit = tagMatcher("protection")(card)
+        if (tagHit > 0f) return tagHit
+        val oracle = card.oracleText?.lowercase().orEmpty()
+        return if (GRANT_PROTECTION_ORACLE.containsMatchIn(oracle)) PROTECTION_ORACLE_CONFIDENCE else 0f
+    }
+
     private val EVASION_KEYWORDS = listOf(
         "flying", "menace", "trample", "shadow", "fear", "intimidate",
         "skulk", "horsemanship", "unblockable", "can't be blocked",
     )
     private val PLUS_BUFF_PATTERN = Regex("""gets? \+\d+/\+\d+""")
+
+    // ── Classifier audit fix (Phase 2 §1) oracle fallbacks — mirror RoleClassifier's private
+    // COUNTER_SPELL/GRANT_PROTECTION patterns and confidences EXACTLY (that file's regexes are
+    // private to its own companion object, so these are intentionally re-declared here rather than
+    // exposing a cross-file surface for two small regexes).
+    private val COUNTER_SPELL_ORACLE = Regex("counter target (?:[^.]*?)?spell")
+    private val GRANT_PROTECTION_ORACLE = Regex("(?:gains?|have|has) (?:hexproof|indestructible|protection from|shroud)")
+    private const val COUNTERSPELL_ORACLE_CONFIDENCE = 0.9f
+    private const val PROTECTION_ORACLE_CONFIDENCE = 0.6f
 
     // ── Deck-level aggregation (mirrors DeckScorer.profile's roleCounts pattern) ───
 

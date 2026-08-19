@@ -753,6 +753,44 @@
     <string name="deck_health_warning_archetype_anti_role">%1$s wants at most %3$d %2$s — you have %4$d.</string>
     <string name="deck_health_warning_curve_outside_archetype_band">%1$s\'s mana curve should average %3$s–%4$s — yours averages %2$s.</string>
 
+    <!-- Deck Analysis Engine v2 (Phase 2) findings: keys/copy only in this phase, the Compose
+         mapper (Finding.label()) is Phase 3 UI work. Distinct deck_analysis_finding_ prefix so
+         these never collide with the legacy deck_health_warning_ rows above (both sets stay
+         live: the legacy rows back the still-visible health ring, these back the new pillar UI). -->
+    <string name="deck_analysis_finding_land_count_off_target">Land count is %1$d — the plan wants about %2$d (band %3$d–%4$d).</string>
+    <string name="deck_analysis_finding_color_source_shortage">Not enough %1$s sources: %2$d (aim for about %3$d to cast your %1$s spells reliably).</string>
+    <string name="deck_analysis_finding_unfixed_splash">Your %1$s is unfixed: almost no lands make %1$s mana. Add fixing or cut the color.</string>
+    <string name="deck_analysis_finding_mana_fix_shortage">Not enough dedicated mana fixing: %1$d (aim for at least %2$d).</string>
+    <string name="deck_analysis_finding_land_mix_off_target">Basic/non-basic land mix is %1$d%% basics — aim for %2$d%%–%3$d%%.</string>
+    <string name="deck_analysis_finding_curve_off_band">Mana curve should average %2$s–%3$s — yours averages %1$s.</string>
+    <string name="deck_analysis_finding_curve_shape_mismatch">Your curve\'s shape does not match this plan\'s expected %1$s shape.</string>
+    <string name="deck_analysis_finding_role_gap">%1$s wants at least %3$d — you have %2$d.</string>
+    <string name="deck_analysis_finding_anti_role_over_max">%1$s wants at most %3$d — you have %2$d.</string>
+    <string name="deck_analysis_finding_low_synergy_density">Low synergy density (%1$d%%). Cards do not pull in one direction.</string>
+    <string name="deck_analysis_finding_deck_too_small">Deck is too small: %1$d cards (this format needs at least %2$d).</string>
+    <string name="deck_analysis_finding_too_many_copies">Too many copies of %1$s: %2$d (limit is %3$d).</string>
+    <string name="deck_analysis_finding_singleton_violation">%1$s breaks the singleton rule: %2$d copies (Commander allows 1).</string>
+    <string name="deck_analysis_finding_off_color_identity">%1$s is outside your commander\'s color identity.</string>
+    <string name="deck_analysis_finding_illegal_card">%1$s is not legal in this format.</string>
+    <string name="deck_analysis_finding_unresolved_cards">%1$d card(s) could not be loaded and were left out of this analysis.</string>
+
+    <!-- Deck Analysis Engine v2 Phase 3: pillar-tile labels (plan §3.4 item 3). -->
+    <string name="deck_analysis_pillar_mana_base">Mana base</string>
+    <string name="deck_analysis_pillar_curve">Curve</string>
+    <string name="deck_analysis_pillar_plan_roles">Plan roles</string>
+    <string name="deck_analysis_pillar_synergy">Synergy</string>
+    <string name="deck_analysis_pillar_legality">Legality</string>
+
+    <!-- Deck Analysis Engine v2 Phase 3: the plan-role table row's "anti-role" inverted text
+         ("Board wipes 3 / max 1", plan §3.4 item 3) — the normal (non-anti) role case reuses the
+         legacy RoleCoverageRow's plain "current/ideal" interpolation (no string needed, see
+         RoleCoverageEntryRow in HealthComponents.kt). -->
+    <string name="deck_analysis_role_anti_max_format">%1$d / max %2$d</string>
+    <!-- Deck Analysis Engine v2 Phase 3: the finding-budget "N more" affordance (plan §3.3's
+         per-pillar cap) — inert (no expand action; PillarResult only exposes a count, not the
+         collapsed Finding objects themselves, see this phase's report). -->
+    <string name="deck_analysis_findings_collapsed_count">+%1$d more</string>
+
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
     ═══════════════════════════════════════════ -->
@@ -828,7 +866,7 @@
     <string name="deck_studio_include_outside_collection_toggle">Include cards outside my collection</string>
     <string name="deck_studio_outside_collection_unavailable">Couldn\'t search outside your collection right now — showing what we found in it.</string>
     <string name="deck_studio_tab_build">Build</string>
-    <string name="deck_studio_tab_suggestions">Suggestions</string>
+    <string name="deck_studio_tab_suggestions">Analysis</string>
 
     <!-- Archetype plan (Deck Doctor Community/Archetype plan, Phase 1.7) -->
     <string name="deck_studio_archetype_chip_prefix">Deck plan: %1$s</string>
@@ -839,6 +877,8 @@
     <string name="deck_studio_archetype_sheet_themes_label">Themes (up to 2)</string>
     <string name="deck_studio_archetype_auto_detect">Auto-detect</string>
     <string name="deck_studio_archetype_apply">Apply</string>
+    <!-- Deck Analysis Engine v2 Phase 0 carve-out (interim StrategyCatalog.isValidCombination guard) -->
+    <string name="deck_studio_archetype_invalid_combo_warning">This archetype and theme combination isn\'t supported yet.</string>
     <string name="deck_studio_archetype_plan_updated">Deck plan updated</string>
     <string name="deck_studio_strategy_unlocked">Strategy unlocked</string>
     <string name="deck_studio_strategy_locked_title">Built by the wizard</string>
@@ -1012,6 +1052,23 @@
     <string name="deck_strategy_picker_incompatible_reason">Not a fit for %1$s</string>
     <string name="deck_strategy_picker_tribe_empty">No tribe candidates detected yet.</string>
     <string name="deck_strategy_picker_max_themes_reason">Remove one of your picks to choose this instead</string>
+
+    <!-- Deck Analysis Engine v2 Phase 3 (plan §3.4 item 1) — CuratedStrategyPickerSheet, the flat
+         curated-strategy replacement for ArchetypePlanSheet in Deck Studio. Deliberately its OWN
+         "deck_curated_strategy_picker_" prefix (never "deck_strategy_picker_") so these never
+         collide with the UNRELATED, already-live 3-axis StrategyPickerSheet above (Deck Wizard &
+         Engine Rework plan WS1.2) — the two components share a similar name but are NOT the same
+         picker; see this phase's report for the full naming-collision note. -->
+    <string name="deck_curated_strategy_picker_search_placeholder">Search strategies</string>
+    <string name="deck_curated_strategy_picker_core_plans_header">Core plans</string>
+    <string name="deck_curated_strategy_picker_themed_header">Build-around themes</string>
+    <string name="deck_curated_strategy_picker_no_results">No strategies match your search.</string>
+    <string name="deck_curated_strategy_picker_auto_detect_hint_current">Currently: %1$s</string>
+    <string name="deck_curated_strategy_picker_auto_detect_hint_manual">Let ManaHub pick your plan from the cards already in this deck</string>
+    <string name="deck_curated_strategy_picker_tribe_prompt">Choose a tribe for %1$s</string>
+    <string name="deck_curated_strategy_picker_tribe_cancel">Back to strategies</string>
+    <string name="deck_curated_strategy_picker_chip_detected">%1$s (detected)</string>
+    <string name="deck_curated_strategy_picker_chip_manual">%1$s (manual)</string>
 
     <!-- Deck Wizard & Engine Rework plan (WS 2) — Commander-only COMMANDER_PICK / STRATEGY / MANUAL_ADDS steps -->
     <string name="deck_wizard_commander_pick_title">Pick your commander</string>
