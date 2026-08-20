@@ -141,6 +141,17 @@ sealed interface Finding {
         override val severity: FindingSeverity get() = FindingSeverity.BLOCKER
     }
 
+    /** NEW in Wave 2 (B3): 60-card constructed formats
+     * ([com.mmg.manahub.core.model.DeckFormat.isSixtyCardConstructed] — Standard/Pioneer/Modern/
+     * Legacy/Vintage/Pauper/Casual) allow at most 15 sideboard cards. Advisory ([FindingSeverity
+     * .WARNING], not BLOCKER) — the v2 analysis is mainboard-only by design, so this does not zero
+     * [PillarResult.subscore] the way a construction BLOCKER does (see [AnalysisEngine
+     * .evaluateLegality]'s KDoc). Deeper sideboard analysis (role coverage of the board, matchup
+     * logic) is FUTURE DEBT, not this pass's scope. */
+    data class SideboardOversized(val count: Int) : Finding {
+        override val severity: FindingSeverity get() = FindingSeverity.WARNING
+    }
+
     /** One or more mainboard slots could not be resolved to a full [com.mmg.manahub.core.model.Card]
      * (mirrors [DeckWarning.UnresolvedCards]) — appended by the orchestrator, never by
      * [AnalysisEngine] itself (the engine only ever sees resolved entries). See [withUnresolvedFinding]. */

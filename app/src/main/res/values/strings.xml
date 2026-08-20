@@ -772,6 +772,7 @@
     <string name="deck_analysis_finding_singleton_violation">%1$s breaks the singleton rule: %2$d copies (Commander allows 1).</string>
     <string name="deck_analysis_finding_off_color_identity">%1$s is outside your commander\'s color identity.</string>
     <string name="deck_analysis_finding_illegal_card">%1$s is not legal in this format.</string>
+    <string name="deck_analysis_finding_sideboard_oversized">Sideboard has %1$d cards — 60-card constructed formats allow at most 15.</string>
     <string name="deck_analysis_finding_unresolved_cards">%1$d card(s) could not be loaded and were left out of this analysis.</string>
 
     <!-- Deck Analysis Engine v2 Phase 3: pillar-tile labels (plan §3.4 item 3). -->

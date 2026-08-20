@@ -17,12 +17,15 @@ archetype/themes moved warnings but never the score). Landed ADDITIVELY, not a h
 `DeckHealth.evaluation` (dormant — no longer read by any UI, kept compiling for the still-flagged-
 off suggestion use cases below). New engine, pure `commonMain`,
 `shared/core-domain/.../feature/decks/domain/engine/`:
-- `CuratedStrategyCatalog.kt` — 28 curated strategies (6 pure archetypes + 22 themed presets), each
-  resolving to an (ArchetypeId, themes[, tribe]) composition validated against
-  `StrategyCatalog.isValidCombination()`; `nearestFor()` maps an (archetype, themes) pair (e.g. from
-  inference) to the nearest catalog entry, `null` = "Custom" (unmatched legacy pin).
+- `CuratedStrategyCatalog.kt` — 29 curated strategies (6 pure archetypes incl. "balanced"/GENERIC +
+  23 themed presets), each resolving to an (ArchetypeId, themes[, tribe]) composition validated
+  against `StrategyCatalog.isValidCombination()`; `nearestFor(archetype, themes, format = null)`
+  maps an (archetype, themes) pair (e.g. from inference) to the nearest catalog entry, optionally
+  filtered to a `DeckFormat`'s availability (Wave 2 B4), `null` = "Custom" (unmatched legacy pin).
+  Since Wave 2 B1, `CuratedStrategy.formats: Set<DeckFormat>` (not the coarser `ArchetypeFormat`) —
+  see the Wave 2 block below for why.
 - `DeckAnalysis.kt` — result models: `DeckAnalysis`, `PillarResult`, `PillarId` (MANA_BASE / CURVE /
-  PLAN_ROLES / SYNERGY / LEGALITY), `Finding` (sealed, 17 variants, severity-tiered BLOCKER/
+  PLAN_ROLES / SYNERGY / LEGALITY), `Finding` (sealed, 18 variants, severity-tiered BLOCKER/
   WARNING/INFO), `RoleCoverageEntry`, `AnalysisWeights` (defaults 0.20/0.15/0.35/0.15/0.15,
   `planRoles` heaviest since that role table IS the score's literal explanation — reasoning as KDoc
   on the class, overridable via the existing `ScoreWeightOverrides` DataStore mechanism, extended
@@ -58,6 +61,65 @@ off suggestion use cases below). New engine, pure `commonMain`,
   id/score, ONLY on the full `loadAnalysis` pass, never `recomputeIncremental`),
   `deck_analysis_picker_abandoned`, `deck_analysis_v2_engine_failed` (non-fatal). → memory:
   `project_deck_analysis_engine_v2`
+- **Wave 2 — Standard (60-card) support (2026-08-20, `docs/plans/deck-analysis-engine-v2-wave2-
+  standard-plan.md`).** The engine now analyzes `DeckFormat.STANDARD` decks through the SAME
+  pipeline as Commander — Standard is re-enabled in `STUDIO_FORMATS`
+  (`DeckEditorComponents.kt`; Modern/Pioneer/Pauper/Legacy/Vintage stay commented out, explicit
+  FUTURE DEBT below). **Design contract (B0): only TWO extension points are `DeckFormat`-keyed** —
+  `CuratedStrategy.formats` (which strategies a format offers) and `SixtyFormatProfile` (a numeric
+  modulation layer). Everything else (`ArchetypeData` bands, `ArchetypeSkeletonResolver`,
+  `COLOR_MODULATION`, `LAND_MIX`, Karsten tables) stays keyed by the coarser `ArchetypeFormat`
+  (COMMANDER/SIXTY) exactly as before — `ArchetypeData` is NOT forked per `DeckFormat`. Adding a
+  future 60-card format therefore needs only: a `SixtyFormatProfile` entry, a strategy-availability
+  row, uncommenting its `STUDIO_FORMATS` chip, and calibration fixtures — zero engine-shape changes.
+  - **B1 — Standard v1 strategy list (15 of 29 catalog entries):** balanced, aggro, midrange,
+    control, tempo, big_mana, tokens, spellslinger, reanimator, landfall, lifegain,
+    plus1_counters, tribal, artifacts, vehicles. Landfall and Reanimator were ADDED beyond the
+    plan's original proposal after a live Standard-metagame check (mtggoldfish, Aug 2026 snapshot)
+    showed both clearly meta-real (curation rationale + full metagame snapshot: Appendix A of the
+    wave2 plan doc, gitignored). CASUAL stays permissive (every non-structurally-Commander-only
+    entry) — unchanged in effect from Wave 1.
+  - **B2 — `SixtyFormatProfile.kt`** (sibling of `ArchetypeData`): `STANDARD =
+    SixtyFormatProfile(landsDelta = 2, curveDelta = 0.3)` (Standard runs higher land counts/curves
+    than the generic Modern-ish SIXTY baseline — a documented judgment call, not a hard citation).
+    `roleBandScale` is reserved, unused (1.0) this wave. Applied by
+    `ArchetypeSkeletonResolver.resolveWithColor`'s new `deckFormat: DeckFormat? = null` param
+    (appended last, defaulted — Commander is byte-identical) only when
+    `ArchetypeFormat.of(deckFormat) == SIXTY`.
+  - **B3 — see the Standard-specifics paragraph above this one** (legality dispatch verified,
+    `Finding.SideboardOversized`, rotation-staleness caveat).
+  - **B4 — format-aware `nearestFor`:** see the `CuratedStrategyCatalog.kt` bullet above.
+  - **B5 — UI:** `STUDIO_FORMATS` now offers 4 chips (Commander/Standard/Casual/Draft); the
+    strategy picker filters via `availableIn(currentFormat)`.
+  - **B6 — calibration:** 2 realistic-density Standard fixtures (mono-Red AGGRO scored 86/100,
+    Azorius CONTROL scored 82/100 — both in the documented 65-95 band at UNCHANGED default
+    weights, no retuning needed) in `DeckAnalysisEngineCalibrationTest.kt`; 3 new sparse
+    SIXTY/STANDARD golden decks in `DeckAnalysisEngineGoldenTest.kt` asserting relative behavior
+    only (same discipline as the Commander golden decks — never assert absolute scores on sparse
+    fixtures). SYNERGY subscores recorded for the future P4 retune (A4): Standard AGGRO=57,
+    CONTROL=19.
+  - **Future debt (out of Wave 2, hooks left but nothing built):** Modern/Pioneer/Pauper/Legacy/
+    Vintage analysis (each needs its own `SixtyFormatProfile` entry + strategy-availability row +
+    `STUDIO_FORMATS` chip + calibration fixtures, blocked on the app supporting deck creation in
+    those formats first); sideboard analysis beyond the size check (role coverage of the 15,
+    matchup guidance); the SYNERGY (P4) pillar retune; rotation-aware legality refresh UX (respect
+    ADR-005 unless real users hit stale verdicts); Deck Analysis "Detected: X" live preview while
+    manually pinned (still deferred from Wave 1); the suggestions (Motor A/B) re-enable campaign.
+- **Standard specifics (Wave 2 B3):** P5 already dispatched `DeckFormat.STANDARD` to
+  `Card.legalityStandard` correctly since Phase 2 — verified, not fixed. New `Finding
+  .SideboardOversized(count)` (WARNING) fires when a 60-card constructed deck
+  (`DeckFormat.isSixtyCardConstructed`) carries more than 15 sideboard cards; `AnalysisEngine
+  .evaluate()`/`EvaluateDeckUseCaseV2`/`EvaluateDeckUseCase` all gained a `sideboardCount: Int = 0`
+  param (appended last) to carry it in, and `DeckDoctorOrchestrator` computes it once from
+  `deckWithCards.sideboard` per `loadAnalysis` pass (cached on `AnalysisCache`, reused unchanged by
+  `recomputeIncremental`). Unlike every other P5 finding, a `SideboardOversized`-only pillar result
+  stays at subscore 100 (the binary 0/100 P5 subscore is now gated on BLOCKER severity specifically,
+  not "any finding") — it is advisory, not construction-breaking. **Legality findings carry no
+  "verified current as of right now" guarantee** — `legalityStandard` et al. are read from the
+  already-cached `Card`, never a live Scryfall call; after a real Standard rotation a stale cache
+  entry can report a wrong verdict until it refreshes through one of the EXISTING paths (Backend
+  call budget / ADR-005 above) — per ADR-005 this pillar deliberately does NOT add a new on-demand
+  refresh path to compensate. Sideboard role-coverage/matchup analysis remains FUTURE DEBT.
 
 **Deck Builder v2 wizard (`Screen.DeckWizard`) and Discoveries v2 (`DiscoverSynergiesV2UseCase`,
 identity-only clustering) are the SOLE "Build from seed" / "Browse inspirations" entry points** —

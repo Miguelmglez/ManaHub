@@ -35,6 +35,20 @@ class DeckAnalysisEngineGoldenTest {
     private fun profileFor(mainboard: List<DeckEntry>, colorIdentity: Set<ManaColor>): DeckProfile =
         scorer.profile(mainboard = mainboard, format = DeckFormat.COMMANDER, colorIdentity = colorIdentity, seedTags = emptyList())
 
+    /** Wave 2 / B6 -- STANDARD sibling of [profileFor]. See that function's own note: the `format`
+     * param only feeds the LEGACY engine's [DeckProfile.skeleton], never read by [AnalysisEngine]
+     * itself -- correctness here is an API-contract concern, not a scoring one. */
+    private fun profileForStandard(mainboard: List<DeckEntry>, colorIdentity: Set<ManaColor>): DeckProfile =
+        scorer.profile(mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, seedTags = emptyList())
+
+    /** [withBasics]'s STANDARD sibling -- pads [nonland] to exactly 60 cards (Standard's
+     * [DeckFormat.targetDeckSize], no commander slot) instead of Commander's 100. */
+    private fun withBasicsStandard(nonland: List<DeckEntry>, landName: String, symbol: String): List<DeckEntry> {
+        val nonlandCount = nonland.sumOf { it.quantity }
+        val landQty = (60 - nonlandCount).coerceAtLeast(1)
+        return nonland + basics(landName, symbol, landQty)
+    }
+
     /** A bulk basic-land entry, closing the mainboard to exactly 100 cards (commander included). */
     private fun basics(landName: String, symbol: String, quantity: Int): DeckEntry = entry(
         card(
@@ -423,6 +437,130 @@ class DeckAnalysisEngineGoldenTest {
         assertTrue(legality.findings.any { it is Finding.IllegalCard && it.cardName == "Sway of the Stars" })
         assertEquals(0, legality.subscore)
         assertTrue(analysis.totalScore <= AnalysisEngine.ILLEGAL_DECK_SCORE_CAP, "an illegal deck must never score above the documented cap")
+    }
+
+    // ── Wave 2 / B6 — sparse SIXTY/STANDARD golden decks ───────────────────────────────────────
+    //
+    //  SAME sparse-fixture convention as the 6 Commander decks above (~a handful of DISTINCT real
+    //  staples, up to Standard's own maxCopies=4 each rather than Commander's singleton-1, plus a
+    //  bulk basic-land entry closing the gap to 60) — validating RELATIVE behavior only, per this
+    //  task's own gate ("never assert absolute bands on them", memory `project_deck_analysis_engine_v2`'s
+    //  central gotcha). The REALISTIC-density absolute-score check for Standard already lives in
+    //  [DeckAnalysisEngineCalibrationTest]'s `standardAggroRealisticDensity_scoresInWellBuiltDeckBand`/
+    //  `standardControlRealisticDensity_scoresInWellBuiltDeckBand`.
+
+    /** Standard sibling of [strategySwitch_changesTotalScoreAndPlanRoleCoverage]: the same mainboard,
+     * evaluated once as AGGRO and once as CONTROL under [DeckFormat.STANDARD] (SIXTY archetype
+     * skeleton + [SixtyFormatProfile.STANDARD]'s deltas, Wave 2 B2), must still recompute BOTH
+     * `totalScore` AND P3's role-coverage table when the resolved strategy changes. */
+    @Test
+    fun standardStrategySwitch_changesTotalScoreAndPlanRoleCoverage() {
+        val nonland = listOf(
+            entry(card(id = "std-sw-swiftspear", name = "Monastery Swiftspear", typeLine = "Creature — Human Monk", cmc = 1.0, colorIdentity = listOf("R"), power = "3", toughness = "2"), quantity = 4),
+            entry(card(id = "std-sw-phoenix-chick", name = "Phoenix Chick", typeLine = "Creature — Bird", cmc = 1.0, colorIdentity = listOf("R"), power = "3", toughness = "1"), quantity = 4),
+            entry(card(id = "std-sw-kari-zev", name = "Kari Zev, Skyship Raider", typeLine = "Legendary Creature — Human Pirate", cmc = 2.0, colorIdentity = listOf("R"), power = "3", toughness = "2"), quantity = 4),
+            entry(card(id = "std-sw-play-with-fire", name = "Play with Fire", typeLine = "Instant", cmc = 1.0, colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL)), quantity = 4),
+            entry(card(id = "std-sw-lightning-strike", name = "Lightning Strike", typeLine = "Instant", cmc = 2.0, colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL)), quantity = 4),
+        )
+        val mainboard = withBasicsStandard(nonland, "Mountain", "R")
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+
+        val asAggro = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+        val asControl = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.CONTROL, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNotEquals(asAggro.totalScore, asControl.totalScore, "Standard strategy switch must recompute totalScore, not just warnings")
+        val aggroCoverage = asAggro.pillars.first { it.id == PillarId.PLAN_ROLES }.roleCoverage.associateBy { it.roleKey }
+        val controlCoverage = asControl.pillars.first { it.id == PillarId.PLAN_ROLES }.roleCoverage.associateBy { it.roleKey }
+        assertNotEquals(aggroCoverage, controlCoverage, "Standard strategy switch must recompute the P3 role-coverage table, not just warnings")
+        assertNotEquals(
+            asAggro.pillars.first { it.id == PillarId.PLAN_ROLES }.subscore,
+            asControl.pillars.first { it.id == PillarId.PLAN_ROLES }.subscore,
+        )
+    }
+
+    /** Standard sibling of [antiRoleOverMax_firesFinding]: SIXTY/STANDARD AGGRO treats
+     * `removal_mass` as an anti-role with tolerance max 1 (unaffected by [SixtyFormatProfile] --
+     * that layer only shifts lands/curve, never role-band tolerances); this sparse deck runs 3
+     * real board wipes. Every OTHER AGGRO role band clears its minimum on purpose (`threat_early`
+     * via 5 distinct real creatures x4, `finisher` via 2 of those SAME creatures also carrying
+     * [CardTag.WIN_CON], `removal_spot` via 1 spell x4, `card_draw`'s min is 0) so no competing
+     * [Finding.RoleGap] out-ranks the anti-role violation in the [AnalysisEngine] finding budget --
+     * same design discipline as the Commander version of this test. */
+    @Test
+    fun standardAntiRoleOverMax_firesFinding() {
+        val threats = listOf(
+            Triple("Goblin Guide", "std-sw-anti-threat-0", false), Triple("Falkenrath Gorger", "std-sw-anti-threat-1", false),
+            Triple("Zurgo Bellstriker", "std-sw-anti-threat-2", true), Triple("Kari Zev, Skyship Raider", "std-sw-anti-threat-3", true),
+            Triple("Ash Zealot", "std-sw-anti-threat-4", false),
+        ).map { (name, id, winCon) ->
+            entry(
+                card(
+                    id = id, name = name, typeLine = "Creature — Human Warrior", cmc = 2.0, colorIdentity = listOf("R"),
+                    power = "3", toughness = "2", tags = if (winCon) listOf(CardTag.WIN_CON) else emptyList(),
+                ),
+                quantity = 4,
+            )
+        }
+        val removalSpot = listOf(entry(card(id = "std-sw-anti-removal", name = "Lightning Strike", typeLine = "Instant", cmc = 2.0, colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL)), quantity = 4))
+        val wipes = listOf("Wrath of God", "Day of Judgment", "Sunfall").mapIndexed { i, name ->
+            entry(card(id = "std-sw-anti-wipe-$i", name = name, typeLine = "Sorcery", cmc = 4.0, colorIdentity = listOf("W"), tags = listOf(CardTag.WRATH)))
+        }
+        val nonland = threats + removalSpot + wipes
+        val mainboard = withBasicsStandard(nonland, "Mountain", "R")
+        val colorIdentity = setOf(ManaColor.R, ManaColor.W)
+        val profile = profileForStandard(mainboard, colorIdentity)
+
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        val planRoles = analysis.pillars.first { it.id == PillarId.PLAN_ROLES }
+        assertTrue(
+            planRoles.findings.any { it is Finding.AntiRoleOverMax && it.roleKey == "removal_mass" },
+            "Standard AGGRO's removal_mass anti-role band should fire an AntiRoleOverMax finding for a 3-wipe deck: ${planRoles.findings}",
+        )
+        val wipeCoverage = planRoles.roleCoverage.first { it.roleKey == "removal_mass" }
+        assertTrue(wipeCoverage.isAntiRole)
+        assertTrue(wipeCoverage.current > wipeCoverage.max)
+    }
+
+    /** Standard sibling of [illegalCard_capsTotalScore]: a card that is legal in other formats but
+     * has NEVER been printed in a Standard-legal set (Lightning Bolt -- Modern/Legacy/Commander
+     * staple, no Standard printing) caps [DeckAnalysis.totalScore] at
+     * [AnalysisEngine.ILLEGAL_DECK_SCORE_CAP] under [DeckFormat.STANDARD], regardless of how clean
+     * the rest of the build is. */
+    @Test
+    fun standardIllegalCard_capsTotalScore() {
+        val neverStandardCard = card(
+            id = "std-illegal-bolt", name = "Lightning Bolt", typeLine = "Instant", cmc = 1.0, colorIdentity = listOf("R"),
+            tags = listOf(CardTag.REMOVAL), legalityStandard = "not_legal", legalityModern = "legal", legalityCommander = "legal",
+        )
+        val nonland = listOf(
+            entry(neverStandardCard, quantity = 4),
+            entry(card(id = "std-illegal-swiftspear", name = "Monastery Swiftspear", typeLine = "Creature — Human Monk", cmc = 1.0, colorIdentity = listOf("R"), power = "3", toughness = "2"), quantity = 4),
+            entry(card(id = "std-illegal-play-with-fire", name = "Play with Fire", typeLine = "Instant", cmc = 1.0, colorIdentity = listOf("R"), tags = listOf(CardTag.REMOVAL)), quantity = 4),
+        )
+        val mainboard = withBasicsStandard(nonland, "Mountain", "R")
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        val legality = analysis.pillars.first { it.id == PillarId.LEGALITY }
+        assertTrue(legality.findings.any { it is Finding.IllegalCard && it.cardName == "Lightning Bolt" })
+        assertEquals(0, legality.subscore)
+        assertTrue(analysis.totalScore <= AnalysisEngine.ILLEGAL_DECK_SCORE_CAP, "a Standard-illegal deck must never score above the documented cap")
     }
 
     /** Classifier audit fix (Phase 2 §1): a tag-less counterspell/protection-granting card is no

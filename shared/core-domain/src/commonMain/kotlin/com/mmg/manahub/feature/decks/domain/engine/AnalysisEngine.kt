@@ -64,6 +64,12 @@ object AnalysisEngine {
     /** Legacy synergy-density floor (mirrors [DeckScorer.evaluate]'s `LowSynergyDensity` gate). */
     private const val SYNERGY_DENSITY_FLOOR = 0.35f
 
+    /** Max sideboard size for any 60-card constructed format
+     * ([com.mmg.manahub.core.model.DeckFormat.isSixtyCardConstructed]) — the real Magic tournament
+     * rule (CR 100.4a). Commander/Draft have no such cap and are never gated by this (see
+     * [evaluateLegality]'s own check). Wave 2 / B3. */
+    private const val MAX_SIXTY_SIDEBOARD_SIZE = 15
+
     /** Legacy synergy-density gate's minimum sample size (mirrors [DeckScorer.evaluate]). */
     private const val SYNERGY_DENSITY_MIN_SAMPLE = 10
 
@@ -80,6 +86,11 @@ object AnalysisEngine {
      * [DeckScorer.profile]) — reused purely as a cheap data source for P1's [ManaBaseAnalyzer] call
      * and P4's tag-fingerprint alignment (both already vocabulary-agnostic / CardTag-key based, NOT
      * [DeckRole]-based), never for scoring itself.
+     *
+     * @param sideboardCount total sideboard card count (Wave 2 / B3) — the analysis itself stays
+     *        mainboard-only (P1-P4 never see the sideboard); this is fed to P5's
+     *        [Finding.SideboardOversized] check alone. Appended LAST and defaulted so every existing
+     *        call site/test keeps compiling unchanged (CLAUDE.md's "new param goes last" rule).
      */
     fun evaluate(
         mainboard: List<DeckEntry>,
@@ -92,6 +103,7 @@ object AnalysisEngine {
         confidence: Float,
         weights: AnalysisWeights = AnalysisWeights(),
         manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
+        sideboardCount: Int = 0,
     ): DeckAnalysis {
         val curated = CuratedStrategyCatalog.nearestFor(archetype, themes)
         val archetypeFormat = ArchetypeFormat.of(format)
@@ -110,7 +122,7 @@ object AnalysisEngine {
         if (archetypeFormat == null) {
             // Draft — Appendix A defines no archetype skeleton at all. P1-P4 have nothing to grade
             // against; only P5 (legality/construction, vocabulary-agnostic) still runs.
-            val p5 = evaluateLegality(mainboard, format, colorIdentity)
+            val p5 = evaluateLegality(mainboard, format, colorIdentity, sideboardCount)
             return compose(
                 listOf(emptyPillar(PillarId.MANA_BASE), emptyPillar(PillarId.CURVE), emptyPillar(PillarId.PLAN_ROLES), emptyPillar(PillarId.SYNERGY), p5),
                 strategyInfo,
@@ -123,6 +135,7 @@ object AnalysisEngine {
             archetype = archetype,
             themes = themes,
             identity = colorIdentity,
+            deckFormat = format,
         )
         val roleCounts = ArchetypeRoleClassifier.deckRoleCounts(mainboard)
         val nonLand = mainboard.filterNot { BasicLandCalculator.isLand(it.card) }
@@ -134,7 +147,7 @@ object AnalysisEngine {
         val p2 = evaluateCurve(avgMv, nonLand, nonLandCount, skeleton, roleCounts, themes)
         val p3 = evaluatePlanRoles(skeleton, roleCounts)
         val p4 = evaluateSynergy(nonLand, nonLandCount, profile)
-        val p5 = evaluateLegality(mainboard, format, colorIdentity)
+        val p5 = evaluateLegality(mainboard, format, colorIdentity, sideboardCount)
 
         return compose(listOf(p1, p2, p3, p4, p5), strategyInfo, weights)
     }
@@ -352,11 +365,24 @@ object AnalysisEngine {
      * Ports [DeckScorer]'s private `constructionWarnings` (deck size / copy limit / off-color-
      * identity) verbatim — vocabulary-agnostic, no rewrite needed — and ADDS a genuinely new check:
      * per-card format legality (the legacy `DeckScorer.isLegal` only ever gated the `fit()`/
-     * `rankAdds()` add-candidate path, it was never surfaced as a deck-level warning). Every finding
-     * here is [FindingSeverity.BLOCKER] and this pillar ALSO hard-caps [DeckAnalysis.totalScore]
-     * via [ILLEGAL_DECK_SCORE_CAP] — see [compose].
+     * `rankAdds()` add-candidate path, it was never surfaced as a deck-level warning). Every
+     * construction/legality finding here is [FindingSeverity.BLOCKER] and this pillar ALSO
+     * hard-caps [DeckAnalysis.totalScore] via [ILLEGAL_DECK_SCORE_CAP] — see [compose]. The single
+     * exception is [Finding.SideboardOversized] (Wave 2 / B3), which is [FindingSeverity.WARNING]
+     * by design (advisory, mainboard-only analysis) and therefore does NOT zero [PillarResult
+     * .subscore] or trigger the score cap on its own — see the subscore computation below.
+     *
+     * ## Rotation staleness caveat (Wave 2 / B3, ADR-005)
+     * Per-format legality ([Card.legalityStandard] et al.) is read from the ALREADY-CACHED
+     * [Card] — this pillar never makes a live Scryfall call. After a real Standard rotation, a
+     * card whose cache entry has not yet been refreshed through one of the EXISTING refresh paths
+     * (see `CLAUDE.md`'s "Backend call budget (ADR-005)" section) can report a stale legality
+     * verdict here until that refresh happens. Per ADR-005, this pillar deliberately does NOT add a
+     * new on-demand refresh path to compensate — a [Finding.IllegalCard]/legality subscore from
+     * this method carries no "verified current as of right now" guarantee, only "current as of the
+     * last cache refresh".
      */
-    private fun evaluateLegality(mainboard: List<DeckEntry>, format: DeckFormat, colorIdentity: Set<ManaColor>): PillarResult {
+    private fun evaluateLegality(mainboard: List<DeckEntry>, format: DeckFormat, colorIdentity: Set<ManaColor>, sideboardCount: Int): PillarResult {
         val findings = mutableListOf<Finding>()
         val totalCards = mainboard.sumOf { it.quantity }
 
@@ -390,7 +416,22 @@ object AnalysisEngine {
             .filterNot { isLegal(it, format) }
             .forEach { findings += Finding.IllegalCard(it.name) }
 
-        val subscore = if (findings.isEmpty()) 100 else 0
+        // Wave 2 / B3: 60-card constructed only (DeckFormat.isSixtyCardConstructed — Standard,
+        // Pioneer, Modern, Legacy, Vintage, Pauper, Casual). Commander/Draft are never gated (no
+        // 15-card sideboard convention). Advisory WARNING, not a construction BLOCKER — deeper
+        // sideboard analysis (role coverage of the board, matchup logic) is FUTURE DEBT, out of
+        // scope for this pass.
+        if (format.isSixtyCardConstructed && sideboardCount > MAX_SIXTY_SIDEBOARD_SIZE) {
+            findings += Finding.SideboardOversized(sideboardCount)
+        }
+
+        // Binary subscore, gated on BLOCKER findings only (matches this pillar's documented
+        // contract — see [ILLEGAL_DECK_SCORE_CAP]'s KDoc): 100 when clean of BLOCKERs, 0 the moment
+        // any BLOCKER exists. A [Finding.SideboardOversized] WARNING alone leaves the subscore
+        // (and therefore this pillar's weighted contribution to [DeckAnalysis.totalScore]) untouched
+        // — it is shown as a finding but never treated as construction-breaking.
+        val hasBlocker = findings.any { it.severity == FindingSeverity.BLOCKER }
+        val subscore = if (hasBlocker) 0 else 100
         val (shown, collapsed) = budgetFindings(findings)
         return PillarResult(id = PillarId.LEGALITY, subscore = subscore, findings = shown, collapsedFindingsCount = collapsed)
     }
@@ -492,6 +533,7 @@ object AnalysisEngine {
         is Finding.SingletonViolation -> finding.copies.toFloat()
         is Finding.OffColorIdentity -> 1f
         is Finding.IllegalCard -> 1f
+        is Finding.SideboardOversized -> (finding.count - MAX_SIXTY_SIDEBOARD_SIZE).toFloat()
         is Finding.UnresolvedCards -> finding.count.toFloat()
     }
 

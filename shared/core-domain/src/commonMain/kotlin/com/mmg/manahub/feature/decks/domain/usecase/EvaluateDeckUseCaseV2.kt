@@ -31,6 +31,11 @@ class EvaluateDeckUseCaseV2(
     private val manaBaseAnalyzer: ManaBaseAnalyzer = ManaBaseAnalyzer(),
 ) {
 
+    /**
+     * @param sideboardCount total sideboard card count (Wave 2 / B3), forwarded verbatim to
+     *        [AnalysisEngine.evaluate]'s own [sideboardCount] param — see its KDoc. Appended LAST
+     *        and defaulted so every existing call site keeps compiling unchanged.
+     */
     operator fun invoke(
         mainboard: List<DeckEntry>,
         format: DeckFormat,
@@ -38,6 +43,7 @@ class EvaluateDeckUseCaseV2(
         profile: DeckProfile,
         resolution: ArchetypeResolution,
         weights: AnalysisWeights = AnalysisWeights(),
+        sideboardCount: Int = 0,
     ): DeckAnalysis = AnalysisEngine.evaluate(
         mainboard = mainboard,
         format = format,
@@ -49,5 +55,6 @@ class EvaluateDeckUseCaseV2(
         confidence = resolution.confidence,
         weights = weights,
         manaBaseAnalyzer = manaBaseAnalyzer,
+        sideboardCount = sideboardCount,
     )
 }

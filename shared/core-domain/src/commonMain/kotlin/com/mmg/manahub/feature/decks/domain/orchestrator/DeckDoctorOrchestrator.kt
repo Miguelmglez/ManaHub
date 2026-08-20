@@ -319,6 +319,11 @@ class DeckDoctorOrchestrator(
         val wishlistIds: Set<String>,
         val resolvedById: MutableMap<String, Card>,
         val unresolvedCount: Int,
+        /** Wave 2 / B3: total sideboard card count, captured once per full [loadAnalysis] pass and
+         * reused UNCHANGED by every incremental [recomputeIncremental] call (mainboard add/cut
+         * suggestions never touch the sideboard) — fed to P5's
+         * [com.mmg.manahub.feature.decks.domain.engine.Finding.SideboardOversized] check. */
+        val sideboardCount: Int,
         // ── Archetype-aware Deck Doctor (Phase 1.6, D2) ─────────────────────────
         /** Raw `Deck.archetypeOverride`/`themesOverride` — re-read on every incremental recompute
          * so a mid-session override change (via [setArchetypeOverride]/[clearArchetypeOverride])
@@ -408,6 +413,9 @@ class DeckDoctorOrchestrator(
             val seedTags = (inferredSeedTags + pinSeedTags(archetypeOverride, themesOverride, tribeOverride)).distinct()
             val weightOverrides = weightsProvider()
             val weights = weightOverrides.toScoreWeights()
+            // Wave 2 / B3: P5's SideboardOversized check needs the sideboard count; the mainboard
+            // resolution above never touches deckWithCards.sideboard.
+            val sideboardCount = deckWithCards.sideboard.sumOf { it.quantity }
 
             val health = evaluateDeckUseCase(
                 mainboard = mainboardEntries,
@@ -421,6 +429,7 @@ class DeckDoctorOrchestrator(
                 // Deck Analysis Engine v2 Phase 2 -- same DataStore-backed debug-tuning mechanism,
                 // extended (not duplicated) to also carry the 5 pillar weights.
                 analysisWeights = weightOverrides.toAnalysisWeights(),
+                sideboardCount = sideboardCount,
             )
             // Deck Analysis Engine v2 Phase 0 carve-out: skip Cuts entirely (no candidate pool scan)
             // while the flag is off -- see [isSuggestionsEngineEnabled]'s KDoc.
@@ -458,6 +467,7 @@ class DeckDoctorOrchestrator(
                 wishlistIds = wishlistIds,
                 resolvedById = resolvedById,
                 unresolvedCount = unresolvedCount,
+                sideboardCount = sideboardCount,
                 archetypeOverride = archetypeOverride,
                 themesOverride = themesOverride,
                 commanderTags = commanderTags,
@@ -481,7 +491,7 @@ class DeckDoctorOrchestrator(
                 val weakestPillar = analysis.pillars.minByOrNull { it.subscore }
                 crashReporter.setCustomKey("deck_analysis_score_bucket", scoreBucket(analysis.totalScore))
                 crashReporter.setCustomKey("deck_analysis_pillar_min_id", weakestPillar?.id?.name ?: "none")
-                crashReporter.setCustomKey("deck_analysis_pillar_min_score", weakestPillar?.subscore?.toString() ?: "0")
+                crashReporter.setCustomKey("deck_analysis_format", format.name)
                 crashReporter.setCustomKey("deck_analysis_strategy_id", analysis.strategy.curatedStrategyId ?: "custom")
                 crashReporter.log("deck_analysis_completed")
             }
@@ -860,6 +870,7 @@ class DeckDoctorOrchestrator(
                 themesOverride = context.themesOverride,
                 commanderTags = context.commanderTags,
                 analysisWeights = weightOverrides.toAnalysisWeights(),
+                sideboardCount = context.sideboardCount,
             )
             val cuts = suggestCutsUseCase(
                 mainboard = mainboard,

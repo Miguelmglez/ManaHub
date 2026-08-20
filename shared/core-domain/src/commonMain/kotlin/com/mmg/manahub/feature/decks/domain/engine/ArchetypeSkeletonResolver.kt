@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.decks.domain.engine
 
+import com.mmg.manahub.core.model.DeckFormat
 import kotlin.math.roundToInt
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -172,8 +173,8 @@ object ArchetypeSkeletonResolver {
     }
 
     /**
-     * Production entry point (1.6 wiring, extended by WS9.2): [resolveWithColorCount] plus a
-     * color-IDENTITY-aware pass ([applyIdentityModulation]). `identity`'s non-colorless count
+     * Production entry point (1.6 wiring, extended by WS9.2 and Wave 2 B2): [resolveWithColorCount]
+     * plus a color-IDENTITY-aware pass ([applyIdentityModulation]). `identity`'s non-colorless count
      * drives the SAME color-count modulation [resolveWithColorCount] always did; when that count
      * is `> 0` (a real, at-least-mono-colored identity — the same fail-closed gate the count-only
      * function already used), the identity's SPECIFIC colors additionally reshape the
@@ -181,17 +182,54 @@ object ArchetypeSkeletonResolver {
      * (count `<= 0`, e.g. unknown/unresolved) is a strict no-op beyond color-count modulation —
      * byte-identical to pre-WS9.2 behavior, matching [resolveWithColorCount]'s own fail-closed
      * convention.
+     *
+     * [deckFormat] (Wave 2 B2) is an OPTIONAL, LAST-appended param: when non-null and [format] is
+     * [ArchetypeFormat.SIXTY], [SixtyFormatProfile.forDeckFormat] is applied as the final layering
+     * step (see [applyFormatProfile]). `null` (every pre-existing call site) or a non-SIXTY
+     * [format] (Commander) is a strict no-op, matching every other fail-closed convention in this
+     * file.
      */
     fun resolveWithColor(
         format: ArchetypeFormat,
         archetype: ArchetypeId = ArchetypeId.GENERIC,
         themes: List<ThemeId> = emptyList(),
         identity: Set<ManaColor>,
+        deckFormat: DeckFormat? = null,
     ): ResolvedArchetypeSkeleton {
         val colorCount = identity.count { it != ManaColor.C }
         val withColorCount = resolveWithColorCount(format, archetype, themes, colorCount)
-        if (colorCount <= 0) return withColorCount
-        return applyIdentityModulation(withColorCount, identity)
+        val withIdentity = if (colorCount <= 0) withColorCount else applyIdentityModulation(withColorCount, identity)
+        return applyFormatProfile(withIdentity, format, deckFormat)
+    }
+
+    /**
+     * Wave 2 B2 — the LAST layering step of [resolveWithColor]: shifts [skeleton]'s `lands`/`curve`
+     * bands by [SixtyFormatProfile.landsDelta]/[SixtyFormatProfile.curveDelta] for [deckFormat],
+     * but only when [format] is [ArchetypeFormat.SIXTY] (Commander has no [DeckFormat]-level
+     * variation — see [ArchetypeFormat.of]). `deckFormat == null` (every legacy call site) or an
+     * all-zero profile (every [DeckFormat] besides STANDARD, this wave) is a no-op that returns
+     * [skeleton] unchanged, avoiding an unnecessary `.copy()` on the hot path.
+     */
+    private fun applyFormatProfile(
+        skeleton: ResolvedArchetypeSkeleton,
+        format: ArchetypeFormat,
+        deckFormat: DeckFormat?,
+    ): ResolvedArchetypeSkeleton {
+        if (deckFormat == null || format != ArchetypeFormat.SIXTY) return skeleton
+        val profile = SixtyFormatProfile.forDeckFormat(deckFormat)
+        if (profile.landsDelta == 0 && profile.curveDelta == 0.0) return skeleton
+
+        val lands = if (profile.landsDelta == 0) skeleton.lands else RoleTarget(
+            skeleton.lands.min + profile.landsDelta,
+            skeleton.lands.ideal + profile.landsDelta,
+            skeleton.lands.max + profile.landsDelta,
+        )
+        val curve = if (profile.curveDelta == 0.0) skeleton.curve else CurveBand(
+            roundTo2(skeleton.curve.min + profile.curveDelta),
+            roundTo2(skeleton.curve.ideal + profile.curveDelta),
+            roundTo2(skeleton.curve.max + profile.curveDelta),
+        )
+        return skeleton.copy(lands = lands, curve = curve)
     }
 
     /**

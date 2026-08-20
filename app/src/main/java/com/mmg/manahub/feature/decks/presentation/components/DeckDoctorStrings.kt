@@ -173,6 +173,8 @@ fun Finding.label(): String = when (this) {
         stringResource(R.string.deck_analysis_finding_off_color_identity, cardName)
     is Finding.IllegalCard ->
         stringResource(R.string.deck_analysis_finding_illegal_card, cardName)
+    is Finding.SideboardOversized ->
+        stringResource(R.string.deck_analysis_finding_sideboard_oversized, count)
     is Finding.UnresolvedCards ->
         stringResource(R.string.deck_analysis_finding_unresolved_cards, count)
 }
@@ -195,6 +197,7 @@ val Finding.key: String
         is Finding.SingletonViolation -> "singleton_violation_$cardName"
         is Finding.OffColorIdentity -> "off_color_identity_$cardName"
         is Finding.IllegalCard -> "illegal_card_$cardName"
+        is Finding.SideboardOversized -> "sideboard_oversized"
         is Finding.UnresolvedCards -> "unresolved_cards"
     }
 

@@ -1,15 +1,19 @@
 package com.mmg.manahub.feature.decks.domain.usecase
 
 import com.mmg.manahub.core.model.CardTag
+import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.TagCategory
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.ArchetypeId
+import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.engine.card
 import com.mmg.manahub.feature.decks.domain.engine.entry
+import com.mmg.manahub.feature.decks.domain.engine.nearestFor
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -119,6 +123,61 @@ class InferDeckArchetypeUseCaseTest {
         val result = useCase(mainboard, ArchetypeFormat.COMMANDER)
         assertEquals(ArchetypeId.MIDRANGE, result.macro)
         assertTrue(ThemeId.REANIMATOR in result.themes, "Expected REANIMATOR in ${result.themes}")
+    }
+
+    // ── Standard-shaped fixtures (Deck Analysis Engine v2 Wave 2, B4) ──────────────────────────
+    //  ArchetypeFormat.SIXTY is the correct param here (not a DeckFormat) -- inference mechanics
+    //  don't distinguish Standard from Pioneer/Modern/etc, only SIXTY vs COMMANDER (see
+    //  ArchetypeFormat.of). Card names are real, Standard-plausible mono-red-aggro / Dimir-control
+    //  cards for readability; exact power/toughness/cmc are tuned for the classifier's own role
+    //  matchers (same convention as the macro-archetype fixtures above), not for real legality --
+    //  this test exercises the classifier, not the legality pillar.
+
+    @Test
+    fun standardAggroShapedDeckClassifiesAsAggro() {
+        // Mono-red aggro playset shape: 5 unique cheap, hard-hitting creatures at 4 copies each.
+        val mainboard = buildList {
+            repeat(4) { add(entry(card(id = "std-aggro-swiftspear-$it", name = "Monastery Swiftspear", typeLine = "Creature — Human Monk", cmc = 1.0, power = "3"))) }
+            repeat(4) { add(entry(card(id = "std-aggro-kumano-$it", name = "Kumano Faces Kakkazan", typeLine = "Creature — Human Shaman", cmc = 1.0, power = "3"))) }
+            repeat(4) { add(entry(card(id = "std-aggro-mouse-$it", name = "Manifold Mouse", typeLine = "Creature — Mouse", cmc = 2.0, power = "3"))) }
+            repeat(4) { add(entry(card(id = "std-aggro-showoff-$it", name = "Slickshot Show-Off", typeLine = "Creature — Human Rogue", cmc = 2.0, power = "4"))) }
+            repeat(4) { add(entry(card(id = "std-aggro-nemesis-$it", name = "Screaming Nemesis", typeLine = "Creature — Elemental", cmc = 3.0, power = "4"))) }
+        }
+        val result = useCase(mainboard, ArchetypeFormat.SIXTY)
+        assertEquals(ArchetypeId.AGGRO, result.macro)
+        assertTrue(result.confidence >= 0.55f, "AGGRO confidence too low: ${result.confidence}")
+    }
+
+    @Test
+    fun standardControlShapedDeckClassifiesAsControl() {
+        // Dimir control playset shape: spot removal + a wrath effect + a heavy counterspell suite.
+        val mainboard = buildList {
+            repeat(7) { add(entry(card(id = "std-ctl-removal-$it", name = "Cut Down", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.REMOVAL)))) }
+            repeat(3) { add(entry(card(id = "std-ctl-wrath-$it", name = "Sunfall", typeLine = "Sorcery", cmc = 4.0, tags = listOf(CardTag.WRATH)))) }
+            repeat(8) { add(entry(card(id = "std-ctl-counter-$it", name = "Negate", typeLine = "Instant", cmc = 4.0, tags = listOf(CardTag.COUNTERSPELL)))) }
+            repeat(2) { add(entry(card(id = "std-ctl-filler-$it", name = "Read the Bones", typeLine = "Sorcery", cmc = 4.0))) }
+        }
+        val result = useCase(mainboard, ArchetypeFormat.SIXTY)
+        assertEquals(ArchetypeId.CONTROL, result.macro)
+        assertTrue(result.confidence >= 0.55f, "CONTROL confidence too low: ${result.confidence}")
+    }
+
+    @Test
+    fun standardAggroInferenceComposesWithCuratedStrategyCatalog() {
+        // End-to-end check: the inferred macro/themes for a Standard-shaped deck feed cleanly into
+        // CuratedStrategyCatalog.nearestFor with DeckFormat.STANDARD (the "aggro" pure-archetype
+        // strategy is COMMANDER_CASUAL_STANDARD-available, so this must resolve non-null).
+        val mainboard = buildList {
+            repeat(4) { add(entry(card(id = "std-aggro2-swiftspear-$it", name = "Monastery Swiftspear", typeLine = "Creature — Human Monk", cmc = 1.0, power = "3"))) }
+            repeat(4) { add(entry(card(id = "std-aggro2-kumano-$it", name = "Kumano Faces Kakkazan", typeLine = "Creature — Human Shaman", cmc = 1.0, power = "3"))) }
+            repeat(4) { add(entry(card(id = "std-aggro2-mouse-$it", name = "Manifold Mouse", typeLine = "Creature — Mouse", cmc = 2.0, power = "3"))) }
+            repeat(4) { add(entry(card(id = "std-aggro2-showoff-$it", name = "Slickshot Show-Off", typeLine = "Creature — Human Rogue", cmc = 2.0, power = "4"))) }
+            repeat(4) { add(entry(card(id = "std-aggro2-nemesis-$it", name = "Screaming Nemesis", typeLine = "Creature — Elemental", cmc = 3.0, power = "4"))) }
+        }
+        val inference = useCase(mainboard, ArchetypeFormat.SIXTY)
+        val strategy = CuratedStrategyCatalog.nearestFor(inference.macro, inference.themes, DeckFormat.STANDARD)
+        assertNotNull(strategy, "Expected a curated strategy for the inferred AGGRO archetype in Standard")
+        assertEquals(ArchetypeId.AGGRO, strategy.archetype)
     }
 
     // ── Zero-regression: low-signal decks must NEVER resolve to a wrong confident label ────────

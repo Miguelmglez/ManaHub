@@ -51,6 +51,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ArchetypeFormat
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategy
 import com.mmg.manahub.feature.decks.domain.engine.CuratedStrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedStrategyInfo
+import com.mmg.manahub.feature.decks.domain.engine.availableIn
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Analysis Engine v2 Phase 3 (plan §3.4 item 1) — the curated-strategy picker that
@@ -137,9 +138,10 @@ fun StrategyPlanHint(onClick: () -> Unit) {
  * off the live [DeckHealth][com.mmg.manahub.feature.decks.domain.usecase.DeckHealth]
  * `.analysis.strategy.curatedStrategyId`); every mutation is a callback.
  *
- * @param currentFormat the live deck's format — strategies not offered for it (plan §3.2's
- *        `CuratedStrategy.formats`, e.g. Voltron/Group Hug/Group Slug/Clones & Theft are
- *        Commander-only) are filtered out. A format with no [ArchetypeFormat] mapping (Draft) is
+ * @param currentFormat the live deck's format — strategies not offered for it ([CuratedStrategy
+ *        .availableIn], Wave 2 B1's `DeckFormat`-granular availability; e.g. Voltron/Group Hug/
+ *        Group Slug/Clones & Theft are Commander-only, and only a curated subset is offered for
+ *        Standard) are filtered out. A format with no [ArchetypeFormat] mapping (Draft) is
  *        treated as "no format restriction" (every entry shown) — Draft has no archetype skeleton
  *        at all ([ArchetypeFormat.of]'s own KDoc), so a strategy pin there is inert either way.
  * @param availableTribes tribe candidates for a `requiresTribe` strategy's sub-picker (see
@@ -169,10 +171,11 @@ fun CuratedStrategyPickerSheet(
     var query by remember { mutableStateOf("") }
     var tribePending by remember { mutableStateOf<CuratedStrategy?>(null) }
 
-    val archetypeFormat = ArchetypeFormat.of(currentFormat)
-    val filtered = remember(query, archetypeFormat) {
+    // B1: filters via CuratedStrategy.availableIn(currentFormat) — DeckFormat-granular (Standard
+    // now sees only its curated subset; Draft keeps the pre-B1 "no restriction" passthrough).
+    val filtered = remember(query, currentFormat) {
         CuratedStrategyCatalog.ALL.filter { entry ->
-            (archetypeFormat == null || archetypeFormat in entry.formats) &&
+            entry.availableIn(currentFormat) &&
                 (query.isBlank() || entry.displayName.contains(query, ignoreCase = true) || entry.description.contains(query, ignoreCase = true))
         }
     }

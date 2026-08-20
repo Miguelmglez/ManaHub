@@ -65,6 +65,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
 import com.mmg.manahub.core.tagging.label
@@ -707,12 +708,18 @@ internal fun EditDeckSheet(
  *
  * A curated subset of [DeckFormat] — the formats a user actively builds toward. Other
  * [DeckFormat] entries (e.g. the engine-internal ones) are intentionally not offered here.
+ *
+ * [DeckFormat.STANDARD] re-enabled in Wave 2 / B5 (Deck Analysis Engine v2 now analyzes 60-card
+ * constructed decks — see `docs/plans/deck-analysis-engine-v2-wave2-standard-plan.md`).
+ * PIONEER/MODERN/PAUPER stay commented out: they are FUTURE DEBT per that plan's §0 — the engine
+ * has the per-format extension points (`DeckFormat.isSixtyCardConstructed`, per-format legality)
+ * but each needs its own meta-relevance/curation pass before the app offers users a deck they
+ * can't yet build toward with a calibrated analysis.
  */
 internal val STUDIO_FORMATS: List<DeckFormat> = listOf(
     DeckFormat.COMMANDER,
-    /*DeckFormat.STANDARD,
-
-    DeckFormat.PIONEER,
+    DeckFormat.STANDARD,
+    /*DeckFormat.PIONEER,
     DeckFormat.MODERN,
     DeckFormat.PAUPER,*/
     DeckFormat.CASUAL,
@@ -786,16 +793,16 @@ private fun DeckFormatPill(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                shape = RoundedCornerShape(12.dp)
+                shape = ChipShape
                 clip = true
             }
             .background(bgColor)
             .border(
                 width = if (selected) 2.dp else 1.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(12.dp),
+                shape = ChipShape,
             )
-            .clip(RoundedCornerShape(12.dp))
+            .clip(ChipShape)
             .clickable(onClick = onClick)
             .padding(vertical = spacing.md, horizontal = spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -804,6 +811,7 @@ private fun DeckFormatPill(
         Text(
             text = when (format) {
                 DeckFormat.COMMANDER -> "⚔️"
+                DeckFormat.STANDARD -> "🏆"
                 DeckFormat.DRAFT -> "📦"
                 else -> "🔮"
             },
@@ -811,7 +819,14 @@ private fun DeckFormatPill(
         )
         Text(
             text = format.displayName,
-            style = ty.labelLarge,
+            // Local override: the design system's labelLarge tracking (3sp letter-spacing, per
+            // design-system.md) is tuned for wider single-pill contexts. At 4 pills per row
+            // (Wave 2 / B5 added STANDARD) the available label width shrinks to ~57dp, and
+            // 3sp/glyph tracking on "Commander"/"Standard" pushes the rendered text well past
+            // that before ellipsis kicks in, making it unreadable. Dropping tracking to 0 for
+            // THIS label only (font/size/weight untouched) reclaims enough width for the label
+            // to read clearly without touching DeckFormat.displayName or any other call site.
+            style = ty.labelLarge.copy(letterSpacing = 0.sp),
             color = if (selected) mc.primaryAccent else mc.textPrimary,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -821,6 +836,8 @@ private fun DeckFormatPill(
             text = stringResource(R.string.decklist_card_count, format.targetDeckSize),
             style = ty.labelSmall,
             color = mc.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

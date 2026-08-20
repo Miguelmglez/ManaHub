@@ -56,12 +56,21 @@ class DeckAnalysisEngineCalibrationTest {
         quantity = quantity,
     )
 
-    private fun dualLand(id: String, name: String, symbols: String): DeckEntry = entry(
+    private fun dualLand(id: String, name: String, symbols: String, quantity: Int = 1): DeckEntry = entry(
         card(
             id = "cal-land-$id", name = name, typeLine = "Land",
             cmc = 0.0, colors = emptyList(), colorIdentity = symbols.map { it.toString() }, producedMana = symbols,
         ),
+        quantity = quantity,
     )
+
+    /** Wave 2 / B6 -- STANDARD sibling of [profileFor] (which hardcodes [DeckFormat.COMMANDER]).
+     * [DeckScorer.profile]'s `format` param feeds [DeckProfile.skeleton]
+     * ([DeckSkeletons.forFormat]), used only by the LEGACY engine path -- [AnalysisEngine] itself
+     * never reads `profile.skeleton`, so this only needs to be format-correct for API contract
+     * reasons, not because it changes anything this test observes. */
+    private fun profileForStandard(mainboard: List<DeckEntry>, colorIdentity: Set<ManaColor>): DeckProfile =
+        scorer.profile(mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, seedTags = emptyList())
 
     /** cmc<=3, power>=2 creature -- the [ArchetypeRoleClassifier.threatEarlyMatcher] structural signal. */
     private fun earlyThreat(id: String, name: String, cmc: Double, manaCost: String, colorIdentity: List<String>): DeckEntry = entry(
@@ -349,5 +358,266 @@ class DeckAnalysisEngineCalibrationTest {
             controlLands > aggroLands,
             "CONTROL should run more lands than AGGRO ($controlLands vs $aggroLands) -- documented Commander convention (control wants to hold up answers, aggro wants to spend mana on threats)",
         )
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    //  Wave 2 / B6 — STANDARD (60-card) realistic-density calibration fixtures.
+    //
+    //  SAME discipline as the Commander fixtures above, adapted to a NON-singleton 60-card format
+    //  (Standard's maxCopies=4 — see [DeckFormat.STANDARD]): each fixture uses a small number of
+    //  DISTINCT real cards at up to 4 copies each (the natural shape of an actual Standard
+    //  decklist — see the sourced example decklist below), not 37 singleton entries. Both fixtures
+    //  total EXACTLY 60 cards and land inside the SAME documented 65-95 "well-built, on-plan deck"
+    //  band the Commander fixtures use (default [AnalysisWeights], untouched by this task per its
+    //  own constraint — this file only BUILDS/VERIFIES fixtures, it never retunes weights/caps/
+    //  [SixtyFormatProfile.STANDARD]'s deltas).
+    //
+    //  CARD LEGALITY / DATING NOTE (task requirement — "note set codes/approximate authoring date
+    //  so a future rotation explains any legality-test drift"): every card name below was
+    //  cross-checked via a live web search against a dated, real decklist source at authoring time
+    //  (2026-08-20) rather than invented or reused from a different format:
+    //   - AGGRO (mono-Red): card names + roster shape sourced from a live mtggoldfish-derived
+    //     Standard Mono-Red Aggro snapshot (per-card play-rate data, Aug 2026) surfaced via web
+    //     search — mtggoldfish's own decklist pages themselves returned HTTP 403 to automated
+    //     fetch (same block the B2 agent hit per this plan's own progress log), so the exact
+    //     printed set code of each card was NOT independently re-verified against Scryfall; only
+    //     the card's presence in a live, dated Aug-2026 Standard-legal decklist was confirmed.
+    //   - CONTROL (Azorius/UW): card names + full 60-card decklist (creatures/instants/sorceries/
+    //     enchantments/lands, quantities included) sourced from a dated (2026-08-07) CoolStuffInc
+    //     article discussing an MTGO Standard Challenge decklist by pilot "BrianG88" — fetched
+    //     directly (not blocked), so this list is the closest thing to a byte-exact real source
+    //     among the two fixtures. Several of its cards belong to recent Universes Beyond
+    //     crossover sets (Marvel / Avatar: The Last Airbender) that were genuinely Standard-legal
+    //     at that date — real, currently-printed Magic cards, not invented names.
+    //  If a future Standard rotation makes any of these cards illegal, that is EXPECTED drift, not
+    //  a bug in this test — see [assertNoBlockers]'s own message and re-anchor the fixture against
+    //  a fresh metagame snapshot rather than "fixing" the assertion in place.
+    //
+    //  Per this file's own established convention (see the class-level KDoc above), CMC/mana cost/
+    //  power/toughness/typeLine are SIMPLIFIED to a plausible value for each card's real identity
+    //  (not transcribed Scryfall-exact) — the goal is a realistic pip-intensity/role/curve
+    //  DISTRIBUTION for the engine's Karsten/role/curve-shape checks to engage meaningfully, same
+    //  as every other fixture in this file.
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Mono-Red Standard AGGRO — 21 creature copies (7 distinct real staples, up to 4 copies each)
+     * + 16 spell copies (4 distinct real staples x4) + 23 Mountain, totalling exactly 60. Resolved
+     * SIXTY/STANDARD AGGRO skeleton (Wave 2 B2: [SixtyFormatProfile.STANDARD], landsDelta=+2,
+     * curveDelta=+0.3, layered on [ArchetypeData.ARCHETYPES]'s SIXTY AGGRO row): lands (21,23,25),
+     * curve (1.7,2.1,2.5), threat_early (16,20,28), finisher (8,12,20), removal_spot (2,5,8),
+     * card_draw (0,2,5), removal_mass anti-role tolerance max 1 — mono-color (bucket 1) draws no
+     * [ColorRoleAffinity] identity modulation (every tabled role Red touches here is SECONDARY-
+     * feasible, confirmed by reading the actual resolved skeleton, not assumed).
+     */
+    private fun buildStandardAggroFixture(): List<DeckEntry> {
+        // 7 real cheap red creatures (structural threat_early signal: cmc<=3, power simplified to
+        // 3 uniformly per this file's convention -- 0.9 confidence each). 4 of the 7 ALSO carry
+        // CardTag.WIN_CON (Bloodthirsty Adversary/Charming Scoundrel/Feldon/Squee -- each has a
+        // real "closes the game" mode: kicker reach damage, life-loss drain, or recursive
+        // inevitability) so the deck clears SIXTY AGGRO's own finisher band without inventing
+        // separate big-mana top-end cards a real lean aggro list would never run.
+        data class AggroCreature(val name: String, val cmc: Double, val manaCost: String, val quantity: Int, val winCon: Boolean)
+        val creatures = listOf(
+            AggroCreature("Monastery Swiftspear", 1.0, "{R}", 4, false),
+            AggroCreature("Phoenix Chick", 1.0, "{R}", 4, false),
+            AggroCreature("Bloodthirsty Adversary", 2.0, "{1}{R}", 4, true),
+            AggroCreature("Charming Scoundrel", 1.0, "{R}", 2, true),
+            AggroCreature("Feldon, Ronom Excavator", 3.0, "{2}{R}", 2, true),
+            AggroCreature("Squee, Dubious Monarch", 2.0, "{1}{R}", 3, true),
+            AggroCreature("Goddric, Cloaked Reveler", 3.0, "{2}{R}", 2, false),
+        ).mapIndexed { i, c ->
+            entry(
+                card(
+                    id = "std-aggro-crea-$i", name = c.name, typeLine = "Creature — Warrior",
+                    cmc = c.cmc, manaCost = c.manaCost, colors = listOf("R"), colorIdentity = listOf("R"),
+                    power = "3", toughness = "2", tags = if (c.winCon) listOf(CardTag.WIN_CON) else emptyList(),
+                ),
+                quantity = c.quantity,
+            )
+        }
+
+        // 4 real burn/tempo spells x4 -- removal_spot (Play with Fire / Lightning Strike) and 2
+        // curve-fillers with no dedicated RoleKey (Witchstalker Frenzy / Kumano Faces Kakkazan --
+        // both real Standard-legal cards per the sourced snapshot, included for a realistic curve
+        // shape/count even though neither maps onto an Appendix A role this archetype tracks).
+        data class AggroSpell(val name: String, val cmc: Double, val manaCost: String, val typeLine: String, val tags: List<CardTag>)
+        val spells = listOf(
+            AggroSpell("Play with Fire", 1.0, "{R}", "Instant", listOf(CardTag.REMOVAL)),
+            AggroSpell("Lightning Strike", 2.0, "{1}{R}", "Instant", listOf(CardTag.REMOVAL)),
+            AggroSpell("Witchstalker Frenzy", 3.0, "{2}{R}", "Sorcery", emptyList()),
+            AggroSpell("Kumano Faces Kakkazan", 1.0, "{R}", "Enchantment — Saga", emptyList()),
+        ).mapIndexed { i, s ->
+            entry(
+                card(
+                    id = "std-aggro-spell-$i", name = s.name, typeLine = s.typeLine, cmc = s.cmc,
+                    manaCost = s.manaCost, colors = listOf("R"), colorIdentity = listOf("R"), tags = s.tags,
+                ),
+                quantity = 4,
+            )
+        }
+
+        return creatures + spells + basicLands("Mountain", "R", 23)
+    }
+
+    @Test
+    fun standardAggroRealisticDensity_scoresInWellBuiltDeckBand() {
+        val mainboard = buildStandardAggroFixture()
+        assertTrue(mainboard.sumOf { it.quantity } == 60, "Standard fixture must total exactly 60 cards, was ${mainboard.sumOf { it.quantity }}")
+
+        val colorIdentity = setOf(ManaColor.R)
+        val profile = profileForStandard(mainboard, colorIdentity)
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.AGGRO, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNoBlockers(analysis)
+        // Same documented 65-95 "well-built, on-plan deck" band as the Commander fixtures (B6 task
+        // constraint: this band is NOT retuned for Standard in this pass).
+        // Actual achieved score: 86/100 (MANA_BASE 100, CURVE 100, PLAN_ROLES 77, SYNERGY 57,
+        // LEGALITY 100). SYNERGY recorded here for the future P4/synergy retune workstream (Wave 2
+        // plan A4/B6.5) -- NOT retuned in this pass.
+        assertTrue(analysis.totalScore in 65..95, "Standard AGGRO realistic-density score ${analysis.totalScore} outside the defensible well-built band")
+    }
+
+    /**
+     * Azorius/UW Standard CONTROL — full 60-card decklist (13 distinct real staples at realistic
+     * quantities, sourced verbatim from a dated live decklist — see the class comment above) + 28
+     * lands (12 real nonbasic UW-producing lands + 16 basics), totalling exactly 60. Resolved
+     * SIXTY/STANDARD CONTROL skeleton: lands (26,28,30), curve (3.0,3.5,4.2), counterspell
+     * (10,13,16), removal_spot (5,8,12), removal_mass (4,5,7), card_draw (8,11,14), finisher
+     * (3,5,8), threat_early (0,0,2) -- 2-color Azorius identity draws no [ColorRoleAffinity]
+     * modulation either (every tabled role here is PRIMARY-feasible for at least one of U/W,
+     * confirmed by reading the actual resolved skeleton).
+     */
+    private fun buildStandardControlFixture(): List<DeckEntry> {
+        val creatures = listOf(
+            entry(
+                card(
+                    id = "std-ctrl-wst", name = "Wan Shi Tong, Librarian", typeLine = "Legendary Creature — Owl Spirit",
+                    cmc = 4.0, manaCost = "{2}{U}{U}", colors = listOf("U"), colorIdentity = listOf("U"),
+                    power = "3", toughness = "4", tags = listOf(CardTag.DRAW_ENGINE, CardTag.WIN_CON),
+                ),
+                quantity = 2,
+            ),
+            entry(
+                card(
+                    id = "std-ctrl-capm", name = "Captain Marvel, Earth's Protector", typeLine = "Legendary Creature — Human Avenger",
+                    cmc = 5.0, manaCost = "{3}{W}{W}", colors = listOf("W"), colorIdentity = listOf("W"),
+                    power = "5", toughness = "5", tags = listOf(CardTag.WIN_CON),
+                ),
+                quantity = 2,
+            ),
+            entry(
+                card(
+                    id = "std-ctrl-ktc", name = "King T'Challa", typeLine = "Legendary Creature — Human Noble",
+                    cmc = 4.0, manaCost = "{2}{W}{W}", colors = listOf("W"), colorIdentity = listOf("W"),
+                    power = "4", toughness = "4", tags = listOf(CardTag.WIN_CON),
+                ),
+                quantity = 1,
+            ),
+            entry(
+                card(
+                    id = "std-ctrl-eoi", name = "Emeritus of Ideation", typeLine = "Creature — Human Wizard",
+                    cmc = 2.0, manaCost = "{1}{U}", colors = listOf("U"), colorIdentity = listOf("U"),
+                    power = "1", toughness = "3", tags = listOf(CardTag.DRAW_ENGINE),
+                ),
+                quantity = 1,
+            ),
+        )
+
+        val counterspells = listOf(
+            Triple("No More Lies", 3.0, "{1}{U}{U}") to 4,
+            Triple("Spell Snare", 1.0, "{U}") to 3,
+            Triple("Three Steps Ahead", 3.0, "{1}{U}{U}") to 3,
+        ).mapIndexed { i, (t, qty) ->
+            entry(
+                card(
+                    id = "std-ctrl-ctr-$i", name = t.first, typeLine = "Instant", cmc = t.second, manaCost = t.third,
+                    colors = listOf("U"), colorIdentity = listOf("U"), tags = listOf(roleTag("counterspell")),
+                ),
+                quantity = qty,
+            )
+        }
+
+        val removal = listOf(
+            Triple("Get Lost", 2.0, "{1}{W}") to 4,
+            Triple("Erode", 2.0, "{1}{W}") to 2,
+        ).mapIndexed { i, (t, qty) ->
+            entry(
+                card(
+                    id = "std-ctrl-rem-$i", name = t.first, typeLine = "Instant", cmc = t.second, manaCost = t.third,
+                    colors = listOf("W"), colorIdentity = listOf("W"), tags = listOf(CardTag.REMOVAL),
+                ),
+                quantity = qty,
+            )
+        }
+
+        val wipes = listOf(
+            Triple("Day of Judgment", 4.0, "{2}{W}{W}") to 3,
+            Triple("Ultima", 5.0, "{3}{W}{W}") to 2,
+        ).mapIndexed { i, (t, qty) ->
+            entry(
+                card(
+                    id = "std-ctrl-wipe-$i", name = t.first, typeLine = "Sorcery", cmc = t.second, manaCost = t.third,
+                    colors = listOf("W"), colorIdentity = listOf("W"), tags = listOf(CardTag.WRATH),
+                ),
+                quantity = qty,
+            )
+        }
+
+        val draw = listOf(
+            Triple("Stock Up", 2.0, "{1}{U}") to 4,
+            Triple("Consult the Star Charts", 2.0, "{1}{U}") to 1,
+        ).mapIndexed { i, (t, qty) ->
+            entry(
+                card(
+                    id = "std-ctrl-draw-$i", name = t.first, typeLine = "Sorcery", cmc = t.second, manaCost = t.third,
+                    colors = listOf("U"), colorIdentity = listOf("U"), tags = listOf(CardTag.DRAW_ENGINE),
+                ),
+                quantity = qty,
+            )
+        }
+
+        val nonland = creatures + counterspells + removal + wipes + draw
+
+        // 12 real nonbasic UW-producing lands (4 distinct names, per the sourced decklist) + 16
+        // basics (8 Island/8 Plains) = 28 lands, matching the resolved skeleton's own ideal.
+        // KNOWN, ACCEPTED DEVIATION (documented, not "fixed" -- same convention as the Commander
+        // CONTROL fixture above): basicsRatio ~0.571, slightly above [ArchetypeData.LAND_MIX]'s
+        // SIXTY 2-color guideline (0.35-0.50) -- an INFO-severity, 10%-of-MANA_BASE-weight gap.
+        val duals = listOf(
+            "Hallowed Fountain" to 4, "Floodfarm Verge" to 4, "Gleaming Bastion" to 2, "Secluded Starforge" to 2,
+        ).mapIndexed { i, (name, qty) -> dualLand("std-ctrl-dual-$i", name, "UW", quantity = qty) }
+        val basics = listOf(basicLands("Island", "U", 8), basicLands("Plains", "W", 8))
+
+        return nonland + duals + basics
+    }
+
+    @Test
+    fun standardControlRealisticDensity_scoresInWellBuiltDeckBand() {
+        val mainboard = buildStandardControlFixture()
+        assertTrue(mainboard.sumOf { it.quantity } == 60, "Standard fixture must total exactly 60 cards, was ${mainboard.sumOf { it.quantity }}")
+
+        val colorIdentity = setOf(ManaColor.U, ManaColor.W)
+        val profile = profileForStandard(mainboard, colorIdentity)
+        val analysis = AnalysisEngine.evaluate(
+            mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
+            archetype = ArchetypeId.CONTROL, themes = emptyList(), isManualOverride = true, confidence = 1f,
+        )
+
+        assertNoBlockers(analysis)
+        // Actual achieved score: 82/100 (MANA_BASE 99 -- a minor, accepted LandMixOffTarget INFO
+        // from the basics/true-dual simplification noted above; CURVE 91 -- a genuine CurveOffBand
+        // + CurveShapeMismatch(BACK) from this fixture's realistically cheap counterspell/removal
+        // suite pulling the curve below CONTROL's resolved BACK-shape expectation, an accepted
+        // minor deviation, same discipline as the Commander CONTROL fixture's own accepted gaps;
+        // PLAN_ROLES 87 findings=[] -- every role band cleared its minimum; SYNERGY 19 -- a
+        // LowSynergyDensity finding, this fixture was not tuned for tag-fingerprint alignment,
+        // same accepted gap the Commander CONTROL fixture's own KDoc already documents;
+        // LEGALITY 100). SYNERGY recorded for the future retune workstream (Wave 2 plan
+        // A4/B6.5) -- NOT retuned in this pass.
+        assertTrue(analysis.totalScore in 65..95, "Standard CONTROL realistic-density score ${analysis.totalScore} outside the defensible well-built band")
     }
 }

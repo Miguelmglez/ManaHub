@@ -121,6 +121,10 @@ class EvaluateDeckUseCase(
      *        [evaluateDeckUseCaseV2] (Deck Analysis Engine v2 Phase 2). The default keeps every
      *        caller byte-identical to pre-Phase-2 behavior for the LEGACY `evaluation`/`profile`
      *        fields — only the new, additive [DeckHealth.analysis] field is affected.
+     * @param sideboardCount total sideboard card count (Wave 2 / B3), forwarded to
+     *        [evaluateDeckUseCaseV2] for P5's [com.mmg.manahub.feature.decks.domain.engine.Finding
+     *        .SideboardOversized] check. Appended LAST and defaulted so every existing call site
+     *        keeps compiling unchanged.
      * @return a [DeckHealth] bundling the [DeckEvaluation], the [DeckProfile] it was built from,
      *         the resolved [ArchetypeResolution] (always present — GENERIC/no-themes when the
      *         deck carries no archetype signal, so the Studio header chip always has something to
@@ -136,6 +140,7 @@ class EvaluateDeckUseCase(
         themesOverride: List<String> = emptyList(),
         commanderTags: List<CardTag> = emptyList(),
         analysisWeights: AnalysisWeights = AnalysisWeights(),
+        sideboardCount: Int = 0,
     ): DeckHealth = withContext(ioDispatcher) {
         val colorIdentity = deriveColorIdentity(mainboard, commanderIdentity)
 
@@ -196,6 +201,7 @@ class EvaluateDeckUseCase(
                 profile = profile,
                 resolution = resolution,
                 weights = analysisWeights,
+                sideboardCount = sideboardCount,
             )
         }.onFailure { t ->
             crashReporter?.setCustomKey("deck_analysis_format", format.name)
