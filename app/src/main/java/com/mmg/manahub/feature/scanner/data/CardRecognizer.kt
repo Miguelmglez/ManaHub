@@ -6,6 +6,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.util.recordSafeNonFatal
+import com.mmg.manahub.feature.scanner.domain.model.OcrCandidate
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -138,9 +139,11 @@ class CardRecognizer(
             try {
                 // imageProxy must remain open until ML Kit finishes consuming mediaImage —
                 // it is closed in the finally block below, on every path.
-                val cardName = extractCardNameWithTimeout(mediaImage, rotationDegrees)
+                // WS2.A: extraction now returns a scored OcrCandidate rather than a bare
+                // String. Only .text is consumed here — WS2.B will gate lookups on .score.
+                val candidate = extractCardNameWithTimeout(mediaImage, rotationDegrees)
 
-                if (cardName == null) {
+                if (candidate == null) {
                     if (com.mmg.manahub.BuildConfig.DEBUG) {
                         android.util.Log.d("CardRecognizer", "OCR: nothing in name zone")
                     }
@@ -148,8 +151,10 @@ class CardRecognizer(
                     return@launch
                 }
 
+                val cardName = candidate.text
+
                 if (com.mmg.manahub.BuildConfig.DEBUG) {
-                    android.util.Log.d("CardRecognizer", "OCR [$selectedLanguage]: '$cardName'")
+                    android.util.Log.d("CardRecognizer", "OCR [$selectedLanguage]: '$cardName' (score=${candidate.score})")
                 }
 
                 val resolvedAtMs = System.currentTimeMillis()
@@ -205,7 +210,7 @@ class CardRecognizer(
     private suspend fun extractCardNameWithTimeout(
         mediaImage: android.media.Image,
         rotationDegrees: Int,
-    ): String? {
+    ): OcrCandidate? {
         return try {
             withTimeout(OCR_TIMEOUT_MS) {
                 cardOcrAnalyzer.extractCardName(mediaImage, rotationDegrees)

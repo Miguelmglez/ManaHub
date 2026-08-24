@@ -7,6 +7,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -135,6 +136,7 @@ import com.mmg.manahub.core.util.PriceFormatter
 import com.mmg.manahub.feature.carddetail.presentation.CardDetailScreen
 import com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer
 import com.mmg.manahub.feature.scanner.data.CardRecognizer
+import com.mmg.manahub.feature.scanner.domain.ScannerZone
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.cancel
@@ -477,7 +479,21 @@ private fun CameraPreview(
         // ResolutionSelector replaces the deprecated setTargetResolution API (CameraX 1.3+).
         // FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER lets CameraX pick the nearest
         // available resolution when 720×1280 is not supported by the sensor.
+        //
+        // W2.2 (2026-08-24): PreviewView uses ImplementationMode.COMPATIBLE with the default
+        // FILL_CENTER scale type, while ImageAnalysis previously requested only a target
+        // resolution with no aspect-ratio pin — if the sensor's chosen resolution for preview
+        // and analysis ended up with different aspect ratios, PreviewView's FILL_CENTER crop
+        // meant the visible frame was NOT the same rectangle ImageAnalysis delivered, so
+        // NameZoneIndicator's on-screen fractions did not map 1:1 onto CardOcrAnalyzer's zone
+        // fractions (finding F3). Pinning both use cases to the same AspectRatioStrategy makes
+        // preview and analysis share one aspect ratio, so ScannerZone's fractions mean the same
+        // rectangle in both places. RATIO_16_9_FALLBACK_AUTO_STRATEGY was chosen over a hard
+        // 4:3/16:9 requirement because it degrades gracefully (AUTO fallback) on sensors that
+        // cannot deliver 16:9, rather than failing use-case binding outright.
+        val aspectRatioStrategy = AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
         val resolutionSelector = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(aspectRatioStrategy)
             .setResolutionStrategy(
                 ResolutionStrategy(
                     android.util.Size(720, 1280),
@@ -485,10 +501,16 @@ private fun CameraPreview(
                 )
             )
             .build()
+        val previewResolutionSelector = ResolutionSelector.Builder()
+            .setAspectRatioStrategy(aspectRatioStrategy)
+            .build()
 
-        val preview = Preview.Builder().build().also {
-            it.setSurfaceProvider(pv.surfaceProvider)
-        }
+        val preview = Preview.Builder()
+            .setResolutionSelector(previewResolutionSelector)
+            .build()
+            .also {
+                it.setSurfaceProvider(pv.surfaceProvider)
+            }
         val imageAnalysis = ImageAnalysis.Builder()
             .setResolutionSelector(resolutionSelector)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -553,8 +575,9 @@ private fun CameraPreview(
 
 /**
  * Draws a minimal horizontal bracket indicating the region where the card name
- * should be placed for OCR. The zone fractions match [CardOcrAnalyzer.NAME_ZONE_TOP_FRACTION]
- * and [CardOcrAnalyzer.NAME_ZONE_BOTTOM_FRACTION] so the visual and the scan area align.
+ * should be placed for OCR. The zone fractions come from [ScannerZone] — the single source of
+ * truth shared with [CardOcrAnalyzer], which restricts its OCR candidates to the same band (plus
+ * an analyzer-only tolerance) so the visual guide and the scan area align (WS2.2, 2026-08-24).
  */
 @Composable
 private fun NameZoneIndicator(modifier: Modifier = Modifier) {
@@ -566,9 +589,9 @@ private fun NameZoneIndicator(modifier: Modifier = Modifier) {
         val screenH = maxHeight
         val screenW = maxWidth
 
-        val zoneTopFrac    = 0.40f
-        val zoneBottomFrac = 0.52f
-        val zoneWidthFrac  = 0.72f
+        val zoneTopFrac    = ScannerZone.TOP
+        val zoneBottomFrac = ScannerZone.BOTTOM
+        val zoneWidthFrac  = ScannerZone.WIDTH
 
         val zoneTop: androidx.compose.ui.unit.Dp    = screenH * zoneTopFrac
         val zoneLeftStart: androidx.compose.ui.unit.Dp = screenW * ((1f - zoneWidthFrac) / 2f)

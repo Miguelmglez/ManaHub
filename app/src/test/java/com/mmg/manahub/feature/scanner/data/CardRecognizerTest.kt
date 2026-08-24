@@ -5,6 +5,7 @@ import androidx.camera.core.ImageInfo
 import androidx.camera.core.ImageProxy
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.feature.scanner.domain.model.OcrCandidate
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.CapturingSlot
@@ -112,7 +113,7 @@ class CardRecognizerTest {
             onResult = { results += it },
         )
         val imageProxy = buildImageProxyMock()
-        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns "Lightning Bolt"
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
         coEvery { cardRepository.getCardByExactName("Lightning Bolt") } returns Result.success(defaultCard)
 
         recognizer.analyze(imageProxy)
@@ -193,7 +194,7 @@ class CardRecognizerTest {
             onResult = { results += it },
         )
         val imageProxy = buildImageProxyMock()
-        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns "Lightning Bolt"
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
         coEvery { cardRepository.getCardByExactName("Lightning Bolt") } throws RuntimeException("boom")
 
         recognizer.analyze(imageProxy)
@@ -261,7 +262,7 @@ class CardRecognizerTest {
         )
 
         val imageProxy = buildImageProxyMock()
-        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns "Serra Angel"
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Serra Angel", score = 100f, lineHeightRatio = 1f)
         coEvery { cardRepository.getCardByExactName("Serra Angel") } returns Result.success(secondCard)
 
         recognizer.analyze(imageProxy)
