@@ -42,9 +42,12 @@ object ScannerModule {
     /**
      * Provides the [CardOcrAnalyzer] singleton.
      *
-     * Initialises the ML Kit Latin text recognizer client eagerly.
-     * No asset downloads or device-side model caching are required — ML Kit
-     * bundles the base model in the app and updates it transparently via Google Play Services.
+     * Deliberately `@Singleton` (one instance per process) and never closed by the UI — see
+     * [CardOcrAnalyzer]'s KDoc lifecycle contract (WS1, 2026-08-24). ML Kit's bundled Latin
+     * recognizer is cheap to hold and expensive to re-init per screen entry, and once closed
+     * a `TextRecognizer` client never recovers on its own; [CardOcrAnalyzer] self-heals
+     * instead by recreating its internal client on demand, so downgrading this to a
+     * non-singleton scope is unnecessary.
      */
     @Provides
     @Singleton

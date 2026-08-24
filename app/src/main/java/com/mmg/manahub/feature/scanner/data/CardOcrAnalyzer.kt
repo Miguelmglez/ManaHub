@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.scanner.data
 
 import android.media.Image
+import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
@@ -8,6 +9,7 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer.Companion.NAME_ZONE_BOTTOM_FRACTION
 import com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer.Companion.NAME_ZONE_TOP_FRACTION
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -24,7 +26,25 @@ import kotlinx.coroutines.tasks.await
  * Smart filters (card-type-line keywords, rules-text phrases, OCR artefact cleanup)
  * further reduce false positives from artwork text or bottom card body.
  *
- * The recognizer client is created lazily and released on [close].
+ * ### Lifecycle contract (WS1, 2026-08-24)
+ * This class is a Hilt `@Singleton` — one instance for the whole process (see
+ * `ScannerModule.provideCardOcrAnalyzer`). **The UI must never call [close]**: a screen is
+ * disposed far more often than the process is torn down (leaving the scanner, rotation, any
+ * Activity recreation), and a closed ML Kit [TextRecognizer] never recovers on its own — every
+ * subsequent [TextRecognizer.process] call throws forever. [close] exists only for tests and
+ * explicit process teardown.
+ *
+ * To make the class resilient even if a client is ever closed out from under it (or ML Kit
+ * itself invalidates the client, e.g. after a Play Services module update), the recognizer is
+ * held in a nullable, `@Volatile` field instead of `by lazy` and is **recreated on demand**:
+ * - [getOrCreateRecognizer] lazily (re)builds the client the first time it is needed.
+ * - [recreateIfNeeded] proactively ensures a live client exists; call this on scanner
+ *   (re)entry from the screen so the very first frame of a new session never pays the
+ *   recreate-on-failure cost.
+ * - [extractCardName] detects the "client already closed / unavailable" failure signature
+ *   ([IllegalStateException], or [MlKitException] with [MlKitException.NOT_FOUND] /
+ *   [MlKitException.UNAVAILABLE]) and recreates the client **once**, retrying that same frame
+ *   once, before giving up. Any other exception is treated as a soft per-frame failure (`null`).
  *
  * Supported script:
  * - Latin (EN/ES/DE/FR/IT/PT): [TextRecognizerOptions.DEFAULT_OPTIONS]
@@ -46,8 +66,31 @@ class CardOcrAnalyzer {
         const val NAME_ZONE_BOTTOM_FRACTION = 0.60f
     }
 
-    private val recognizerLazy = lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
-    private val recognizer: TextRecognizer by recognizerLazy
+    /**
+     * The live ML Kit client, or `null` when none has been built yet (first use) or the
+     * previous one was explicitly [close]d. `@Volatile` + [recognizerLock] so concurrent
+     * frames can never race two clients into existence.
+     */
+    @Volatile private var recognizer: TextRecognizer? = null
+    private val recognizerLock = Any()
+
+    private fun getOrCreateRecognizer(): TextRecognizer {
+        recognizer?.let { return it }
+        synchronized(recognizerLock) {
+            recognizer?.let { return it }
+            val fresh = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            recognizer = fresh
+            return fresh
+        }
+    }
+
+    /**
+     * Ensures a live client exists without waiting for the first frame to discover it is
+     * missing. Call this when the scanner screen (re)enters composition.
+     */
+    fun recreateIfNeeded() {
+        getOrCreateRecognizer()
+    }
 
     /**
      * Runs OCR on [mediaImage] and returns the most likely card name within the name zone,
@@ -64,16 +107,56 @@ class CardOcrAnalyzer {
         rotationDegrees: Int,
     ): String? {
         return try {
-            val image = InputImage.fromMediaImage(mediaImage, rotationDegrees)
-            val result = recognizer.process(image).await()
-            extractFromResult(result)
+            runRecognition(mediaImage, rotationDegrees)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            if (com.mmg.manahub.BuildConfig.DEBUG) {
-                android.util.Log.w("CardOcrAnalyzer", "OCR failed", e)
-            } else {
-                android.util.Log.w("CardOcrAnalyzer", "OCR failed: ${e.javaClass.simpleName}")
+            if (isRecognizerUnavailable(e)) {
+                logRecognitionFailure(e, willRetry = true)
+                recreateRecognizer()
+                return try {
+                    runRecognition(mediaImage, rotationDegrees)
+                } catch (retryException: CancellationException) {
+                    throw retryException
+                } catch (retryException: Exception) {
+                    logRecognitionFailure(retryException, willRetry = false)
+                    null
+                }
             }
+            logRecognitionFailure(e, willRetry = false)
             null
+        }
+    }
+
+    private suspend fun runRecognition(mediaImage: Image, rotationDegrees: Int): String? {
+        val image = InputImage.fromMediaImage(mediaImage, rotationDegrees)
+        val result = getOrCreateRecognizer().process(image).await()
+        return extractFromResult(result)
+    }
+
+    /**
+     * True when [e] is the failure signature of a closed/unavailable ML Kit client rather
+     * than an ordinary per-frame recognition failure.
+     */
+    private fun isRecognizerUnavailable(e: Exception): Boolean {
+        if (e is IllegalStateException) return true
+        if (e is MlKitException) {
+            return e.errorCode == MlKitException.NOT_FOUND || e.errorCode == MlKitException.UNAVAILABLE
+        }
+        return false
+    }
+
+    private fun recreateRecognizer() {
+        synchronized(recognizerLock) {
+            recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        }
+    }
+
+    private fun logRecognitionFailure(e: Exception, willRetry: Boolean) {
+        if (com.mmg.manahub.BuildConfig.DEBUG) {
+            android.util.Log.w("CardOcrAnalyzer", "OCR failed (willRetry=$willRetry)", e)
+        } else {
+            android.util.Log.w("CardOcrAnalyzer", "OCR failed: ${e.javaClass.simpleName} (willRetry=$willRetry)")
         }
     }
 
@@ -241,7 +324,15 @@ class CardOcrAnalyzer {
         return if (cleaned.length >= 2) cleaned else null
     }
 
+    /**
+     * Closes the current client and clears the field so the next call rebuilds a fresh one.
+     * **Never call this from the Compose tree** — see the class KDoc lifecycle contract.
+     * Intended for tests and explicit process teardown only.
+     */
     fun close() {
-        if (recognizerLazy.isInitialized()) recognizer.close()
+        synchronized(recognizerLock) {
+            recognizer?.close()
+            recognizer = null
+        }
     }
 }

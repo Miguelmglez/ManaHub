@@ -77,6 +77,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -384,13 +385,21 @@ private fun CameraPreview(
 
     var camera by remember { mutableStateOf<Camera?>(null) }
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
+    // Retained so the merged DisposableEffect below can unbind/clear them on dispose —
+    // previously only [camera] was retained, so dispose could never reach these (F11/W1.3).
+    var boundImageAnalysis by remember { mutableStateOf<ImageAnalysis?>(null) }
+    var boundCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
     val entryPoint = remember {
         EntryPointAccessors
             .fromApplication(context.applicationContext, ScannerEntryPoint::class.java)
     }
     val cardRepository = remember { entryPoint.cardRepository() }
-    val cardOcrAnalyzer = remember { entryPoint.cardOcrAnalyzer() }
+    // recreateIfNeeded() ensures the process-wide ML Kit client is live on every scanner
+    // (re)entry — it is a no-op when the client is already alive (W1.1).
+    val cardOcrAnalyzer = remember {
+        entryPoint.cardOcrAnalyzer().also { it.recreateIfNeeded() }
+    }
     // COMMENTED OUT — TFLite model no longer used in OCR pipeline
     // val cardEmbeddingModel = remember { entryPoint.cardEmbeddingModel() }
 
@@ -418,16 +427,22 @@ private fun CameraPreview(
         recognizer.selectedLanguage = selectedLanguage
     }
 
-    androidx.compose.runtime.DisposableEffect(Unit) {
+    // Single dispose path (W1.3) — order matters:
+    // 1. clearAnalyzer() stops new frames being delivered to the recognizer.
+    // 2. unbindAll() releases the camera session (previously only called before binding,
+    //    never on dispose — the camera stayed bound past screen exit).
+    // 3. recognizerScope.cancel() cancels any in-flight OCR/resolution coroutine.
+    // 4. analysisExecutor.shutdown() runs LAST so it outlives the last delivered frame —
+    //    shutting it down first risks RejectedExecutionException on a frame already
+    //    in-flight to the executor.
+    // Note: CardOcrAnalyzer is a process-wide singleton and must never be closed here —
+    // see CardOcrAnalyzer's KDoc lifecycle contract (W1.1).
+    DisposableEffect(Unit) {
         onDispose {
+            boundImageAnalysis?.clearAnalyzer()
+            boundCameraProvider?.unbindAll()
             recognizerScope.cancel()
             analysisExecutor.shutdown()
-        }
-    }
-
-    androidx.compose.runtime.DisposableEffect(recognizer) {
-        onDispose {
-            recognizer.release()
         }
     }
 
@@ -457,6 +472,7 @@ private fun CameraPreview(
                 androidx.core.content.ContextCompat.getMainExecutor(context),
             )
         }
+        boundCameraProvider = cameraProvider
 
         // ResolutionSelector replaces the deprecated setTargetResolution API (CameraX 1.3+).
         // FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER lets CameraX pick the nearest
@@ -480,6 +496,7 @@ private fun CameraPreview(
             .also { analysis ->
                 analysis.setAnalyzer(analysisExecutor, frameMetadataAnalyzer)
             }
+        boundImageAnalysis = imageAnalysis
 
         runCatching {
             cameraProvider.unbindAll()
