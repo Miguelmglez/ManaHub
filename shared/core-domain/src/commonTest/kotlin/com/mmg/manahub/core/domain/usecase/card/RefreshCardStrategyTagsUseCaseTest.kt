@@ -68,6 +68,7 @@ class RefreshCardStrategyTagsUseCaseTest {
         // Unused by this use case — minimal no-op implementations to satisfy the interface.
         override suspend fun updateCardTags(scryfallId: String, tags: List<CardTag>) = error("unused")
         override suspend fun searchCardByName(query: String): DataResult<Card> = error("unused")
+        override suspend fun searchCardPrintedName(name: String, lang: String): DataResult<Card> = error("unused")
         override suspend fun searchCards(query: String, page: Int, bypassCache: Boolean): DataResult<List<Card>> = error("unused")
         override suspend fun searchCardsPaginated(query: String, page: Int, bypassCache: Boolean): DataResult<PaginatedCards> = error("unused")
         override suspend fun getCardPrints(name: String): DataResult<List<Card>> = error("unused")

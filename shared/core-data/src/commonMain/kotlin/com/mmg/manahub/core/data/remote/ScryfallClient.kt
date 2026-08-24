@@ -47,13 +47,22 @@ class ScryfallClient(
             parameter("exact", name)
         }.body()
 
-    /** Paginated card search. */
+    /**
+     * Paginated card search.
+     *
+     * @param includeMultilingual W2.8 (scanner-reliability-plan.md, 2026-08-24). When true, emits
+     *   `include_multilingual=true` -- the ONLY way Scryfall matches a non-English PRINTED name
+     *   (`lang:<code>` alone is not enough; without this flag Scryfall only searches English
+     *   oracle/printed names). Defaults to `false` so every pre-existing call site is byte-identical
+     *   -- the sole caller passing `true` is [ScryfallRemoteDataSource.searchCardPrintedName].
+     */
     suspend fun searchCards(
         query: String,
         order: String = "name",
         dir: String = "auto",
         unique: String = "cards",
         page: Int = 1,
+        includeMultilingual: Boolean = false,
     ): SearchResultDto =
         httpClient.get("${baseUrl}cards/search") {
             parameter("q", query)
@@ -61,6 +70,7 @@ class ScryfallClient(
             parameter("dir", dir)
             parameter("unique", unique)
             parameter("page", page)
+            if (includeMultilingual) parameter("include_multilingual", "true")
         }.body()
 
     /**

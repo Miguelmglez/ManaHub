@@ -11,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -19,6 +20,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -118,6 +121,123 @@ class ScryfallRemoteDataSourceTest {
             // Both the new paginatedSearches cache AND the pre-existing per-card cards cache must
             // be populated -- individual card lookups elsewhere should benefit too.
             assertTrue(cache.cards.get("id-1") != null, "individual result cards must still populate cache.cards")
+        }
+
+    // ── W2.8 (scanner-reliability-plan.md, 2026-08-24): searchCardPrintedName / include_multilingual ──
+
+    /**
+     * A [ScryfallRemoteDataSource] whose engine returns [responses] IN ORDER and records every
+     * outgoing [HttpRequestData] into [captured] -- used to assert on the actual query parameters
+     * sent (`include_multilingual`, `q`), not just the response shape.
+     */
+    private fun dataSourceCapturingRequests(
+        responses: List<SearchResultDto>,
+        captured: MutableList<HttpRequestData>,
+        cache: ScryfallCache = ScryfallCache(),
+    ): ScryfallRemoteDataSource {
+        var callIndex = 0
+        val engine = MockEngine { request ->
+            captured.add(request)
+            val response = responses[callIndex]
+            callIndex++
+            respond(
+                content = dtoJson.encodeToString(SearchResultDto.serializer(), response),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val httpClient = HttpClient(engine) { install(ContentNegotiation) { json(dtoJson) } }
+        val client = ScryfallClient(httpClient, baseUrl = "https://api.scryfall.com/")
+        return ScryfallRemoteDataSource(
+            api = client,
+            requestQueue = ScryfallRequestQueue(),
+            cache = cache,
+            dispatcherProvider = DispatcherProvider(),
+        )
+    }
+
+    @Test
+    fun `given a printed-name lookup when searchCardPrintedName is called then the request carries include_multilingual=true and the localized name+lang query`() =
+        runTest {
+            val captured = mutableListOf<HttpRequestData>()
+            val response = SearchResultDto(totalCards = 1, hasMore = false, data = listOf(cardDto("id-es-1")))
+            val ds = dataSourceCapturingRequests(responses = listOf(response), captured = captured)
+
+            val result = ds.searchCardPrintedName("Rayo", "es")
+
+            assertTrue(result.isSuccess)
+            assertEquals(1, captured.size)
+            val params = captured.single().url.parameters
+            assertEquals("true", params["include_multilingual"])
+            assertEquals("prints", params["unique"])
+            assertTrue(params["q"]!!.contains("lang:es"), "query must scope the search to the selected language")
+            assertTrue(params["q"]!!.contains("Rayo"), "query must embed the OCR'd printed name")
+        }
+
+    @Test
+    fun `given an existing searchCards caller when it runs then include_multilingual is NEVER sent`() = runTest {
+        val captured = mutableListOf<HttpRequestData>()
+        val response = SearchResultDto(totalCards = 1, hasMore = false, data = listOf(cardDto("id-1")))
+        val ds = dataSourceCapturingRequests(responses = listOf(response), captured = captured)
+
+        ds.searchCards("lightning bolt", page = 1)
+
+        assertEquals(1, captured.size)
+        assertNull(
+            captured.single().url.parameters["include_multilingual"],
+            "pre-existing callers must stay byte-identical -- include_multilingual defaults to false/absent",
+        )
+    }
+
+    @Test
+    fun `given the same raw text when searched via searchCards and searchCardPrintedName then they issue SEPARATE network calls and never share a cache entry`() =
+        runTest {
+            val cache = ScryfallCache()
+            val captured = mutableListOf<HttpRequestData>()
+            val englishOnly = SearchResultDto(totalCards = 1, hasMore = false, data = listOf(cardDto("id-en")))
+            val localized = SearchResultDto(totalCards = 1, hasMore = false, data = listOf(cardDto("id-es")))
+            val ds = dataSourceCapturingRequests(
+                responses = listOf(englishOnly, localized),
+                captured = captured,
+                cache = cache,
+            )
+
+            val plain = ds.searchCards("Rayo")
+            val printed = ds.searchCardPrintedName("Rayo", "es")
+
+            // Two DISTINCT network calls -- the multilingual lookup never reuses (nor pollutes) the
+            // plain search's cache entry, and vice versa (highest-risk item in the plan).
+            assertEquals(2, captured.size)
+            assertTrue(plain.isSuccess)
+            assertTrue(printed.isSuccess)
+            assertEquals("id-en", plain.getOrNull()!!.first().scryfallId)
+            assertEquals("id-es", printed.getOrNull()!!.scryfallId)
+        }
+
+    @Test
+    fun `given the same printed-name lookup when called twice within the TTL then the second call is served from cache with zero network calls`() =
+        runTest {
+            val captured = mutableListOf<HttpRequestData>()
+            val response = SearchResultDto(totalCards = 1, hasMore = false, data = listOf(cardDto("id-es-1")))
+            val ds = dataSourceCapturingRequests(responses = listOf(response), captured = captured)
+
+            ds.searchCardPrintedName("Rayo", "es")
+            ds.searchCardPrintedName("Rayo", "es")
+
+            assertEquals(1, captured.size, "the 2nd identical printed-name lookup must be cached")
+        }
+
+    @Test
+    fun `given no printing exists in the requested language when searchCardPrintedName is called then it fails without throwing`() =
+        runTest {
+            val captured = mutableListOf<HttpRequestData>()
+            val empty = SearchResultDto(totalCards = 0, hasMore = false, data = emptyList())
+            val ds = dataSourceCapturingRequests(responses = listOf(empty), captured = captured)
+
+            val result = ds.searchCardPrintedName("Nonexistent Card", "de")
+
+            assertTrue(result.isFailure)
+            assertFalse(result.exceptionOrNull() is NullPointerException)
         }
 
     @Test

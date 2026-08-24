@@ -102,6 +102,19 @@ interface CardRepository {
     suspend fun getCardByExactName(name: String): Result<Card>
 
     /**
+     * Scanner reliability plan, W2.8 (2026-08-24). Resolves the LOCALIZED printing matching
+     * [name] in [lang] via Scryfall's `include_multilingual` search -- the only way to match a
+     * non-English PRINTED name; [getCardByExactName]/[searchCardByName] hit `/cards/named`, which
+     * is English-only. Used by the card scanner's resolution ladder so a non-English OCR name
+     * resolves straight to its correct localized [Card] (with the right `scryfallId` and
+     * `printedName`) instead of resolving the English print and flagging every non-English scan
+     * as a mismatch. `DataResult.Error` (never a thrown exception) when nothing matches --
+     * callers distinguish "not found" from a real failure the same way every other method on this
+     * interface does (the `"SCRYFALL_404"` sentinel convention).
+     */
+    suspend fun searchCardPrintedName(name: String, lang: String): DataResult<Card>
+
+    /**
      * Executes a raw Scryfall query string and returns matching cards.
      *
      * @param order optional Scryfall `order` param (e.g. `"edhrec"`). Null preserves the historic

@@ -69,6 +69,46 @@ class ScryfallRemoteDataSource(
         }
 
     /**
+     * W2.8 (scanner-reliability-plan.md, 2026-08-24). Resolves the LOCALIZED printing matching
+     * [name] in [lang] via `/cards/search?q=name:"<name>" lang:<lang>&unique:prints
+     * &include_multilingual=true` -- the only endpoint/flag combination that matches a non-English
+     * PRINTED name (`/cards/named` -- [getCardByExactName]/[searchCardByName] -- is English-only,
+     * and `lang:<code>` alone on a plain search is not enough without `include_multilingual`).
+     * Returns Scryfall's first (best) match, or a failure when nothing matches.
+     *
+     * ## Cache-key isolation (highest-risk item in the plan)
+     * Keyed under the `"printed:"` namespace in [ScryfallCache.cardNames] -- a namespace no other
+     * method in this class ever writes to. This is deliberate, not incidental: every other cache
+     * key in [ScryfallCache] (`"fuzzy:"`, `"exact:"`, `"setnum:"` in [ScryfallCache.cardNames];
+     * bare `"$query:$page"` in [ScryfallCache.searches]; `"paginated:$query:$page"` in
+     * [ScryfallCache.paginatedSearches]) is written ONLY by a call path that passes
+     * `includeMultilingual = false` to [ScryfallClient.searchCards] -- this is the SOLE call site
+     * in the codebase passing `true`. A multilingual result can therefore never be served back to
+     * an English-only caller (or vice versa): they never share a key, and they never share a
+     * network call, regardless of how similar the raw query text is.
+     */
+    suspend fun searchCardPrintedName(name: String, lang: String): Result<Card> =
+        safeCall {
+            val safeName = name.replace("\"", "").replace("\\", "").trim()
+            val safeLang = lang.lowercase().filter { it.isLetter() }
+            require(safeName.isNotBlank()) { "blank card name" }
+            val cacheKey = "printed:${safeName.lowercase()}:$safeLang:multilingual"
+            cache.cardNames.getOrFetch(cacheKey) {
+                val response = requestQueue.execute {
+                    api.searchCards(
+                        query = "name:\"$safeName\" lang:$safeLang",
+                        unique = "prints",
+                        includeMultilingual = true,
+                    )
+                }
+                val card = response.data.toDomain().firstOrNull()
+                    ?: throw NoSuchElementException("no $safeLang printing found for '$safeName'")
+                cache.cards.put(card.scryfallId, card)
+                card
+            }
+        }
+
+    /**
      * Searches Scryfall for cards matching [query], page [page].
      *
      * Results are memoised in [ScryfallCache.searches] keyed by `query:page`. When [bypassCache]
