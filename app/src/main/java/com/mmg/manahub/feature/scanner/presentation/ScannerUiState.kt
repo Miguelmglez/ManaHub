@@ -72,6 +72,12 @@ data class ScanSession(
  *                                  present in the user's collection — feeds the "already in
  *                                  collection" badge in [QueueCardItem]. Kept up to date by a
  *                                  [ScannerViewModel] collector on `UserCardRepository.observeCollection()`.
+ * @property rateLimitedUntilMs     W2.10 (scanner-reliability-plan.md, 2026-08-24). Wall-clock
+ *                                  epoch millis until which [CardRecognizer] is suspending every
+ *                                  Scryfall lookup after the shared rate limiter exhausted its
+ *                                  retries. `null` when no cooldown is active. Feeds the
+ *                                  "Scryfall busy — retrying in Ns" badge via
+ *                                  `rememberRateLimitCountdownSeconds`.
  */
 data class ScannerUiState(
     val isFlashOn: Boolean = false,
@@ -107,8 +113,12 @@ data class ScannerUiState(
     val isAutoDeleteOnAddEnabled: Boolean = false,
     // "Already in collection" badge — live identity-key set, see KDoc above
     val ownedCardIdentityKeys: Set<String> = emptySet(),
-    // Language mismatch indicator (Quick Mode only)
+    // Purely informational since W2.11 (2026-08-24): true when the resolved card is an
+    // English-fallback printing (no printing exists in the selected non-English language). The
+    // card IS still added — this only drives the "no <lang> printing found — added as EN" badge.
     val languageMismatch: Boolean = false,
+    // W2.10 (2026-08-24): active Scryfall rate-limit cooldown — see the field KDoc above.
+    val rateLimitedUntilMs: Long? = null,
     // Ambiguity resolution (normal mode only)
     val showAmbiguitySelector: Boolean = false,
     // Card Detail overlay (Phase 2 scanner UX, 2026-07-17)

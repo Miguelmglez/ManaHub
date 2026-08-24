@@ -127,6 +127,7 @@ import com.mmg.manahub.core.ui.components.MagicToastHost
 import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.VariantSelectorSheet
 import com.mmg.manahub.core.ui.components.rememberMagicToastState
+import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.LocalPreferredCurrency
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -223,15 +224,31 @@ fun ScannerScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
                 ) {
-                    DetectedCardOverlay(
-                        card = uiState.lastDetectedCard,
-                        isSearching = uiState.isSearching,
-                        error = uiState.error,
-                        languageMismatch = uiState.languageMismatch,
-                        isFoil = uiState.selectedIsFoil,
-                        preferredCurrency = preferredCurrency,
-                        onClick = { uiState.lastDetectedCard?.scryfallId?.let { viewModel.onOpenCardDetail(it, fromQueue = false) } },
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // W2.10: rate-limit cooldown badge. initialRetryAfterMs is captured ONCE
+                        // per distinct rateLimitedUntilMs value (remember-keyed) so the countdown
+                        // ticks down locally instead of restarting every recomposition — see
+                        // rememberRateLimitCountdownSeconds's KDoc.
+                        val rateLimitedUntilMs = uiState.rateLimitedUntilMs
+                        val initialRetryAfterMs = remember(rateLimitedUntilMs) {
+                            rateLimitedUntilMs?.let { (it - System.currentTimeMillis()).coerceAtLeast(0L) }
+                        }
+                        val rateLimitedRemainingSeconds = rememberRateLimitCountdownSeconds(initialRetryAfterMs)
+                        if (rateLimitedUntilMs != null && rateLimitedRemainingSeconds > 0) {
+                            RateLimitedBadge(remainingSeconds = rateLimitedRemainingSeconds)
+                        }
+
+                        DetectedCardOverlay(
+                            card = uiState.lastDetectedCard,
+                            isSearching = uiState.isSearching,
+                            error = uiState.error,
+                            languageMismatch = uiState.languageMismatch,
+                            selectedLanguage = uiState.selectedLanguage,
+                            isFoil = uiState.selectedIsFoil,
+                            preferredCurrency = preferredCurrency,
+                            onClick = { uiState.lastDetectedCard?.scryfallId?.let { viewModel.onOpenCardDetail(it, fromQueue = false) } },
+                        )
+                    }
                 }
 
                 if (uiState.showAmbiguitySelector && uiState.lastDetectedCard != null) {
@@ -402,6 +419,9 @@ private fun CameraPreview(
     val cardOcrAnalyzer = remember {
         entryPoint.cardOcrAnalyzer().also { it.recreateIfNeeded() }
     }
+    // W2.7: local-first Room lookup so a card the user already owns/has cached resolves with
+    // zero network calls — see CardRecognizer's KDoc "Call-budget pipeline".
+    val cardDao = remember { entryPoint.cardDao() }
     // COMMENTED OUT — TFLite model no longer used in OCR pipeline
     // val cardEmbeddingModel = remember { entryPoint.cardEmbeddingModel() }
 
@@ -417,7 +437,8 @@ private fun CameraPreview(
             cardRepository = cardRepository,
             cardOcrAnalyzer = cardOcrAnalyzer,
             scope = recognizerScope,
-            selectedLanguage = selectedLanguage,
+            cardDao = cardDao,
+            initialLanguage = selectedLanguage,
             onResult = onRecognitionResult,
             // COMMENTED OUT — embedding params replaced by OCR
             // embeddingDatabase = embeddingDatabase,
@@ -425,8 +446,20 @@ private fun CameraPreview(
         )
     }
 
+    // The custom setter on CardRecognizer.selectedLanguage (W2.11) transparently resets the
+    // negative cache, the resolution generation, the pre-resolution stability buffer, the local
+    // 3s memo, and any active rate-limit cooldown whenever the value actually changes — this
+    // effect only needs to forward the new value, no extra reset call needed here.
     LaunchedEffect(selectedLanguage) {
         recognizer.selectedLanguage = selectedLanguage
+    }
+
+    // W2.9: bump the resolution generation the moment recognition pauses (top-bar toggle or any
+    // covering sheet/overlay) so an in-flight resolution attempt's result is dropped instead of
+    // surfacing late after the user has moved on. isPaused already ORs in every pause source at
+    // the call site (see the isRecognitionPaused computation above).
+    LaunchedEffect(isPaused) {
+        if (isPaused) recognizer.bumpGeneration()
     }
 
     // Single dispose path (W1.3) — order matters:
@@ -678,6 +711,8 @@ private class FrameMetadataAnalyzer(
 interface ScannerEntryPoint {
     fun cardRepository(): com.mmg.manahub.core.domain.repository.CardRepository
     fun cardOcrAnalyzer(): CardOcrAnalyzer
+    /** W2.7: local-first Room lookup for [CardRecognizer] — already Hilt-provided for [com.mmg.manahub.core.data.repository.CardRepositoryImpl]. */
+    fun cardDao(): com.mmg.manahub.core.data.local.dao.CardDao
     // COMMENTED OUT — TFLite embedding model replaced by ML Kit OCR
     // fun cardEmbeddingModel(): CardEmbeddingModel
 }
@@ -882,14 +917,24 @@ private fun TopScannerControls(
 /**
  * Language codes for which on-device OCR recognition is available. Scanner-only restriction —
  * [CardConstants.languages] itself stays untouched (AddCard's Scryfall search-by-language must
- * keep offering every language Scryfall indexes, ja/ko included; that's independent of what
- * [com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer] can recognize on a physical card).
+ * keep offering every language Scryfall indexes, ja/ko/ru/zhs/zht included; that's independent of
+ * what [com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer] can recognize on a physical card).
  *
  * ja/ko excluded 2026-07-22 (Android 16 / API 36 migration): the ML Kit `-japanese`/`-korean`
  * text-recognition artefacts were removed end-to-end (native libs not 16KB-page-size aligned,
  * no fixed release upstream) — see [com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer].
+ *
+ * ru/zhs/zht ALSO excluded (W2.12, scanner-reliability-plan.md finding F10, 2026-08-24): the
+ * bundled recognizer is [com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS]
+ * -- Latin script ONLY. Cyrillic and Chinese glyphs can never be read from a physical card
+ * regardless of which language is selected here, so offering them was pure wasted Scryfall
+ * requests (every scan would fall through the same failing-lookup path as F6). The remaining set
+ * (en/es/de/fr/it/pt) matches exactly the language set [com.mmg.manahub.feature.scanner.data.CardOcrAnalyzer]'s
+ * keyword-penalty scoring understands.
  */
-private val OCR_SUPPORTED_LANGUAGES = CardConstants.languages.filterNot { (code, _) -> code == "ja" || code == "ko" }
+private val OCR_SUPPORTED_LANGUAGES = CardConstants.languages.filter { (code, _) ->
+    code in setOf("en", "es", "de", "fr", "it", "pt")
+}
 
 /**
  * Language selector bottom sheet — visual/behavioral twin of `AddCardScreen`'s private
@@ -969,6 +1014,7 @@ private fun DetectedCardOverlay(
     isSearching: Boolean,
     error: String?,
     languageMismatch: Boolean,
+    selectedLanguage: String,
     isFoil: Boolean,
     preferredCurrency: PreferredCurrency,
     onClick: () -> Unit,
@@ -991,6 +1037,26 @@ private fun DetectedCardOverlay(
         ) {
             if (card != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // W2.11: purely informational — the card is added regardless. languageMismatch
+                    // here means "no <selectedLanguage> printing exists, added the English print".
+                    if (languageMismatch) {
+                        Surface(
+                            color = mc.goldMtg.withAlpha(0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    R.string.scanner_language_fallback_added_as_en,
+                                    selectedLanguage.uppercase(),
+                                ),
+                                style = ty.labelSmall,
+                                color = mc.goldMtg,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1101,6 +1167,31 @@ private fun DetectedCardOverlay(
     }
 }
 
+/**
+ * W2.10 badge: shown above [DetectedCardOverlay] while [CardRecognizer]'s active rate-limit
+ * cooldown ([ScannerUiState.rateLimitedUntilMs]) is running. OCR keeps highlighting text in the
+ * name zone underneath — only Scryfall lookups are suspended — so this reads as a status strip,
+ * not a full-screen block.
+ */
+@Composable
+private fun RateLimitedBadge(remainingSeconds: Int, modifier: Modifier = Modifier) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    Surface(
+        color = mc.lifeNegative.withAlpha(0.15f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = stringResource(R.string.scanner_rate_limited_retrying, remainingSeconds),
+            style = ty.labelSmall,
+            color = mc.lifeNegative,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Scan Queue Sheet

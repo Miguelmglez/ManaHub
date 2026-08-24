@@ -42,7 +42,13 @@ import org.junit.Test
  *   confirms the card ([HIGH_CONFIDENCE_FRAMES]=1)
  * - Anti-duplicate guard: same card within 800 ms is blocked
  * - Set lock filter: mismatched setCode is rejected before stability
- * - Language mismatch: language != "en" sets languageMismatch flag
+ * - Language fallback (W2.11, 2026-08-24): informational only — a fallback add sets
+ *   languageMismatch as a badge but the card IS added; a genuine localized-printing hit never
+ *   sets it
+ * - Rate-limit cooldown (W2.10): RecognitionResult.RateLimited sets rateLimitedUntilMs
+ * - onLanguageSelected resets: clears rateLimitedUntilMs/languageMismatch (the CardRecognizer-side
+ *   reset — negative cache/generation/stability buffer — is Composable-scoped, covered by
+ *   CardRecognizerTest instead, see that class's KDoc)
  * - Ambiguity selector: ambiguous → showAmbiguitySelector=true
  * - UI toggle actions: flash, queue sheet, sound
  *
@@ -96,15 +102,22 @@ class ScannerViewModelTest {
      * Default [similarity] is 0.85f — above the acceptance threshold (0.80) but below the
      * high-confidence threshold (0.90) — so tests that call this without overriding similarity
      * exercise the 3-frame stability path.  Pass similarity ≥ 0.90f to test the 1-frame path.
+     *
+     * [languageFallback] defaults to false — W2.11 (scanner-reliability-plan.md, 2026-08-24):
+     * true simulates `CardRecognizer` resolving an English-fallback printing because no printing
+     * exists in the selected language (informational badge, card is still added).
      */
     private fun identified(
         ambiguous: Boolean = false,
         similarity: Float = 0.85f,
+        card: com.mmg.manahub.core.model.Card = defaultCard,
+        languageFallback: Boolean = false,
     ) = RecognitionResult.Identified(
-        card = defaultCard,
+        card = card,
         similarity = similarity,
         ambiguous = ambiguous,
         corners = fakeCorners,
+        languageFallback = languageFallback,
     )
 
     // ── Setup / Teardown ───────────────────────────────────────────────────────
@@ -164,6 +177,7 @@ class ScannerViewModelTest {
         assertTrue(state.isSoundEnabled)
         assertTrue(state.hasFlash)             // defaults to true until hardware confirms
         assertFalse(state.isFlashOn)
+        assertNull(state.rateLimitedUntilMs)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -283,31 +297,113 @@ class ScannerViewModelTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  GROUP 6 — Language mismatch
+    //  GROUP 6 — Language fallback (W2.11, 2026-08-24 — informational, never blocks the add)
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun onRecognitionResult_languageMismatch_setsFlag() = runTest {
-        // Arrange — selectedLanguage = "ja", card.lang = "en"
-        // The language filter only triggers when selectedLanguage != "en"
-        viewModel.onLanguageSelected("ja")
+    fun onRecognitionResult_languageFallback_addsCardAndSetsInformationalBadge() = runTest {
+        // Arrange — user selected "es", but CardRecognizer found no Spanish printing and fell
+        // back to the English one (languageFallback = true on the incoming result).
+        viewModel.onLanguageSelected("es")
 
         // Act
-        viewModel.onRecognitionResult(identified(similarity = 1.0f))
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = true))
         advanceUntilIdle()
 
-        // Assert — languageMismatch is true; card was NOT auto-added
+        // Assert — languageMismatch surfaces the informational badge, but the card IS added.
         val state = viewModel.uiState.value
         assertTrue(
-            "Language mismatch flag should be set when card.lang != selectedLanguage",
+            "languageMismatch must be set as an informational badge for a fallback add",
             state.languageMismatch,
         )
-        // Card is shown in bottom bar (lastDetectedCard set) but session is empty
         assertNotNull(state.lastDetectedCard)
-        assertTrue(
-            "Session should be empty when language mismatch",
+        assertFalse(
+            "A language-fallback result must still be added to the session, never silently refused",
             state.scanSession.cards.isEmpty(),
         )
+        assertEquals(defaultCard.scryfallId, state.scanSession.cards.first().card.scryfallId)
+    }
+
+    @Test
+    fun onRecognitionResult_localizedPrinting_neverSetsLanguageMismatch() = runTest {
+        // Arrange — the normal (non-fallback) case: CardRecognizer resolved the ACTUAL localized
+        // printing, so languageFallback = false even though selectedLanguage != "en".
+        viewModel.onLanguageSelected("es")
+
+        // Act
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = false))
+        advanceUntilIdle()
+
+        // Assert — no badge, card added normally.
+        val state = viewModel.uiState.value
+        assertFalse(
+            "A genuine localized-printing hit must never show the fallback badge",
+            state.languageMismatch,
+        )
+        assertFalse(state.scanSession.cards.isEmpty())
+    }
+
+    @Test
+    fun onRecognitionResult_englishSelected_languageFallbackNeverFires() = runTest {
+        // Arrange — default selectedLanguage = "en"; CardRecognizer never sets languageFallback
+        // = true on the English ladder, but this asserts the ViewModel trusts the flag either way.
+        // Act
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = false))
+        advanceUntilIdle()
+
+        // Assert
+        assertFalse(viewModel.uiState.value.languageMismatch)
+        assertFalse(viewModel.uiState.value.scanSession.cards.isEmpty())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6b — RecognitionResult.RateLimited (W2.10, 2026-08-24)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onRecognitionResult_rateLimited_setsRateLimitedUntilMsAndStopsSearching() = runTest {
+        // Arrange
+        val beforeMs = System.currentTimeMillis()
+
+        // Act
+        viewModel.onRecognitionResult(RecognitionResult.RateLimited(retryAfterMs = 5_000L))
+        advanceUntilIdle()
+
+        // Assert
+        val state = viewModel.uiState.value
+        assertFalse(state.isSearching)
+        assertNotNull(state.rateLimitedUntilMs)
+        assertTrue(
+            "rateLimitedUntilMs must be roughly now + retryAfterMs",
+            state.rateLimitedUntilMs!! >= beforeMs + 5_000L,
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 6c — onLanguageSelected resets (W2.11, 2026-08-24)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onLanguageSelected_clearsRateLimitedUntilMsAndLanguageMismatch() = runTest {
+        // Arrange — reach a state with both flags set.
+        viewModel.onLanguageSelected("es")
+        viewModel.onRecognitionResult(RecognitionResult.RateLimited(retryAfterMs = 30_000L))
+        viewModel.onRecognitionResult(identified(similarity = 1.0f, languageFallback = true))
+        advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.rateLimitedUntilMs)
+        assertTrue(viewModel.uiState.value.languageMismatch)
+
+        // Act — switching language again is a fresh scanning intent.
+        viewModel.onLanguageSelected("de")
+
+        // Assert
+        val state = viewModel.uiState.value
+        assertEquals("de", state.selectedLanguage)
+        assertNull(
+            "onLanguageSelected must clear a stale rate-limit cooldown badge from the OLD language",
+            state.rateLimitedUntilMs,
+        )
+        assertFalse(state.languageMismatch)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

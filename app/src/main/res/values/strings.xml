@@ -307,6 +307,8 @@
     <string name="scanner_view_detail">View card detail</string>
     <string name="scanner_sound_effects">Sound effects</string>
     <string name="scanner_language_mismatch">Language mismatch</string>
+    <string name="scanner_language_fallback_added_as_en">No %1$s printing found — added as EN</string>
+    <string name="scanner_rate_limited_retrying">Scryfall busy — retrying in %1$ds</string>
     <string name="scanner_ambiguous_match">Ambiguous match — confirm or skip</string>
     <string name="scanner_confirm">Confirm</string>
     <string name="scanner_skip">Skip</string>

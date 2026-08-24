@@ -50,9 +50,15 @@ import javax.inject.Inject
  *   hasn't moved the camera.
  * - **Set lock filter**: when [ScannerUiState.lockedSetCode] is non-null, only cards
  *   whose [Card.setCode] matches are processed; others are silently ignored.
- * - **Language mismatch**: when [ScannerUiState.selectedLanguage] is not "en" and the
- *   scanned card's [Card.lang] differs, the card is displayed but not auto-added in
- *   Quick Mode, and a [ScannerUiState.languageMismatch] indicator is shown.
+ * - **Language fallback (informational only, W2.11)**: [CardRecognizer] resolves the LOCALIZED
+ *   printing whenever one exists, so [Card.lang] normally matches [ScannerUiState.selectedLanguage]
+ *   already. When no printing exists in the selected language, [CardRecognizer] falls back to the
+ *   English printing and flags [RecognitionResult.Identified.languageFallback] — the card is
+ *   still added (never silently refused), with [ScannerUiState.languageMismatch] surfacing a
+ *   non-blocking "no <lang> printing found — added as EN" badge.
+ * - **Rate-limit cooldown (W2.10)**: [RecognitionResult.RateLimited] sets
+ *   [ScannerUiState.rateLimitedUntilMs] — the recognizer suspends all further lookups until it
+ *   elapses, and the UI shows a countdown badge instead of a card.
  * - **Ambiguity selector**: when the recognition result is ambiguous and the scanner is
  *   in normal mode (not Quick, not Lookup Only), a dialog is shown to let the user confirm.
  *
@@ -116,9 +122,6 @@ class ScannerViewModel @Inject constructor(
 
         /** Minimum time in ms before the same card can be added again. */
         private const val ANTI_DUPLICATE_MS = 800L
-
-        /** Default language code — used to determine when the language filter is active. */
-        private const val DEFAULT_LANGUAGE = "en"
 
         /** SharedPreferences file name for scanner settings. */
         private const val PREF_FILE = "scanner_prefs"
@@ -312,6 +315,20 @@ class ScannerViewModel @Inject constructor(
                 }
             }
 
+            is RecognitionResult.RateLimited -> {
+                // W2.10: the shared Scryfall rate limiter exhausted its retries. OCR keeps
+                // running (CardRecognizer only suspends the NETWORK half of the pipeline), so
+                // the detected-card overlay/searching indicator just steps back to idle while
+                // the countdown badge (rememberRateLimitCountdownSeconds, fed by
+                // rateLimitedUntilMs) takes over.
+                _uiState.update {
+                    it.copy(
+                        isSearching = false,
+                        rateLimitedUntilMs = System.currentTimeMillis() + result.retryAfterMs,
+                    )
+                }
+            }
+
             is RecognitionResult.Identified -> {
                 _uiState.update {
                     it.copy(detectedCorners = result.corners.ifEmpty { null })
@@ -353,11 +370,14 @@ class ScannerViewModel @Inject constructor(
 
                 val confirmedState = _uiState.value
 
-                // Skip adding if already in session with same attributes
+                // Skip adding if already in session with same attributes. Language identity
+                // tracks the RESOLVED printing's language (result.card.lang), not the mode-bar
+                // filter (confirmedState.selectedLanguage) — see addToSession's KDoc (W2.11):
+                // ScannedCard.language must be truthful data, so its identity key must match.
                 val isInSession = confirmedState.scanSession.cards.any { entry ->
                     entry.card.scryfallId == result.card.scryfallId &&
                             entry.isFoil == confirmedState.selectedIsFoil &&
-                            entry.language == confirmedState.selectedLanguage &&
+                            entry.language == result.card.lang &&
                             entry.condition == confirmedState.selectedCondition
                 }
 
@@ -366,14 +386,14 @@ class ScannerViewModel @Inject constructor(
                     return
                 }
 
-                if (confirmedState.selectedLanguage != DEFAULT_LANGUAGE &&
-                    result.card.lang != confirmedState.selectedLanguage
-                ) {
-                    _uiState.update { it.copy(languageMismatch = true) }
-                    return
-                }
-
-                _uiState.update { it.copy(languageMismatch = false) }
+                // W2.11 (2026-08-24): with the localized resolution ladder (CardRecognizer), a
+                // non-English selection normally resolves the LOCALIZED printing directly, so
+                // result.card.lang == confirmedState.selectedLanguage in the common case and
+                // languageMismatch never fires. result.languageFallback is set ONLY when no
+                // printing exists in the selected language and CardRecognizer fell back to the
+                // English printing — that case is now purely informational (a badge), never a
+                // reason to refuse the add.
+                _uiState.update { it.copy(languageMismatch = result.languageFallback) }
 
                 if (result.ambiguous) {
                     _uiState.update {
@@ -420,13 +440,21 @@ class ScannerViewModel @Inject constructor(
      * Merges [card] into the current [ScanSession] and persists the updated queue.
      * Increments quantity if an entry with the same key (scryfallId + isFoil + language + condition)
      * already exists; otherwise appends a new [ScannedCard].
+     *
+     * [ScannedCard.language] stores [Card.lang] (the RESOLVED printing's real language), NOT
+     * [ScannerUiState.selectedLanguage] (the mode-bar filter) — W2.11 (scanner-reliability-plan.md,
+     * 2026-08-24). The two coincide in the normal case (the resolution ladder resolves the
+     * localized printing when one exists), but on an English-fallback add
+     * ([RecognitionResult.Identified.languageFallback] = true) `card.lang` is `"en"` while
+     * [ScannerUiState.selectedLanguage] might still be e.g. `"es"` — the user's collection must
+     * reflect the actual printing they now own, not the filter they had selected when scanning.
      */
     private fun addToSession(card: Card) {
         _uiState.update { state ->
             val existingIndex = state.scanSession.cards.indexOfFirst { entry ->
                 entry.card.scryfallId == card.scryfallId &&
                     entry.isFoil == state.selectedIsFoil &&
-                    entry.language == state.selectedLanguage &&
+                    entry.language == card.lang &&
                     entry.condition == state.selectedCondition
             }
             val updatedCards = if (existingIndex >= 0) {
@@ -440,7 +468,7 @@ class ScannerViewModel @Inject constructor(
                     card = card,
                     quantity = state.selectedQuantity,
                     isFoil = state.selectedIsFoil,
-                    language = state.selectedLanguage,
+                    language = card.lang,
                     condition = state.selectedCondition,
                     setCode = card.setCode,
                     timestamp = System.currentTimeMillis(),
@@ -626,9 +654,29 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { it.copy(selectedIsFoil = !it.selectedIsFoil) }
     }
 
-    /** Updates the selected language code. */
+    /**
+     * Updates the selected scan language.
+     *
+     * Also clears [ScannerUiState.rateLimitedUntilMs] (W2.11, scanner-reliability-plan.md,
+     * 2026-08-24) — switching language is a strong signal the user is starting a fresh scanning
+     * intent, so the badge shouldn't keep counting down against the OLD language's failed
+     * attempt; the shared `com.mmg.manahub.core.data.network.RateLimitedQueue` still enforces its
+     * own cooldown server-side regardless, so this only affects how eagerly the UI lets a new
+     * attempt be tried, never bypasses the shared limiter.
+     *
+     * The CardRecognizer-side half of the reset (negative cache, resolution generation,
+     * pre-resolution stability buffer, local 3s memo — see `CardRecognizer`'s KDoc) fires via
+     * `CardRecognizer.selectedLanguage`'s custom setter when `ScannerScreen`'s
+     * `LaunchedEffect(selectedLanguage)` forwards this new value on the next recomposition.
+     * `CardRecognizer` is a Composable-scoped dependency (excluded from KMP, Hilt-entry-point
+     * constructed per screen entry), not a ViewModel-owned one, so that half of the reset is unit
+     * tested in `CardRecognizerTest`, not here — this project has no Compose UI test
+     * infrastructure to exercise the cross-layer wiring directly.
+     */
     fun onLanguageSelected(language: String) {
-        _uiState.update { it.copy(selectedLanguage = language, languageMismatch = false) }
+        _uiState.update {
+            it.copy(selectedLanguage = language, languageMismatch = false, rateLimitedUntilMs = null)
+        }
     }
 
     /** Updates the selected condition code. */
