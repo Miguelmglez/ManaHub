@@ -59,6 +59,23 @@ abstract class CardDao {
     @Query("SELECT * FROM cards WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
     abstract fun searchByName(query: String): Flow<List<CardEntity>>
 
+    /**
+     * Scanner reliability plan, W2.7 (2026-08-24): local-first card-name lookup for
+     * `CardRecognizer` so a card the user already owns/has cached resolves with ZERO network
+     * calls. Exact, case-insensitive name match (unlike [searchByName]'s substring `LIKE`).
+     * Prefers a row already cached in [lang] (`ORDER BY CASE WHEN lang = :lang THEN 0 ELSE 1 END`)
+     * but falls back to the most recently cached printing in ANY language rather than returning
+     * nothing -- the caller (`CardRecognizer`) treats a language-mismatched local hit the same way
+     * as a language-mismatched network hit (informational "added as EN" badge), never a hard miss.
+     */
+    @Query("""
+        SELECT * FROM cards
+        WHERE LOWER(name) = LOWER(:name)
+        ORDER BY CASE WHEN lang = :lang THEN 0 ELSE 1 END, cached_at DESC
+        LIMIT 1
+    """)
+    abstract suspend fun findByExactNameForLanguage(name: String, lang: String): CardEntity?
+
     @Query("SELECT COUNT(*) > 0 FROM cards WHERE scryfall_id = :id AND cached_at > :minCachedAt")
     abstract suspend fun isCacheValid(id: String, minCachedAt: Long): Boolean
 

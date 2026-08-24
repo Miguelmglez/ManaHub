@@ -4,12 +4,16 @@ import android.media.Image
 import androidx.camera.core.ImageInfo
 import androidx.camera.core.ImageProxy
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.mmg.manahub.core.data.local.dao.CardDao
+import com.mmg.manahub.core.data.network.RateLimitExhaustedException
 import com.mmg.manahub.core.domain.repository.CardRepository
+import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.feature.scanner.domain.model.OcrCandidate
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.util.TestFixtures
 import io.mockk.CapturingSlot
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -33,21 +37,29 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Unit tests for [CardRecognizer]'s WS1 guard/resource-ownership contract:
- * - The in-flight guard ([isProcessing]) and the per-frame [ImageProxy] are owned by the
- *   launched coroutine and released on EVERY path via `finally`.
- * - A stuck OCR call is bounded by [CardRecognizer.OCR_TIMEOUT_MS].
- * - A latched guard is recovered by the stall watchdog after
- *   [CardRecognizer.STALL_THRESHOLD_MS].
- * - Cancellation is rethrown, never reported as a soft [RecognitionResult.NoCard].
+ * Unit tests for [CardRecognizer]'s two responsibilities:
+ * - WS1's guard/resource-ownership contract (in-flight guard, timeout, stall watchdog, cancellation).
+ * - WS2.B's call-budget pipeline (pre-resolution stability, negative cache, local-first Room
+ *   lookup, rolling lookup budget, the ≤2-call resolution ladder, staleness rejection, rate-limit
+ *   propagation) — see `docs/plans/scanner-reliability-plan.md`.
  *
  * Name-extraction accuracy (zone maths, keyword scoring) is WS2.A scope, not covered here.
+ *
+ * ### Two-frame stability in tests
+ * [CardRecognizer.analyze] now requires the SAME normalized OCR text on
+ * [CardRecognizer.STABILITY_FRAMES_PRE_RESOLUTION] (= 2) consecutive PROCESSED frames before any
+ * repository/DAO call. [stabilize] sends one throwaway priming frame (via a separate,
+ * untracked [ImageProxy] mock) with the same candidate text queued for the test's real
+ * [imageProxy], bypassing the real 800 ms wall-clock throttle via the same reflection technique
+ * [setLongField] already used for the stall-watchdog tests — so every pre-existing single-frame
+ * test now sends 2 frames and asserts against the SECOND (real, tracked) [ImageProxy].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CardRecognizerTest {
 
     private val cardOcrAnalyzer: CardOcrAnalyzer = mockk()
     private val cardRepository: CardRepository = mockk()
+    private val cardDao: CardDao = mockk(relaxed = true) // relaxed: null (no local-cache hit) by default
     private val crashlytics: FirebaseCrashlytics = mockk(relaxed = true)
 
     private val defaultCard = TestFixtures.buildCard(
@@ -63,6 +75,11 @@ class CardRecognizerTest {
     fun setUp() {
         mockkStatic(FirebaseCrashlytics::class)
         every { FirebaseCrashlytics.getInstance() } returns crashlytics
+        // MockK's relaxed mode returns an auto-generated (non-null, all-default-field) CardEntity
+        // for an UNSTUBBED nullable-returning call rather than null -- an explicit default here
+        // keeps "no local Room hit" the actual default for every test; the local-first-lookup
+        // test overrides this per-name.
+        coEvery { cardDao.findByExactNameForLanguage(any(), any()) } returns null
     }
 
     @After
@@ -100,35 +117,70 @@ class CardRecognizerTest {
         field.setLong(this, value)
     }
 
+    /** Resets the real wall-clock throttle so the next [analyze] call is not dropped. */
+    private fun CardRecognizer.bypassThrottle() {
+        setLongField("lastProcessedMs", 0L)
+    }
+
+    private fun defaultRecognizer(
+        scope: CoroutineScope,
+        dispatcher: kotlinx.coroutines.CoroutineDispatcher,
+        onResult: (RecognitionResult) -> Unit,
+    ) = CardRecognizer(
+        cardRepository = cardRepository,
+        cardOcrAnalyzer = cardOcrAnalyzer,
+        scope = scope,
+        cardDao = cardDao,
+        ioDispatcher = dispatcher,
+        onResult = onResult,
+    )
+
+    /**
+     * Sends a throwaway PRIMING frame carrying the same OCR text the caller is about to send for
+     * real, satisfying [CardRecognizer.STABILITY_FRAMES_PRE_RESOLUTION] so the NEXT [analyze]
+     * call reaches the actual resolution pipeline. Uses a separate, untracked [ImageProxy] mock
+     * so `verify(exactly = 1) { imageProxy.close() }` assertions on the caller's own mock stay
+     * valid. Bypasses the real 800 ms throttle before returning so the caller's own [analyze]
+     * call is not itself dropped.
+     */
+    private fun CardRecognizer.stabilize() {
+        // Bypass BEFORE too: on a 2nd+ call within the same fast-running test, real wall-clock
+        // time since the previous processed frame is almost always < minIntervalMs (800 ms), so
+        // without this the priming frame itself would be silently throttle-dropped and never
+        // reach the stability buffer at all.
+        bypassThrottle()
+        analyze(buildImageProxyMock())
+        bypassThrottle()
+    }
+
     // ── Success / null-result paths ───────────────────────────────────────────
 
     @Test
     fun `successful frame closes imageProxy exactly once, releases guard, emits Identified`() = runTest {
         val results = mutableListOf<RecognitionResult>()
-        val recognizer = CardRecognizer(
-            cardRepository = cardRepository,
-            cardOcrAnalyzer = cardOcrAnalyzer,
-            scope = this,
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            onResult = { results += it },
-        )
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
         val imageProxy = buildImageProxyMock()
         coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
         coEvery { cardRepository.getCardByExactName("Lightning Bolt") } returns Result.success(defaultCard)
 
+        recognizer.stabilize()
+        advanceUntilIdle()
         recognizer.analyze(imageProxy)
         advanceUntilIdle()
 
         verify(exactly = 1) { imageProxy.close() }
-        assertEquals(1, results.size)
+        // 2 results total: the priming frame's NoCard (stability not yet satisfied) + the real
+        // frame's Identified.
+        assertEquals(2, results.size)
         assertEquals(
             RecognitionResult.Identified(
                 card = defaultCard,
                 similarity = 1.0f,
                 ambiguous = false,
                 corners = emptyList(),
+                languageFallback = false,
             ),
-            results.single(),
+            results.last(),
         )
         assertFalse(recognizer.isProcessingFlag())
     }
@@ -136,13 +188,7 @@ class CardRecognizerTest {
     @Test
     fun `null OCR result closes imageProxy exactly once, releases guard, emits NoCard`() = runTest {
         val results = mutableListOf<RecognitionResult>()
-        val recognizer = CardRecognizer(
-            cardRepository = cardRepository,
-            cardOcrAnalyzer = cardOcrAnalyzer,
-            scope = this,
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            onResult = { results += it },
-        )
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
         val imageProxy = buildImageProxyMock()
         coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns null
 
@@ -159,13 +205,7 @@ class CardRecognizerTest {
     @Test
     fun `stuck OCR call times out, closes imageProxy once, records non-fatal, emits NoCard`() = runTest {
         val results = mutableListOf<RecognitionResult>()
-        val recognizer = CardRecognizer(
-            cardRepository = cardRepository,
-            cardOcrAnalyzer = cardOcrAnalyzer,
-            scope = this,
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            onResult = { results += it },
-        )
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
         val imageProxy = buildImageProxyMock()
         coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } coAnswers { awaitCancellation() }
 
@@ -186,22 +226,20 @@ class CardRecognizerTest {
     @Test
     fun `resolution exception closes imageProxy exactly once, releases guard, emits NoCard`() = runTest {
         val results = mutableListOf<RecognitionResult>()
-        val recognizer = CardRecognizer(
-            cardRepository = cardRepository,
-            cardOcrAnalyzer = cardOcrAnalyzer,
-            scope = this,
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            onResult = { results += it },
-        )
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
         val imageProxy = buildImageProxyMock()
         coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
         coEvery { cardRepository.getCardByExactName("Lightning Bolt") } throws RuntimeException("boom")
 
+        recognizer.stabilize()
+        advanceUntilIdle()
         recognizer.analyze(imageProxy)
         advanceUntilIdle()
 
         verify(exactly = 1) { imageProxy.close() }
-        assertEquals(listOf(RecognitionResult.NoCard), results)
+        // Priming frame's NoCard (stability not yet satisfied) + the real frame's NoCard
+        // (repository threw).
+        assertEquals(listOf(RecognitionResult.NoCard, RecognitionResult.NoCard), results)
         assertFalse(recognizer.isProcessingFlag())
     }
 
@@ -212,13 +250,7 @@ class CardRecognizerTest {
         val results = mutableListOf<RecognitionResult>()
         val childJob = Job()
         val childScope = CoroutineScope(coroutineContext + childJob)
-        val recognizer = CardRecognizer(
-            cardRepository = cardRepository,
-            cardOcrAnalyzer = cardOcrAnalyzer,
-            scope = childScope,
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            onResult = { results += it },
-        )
+        val recognizer = defaultRecognizer(childScope, StandardTestDispatcher(testScheduler)) { results += it }
         val imageProxy = buildImageProxyMock()
         // Hangs inside the OCR call (not the timeout-bounded path failing on its own) so we
         // can trigger an EXTERNAL cancellation instead of a timeout.
@@ -239,13 +271,12 @@ class CardRecognizerTest {
     @Test
     fun `stall watchdog force-resets a latched guard and processes the new frame`() = runTest {
         val results = mutableListOf<RecognitionResult>()
-        val recognizer = CardRecognizer(
-            cardRepository = cardRepository,
-            cardOcrAnalyzer = cardOcrAnalyzer,
-            scope = this,
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            onResult = { results += it },
-        )
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Serra Angel", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Serra Angel") } returns Result.success(secondCard)
+
+        recognizer.stabilize()
+        advanceUntilIdle()
 
         // Simulate a previous frame's coroutine that latched the guard well past the stall
         // threshold — deterministic via reflection rather than a real hanging coroutine,
@@ -262,8 +293,6 @@ class CardRecognizerTest {
         )
 
         val imageProxy = buildImageProxyMock()
-        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Serra Angel", score = 100f, lineHeightRatio = 1f)
-        coEvery { cardRepository.getCardByExactName("Serra Angel") } returns Result.success(secondCard)
 
         recognizer.analyze(imageProxy)
         advanceUntilIdle()
@@ -276,8 +305,9 @@ class CardRecognizerTest {
                 similarity = 1.0f,
                 ambiguous = false,
                 corners = emptyList(),
+                languageFallback = false,
             ),
-            results.single(),
+            results.last(),
         )
         assertFalse(recognizer.isProcessingFlag())
     }
@@ -285,13 +315,7 @@ class CardRecognizerTest {
     @Test
     fun `guard still held within the stall threshold drops the frame without recovering`() = runTest {
         val results = mutableListOf<RecognitionResult>()
-        val recognizer = CardRecognizer(
-            cardRepository = cardRepository,
-            cardOcrAnalyzer = cardOcrAnalyzer,
-            scope = this,
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            onResult = { results += it },
-        )
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
         recognizer.setProcessingFlag(true)
         recognizer.setLongField("processingStartedAtMs", System.currentTimeMillis())
         recognizer.setLongField("lastProcessedMs", System.currentTimeMillis() - 10_000L)
@@ -305,5 +329,361 @@ class CardRecognizerTest {
         assertTrue(results.isEmpty())
         verify(exactly = 0) { crashlytics.log("scanner_ocr_stall_recovered") }
         assertTrue(recognizer.isProcessingFlag())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.5 — pre-resolution stability
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `a single frame never reaches the repository — stability requires 2 consecutive frames`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
+        assertEquals(listOf(RecognitionResult.NoCard), results)
+    }
+
+    @Test
+    fun `two consecutive frames with a DIFFERENT text each never reach stability`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returnsMany listOf(
+            OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f),
+            OcrCandidate(text = "Serra Angel", score = 100f, lineHeightRatio = 1f),
+        )
+
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+        recognizer.bypassThrottle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
+        assertTrue(results.all { it == RecognitionResult.NoCard })
+    }
+
+    @Test
+    fun `a candidate below the confidence threshold never reaches the repository, even on a single frame`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns
+            OcrCandidate(text = "Creature — Human Wizard", score = CardRecognizer.MIN_CONFIDENCE_SCORE - 1f, lineHeightRatio = 0.6f)
+
+        // A single frame suffices: a below-threshold candidate is rejected BEFORE the stability
+        // buffer is even consulted, so it never gets a chance to earn 2-frame stability anyway.
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
+        assertEquals(listOf(RecognitionResult.NoCard), results)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.6 — negative cache
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `a name that already failed this session short-circuits with zero repository calls`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Garbage Text", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Garbage Text") } returns Result.failure(RuntimeException("404"))
+        coEvery { cardRepository.searchCardByName("Garbage Text") } returns DataResult.Error("SCRYFALL_404")
+
+        // First resolution attempt: reaches the network, fails, gets negative-cached.
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Garbage Text") }
+        coVerify(exactly = 1) { cardRepository.searchCardByName("Garbage Text") }
+
+        // Same text again (stability already satisfied — key unchanged) — must be a pure
+        // negative-cache hit with ZERO further repository calls.
+        recognizer.bypassThrottle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Garbage Text") } // still exactly 1
+        coVerify(exactly = 1) { cardRepository.searchCardByName("Garbage Text") }   // still exactly 1
+        assertTrue(results.all { it == RecognitionResult.NoCard })
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.7 — local-first Room lookup
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `a card already cached locally resolves with zero network calls`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        val cachedEntity = TestFixtures.buildCardEntity(
+            scryfallId = defaultCard.scryfallId,
+            name = defaultCard.name,
+        )
+        coEvery { cardDao.findByExactNameForLanguage("Lightning Bolt", "en") } returns cachedEntity
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
+        coVerify(exactly = 0) { cardRepository.searchCardByName(any()) }
+        assertTrue(results.last() is RecognitionResult.Identified)
+        assertEquals(defaultCard.scryfallId, (results.last() as RecognitionResult.Identified).card.scryfallId)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.10 — scanner-local lookup budget
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `the 7th distinct lookup attempt within the rolling window is skipped without a network call`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardRepository.getCardByExactName(any()) } returns Result.failure(RuntimeException("404"))
+        coEvery { cardRepository.searchCardByName(any()) } returns DataResult.Error("SCRYFALL_404")
+
+        // 6 DISTINCT names, each satisfying 2-frame stability, each a genuine (failing) network
+        // attempt — consumes the whole CardRecognizer.LOOKUP_BUDGET_MAX budget.
+        repeat(CardRecognizer.LOOKUP_BUDGET_MAX) { i ->
+            val text = "Distinct Name $i"
+            coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = text, score = 100f, lineHeightRatio = 1f)
+            recognizer.stabilize()
+            advanceUntilIdle()
+            recognizer.analyze(buildImageProxyMock())
+            advanceUntilIdle()
+        }
+        coVerify(exactly = CardRecognizer.LOOKUP_BUDGET_MAX) { cardRepository.getCardByExactName(any()) }
+
+        // A 7th DISTINCT name, past the budget — must be skipped with zero network calls.
+        val overBudgetText = "Distinct Name over-budget"
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = overBudgetText, score = 100f, lineHeightRatio = 1f)
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(overBudgetText) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.8 — resolution ladder (≤2 network calls per attempt)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `english path — exact-name miss falls back to fuzzy search, at most 2 calls`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } returns Result.failure(RuntimeException("404"))
+        coEvery { cardRepository.searchCardByName("Lightning Bolt") } returns DataResult.Success(defaultCard)
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Lightning Bolt") }
+        coVerify(exactly = 1) { cardRepository.searchCardByName("Lightning Bolt") }
+        assertEquals(defaultCard, (results.last() as RecognitionResult.Identified).card)
+    }
+
+    @Test
+    fun `non-english path — printed-name search success issues exactly 1 call and never falls back`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        recognizer.selectedLanguage = "es"
+        val spanishCard = defaultCard.copy(lang = "es", printedName = "Rayo")
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Rayo", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.searchCardPrintedName("Rayo", "es") } returns DataResult.Success(spanishCard)
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.searchCardPrintedName("Rayo", "es") }
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
+        coVerify(exactly = 0) { cardRepository.searchCardByName(any()) }
+        val identified = results.last() as RecognitionResult.Identified
+        assertEquals(spanishCard, identified.card)
+        assertFalse("a genuine localized hit must not be flagged as a fallback", identified.languageFallback)
+    }
+
+    @Test
+    fun `non-english path — printed-name search miss falls back to a SINGLE English exact-name call, at most 2 calls total`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        recognizer.selectedLanguage = "es"
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.searchCardPrintedName("Lightning Bolt", "es") } returns DataResult.Error("SCRYFALL_404")
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } returns Result.success(defaultCard) // lang="en"
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.searchCardPrintedName("Lightning Bolt", "es") }
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Lightning Bolt") }
+        coVerify(exactly = 0) { cardRepository.searchCardByName(any()) } // never a 3rd call
+        val identified = results.last() as RecognitionResult.Identified
+        assertEquals(defaultCard, identified.card)
+        assertTrue("an English-fallback resolution must be flagged", identified.languageFallback)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.9 — staleness / generation rejection
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `a result superseded by bumpGeneration mid-flight is dropped, never reaching onResult`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val recognizer = defaultRecognizer(this, dispatcher) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } coAnswers {
+            // Bump generation WHILE the network call is notionally in flight (simulates a pause
+            // arriving between the frame being processed and the network round-trip completing).
+            recognizer.bumpGeneration()
+            Result.success(defaultCard)
+        }
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        assertTrue("a superseded result must never reach onResult", results.none { it is RecognitionResult.Identified })
+    }
+
+    @Test
+    fun `a result older than RESULT_MAX_AGE_MS is dropped, never reaching onResult`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val recognizer = defaultRecognizer(this, dispatcher) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } coAnswers {
+            // Rewind processingStartedAtMs so "now - processingStartedAtMs" already exceeds
+            // RESULT_MAX_AGE_MS by the time the (mocked, instant) call returns.
+            recognizer.setLongField(
+                "processingStartedAtMs",
+                System.currentTimeMillis() - (CardRecognizer.RESULT_MAX_AGE_MS + 1_000),
+            )
+            Result.success(defaultCard)
+        }
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        assertTrue("a stale result must never reach onResult", results.none { it is RecognitionResult.Identified })
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.10 — RateLimited propagation
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `a RateLimitExhaustedException from the exact-name call surfaces as RecognitionResult RateLimited`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } returns
+            Result.failure(RateLimitExhaustedException(retryAfterMs = 5_000L))
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { cardRepository.searchCardByName(any()) } // never falls through to fuzzy on rate-limit
+        assertEquals(RecognitionResult.RateLimited(5_000L), results.last())
+    }
+
+    @Test
+    fun `while an active rate-limit cooldown is running, further lookups are suspended with zero network calls`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } returns
+            Result.failure(RateLimitExhaustedException(retryAfterMs = 60_000L))
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Lightning Bolt") }
+
+        // Same text again, well within the 60s cooldown — must be suspended with zero network.
+        recognizer.bypassThrottle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Lightning Bolt") } // still exactly 1
+        assertEquals(RecognitionResult.NoCard, results.last())
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  W2.11 — language change resets negative cache / generation / stability
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `changing selectedLanguage resets the negative cache so a previously-failed name is retried`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Garbage Text", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Garbage Text") } returns Result.failure(RuntimeException("404"))
+        coEvery { cardRepository.searchCardByName("Garbage Text") } returns DataResult.Error("SCRYFALL_404")
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Garbage Text") }
+
+        // Language change (still "en" -> "en" would be a no-op; go to "es" then back to "en" to
+        // exercise a REAL transition) resets the negative cache — the identical failing name must
+        // be eligible for a fresh attempt (2-frame stability applies again after the reset).
+        recognizer.selectedLanguage = "es"
+        recognizer.selectedLanguage = "en"
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Garbage Text", score = 100f, lineHeightRatio = 1f)
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 2) { cardRepository.getCardByExactName("Garbage Text") }
+    }
+
+    @Test
+    fun `changing selectedLanguage does not reset when the value is unchanged`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val recognizer = defaultRecognizer(this, StandardTestDispatcher(testScheduler)) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Garbage Text", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Garbage Text") } returns Result.failure(RuntimeException("404"))
+        coEvery { cardRepository.searchCardByName("Garbage Text") } returns DataResult.Error("SCRYFALL_404")
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Garbage Text") }
+
+        recognizer.selectedLanguage = "en" // same value — must be a no-op, negative cache stays intact
+        recognizer.bypassThrottle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { cardRepository.getCardByExactName("Garbage Text") } // still exactly 1
     }
 }
