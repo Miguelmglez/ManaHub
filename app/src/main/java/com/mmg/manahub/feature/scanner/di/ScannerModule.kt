@@ -13,31 +13,14 @@ import javax.inject.Singleton
 /**
  * Hilt module that provides scanner-related singleton dependencies.
  *
- * The embedding-database and TFLite-model providers are commented out because the
- * pipeline now uses ML Kit Text Recognition (OCR) instead of cosine nearest-neighbour
- * search over a downloaded embedding binary.
+ * The pipeline uses ML Kit Text Recognition (OCR) — see [CardOcrAnalyzer] and
+ * `CardRecognizer`. The earlier embedding-database / TFLite cosine nearest-neighbour pipeline
+ * was removed (WS5, `scanner-reliability-plan.md`, 2026-08-25); it is preserved in git history
+ * if it is ever needed again.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object ScannerModule {
-
-    // COMMENTED OUT — replaced by ML Kit OCR provider below.
-    /*
-    @Provides
-    @Singleton
-    fun provideEmbeddingDatabase(@ApplicationContext context: Context): EmbeddingDatabase {
-        val db = EmbeddingDatabase(context)
-        val downloadedFile = java.io.File(context.filesDir, "card_embeddings.bin")
-        if (downloadedFile.exists()) db.loadFromFile(downloadedFile)
-        else db.loadFromAssets()
-        return db
-    }
-
-    @Provides
-    @Singleton
-    fun provideCardEmbeddingModel(@ApplicationContext context: Context): CardEmbeddingModel =
-        CardEmbeddingModel(context)
-    */
 
     /**
      * Provides the [CardOcrAnalyzer] singleton.

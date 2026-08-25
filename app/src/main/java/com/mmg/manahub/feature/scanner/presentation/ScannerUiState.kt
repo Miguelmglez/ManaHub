@@ -154,12 +154,4 @@ data class ScannerUiState(
     val isLoadingVariants: Boolean = false,
     // Full-screen image viewer
     val expandedVariantImageUrl: String? = null,
-
-    // COMMENTED OUT — embedding DB fields no longer needed with ML Kit OCR pipeline
-    // val embeddingDbVersionReady: Boolean = false,
-    // val embeddingDbVersion: Int = 0,
-    // val isEmbeddingDbUpdating: Boolean = false,
-    // val embeddingDbDownloadProgress: Float = 0f,
-    // val embeddingDbLoaded: Boolean = false,
-    // val embeddingDbCardCount: Int = 0,
 )

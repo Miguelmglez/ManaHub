@@ -452,8 +452,6 @@ private fun CameraPreview(
     isCameraActive: Boolean,
     overlayReason: String?,
     selectedLanguage: String,
-    // COMMENTED OUT — embeddingDatabase no longer needed with ML Kit OCR pipeline
-    // embeddingDatabase: EmbeddingDatabase,
     onRecognitionResult: (RecognitionResult) -> Unit,
     onFlashAvailability: (Boolean) -> Unit,
 ) {
@@ -485,8 +483,6 @@ private fun CameraPreview(
     // W2.7: local-first Room lookup so a card the user already owns/has cached resolves with
     // zero network calls — see CardRecognizer's KDoc "Call-budget pipeline".
     val cardDao = remember { entryPoint.cardDao() }
-    // COMMENTED OUT — TFLite model no longer used in OCR pipeline
-    // val cardEmbeddingModel = remember { entryPoint.cardEmbeddingModel() }
 
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
 
@@ -503,9 +499,6 @@ private fun CameraPreview(
             cardDao = cardDao,
             initialLanguage = selectedLanguage,
             onResult = onRecognitionResult,
-            // COMMENTED OUT — embedding params replaced by OCR
-            // embeddingDatabase = embeddingDatabase,
-            // cardEmbeddingModel = cardEmbeddingModel,
         )
     }
 
@@ -840,8 +833,6 @@ interface ScannerEntryPoint {
     fun cardOcrAnalyzer(): CardOcrAnalyzer
     /** W2.7: local-first Room lookup for [CardRecognizer] — already Hilt-provided for [com.mmg.manahub.core.data.repository.CardRepositoryImpl]. */
     fun cardDao(): com.mmg.manahub.core.data.local.dao.CardDao
-    // COMMENTED OUT — TFLite embedding model replaced by ML Kit OCR
-    // fun cardEmbeddingModel(): CardEmbeddingModel
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

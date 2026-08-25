@@ -168,8 +168,6 @@ private val KEY_LAST_CELEBRATED_LEVEL = intPreferencesKey("gamification_last_cel
 /** Sentinel meaning the level-up celebration baseline was never set (seed-without-celebrating). */
 private const val LAST_CELEBRATED_LEVEL_UNINITIALIZED = -1
 
-private val KEY_EMBEDDING_DB_VERSION = intPreferencesKey("hash_db_version")
-
 // ── Deck Doctor: scoring-weight overrides (debug-only tuning) ─────────────────
 // Seven independent nullable Float overrides for the engine ScoreWeights. Absent key = use the
 // engine default for that weight. Stored as primitives so this core-layer store never imports the
@@ -525,22 +523,6 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun saveCollectionGroupingMode(mode: CollectionGroupingMode) {
         context.userPrefsDataStore.edit { it[KEY_COLLECTION_GROUPING_MODE] = mode.name }
-    }
-
-    // ── Embedding database version ────────────────────────────────────────────
-
-    /** Emits the locally stored version of the downloaded embedding DB (0 = bundled asset only). */
-    val embeddingDbVersionFlow: Flow<Int> = context.userPrefsDataStore.data
-        .map { it[KEY_EMBEDDING_DB_VERSION] ?: 0 }
-        .catch { emit(0) }
-
-    /** Returns the current embedding DB version synchronously (for use in Workers). */
-    suspend fun getEmbeddingDbVersion(): Int =
-        context.userPrefsDataStore.data.map { it[KEY_EMBEDDING_DB_VERSION] ?: 0 }.first()
-
-    /** Persists the version number after a successful R2 download. */
-    suspend fun saveEmbeddingDbVersion(version: Int) {
-        context.userPrefsDataStore.edit { it[KEY_EMBEDDING_DB_VERSION] = version }
     }
 
     // ── Deck Doctor: scoring-weight overrides (debug-only tuning) ──────────────

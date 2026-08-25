@@ -1,6 +1,5 @@
 package com.mmg.manahub.app
 
-// import com.mmg.manahub.feature.scanner.EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -182,7 +181,6 @@ class ManaHubApp : Application(), KoinComponent {
     @Inject lateinit var pushTokenRemoteDataSource: PushTokenRemoteDataSource
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var userPreferencesDataStore: UserPreferencesDataStore
-    // @Inject lateinit var embeddingDatabaseUpdater: EmbeddingDatabaseUpdater  // COMMENTED OUT — replaced by ML Kit OCR
 
     // ── KMP migration — Hilt→Koin bridge dependencies ───────────────────────────────────────────
     // These singletons are still owned by Hilt. ManaHubApp is the bridge: it @Inject's them from the
@@ -686,9 +684,6 @@ class ManaHubApp : Application(), KoinComponent {
 
         PriceRefreshWorker.scheduleDailyRefresh(workManager)
         CollectionStatsSyncWorker.scheduleDailySync(workManager)
-
-        // COMMENTED OUT — Cloudflare R2 embedding DB download replaced by ML Kit OCR
-        // embeddingDatabaseUpdater.scheduleUpdateCheck()
 
         // Schedule/cancel the periodic background sync based on auth state.
         // CollectionViewModel also does this for the collection screen, but this

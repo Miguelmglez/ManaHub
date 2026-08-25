@@ -33,12 +33,6 @@ import org.json.JSONObject
 import java.util.UUID
 import javax.inject.Inject
 
-// COMMENTED OUT — no longer needed with ML Kit OCR pipeline
-// import androidx.lifecycle.asFlow
-// import androidx.work.WorkInfo
-// import androidx.work.WorkManager
-// import com.mmg.manahub.core.data.local.UserPreferencesDataStore
-
 /**
  * Clears the transient per-frame detection overlay ([ScannerUiState.detectedCorners],
  * [ScannerUiState.isSearching]) before a covering sheet/overlay opens (W3,
@@ -100,10 +94,6 @@ class ScannerViewModel @Inject constructor(
     private val analyticsHelper: AnalyticsHelper,
     private val soundManager: SoundManager,
     @ApplicationContext private val context: Context,
-    // COMMENTED OUT — embedding DB and WorkManager no longer injected with OCR pipeline
-    // val embeddingDatabase: EmbeddingDatabase,
-    // private val userPreferencesDataStore: UserPreferencesDataStore,
-    // private val workManager: WorkManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScannerUiState())
@@ -1036,12 +1026,10 @@ class ScannerViewModel @Inject constructor(
         persistQueue()
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Cleanup
-    // ─────────────────────────────────────────────────────────────────────────
-
-    override fun onCleared() {
-        super.onCleared()
-        soundManager.release()
-    }
+    // Note (WS5, `scanner-reliability-plan.md`, 2026-08-25): this ViewModel deliberately does
+    // NOT override onCleared() to release [soundManager]. [SoundManager] is a Hilt @Singleton
+    // alive for the whole app process, while this ViewModel is scoped to the scanner screen and
+    // is cleared every time the user navigates away — releasing a process-wide singleton from a
+    // screen-scoped lifecycle would permanently kill scan sounds on the next visit, the same
+    // class of bug fixed for `CardOcrAnalyzer` in WS1. See [SoundManager]'s class KDoc.
 }
