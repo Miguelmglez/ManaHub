@@ -406,6 +406,30 @@ class CardRecognizer(
     }
 
     /**
+     * Resets the pipeline state that must not survive a full camera stop (W3.5,
+     * `scanner-reliability-plan.md`, 2026-08-24 — `ScannerScreen`'s `CameraPreview` calling
+     * `cameraProvider.unbindAll()` for a covering sheet/overlay, as opposed to an
+     * `isRecognitionPausedByUser`-style analyzer-only pause):
+     * - [bumpGeneration] (reused, not duplicated) so a resolution attempt already in flight the
+     *   moment the camera stops has its result dropped on arrival, same mechanism as any other
+     *   pause.
+     * - [resetStabilityBuffer] so a resumed session does not silently "complete" a 2-frame match
+     *   against OCR text collected before the stop — the first frame after resume must re-earn
+     *   stability from zero.
+     *
+     * Deliberately leaves the local 3s memo ([lastOcrCard]) and the negative cache
+     * ([negativeCache]) untouched: unlike a language change ([resetForLanguageChange]), the
+     * underlying card data and any prior failed lookups are still valid after a camera stop —
+     * there's no reason to force a fresh network round trip for a card the user is still
+     * pointing at moments later, or to re-attempt a name that just failed under the SAME
+     * language.
+     */
+    fun resetForCameraStop() {
+        bumpGeneration()
+        resetStabilityBuffer()
+    }
+
+    /**
      * Resets every per-language-session mechanism (W2.11): the negative cache would otherwise
      * keep rejecting names purely because they failed under the OLD language's search; the
      * pre-resolution stability buffer and 3s memo reference OCR text that was resolved (or not)

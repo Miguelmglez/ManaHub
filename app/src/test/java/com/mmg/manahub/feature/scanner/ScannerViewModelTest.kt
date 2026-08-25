@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -534,5 +535,199 @@ class ScannerViewModelTest {
         // Assert
         assertTrue(viewModel.uiState.value.scanSession.cards.isEmpty())
         assertFalse(viewModel.uiState.value.showQueueSheet)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP 11 — W3 (scanner-reliability-plan.md, 2026-08-24): opening a covering
+    //  sheet/overlay clears the transient detection overlay (detectedCorners/isSearching),
+    //  since ScannerScreen's CameraPreview fully unbinds the camera for the same conditions and
+    //  no new RecognitionResult will arrive to refresh them while the overlay is open.
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Puts the ViewModel into a state with a live detection overlay (corners + searching).
+     * [onRecognitionResult] dispatches via `viewModelScope.launch(Dispatchers.Main.immediate)`,
+     * which on the [StandardTestDispatcher] used here only QUEUES the block — hence the
+     * [TestScope] receiver and the [advanceUntilIdle] call to actually run it before asserting.
+     */
+    private suspend fun TestScope.reachDetectionOverlayState() {
+        viewModel.onRecognitionResult(
+            RecognitionResult.Detected(corners = fakeCorners),
+        )
+        advanceUntilIdle()
+        assertNotNull(
+            "Precondition: Detected must populate detectedCorners",
+            viewModel.uiState.value.detectedCorners,
+        )
+        assertTrue(
+            "Precondition: Detected must set isSearching",
+            viewModel.uiState.value.isSearching,
+        )
+    }
+
+    private fun sampleScannedCard() = com.mmg.manahub.feature.scanner.presentation.ScannedCard(
+        card = defaultCard,
+        quantity = 1,
+        isFoil = false,
+        language = "en",
+        condition = "NM",
+        setCode = "lea",
+        timestamp = 1L,
+    )
+
+    @Test
+    fun onOpenQueue_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenQueue()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showQueueSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseQueue_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenQueue()
+
+        viewModel.onCloseQueue()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showQueueSheet)
+        assertNull(
+            "Closing must not resurrect a stale outline from before the overlay opened",
+            state.detectedCorners,
+        )
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onEditScannedCard_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+        // cardRepository is a relaxed mock (see class field) — the async getCardPrints() call
+        // this launches is irrelevant to this assertion, which only checks the SYNCHRONOUS state
+        // update onEditScannedCard makes before launching that coroutine.
+
+        viewModel.onEditScannedCard(sampleScannedCard())
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showEditSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseEditSheet_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onEditScannedCard(sampleScannedCard())
+
+        viewModel.onCloseEditSheet()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showEditSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onOpenVariantSelector_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenVariantSelector(sampleScannedCard())
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showVariantSelector)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseVariantSelector_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenVariantSelector(sampleScannedCard())
+
+        viewModel.onCloseVariantSelector()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showVariantSelector)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onExpandVariantImage_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onExpandVariantImage("https://example.com/card.jpg")
+
+        val state = viewModel.uiState.value
+        assertEquals("https://example.com/card.jpg", state.expandedVariantImageUrl)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseExpandedImage_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onExpandVariantImage("https://example.com/card.jpg")
+
+        viewModel.onCloseExpandedImage()
+
+        val state = viewModel.uiState.value
+        assertNull(state.expandedVariantImageUrl)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onOpenCardDetail_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenCardDetail(defaultCard.scryfallId)
+
+        val state = viewModel.uiState.value
+        assertEquals(defaultCard.scryfallId, state.selectedCardDetailId)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onCloseCardDetail_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenCardDetail(defaultCard.scryfallId)
+
+        viewModel.onCloseCardDetail()
+
+        val state = viewModel.uiState.value
+        assertNull(state.selectedCardDetailId)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onOpenPriceDetail_clearsDetectionOverlay() = runTest {
+        reachDetectionOverlayState()
+
+        viewModel.onOpenPriceDetail()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showPriceDetailSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
+    }
+
+    @Test
+    fun onClosePriceDetail_restoresScannableState() = runTest {
+        reachDetectionOverlayState()
+        viewModel.onOpenPriceDetail()
+
+        viewModel.onClosePriceDetail()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showPriceDetailSheet)
+        assertNull(state.detectedCorners)
+        assertFalse(state.isSearching)
     }
 }

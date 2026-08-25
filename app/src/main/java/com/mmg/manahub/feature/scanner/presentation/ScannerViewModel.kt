@@ -40,6 +40,17 @@ import javax.inject.Inject
 // import com.mmg.manahub.core.data.local.UserPreferencesDataStore
 
 /**
+ * Clears the transient per-frame detection overlay ([ScannerUiState.detectedCorners],
+ * [ScannerUiState.isSearching]) before a covering sheet/overlay opens (W3,
+ * `scanner-reliability-plan.md`, 2026-08-24). See [ScannerViewModel]'s class KDoc, "Camera stop
+ * vs. recognition pause", for why this lives on every overlay-opening action rather than being
+ * driven from the camera-binding side (this project has no Compose UI test infrastructure to
+ * exercise that cross-layer wiring directly — see `CardRecognizerTest`/`ScannerViewModelTest`).
+ */
+private fun ScannerUiState.clearedForOverlay(): ScannerUiState =
+    copy(detectedCorners = null, isSearching = false)
+
+/**
  * ViewModel for the scanner screen.
  *
  * Receives [RecognitionResult] from [CardRecognizer] and applies:
@@ -61,6 +72,15 @@ import javax.inject.Inject
  *   elapses, and the UI shows a countdown badge instead of a card.
  * - **Ambiguity selector**: when the recognition result is ambiguous and the scanner is
  *   in normal mode (not Quick, not Lookup Only), a dialog is shown to let the user confirm.
+ * - **Camera stop vs. recognition pause (W3, `scanner-reliability-plan.md`, 2026-08-24)**: every
+ *   action that opens a covering sheet/overlay ([onOpenQueue], [onEditScannedCard],
+ *   [onOpenVariantSelector], [onExpandVariantImage], [onOpenCardDetail], [onOpenPriceDetail])
+ *   clears [ScannerUiState.detectedCorners]/[ScannerUiState.isSearching] via
+ *   [ScannerUiState.clearedForOverlay] — `ScannerScreen`'s `CameraPreview` fully unbinds the
+ *   camera for these same conditions, so no new [RecognitionResult] will arrive to refresh them
+ *   while the overlay is open, and a resumed session must not show a stale outline/spinner left
+ *   over from before it opened. This is independent of [onToggleRecognitionPaused] (the top-bar
+ *   toggle), which only stops the analyzer while keeping the preview live.
  *
  * **Queue persistence**: the [ScanSession] is serialized to [SharedPreferences] on every
  * mutation, using [PREF_KEY_QUEUE] inside the [PREF_FILE] preferences file.
@@ -619,7 +639,7 @@ class ScannerViewModel @Inject constructor(
 
     /** Opens the price detail [ModalBottomSheet] for the currently detected card. */
     fun onOpenPriceDetail() {
-        _uiState.update { it.copy(showPriceDetailSheet = true) }
+        _uiState.update { it.clearedForOverlay().copy(showPriceDetailSheet = true) }
     }
 
     /** Closes the price detail [ModalBottomSheet]. */
@@ -704,7 +724,7 @@ class ScannerViewModel @Inject constructor(
      */
     fun onEditScannedCard(entry: ScannedCard) {
         _uiState.update {
-            it.copy(
+            it.clearedForOverlay().copy(
                 editingCard = entry,
                 showEditSheet = true,
                 availablePrints = emptyList(),
@@ -787,7 +807,7 @@ class ScannerViewModel @Inject constructor(
 
     /** Opens the scan-queue bottom sheet. */
     fun onOpenQueue() {
-        _uiState.update { it.copy(showQueueSheet = true, multiSelectedIds = emptySet()) }
+        _uiState.update { it.clearedForOverlay().copy(showQueueSheet = true, multiSelectedIds = emptySet()) }
     }
 
     /** Closes the scan-queue bottom sheet. */
@@ -904,7 +924,7 @@ class ScannerViewModel @Inject constructor(
      */
     fun onOpenCardDetail(id: String, fromQueue: Boolean = false) {
         _uiState.update {
-            it.copy(
+            it.clearedForOverlay().copy(
                 selectedCardDetailId = id,
                 showQueueSheet = if (fromQueue) false else it.showQueueSheet,
                 returnToQueueOnDetailClose = fromQueue
@@ -932,7 +952,7 @@ class ScannerViewModel @Inject constructor(
     fun onOpenVariantSelector(entry: ScannedCard) {
         variantLoadJob?.cancel()
         _uiState.update {
-            it.copy(
+            it.clearedForOverlay().copy(
                 showVariantSelector = true,
                 variantSelectorEntry = entry,
                 cardVariants = emptyList(),
@@ -983,7 +1003,7 @@ class ScannerViewModel @Inject constructor(
 
     fun onExpandVariantImage(imageUrl: String) {
         if (imageUrl.isBlank()) return
-        _uiState.update { it.copy(expandedVariantImageUrl = imageUrl) }
+        _uiState.update { it.clearedForOverlay().copy(expandedVariantImageUrl = imageUrl) }
     }
 
     fun onCloseExpandedImage() {

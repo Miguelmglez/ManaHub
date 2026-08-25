@@ -590,6 +590,61 @@ class CardRecognizerTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    //  W3.5 — resetForCameraStop (full camera stop, scanner-reliability-plan.md, 2026-08-24)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `resetForCameraStop bumps generation, so a result already in flight when the camera stops is dropped`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val recognizer = defaultRecognizer(this, dispatcher) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } coAnswers {
+            // Simulate ScannerScreen's CameraPreview calling resetForCameraStop() the instant a
+            // covering sheet/overlay opens, WHILE this network call is notionally in flight.
+            recognizer.resetForCameraStop()
+            Result.success(defaultCard)
+        }
+
+        recognizer.stabilize()
+        advanceUntilIdle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        assertTrue(
+            "a result superseded by resetForCameraStop's generation bump must never reach onResult",
+            results.none { it is RecognitionResult.Identified },
+        )
+    }
+
+    @Test
+    fun `resetForCameraStop clears the pre-resolution stability buffer`() = runTest {
+        val results = mutableListOf<RecognitionResult>()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val recognizer = defaultRecognizer(this, dispatcher) { results += it }
+        coEvery { cardOcrAnalyzer.extractCardName(any(), any()) } returns OcrCandidate(text = "Lightning Bolt", score = 100f, lineHeightRatio = 1f)
+        coEvery { cardRepository.getCardByExactName("Lightning Bolt") } returns Result.success(defaultCard)
+
+        // First frame: stableFrameCount goes 0 -> 1 (STABILITY_FRAMES_PRE_RESOLUTION = 2), not yet
+        // enough to reach the network.
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
+
+        // Camera stop arrives here — must wipe the buffer back to 0, not leave it at 1.
+        recognizer.resetForCameraStop()
+
+        // A SECOND consecutive frame with the same text: if the buffer had NOT been reset, this
+        // would be the 2nd consecutive hit (0->1 already happened above) and would trigger the
+        // network call. Since it was reset, this is only the 1st hit again post-reset.
+        recognizer.bypassThrottle()
+        recognizer.analyze(buildImageProxyMock())
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     //  W2.10 — RateLimited propagation
     // ══════════════════════════════════════════════════════════════════════════
 

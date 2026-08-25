@@ -147,6 +147,14 @@ import java.util.concurrent.Executors
 
 // ── Private helpers for copy ambiguity ──────────────────────────────────────
 
+/**
+ * W3.3 (scanner-reliability-plan.md, 2026-08-24): debounce applied before UNBINDING the camera
+ * when a covering sheet/overlay opens, so a fast open→close does not thrash the camera session (a
+ * rebind can cost ~200-600 ms on some devices). Rebinding itself is always immediate — see
+ * [CameraPreview]'s KDoc.
+ */
+private const val CAMERA_STOP_DEBOUNCE_MS = 250L
+
 private fun Color.withAlpha(alpha: Float): Color = this.copy(alpha = alpha)
 
 private fun TextStyle.withFontSize(size: TextUnit): TextStyle = this.copy(fontSize = size)
@@ -190,13 +198,18 @@ fun ScannerScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             cameraPermission.status.isGranted -> {
-                val isRecognitionPaused = uiState.isRecognitionPausedByUser || uiState.showQueueSheet
-                        || uiState.showEditSheet || uiState.showVariantSelector || uiState.expandedVariantImageUrl != null
-                        || uiState.selectedCardDetailId != null || uiState.showPriceDetailSheet
+                // W3.1 (scanner-reliability-plan.md, 2026-08-24): a covering sheet/overlay is a
+                // STRONGER condition than the top-bar recognition-pause toggle — it fully stops
+                // the camera (see isCameraActive below) rather than just detaching the analyzer.
+                val isCoveringOverlayOpen = uiState.showQueueSheet || uiState.showEditSheet ||
+                        uiState.showVariantSelector || uiState.expandedVariantImageUrl != null ||
+                        uiState.selectedCardDetailId != null || uiState.showPriceDetailSheet
+                val isCameraActive = !isCoveringOverlayOpen
 
                 CameraPreview(
                     isFlashOn = uiState.isFlashOn,
-                    isPaused = isRecognitionPaused,
+                    isRecognitionPausedByUser = uiState.isRecognitionPausedByUser,
+                    isCameraActive = isCameraActive,
                     selectedLanguage = uiState.selectedLanguage,
                     onRecognitionResult = viewModel::onRecognitionResult,
                     onFlashAvailability = viewModel::onFlashAvailabilityChanged,
@@ -389,10 +402,35 @@ fun ScannerScreen(
 //  Camera preview
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Binds and renders the CameraX preview + [ImageAnalysis] pipeline.
+ *
+ * ### Pause vs. stop contract (W3, `scanner-reliability-plan.md`, 2026-08-24)
+ * Two independent, differently-scoped conditions:
+ * - [isRecognitionPausedByUser] (top-bar toggle) — the preview STAYS bound and live (the user
+ *   still wants a viewfinder); only the [ImageAnalysis] analyzer is detached
+ *   ([ImageAnalysis.clearAnalyzer]) and re-attached ([ImageAnalysis.setAnalyzer]) on resume, via
+ *   the `LaunchedEffect(isRecognitionPausedByUser, boundImageAnalysis)` below.
+ * - [isCameraActive] (`false` while a covering sheet/overlay — queue, edit, variant selector,
+ *   expanded image, card detail, price detail — is open, computed by the caller) — a STRONGER
+ *   condition: the camera session is FULLY unbound ([ProcessCameraProvider.unbindAll]) after a
+ *   [CAMERA_STOP_DEBOUNCE_MS] debounce, which actually stops the sensor/ISP/preview surface
+ *   (privacy-dot off, real power savings), not just frame delivery. Rebinding on `isCameraActive`
+ *   flipping back to `true` is immediate (no debounce) so the user is not left staring at a black
+ *   preview. See [ScannerUiState.isRecognitionPausedByUser]'s KDoc for the full rationale.
+ *
+ * @param isFlashOn                 Torch on/off — also restored immediately after a rebind
+ *                                  ([Camera.cameraControl.enableTorch]) since the separate
+ *                                  `LaunchedEffect(isFlashOn)` below will not re-fire on a rebind
+ *                                  (the value itself did not change).
+ * @param isRecognitionPausedByUser See "Pause vs. stop" above.
+ * @param isCameraActive            See "Pause vs. stop" above.
+ */
 @Composable
 private fun CameraPreview(
     isFlashOn: Boolean,
-    isPaused: Boolean,
+    isRecognitionPausedByUser: Boolean,
+    isCameraActive: Boolean,
     selectedLanguage: String,
     // COMMENTED OUT — embeddingDatabase no longer needed with ML Kit OCR pipeline
     // embeddingDatabase: EmbeddingDatabase,
@@ -401,6 +439,7 @@ private fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val mc = MaterialTheme.magicColors
 
     var camera by remember { mutableStateOf<Camera?>(null) }
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
@@ -454,12 +493,13 @@ private fun CameraPreview(
         recognizer.selectedLanguage = selectedLanguage
     }
 
-    // W2.9: bump the resolution generation the moment recognition pauses (top-bar toggle or any
-    // covering sheet/overlay) so an in-flight resolution attempt's result is dropped instead of
-    // surfacing late after the user has moved on. isPaused already ORs in every pause source at
-    // the call site (see the isRecognitionPaused computation above).
-    LaunchedEffect(isPaused) {
-        if (isPaused) recognizer.bumpGeneration()
+    // W2.9: bump the resolution generation the moment the user pauses via the top-bar toggle, so
+    // an in-flight resolution attempt's result is dropped instead of surfacing late after the
+    // user has moved on. The covering-sheet/overlay case is handled separately below by
+    // recognizer.resetForCameraStop() when isCameraActive flips to false (W3.5) — it is a
+    // stronger condition (full camera stop) with its own reset, not just a generation bump.
+    LaunchedEffect(isRecognitionPausedByUser) {
+        if (isRecognitionPausedByUser) recognizer.bumpGeneration()
     }
 
     // Single dispose path (W1.3) — order matters:
@@ -481,23 +521,54 @@ private fun CameraPreview(
         }
     }
 
-    // Wrap the isPaused state in a remembered updated state to ensure the analyzer
-    // lambda always reads the fresh value without triggering a re-allocation of
-    // the analyzer or re-binding of the camera use case.
-    val currentIsPaused by rememberUpdatedState(isPaused)
+    // W3.2: rememberUpdatedState so the bind LaunchedEffect always restores the freshest torch
+    // value after a rebind (see this composable's "Pause vs. stop" KDoc).
+    val currentIsFlashOn by rememberUpdatedState(isFlashOn)
+
     val frameMetadataAnalyzer = remember {
-        FrameMetadataAnalyzer(
-            delegate = recognizer,
-            isPaused = { currentIsPaused },
-        )
+        FrameMetadataAnalyzer(delegate = recognizer)
     }
 
-    // Bind the camera asynchronously so we never block the main thread waiting for
-    // ProcessCameraProvider. The effect keys on both [lifecycleOwner] and [previewViewRef]:
-    // it will not run until AndroidView.factory has assigned a non-null PreviewView, and
-    // it re-runs on configuration change (new lifecycleOwner) so use cases are re-bound.
-    LaunchedEffect(lifecycleOwner, previewViewRef) {
+    // W3.1: the top-bar pause toggle only detaches/re-attaches the ImageAnalysis analyzer —
+    // clearAnalyzer() stops CameraX from ever invoking FrameMetadataAnalyzer.analyze() at all
+    // (not merely dropping frames after delivery, as before this workstream), while the preview
+    // stays bound and live. Keyed on [boundImageAnalysis] too so the correct attach/detach state
+    // is re-applied every time the camera use case changes identity — in particular after a full
+    // stop/resume cycle driven by [isCameraActive] below.
+    LaunchedEffect(isRecognitionPausedByUser, boundImageAnalysis) {
+        val analysis = boundImageAnalysis ?: return@LaunchedEffect
+        if (isRecognitionPausedByUser) {
+            analysis.clearAnalyzer()
+        } else {
+            analysis.setAnalyzer(analysisExecutor, frameMetadataAnalyzer)
+        }
+    }
+
+    // Bind (or fully unbind) the camera asynchronously so we never block the main thread.
+    // W3.2 (2026-08-24): the effect now also keys on [isCameraActive] — flipping it re-runs this
+    // whole block, cancelling whatever the previous run was doing (including a pending unbind
+    // delay below, which is how W3.3's debounce gets cancelled for free on a fast resume).
+    LaunchedEffect(lifecycleOwner, previewViewRef, isCameraActive) {
         val pv = previewViewRef ?: return@LaunchedEffect
+
+        if (!isCameraActive) {
+            // W3.3: debounce the UNBIND only — a fast open→close of a covering sheet must not
+            // thrash the camera session (a rebind can cost ~200-600 ms on some devices).
+            // Cancelled automatically if isCameraActive flips back to true before this elapses,
+            // because that flip re-keys this LaunchedEffect and cancels this very coroutine.
+            kotlinx.coroutines.delay(CAMERA_STOP_DEBOUNCE_MS)
+            boundImageAnalysis?.clearAnalyzer()
+            boundCameraProvider?.unbindAll()
+            boundImageAnalysis = null
+            boundCameraProvider = null
+            camera = null
+            // W3.5: reset the recognizer's own transient pipeline state (bumps the resolution
+            // generation — reusing bumpGeneration(), not a parallel mechanism — and clears the
+            // pre-resolution stability buffer) so a resumed session never silently "completes" a
+            // match against OCR text collected before the stop.
+            recognizer.resetForCameraStop()
+            return@LaunchedEffect
+        }
 
         // Suspend without blocking the main thread until the provider is ready.
         val cameraProvider = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
@@ -562,9 +633,19 @@ private fun CameraPreview(
                 imageAnalysis,
             )
             onFlashAvailability(camera?.cameraInfo?.hasFlashUnit() ?: false)
+            // W3.2: restore torch state immediately after a (re)bind. The separate
+            // LaunchedEffect(isFlashOn) below only fires when isFlashOn itself CHANGES, so a
+            // rebind triggered by isCameraActive (torch value unchanged throughout) would
+            // otherwise silently come back with the torch off. currentIsFlashOn is read via
+            // rememberUpdatedState so this always restores the freshest value even though this
+            // LaunchedEffect isn't keyed on isFlashOn.
+            camera?.cameraControl?.enableTorch(currentIsFlashOn)
         }
     }
 
+    // Live torch toggling while the camera stays continuously bound (does not fire on a rebind
+    // since isFlashOn itself doesn't change then — see the restore call right after bindToLifecycle
+    // above for that case).
     LaunchedEffect(isFlashOn) {
         camera?.cameraControl?.enableTorch(isFlashOn)
     }
@@ -582,6 +663,18 @@ private fun CameraPreview(
             },
             modifier = Modifier.fillMaxSize(),
         )
+
+        // W3.4: PreviewView goes solid black the instant the camera is unbound, and that can be
+        // visible for a moment before/around a covering sheet's own surface finishes drawing over
+        // it. A themed scrim in the same spot turns that into a themed fade instead of a raw
+        // black flash — ManaHub tokens only (mc.background), no hardcoded colour.
+        AnimatedVisibility(
+            visible = !isCameraActive,
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(150)),
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(mc.background))
+        }
 
         Box(
             modifier = Modifier
@@ -679,17 +772,17 @@ private fun NameZoneIndicator(modifier: Modifier = Modifier) {
 
 /**
  * Thin [ImageAnalysis.Analyzer] wrapper that forwards frames to [CardRecognizer].
+ *
+ * W3.1 (scanner-reliability-plan.md, 2026-08-24): no longer takes an `isPaused` lambda — pausing
+ * is now enforced UPSTREAM by detaching this analyzer entirely (`ImageAnalysis.clearAnalyzer()`
+ * in [CameraPreview]), so CameraX never invokes [analyze] at all while paused, instead of this
+ * class dropping frames it was still being handed.
  */
 private class FrameMetadataAnalyzer(
     private val delegate: CardRecognizer,
-    private val isPaused: () -> Boolean,
 ) : ImageAnalysis.Analyzer {
 
     override fun analyze(imageProxy: androidx.camera.core.ImageProxy) {
-        if (isPaused()) {
-            imageProxy.close()
-            return
-        }
         try {
             if (com.mmg.manahub.BuildConfig.DEBUG) {
                 android.util.Log.d("ScannerScreen", "FrameMetadataAnalyzer.analyze: frame=${imageProxy.width}x${imageProxy.height}")
