@@ -2,19 +2,23 @@ package com.mmg.manahub.feature.scanner.data
 
 import android.media.Image
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
+import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -41,10 +45,17 @@ class CardOcrAnalyzerTest {
      *  (WS2.A scope). [CardOcrAnalyzer.extractFromResult] returns null immediately for it. */
     private val emptyText: Text = mockk(relaxed = true)
 
+    private val crashlytics: FirebaseCrashlytics = mockk(relaxed = true)
+
     @Before
     fun setUp() {
         mockkStatic(TextRecognition::class)
         mockkStatic(InputImage::class)
+        // WS4 (2026-08-25): the self-heal path now calls recordSafeNonFatal ->
+        // FirebaseCrashlytics.getInstance() — must be mocked or every recreate/retry test below
+        // crashes on an uninitialized Firebase singleton.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
         every { InputImage.fromMediaImage(any(), any()) } returns inputImage
         every { emptyText.textBlocks } returns emptyList()
     }
@@ -53,6 +64,7 @@ class CardOcrAnalyzerTest {
     fun tearDown() {
         unmockkStatic(TextRecognition::class)
         unmockkStatic(InputImage::class)
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     @Test
@@ -84,6 +96,30 @@ class CardOcrAnalyzerTest {
         verify(exactly = 2) { TextRecognition.getClient(any()) }
         verify(exactly = 1) { staleClient.process(inputImage) }
         verify(exactly = 1) { freshClient.process(inputImage) }
+
+        // WS4: the self-heal path must be observable in production via a non-fatal.
+        val exceptionSlot: CapturingSlot<Throwable> = slot()
+        verify(exactly = 1) { crashlytics.recordException(capture(exceptionSlot)) }
+        assertTrue(exceptionSlot.captured.message.orEmpty().contains("scanner_ocr_client_recreated"))
+    }
+
+    @Test
+    fun `both the recreate and the retry failing records a recreate_failed non-fatal and returns null`() = runTest {
+        val staleClient = mockk<TextRecognizer>(relaxed = true)
+        val freshClient = mockk<TextRecognizer>(relaxed = true)
+        every { TextRecognition.getClient(any()) } returnsMany listOf(staleClient, freshClient)
+        every { staleClient.process(inputImage) } throws IllegalStateException("This client has been closed")
+        every { freshClient.process(inputImage) } throws IllegalStateException("Still closed after recreate")
+
+        val analyzer = CardOcrAnalyzer()
+        val result = analyzer.extractCardName(mediaImage, 0)
+
+        assertNull(result)
+        verify(exactly = 2) { TextRecognition.getClient(any()) }
+        val exceptionSlots = mutableListOf<Throwable>()
+        verify(exactly = 2) { crashlytics.recordException(capture(exceptionSlots)) }
+        assertTrue(exceptionSlots.any { it.message.orEmpty().contains("scanner_ocr_client_recreated") })
+        assertTrue(exceptionSlots.any { it.message.orEmpty().contains("scanner_ocr_client_recreate_failed") })
     }
 
     @Test

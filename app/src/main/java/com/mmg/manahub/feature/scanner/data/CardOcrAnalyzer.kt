@@ -7,6 +7,7 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.mmg.manahub.core.util.recordSafeNonFatal
 import com.mmg.manahub.feature.scanner.domain.ScannerZone
 import com.mmg.manahub.feature.scanner.domain.model.OcrCandidate
 import kotlinx.coroutines.CancellationException
@@ -314,6 +315,10 @@ class CardOcrAnalyzer {
         } catch (e: Exception) {
             if (isRecognizerUnavailable(e)) {
                 logRecognitionFailure(e, willRetry = true)
+                // WS4 (2026-08-25): the self-heal path itself had zero Crashlytics visibility —
+                // without this, WS1's core fix ("OCR dies until app restart") is unverifiable in
+                // production. Expected to be RARE; frequent firing is an alarm, not noise.
+                recordSafeNonFatal("scanner_ocr_client_recreated", e)
                 recreateRecognizer()
                 return try {
                     runRecognition(mediaImage, rotationDegrees)
@@ -321,6 +326,9 @@ class CardOcrAnalyzer {
                     throw retryException
                 } catch (retryException: Exception) {
                     logRecognitionFailure(retryException, willRetry = false)
+                    // Both the recreate AND the retry failed — the client could not be healed
+                    // on this frame. Also expected to be RARE.
+                    recordSafeNonFatal("scanner_ocr_client_recreate_failed", retryException)
                     null
                 }
             }

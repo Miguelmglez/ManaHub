@@ -109,6 +109,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.PreferredCurrency
@@ -201,15 +202,26 @@ fun ScannerScreen(
                 // W3.1 (scanner-reliability-plan.md, 2026-08-24): a covering sheet/overlay is a
                 // STRONGER condition than the top-bar recognition-pause toggle — it fully stops
                 // the camera (see isCameraActive below) rather than just detaching the analyzer.
-                val isCoveringOverlayOpen = uiState.showQueueSheet || uiState.showEditSheet ||
-                        uiState.showVariantSelector || uiState.expandedVariantImageUrl != null ||
-                        uiState.selectedCardDetailId != null || uiState.showPriceDetailSheet
-                val isCameraActive = !isCoveringOverlayOpen
+                // WS4 (2026-08-25): overlayReason is derived from the SAME when-ordering so it can
+                // never disagree with isCameraActive — it exists purely as a closed-set breadcrumb
+                // payload for scanner_camera_stopped_for_sheet (see CameraPreview), never as an
+                // independent source of truth.
+                val overlayReason: String? = when {
+                    uiState.showQueueSheet -> "queue"
+                    uiState.showEditSheet -> "edit"
+                    uiState.showVariantSelector -> "variant_selector"
+                    uiState.expandedVariantImageUrl != null -> "expanded_image"
+                    uiState.selectedCardDetailId != null -> "card_detail"
+                    uiState.showPriceDetailSheet -> "price_detail"
+                    else -> null
+                }
+                val isCameraActive = overlayReason == null
 
                 CameraPreview(
                     isFlashOn = uiState.isFlashOn,
                     isRecognitionPausedByUser = uiState.isRecognitionPausedByUser,
                     isCameraActive = isCameraActive,
+                    overlayReason = overlayReason,
                     selectedLanguage = uiState.selectedLanguage,
                     onRecognitionResult = viewModel::onRecognitionResult,
                     onFlashAvailability = viewModel::onFlashAvailabilityChanged,
@@ -425,12 +437,20 @@ fun ScannerScreen(
  *                                  (the value itself did not change).
  * @param isRecognitionPausedByUser See "Pause vs. stop" above.
  * @param isCameraActive            See "Pause vs. stop" above.
+ * @param overlayReason             WS4 (2026-08-25): which covering sheet/overlay caused
+ *                                  [isCameraActive] to be `false` (`"queue"`, `"edit"`,
+ *                                  `"variant_selector"`, `"expanded_image"`, `"card_detail"`,
+ *                                  `"price_detail"`), or `null` while the camera is active. A
+ *                                  fixed closed set computed by the caller — never user input —
+ *                                  used only as the payload for the `scanner_camera_stopped_for_sheet`
+ *                                  breadcrumb below.
  */
 @Composable
 private fun CameraPreview(
     isFlashOn: Boolean,
     isRecognitionPausedByUser: Boolean,
     isCameraActive: Boolean,
+    overlayReason: String?,
     selectedLanguage: String,
     // COMMENTED OUT — embeddingDatabase no longer needed with ML Kit OCR pipeline
     // embeddingDatabase: EmbeddingDatabase,
@@ -447,6 +467,10 @@ private fun CameraPreview(
     // previously only [camera] was retained, so dispose could never reach these (F11/W1.3).
     var boundImageAnalysis by remember { mutableStateOf<ImageAnalysis?>(null) }
     var boundCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    // WS4: tracks whether the camera was actually stopped for a covering overlay, so
+    // scanner_camera_resumed only fires on a rebind that follows a REAL stop — never on the
+    // initial screen bind (which carries no diagnostic value).
+    var wasStoppedForOverlay by remember { mutableStateOf(false) }
 
     val entryPoint = remember {
         EntryPointAccessors
@@ -567,6 +591,10 @@ private fun CameraPreview(
             // pre-resolution stability buffer) so a resumed session never silently "completes" a
             // match against OCR text collected before the stop.
             recognizer.resetForCameraStop()
+            // WS4: bounded by human interaction (opening a sheet), not frame rate — a real
+            // log() breadcrumb is correct here, unlike the per-frame counters in CardRecognizer.
+            wasStoppedForOverlay = true
+            FirebaseCrashlytics.getInstance().log("scanner_camera_stopped_for_sheet: reason=$overlayReason")
             return@LaunchedEffect
         }
 
@@ -640,6 +668,12 @@ private fun CameraPreview(
             // rememberUpdatedState so this always restores the freshest value even though this
             // LaunchedEffect isn't keyed on isFlashOn.
             camera?.cameraControl?.enableTorch(currentIsFlashOn)
+            // WS4: only when this rebind follows a REAL stop (never the initial screen bind),
+            // and only inside runCatching so it fires solely on a genuinely successful rebind.
+            if (wasStoppedForOverlay) {
+                FirebaseCrashlytics.getInstance().log("scanner_camera_resumed")
+                wasStoppedForOverlay = false
+            }
         }
     }
 

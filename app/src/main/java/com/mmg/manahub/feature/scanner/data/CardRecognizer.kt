@@ -184,6 +184,9 @@ class CardRecognizer(
         set(value) {
             if (field == value) return
             field = value
+            // WS4: low-cardinality (6 values) session context tagging every later non-fatal
+            // with the active scan language — essential for diagnosing language-specific bugs.
+            FirebaseCrashlytics.getInstance().setCustomKey("scanner_selected_lang", value)
             resetForLanguageChange()
         }
 
@@ -206,6 +209,17 @@ class CardRecognizer(
     // ── W2.10: active rate-limit cooldown + rolling lookup budget ─────────────────────────────
     @Volatile private var rateLimitedUntilMs: Long? = null
     private val lookupTimestamps = ArrayDeque<Long>()
+
+    // ── WS4 (2026-08-25, scanner-reliability-plan.md): session counters for the call-budget
+    // skip gates. These gates can fire up to ~1.25×/second (the 800 ms frame throttle), so a
+    // log() breadcrumb per occurrence would flood Crashlytics' ring buffer — an accumulating
+    // instance counter flushed via setCustomKey (in-memory overwrite, no network/I/O) is used
+    // instead. Kept as separate `var`s (not a map) so each has a fixed, typo-proof key name. ──
+    private var lowConfidenceSkipCount = 0
+    private var negativeCacheSkipCount = 0
+    private var budgetSkipCount = 0
+    private var staleDropGenerationCount = 0
+    private var staleDropAgeCount = 0
 
     override fun analyze(imageProxy: ImageProxy) {
         val now = System.currentTimeMillis()
@@ -264,8 +278,14 @@ class CardRecognizer(
                     return@launch
                 }
 
+                // WS4: numeric score only — never the OCR text itself (PII/free-text guard).
+                FirebaseCrashlytics.getInstance().setCustomKey("scanner_ocr_score", candidate.score)
+
                 if (candidate.score < MIN_CONFIDENCE_SCORE) {
                     resetStabilityBuffer()
+                    lowConfidenceSkipCount++
+                    FirebaseCrashlytics.getInstance()
+                        .setCustomKey("scanner_low_confidence_skips_session", lowConfidenceSkipCount)
                     if (com.mmg.manahub.BuildConfig.DEBUG) {
                         android.util.Log.d(
                             "CardRecognizer",
@@ -319,6 +339,9 @@ class CardRecognizer(
 
                 // ── W2.6: negative cache ─────────────────────────────────────────────────────
                 if (negativeCache.isNegative(normalizedKey)) {
+                    negativeCacheSkipCount++
+                    FirebaseCrashlytics.getInstance()
+                        .setCustomKey("scanner_negcache_hits_session", negativeCacheSkipCount)
                     onResult(RecognitionResult.NoCard)
                     return@launch
                 }
@@ -341,6 +364,9 @@ class CardRecognizer(
 
                 // ── W2.10: scanner-local rolling lookup budget ──────────────────────────────
                 if (!tryAcquireLookupBudget()) {
+                    budgetSkipCount++
+                    FirebaseCrashlytics.getInstance()
+                        .setCustomKey("scanner_budget_skips_session", budgetSkipCount)
                     onResult(RecognitionResult.NoCard)
                     return@launch
                 }
@@ -350,8 +376,21 @@ class CardRecognizer(
                 val outcome = resolveCard(cardName, langAtAttemptStart)
 
                 // ── W2.9: staleness rejection — drop a superseded or too-late result ────────
-                if (myGeneration != generation.get()) return@launch
-                if (System.currentTimeMillis() - processingStartedAtMs > RESULT_MAX_AGE_MS) return@launch
+                // WS4: kept as TWO separate counters (not one combined) — which one dominates
+                // tells us whether stale drops come from pause/language-change (generation) or
+                // a rate-limit queue backlog (age); a combined counter would lose that signal.
+                if (myGeneration != generation.get()) {
+                    staleDropGenerationCount++
+                    FirebaseCrashlytics.getInstance()
+                        .setCustomKey("scanner_stale_drop_generation_count", staleDropGenerationCount)
+                    return@launch
+                }
+                if (System.currentTimeMillis() - processingStartedAtMs > RESULT_MAX_AGE_MS) {
+                    staleDropAgeCount++
+                    FirebaseCrashlytics.getInstance()
+                        .setCustomKey("scanner_stale_drop_age_count", staleDropAgeCount)
+                    return@launch
+                }
 
                 when (outcome) {
                     is ResolutionOutcome.Found -> {
@@ -492,6 +531,9 @@ class CardRecognizer(
         while (lookupTimestamps.isNotEmpty() && now - lookupTimestamps.first() > LOOKUP_BUDGET_WINDOW_MS) {
             lookupTimestamps.removeFirst()
         }
+        // WS4: recorded on BOTH the allowed and the rejected path (before the early return)
+        // so the gauge always reflects the current window size, not just successful lookups.
+        FirebaseCrashlytics.getInstance().setCustomKey("scanner_lookups_last_10s", lookupTimestamps.size)
         if (lookupTimestamps.size >= LOOKUP_BUDGET_MAX) return false
         lookupTimestamps.addLast(now)
         return true

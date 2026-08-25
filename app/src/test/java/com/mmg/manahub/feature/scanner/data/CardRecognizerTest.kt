@@ -183,6 +183,8 @@ class CardRecognizerTest {
             results.last(),
         )
         assertFalse(recognizer.isProcessingFlag())
+        // WS4: the ocr-score gauge is set once per non-null candidate — priming frame + real frame.
+        verify(exactly = 2) { crashlytics.setCustomKey("scanner_ocr_score", 100f) }
     }
 
     @Test
@@ -381,6 +383,8 @@ class CardRecognizerTest {
 
         coVerify(exactly = 0) { cardRepository.getCardByExactName(any()) }
         assertEquals(listOf(RecognitionResult.NoCard), results)
+        // WS4: the low-confidence skip gate must flush its session counter via setCustomKey.
+        verify(exactly = 1) { crashlytics.setCustomKey("scanner_low_confidence_skips_session", 1) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -412,6 +416,9 @@ class CardRecognizerTest {
         coVerify(exactly = 1) { cardRepository.getCardByExactName("Garbage Text") } // still exactly 1
         coVerify(exactly = 1) { cardRepository.searchCardByName("Garbage Text") }   // still exactly 1
         assertTrue(results.all { it == RecognitionResult.NoCard })
+        // WS4: exactly 1 negative-cache HIT (the first attempt was a genuine network miss, not a
+        // cache hit — the session counter only increments on the second, short-circuited call).
+        verify(exactly = 1) { crashlytics.setCustomKey("scanner_negcache_hits_session", 1) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -472,6 +479,8 @@ class CardRecognizerTest {
         advanceUntilIdle()
 
         coVerify(exactly = 0) { cardRepository.getCardByExactName(overBudgetText) }
+        // WS4: the budget-skip session counter increments exactly once, for the 7th attempt.
+        verify(exactly = 1) { crashlytics.setCustomKey("scanner_budget_skips_session", 1) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -563,6 +572,9 @@ class CardRecognizerTest {
         advanceUntilIdle()
 
         assertTrue("a superseded result must never reach onResult", results.none { it is RecognitionResult.Identified })
+        // WS4: the generation-drop counter (kept separate from the age-drop counter — see the
+        // production KDoc for why) must flush exactly once.
+        verify(exactly = 1) { crashlytics.setCustomKey("scanner_stale_drop_generation_count", 1) }
     }
 
     @Test
@@ -587,6 +599,8 @@ class CardRecognizerTest {
         advanceUntilIdle()
 
         assertTrue("a stale result must never reach onResult", results.none { it is RecognitionResult.Identified })
+        // WS4: the age-drop counter (kept separate from the generation-drop counter) must flush.
+        verify(exactly = 1) { crashlytics.setCustomKey("scanner_stale_drop_age_count", 1) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -718,6 +732,9 @@ class CardRecognizerTest {
         advanceUntilIdle()
 
         coVerify(exactly = 2) { cardRepository.getCardByExactName("Garbage Text") }
+        // WS4: a REAL transition must tag the session context for both hops.
+        verify(exactly = 1) { crashlytics.setCustomKey("scanner_selected_lang", "es") }
+        verify(exactly = 1) { crashlytics.setCustomKey("scanner_selected_lang", "en") }
     }
 
     @Test
@@ -740,5 +757,7 @@ class CardRecognizerTest {
         advanceUntilIdle()
 
         coVerify(exactly = 1) { cardRepository.getCardByExactName("Garbage Text") } // still exactly 1
+        // WS4: an unchanged-value assignment must never reach the custom-setter's telemetry line.
+        verify(exactly = 0) { crashlytics.setCustomKey("scanner_selected_lang", any<String>()) }
     }
 }
