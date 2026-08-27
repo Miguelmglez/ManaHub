@@ -24,16 +24,24 @@ package com.mmg.manahub.feature.decks.domain.engine
  */
 data class ColorStrategyEntry(
     val archetype: ArchetypeId? = null,
+    /** Deck Analysis Engine v3 compat shim (2026-08-26): `RAMP`/`TEMPO` moved from [ArchetypeId] to
+     * [PostureId] -- every entry below that used to declare `archetype = ArchetypeId.RAMP`/`TEMPO`
+     * alone now declares a real macro (`MIDRANGE`/`AGGRO`, the posture's own default overlay per
+     * spec §2/§3) PLUS this field, so the player-facing [label] can still read "Ramp"/"Tempo".
+     * Pure display metadata here -- NOT threaded into [StrategyProfile]/[toStrategyProfile] (the
+     * Wizard flow's own posture support is a follow-up, out of Phase 3a's scope). */
+    val posture: PostureId? = null,
     val themes: List<ThemeId> = emptyList(),
     /** Rough viability ranking within this color combo, 0f..1f. Curated by hand (see class KDoc) —
      * not a statistically derived score. */
     val weight: Float,
 ) {
-    /** Display label for this entry — the archetype name when set, else the first theme's name. */
+    /** Display label for this entry — [posture] (the more specific ex-macro/ex-theme identity)
+     * when set, else the archetype name, else the first theme's name. */
     val label: String
-        get() = archetype?.takeIf { it != ArchetypeId.GENERIC }?.displayName
-            ?: themes.firstOrNull()?.displayName
+        get() = posture?.displayName
             ?: archetype?.displayName
+            ?: themes.firstOrNull()?.displayName
             ?: "Balanced"
 
     /** Resolves this entry into a pickable [StrategyProfile] (colors filled in by the caller, which
@@ -54,16 +62,17 @@ object ColorStrategyAffinity {
 
     /**
      * Reverse lookup for Flow C (strategy-first, plan §5 3.4): every color combo in the curated
-     * table whose entry list contains [archetype] (when non-null/non-GENERIC) or [theme]
-     * (when non-null), paired with that entry's own [ColorStrategyEntry.weight]. Sorted best-first.
-     * Both null returns an empty list (nothing to rank against).
+     * table whose entry list contains [archetype] (when non-null -- Deck Analysis Engine v3
+     * removed `ArchetypeId.GENERIC`, so any real value now qualifies) or [theme] (when non-null),
+     * paired with that entry's own [ColorStrategyEntry.weight]. Sorted best-first. Both null
+     * returns an empty list (nothing to rank against).
      */
     fun combosFor(archetype: ArchetypeId?, theme: ThemeId?): List<Pair<Set<ManaColor>, Float>> {
-        if ((archetype == null || archetype == ArchetypeId.GENERIC) && theme == null) return emptyList()
+        if (archetype == null && theme == null) return emptyList()
         return TABLE.entries
             .mapNotNull { (colors, entries) ->
                 val match = entries.firstOrNull { entry ->
-                    (archetype != null && archetype != ArchetypeId.GENERIC && entry.archetype == archetype) ||
+                    (archetype != null && entry.archetype == archetype) ||
                         (theme != null && theme in entry.themes)
                 }
                 match?.let { colors to it.weight }
@@ -91,7 +100,7 @@ object ColorStrategyAffinity {
             // instant/sorcery density and mill are its well-known secondary identities.
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, weight = 0.9f),
             ColorStrategyEntry(themes = listOf(ThemeId.SPELLSLINGER), weight = 0.6f),
-            ColorStrategyEntry(themes = listOf(ThemeId.MILL), weight = 0.5f),
+            ColorStrategyEntry(themes = listOf(ThemeId.MILL_OPPONENT), weight = 0.5f),
         ))
         put(setOf(ManaColor.B), listOf(
             // Black's primary functions are graveyard recursion/reanimation and sacrifice-for-value
@@ -112,7 +121,7 @@ object ColorStrategyAffinity {
         put(setOf(ManaColor.G), listOf(
             // Green's primary function is mana acceleration into big threats (the archetypal RAMP
             // color); +1/+1 counters is its best-known secondary theme.
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.9f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.9f),
             ColorStrategyEntry(themes = listOf(ThemeId.PLUS1_COUNTERS), weight = 0.6f),
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, weight = 0.55f),
         ))
@@ -123,14 +132,14 @@ object ColorStrategyAffinity {
             // W wipes + U counters/draw is the definitive tempo-control shell; ETB-blink value is
             // Azorius' best-known secondary theme (W removal-on-ETB + U card selection).
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.BLINK), weight = 0.75f),
-            ColorStrategyEntry(archetype = ArchetypeId.TEMPO, weight = 0.6f),
+            ColorStrategyEntry(archetype = ArchetypeId.AGGRO, posture = PostureId.TEMPO, weight = 0.6f),
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, weight = 0.5f),
         ))
         put(setOf(ManaColor.U, ManaColor.B), listOf( // Dimir
             // U card selection + B graveyard hate/removal is the classic mill control shell; the
             // pure control read (no theme) and self-mill (Dimir's own graveyard enabler side) round
             // out the guild.
-            ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.MILL), weight = 0.75f),
+            ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.MILL_OPPONENT), weight = 0.75f),
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, weight = 0.6f),
             ColorStrategyEntry(themes = listOf(ThemeId.SELF_MILL), weight = 0.5f),
         ))
@@ -165,7 +174,7 @@ object ColorStrategyAffinity {
         put(setOf(ManaColor.U, ManaColor.R), listOf( // Izzet
             // U card selection/copy + R burn/damage is THE definitive spellslinger guild, built as
             // a tempo shell; pure combo (storm-adjacent) is the secondary lean.
-            ColorStrategyEntry(archetype = ArchetypeId.TEMPO, themes = listOf(ThemeId.SPELLSLINGER), weight = 0.9f),
+            ColorStrategyEntry(archetype = ArchetypeId.AGGRO, posture = PostureId.TEMPO, themes = listOf(ThemeId.SPELLSLINGER), weight = 0.9f),
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.SPELLSLINGER), weight = 0.55f),
             ColorStrategyEntry(archetype = ArchetypeId.COMBO, weight = 0.5f),
         ))
@@ -181,13 +190,13 @@ object ColorStrategyAffinity {
             // go-wide guild.
             ColorStrategyEntry(archetype = ArchetypeId.AGGRO, themes = listOf(ThemeId.TOKENS), weight = 0.9f),
             ColorStrategyEntry(archetype = ArchetypeId.AGGRO, weight = 0.6f),
-            ColorStrategyEntry(archetype = ArchetypeId.TEMPO, weight = 0.55f),
+            ColorStrategyEntry(archetype = ArchetypeId.AGGRO, posture = PostureId.TEMPO, weight = 0.55f),
         ))
         put(setOf(ManaColor.G, ManaColor.U), listOf( // Simic
             // G ramp + U card selection/big-spell payoffs is the definitive ramp-value guild;
             // +1/+1 counters (proliferate) is Simic's well-known secondary theme.
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, themes = listOf(ThemeId.PLUS1_COUNTERS), weight = 0.8f),
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.6f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, themes = listOf(ThemeId.PLUS1_COUNTERS), weight = 0.8f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.6f),
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, weight = 0.55f),
         ))
         // ── Three-color WEDGES (5) -- Tarkir wedges: a color plus its two ENEMY colors
@@ -203,7 +212,7 @@ object ColorStrategyAffinity {
             // U/R/G's "big creatures + card selection + burn" mix supports both a value-midrange
             // read and a ramp-into-threats read equally well -- no single archetype clearly wins.
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, weight = 0.7f),
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.65f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.65f),
         ))
         put(setOf(ManaColor.W, ManaColor.B, ManaColor.G), listOf( // Abzan
             // W/B/G's synergy with +1/+1 counters (Outlast/Renown convention) is Abzan's signature
@@ -215,8 +224,8 @@ object ColorStrategyAffinity {
         put(setOf(ManaColor.W, ManaColor.U, ManaColor.R), listOf( // Jeskai
             // W/U/R's dense removal + card selection + burn is THE definitive spellslinger wedge;
             // a non-spells-focused aggressive-tempo build is the secondary lean.
-            ColorStrategyEntry(archetype = ArchetypeId.TEMPO, themes = listOf(ThemeId.SPELLSLINGER), weight = 0.8f),
-            ColorStrategyEntry(archetype = ArchetypeId.TEMPO, weight = 0.6f),
+            ColorStrategyEntry(archetype = ArchetypeId.AGGRO, posture = PostureId.TEMPO, themes = listOf(ThemeId.SPELLSLINGER), weight = 0.8f),
+            ColorStrategyEntry(archetype = ArchetypeId.AGGRO, posture = PostureId.TEMPO, weight = 0.6f),
         ))
         put(setOf(ManaColor.U, ManaColor.B, ManaColor.G), listOf( // Sultai
             // U/B/G's card selection + graveyard-filling is the definitive self-mill/value wedge;
@@ -231,7 +240,7 @@ object ColorStrategyAffinity {
             // G ramp + W removal/wipes + U card draw is the classic "durdle into value" shell --
             // ETB-blink value is Bant's best-known Commander theme (removal-on-ETB, repeatable).
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.BLINK), weight = 0.75f),
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.65f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.65f),
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.SUPERFRIENDS), weight = 0.5f),
         ))
         put(setOf(ManaColor.W, ManaColor.U, ManaColor.B), listOf( // Esper
@@ -245,7 +254,7 @@ object ColorStrategyAffinity {
             // U tempo/selection + B removal + R burn/copy is THE definitive spellslinger shard;
             // B reanimation with U/R support (discard outlets, card selection) is the classic
             // secondary shell, with pure combo (storm-adjacent) close behind.
-            ColorStrategyEntry(archetype = ArchetypeId.TEMPO, themes = listOf(ThemeId.SPELLSLINGER), weight = 0.8f),
+            ColorStrategyEntry(archetype = ArchetypeId.AGGRO, posture = PostureId.TEMPO, themes = listOf(ThemeId.SPELLSLINGER), weight = 0.8f),
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.REANIMATOR), weight = 0.65f),
             ColorStrategyEntry(archetype = ArchetypeId.COMBO, weight = 0.5f),
         ))
@@ -255,7 +264,7 @@ object ColorStrategyAffinity {
             // bigger bodies to feed it is the natural secondary read.
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, weight = 0.85f),
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, themes = listOf(ThemeId.ARISTOCRATS), weight = 0.65f),
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.5f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.5f),
         ))
         put(setOf(ManaColor.R, ManaColor.G, ManaColor.W), listOf( // Naya
             // R/G/W all excel at cheap, powerful creatures -- the definitive wide-creature-aggro
@@ -284,12 +293,12 @@ object ColorStrategyAffinity {
             // W/B/R/G is the definitive sacrifice-and-drain shell without blue's card-draw crutch --
             // recursion and raw value fill the gap; G ramp into removal-backed threats is secondary.
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, themes = listOf(ThemeId.ARISTOCRATS), weight = 0.75f),
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.5f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.5f),
         ))
         put(setOf(ManaColor.W, ManaColor.U, ManaColor.R, ManaColor.G), listOf( // "Ink-Treader" (no black)
             // G ramp fueling W/U/R support pieces -- the definitive big-mana shell without black's
             // reanimation shortcuts; W/U removal+draw protecting aggressive walkers is secondary.
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.7f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.7f),
             ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.SUPERFRIENDS), weight = 0.55f),
         ))
         put(setOf(ManaColor.W, ManaColor.U, ManaColor.B, ManaColor.G), listOf( // "Witch-Maw" (no red)
@@ -305,8 +314,8 @@ object ColorStrategyAffinity {
             // fixing doubles as ramp, favouring a secondary big-mana read; full color access also
             // supports a toolbox of situational answers.
             ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, weight = 0.6f),
-            ColorStrategyEntry(archetype = ArchetypeId.RAMP, weight = 0.5f),
-            ColorStrategyEntry(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.TOOLBOX), weight = 0.45f),
+            ColorStrategyEntry(archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, weight = 0.5f),
+            ColorStrategyEntry(archetype = ArchetypeId.CONTROL, posture = PostureId.TOOLBOX, weight = 0.45f),
         ))
     }
 }

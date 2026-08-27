@@ -416,7 +416,7 @@ object HarnessMetricsCalculator {
             DeckFormat.VINTAGE -> ok(card.legalityVintage)
             DeckFormat.PAUPER -> ok(card.legalityPauper)
             DeckFormat.COMMANDER -> ok(card.legalityCommander)
-            DeckFormat.CASUAL, DeckFormat.DRAFT -> true
+            DeckFormat.CASUAL, DeckFormat.DRAFT, DeckFormat.COMMANDER_CASUAL -> true
         }
     }
 }

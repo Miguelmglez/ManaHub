@@ -36,6 +36,17 @@ package com.mmg.manahub.feature.decks.domain.engine
  * type-lines/oracle text via [TribeDeriver] — EDHREC tribal data would be redundant with, and
  * coarser than, what the app already computes for itself.
  *
+ * **Deck Analysis Engine v3 (2026-08-26, compat pass):** `voltron`/`stax`/`group-hug`/`group-slug`/
+ * `toolbox` slugs REMOVED -- `VOLTRON`/`GROUP_HUG`/`GROUP_SLUG`/`TOOLBOX` moved to [PostureId] and
+ * `STAX` moved to the macro `ArchetypeId.PRISON` (spec §4.1/§2.2); none of these is a [ThemeId] any
+ * more. `mill` retargeted onto the new [ThemeId.MILL_OPPONENT] (spec §4.2 split -- EDHREC's own
+ * `"mill"` tag page is the win-condition/opponent-facing concept, not the self-mill enabler half).
+ * The 3 brand-new themes (`TREASURE`/`EQUIPMENT`/`STORM`) are left UNMAPPED here -- per this file's
+ * own "never invent a mapping you're unsure about" discipline, no real EDHREC slug for any of the
+ * three has been verified live yet (unlike every other entry in this table); a future pass should
+ * verify candidate slugs (e.g. `"treasures"`, `"equipment"`, `"storm"`) the same way every existing
+ * entry was.
+ *
  * See [EDHREC_SLUG_TO_ARCHETYPE_ID] for the analogous curated mapping onto [ArchetypeId].
  */
 val EDHREC_SLUG_TO_THEME_ID: Map<String, ThemeId> = mapOf(
@@ -43,23 +54,20 @@ val EDHREC_SLUG_TO_THEME_ID: Map<String, ThemeId> = mapOf(
     "tokens" to ThemeId.TOKENS,
     "reanimator" to ThemeId.REANIMATOR,
     "self-mill" to ThemeId.SELF_MILL,
-    "mill" to ThemeId.MILL,
+    "mill" to ThemeId.MILL_OPPONENT,
     "spellslinger" to ThemeId.SPELLSLINGER,
-    "voltron" to ThemeId.VOLTRON,
-    "stax" to ThemeId.STAX,
     "landfall" to ThemeId.LANDFALL,
     "lifegain" to ThemeId.LIFEGAIN,
     "plus-1-plus-1-counters" to ThemeId.PLUS1_COUNTERS,
     "artifacts" to ThemeId.ARTIFACTS,
     "enchantress" to ThemeId.ENCHANTRESS,
     "wheels" to ThemeId.WHEELS,
-    "group-hug" to ThemeId.GROUP_HUG,
-    "group-slug" to ThemeId.GROUP_SLUG,
     "blink" to ThemeId.BLINK,
     "planeswalkers" to ThemeId.SUPERFRIENDS,
     "vehicles" to ThemeId.VEHICLES,
-    "toolbox" to ThemeId.TOOLBOX,
     // ThemeId.CLONES_THEFT, ThemeId.TRIBAL: intentionally absent — see KDoc above.
+    // ThemeId.TREASURE, ThemeId.EQUIPMENT, ThemeId.STORM: intentionally unmapped, unverified — see
+    // this KDoc's "Deck Analysis Engine v3" note above.
 )
 
 /** Every EDHREC slug this pipeline/app should fetch a theme page for — the map's key set. */
@@ -77,8 +85,13 @@ val EDHREC_THEME_SLUGS: Set<String> = EDHREC_SLUG_TO_THEME_ID.keys
  * genuinely archetype-appropriate cards (e.g. `ramp` → Tatyova/The Gitrog Monster/Lotus Cobra/
  * Azusa; `control` → Mystic Remora/Ghostly Prison/Swan Song).
  *
- * [ArchetypeId.GENERIC] is deliberately UNMAPPED — the taxonomy's neutral "no specific archetype"
- * default, not a page-worthy archetype.
+ * `null`/no archetype pin is deliberately UNMAPPED — the taxonomy's neutral "no specific archetype"
+ * state (Deck Analysis Engine v3 removed `ArchetypeId.GENERIC`), not a page-worthy archetype.
+ * `tempo`/`ramp` slugs REMOVED (2026-08-26 compat pass) -- `TEMPO`/`RAMP` moved to [PostureId]
+ * (spec §2/§3), no longer [ArchetypeId] values. `ArchetypeId.PRISON` (NEW, spec §2.2) is left
+ * UNMAPPED here -- the old `stax` slug (removed from [EDHREC_SLUG_TO_THEME_ID] above) is the closest
+ * candidate, but re-pointing an EDHREC ARCHETYPE-page slug at PRISON has not been separately
+ * verified against a live response for this table specifically, per this file's own discipline.
  *
  * **Note (plan §8a addendum):** the app's on-device per-card EDHREC fallback
  * (`EdhrecCardTagEnrichmentSource`) does NOT use this table — [ArchetypeId] is a whole-DECK
@@ -91,10 +104,8 @@ val EDHREC_SLUG_TO_ARCHETYPE_ID: Map<String, ArchetypeId> = mapOf(
     "aggro" to ArchetypeId.AGGRO,
     "midrange" to ArchetypeId.MIDRANGE,
     "control" to ArchetypeId.CONTROL,
-    "tempo" to ArchetypeId.TEMPO,
     "combo" to ArchetypeId.COMBO,
-    "ramp" to ArchetypeId.RAMP,
-    // ArchetypeId.GENERIC: intentionally absent — see KDoc above.
+    // ArchetypeId.PRISON: intentionally unmapped, unverified — see this KDoc's note above.
 )
 
 /** Every EDHREC slug this pipeline should fetch an archetype page for — the map's key set. */

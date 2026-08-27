@@ -72,7 +72,7 @@ class AnalysisEngineLegalityP5Test {
 
         val analysis = AnalysisEngine.evaluate(
             mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
-            archetype = ArchetypeId.GENERIC, themes = emptyList(), isManualOverride = false, confidence = 0f,
+            archetype = null, themes = emptyList(), isManualOverride = false, confidence = 0f,
         )
 
         val legality = analysis.pillars.first { it.id == PillarId.LEGALITY }
@@ -92,7 +92,7 @@ class AnalysisEngineLegalityP5Test {
 
         val analysis = AnalysisEngine.evaluate(
             mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
-            archetype = ArchetypeId.GENERIC, themes = emptyList(), isManualOverride = false, confidence = 0f,
+            archetype = null, themes = emptyList(), isManualOverride = false, confidence = 0f,
         )
 
         val legality = analysis.pillars.first { it.id == PillarId.LEGALITY }
@@ -115,7 +115,7 @@ class AnalysisEngineLegalityP5Test {
 
         val analysis = AnalysisEngine.evaluate(
             mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
-            archetype = ArchetypeId.GENERIC, themes = emptyList(), isManualOverride = false, confidence = 0f,
+            archetype = null, themes = emptyList(), isManualOverride = false, confidence = 0f,
             sideboardCount = 16,
         )
 
@@ -139,7 +139,7 @@ class AnalysisEngineLegalityP5Test {
         listOf(15, 0).forEach { count ->
             val analysis = AnalysisEngine.evaluate(
                 mainboard = mainboard, format = DeckFormat.STANDARD, colorIdentity = colorIdentity, profile = profile,
-                archetype = ArchetypeId.GENERIC, themes = emptyList(), isManualOverride = false, confidence = 0f,
+                archetype = null, themes = emptyList(), isManualOverride = false, confidence = 0f,
                 sideboardCount = count,
             )
             val legality = analysis.pillars.first { it.id == PillarId.LEGALITY }
@@ -168,7 +168,7 @@ class AnalysisEngineLegalityP5Test {
 
         val analysis = AnalysisEngine.evaluate(
             mainboard = mainboard, format = DeckFormat.COMMANDER, colorIdentity = colorIdentity, profile = profile,
-            archetype = ArchetypeId.GENERIC, themes = emptyList(), isManualOverride = false, confidence = 0f,
+            archetype = null, themes = emptyList(), isManualOverride = false, confidence = 0f,
             sideboardCount = 25,
         )
 

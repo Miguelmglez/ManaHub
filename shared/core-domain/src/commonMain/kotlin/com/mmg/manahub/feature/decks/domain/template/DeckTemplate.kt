@@ -44,7 +44,9 @@ data class TemplateCategory(
  * `themesOverride` by the builder (§3.3 "Builder<->Doctor coherence") so [com.mmg.manahub.feature
  * .decks.domain.usecase.EvaluateDeckUseCase] evaluates against the SAME skeleton the builder filled. */
 data class DeckTemplateArchetypeInfo(
-    val archetype: ArchetypeId,
+    /** `null` = no macro pin (Deck Analysis Engine v3 removed `ArchetypeId.GENERIC`; a "no specific
+     * archetype" result is now `null` rather than a neutral enum value). */
+    val archetype: ArchetypeId?,
     val themes: List<ThemeId>,
 )
 

@@ -53,16 +53,6 @@ class StrategyCatalogTest {
     }
 
     @Test
-    fun `no theme lists GENERIC among its own compatible archetypes`() {
-        // GENERIC is compatible with everything by construction (see isValidCombination) and is
-        // deliberately never enumerated inside a theme's own curated set -- a theme listing it
-        // explicitly would be redundant and could silently drift from that construction rule.
-        ThemeId.entries.forEach { theme ->
-            assertFalse(ArchetypeId.GENERIC in StrategyCatalog.compatibleArchetypes(theme), "$theme should not list GENERIC")
-        }
-    }
-
-    @Test
     fun `only TRIBAL requires a tribe`() {
         ThemeId.entries.forEach { theme ->
             val expected = theme == ThemeId.TRIBAL
@@ -86,7 +76,7 @@ class StrategyCatalogTest {
         // Derived-from-the-same-table invariant (WS 1.1 "generate the inverse, never hand-maintain
         // two directions"): for every (archetype, theme) pair, archetype in theme's set iff theme
         // in archetype's set.
-        ArchetypeId.entries.filter { it != ArchetypeId.GENERIC }.forEach { archetype ->
+        ArchetypeId.entries.forEach { archetype ->
             val fromArchetype = StrategyCatalog.compatibleThemes(archetype)
             ThemeId.entries.forEach { theme ->
                 val fromTheme = archetype in StrategyCatalog.compatibleArchetypes(theme)
@@ -99,28 +89,25 @@ class StrategyCatalogTest {
         }
     }
 
-    @Test
-    fun `GENERIC is compatible with every theme via compatibleThemes`() {
-        assertEquals(ThemeId.entries.toSet(), StrategyCatalog.compatibleThemes(ArchetypeId.GENERIC))
-    }
-
     // ── isValidCombination ──────────────────────────────────────────────────────────────────────
 
     @Test
-    fun `GENERIC (or null) archetype is valid with any theme combination`() {
-        assertTrue(StrategyCatalog.isValidCombination(null, listOf(ThemeId.STAX)))
-        assertTrue(StrategyCatalog.isValidCombination(ArchetypeId.GENERIC, listOf(ThemeId.STAX, ThemeId.WHEELS)))
+    fun `a null (unpinned) archetype is valid with any theme combination`() {
+        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- `null` is the sole "unpinned,
+        // compatible with everything" state now.
+        assertTrue(StrategyCatalog.isValidCombination(null, listOf(ThemeId.WHEELS)))
+        assertTrue(StrategyCatalog.isValidCombination(null, listOf(ThemeId.WHEELS, ThemeId.BLINK)))
     }
 
     @Test
     fun `a theme incompatible with the picked archetype is invalid`() {
-        // STAX explicitly excludes AGGRO (plan's own worked example).
-        assertFalse(StrategyCatalog.isValidCombination(ArchetypeId.AGGRO, listOf(ThemeId.STAX)))
+        // MILL_OPPONENT explicitly excludes AGGRO (compatibleArchetypes = {CONTROL, COMBO}).
+        assertFalse(StrategyCatalog.isValidCombination(ArchetypeId.AGGRO, listOf(ThemeId.MILL_OPPONENT)))
     }
 
     @Test
     fun `a theme compatible with the picked archetype is valid`() {
-        assertTrue(StrategyCatalog.isValidCombination(ArchetypeId.CONTROL, listOf(ThemeId.STAX)))
+        assertTrue(StrategyCatalog.isValidCombination(ArchetypeId.CONTROL, listOf(ThemeId.MILL_OPPONENT)))
     }
 
     @Test

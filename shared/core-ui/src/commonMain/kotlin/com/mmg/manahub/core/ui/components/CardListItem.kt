@@ -74,6 +74,7 @@ fun CardListItem(
         setName = item.card.setName,
         rarity = item.card.rarity,
         typeLine = item.card.typeLine,
+        manaCost = item.card.manaCost,
         onClick = onClick,
         modifier = modifier,
         sharedTransitionScope = sharedTransitionScope,
@@ -113,6 +114,13 @@ fun CardListItem(
     setName: String? = null,
     rarity: String? = null,
     typeLine: String? = null,
+    /**
+     * Raw Scryfall mana cost string (e.g. `"{2}{U}{U}"`), rendered as symbol images pinned to the
+     * end of the headline row next to [name] — Deck Analysis Category Sections rework, W6.
+     * `null`/blank renders nothing ([ManaCostImages] itself no-ops on an unparseable/empty string),
+     * so every pre-existing call site (which never sets this) is visually unchanged.
+     */
+    manaCost: String? = null,
     containerColor: Color = Color.Transparent,
     shape: Shape = RectangleShape,
     sharedTransitionScope: SharedTransitionScope? = null,
@@ -171,14 +179,24 @@ fun CardListItem(
             },
             headlineContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CardName(
-                        name = name,
-                        showFrontOnly = true,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = mc.textPrimary,
-                        style = MaterialTheme.magicTypography.titleMedium,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        CardName(
+                            name = name,
+                            showFrontOnly = true,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = mc.textPrimary,
+                            style = MaterialTheme.magicTypography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (!manaCost.isNullOrBlank()) {
+                            ManaCostImages(manaCost = manaCost, symbolSize = 14.dp)
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

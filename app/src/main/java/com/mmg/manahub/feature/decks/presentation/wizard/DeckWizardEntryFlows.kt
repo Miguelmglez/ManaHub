@@ -51,7 +51,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ColorStrategyEntry
 import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.StrategyCatalog
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
-import com.mmg.manahub.feature.decks.presentation.components.CardRow
+import com.mmg.manahub.core.ui.components.CardRow
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Engine Unification plan (`docs/plans/deck-engine-unification-plan.md` §5 Phase 3) --
@@ -244,8 +244,10 @@ internal fun StrategyFlowDirectionContent(
     val spacing = MaterialTheme.spacing
 
     val query = uiState.taxonomyQuery.trim()
+    // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- every entries value is now a real,
+    // specialized macro, so no filter is needed (was previously excluding the neutral default).
     val filteredArchetypes = remember(query) {
-        ArchetypeId.entries.filter { it != ArchetypeId.GENERIC && (query.isEmpty() || it.displayName.contains(query, ignoreCase = true)) }
+        ArchetypeId.entries.filter { query.isEmpty() || it.displayName.contains(query, ignoreCase = true) }
     }
     val filteredThemes = remember(query) {
         ThemeId.entries.filter { query.isEmpty() || it.displayName.contains(query, ignoreCase = true) }
@@ -600,14 +602,15 @@ private fun ArchetypeId.description(): String = StrategyCatalog.description(this
 private fun ThemeId.description(): String = StrategyCatalog.description(this)
 
 /** [ColorStrategyEntry.description] -- same fallback order as [ColorStrategyEntry.label]'s own KDoc:
- * a non-GENERIC archetype's description first, else the first theme's, else the GENERIC/"Balanced"
- * fallback (a [ColorStrategyEntry] with neither is never actually curated in [ColorStrategyAffinity]'s
- * table today, but the fallback keeps this total rather than crashing if one ever is). */
+ * the archetype's description first, else the first theme's, else a plain "Balanced" fallback
+ * (Deck Analysis Engine v3 removed `ArchetypeId.GENERIC` -- a [ColorStrategyEntry] with neither is
+ * never actually curated in [ColorStrategyAffinity]'s table today, but the fallback keeps this
+ * total rather than crashing if one ever is). */
 private fun ColorStrategyEntry.description(): String {
-    val nonGenericArchetype = archetype?.takeIf { it != ArchetypeId.GENERIC }
+    val archetype = archetype
     return when {
-        nonGenericArchetype != null -> nonGenericArchetype.description()
+        archetype != null -> archetype.description()
         themes.isNotEmpty() -> themes.first().description()
-        else -> StrategyCatalog.description(ArchetypeId.GENERIC)
+        else -> "A flexible, balanced approach with no single dominant strategy."
     }
 }

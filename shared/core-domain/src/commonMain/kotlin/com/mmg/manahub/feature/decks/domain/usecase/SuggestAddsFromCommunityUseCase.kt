@@ -154,6 +154,7 @@ class SuggestAddsFromCommunityUseCase(
             DeckFormat.VINTAGE -> ok(card.legalityVintage)
             DeckFormat.PAUPER -> ok(card.legalityPauper)
             DeckFormat.COMMANDER -> ok(card.legalityCommander)
+            DeckFormat.COMMANDER_CASUAL -> true
             DeckFormat.CASUAL -> true
             DeckFormat.DRAFT -> true
         }

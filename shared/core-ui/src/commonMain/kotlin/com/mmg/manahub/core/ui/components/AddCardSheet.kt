@@ -97,6 +97,11 @@ fun AddCardSheet(
     setName: String? = null,
     rarity: String? = null,
     /**
+     * Raw Scryfall mana cost string (e.g. `"{2}{U}{U}"`), rendered as symbol images beside the
+     * card-name header — Deck Analysis Category Sections rework, W6. `null`/blank renders nothing.
+     */
+    manaCost: String? = null,
+    /**
      * Card Versions & Languages, Phase 1B. When non-null, renders a "Set / Variant" field above the
      * toggles that invokes this callback on tap. The caller owns the printing selection state: it
      * swaps [setCode]/[setName]/[rarity]/[cardImage]/[manaCost] on the NEXT recomposition when the
@@ -188,13 +193,21 @@ fun AddCardSheet(
                 verticalArrangement = Arrangement.spacedBy(spacing.lg)
             ) {
                 val displayName = cardName.substringBefore(" // ")
-                CardName(
-                    name = displayName,
-                    style = ty.displayMedium,
-                    color = mc.primaryAccent,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CardName(
+                        name = displayName,
+                        style = ty.displayMedium,
+                        color = mc.primaryAccent,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!manaCost.isNullOrBlank()) {
+                        ManaCostImages(manaCost = manaCost, symbolSize = 18.dp)
+                    }
+                }
 
                 cardImage?.let {
                     Box(

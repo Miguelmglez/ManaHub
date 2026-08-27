@@ -8,17 +8,13 @@ object FeatureFlags {
 
     /** Flags for the Decks feature and Deck Studio editor. */
     object Decks {
-        /** Deck Studio "Suggestions" tab (inline Deck Doctor). */
-        const val DECK_STUDIO_SUGGESTIONS_TAB_ENABLED = false
-
-        /**
-         * Deck Studio Suggestions/Analysis tab: Cuts, Adds (Motor A + outside-collection backstop),
-         * Community (Motor B), and Similar-decks carousel. Independent of [DECK_STUDIO_SUGGESTIONS_TAB_ENABLED]
-         * (which gates the whole tab) — this flag hides only these specific sub-sections while the tab's
-         * plan chip + Health score/role-coverage/warnings stay visible. OFF while the Deck Analysis Engine v2
-         * rewrite (docs/plans/deck-analysis-engine-v2-plan.md) is in progress; code stays compiled, not deleted.
-         */
-        const val DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED = false
+        /** Deck Studio "Suggestions"/Analysis tab (inline Deck Doctor: score/pillars/findings +
+         * "Decks like yours"). Deck Analysis Category Sections rework (W0, D3/D5): the old Motor
+         * A/B "Adds"/"Cuts" suggestion engine and its own independent
+         * `DECK_STUDIO_SUGGESTIONS_ENGINE_ENABLED` sub-flag were deleted end-to-end — the tab's
+         * Analysis content (score ring, pillar tiles, findings, "Decks like yours") is now always
+         * on whenever this flag is, no separate engine gate. */
+        const val DECK_STUDIO_SUGGESTIONS_TAB_ENABLED = true
 
         /** Deck Builder v2 wizard + generation + result screens. */
         const val DECK_BUILDER_V2_ENABLED = false

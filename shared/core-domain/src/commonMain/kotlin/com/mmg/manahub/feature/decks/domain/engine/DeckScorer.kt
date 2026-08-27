@@ -528,6 +528,7 @@ class DeckScorer(
             DeckFormat.VINTAGE -> ok(card.legalityVintage)
             DeckFormat.PAUPER -> ok(card.legalityPauper)
             DeckFormat.COMMANDER -> ok(card.legalityCommander)
+            DeckFormat.COMMANDER_CASUAL -> true
             DeckFormat.CASUAL -> true // permissive: no legality restriction
             DeckFormat.DRAFT -> true // limited: any card in the set is playable
         }

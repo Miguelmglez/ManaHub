@@ -585,6 +585,24 @@ class CollectionViewModel(
                 else criterion.types.any(check)
             }
 
+            is SearchCriterion.CardFunction -> {
+                // Deck Analysis — Category Sections plan, W4. Each selected Scryfall function value
+                // maps to its own hand-curated CardTag key set (CardFunctionOption.collectionTagKeys)
+                // — NOT SectionSearchQuery.collectionTagKeysFor(sectionId), which operates on a
+                // different key space (pillar section ids like "role:removal_spot", not raw function
+                // values like "spot-removal"). See CardFunctionOption's KDoc for the full rationale.
+                // A function with no local tag equivalent (emptySet()) matches nothing locally — it
+                // is Scryfall-search-only, same as curve/mana/legality sections in SectionSearchQuery.
+                val cardTagKeys = card.card.tags.map { it.key }.toSet() + card.card.userTags.map { it.key }
+                val check: (String) -> Boolean = { value ->
+                    val tagKeys = com.mmg.manahub.core.model.CardFunctionOption.allFunctions
+                        .find { it.scryfallValue == value }?.collectionTagKeys ?: emptySet()
+                    tagKeys.isNotEmpty() && tagKeys.any { it in cardTagKeys }
+                }
+                if (criterion.matchAll) criterion.functions.all(check)
+                else criterion.functions.any(check)
+            }
+
             is SearchCriterion.Colors ->
                 if (criterion.exactly)
                     card.card.colors.map { it.uppercase() }.toSet() ==

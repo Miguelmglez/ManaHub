@@ -42,19 +42,31 @@ class EvaluateDeckUseCaseV2(
         colorIdentity: Set<ManaColor>,
         profile: DeckProfile,
         resolution: ArchetypeResolution,
-        weights: AnalysisWeights = AnalysisWeights(),
+        // Deck Analysis Engine v3 (spec §8) -- macro-dependent default (AnalysisWeights.forMacro),
+        // same "caller-explicit-value always wins" contract as AnalysisEngine.evaluate's own
+        // [weights] param (see its KDoc); resolution is a parameter of THIS function so the default
+        // expression can read resolution.macro/resolution.themes directly.
+        weights: AnalysisWeights = AnalysisWeights.forMacro(resolution.macro, resolution.themes.size),
         sideboardCount: Int = 0,
+        // Deck Analysis Engine v3, PHASE 5 (UI) -- forwarded verbatim to [AnalysisEngine.evaluate]'s
+        // own [includeDebugSynergyGraph] param. Appended LAST and defaulted `false` so every existing
+        // call site/test keeps compiling unchanged; [EvaluateDeckUseCase] (the real Analysis tab
+        // pass) is the first caller to pass `true`, since the synergy-package UI needs
+        // [DeckAnalysis.debugSynergyGraph] to render producer -> payoff sections per live axis.
+        includeDebugSynergyGraph: Boolean = false,
     ): DeckAnalysis = AnalysisEngine.evaluate(
         mainboard = mainboard,
         format = format,
         colorIdentity = colorIdentity,
         profile = profile,
         archetype = resolution.macro,
+        posture = resolution.posture,
         themes = resolution.themes,
         isManualOverride = resolution.isManualOverride,
         confidence = resolution.confidence,
         weights = weights,
         manaBaseAnalyzer = manaBaseAnalyzer,
         sideboardCount = sideboardCount,
+        includeDebugSynergyGraph = includeDebugSynergyGraph,
     )
 }

@@ -100,7 +100,6 @@ import com.mmg.manahub.core.ui.components.rememberRateLimitCountdownSeconds
 import com.mmg.manahub.core.ui.components.search.AdvancedSearchSheet
 import com.mmg.manahub.core.ui.mtg_card_back
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -329,7 +328,7 @@ private fun SearchSurface(
                     focusedContainerColor = mc.surface,
                     unfocusedContainerColor = mc.surface,
                 ),
-                shape = SmallCardShape,
+                shape = CardShape,
             )
             BadgedBox(
                 badge = {
@@ -349,7 +348,7 @@ private fun SearchSurface(
                     },
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(SmallCardShape)
+                        .clip(CardShape)
                         .background(mc.primaryAccent.copy(alpha = 0.1f)),
                 ) {
                     Icon(
@@ -616,14 +615,14 @@ private fun SpotlightCardTile(
             .fillMaxWidth()
             // Full MTG card aspect ratio (745:1040) so the whole card is shown.
             .aspectRatio(0.717f)
-            .clip(SmallCardShape)
+            .clip(CardShape)
             .then(
                 if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {
                         Modifier.sharedBounds(
                             sharedContentState = rememberSharedContentState(key = "card-image-${card.scryfallId}"),
                             animatedVisibilityScope = animatedVisibilityScope,
-                            clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                            clipInOverlayDuringTransition = OverlayClip(CardShape),
                             renderInOverlayDuringTransition = true,
                         )
                     }
@@ -780,11 +779,11 @@ private fun SearchResultGridItem(
     val ty = MaterialTheme.magicTypography
     Surface(
         onClick = onClick,
-        shape = SmallCardShape,
+        shape = CardShape,
         color = MaterialTheme.magicColors.surface,
     ) {
 
-        Column(modifier = Modifier.clip(SmallCardShape)
+        Column(modifier = Modifier.clip(CardShape)
             .background(MaterialTheme.magicColors.surfaceVariant),
             horizontalAlignment = Alignment.Start) {
             AsyncImage(
@@ -795,7 +794,7 @@ private fun SearchResultGridItem(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .aspectRatio(0.716f)
-                    .clip(SmallCardShape)
+                    .clip(CardShape)
                     .then(
                         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                             with(sharedTransitionScope) {
@@ -881,7 +880,7 @@ private fun SearchResultItem(
 
     Surface(
         onClick = onClick,
-        shape = SmallCardShape,
+        shape = CardShape,
         color = mc.surface,
         border = BorderStroke(0.5.dp, mc.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),

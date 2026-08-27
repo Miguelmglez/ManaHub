@@ -106,8 +106,10 @@ class DeckWizardViewModelTest {
         communitySuggestions = emptyList(),
         report = emptyList(),
         templateSource = TemplateSource.SYNTHETIC,
-        archetypeInfo = DeckTemplateArchetypeInfo(archetype = ArchetypeId.GENERIC, themes = emptyList()),
-        archetypeOverride = ArchetypeId.GENERIC.name,
+        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- a null archetype is the new
+        // "no macro pin" state.
+        archetypeInfo = DeckTemplateArchetypeInfo(archetype = null, themes = emptyList()),
+        archetypeOverride = null,
         themesOverride = emptyList(),
         colorConsistencyWarning = false,
         gamePlan = null,
@@ -321,7 +323,7 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
-        vm.onSelectTaxonomyArchetype(ArchetypeId.RAMP)
+        vm.onSelectTaxonomyArchetype(ArchetypeId.AGGRO)
         assertTrue(vm.uiState.value.colorIdentity.isEmpty())
 
         vm.events.test {
@@ -498,8 +500,8 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
 
         // A strategy pick alone (no colors) still blocks.
-        vm.onSelectDirectionTag(CardTag.RAMP)
-        assertEquals(ArchetypeId.RAMP, vm.uiState.value.selectedArchetype)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
+        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
         vm.events.test {
             vm.onNextFromDirection()
             assertTrue(awaitItem() is DeckWizardEvent.ShowToast)
@@ -589,7 +591,7 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `a seed strategy candidate's misfit hint reflects the currently picked seeds and colors`() = runTest(dispatcher) {
-        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.AGGRO))
         val offSeed = card(id = "gy-1", name = "Graveyard Piece", tags = listOf(CardTag.GRAVEYARD))
         val vm = viewModel()
         advanceUntilIdle()
@@ -599,12 +601,12 @@ class DeckWizardViewModelTest {
         vm.onAddSeed(rampSeed)
         vm.onAddSeed(offSeed)
 
-        val rampCandidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        val rampCandidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
         assertTrue(rampCandidate.misfitSeeds.any { it.scryfallId == "gy-1" })
 
         // Removing the misfit seed re-ranks: the SAME candidate no longer carries it as a misfit.
         vm.onRemoveSeed(offSeed)
-        val reranked = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        val reranked = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
         assertTrue(reranked.misfitSeeds.isEmpty())
     }
 
@@ -612,7 +614,7 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `Flow A full step chain -- FORMAT to ENTRY to DIRECTION to MANUAL_ADDS to REVIEW, and back mirrors it`() = runTest(dispatcher) {
-        val seed = card(id = "seed-1", name = "Ramp Seed", tags = listOf(CardTag.RAMP), colorIdentity = listOf("G"))
+        val seed = card(id = "seed-1", name = "Ramp Seed", tags = listOf(CardTag.AGGRO), colorIdentity = listOf("G"))
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
@@ -623,7 +625,7 @@ class DeckWizardViewModelTest {
         assertEquals(WizardPhase.DIRECTION, vm.uiState.value.phase)
 
         vm.onAddSeed(seed)
-        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
         vm.onSelectSeedStrategyCandidate(candidate)
 
         vm.onNextFromDirection()
@@ -672,7 +674,7 @@ class DeckWizardViewModelTest {
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.STRATEGY)
-        vm.onSelectTaxonomyArchetype(ArchetypeId.RAMP)
+        vm.onSelectTaxonomyArchetype(ArchetypeId.AGGRO)
         val combo = vm.uiState.value.colorComboSuggestions.first()
         vm.onSelectColorCombo(combo)
 
@@ -831,7 +833,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -843,7 +845,7 @@ class DeckWizardViewModelTest {
         assertEquals("wizard-deck-1", state.createdDeckId)
         assertEquals(result, state.buildResult)
         coVerify { deckRepository.addCardToDeck("wizard-deck-1", "spell-1", 2, false, DeckCardSource.WIZARD) }
-        coVerify { deckRepository.updateArchetypeOverride("wizard-deck-1", ArchetypeId.GENERIC.name, emptyList()) }
+        coVerify { deckRepository.updateArchetypeOverride("wizard-deck-1", null, emptyList()) }
         // D4: every wizard build pins strategyLocked=true and writes the (here absent) tribe pin.
         coVerify { deckRepository.updateTribeOverride("wizard-deck-1", null) }
         coVerify { deckRepository.updateStrategyLocked("wizard-deck-1", true) }
@@ -922,7 +924,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -954,7 +956,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -982,7 +984,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1016,7 +1018,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1056,7 +1058,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1083,7 +1085,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1115,7 +1117,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1155,7 +1157,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1185,7 +1187,7 @@ class DeckWizardViewModelTest {
         // Workstream 3 -- CARDS now requires a real strategy pick + a color set before advancing;
         // satisfying it here avoids a stray blocked-attempt ShowToast sitting in the buffered events
         // channel ahead of the OpenDeckStudio event this test actually asserts on.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1204,7 +1206,7 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `adding a seed populates a ranked seedStrategySuggestion`() = runTest(dispatcher) {
-        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.AGGRO))
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
@@ -1215,12 +1217,12 @@ class DeckWizardViewModelTest {
         vm.onAddSeed(rampSeed)
         val suggestion = vm.uiState.value.seedStrategySuggestion
         assertTrue(suggestion != null && suggestion.candidates.isNotEmpty())
-        assertTrue(suggestion!!.candidates.any { it.profile.archetype == ArchetypeId.RAMP })
+        assertTrue(suggestion!!.candidates.any { it.profile.archetype == ArchetypeId.AGGRO })
     }
 
     @Test
     fun `removing every seed clears seedStrategySuggestion`() = runTest(dispatcher) {
-        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.AGGRO))
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
@@ -1238,16 +1240,16 @@ class DeckWizardViewModelTest {
         // strategy-candidate list recomputes to empty (nothing left to rank against) -- the
         // mandatory-strategy gate in onNextFromDirection would then silently pass on the stale pick
         // and advance to MANUAL_ADDS on a plan the user can no longer see or reconsider.
-        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.AGGRO))
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
         vm.onAddSeed(rampSeed)
-        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
         vm.onSelectSeedStrategyCandidate(candidate)
-        assertEquals(ArchetypeId.RAMP, vm.uiState.value.selectedArchetype)
+        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
 
         vm.onRemoveSeed(rampSeed)
 
@@ -1270,17 +1272,17 @@ class DeckWizardViewModelTest {
 
     @Test
     fun `onSelectSeedStrategyCandidate picks the same one-slot Direction fields, and toggles off on a second tap`() = runTest(dispatcher) {
-        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.AGGRO))
         val vm = viewModel()
         advanceUntilIdle()
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
         vm.onSelectEntryFlow(WizardEntryFlow.CARDS)
         vm.onAddSeed(rampSeed)
-        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.RAMP }
+        val candidate = vm.uiState.value.seedStrategySuggestion!!.candidates.first { it.profile.archetype == ArchetypeId.AGGRO }
 
         vm.onSelectSeedStrategyCandidate(candidate)
-        assertEquals(ArchetypeId.RAMP, vm.uiState.value.selectedArchetype)
+        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
 
         vm.onSelectSeedStrategyCandidate(candidate)
         assertNull(vm.uiState.value.selectedArchetype)
@@ -1451,7 +1453,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1546,7 +1548,7 @@ class DeckWizardViewModelTest {
         // this workstream, see DeckWizardViewModel.onNextFromDirection's KDoc) -- these tests only
         // care about the resulting REVIEW/GENERATING/RESULT-phase behavior below, not the specific
         // strategy/color picked.
-        vm.onSelectDirectionTag(CardTag.RAMP)
+        vm.onSelectDirectionTag(CardTag.AGGRO)
         vm.onToggleCardsFlowColor(ManaColor.G)
         vm.onNextFromDirection()
         vm.onNextFromManualAdds()
@@ -1626,9 +1628,9 @@ class DeckWizardViewModelTest {
         assertEquals(combo.colors, vm.uiState.value.colorIdentity)
 
         // User changes their mind without ever picking a new combo for RAMP.
-        vm.onSelectTaxonomyArchetype(ArchetypeId.RAMP)
+        vm.onSelectTaxonomyArchetype(ArchetypeId.AGGRO)
 
-        assertEquals(ArchetypeId.RAMP, vm.uiState.value.selectedArchetype)
+        assertEquals(ArchetypeId.AGGRO, vm.uiState.value.selectedArchetype)
         assertTrue(vm.uiState.value.colorIdentity.isEmpty())
     }
 
@@ -1692,7 +1694,7 @@ class DeckWizardViewModelTest {
             delay(1_000)
             emit(emptyList())
         }
-        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.RAMP))
+        val rampSeed = card(id = "ramp-1", name = "Ramp Spell", tags = listOf(CardTag.AGGRO))
         val vm = viewModel()
         vm.onSelectFormat(DeckFormat.CASUAL)
         vm.onNextFromFormat()
@@ -1700,6 +1702,6 @@ class DeckWizardViewModelTest {
         vm.onAddSeed(rampSeed)
 
         val suggestion = vm.uiState.value.seedStrategySuggestion
-        assertTrue(suggestion != null && suggestion.candidates.any { it.profile.archetype == ArchetypeId.RAMP })
+        assertTrue(suggestion != null && suggestion.candidates.any { it.profile.archetype == ArchetypeId.AGGRO })
     }
 }

@@ -110,6 +110,7 @@ class CollectionViewModelTest {
         keywords:   List<String> = emptyList(),
         power:      String? = null,
         toughness:  String? = null,
+        tags:       List<com.mmg.manahub.core.model.CardTag> = emptyList(),
     ): UserCardWithCard = TestFixtures.buildUserCardWithCard(
         userCard = TestFixtures.buildUserCard(
             id           = id,
@@ -134,6 +135,7 @@ class CollectionViewModelTest {
             legalityPioneer   = legalityPioneer,
             legalityModern    = legalityModern,
             legalityCommander = legalityCommander,
+            tags              = tags,
         ),
     )
 
@@ -720,6 +722,119 @@ class CollectionViewModelTest {
 
         assertEquals(1, viewModel.uiState.value.cards.size)
         assertEquals("Red Instant", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    // ── CardFunction (Deck Analysis — Category Sections plan, W4) ───────────────
+    // Regression guard for the `else -> true` trap noted in CLAUDE.md: matchesCriterion's `when`
+    // ends in `else -> true`, so a missing/short-circuited SearchCriterion.CardFunction branch would
+    // silently match every card with zero compile error. These tests fail if that branch is removed
+    // or stops actually filtering.
+
+    @Test
+    fun `given CardFunction criterion when applyAdvancedFilters then only cards with a matching tag pass`() = runTest {
+        val entries = listOf(
+            buildEntry(
+                scryfallId = "id-001", name = "Rampant Growth",
+                tags = listOf(com.mmg.manahub.core.model.CardTag("ramp", com.mmg.manahub.core.model.TagCategory.ARCHETYPE)),
+            ),
+            buildEntry(
+                scryfallId = "id-002", name = "Lightning Bolt",
+                tags = emptyList(),
+            ),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.CardFunction(setOf("ramp"), matchAll = false))
+        )
+        viewModel.applyAdvancedFilters(query)
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Rampant Growth", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given CardFunction match-any criterion when applyAdvancedFilters then a card matching either function passes`() = runTest {
+        val entries = listOf(
+            buildEntry(
+                scryfallId = "id-001", name = "Board Wipe Card",
+                tags = listOf(com.mmg.manahub.core.model.CardTag("board_wipe", com.mmg.manahub.core.model.TagCategory.ROLE)),
+            ),
+            buildEntry(
+                scryfallId = "id-002", name = "Tutor Card",
+                tags = listOf(com.mmg.manahub.core.model.CardTag("tutor", com.mmg.manahub.core.model.TagCategory.ROLE)),
+            ),
+            buildEntry(
+                scryfallId = "id-003", name = "Unrelated Card",
+                tags = emptyList(),
+            ),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        val query = AdvancedSearchQuery(
+            criteria = listOf(
+                SearchCriterion.CardFunction(setOf("board-wipe", "tutor"), matchAll = false)
+            )
+        )
+        viewModel.applyAdvancedFilters(query)
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.value.cards.size)
+        assertTrue(viewModel.uiState.value.cards.none { it.card.name == "Unrelated Card" })
+    }
+
+    @Test
+    fun `given CardFunction match-all criterion when applyAdvancedFilters then only a card with both tags passes`() = runTest {
+        val bothTags = listOf(
+            com.mmg.manahub.core.model.CardTag("ramp", com.mmg.manahub.core.model.TagCategory.ARCHETYPE),
+            com.mmg.manahub.core.model.CardTag("tutor", com.mmg.manahub.core.model.TagCategory.ROLE),
+        )
+        val entries = listOf(
+            buildEntry(scryfallId = "id-001", name = "Ramp And Tutor", tags = bothTags),
+            buildEntry(
+                scryfallId = "id-002", name = "Ramp Only",
+                tags = listOf(com.mmg.manahub.core.model.CardTag("ramp", com.mmg.manahub.core.model.TagCategory.ARCHETYPE)),
+            ),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        val query = AdvancedSearchQuery(
+            criteria = listOf(
+                SearchCriterion.CardFunction(setOf("ramp", "tutor"), matchAll = true)
+            )
+        )
+        viewModel.applyAdvancedFilters(query)
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.cards.size)
+        assertEquals("Ramp And Tutor", viewModel.uiState.value.cards.first().card.name)
+    }
+
+    @Test
+    fun `given CardFunction value with no local tag equivalent when applyAdvancedFilters then no card matches`() = runTest {
+        // "cantrip" has an empty collectionTagKeys set (CardFunctionOption) — Scryfall-search-only,
+        // no local tag captures the concept. This must NOT fall through to the `else -> true`
+        // catch-all and match everything.
+        val entries = listOf(
+            buildEntry(
+                scryfallId = "id-001", name = "Some Card",
+                tags = listOf(com.mmg.manahub.core.model.CardTag("ramp", com.mmg.manahub.core.model.TagCategory.ARCHETYPE)),
+            ),
+        )
+        viewModel = buildViewModel(entries)
+        advanceUntilIdle()
+
+        val query = AdvancedSearchQuery(
+            criteria = listOf(SearchCriterion.CardFunction(setOf("cantrip"), matchAll = false))
+        )
+        viewModel.applyAdvancedFilters(query)
+        advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.cards.size)
     }
 
     @Test

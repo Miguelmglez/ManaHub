@@ -23,7 +23,6 @@ import com.mmg.manahub.feature.decks.domain.usecase.RankOwnedCardsForProfileUseC
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCollectionUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsFromCommunityUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestAddsUseCase
-import com.mmg.manahub.feature.decks.domain.usecase.SuggestCutsUseCase
 import com.mmg.manahub.feature.decks.domain.usecase.SuggestStrategiesForSeedsUseCase
 import com.mmg.manahub.feature.decks.domain.template.BuildDeckFromTemplateUseCase
 import com.mmg.manahub.feature.decks.domain.template.CollectionProfileUseCase
@@ -111,8 +110,8 @@ fun decksKoinModule(): Module = module {
     // and pure — a single shared instance is safe.
     single { InferDeckArchetypeUseCase() }
     // Deck Analysis Engine v2 (Phase 2) -- the new unified pillar pipeline. Shares the same
-    // ManaBaseAnalyzer singleton DeckScorer/SuggestCutsUseCase already use above (P1 reuses it
-    // verbatim, never a second instance).
+    // ManaBaseAnalyzer singleton DeckScorer already uses above (P1 reuses it verbatim, never a
+    // second instance).
     single { EvaluateDeckUseCaseV2(manaBaseAnalyzer = get()) }
     single {
         EvaluateDeckUseCase(
@@ -127,19 +126,21 @@ fun decksKoinModule(): Module = module {
         )
     }
     single { SuggestAddsUseCase(deckScorer = get()) }
-    // WS9.5 (Deck Wizard & Engine Rework plan): the manabase-aware cut penalty needs the SAME
-    // shared ManaBaseAnalyzer singleton SuggestAddsFromCollectionUseCase already uses below.
-    single { SuggestCutsUseCase(deckScorer = get(), manaBaseAnalyzer = get()) }
-    // Deck Doctor Community/Archetype plan, Phase 2 (Motor A): the primary, always-available,
-    // offline adds source — see `project_deck_doctor_phase2_motor_a` memory. The dormant
-    // `SuggestAddsWithBudgetUseCase` sibling (D5, no longer injected into any live surface) was
-    // DELETED in WS7.3 (D-H, budget feature not coming back) — Motor A is now the only adds path
-    // through this registration.
+    // Deck Analysis Category Sections rework (W0, D3): the old Deck Doctor "Cuts" suggestion tab
+    // was deleted, so NOTHING in production resolves `SuggestCutsUseCase` via Koin any more --
+    // its `single { }` registration is intentionally NOT re-added here. The class itself SURVIVES
+    // undeleted (not Koin-wired) because `app/src/test/.../harness/HarnessDoctorPipeline.kt`
+    // directly constructs it (bypassing Koin) for the separate Wizard Quality Campaign's
+    // "coherence-cuts-v2" ZERO-TOLERANCE QA gate -- deleting the class would have broken that
+    // unrelated harness. `SuggestAddsFromCollectionUseCase`/`SuggestAddsFromCommunityUseCase`
+    // SURVIVE (and stay Koin-registered) below for a similar but PRODUCTION reason: they are now
+    // ALSO the Deck Wizard's own fill-from-collection/community placement engine
+    // (`BuildDeckFromTemplateUseCase`, registered further down), not just Suggestions-tab-only as
+    // their original (Phase 2/4) KDoc implied.
     single { SuggestAddsFromCollectionUseCase(deckScorer = get(), manaBaseAnalyzer = get()) }
-    // Deck Doctor Community/Archetype plan, Phase 4 (Motor B). `CommunityAggregateRepository`
-    // (communityAggregateKoinModule) and `CommunityDecksRepository` (communityDecksKoinModule) are
-    // resolved via `get()` — both modules load in the same ManaHubApp `modules(...)` call, so
-    // declaration order does not matter to Koin.
+    // `CommunityAggregateRepository` (communityAggregateKoinModule) and `CommunityDecksRepository`
+    // (communityDecksKoinModule) are resolved via `get()` — both modules load in the same
+    // ManaHubApp `modules(...)` call, so declaration order does not matter to Koin.
     single { SuggestAddsFromCommunityUseCase(cardRepository = get()) }
     single { FindSimilarDecksUseCase(communityDecksRepository = get()) }
 
@@ -219,8 +220,6 @@ fun decksKoinModule(): Module = module {
             suggestTagsUseCase = get(),
             evaluateDeckUseCase = get(),
             inferDeckIdentityUseCase = get(),
-            suggestCutsUseCase = get(),
-            suggestAddsFromCollectionUseCase = get(),
             getDeckGameStatsUseCase = get(),
             importDeckUseCase = get(),
             wishlistRepository = get(),
@@ -228,9 +227,7 @@ fun decksKoinModule(): Module = module {
             crashReporter = get(),
             appContext = get(),
             savedStateHandle = get(),
-            suggestAddsFromCommunityUseCase = get(),
             findSimilarDecksUseCase = get(),
-            communityAggregateRepository = get(),
             importDeckCardsUseCase = get(),
             discoverSynergiesV2UseCase = get(),
             findCombosUseCase = get(),
@@ -239,9 +236,9 @@ fun decksKoinModule(): Module = module {
             // on resolveStudioLandTarget).
             deckScorer = get(),
             manaBaseAnalyzer = get(),
-            // Deck Wizard & Engine Rework plan, Workstream 8.2 -- the Suggestions tab's own Scryfall
-            // backstop toggle shares the SAME CandidatePoolGenerator singleton registered above.
-            candidatePoolGenerator = get(),
+            // Suggestions Tab UI Polish plan (W11 bug-fix pass, 2026-08-25) -- already a `single`
+            // in SharedDomainKoinModule (shared with AdvancedSearchViewModel/AddCardViewModel).
+            buildScryfallQueryUseCase = get(),
         )
     }
 

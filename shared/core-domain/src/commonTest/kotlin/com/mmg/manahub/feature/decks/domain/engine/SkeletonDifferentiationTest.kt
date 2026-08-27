@@ -92,7 +92,7 @@ class SkeletonDifferentiationTest {
         this == ArchetypeFormat.COMMANDER || !ArchetypeData.THEMES.getValue(theme).commanderOnly
 
     private fun resolveCombo(format: ArchetypeFormat, archetype: ArchetypeId, theme: ThemeId? = null) =
-        ArchetypeSkeletonResolver.resolve(format, archetype, listOfNotNull(theme))
+        ArchetypeSkeletonResolver.resolve(format, archetype, themes = listOfNotNull(theme))
 
     private fun label(archetype: ArchetypeId, theme: ThemeId? = null) =
         if (theme == null) archetype.displayName else "${archetype.displayName}+${theme.displayName}"
@@ -102,12 +102,10 @@ class SkeletonDifferentiationTest {
         ArchetypeId.entries.forEach { archetype ->
             val s = resolveCombo(format, archetype)
             println("  ${label(archetype).padEnd(24)} lands=${s.lands} curve=${s.curve}")
-            if (archetype != ArchetypeId.GENERIC) {
-                StrategyCatalog.compatibleThemes(archetype).forEach { theme ->
-                    if (!format.supports(theme)) return@forEach
-                    val ts = resolveCombo(format, archetype, theme)
-                    println("    +${theme.displayName.padEnd(20)} lands=${ts.lands} curve=${ts.curve}")
-                }
+            StrategyCatalog.compatibleThemes(archetype).forEach { theme ->
+                if (!format.supports(theme)) return@forEach
+                val ts = resolveCombo(format, archetype, theme)
+                println("    +${theme.displayName.padEnd(20)} lands=${ts.lands} curve=${ts.curve}")
             }
         }
     }
@@ -148,7 +146,7 @@ class SkeletonDifferentiationTest {
 
     private fun assertThemeAddsVisibleEffect(format: ArchetypeFormat) {
         val failures = mutableListOf<String>()
-        ArchetypeId.entries.filter { it != ArchetypeId.GENERIC }.forEach { archetype ->
+        ArchetypeId.entries.forEach { archetype ->
             val bare = resolveCombo(format, archetype)
             StrategyCatalog.compatibleThemes(archetype).forEach { theme ->
                 if (!format.supports(theme)) return@forEach
@@ -177,7 +175,7 @@ class SkeletonDifferentiationTest {
 
     private fun assertThemesDifferentiateWithinArchetype(format: ArchetypeFormat) {
         val failures = mutableListOf<String>()
-        ArchetypeId.entries.filter { it != ArchetypeId.GENERIC }.forEach { archetype ->
+        ArchetypeId.entries.forEach { archetype ->
             val themes = StrategyCatalog.compatibleThemes(archetype).filter { format.supports(it) }.toList()
             val resolved = themes.associateWith { resolveCombo(format, archetype, it) }
             for (i in themes.indices) {

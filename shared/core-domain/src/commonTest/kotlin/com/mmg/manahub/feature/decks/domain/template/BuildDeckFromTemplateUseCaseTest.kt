@@ -369,20 +369,23 @@ class BuildDeckFromTemplateUseCaseTest {
             useCase(),
             DeckWizardSpec(format = DeckFormat.COMMANDER, commander = commander, strategyProfile = SeedStrategy.GRAVEYARD.toStrategyProfile()),
         )
-        assertEquals("GENERIC", result.archetypeOverride)
+        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- the persisted "no macro pin" state
+        // is now a null archetypeOverride rather than the literal string "GENERIC".
+        assertEquals(null, result.archetypeOverride)
         assertEquals(listOf("REANIMATOR"), result.themesOverride)
 
         // What the wizard's own build-time recomputeProfile fed deckScorer.fit with for this build
         // (Deck Engine Unification D2: reads the RESOLVED template archetype/themes, exactly what
         // recomputeProfile itself computes -- SeedStrategy.GRAVEYARD.toStrategyProfile() resolves to
-        // GENERIC + REANIMATOR, and GENERIC's own archetypeSeedTags is intentionally empty).
-        val wizardExplicitTags = DeckIdentitySeedTags.forArchetype(ArchetypeId.GENERIC, listOf(ThemeId.REANIMATOR))
+        // null archetype + REANIMATOR, and a null archetype's own archetypeSeedTags is intentionally
+        // empty).
+        val wizardExplicitTags = DeckIdentitySeedTags.forArchetype(null, listOf(ThemeId.REANIMATOR))
         assertTrue(CardTag.GRAVEYARD in wizardExplicitTags)
 
         // What DeckDoctorOrchestrator's pinSeedTags (Wave 4) derives, reading back the EXACT strings
         // the wizard persisted onto the Deck (writeResultIntoNewDeck -> DeckRepository
         // .updateArchetypeOverride) -- never a separately-maintained table.
-        val persistedArchetype = ArchetypeId.entries.first { it.name == result.archetypeOverride }
+        val persistedArchetype = result.archetypeOverride?.let { name -> ArchetypeId.entries.first { it.name == name } }
         val persistedThemes = result.themesOverride.map { name -> ThemeId.entries.first { it.name == name } }
         val doctorPinTags = DeckIdentitySeedTags.forArchetype(persistedArchetype, persistedThemes)
         assertTrue(CardTag.GRAVEYARD in doctorPinTags, "the Doctor's persisted-pin fold-in must recover the same GRAVEYARD signal the wizard built with")
@@ -634,11 +637,11 @@ class BuildDeckFromTemplateUseCaseTest {
         val nonLandEntries = result.deckCards
             .filterNot { it.card.typeLine.contains("Basic Land") }
             .map { DeckEntry(card = it.card, quantity = it.quantity, isOwned = true, isSideboard = false) }
-        val archetype = ArchetypeId.entries.firstOrNull { it.name == result.archetypeOverride } ?: ArchetypeId.GENERIC
+        val archetype = ArchetypeId.entries.firstOrNull { it.name == result.archetypeOverride }
         val themes = result.themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
         val colorIdentity = commander.colorIdentity.mapNotNull { symbol -> ManaColor.entries.firstOrNull { it.symbol == symbol } }.toSet()
         val archetypeFormat = ArchetypeFormat.of(DeckFormat.COMMANDER)
-        val studioSkeleton = if (archetypeFormat == null || (archetype == ArchetypeId.GENERIC && themes.isEmpty())) {
+        val studioSkeleton = if (archetypeFormat == null || (archetype == null && themes.isEmpty())) {
             null
         } else {
             ArchetypeSkeletonResolver.resolveWithColor(

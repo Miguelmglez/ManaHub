@@ -14,9 +14,12 @@ import com.mmg.manahub.core.model.ScoreWeightOverrides.Companion.NONE
  * not a second/duplicated DataStore surface.
  *
  * Each field is nullable: `null` means "use the engine default for this weight". The all-null instance
- * ([NONE]) therefore round-trips to exactly `ScoreWeights()`/`AnalysisWeights()` — i.e. zero behavior
- * change at default. These weights are a debug tuning surface only; production builds leave every
- * field null.
+ * ([NONE]) round-trips to exactly `ScoreWeights()` for the legacy fields. For the `analysis*` fields
+ * (Deck Analysis Engine v2/v3), [NONE] round-trips to whatever base `AnalysisWeights` the caller
+ * passes into `toAnalysisWeights(defaults)` — as of v3 (spec §8) that base is macro-dependent
+ * (`AnalysisWeights.forMacro`), not a flat default, so [NONE] means "use the archetype-dependent
+ * weighting", not "use one fixed weight vector". These weights are a debug tuning surface only;
+ * production builds leave every field null.
  */
 data class ScoreWeightOverrides(
     val synergy: Float? = null,

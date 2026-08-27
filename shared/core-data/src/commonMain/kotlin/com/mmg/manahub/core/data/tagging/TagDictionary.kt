@@ -719,6 +719,77 @@ private val baseEntries: List<TagDictionaryEntry> = buildList {
         )),
     )))
 
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Deck Analysis Engine v3, Phase 1 — producer-half ROLE keys (spec §5.1).
+    //
+    //  Same discipline as the Phase 0 block above: a brand-new key per concept, even
+    //  where a same-spirit STRATEGY tag already exists (e.g. "lifegain"/"treasure" are
+    //  broad mixed producer+payoff STRATEGY tags; "lifegain_source"/"treasure_source"
+    //  below are the narrower producer-only ROLE half the synergy axis model needs).
+    //  `anthem`, `untapper`, `equipment`, `evasion`, `recursion`, `cost_reduction`,
+    //  `aura_buff` and `spell_copy` already exist as dictionary entries from earlier
+    //  work and are reused as-is (see [ArchetypeRoleClassifier]'s DIRECT_TAG_ROLES) —
+    //  only the genuinely NEW producer concepts get a new key here.
+    // ════════════════════════════════════════════════════════════════════════════
+    add(strat("lifegain_source", TagCategory.ROLE, "Lifegain Source", 0.75f, listOf(
+        rule(allOf = listOf("gain", "life"), noneOf = listOf("gain control"), confidence = 0.75f),
+        rule(allOf = listOf("gains", "life"), confidence = 0.70f),
+        rule(allOf = listOf("lifelink"), confidence = 0.80f),
+    )))
+    add(strat("counters_source", TagCategory.ROLE, "Counters Source", 0.80f, listOf(
+        rule(allOf = listOf("put a +1/+1 counter"), confidence = 0.85f),
+        rule(allOf = listOf("proliferate"), confidence = 0.80f),
+        rule(anyOf = listOf("adapt", "evolve", "outlast"), confidence = 0.75f),
+    )))
+    add(strat("treasure_source", TagCategory.ROLE, "Treasure Source", 0.90f, listOf(
+        rule(anyOf = listOf("treasure token", "gold token", "powerstone token")),
+    )))
+    add(strat("extra_land_drop", TagCategory.ROLE, "Extra Land Drop", 0.85f, listOf(
+        rule(allOf = listOf("play an additional land"), confidence = 0.95f),
+        rule(allOf = listOf("put", "land", "onto the battlefield"),
+            typeLineNoneOf = listOf("basic"), confidence = 0.75f),
+    )))
+    add(strat("discard_outlet", TagCategory.ROLE, "Discard Outlet", 0.80f, listOf(
+        rule(allOf = listOf("discard a card:"), confidence = 0.85f),
+        rule(allOf = listOf("you may discard a card"), confidence = 0.70f),
+    )))
+    add(strat("cost_reducer", TagCategory.ROLE, "Cost Reducer", 0.85f, listOf(
+        rule(anyOf = listOf("cost {1} less to cast", "cost {2} less to cast", "spells you cast cost")),
+        rule(anyOf = listOf("affinity for", "convoke", "improvise"), confidence = 0.70f),
+    )))
+    add(strat("haste_source", TagCategory.ROLE, "Haste Source", 0.85f, listOf(
+        rule(anyOf = listOf(
+            "creatures you control have haste", "other creatures you control have haste",
+            "gains haste", "gain haste",
+        )),
+    )))
+    add(strat("mill_opponent", TagCategory.ROLE, "Mill Opponent", 0.85f, listOf(
+        // Splits `mill_engine`'s existing pattern (already opponent-only in practice) under the
+        // new precise key — `mill_engine` itself stays UNTOUCHED so nothing reading it breaks.
+        rule(anyOf = listOf("target player mills", "each opponent mills", "that player mills")),
+    )))
+    add(strat("mill_self", TagCategory.ROLE, "Mill Self", 0.75f, listOf(
+        // Real self-mill templating rarely says "you mill" explicitly (e.g. Hedron Crab: "mill
+        // three cards"; Stitcher's Supplier: "mill three cards, then..."); disambiguate from
+        // `mill_opponent` by excluding the other-player-targeting phrasing instead.
+        rule(allOf = listOf("mill"),
+            noneOf = listOf("target player", "each opponent", "that player", "target opponent"),
+            confidence = 0.75f),
+        rule(allOf = listOf("you mill"), confidence = 0.85f),
+    )))
+    add(strat("combat_payoff", TagCategory.ROLE, "Combat Payoff", 0.80f, listOf(
+        rule(anyOf = listOf(
+            "whenever a creature you control attacks", "whenever one or more creatures you control attack",
+            "deals combat damage to a player",
+        )),
+    )))
+    add(strat("removal_artifact_enchant", TagCategory.ROLE, "Artifact/Enchantment Removal", 0.85f, listOf(
+        rule(anyOf = listOf(
+            "destroy target artifact", "destroy target enchantment",
+            "exile target artifact", "exile target enchantment",
+        )),
+    )))
+
     // ── ARCHETYPE plains (manual-pick only) ──────────────────────────────────────
     add(plain("aggro",          TagCategory.ARCHETYPE, "Aggro"))
     add(plain("control",        TagCategory.ARCHETYPE, "Control"))

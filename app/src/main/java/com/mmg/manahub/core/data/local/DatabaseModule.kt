@@ -146,6 +146,10 @@ object DatabaseModule {
                 // competitive_limited_ratings_cache tables (Competitive feature,
                 // Phase 2, manahub-competitive Cloudflare Worker).
                 MIGRATION_50_51,
+                // v51 → v52 lives as a top-level `val` in Migration_51_52.kt (same reason).
+                // Clears archetype_override/themes_override on every deck (never migrated) --
+                // Deck Analysis Engine v3's taxonomy migration (Phase 3, spec §2/§3/§4).
+                MIGRATION_51_52,
             )
             .build()
 

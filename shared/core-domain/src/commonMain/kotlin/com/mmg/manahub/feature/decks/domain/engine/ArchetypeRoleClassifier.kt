@@ -103,26 +103,163 @@ object ArchetypeRoleClassifier {
         // tagMatcher, so a tag-less card is not silently undercounted.
         "recursion" to "Recursion",
         "evasion" to "Evasion",
+        // ── Deck Analysis Engine v3, Phase 1 (spec §5.1) -- reused pre-existing tag entries ──
+        // (anthem/untapper/spell_copy/equipment already had a real TagDictionary DetectionRule
+        // from earlier work; they were simply never wired into this classifier's vocabulary).
+        "anthem" to "Anthem",
+        "untapper" to "Untapper",
+        "spell_copy" to "Spell Copy",
+        "equipment" to "Equipment",
+        // ── Deck Analysis Engine v3, Phase 1 -- brand-new producer roles (spec §5.1) ────────
+        "lifegain_source" to "Lifegain Source",
+        "counters_source" to "Counters Source",
+        "treasure_source" to "Treasure Source",
+        "extra_land_drop" to "Extra Land Drop",
+        "discard_outlet" to "Discard Outlet",
+        "cost_reducer" to "Cost Reducer",
+        "haste_source" to "Haste Source",
+        "mill_opponent" to "Mill Opponent",
+        "mill_self" to "Mill Self",
+        "combat_payoff" to "Combat Payoff",
+        "removal_artifact_enchant" to "Artifact/Enchantment Removal",
     )
+
+    /**
+     * Deck Analysis Engine v3, Phase 1 (spec §5.2) -- the derived synergy-axis table, one entry
+     * per [RoleSpec] that participates in at least one axis. Kept as three separate lookup maps
+     * (rather than inline per-[RoleSpec] literals) so this table can be read top-to-bottom against
+     * the spec's own table and audited in one place. A key absent from a map simply defaults to
+     * `emptySet()` via [axisSetFor] -- most roles (e.g. `finisher`, `mana_fix`,
+     * `equipment_or_aura`, `mill_engine`, `removal_artifact_enchant`) are not part of the axis
+     * model at all and are deliberately absent from all three maps.
+     *
+     * `equipment_or_aura` and `mill_engine` are intentionally NOT re-pointed at any axis here --
+     * they stay exactly as they were (a derived union of their own pre-existing matcher logic,
+     * untouched by this phase); the axis metadata lives on their SPLIT children (`equipment`/
+     * `aura_buff` and `mill_self`/`mill_opponent`) instead, per spec §5.1's split instruction.
+     *
+     * `tribe_members` is deliberately absent from [AXIS_PRODUCES] even though it is the TRIBE
+     * axis's producer role: TRIBE is deck-relative (`TRIBE:<subtype>`, spec §5.2), so a static
+     * per-[RoleSpec] `produces` set cannot express it -- Phase 2's [SynergyGraph] (not yet built)
+     * substitutes the deck's own dominant subtype at graph-build time, the same way P3 already
+     * special-cases `tribe_members` via [tribeMemberCount]/[dominantTribeKey] rather than through
+     * [ROLE_SPECS]. `tribe_payoff`'s `consumes = {"TRIBE"}` and `anthem`'s `amplifies` entry are
+     * enough to establish the axis has a real payoff/amplifier side today.
+     */
+    private val AXIS_PRODUCES: Map<RoleKey, Set<AxisKey>> = mapOf(
+        "lifegain_source" to setOf("LIFE"),
+        "sac_outlet" to setOf("DEATH"),
+        "sacrifice_fodder" to setOf("DEATH"),
+        "token_generator" to setOf("TOKENS", "ETB", "DEATH"),
+        "counters_source" to setOf("COUNTERS"),
+        "extra_land_drop" to setOf("LANDFALL"),
+        "mill_self" to setOf("GRAVEYARD"),
+        "discard_outlet" to setOf("GRAVEYARD"),
+        "graveyard_enabler" to setOf("GRAVEYARD"),
+        "blink_effect" to setOf("ETB"),
+        "clone_theft_effect" to setOf("ETB"),
+        "spell_copy" to setOf("SPELLS"),
+        "treasure_source" to setOf("ARTIFACTS"),
+        "aura_buff" to setOf("ENCHANTMENTS", "ATTACHED"),
+        "equipment" to setOf("ATTACHED"),
+        "haste_source" to setOf("ATTACK"),
+        "evasion" to setOf("ATTACK"),
+        "threat_early" to setOf("ATTACK"),
+        "planeswalker" to setOf("PLANESWALKERS"),
+        "group_effect" to setOf("GROUP"),
+        "mill_opponent" to setOf("MILL_OPP"),
+        // Final engine-correction run, DEFECT 1: `stax_piece` previously formed zero graph edges on
+        // ANY axis (absent from every table in this file) -- PRISON's own `linearity` prototype
+        // (0.60 Commander / 0.65 60-card) demanded a coordinate the model could not produce for ANY
+        // stax-shaped deck, in EITHER format (measured `health=0.0` on every one of 15 axes for both
+        // Grand Arbiter (Commander) and Death and Taxes (60-card) -- see
+        // `project_deck_analysis_v3_sixtycard_corpus_expansion`/`_phase4b_p4_corrective` memory).
+        // Fixed via a new payoff-optional `LOCK` axis (spec §5.3's own documented mechanism for
+        // "the producers ARE the win condition", already used by `MILL_OPP` and `TRIBE:x` with a
+        // lord) -- `stax_piece` is this axis's sole producer; no dedicated payoff role exists for
+        // it (a lock piece does not "pay off" into anything else, it IS the plan), mirroring
+        // `MILL_OPP`'s own producer-only shape exactly rather than inventing a self-consuming edge.
+        "stax_piece" to setOf("LOCK"),
+    )
+
+    private val AXIS_CONSUMES: Map<RoleKey, Set<AxisKey>> = mapOf(
+        "lifegain_payoff" to setOf("LIFE", "GROUP"),
+        "death_payoff" to setOf("DEATH", "TOKENS", "GROUP"),
+        "counters_payoff" to setOf("COUNTERS", "TOKENS"),
+        "landfall_payoff" to setOf("LANDFALL"),
+        "reanimation" to setOf("GRAVEYARD"),
+        "self_mill_payoff" to setOf("GRAVEYARD"),
+        "recursion" to setOf("GRAVEYARD"),
+        "etb_payoff" to setOf("ETB"),
+        "spell_payoff" to setOf("SPELLS"),
+        // "counterspell" deliberately NOT mapped to SPELLS (Deck Analysis Engine v3 spec §5.2
+        // AMENDMENT, 2026-08-26, user-approved during phase 3a). A counterspell is interaction,
+        // not a spellslinger payoff -- it does not reward casting spells, it IS the spell. As
+        // originally written, any control deck's instant/sorcery type-line density (SPELLS
+        // producer) plus its counterspell suite (SPELLS payoff) lit the axis by construction, with
+        // no dedicated spellslinger payoff present -- root cause of fixtures 05/11/15's spurious
+        // SPELLSLINGER theme. Genuine spellslinger decks still light SPELLS through `spell_payoff`
+        // alone (Guttersnipe/Young Pyromancer/Veyran-style "whenever you cast an instant or
+        // sorcery" effects), which is the correct signal. `counterspell` stays axis-inert -- it
+        // still counts toward the CONTROL/PRISON/interaction role bands (ArchetypeData.kt) and the
+        // §3 posture TEMPO signal, just not the synergy-graph SPELLS axis.
+        "artifact_payoff" to setOf("ARTIFACTS"),
+        "enchantment_payoff" to setOf("ENCHANTMENTS"),
+        "combat_payoff" to setOf("ATTACHED", "ATTACK", "TOKENS"),
+        "evasion" to setOf("ATTACHED"),
+        "tribe_payoff" to setOf("TRIBE"),
+        "counters_source" to setOf("PLANESWALKERS"),
+    )
+
+    private val AXIS_AMPLIFIES: Map<RoleKey, Set<AxisKey>> = mapOf(
+        "anthem" to setOf("TOKENS", "COUNTERS", "TRIBE", "ATTACK"),
+        "recursion" to setOf("DEATH"),
+        "cost_reducer" to setOf("SPELLS", "ARTIFACTS"),
+        "protection" to setOf("ATTACHED", "PLANESWALKERS"),
+    )
+
+    private fun axisSetFor(map: Map<RoleKey, Set<AxisKey>>, key: RoleKey): Set<AxisKey> = map[key].orEmpty()
 
     /**
      * Every [RoleSpec] this classifier evaluates BEYOND [LEGACY_ROLE_MAP] (the 5 legacy-backed
      * roles are handled directly in [classify], not via this list, to avoid a double lookup).
      */
     val ROLE_SPECS: List<RoleSpec> = buildList {
-        // ── Direct 1:1 tag-key roles (Phase 0.2 dictionary expansion) ──────────────
-        DIRECT_TAG_ROLES.forEach { (key, label) -> add(RoleSpec(key, label, tagMatcher(key))) }
+        // ── Direct 1:1 tag-key roles (Phase 0.2 dictionary expansion + Phase 1 additions) ────
+        DIRECT_TAG_ROLES.forEach { (key, label) ->
+            add(RoleSpec(key, label, tagMatcher(key), axisSetFor(AXIS_PRODUCES, key), axisSetFor(AXIS_CONSUMES, key), axisSetFor(AXIS_AMPLIFIES, key)))
+        }
 
         // ── Structural / composite roles (no single tag covers them) ───────────────
         add(RoleSpec("finisher", "Finisher", ::finisherMatcher))
-        add(RoleSpec("threat_early", "Early Threat", ::threatEarlyMatcher))
+        add(RoleSpec("threat_early", "Early Threat", ::threatEarlyMatcher, produces = axisSetFor(AXIS_PRODUCES, "threat_early")))
         add(RoleSpec("equipment_or_aura", "Equipment / Aura", ::equipmentOrAuraMatcher))
         add(RoleSpec(ArchetypeData.MANA_FIX_KEY, "Mana Fixing", ::manaFixMatcher))
         // Classifier audit fix (Phase 2 §1) -- tag hit first, oracle-text fallback second (mirrors
         // RoleClassifier's own validated INTERACTION patterns, folded in rather than duplicated at
-        // a weaker confidence).
+        // a weaker confidence). No `consumes` -- v3 spec §5.2 AMENDMENT: counterspell is
+        // intentionally axis-inert (see AXIS_CONSUMES's own comment above for the rationale).
         add(RoleSpec("counterspell", "Counterspell", ::counterspellMatcher))
-        add(RoleSpec("protection", "Protection", ::protectionMatcher))
+        add(RoleSpec("protection", "Protection", ::protectionMatcher, amplifies = axisSetFor(AXIS_AMPLIFIES, "protection")))
+        // Deck Analysis Engine v3, Phase 1 (spec §5.1) -- structural, no single tag covers it:
+        // a cheap creature built to die profitably, OR a token generator (the tokens it makes ARE
+        // the fodder -- "distinct from token_generator" per the spec's own wording means a
+        // separate RoleKey, not that the two are mutually exclusive on the same card).
+        add(RoleSpec("sacrifice_fodder", "Sacrifice Fodder", ::sacrificeFodderMatcher, produces = axisSetFor(AXIS_PRODUCES, "sacrifice_fodder")))
+        // Final engine-correction run, DEFECT 3 -- a burn/reach spell ("deals X damage to any
+        // target/target player/target opponent") is genuinely DUAL-PURPOSE: it can kill a creature
+        // (legitimately `removal_spot`, untouched) AND close the game (a `clock` component the
+        // resolver's own §2.1 axis had no way to see, forcing every burn spell's density entirely
+        // into `interaction` -- confirmed root cause of fixture 14/Mono-Red Burn resolving MIDRANGE,
+        // see `project_deck_analysis_v3_sixtycard_corpus_expansion` memory). No `produces`/
+        // `consumes`/`amplifies` here -- this role feeds ONLY `InferDeckArchetypeUseCase.computeAxes`'s
+        // `clock` density term (a NEW consumer this phase adds), not the SynergyGraph axis model,
+        // which spec §5.2's own table never lists a "reach"/direct-damage axis for.
+        add(RoleSpec("direct_damage", "Direct Damage", ::directDamageMatcher))
+        // Deck Analysis Engine v3, Phase 1 -- fixes the gap #2 documented in ColorRoleAffinity.kt's
+        // own header ("tabled for documentation/future use only -- no matcher, no band"). Now a
+        // real DIRECT_TAG_ROLES entry above; this comment lives here since ColorRoleAffinity is the
+        // file that originally flagged the gap.
     }
 
     /**
@@ -209,6 +346,24 @@ object ArchetypeRoleClassifier {
         }
     }
 
+    /**
+     * Deck Analysis Engine v3, Phase 1 (spec §5.1): a cheap creature built to be sacrificed
+     * profitably (MV <= 2 with its own ETB or death trigger -- structural, no single tag covers
+     * "wants to die young"), OR any token generator (the tokens themselves are the fodder; see
+     * [sacrificeFodderMatcher]'s call site comment on why this is a separate RoleKey rather than
+     * folded into `token_generator`).
+     */
+    private fun sacrificeFodderMatcher(card: Card): Float {
+        if (!BasicLandCalculator.isLand(card) && card.typeLine.contains("Creature", ignoreCase = true) && card.cmc <= 2.0) {
+            val oracle = card.oracleText?.lowercase().orEmpty()
+            val hasEtbOrDeathTrigger = oracle.contains("when") && (oracle.contains("enters") || oracle.contains("dies"))
+            if (hasEtbOrDeathTrigger) return 0.7f
+        }
+        val tokenGeneratorHit = tagMatcher("token_generator")(card)
+        if (tokenGeneratorHit > 0f) return 0.6f
+        return 0f
+    }
+
     /** Voltron gear: Equipment type-line (full confidence) or an Aura that buffs (aura_buff tag,
      * or a `+X/+X`-shaped oracle clause as a structural fallback). */
     private fun equipmentOrAuraMatcher(card: Card): Float {
@@ -261,6 +416,32 @@ object ArchetypeRoleClassifier {
         return if (GRANT_PROTECTION_ORACLE.containsMatchIn(oracle)) PROTECTION_ORACLE_CONFIDENCE else 0f
     }
 
+    /**
+     * Final engine-correction run, DEFECT 3: tag hit first (`"burn"`, `CardTag.BURN`'s key -- a
+     * pre-existing `TagCategory.STRATEGY` tag; [tagMatcher] compares by key string only,
+     * category-agnostic, so a card carrying it is matched regardless), oracle-text fallback second.
+     * [DIRECT_DAMAGE_ORACLE] covers the SAME "deals ... damage to any target/target player/target
+     * opponent/each opponent/each player" wording `TagDictionary`'s own "burn" strategy-tag rule 1
+     * detects (deliberately NOT its rule 2, "damage to target creature" alone with no player
+     * component, which would tag pure single-target creature removal as "can hit face") -- but as
+     * ONE contiguous regex (mirrors [counterspellMatcher]/[protectionMatcher]'s own
+     * classifier-audit-fix pattern) rather than two independent whole-text `contains` checks: a
+     * multi-clause card can genuinely contain "damage to <player>" in one sentence and, say, "each
+     * player" in a LATER, unrelated sentence (caught during this fix — Chainer fixture's own
+     * Rankle, Master of Pranks: "...deals combat damage to a player, choose ... Each player
+     * discards..." -- two unrelated clauses, not a reach spell) — an independent-substring check
+     * would false-positive on that; the contiguous regex correctly does not.
+     */
+    private fun directDamageMatcher(card: Card): Float {
+        val tagHit = tagMatcher("burn")(card)
+        if (tagHit > 0f) return tagHit
+        val oracle = card.oracleText?.lowercase().orEmpty()
+        return if (DIRECT_DAMAGE_ORACLE.containsMatchIn(oracle)) DIRECT_DAMAGE_ORACLE_CONFIDENCE else 0f
+    }
+
+    private val DIRECT_DAMAGE_ORACLE = Regex("deals? [^.]*?damage to (?:any target|target player|target opponent|each opponent|each player)")
+    private const val DIRECT_DAMAGE_ORACLE_CONFIDENCE = 0.85f // mirrors TagDictionary's own "burn" rule 1 confidence
+
     private val EVASION_KEYWORDS = listOf(
         "flying", "menace", "trample", "shadow", "fear", "intimidate",
         "skulk", "horsemanship", "unblockable", "can't be blocked",
@@ -291,7 +472,71 @@ object ArchetypeRoleClassifier {
                 counts[key] = (counts[key] ?: 0f) + entry.quantity * confidence
             }
         }
-        return counts.mapValues { (_, v) -> kotlin.math.round(v).toInt() }
+        val result = counts.mapValues { (_, v) -> kotlin.math.round(v).toInt() }
+        // Deck Analysis Engine v3, Phase 1 (spec §5.1) -- fixes gap #1 ("tribe_members" has no
+        // classifier). Injected here rather than via a per-card RoleSpec because "the deck's
+        // dominant creature subtype" is a whole-deck fact no stateless (Card) -> Float matcher can
+        // compute -- see the KDoc above [AXIS_PRODUCES] for the full reasoning. P3's own
+        // `AnalysisEngine.evaluatePlanRoles` special-case (untouched by this phase) reads
+        // [tribeMemberCount] directly and never this map's "tribe_members" entry, so this addition
+        // cannot move P3's score; it exists so every OTHER `deckRoleCounts` consumer (Phase 2's
+        // future SynergyGraph, Suggest*/SuggestCuts use cases) stops seeing a permanent 0.
+        val tribeMembers = tribeMemberCount(mainboard)
+        return if (tribeMembers > 0) result + ("tribe_members" to tribeMembers) else result
+    }
+
+    /**
+     * Deck Analysis Category Sections rework (W1) — per-role card attribution, the SAME
+     * classification pass as [deckRoleCounts], nothing discarded (that function collapses straight
+     * to a rounded `Int`; this one keeps every (card, quantity, confidence) triple that produced
+     * it). Sorted by confidence descending so a section's card row leads with its strongest
+     * matches. See [com.mmg.manahub.feature.decks.domain.engine.CardContribution]'s KDoc for why
+     * this list will not always sum back to [deckRoleCounts]'s rounded count for the same key.
+     */
+    fun deckRoleAttribution(mainboard: List<DeckEntry>): Map<RoleKey, List<CardContribution>> {
+        val base = buildMap<RoleKey, MutableList<CardContribution>> {
+            mainboard.forEach { entry ->
+                classify(entry.card).forEach { (key, confidence) ->
+                    getOrPut(key) { mutableListOf() } +=
+                        CardContribution(entry.card.scryfallId, entry.quantity, confidence)
+                }
+            }
+        }.mapValues { (_, list) ->
+            list.groupBy { it.scryfallId }
+                .map { (id, group) ->
+                    CardContribution(
+                        scryfallId = id,
+                        quantity   = group.sumOf { it.quantity },
+                        confidence = group.maxOf { it.confidence }
+                    )
+                }
+                .sortedByDescending { it.confidence }
+        }
+        // Mirrors deckRoleCounts' "tribe_members" injection above -- SAME dominant-tribe source
+        // ([dominantTribeKey]/[tribeSubtypeCopyCounts]) so the two can never disagree. Confidence
+        // 1f matches AnalysisEngine's own private `toContributions()` helper (a structural
+        // subtype-membership match, not a fuzzy oracle-text one).
+        val dominantTribe = dominantTribeKey(mainboard) ?: return base
+        val tribeContributions = mainboard
+            .filter { dominantTribe in TribeDeriver.subtypeKeys(it.card) }
+            .groupBy { it.card.scryfallId }
+            .map { (id, group) -> CardContribution(id, group.sumOf { it.quantity }, 1f) }
+        return if (tribeContributions.isEmpty()) base else base + ("tribe_members" to tribeContributions)
+    }
+
+    /**
+     * Per-`tribe:<subtype>` copy-count map for a mainboard ([TribeDeriver.subtypeKeys] — a card's
+     * OWN creature subtypes only, never payoff-named tribes). Shared by [tribeMemberCount] and
+     * [dominantTribeKey] so both always agree on which tribe is dominant.
+     */
+    private fun tribeSubtypeCopyCounts(mainboard: List<DeckEntry>): Map<String, Int> {
+        val tribeCopies = mutableMapOf<String, Int>()
+        mainboard.forEach { entry ->
+            TribeDeriver.subtypeKeys(entry.card).forEach { key ->
+                tribeCopies[key] = (tribeCopies[key] ?: 0) + entry.quantity
+            }
+        }
+        return tribeCopies
     }
 
     /**
@@ -300,14 +545,19 @@ object ArchetypeRoleClassifier {
      * uses — mirrored here rather than shared, since [DeckScorer]'s fingerprint building is
      * private). Returns 0 when the deck has no creatures or no tribe clears the threshold.
      */
-    fun tribeMemberCount(mainboard: List<DeckEntry>): Int {
-        val tribeCopies = mutableMapOf<String, Int>()
-        mainboard.forEach { entry ->
-            TribeDeriver.subtypeKeys(entry.card).forEach { key ->
-                tribeCopies[key] = (tribeCopies[key] ?: 0) + entry.quantity
-            }
-        }
-        val dominant = tribeCopies.maxByOrNull { it.value } ?: return 0
-        return dominant.value
-    }
+    fun tribeMemberCount(mainboard: List<DeckEntry>): Int =
+        tribeSubtypeCopyCounts(mainboard).maxByOrNull { it.value }?.value ?: 0
+
+    /**
+     * Deck Analysis Category Sections rework (W1) — the `tribe:<subtype>` key ([tribeMemberCount]
+     * counted) with the most copies in [mainboard], or `null` for a creatureless/tribeless deck.
+     * [AnalysisEngine]'s PLAN_ROLES section builder uses this to attribute `tribe_members`
+     * contributions to the SAME tribe [tribeMemberCount] already counts (originally fixing the bug
+     * where `roleCounts["tribe_members"]` was always absent since no [RoleSpec] produced that key;
+     * Deck Analysis Engine v3 Phase 1's [deckRoleCounts]/[deckRoleAttribution] injection now also
+     * uses this same source, so every consumer agrees) — this and [tribeMemberCount] deliberately
+     * share [tribeSubtypeCopyCounts] so the two numbers can never disagree.
+     */
+    fun dominantTribeKey(mainboard: List<DeckEntry>): String? =
+        tribeSubtypeCopyCounts(mainboard).maxByOrNull { it.value }?.key
 }

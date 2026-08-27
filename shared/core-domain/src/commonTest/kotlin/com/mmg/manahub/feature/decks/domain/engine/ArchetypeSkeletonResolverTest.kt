@@ -63,20 +63,21 @@ class ArchetypeSkeletonResolverTest {
 
     @Test
     fun twoThemesScaleAdditionallyBy075() {
-        // ARISTOCRATS alone (commander, scale 1.0): sac_outlet ideal 9.
+        // Deck Analysis Engine v3 (spec §4.2): SELF_MILL retargeted onto `mill_self` (was
+        // `graveyard_enabler`, now owned exclusively by REANIMATOR).
         val single = ArchetypeSkeletonResolver.resolve(
-            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, listOf(ThemeId.SELF_MILL),
+            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, themes = listOf(ThemeId.SELF_MILL),
         )
         // SELF_MILL sixty_scale 0.55; single-theme scale = 0.55 * 1.0 = 0.55.
-        // graveyard_enabler ideal 12 * 0.55 = 6.6 -> round 7.
-        assertEquals(7, single.roleTargets.getValue("graveyard_enabler").ideal)
+        // mill_self ideal 12 * 0.55 = 6.6 -> round 7.
+        assertEquals(7, single.roleTargets.getValue("mill_self").ideal)
 
         val two = ArchetypeSkeletonResolver.resolve(
-            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, listOf(ThemeId.SELF_MILL, ThemeId.ARISTOCRATS),
+            ArchetypeFormat.SIXTY, ArchetypeId.COMBO, themes = listOf(ThemeId.SELF_MILL, ThemeId.ARISTOCRATS),
         )
         // With a 2nd theme, SELF_MILL's own scale becomes 0.55 * 0.75 = 0.4125.
-        // graveyard_enabler ideal 12 * 0.4125 = 4.95 -> round 5 (< the single-theme 7).
-        val twoThemeIdeal = two.roleTargets.getValue("graveyard_enabler").ideal
+        // mill_self ideal 12 * 0.4125 = 4.95 -> round 5 (< the single-theme 7).
+        val twoThemeIdeal = two.roleTargets.getValue("mill_self").ideal
         assertTrue(twoThemeIdeal < 7, "2-theme dilution should shrink the band (was $twoThemeIdeal)")
     }
 

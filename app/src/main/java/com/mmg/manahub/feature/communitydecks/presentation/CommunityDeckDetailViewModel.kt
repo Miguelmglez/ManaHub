@@ -127,6 +127,20 @@ class CommunityDeckDetailViewModel(
         }
     }
 
+    /** Toggles the collapsed state of a sub-section (category) within a board. */
+    fun toggleSection(sectionLabel: String) {
+        _uiState.update { current ->
+            if (current is CommunityDeckDetailUiState.Content) {
+                val newCollapsed = if (sectionLabel in current.collapsedSections) {
+                    current.collapsedSections - sectionLabel
+                } else {
+                    current.collapsedSections + sectionLabel
+                }
+                current.copy(collapsedSections = newCollapsed)
+            } else current
+        }
+    }
+
     /**
      * Continuously tracks the set of "already owned" card identity keys — the same convention
      * used across Card Versions & Languages: [com.mmg.manahub.core.model.Card.oracleId] falling

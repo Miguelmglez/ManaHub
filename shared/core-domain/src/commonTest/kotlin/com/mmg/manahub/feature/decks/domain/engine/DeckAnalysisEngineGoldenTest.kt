@@ -300,7 +300,8 @@ class DeckAnalysisEngineGoldenTest {
 
         val analysis = AnalysisEngine.evaluate(
             mainboard = mainboard, format = DeckFormat.COMMANDER, colorIdentity = colorIdentity, profile = profile,
-            archetype = ArchetypeId.RAMP, themes = listOf(ThemeId.LANDFALL), isManualOverride = true, confidence = 1f,
+            // Deck Analysis Engine v3: RAMP moved from ArchetypeId to PostureId (spec §2/§3).
+            archetype = ArchetypeId.MIDRANGE, posture = PostureId.RAMP, themes = listOf(ThemeId.LANDFALL), isManualOverride = true, confidence = 1f,
         )
 
         assertTrue(analysis.pillars.first { it.id == PillarId.PLAN_ROLES }.roleCoverage.any { it.roleKey == "landfall_payoff" })

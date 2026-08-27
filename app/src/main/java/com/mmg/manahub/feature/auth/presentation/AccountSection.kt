@@ -60,7 +60,6 @@ import com.mmg.manahub.core.ui.components.ShareProfileSheet
 import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
-import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.ThemeBackground
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -194,7 +193,7 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                         modifier = Modifier
                             .width(120.dp)
                             .height(20.dp)
-                            .clip(SmallCardShape)
+                            .clip(CardShape)
                             .background(shimmerColor)
                     )
                     Spacer(modifier = Modifier.height(sp.sm))
@@ -202,7 +201,7 @@ private fun AccountSectionSkeleton(modifier: Modifier = Modifier) {
                         modifier = Modifier
                             .width(160.dp)
                             .height(14.dp)
-                            .clip(SmallCardShape)
+                            .clip(CardShape)
                             .background(shimmerColor)
                     )
                 }
@@ -484,28 +483,6 @@ private fun AuthenticatedCard(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            if (gameTag != null) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .border(
-                                            width = 1.dp,
-                                            color = mc.primaryAccent.copy(alpha = 0.4f),
-                                            shape = ChipShape,
-                                        )
-                                        .background(
-                                            color = mc.primaryAccent.copy(alpha = 0.12f),
-                                            shape = ChipShape,
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                                ) {
-                                    Text(
-                                        text = gameTag,
-                                        color = mc.primaryAccent,
-                                        style = ty.labelSmall,
-                                    )
-                                }
-                            }
                         }
                         val email: String? = user.email
                         if (email != null) {
@@ -517,6 +494,28 @@ private fun AuthenticatedCard(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                        }
+                        if (gameTag != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .border(
+                                        width = 1.dp,
+                                        color = mc.primaryAccent.copy(alpha = 0.4f),
+                                        shape = ChipShape,
+                                    )
+                                    .background(
+                                        color = mc.primaryAccent.copy(alpha = 0.12f),
+                                        shape = ChipShape,
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                            ) {
+                                Text(
+                                    text = gameTag,
+                                    color = mc.primaryAccent,
+                                    style = ty.labelSmall,
+                                )
+                            }
                         }
                     }
                 }

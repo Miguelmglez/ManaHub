@@ -37,6 +37,11 @@ class AdvancedSearchViewModel(
         val oracleText: String = "",
         val cardType: Set<String> = emptySet(),
         val cardTypeMatchAll: Boolean = true,
+        // Suggestions Tab UI Polish plan (W11): backs SearchCriterion.CardType.exclude -- Deck
+        // Analysis's Curve sections seed this true (e.g. "mv=3 -t:land").
+        val cardTypeExclude: Boolean = false,
+        val cardFunction: Set<String> = emptySet(),
+        val cardFunctionMatchAll: Boolean = false,
         val selectedColors: Set<String> = emptySet(),
         val colorsExact: Boolean = false,
         val useColorIdentity: Boolean = false,
@@ -53,6 +58,13 @@ class AdvancedSearchViewModel(
         val priceCurrency: String = "eur",
         val selectedFormat: List<String> = emptyList(),
         val formatLegal: Boolean = true,
+        // Suggestions Tab UI Polish plan (W11): structural criteria with no free-text UiState
+        // equivalent -- only ever populated via seedFrom() (Deck Analysis's "Browse for X"), never
+        // hand-edited by the user through a dedicated picker (there is no realistic manual UI for
+        // "curated oracle-text OR-group" or "mana production threshold"). Rendered read-only in
+        // the sheet with a clear (X) action -- see the Oracle text / Mana production sections.
+        val oracleTerms: SearchCriterion.OracleTerms? = null,
+        val manaProduction: SearchCriterion.ManaProduction? = null,
         val orderBy: SearchOrder = SearchOrder.NAME,
         val orderDirection: SearchDirection = SearchDirection.ASC,
         val builtQuery: String = "",
@@ -90,7 +102,9 @@ class AdvancedSearchViewModel(
         if (s.oracleText.isNotBlank())
             criteria.add(SearchCriterion.OracleText(s.oracleText))
         if (s.cardType.isNotEmpty())
-            criteria.add(SearchCriterion.CardType(s.cardType, s.cardTypeMatchAll))
+            criteria.add(SearchCriterion.CardType(s.cardType, s.cardTypeMatchAll, s.cardTypeExclude))
+        if (s.cardFunction.isNotEmpty())
+            criteria.add(SearchCriterion.CardFunction(s.cardFunction, s.cardFunctionMatchAll))
         if (s.selectedColors.isNotEmpty()) {
             if (s.useColorIdentity)
                 criteria.add(SearchCriterion.ColorIdentity(s.selectedColors, s.colorsExact))
@@ -116,6 +130,8 @@ class AdvancedSearchViewModel(
         }
         if (s.selectedFormat.isNotEmpty())
             criteria.add(SearchCriterion.Format(s.selectedFormat, s.formatLegal))
+        s.oracleTerms?.let { criteria.add(it) }
+        s.manaProduction?.let { criteria.add(it) }
         if (s.filterWishlist == true || s.filterForTrade == true)
             criteria.add(SearchCriterion.CollectionStatus(s.filterWishlist == true, s.filterForTrade == true))
         if (s.filterTags.isNotEmpty())
@@ -154,6 +170,33 @@ class AdvancedSearchViewModel(
 
     fun setCardTypeMatchAll(matchAll: Boolean) {
         _uiState.update { it.copy(cardTypeMatchAll = matchAll) }
+        updateBuiltQuery()
+    }
+
+    fun setCardTypeExclude(exclude: Boolean) {
+        _uiState.update { it.copy(cardTypeExclude = exclude) }
+        updateBuiltQuery()
+    }
+
+    fun clearOracleTerms() {
+        _uiState.update { it.copy(oracleTerms = null) }
+        updateBuiltQuery()
+    }
+
+    fun clearManaProduction() {
+        _uiState.update { it.copy(manaProduction = null) }
+        updateBuiltQuery()
+    }
+
+    fun toggleCardFunction(value: String) {
+        val current = _uiState.value.cardFunction.toMutableSet()
+        if (current.contains(value)) current.remove(value) else current.add(value)
+        _uiState.update { it.copy(cardFunction = current) }
+        updateBuiltQuery()
+    }
+
+    fun setCardFunctionMatchAll(matchAll: Boolean) {
+        _uiState.update { it.copy(cardFunctionMatchAll = matchAll) }
         updateBuiltQuery()
     }
 
@@ -254,6 +297,73 @@ class AdvancedSearchViewModel(
 
     fun clearAll() {
         _uiState.value = UiState()
+        updateBuiltQuery()
+    }
+
+    /**
+     * Suggestions Tab UI Polish plan (W11/D8): decomposes a pre-built [AdvancedSearchQuery]
+     * (e.g. [com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery.toAdvancedQuery]'s
+     * output) back into this ViewModel's flat [UiState] fields — the inverse of [rebuildQuery] —
+     * so the sheet opens ALREADY SHOWING the translated filters as real, checked UI state, never a
+     * raw string dumped anywhere. Starts from a FRESH [UiState] (preserving only `priceCurrency`,
+     * the one field seeded from user prefs at init, unrelated to any search criterion) rather than
+     * merging onto whatever was there before — a stale filter from a previous, unrelated open must
+     * never leak into a fresh "Browse for X" seed.
+     *
+     * A handful of [SearchCriterion] subtypes ([SearchCriterion.CardSet], [SearchCriterion.Loyalty],
+     * [SearchCriterion.Language], [SearchCriterion.Artist], [SearchCriterion.FlavorText]) have no
+     * backing [UiState] field today (or, for `CardSet`, would need a set-code→[MagicSet] reverse
+     * lookup this ViewModel doesn't own) and are no-ops here — dead branches in PRACTICE (no
+     * current [SectionSearchQuery][com.mmg.manahub.feature.decks.domain.engine.SectionSearchQuery]
+     * translation ever produces them), kept only because [SearchCriterion] is a closed sealed
+     * class and this `when` must stay exhaustive.
+     */
+    fun seedFrom(query: AdvancedSearchQuery) {
+        var next = UiState(priceCurrency = _uiState.value.priceCurrency)
+        query.criteria.forEach { criterion ->
+            next = when (criterion) {
+                is SearchCriterion.Name -> next.copy(nameValue = criterion.value, nameExact = criterion.exact)
+                is SearchCriterion.OracleText -> next.copy(oracleText = criterion.value)
+                is SearchCriterion.CardType -> next.copy(
+                    cardType = criterion.types,
+                    cardTypeMatchAll = criterion.matchAll,
+                    cardTypeExclude = criterion.exclude,
+                )
+                is SearchCriterion.CardFunction -> next.copy(
+                    cardFunction = criterion.functions,
+                    cardFunctionMatchAll = criterion.matchAll,
+                )
+                is SearchCriterion.Colors -> next.copy(
+                    selectedColors = criterion.colors,
+                    colorsExact = criterion.exactly,
+                    useColorIdentity = false,
+                )
+                is SearchCriterion.ColorIdentity -> next.copy(
+                    selectedColors = criterion.colors,
+                    colorsExact = criterion.exactly,
+                    useColorIdentity = true,
+                )
+                is SearchCriterion.ManaCost -> next.copy(manaCostValue = criterion.value.toString(), manaCostOp = criterion.operator)
+                is SearchCriterion.Rarity -> next.copy(selectedRarity = criterion.rarity)
+                is SearchCriterion.CardSet -> next
+                is SearchCriterion.Power -> next.copy(powerValue = criterion.value.toString(), powerOp = criterion.operator)
+                is SearchCriterion.Toughness -> next.copy(toughnessValue = criterion.value.toString(), toughnessOp = criterion.operator)
+                is SearchCriterion.Loyalty -> next
+                is SearchCriterion.Price -> next.copy(priceMax = criterion.value.toString(), priceCurrency = criterion.currency)
+                is SearchCriterion.Format -> next.copy(selectedFormat = criterion.format, formatLegal = criterion.legal)
+                is SearchCriterion.Language -> next
+                is SearchCriterion.Artist -> next
+                is SearchCriterion.FlavorText -> next
+                is SearchCriterion.ManaProduction -> next.copy(manaProduction = criterion)
+                is SearchCriterion.OracleTerms -> next.copy(oracleTerms = criterion)
+                is SearchCriterion.CollectionStatus -> next.copy(
+                    filterWishlist = criterion.wishlist.takeIf { it },
+                    filterForTrade = criterion.forTrade.takeIf { it },
+                )
+                is SearchCriterion.HasTag -> next.copy(filterTags = criterion.keys.toSet())
+            }
+        }
+        _uiState.value = next
         updateBuiltQuery()
     }
 

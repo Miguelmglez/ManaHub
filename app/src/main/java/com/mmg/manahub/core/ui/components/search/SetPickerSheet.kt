@@ -22,8 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,9 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import coil3.svg.SvgDecoder
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.svg.SvgDecoder
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.MagicSet
 import com.mmg.manahub.core.model.PLAYABLE_SET_TYPES
@@ -125,6 +123,11 @@ fun SetPickerSheet(
                         tint = mc.textSecondary
                     )
                 }
+                Text(
+                    stringResource(R.string.advsearch_set_picker_title),
+                    style = ty.titleMedium,
+                    color = mc.textPrimary,
+                )
             }
 
             // ── Header ──
@@ -135,11 +138,6 @@ fun SetPickerSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    stringResource(R.string.advsearch_set_picker_title),
-                    style = ty.titleMedium,
-                    color = mc.textPrimary,
-                )
                 if (selectedSetCodes.isNotEmpty()) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),

@@ -32,6 +32,7 @@ sealed interface CommunityDeckDetailUiState {
         val commanderExpanded: Boolean = true,
         val mainboardExpanded: Boolean = true,
         val sideboardExpanded: Boolean = true,
+        val collapsedSections: Set<String> = emptySet(),
         val ownedCardIdentityKeys: Set<String> = emptySet(),
     ) : CommunityDeckDetailUiState
 

@@ -72,7 +72,7 @@ object ArchetypeData {
 
     fun generic(format: ArchetypeFormat): ArchetypeDefinition = when (format) {
         ArchetypeFormat.COMMANDER -> ArchetypeDefinition(
-            id = ArchetypeId.GENERIC,
+            id = null,
             format = ArchetypeFormat.COMMANDER,
             lands = RoleTarget(36, 38, 40), // ep.658 baseline: 38 lands (plan line ~304)
             roleTargets = mapOf(
@@ -89,7 +89,7 @@ object ArchetypeData {
             shape = CurveShape.BELL,
         )
         ArchetypeFormat.SIXTY -> ArchetypeDefinition(
-            id = ArchetypeId.GENERIC,
+            id = null,
             format = ArchetypeFormat.SIXTY,
             lands = RoleTarget(22, 24, 26), // 60-card MIDRANGE row: 24 lands "default" (plan line ~321)
             roleTargets = mapOf(
@@ -231,43 +231,6 @@ object ArchetypeData {
                 shape = CurveShape.BELL,
             ),
         ),
-        ArchetypeId.TEMPO to mapOf(
-            // No ep.658 Commander row (see MIDRANGE note above) -- INTERPOLATED from the 60-card
-            // TEMPO row ("cheap threats + cheap interaction, near-zero wipes -- own board matters")
-            // scaled to Commander norms: counterspell/threat_early pushed above GENERIC, ramp/
-            // card_draw pulled below (tempo is proactive, not a card-advantage-first plan).
-            ArchetypeFormat.COMMANDER to ArchetypeDefinition(
-                id = ArchetypeId.TEMPO, format = ArchetypeFormat.COMMANDER,
-                lands = RoleTarget(32, 34, 37),
-                roleTargets = mapOf(
-                    "threat_early" to RoleTarget(9, 13, 17),
-                    "counterspell" to RoleTarget(7, 10, 13),
-                    "removal_spot" to RoleTarget(4, 6, 9),
-                    "card_draw" to RoleTarget(6, 8, 11),
-                    "ramp" to RoleTarget(4, 6, 9),
-                    "removal_mass" to RoleTarget(0, 0, 2),
-                ),
-                antiRoles = setOf("removal_mass"),
-                curve = CurveBand(2.0, 2.4, 2.8),
-                shape = CurveShape.FRONT,
-            ),
-            // 60-card TEMPO row: lands 21-23, FRONT-BELL, cheap threats + cheap interaction
-            // (counters/bounce), near-zero wipes -- plan line ~322.
-            ArchetypeFormat.SIXTY to ArchetypeDefinition(
-                id = ArchetypeId.TEMPO, format = ArchetypeFormat.SIXTY,
-                lands = RoleTarget(20, 22, 24),
-                roleTargets = mapOf(
-                    "threat_early" to RoleTarget(9, 13, 17),
-                    "counterspell" to RoleTarget(7, 10, 13),
-                    "removal_spot" to RoleTarget(3, 5, 8),
-                    "card_draw" to RoleTarget(3, 6, 9),
-                    "removal_mass" to RoleTarget(0, 0, 1),
-                ),
-                antiRoles = setOf("removal_mass"),
-                curve = CurveBand(1.5, 1.9, 2.4),
-                shape = CurveShape.FRONT,
-            ),
-        ),
         ArchetypeId.COMBO to mapOf(
             // ep.658 COMBO row: lands 37-38, ramp 10-12, card advantage 12, targeted disruption
             // 6-8, mass disruption 2-3, "+4-6 protection + tutors up (6-8)" -- plan line ~307.
@@ -305,39 +268,140 @@ object ArchetypeData {
                 shape = CurveShape.FRONT,
             ),
         ),
-        ArchetypeId.RAMP to mapOf(
-            // ep.658 RAMP row: lands 37-38, ramp 12-15, card advantage 10-12, targeted disruption
-            // 6-8, mass disruption 3-4, "finishers/big-mana payoffs band added; curve BACK-shaped"
-            // -- plan line ~308.
+        // PRISON (Deck Analysis Engine v3, spec §2.2, NEW) -- a stax skeleton is structurally
+        // incompatible with an overlay: it wants 3-5 finishers and 3-7 card draw as its BASE
+        // (a `relaxes` cannot express "reduce a hypothetical band that was never set" cleanly on
+        // top of another archetype), so it ships as a full 5th macro rather than the old `STAX`
+        // theme it replaces. Bands transcribed verbatim from spec §2.2.
+        ArchetypeId.PRISON to mapOf(
             ArchetypeFormat.COMMANDER to ArchetypeDefinition(
-                id = ArchetypeId.RAMP, format = ArchetypeFormat.COMMANDER,
-                lands = RoleTarget(37, 39, 42),
+                id = ArchetypeId.PRISON, format = ArchetypeFormat.COMMANDER,
+                lands = RoleTarget(34, 36, 38),
                 roleTargets = mapOf(
-                    "ramp" to RoleTarget(12, 14, 17),
-                    "finisher" to RoleTarget(9, 12, 15), // "big-mana payoffs band added"
-                    "card_draw" to RoleTarget(9, 11, 14),
-                    "removal_mass" to RoleTarget(3, 4, 6),
+                    "ramp" to RoleTarget(8, 10, 13),
+                    "card_draw" to RoleTarget(3, 6, 9),
+                    "removal_spot" to RoleTarget(6, 8, 11),
+                    "removal_mass" to RoleTarget(3, 5, 7),
+                    "stax_piece" to RoleTarget(10, 14, 20),
+                    "finisher" to RoleTarget(3, 5, 8),
+                    "protection" to RoleTarget(3, 5, 8),
+                    "tutor" to RoleTarget(2, 4, 8),
                 ),
                 antiRoles = emptySet(),
-                curve = CurveBand(3.3, 3.8, 4.4),
-                shape = CurveShape.BACK,
+                curve = CurveBand(2.2, 2.6, 3.2),
+                shape = CurveShape.FRONT,
             ),
-            // 60-card RAMP row: lands 24-26 (+ dorks/rocks count partially), BACK, 8-12 accel,
-            // top-end payoff band -- plan line ~324.
             ArchetypeFormat.SIXTY to ArchetypeDefinition(
-                id = ArchetypeId.RAMP, format = ArchetypeFormat.SIXTY,
-                lands = RoleTarget(23, 25, 27),
+                id = ArchetypeId.PRISON, format = ArchetypeFormat.SIXTY,
+                lands = RoleTarget(20, 22, 24),
                 roleTargets = mapOf(
-                    "ramp" to RoleTarget(8, 11, 14),
-                    "finisher" to RoleTarget(9, 12, 16), // "top-end payoff band"
-                    "removal_mass" to RoleTarget(2, 4, 6),
-                    "card_draw" to RoleTarget(3, 5, 8),
-                    "threat_early" to RoleTarget(0, 1, 5),
+                    "stax_piece" to RoleTarget(12, 16, 20),
+                    "removal_spot" to RoleTarget(4, 6, 9),
+                    "card_draw" to RoleTarget(2, 4, 7),
+                    "finisher" to RoleTarget(2, 4, 6),
+                    "protection" to RoleTarget(2, 4, 6),
+                    "tutor" to RoleTarget(2, 4, 8),
                 ),
                 antiRoles = emptySet(),
-                curve = CurveBand(2.9, 3.4, 4.1),
-                shape = CurveShape.BACK,
+                curve = CurveBand(1.8, 2.2, 2.8),
+                shape = CurveShape.FRONT,
             ),
+        ),
+    )
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  postures.<POSTURE> (Deck Analysis Engine v3, spec §3) -- layer 2.5, applied by
+    //  [ArchetypeSkeletonResolver] between the archetype override (layer 2) and themes (layer 3),
+    //  reusing the SAME adds/relaxes/landsDelta/curveDelta merge machinery a [ThemeDefinition]
+    //  already uses (spec: "a data change, not an engine change"). Bands transcribed verbatim from
+    //  spec §3's table; `RAMP`/`TEMPO` are the two ex-macros (their OLD ArchetypeDefinition bands
+    //  above are NOT reused here -- the posture table gives its own, smaller DELTA-shaped numbers,
+    //  since a posture only nudges an already-resolved archetype skeleton, it does not define one
+    //  from scratch). `ATTRITION`/`TOOLBOX`/`VOLTRON`/`GROUP_HUG`/`GROUP_SLUG` are the 5 ex-themes.
+    //  `sixtyScale` for RAMP/TEMPO (0.75) mirrors the old RAMP/TEMPO archetypes' own Commander-vs-
+    //  60-card SCALE ratio (their retired bands above, ~0.75-0.8x) since both postures still carry
+    //  a "big/small mana" identity at roughly that same proportion; the newer postures
+    //  (ATTRITION/TOOLBOX/VOLTRON/GROUP_HUG/GROUP_SLUG) default to 0.5, mirroring
+    //  [ThemeDefinition.sixtyScale]'s own default. Both are documented judgment calls (spec §3
+    //  gives one Commander-scale table only), not cited numbers.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    val POSTURES: Map<PostureId, PostureDefinition> = mapOf(
+        PostureId.RAMP to PostureDefinition(
+            id = PostureId.RAMP,
+            adds = mapOf(
+                "ramp" to RoleTarget(12, 15, 19),
+                "finisher" to RoleTarget(8, 11, 15),
+            ),
+            landsDelta = 2,
+            curveDelta = 0.5,
+            sixtyScale = 0.75,
+        ),
+        PostureId.TEMPO to PostureDefinition(
+            id = PostureId.TEMPO,
+            adds = mapOf(
+                "threat_early" to RoleTarget(9, 13, 17),
+                "counterspell" to RoleTarget(6, 9, 12),
+            ),
+            antiRoles = setOf("removal_mass"), // spec §3: "TEMPO also carries antiRoles = {removal_mass}"
+            landsDelta = -2,
+            curveDelta = -0.5,
+            sixtyScale = 0.75,
+        ),
+        PostureId.ATTRITION to PostureDefinition(
+            id = PostureId.ATTRITION,
+            adds = mapOf(
+                "recursion" to RoleTarget(4, 6, 9),
+                // spec §3: "card_draw +2 shift / removal_spot +2 shift" -- expressed here as an
+                // adds band whose ideal sits +2 above GENERIC's own card_draw/removal_spot ideal
+                // (12/12, see ArchetypeData.generic(COMMANDER)) so the MAX-per-bound merge actually
+                // raises a compatible archetype's band rather than being silently swallowed.
+                "card_draw" to RoleTarget(10, 14, 17),
+                "removal_spot" to RoleTarget(9, 14, 17),
+            ),
+            curveDelta = 0.2,
+        ),
+        PostureId.TOOLBOX to PostureDefinition(
+            id = PostureId.TOOLBOX,
+            adds = mapOf(
+                "tutor" to RoleTarget(8, 12, 18),
+                "recursion" to RoleTarget(3, 5, 8),
+            ),
+            relaxes = mapOf("finisher" to RoleTarget(3, 5, 8)),
+            curveDelta = 0.3,
+        ),
+        PostureId.VOLTRON to PostureDefinition(
+            id = PostureId.VOLTRON,
+            adds = mapOf(
+                "equipment" to RoleTarget(6, 9, 13),
+                "aura_buff" to RoleTarget(0, 6, 12),
+                "protection" to RoleTarget(6, 9, 12),
+                "evasion" to RoleTarget(4, 6, 9),
+            ),
+            relaxes = mapOf(
+                "threat_early" to RoleTarget(0, 0, 99),
+                "finisher" to RoleTarget(0, 2, 5),
+                "removal_mass" to RoleTarget(0, 0, 2),
+            ),
+            landsDelta = -2,
+            curveDelta = -0.4,
+        ),
+        PostureId.GROUP_HUG to PostureDefinition(
+            id = PostureId.GROUP_HUG,
+            adds = mapOf(
+                "group_effect" to RoleTarget(9, 12, 16),
+                "finisher" to RoleTarget(7, 9, 12),
+            ),
+            landsDelta = 2,
+            commanderOnly = true,
+        ),
+        PostureId.GROUP_SLUG to PostureDefinition(
+            id = PostureId.GROUP_SLUG,
+            adds = mapOf(
+                "group_effect" to RoleTarget(11, 15, 20),
+                "lifegain_source" to RoleTarget(0, 3, 7),
+            ),
+            commanderOnly = true,
         ),
     )
 
@@ -379,12 +443,16 @@ object ArchetypeData {
             sixtyScale = 0.55,
             curveExemption = CurveExemption.REANIMATOR_HIGH_MV,
         ),
-        // No published per-theme anchor (see file header) -- kept close to prior D15 band, which
-        // already differentiates via the unique graveyard_enabler+self_mill_payoff pair.
+        // Deck Analysis Engine v3 (spec §4.2) -- RETARGETED onto the new `mill_self` producer role
+        // (Phase 1) instead of the old, ambiguous `graveyard_enabler` (which REANIMATOR's own
+        // `graveyard_enabler` band above already owns): "milling yourself and milling the opponent
+        // are opposite axes -- one feeds a graveyard payoff, the other is a win condition. Merging
+        // them into mill_engine was a modelling error." Bands per spec §4.2:
+        // `mill_self 8-12-16 · self_mill_payoff 10-14-20 · recursion 4-6-10`.
         ThemeId.SELF_MILL to ThemeDefinition(
             id = ThemeId.SELF_MILL,
             adds = mapOf(
-                "graveyard_enabler" to RoleTarget(8, 12, 16),
+                "mill_self" to RoleTarget(8, 12, 16),
                 "self_mill_payoff" to RoleTarget(10, 14, 20),
                 "recursion" to RoleTarget(4, 6, 10),
             ),
@@ -404,23 +472,22 @@ object ArchetypeData {
             sixtyScale = 0.5,
             overlayRoles = setOf("death_payoff"),
         ),
-        // Plan anchor: "producers 10-14 + anthems 4-6, wipes reduced" (plan line ~332). No
-        // "anthem" RoleKey exists in ArchetypeRoleClassifier's vocabulary (no card-level anthem
-        // matcher today) -- flagged rather than inventing an uncounted key; `counters_payoff` is
-        // kept as the closest existing proxy since some anthem-adjacent tokens shells double as
-        // +1/+1-counter payoffs. "Wipes reduced" is now a REAL relax (replacing the old inert
-        // `removal_mass_own_note` transcription artifact, see file header) rather than a
-        // documentation-only zero band.
+        // Plan anchor: "producers 10-14 + anthems 4-6, wipes reduced" (plan line ~332). Deck
+        // Analysis Engine v3 (spec §4.2/§5.1) finally gives TOKENS its real `anthem` band
+        // (3-5-8) -- Phase 1 added the `anthem` RoleSpec this comment previously flagged as
+        // missing ("no anthem role exists"); `counters_payoff` (the old proxy) is REMOVED now that
+        // a real anthem key exists, since keeping both would double-count the same "go-wide +
+        // buff" signal. "Wipes reduced" stays a REAL relax (see file header).
         ThemeId.TOKENS to ThemeDefinition(
             id = ThemeId.TOKENS,
             adds = mapOf(
                 "token_generator" to RoleTarget(10, 12, 15), // "producers 10-14"
-                "counters_payoff" to RoleTarget(0, 3, 8),
+                "anthem" to RoleTarget(3, 5, 8), // spec §4.2: TOKENS' real anthem band
                 "finisher" to RoleTarget(6, 9, 12),
             ),
             relaxes = mapOf("removal_mass" to RoleTarget(0, 0, 2)), // "wipes reduced"
             sixtyScale = 0.5,
-            overlayRoles = setOf("counters_payoff"),
+            overlayRoles = setOf("anthem"),
         ),
         // No published per-theme anchor beyond "instant/sorcery density + payoffs" (plan
         // line ~333). `spell_payoff`/`counterspell` pushed above every compatible archetype's own
@@ -438,39 +505,10 @@ object ArchetypeData {
             sixtyScale = 0.55,
             overlayRoles = setOf("spell_payoff"),
         ),
-        // Plan's own worked example (WS 1.1 + WS5): "equipment_or_aura band 10-14" (plan
-        // line ~332) -- brought DOWN from the prior D15 band (which sat at 14-18-24, above the
-        // plan's stated range).
-        ThemeId.VOLTRON to ThemeDefinition(
-            id = ThemeId.VOLTRON,
-            adds = mapOf(
-                "equipment_or_aura" to RoleTarget(9, 12, 16), // "equipment_or_aura band 10-14"
-                "protection" to RoleTarget(6, 9, 12),
-                "evasion" to RoleTarget(4, 6, 9),
-                "tutor" to RoleTarget(2, 4, 8),
-            ),
-            relaxes = mapOf(
-                "finisher" to RoleTarget(0, 2, 5),
-                "threat_early" to RoleTarget(0, 0, 99),
-                "removal_mass" to RoleTarget(0, 0, 2), // "wipes -> anti-role" (plan line ~338)
-            ),
-            sixtyScale = 0.55,
-            landsDelta = -2,
-            curveDelta = -0.4,
-        ),
-        // Plan anchor: "prison/tax pieces as the main band, wipes optional, draw down" (plan
-        // line ~333) -- `card_draw` relax tightened substantially (was barely below GENERIC).
-        ThemeId.STAX to ThemeDefinition(
-            id = ThemeId.STAX,
-            adds = mapOf(
-                "stax_piece" to RoleTarget(10, 14, 20),
-                "protection" to RoleTarget(3, 5, 8),
-                "finisher" to RoleTarget(3, 5, 8),
-            ),
-            relaxes = mapOf("card_draw" to RoleTarget(0, 3, 6)), // "draw down" -- was (6,8,12), barely a relax
-            sixtyScale = 0.6,
-            curveDelta = -0.2,
-        ),
+        // VOLTRON: MOVED to PostureId.VOLTRON (Deck Analysis Engine v3, spec §4.1 -- "none owns a
+        // producer<->payoff axis; they only reshape the skeleton"). See ArchetypeData.POSTURES.
+        // STAX: MOVED to ArchetypeId.PRISON (spec §4.1 -- STAX -> macro PRISON). See
+        // ArchetypeData.ARCHETYPES[PRISON].
         // Plan anchor: "lands UP +2-4 vs. baseline + landfall payoffs" (plan line ~334) -- delta
         // bumped from +2 to +3 (middle of the stated +2-4 range).
         ThemeId.LANDFALL to ThemeDefinition(
@@ -557,47 +595,24 @@ object ArchetypeData {
             sixtyScale = 0.5,
             overlayRoles = setOf("spell_payoff"),
         ),
-        // Plan anchor: "dedicated mill band, interaction up since the clock is slow" (plan
-        // line ~335). `removal_spot` (NEW) + `curveDelta` (NEW) both encode "interaction up /
-        // clock is slow, expensive answers are fine" and give this theme a differentiation channel
-        // that survives 60-card scaling even when `removal_spot` alone gets swallowed by a
-        // compatible archetype's own band.
-        ThemeId.MILL to ThemeDefinition(
-            id = ThemeId.MILL,
+        // Deck Analysis Engine v3 (spec §4.2) -- split from the old merged `MILL` into
+        // `MILL_OPPONENT` (this is the WIN-CONDITION half -- milling the opponent out; the
+        // enabler/self-mill half is the separately-retargeted `ThemeId.SELF_MILL` above). Bands per
+        // spec §4.2: `mill_opponent 10-14-18 · removal_spot 4-6-9 · counterspell 0-4-8 ·
+        // finisher 0-2-4`, curve Δ +0.3, sixtyScale 0.60.
+        ThemeId.MILL_OPPONENT to ThemeDefinition(
+            id = ThemeId.MILL_OPPONENT,
             adds = mapOf(
-                "mill_engine" to RoleTarget(10, 14, 18),
-                "finisher" to RoleTarget(4, 6, 9),
-                "removal_spot" to RoleTarget(2, 4, 7), // "interaction up since the clock is slow"
+                "mill_opponent" to RoleTarget(10, 14, 18),
+                "removal_spot" to RoleTarget(4, 6, 9),
+                "counterspell" to RoleTarget(0, 4, 8),
+                "finisher" to RoleTarget(0, 2, 4),
             ),
-            curveDelta = 0.3, // a long, slow clock tolerates (needs) pricier answers
+            curveDelta = 0.3,
             sixtyScale = 0.6,
         ),
-        // No published per-theme anchor -- `finisher` add bumped above CONTROL's own band and
-        // `landsDelta` added (durdle-and-give-resources plan wants to reliably hit land drops over
-        // a long game) so this theme has 2 independent differentiation channels instead of relying
-        // solely on the shared `group_effect` key (which GROUP_SLUG also carries).
-        ThemeId.GROUP_HUG to ThemeDefinition(
-            id = ThemeId.GROUP_HUG,
-            adds = mapOf(
-                "group_effect" to RoleTarget(9, 12, 16),
-                "finisher" to RoleTarget(7, 9, 12),
-            ),
-            landsDelta = 2,
-            commanderOnly = true,
-            overlayRoles = setOf("group_effect"),
-        ),
-        // No published per-theme anchor -- `group_effect` ideal pushed higher than GROUP_HUG's
-        // (a dedicated damage-engine identity runs denser than a resource-giving one) for a
-        // same-key differentiation from its sibling theme.
-        ThemeId.GROUP_SLUG to ThemeDefinition(
-            id = ThemeId.GROUP_SLUG,
-            adds = mapOf(
-                "group_effect" to RoleTarget(11, 15, 20),
-                "lifegain_payoff" to RoleTarget(0, 2, 6),
-            ),
-            commanderOnly = true,
-            overlayRoles = setOf("group_effect", "lifegain_payoff"),
-        ),
+        // GROUP_HUG/GROUP_SLUG: MOVED to PostureId.GROUP_HUG/GROUP_SLUG (spec §4.1). See
+        // ArchetypeData.POSTURES.
         // No published per-theme anchor -- unique blink_effect+etb_payoff pair already
         // differentiates strongly (unchanged from prior D15 band).
         ThemeId.BLINK to ThemeDefinition(
@@ -637,23 +652,7 @@ object ArchetypeData {
             sixtyScale = 0.6,
             overlayRoles = setOf("vehicle"),
         ),
-        // No published per-theme anchor -- `tutor` pushed above every compatible archetype's own
-        // tutor band (including COMBO's) and `recursion` (NEW) added as a 2nd channel, since
-        // `finisher` alone was routinely swallowed (CONTROL/MIDRANGE/COMBO all run a real
-        // finisher band already). `curveDelta` (NEW): a wide toolbox of situational one-ofs tends
-        // to run pricier answers than a lean beatdown curve -- also gives a 3rd, scale-independent
-        // channel under COMBO/60-card, where the scaled `tutor` contribution is swallowed by
-        // COMBO's own already-high 60-card tutor band.
-        ThemeId.TOOLBOX to ThemeDefinition(
-            id = ThemeId.TOOLBOX,
-            adds = mapOf(
-                "tutor" to RoleTarget(10, 14, 20),
-                "finisher" to RoleTarget(4, 6, 9),
-                "recursion" to RoleTarget(4, 6, 9),
-            ),
-            curveDelta = 0.3,
-            sixtyScale = 0.5,
-        ),
+        // TOOLBOX: MOVED to PostureId.TOOLBOX (spec §4.1). See ArchetypeData.POSTURES.
         // No published per-theme anchor -- unique clone_theft_effect key + sac_outlet (an
         // uncovered key for all 3 compatible archetypes) already differentiate strongly (unchanged
         // from prior D15 band).
@@ -664,6 +663,46 @@ object ArchetypeData {
                 "sac_outlet" to RoleTarget(0, 3, 7),
             ),
             commanderOnly = true,
+        ),
+        // Deck Analysis Engine v3 (spec §4.2, NEW). Bands verbatim: `treasure_source 8-11-15 ·
+        // artifact_payoff 5-8-12 · sac_outlet 0-3-7`, sixtyScale 0.55.
+        ThemeId.TREASURE to ThemeDefinition(
+            id = ThemeId.TREASURE,
+            adds = mapOf(
+                "treasure_source" to RoleTarget(8, 11, 15),
+                "artifact_payoff" to RoleTarget(5, 8, 12),
+                "sac_outlet" to RoleTarget(0, 3, 7),
+            ),
+            sixtyScale = 0.55,
+            overlayRoles = setOf("artifact_payoff"),
+        ),
+        // Deck Analysis Engine v3 (spec §4.2, NEW -- split out of the old VOLTRON theme's
+        // `equipment_or_aura` proxy now that Phase 1 gave `equipment` its own real RoleSpec). Bands
+        // verbatim: `equipment 8-11-15 · threat_early 6-9-13 · evasion 3-5-8`, sixtyScale 0.60.
+        ThemeId.EQUIPMENT to ThemeDefinition(
+            id = ThemeId.EQUIPMENT,
+            adds = mapOf(
+                "equipment" to RoleTarget(8, 11, 15),
+                "threat_early" to RoleTarget(6, 9, 13),
+                "evasion" to RoleTarget(3, 5, 8),
+            ),
+            sixtyScale = 0.6,
+        ),
+        // Deck Analysis Engine v3 (spec §4.2, NEW, `sixtyOnly`). Bands verbatim: `spell_payoff
+        // 4-6-9 · card_draw 12-16-20 · ramp 8-12-16 · tutor 4-6-9`, curve Δ -0.5. Commander's
+        // higher average curve and lower spell density make a genuine storm-count kill implausible
+        // -- storm is a 60-card-constructed-specific archetype (spec §4.2).
+        ThemeId.STORM to ThemeDefinition(
+            id = ThemeId.STORM,
+            adds = mapOf(
+                "spell_payoff" to RoleTarget(4, 6, 9),
+                "card_draw" to RoleTarget(12, 16, 20),
+                "ramp" to RoleTarget(8, 12, 16),
+                "tutor" to RoleTarget(4, 6, 9),
+            ),
+            curveDelta = -0.5,
+            sixtyOnly = true,
+            overlayRoles = setOf("spell_payoff"),
         ),
     )
 

@@ -95,9 +95,13 @@ fun StrategyPickerSheet(
     availableThemes: Set<ThemeId>? = null,
 ) {
     val spacing = MaterialTheme.spacing
+    // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists (removed from the enum) -- the
+    // old "always allow GENERIC ('Balanced') as a row" union is gone; the picker's "clear pin"
+    // interaction is still available via toggling the currently-selected row off (see the onClick
+    // below), it just no longer renders as its own dedicated list row. A dedicated "Balanced/no
+    // pin" row is real, flagged follow-up UI debt (out of Phase 3a's scope).
     val archetypeItems = if (availableArchetypes != null) {
-        val allowed = availableArchetypes + ArchetypeId.GENERIC
-        ArchetypeId.entries.filter { it in allowed }
+        ArchetypeId.entries.filter { it in availableArchetypes }
     } else {
         ArchetypeId.entries
     }
@@ -146,7 +150,6 @@ fun StrategyPickerSheet(
                 disabledReason = when {
                     isSelected -> null
                     !selectable -> selection.archetype
-                        ?.takeIf { it != ArchetypeId.GENERIC }
                         ?.let { stringResource(R.string.deck_strategy_picker_incompatible_reason, it.displayName) }
                     atCap -> stringResource(R.string.deck_strategy_picker_max_themes_reason)
                     else -> null

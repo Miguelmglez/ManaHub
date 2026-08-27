@@ -83,8 +83,8 @@ class ColorStrategyAffinityTest {
     }
 
     @Test
-    fun `combosFor GENERIC (the neutral default) returns nothing -- it is never a curated pick`() {
-        assertTrue(ColorStrategyAffinity.combosFor(ArchetypeId.GENERIC, null).isEmpty())
+    fun `combosFor a null archetype and null theme returns nothing -- there is nothing to rank against`() {
+        assertTrue(ColorStrategyAffinity.combosFor(null, null).isEmpty())
     }
 
     @Test

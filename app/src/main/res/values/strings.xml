@@ -767,8 +767,14 @@
     <string name="deck_analysis_finding_curve_off_band">Mana curve should average %2$s–%3$s — yours averages %1$s.</string>
     <string name="deck_analysis_finding_curve_shape_mismatch">Your curve\'s shape does not match this plan\'s expected %1$s shape.</string>
     <string name="deck_analysis_finding_role_gap">%1$s wants at least %3$d — you have %2$d.</string>
+    <string name="deck_analysis_finding_role_below_ideal">%1$s\'s ideal is %3$d — you have %2$d, consider adding more.</string>
     <string name="deck_analysis_finding_anti_role_over_max">%1$s wants at most %3$d — you have %2$d.</string>
-    <string name="deck_analysis_finding_low_synergy_density">Low synergy density (%1$d%%). Cards do not pull in one direction.</string>
+    <!-- Deck Analysis Engine v3, Phase 4 (spec §5.4/§7): anti-synergy conflict findings, replacing
+         deck_analysis_finding_low_synergy_density (retired this phase). -->
+    <string name="deck_analysis_finding_self_defeating_graveyard_hate">You are running %1$d graveyard hate cards while your own plan depends on the graveyard — they cancel each other out.</string>
+    <string name="deck_analysis_finding_orphan_producers">%2$d %1$s cards but 0 payoffs to use them — add a payoff, or trim some of the %2$d down.</string>
+    <string name="deck_analysis_finding_orphan_payoffs">%2$d %1$s payoffs but almost no producers to feed them — aim for at least %3$d.</string>
+    <string name="deck_analysis_finding_stax_vs_own_engine">%1$d stax pieces are also choking your own card-draw engine (%2$d — Control decks want at least %3$d).</string>
     <string name="deck_analysis_finding_deck_too_small">Deck is too small: %1$d cards (this format needs at least %2$d).</string>
     <string name="deck_analysis_finding_too_many_copies">Too many copies of %1$s: %2$d (limit is %3$d).</string>
     <string name="deck_analysis_finding_singleton_violation">%1$s breaks the singleton rule: %2$d copies (Commander allows 1).</string>
@@ -789,10 +795,90 @@
          legacy RoleCoverageRow's plain "current/ideal" interpolation (no string needed, see
          RoleCoverageEntryRow in HealthComponents.kt). -->
     <string name="deck_analysis_role_anti_max_format">%1$d / max %2$d</string>
-    <!-- Deck Analysis Engine v2 Phase 3: the finding-budget "N more" affordance (plan §3.3's
-         per-pillar cap) — inert (no expand action; PillarResult only exposes a count, not the
-         collapsed Finding objects themselves, see this phase's report). -->
-    <string name="deck_analysis_findings_collapsed_count">+%1$d more</string>
+    <!-- Suggestions Tab UI Polish plan (W4, D5, 2026-08-25): FindingsList's "show first N" toggle
+         — replaces the old inert "+N more" caption (deck_analysis_findings_collapsed_count,
+         deleted) now that PillarResult.findings carries the FULL list and the UI itself owns the
+         fold/unfold interaction. -->
+    <string name="deck_analysis_findings_show_more">Show %1$d more</string>
+    <string name="deck_analysis_findings_show_less">Show less</string>
+
+    <!-- Deck Analysis Category Sections rework (W2, 2026-08-21): SYNERGY-pillar-only sub-caption
+         under the pillar detail header, explaining the subscore's raw N/M (PillarResult
+         .alignedNonLandCopies / .totalNonLandCopies). SYNERGY is the weakest-calibrated pillar
+         (see AnalysisEngine.evaluateSynergy's KDoc); this is the "honest framing" the plan calls
+         for instead of extra visual authority. -->
+    <string name="deck_analysis_synergy_alignment_caption">Aligned %1$d / %2$d non-lands</string>
+
+    <!-- Deck Analysis Engine v2 "score limiter" follow-up (2026-08-20): a small, tappable hint row
+         near the score ring when ONE specific thing is dominantly holding totalScore back — live-
+         device finding, a Standard deck stuck at ILLEGAL_DECK_SCORE_CAP regardless of strategy pick
+         was misread as "the strategy switcher is broken" (it wasn't). Tapping either row expands the
+         relevant pillar tile via the SAME expandedPillar mechanism a tile tap already uses. -->
+    <string name="deck_analysis_limiter_legality_capped">Score capped by legality issues — your real plan score is %1$d. Fix the Legality findings below to unlock it.</string>
+    <string name="deck_analysis_limiter_dominant_pillar">%1$s is the main thing holding back your score right now.</string>
+    <string name="deck_analysis_limiter_action">View pillar details</string>
+
+    <!-- Deck Analysis Category Sections rework (W7, 2026-08-24): the per-category section list
+         inside each expanded pillar tile — CardSectionComponents.kt. Replaces the old flat
+         role-coverage-bar list; every pillar (not just Plan roles) renders sections now. -->
+    <string name="deck_analysis_section_progress_format">%1$d / %2$d</string>
+    <string name="deck_analysis_section_browse">Browse for %1$s</string>
+    <!-- Suggestions Tab UI Polish plan (W3, 2026-08-25): placeholder shown in a CardSectionRow
+         whose section.contributions is empty — every section now renders a consistent visual
+         anchor instead of the LazyRow simply being absent. -->
+    <string name="deck_analysis_section_empty">No cards yet</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI, 2026-08-27): PillarTile's "not applicable" state
+         (PillarResult.notApplicable) — SYNERGY on a zero-edge deck. Never renders as "0". -->
+    <string name="deck_analysis_pillar_not_applicable_badge">N/A</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI): the synergy-package section list inside the SYNERGY
+         pillar detail — one card per live axis, producers -> payoffs, ArchetypeResemblanceComponents/
+         SynergyAxisComponents.kt. -->
+    <string name="deck_analysis_synergy_packages_header">Synergy packages</string>
+    <string name="deck_analysis_synergy_not_applicable_title">No detectable synergy plan</string>
+    <string name="deck_analysis_synergy_not_applicable_body">This deck has no producer→payoff pairs the engine can detect. That doesn\'t mean it\'s poorly built — a straightforward removal-and-card-advantage plan can legitimately have no synergy graph at all — it just means this pillar has nothing to measure, so it\'s excluded from your score instead of scored as zero.</string>
+    <string name="deck_analysis_synergy_no_live_packages">No live synergy package yet — a package needs both producers and payoffs to count.</string>
+    <string name="deck_analysis_axis_package_header">%1$s package</string>
+    <string name="deck_analysis_axis_producers_label">Producers</string>
+    <string name="deck_analysis_axis_payoffs_label">Payoffs</string>
+    <string name="deck_analysis_axis_live_badge">LIVE</string>
+    <string name="deck_analysis_axis_health_caption">%1$d producers → %2$d payoffs · %3$d%% healthy</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI): per-AxisKey English fallback labels — a presentation-
+         layer mirror of AnalysisEngine's own private AXIS_LABELS map (core-domain stays string-free
+         per Finding's own discipline; this is the SAME "each layer keeps its own fallback" precedent
+         as CardTag.displayLabel/ArchetypeRoleClassifier.label). Keep in sync with that map by hand
+         if a new axis is ever added. -->
+    <string name="deck_analysis_axis_life">Life</string>
+    <string name="deck_analysis_axis_death">Death</string>
+    <string name="deck_analysis_axis_tokens">Tokens</string>
+    <string name="deck_analysis_axis_counters">Counters</string>
+    <string name="deck_analysis_axis_landfall">Landfall</string>
+    <string name="deck_analysis_axis_graveyard">Graveyard</string>
+    <string name="deck_analysis_axis_etb">ETB</string>
+    <string name="deck_analysis_axis_spells">Spells</string>
+    <string name="deck_analysis_axis_artifacts">Artifacts</string>
+    <string name="deck_analysis_axis_enchantments">Enchantments</string>
+    <string name="deck_analysis_axis_attached">Equipment / Auras</string>
+    <string name="deck_analysis_axis_attack">Attack</string>
+    <string name="deck_analysis_axis_planeswalkers">Planeswalkers</string>
+    <string name="deck_analysis_axis_group">Group Effects</string>
+    <string name="deck_analysis_axis_mill_opp">Mill (Opponent)</string>
+    <string name="deck_analysis_axis_lock">Stax Lock</string>
+    <string name="deck_analysis_axis_engine">Engine</string>
+    <string name="deck_analysis_axis_tribe_format">%1$s (Tribe)</string>
+
+    <!-- Deck Analysis Engine v3, Phase 5 (UI): the archetype resemblance card — macro/posture/
+         themes + the full 5-way resemblance profile (ArchetypeResemblanceComponents.kt). Never a
+         "no plan" bucket: there is always a nearest plan with an honest confidence beside it. -->
+    <string name="deck_analysis_archetype_header">Archetype signal</string>
+    <string name="deck_analysis_archetype_custom_label">Custom</string>
+    <string name="deck_analysis_archetype_hybrid_format">%1$s / %2$s</string>
+    <string name="deck_analysis_archetype_confidence_margin">%1$d%% margin over runner-up</string>
+    <string name="deck_analysis_archetype_ambiguous_caption">No single archetype is confident enough yet — here\'s how this deck resembles each one.</string>
+    <string name="deck_analysis_resemblance_row_format">%1$d%%</string>
+    <string name="deck_analysis_posture_prefix">Posture: %1$s</string>
 
     <!-- ══════════════════════════════════════════
          DECK DOCTOR — CUT &amp; ADD SUGGESTIONS
@@ -829,7 +915,6 @@
     <string name="deck_studio_suggestions_similar_decks_header">Decks like yours</string>
     <string name="deck_doctor_community_inclusion">%1$d%% of %2$s decks</string>
     <string name="deck_doctor_community_fills_gap">Fills a gap</string>
-    <string name="deck_doctor_community_color_match">%1$d%% color match</string>
     <string name="deck_doctor_community_view_decks_cd">View decks containing %1$s</string>
     <string name="deck_doctor_community_unavailable">Community data unavailable</string>
     <string name="deck_doctor_community_empty">No community data for this deck yet.</string>
@@ -876,6 +961,7 @@
     <string name="deck_studio_archetype_chip_action">Edit deck plan</string>
     <string name="deck_studio_archetype_low_confidence_hint">Set your deck\'s plan for better advice</string>
     <string name="deck_studio_archetype_sheet_title">Deck plan</string>
+    <string name="deck_studio_archetype_sheet_subtitle">Choose a strategy to get personalized advice</string>
     <string name="deck_studio_archetype_sheet_macro_label">Archetype</string>
     <string name="deck_studio_archetype_sheet_themes_label">Themes (up to 2)</string>
     <string name="deck_studio_archetype_auto_detect">Auto-detect</string>
@@ -1123,10 +1209,7 @@
          the wizard's own "Generating" stage copy above; same visual language, separate strings
          since this is the Suggestions tab's full-analysis pass, not a deck build. -->
     <string name="deck_doctor_stage_reading_deck_plan">Reading your deck plan…</string>
-    <string name="deck_doctor_stage_evaluating_collection">Evaluating your collection…</string>
     <string name="deck_doctor_stage_searching_community">Searching similar community decks…</string>
-    <string name="deck_doctor_stage_searching_card_pool">Searching card pool (exhaustive)…</string>
-    <string name="deck_doctor_stage_ranking_suggestions">Ranking suggestions…</string>
     <!-- Result -->
     <string name="deck_wizard_gaps_title">Couldn\'t fill from your collection</string>
     <string name="deck_wizard_gap_row_with_colors">Missing %1$d %2$s in %3$s</string>
@@ -2146,6 +2229,16 @@
     <string name="advsearch_filter_for_trade">Marked for trade</string>
     <string name="advsearch_section_tags">Tags</string>
     <string name="advsearch_tags_hint">Any card or user tag</string>
+    <string name="advsearch_section_function">Card function</string>
+    <string name="advsearch_function_hint">e.g. Ramp, Board Wipe, Recursion…</string>
+    <string name="advsearch_function_selected_count">%1$d functions selected</string>
+    <!-- Suggestions Tab UI Polish plan (W11, 2026-08-25): 2 new sections seeded ONLY from Deck
+         Analysis's "Browse for X" structured translation (SectionSearchQuery.toAdvancedQuery),
+         no manual picker exists for either, they render read-only chips + a single clear action. -->
+    <string name="advsearch_section_mana_production">Mana production</string>
+    <string name="advsearch_mana_production_colors">Lands producing: %1$s</string>
+    <string name="advsearch_mana_production_threshold">Produces %1$d+ colors</string>
+    <string name="advsearch_section_oracle_terms">Curated oracle match</string>
     <string name="collection_active_filters">%1$d active filter(s)</string>
     <string name="collection_clear_filters">Clear filters</string>
 
@@ -3189,7 +3282,7 @@
     <string name="quick_start_sheet_build_deck">Build deck</string>
     <string name="quick_start_sheet_draft_guide">Draft guide</string>
     <string name="quick_start_sheet_search_card">Search card</string>
-    <string name="quick_start_sheet_decks">Decks</string>
+    <string name="quick_start_sheet_decks">My decks</string>
     <string name="quick_start_sheet_news">News</string>
     <string name="quick_start_sheet_stats">Stats</string>
     <string name="quick_start_sheet_friends">Friends</string>

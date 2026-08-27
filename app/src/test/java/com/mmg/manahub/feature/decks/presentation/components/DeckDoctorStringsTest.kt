@@ -28,7 +28,10 @@ class DeckDoctorStringsTest {
         assertEquals("curve_shape_mismatch", Finding.CurveShapeMismatch(CurveShape.BELL).key)
         assertEquals("role_gap_removal", Finding.RoleGap(roleKey = "removal", label = "Removal", current = 3, min = 8).key)
         assertEquals("anti_role_over_max_board_wipe", Finding.AntiRoleOverMax(roleKey = "board_wipe", label = "Board wipes", current = 3, max = 1).key)
-        assertEquals("low_synergy_density", Finding.LowSynergyDensity(density = 0.2f).key)
+        assertEquals("self_defeating_graveyard_hate", Finding.SelfDefeatingGraveyardHate(graveyardHateCopies = 4).key)
+        assertEquals("orphan_producers_TOKENS", Finding.OrphanProducers(axis = "TOKENS", axisLabel = "Tokens", producerCopies = 12, producerIdeal = 10).key)
+        assertEquals("orphan_payoffs_TOKENS", Finding.OrphanPayoffs(axis = "TOKENS", axisLabel = "Tokens", payoffCopies = 8, payoffIdeal = 6).key)
+        assertEquals("stax_vs_own_engine", Finding.StaxVsOwnEngine(staxPieceCopies = 8, cardDrawCopies = 12, controlCardDrawIdeal = 10).key)
         assertEquals("deck_too_small", Finding.DeckTooSmall(current = 40, minimum = 100).key)
         assertEquals("too_many_copies_Sol Ring", Finding.TooManyCopies(cardName = "Sol Ring", copies = 2, maxCopies = 1).key)
         assertEquals("singleton_violation_Sol Ring", Finding.SingletonViolation(cardName = "Sol Ring", copies = 2).key)
@@ -63,7 +66,10 @@ class DeckDoctorStringsTest {
             Finding.CurveShapeMismatch(CurveShape.FRONT),
             Finding.RoleGap("removal", "Removal", 3, 8),
             Finding.AntiRoleOverMax("board_wipe", "Board wipes", 3, 1),
-            Finding.LowSynergyDensity(0.2f),
+            Finding.SelfDefeatingGraveyardHate(4),
+            Finding.OrphanProducers("TOKENS", "Tokens", 12, 10),
+            Finding.OrphanPayoffs("TOKENS", "Tokens", 8, 6),
+            Finding.StaxVsOwnEngine(8, 12, 10),
             Finding.DeckTooSmall(40, 100),
             Finding.TooManyCopies("Sol Ring", 2, 1),
             Finding.SingletonViolation("Sol Ring", 2),

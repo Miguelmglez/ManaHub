@@ -34,6 +34,7 @@ import com.mmg.manahub.core.ui.components.MagicCtaButton
 import com.mmg.manahub.core.ui.components.MagicCtaStyle
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
@@ -341,7 +342,7 @@ private fun TradeHistoryRow(
     val receivedCount = proposal.items.count { it.fromUserId == proposal.receiverId }
 
     Surface(
-        shape = SmallCardShape,
+        shape = CardShape,
         color = mc.surface,
         modifier = Modifier
             .fillMaxWidth()

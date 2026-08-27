@@ -149,7 +149,9 @@ object HarnessDoctorPipeline {
         val archetype = archetypeOverride?.let { name -> ArchetypeId.entries.firstOrNull { it.name == name } }
         val themes = themesOverride.mapNotNull { name -> ThemeId.entries.firstOrNull { it.name == name } }
         if (archetype == null && themes.isEmpty() && tribeOverride.isNullOrBlank()) return emptyList()
-        return DeckIdentitySeedTags.forArchetype(archetype ?: ArchetypeId.GENERIC, themes, tribeOverride)
+        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- forArchetype now takes a nullable
+        // archetype directly (null = no macro pin), no fallback coercion needed.
+        return DeckIdentitySeedTags.forArchetype(archetype, themes, tribeOverride)
     }
 
     /** Mirrors DeckDoctorOrchestrator.resolveArchetypeSkeleton EXACTLY. Public (not private) so
@@ -158,7 +160,7 @@ object HarnessDoctorPipeline {
     fun resolveArchetypeSkeleton(health: DeckHealth): ResolvedArchetypeSkeleton? {
         val archetypeFormat = ArchetypeFormat.of(health.profile.format) ?: return null
         val resolution = health.archetypeResolution
-        if (resolution.macro == ArchetypeId.GENERIC && resolution.themes.isEmpty()) return null
+        if (resolution.macro == null && resolution.themes.isEmpty()) return null
         return ArchetypeSkeletonResolver.resolveWithColor(
             format = archetypeFormat,
             archetype = resolution.macro,

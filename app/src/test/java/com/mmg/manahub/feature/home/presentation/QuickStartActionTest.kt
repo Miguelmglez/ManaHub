@@ -88,7 +88,7 @@ class QuickStartActionTest {
         assertEquals(
             listOf(
                 QuickStartAction.SCAN_CARD,
-                QuickStartAction.CREATE_DECK,
+                QuickStartAction.DECKS,
                 QuickStartAction.SEARCH_CARD,
                 QuickStartAction.STATS,
             ),

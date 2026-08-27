@@ -270,6 +270,7 @@ class CandidatePoolGenerator(
         com.mmg.manahub.core.model.DeckFormat.PAUPER -> "legal:pauper"
         // Casual and Draft/limited have no universal Scryfall legality token; omit the fragment.
         com.mmg.manahub.core.model.DeckFormat.CASUAL,
+        com.mmg.manahub.core.model.DeckFormat.COMMANDER_CASUAL,
         com.mmg.manahub.core.model.DeckFormat.DRAFT -> null
     }
 

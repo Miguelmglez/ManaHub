@@ -53,11 +53,12 @@ object StrategyPickerLogic {
      * [StrategyProfile]'s own contract).
      */
     fun selectArchetype(current: StrategyPickerSelection, archetype: ArchetypeId?): StrategyPickerSelection {
-        val effective = archetype ?: ArchetypeId.GENERIC
-        val survivingThemes = if (effective == ArchetypeId.GENERIC) {
+        // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- `null` is the sole
+        // "unpinned, compatible with every theme" state now.
+        val survivingThemes = if (archetype == null) {
             current.themes
         } else {
-            current.themes.filter { theme -> effective in StrategyCatalog.compatibleArchetypes(theme) }
+            current.themes.filter { theme -> archetype in StrategyCatalog.compatibleArchetypes(theme) }
         }
         val survivingTribe = if (ThemeId.TRIBAL in survivingThemes) current.tribe else null
         return current.copy(archetype = archetype, themes = survivingThemes, tribe = survivingTribe)
@@ -90,13 +91,14 @@ object StrategyPickerLogic {
     fun selectTribe(current: StrategyPickerSelection, tribe: String?): StrategyPickerSelection =
         current.copy(tribe = tribe?.takeIf { it.isNotBlank() })
 
-    /** Whether [theme] can be added to [selection] right now -- [ArchetypeId.GENERIC]/`null`
-     * accepts every theme (the neutral default restricts nothing); any other archetype requires
-     * [theme] to list it in [StrategyCatalog.compatibleArchetypes]. Drives the picker's
-     * "incompatible options render disabled" requirement (WS 1.2) -- never hidden, so this is a
-     * pure predicate the UI can query per-item without mutating state. */
+    /** Whether [theme] can be added to [selection] right now -- `null` (no archetype pin --
+     * Deck Analysis Engine v3 removed `ArchetypeId.GENERIC`) accepts every theme (the unpinned
+     * state restricts nothing); any real archetype requires [theme] to list it in
+     * [StrategyCatalog.compatibleArchetypes]. Drives the picker's "incompatible options render
+     * disabled" requirement (WS 1.2) -- never hidden, so this is a pure predicate the UI can query
+     * per-item without mutating state. */
     fun isThemeSelectable(selection: StrategyPickerSelection, theme: ThemeId): Boolean {
-        val effective = selection.archetype ?: ArchetypeId.GENERIC
-        return effective == ArchetypeId.GENERIC || effective in StrategyCatalog.compatibleArchetypes(theme)
+        val archetype = selection.archetype ?: return true
+        return archetype in StrategyCatalog.compatibleArchetypes(theme)
     }
 }

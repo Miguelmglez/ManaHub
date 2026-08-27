@@ -14,7 +14,6 @@ import com.mmg.manahub.core.model.DeckFormat
 data class SixtyFormatProfile(
     val landsDelta: Int = 0,          // shifts min/ideal/max together
     val curveDelta: Double = 0.0,     // shifts the CurveBand
-    val roleBandScale: Double = 1.0,  // reserved; UNUSED this wave -- do not apply it in the resolver
 ) {
     companion object {
         /**
@@ -32,8 +31,13 @@ data class SixtyFormatProfile(
          * they are internally consistent with the draftsim.com baseline and not contradicted by
          * anything found). +2 lands / +0.3 avg-CMC is a deliberate BLANKET shift applied across
          * every archetype (not derived from a per-archetype published source) -- same WS5
-         * judgment-call discipline Wave 1 used for its weights/cap. `roleBandScale` is
-         * intentionally left at 1.0 / unused this wave -- see class KDoc.
+         * judgment-call discipline Wave 1 used for its weights/cap.
+         *
+         * Deck Analysis Engine v3, Phase 3 (2026-08-26): the dead `roleBandScale` field (declared,
+         * never applied by [ArchetypeSkeletonResolver]) was REMOVED rather than wired -- deriving a
+         * real per-format role-band scale factor would be a genuine new calibration exercise (no
+         * existing citation covers it), out of this phase's scope; leaving it declared-but-unused
+         * was flagged as a trap for the next reader, so it is gone rather than left in place.
          */
         val STANDARD = SixtyFormatProfile(landsDelta = 2, curveDelta = 0.3)
 

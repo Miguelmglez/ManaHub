@@ -133,7 +133,6 @@ fun CollectionScreen(
     onCardClick:              (scryfallId: String, sharedTransitionKey: String?) -> Unit,
     onAddCardClick:           () -> Unit,
     onDeckClick:              (deckId: String) -> Unit,
-    onCreateDeck:             () -> Unit = {},
     onPlaytestClick:          (deckId: String) -> Unit = {},
     onBrowseCommunityDecks:   () -> Unit = {},
     onNavigateToTradeProposal: (receiverId: String) -> Unit = {},
@@ -178,7 +177,6 @@ fun CollectionScreen(
             viewModel.onTabSelected(CollectionTab.DECKS)
             onDeckClick(id)
         },
-        onCreateDeck          = onCreateDeck,
         onPlaytestClick       = onPlaytestClick,
         onBrowseCommunityDecks = onBrowseCommunityDecks,
         onViewModeToggle      = viewModel::onViewModeToggle,
@@ -223,7 +221,6 @@ private fun CollectionContent(
     onCardClick:          (String, String?) -> Unit,
     onAddCardClick:       () -> Unit,
     onDeckClick:          (String) -> Unit,
-    onCreateDeck:         () -> Unit = {},
     onPlaytestClick:      (String) -> Unit = {},
     onBrowseCommunityDecks: () -> Unit = {},
     onViewModeToggle:     () -> Unit,
@@ -348,7 +345,6 @@ private fun CollectionContent(
                     )
                     CollectionTab.DECKS   -> DeckListScreen(
                         onDeckClick     = onDeckClick,
-                        onCreateDeck    = onCreateDeck,
                         onPlaytestClick = onPlaytestClick,
                         onBrowseCommunityDecks = onBrowseCommunityDecks,
                     )

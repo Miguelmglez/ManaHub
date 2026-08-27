@@ -323,6 +323,7 @@ fun CardDetailScreen(
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
+                manaCost = card.manaCost,
                 initialFoil = editingEntry?.userCard?.isFoil ?: false,
                 initialCondition = editingEntry?.userCard?.condition ?: "NM",
                 initialLanguage = editingEntry?.userCard?.language ?: card.lang,
@@ -357,6 +358,7 @@ fun CardDetailScreen(
                 setCode = card.setCode,
                 setName = card.setName,
                 rarity = card.rarity,
+                manaCost = card.manaCost,
                 initialFoil = editingWishlistEntry?.isFoil ?: false,
                 initialCondition = editingWishlistEntry?.condition ?: "NM",
                 initialLanguage = editingWishlistEntry?.language ?: card.lang,
@@ -677,7 +679,7 @@ private fun CardDetailContent(
                                         key = sharedTransitionKey ?: "card-image-${card.scryfallId}"
                                     ),
                                     animatedVisibilityScope = animatedVisibilityScope,
-                                    clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
+                                    clipInOverlayDuringTransition = OverlayClip(CardShape),
                                     boundsTransform = sharedBoundsTransform,
                                     renderInOverlayDuringTransition = true,
                                 )
@@ -1798,6 +1800,9 @@ private fun LegalitySection(card: Card) {
             stringResource(R.string.format_standard) to card.legalityStandard,
             stringResource(R.string.format_pioneer) to card.legalityPioneer,
             stringResource(R.string.format_modern) to card.legalityModern,
+            stringResource(R.string.format_legacy) to card.legalityLegacy,
+            stringResource(R.string.format_vintage) to card.legalityVintage,
+            stringResource(R.string.format_pauper) to card.legalityPauper,
             stringResource(R.string.format_commander) to card.legalityCommander,
         )
         FlowRow(

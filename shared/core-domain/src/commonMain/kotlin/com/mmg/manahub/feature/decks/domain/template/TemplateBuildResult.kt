@@ -82,11 +82,13 @@ data class TemplateBuildResult(
     val report: List<CategoryFill>,
     val templateSource: TemplateSource,
     val archetypeInfo: DeckTemplateArchetypeInfo,
-    /** Raw `ArchetypeId.name` -- write straight onto `Deck.archetypeOverride` (CLAUDE.md: never
-     * `.valueOf()`, always the raw enum-name string; mirrors `DeckDoctorOrchestrator`'s own
-     * `archetypeId?.name` precedent) so `EvaluateDeckUseCase` evaluates against the SAME skeleton
-     * this build just filled against (plan §3.3 "Builder<->Doctor coherence"). */
-    val archetypeOverride: String,
+    /** Raw `ArchetypeId.name`, or `null` for no macro pin -- write straight onto
+     * `Deck.archetypeOverride` (CLAUDE.md: never `.valueOf()`, always the raw enum-name string;
+     * mirrors `DeckDoctorOrchestrator`'s own `archetypeId?.name` precedent) so
+     * `EvaluateDeckUseCase` evaluates against the SAME skeleton this build just filled against
+     * (plan §3.3 "Builder<->Doctor coherence"). Deck Analysis Engine v3 removed
+     * `ArchetypeId.GENERIC` -- `null` is the new "no macro pin" value. */
+    val archetypeOverride: String?,
     val themesOverride: List<String>,
     /** D9: Casual/60-card recommends <=2 colors; true when the wizard's chosen color count is 3+. */
     val colorConsistencyWarning: Boolean,

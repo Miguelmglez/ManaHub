@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,15 +20,18 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,11 +41,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.ui.components.MagicSelectionItem
 import com.mmg.manahub.core.ui.theme.CardShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.magicColors
@@ -81,32 +90,73 @@ fun StrategyPlanChip(
     onClick: () -> Unit,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
-    val qualifiedName = stringResource(
-        if (strategy.isManualOverride) R.string.deck_curated_strategy_picker_chip_manual
-        else R.string.deck_curated_strategy_picker_chip_detected,
-        strategy.displayName,
-    )
-    Row(
-        modifier = Modifier
-            .sizeIn(minHeight = 48.dp)
-            .background(mc.surfaceVariant, ChipShape)
-            .clickable(onClickLabel = stringResource(R.string.deck_studio_archetype_chip_action)) { onClick() }
-            .padding(horizontal = spacing.md, vertical = spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+    
+    Surface(
+        onClick = onClick,
+        shape = CardShape,
+        color = mc.backgroundSecondary,
+        border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f)),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Icon(
-            imageVector = if (strategy.isManualOverride) Icons.Default.Person else Icons.Default.AutoAwesome,
-            contentDescription = null,
-            tint = mc.primaryAccent,
-            modifier = Modifier.sizeIn(maxWidth = 18.dp, maxHeight = 18.dp),
-        )
-        Text(
-            text = stringResource(R.string.deck_studio_archetype_chip_prefix, qualifiedName),
-            style = MaterialTheme.magicTypography.labelLarge,
-            color = mc.textPrimary,
-        )
+        Box(
+            modifier = Modifier.background(
+                Brush.verticalGradient(
+                    listOf(mc.primaryAccent.copy(alpha = 0.12f), mc.backgroundSecondary)
+                )
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(spacing.md)
+                    .heightIn(min = 60.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.md),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(mc.primaryAccent.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (strategy.isManualOverride) Icons.Default.Person else Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = mc.primaryAccent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "DECK STRATEGY",
+                        style = ty.labelSmall.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp),
+                        color = mc.primaryAccent,
+                    )
+                    Text(
+                        text = strategy.displayName,
+                        style = ty.titleMedium.copy(fontWeight = FontWeight.Black),
+                        color = mc.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (strategy.isManualOverride) mc.goldMtg.copy(alpha = 0.15f) else mc.lifePositive.copy(alpha = 0.15f),
+                ) {
+                    Text(
+                        text = (if (strategy.isManualOverride) "MANUAL" else "AUTO").uppercase(),
+                        style = ty.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = if (strategy.isManualOverride) mc.goldMtg else mc.lifePositive,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -115,15 +165,33 @@ fun StrategyPlanChip(
 @Composable
 fun StrategyPlanHint(onClick: () -> Unit) {
     val mc = MaterialTheme.magicColors
-    Text(
-        text = stringResource(R.string.deck_studio_archetype_low_confidence_hint),
-        style = MaterialTheme.magicTypography.bodySmall,
-        color = mc.textSecondary,
-        modifier = Modifier
-            .sizeIn(minHeight = 48.dp)
-            .clickable(onClickLabel = stringResource(R.string.deck_studio_archetype_chip_action)) { onClick() }
-            .padding(vertical = MaterialTheme.spacing.xs),
-    )
+    val ty = MaterialTheme.magicTypography
+    val spacing = MaterialTheme.spacing
+    Surface(
+        onClick = onClick,
+        shape = ChipShape,
+        color = mc.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, mc.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = spacing.md, vertical = spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = mc.textSecondary,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = stringResource(R.string.deck_studio_archetype_low_confidence_hint),
+                style = ty.labelMedium,
+                color = mc.textSecondary,
+            )
+        }
+    }
 }
 
 /**
@@ -167,6 +235,7 @@ fun CuratedStrategyPickerSheet(
     currentStrategyName: String? = null,
 ) {
     val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
     var query by remember { mutableStateOf("") }
     var tribePending by remember { mutableStateOf<CuratedStrategy?>(null) }
@@ -183,20 +252,43 @@ fun CuratedStrategyPickerSheet(
     val themedPresets = filtered.filter { it.themes.isNotEmpty() }
 
     Column(modifier.fillMaxSize().padding(horizontal = spacing.lg, vertical = spacing.md)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = mc.textSecondary
+                )
+            }
+            Text(
+                text = stringResource(R.string.deck_studio_archetype_sheet_title),
+                style = ty.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                color = mc.textPrimary,
+            )
+        }
         Text(
-            text = stringResource(R.string.deck_studio_archetype_sheet_title),
-            style = MaterialTheme.magicTypography.titleMedium,
-            color = mc.textPrimary,
+            text = stringResource(R.string.deck_studio_archetype_sheet_subtitle),
+            style = ty.bodySmall,
+            color = mc.textSecondary,
         )
-        Spacer(Modifier.height(spacing.sm))
+        Spacer(Modifier.height(spacing.md))
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text(stringResource(R.string.deck_curated_strategy_picker_search_placeholder)) },
+            placeholder = { Text(stringResource(R.string.deck_curated_strategy_picker_search_placeholder), style = ty.bodyMedium) },
             singleLine = true,
-            // Review fix (P2 #8): trailing clear ("x") action once there's a query to clear —
-            // mirrors the same pattern already used by the Inspirations search field
-            // (DeckStudioScreen.kt, `deck_studio_inspirations_search_clear`).
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = mc.primaryAccent,
+                unfocusedBorderColor = mc.surfaceVariant,
+                focusedContainerColor = mc.backgroundSecondary,
+                unfocusedContainerColor = mc.backgroundSecondary,
+            ),
             trailingIcon = if (query.isNotEmpty()) {
                 {
                     IconButton(onClick = { query = "" }, modifier = Modifier.size(48.dp)) {
@@ -208,13 +300,14 @@ fun CuratedStrategyPickerSheet(
                     }
                 }
             } else null,
-            modifier = Modifier.fillMaxWidth().sizeIn(minHeight = 48.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            shape = ChipShape,
         )
-        Spacer(Modifier.height(spacing.sm))
+        Spacer(Modifier.height(spacing.md))
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = spacing.xs),
+            contentPadding = PaddingValues(bottom = spacing.xl),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             val pending = tribePending
@@ -232,9 +325,28 @@ fun CuratedStrategyPickerSheet(
                 }
             } else {
                 item(key = "auto_detect") {
-                    AutoDetectRow(
-                        currentStrategyName = currentStrategyName,
-                        onClick = { onAutoDetect(); onDismiss() },
+                    val desc = if (currentStrategyName != null) {
+                        stringResource(R.string.deck_curated_strategy_picker_auto_detect_hint_current, currentStrategyName)
+                    } else {
+                        stringResource(R.string.deck_curated_strategy_picker_auto_detect_hint_manual)
+                    }
+                    MagicSelectionItem(
+                        title = stringResource(R.string.deck_studio_archetype_auto_detect),
+                        description = desc,
+                        isSelected = selectedStrategyId == null,
+                        accentColor = mc.primaryAccent,
+                        icon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(mc.primaryAccent.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent)
+                            }
+                        },
+                        onClick = { onAutoDetect(); onDismiss() }
                     )
                 }
                 if (corePlans.isNotEmpty()) {
@@ -242,13 +354,15 @@ fun CuratedStrategyPickerSheet(
                         PickerSectionHeader(stringResource(R.string.deck_curated_strategy_picker_core_plans_header))
                     }
                     items(corePlans, key = { "core_${it.id}" }) { entry ->
-                        CuratedStrategyRow(
-                            strategy = entry,
-                            selected = entry.id == selectedStrategyId,
+                        MagicSelectionItem(
+                            title = entry.displayName,
+                            description = entry.description,
+                            isSelected = entry.id == selectedStrategyId,
+                            accentColor = mc.primaryAccent,
                             onClick = {
                                 if (entry.requiresTribe) tribePending = entry
                                 else { onApply(entry, null); onDismiss() }
-                            },
+                            }
                         )
                     }
                 }
@@ -257,13 +371,15 @@ fun CuratedStrategyPickerSheet(
                         PickerSectionHeader(stringResource(R.string.deck_curated_strategy_picker_themed_header))
                     }
                     items(themedPresets, key = { "themed_${it.id}" }) { entry ->
-                        CuratedStrategyRow(
-                            strategy = entry,
-                            selected = entry.id == selectedStrategyId,
+                        MagicSelectionItem(
+                            title = entry.displayName,
+                            description = entry.description,
+                            isSelected = entry.id == selectedStrategyId,
+                            accentColor = mc.primaryAccent,
                             onClick = {
                                 if (entry.requiresTribe) tribePending = entry
                                 else { onApply(entry, null); onDismiss() }
-                            },
+                            }
                         )
                     }
                 }
@@ -271,7 +387,7 @@ fun CuratedStrategyPickerSheet(
                     item(key = "no_results") {
                         Text(
                             text = stringResource(R.string.deck_curated_strategy_picker_no_results),
-                            style = MaterialTheme.magicTypography.bodySmall,
+                            style = ty.bodySmall,
                             color = mc.textSecondary,
                         )
                     }
@@ -291,88 +407,7 @@ private fun PickerSectionHeader(title: String) {
     )
 }
 
-/** "Auto-detect" — a permanent first row (not filtered by search), mirrors the retired
- * `ArchetypePlanSheetContent`'s OutlinedButton but as a full-width list row for a flat-list layout.
- * Review fix (P1 #4): a second hint line under the label now actually surfaces
- * `deck_curated_strategy_picker_auto_detect_hint_current`/`..._hint_manual` (previously declared
- * in `strings.xml` but never referenced by any composable) — "Currently: X" once a strategy has
- * resolved, else the static "let ManaHub pick" explainer. */
-@Composable
-private fun AutoDetectRow(currentStrategyName: String?, onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val spacing = MaterialTheme.spacing
-    Surface(
-        onClick = onClick,
-        shape = CardShape,
-        color = mc.primaryAccent.copy(alpha = 0.10f),
-        border = BorderStroke(1.dp, mc.primaryAccent.copy(alpha = 0.4f)),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(spacing.md).heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = mc.primaryAccent)
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.xxs)) {
-                Text(
-                    text = stringResource(R.string.deck_studio_archetype_auto_detect),
-                    style = MaterialTheme.magicTypography.bodyLarge,
-                    color = mc.primaryAccent,
-                )
-                Text(
-                    text = if (currentStrategyName != null) {
-                        stringResource(R.string.deck_curated_strategy_picker_auto_detect_hint_current, currentStrategyName)
-                    } else {
-                        stringResource(R.string.deck_curated_strategy_picker_auto_detect_hint_manual)
-                    },
-                    style = MaterialTheme.magicTypography.bodySmall,
-                    color = mc.textSecondary,
-                )
-            }
-        }
-    }
-}
-
-/** One curated-strategy row: name + description, a checkmark when [selected]. Every strategy is
- * always tappable (D2's catalog is pre-validated — unlike the wizard's 3-axis picker, there is no
- * "disabled, incompatible" state to render here). */
-@Composable
-private fun CuratedStrategyRow(strategy: CuratedStrategy, selected: Boolean, onClick: () -> Unit) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    Surface(
-        onClick = onClick,
-        shape = CardShape,
-        color = if (selected) mc.primaryAccent.copy(alpha = 0.12f) else mc.surface,
-        border = BorderStroke(1.dp, if (selected) mc.primaryAccent else mc.surfaceVariant),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(spacing.md).heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.xxs)) {
-                Text(strategy.displayName, style = ty.bodyLarge, color = if (selected) mc.primaryAccent else mc.textPrimary)
-                // Review fix (P2 #7): bound the description so a long entry (28 catalog strategies,
-                // varying copy length) can't grow the row unbounded.
-                Text(
-                    strategy.description,
-                    style = ty.bodySmall,
-                    color = mc.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (selected) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = mc.primaryAccent)
-            }
-        }
-    }
-}
+// AutoDetectRow and CuratedStrategyRow were replaced by MagicSelectionItem
 
 /** The inline "now pick a tribe for <Strategy>" step shown after tapping a `requiresTribe`
  * strategy (plan §3.4 item 1's "tribe sub-picker shown when the selected entry has

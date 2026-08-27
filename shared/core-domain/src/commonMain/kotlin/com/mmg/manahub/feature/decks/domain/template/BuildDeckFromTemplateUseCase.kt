@@ -257,7 +257,7 @@ class BuildDeckFromTemplateUseCase(
             crashReporter?.log("deck_builder_v2_gap_declared")
             crashReporter?.setCustomKey("deck_builder_v2_gap_count", trueShortfall.toString())
             crashReporter?.setCustomKey("deck_builder_v2_gap_format", spec.format.name)
-            crashReporter?.setCustomKey("deck_builder_v2_gap_archetype", template.archetypeInfo.archetype.name)
+            crashReporter?.setCustomKey("deck_builder_v2_gap_archetype", template.archetypeInfo.archetype?.name ?: "none")
             // Workstream 4.2: fill_source breakdown -- how many nonland copies each source placed
             // BEFORE this gap was declared, so post-release we can see where fills actually come
             // from (and how often the Scryfall backstop was even reachable).
@@ -273,7 +273,7 @@ class BuildDeckFromTemplateUseCase(
             report = report,
             templateSource = template.source,
             archetypeInfo = template.archetypeInfo,
-            archetypeOverride = template.archetypeInfo.archetype.name,
+            archetypeOverride = template.archetypeInfo.archetype?.name,
             themesOverride = template.archetypeInfo.themes.map { it.name },
             colorConsistencyWarning = spec.format.isSixtyCardConstructed &&
                 template.colorIdentity.count { it != ManaColor.C } > COLOR_DISCIPLINE_LIMIT,
@@ -301,7 +301,7 @@ class BuildDeckFromTemplateUseCase(
             DeckFormat.VINTAGE -> ok(card.legalityVintage)
             DeckFormat.PAUPER -> ok(card.legalityPauper)
             DeckFormat.COMMANDER -> ok(card.legalityCommander)
-            DeckFormat.CASUAL, DeckFormat.DRAFT -> true
+            DeckFormat.CASUAL, DeckFormat.DRAFT, DeckFormat.COMMANDER_CASUAL -> true
         }
     }
 
@@ -506,14 +506,15 @@ class BuildDeckFromTemplateUseCase(
      * Resolves the archetype/theme skeleton Motor A's theme-role gap bonus scores against, mirroring
      * [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator.resolveArchetypeSkeleton]
      * EXACTLY (same inputs: format, resolved macro/themes, color count). Returns `null` for the
-     * GENERIC-with-no-themes / no-archetype-skeleton (Draft) cases -- Motor A then scores purely off
-     * its own base ranking plus the pip multiplier, with zero theme bonus.
+     * no-macro-pin-with-no-themes / no-archetype-skeleton (Draft) cases -- Motor A then scores
+     * purely off its own base ranking plus the pip multiplier, with zero theme bonus. Deck
+     * Analysis Engine v3 removed `ArchetypeId.GENERIC` -- `archetype == null` is the new signal.
      */
     private fun resolveArchetypeSkeleton(template: DeckTemplate, profile: DeckProfile): ResolvedArchetypeSkeleton? {
         val archetypeFormat = ArchetypeFormat.of(profile.format) ?: return null
         val archetype = template.archetypeInfo.archetype
         val themes = template.archetypeInfo.themes
-        if (archetype == ArchetypeId.GENERIC && themes.isEmpty()) return null
+        if (archetype == null && themes.isEmpty()) return null
         return ArchetypeSkeletonResolver.resolveWithColor(
             format = archetypeFormat,
             archetype = archetype,

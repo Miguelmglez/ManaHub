@@ -45,9 +45,18 @@ import com.mmg.manahub.core.model.DeckFormat
  * @property description player-facing 1-3 sentence game-plan copy -- reuses [StrategyCatalog]'s
  *           existing archetype/theme copy verbatim (plan §3.2: "reuse StrategyCatalog copy where
  *           it exists") rather than inventing new prose.
- * @property archetype the internal composition's macro archetype -- resolves via
- *           [ArchetypeSkeletonResolver] exactly like a manual archetype+theme pin does today.
- * @property themes 0..2 themes (mirrors [StrategyCatalog.MAX_THEMES]) layered on [archetype].
+ * @property archetypes Deck Analysis Engine v3 (spec §4.2) -- the SET of macro archetypes this
+ *           strategy is compatible with, DOWN from a single `archetype` field. Today 11+ of the 23
+ *           themed entries hardcoded `archetype = MIDRANGE`, which was the third layer reinforcing
+ *           the MIDRANGE bias the v3 spec exists to kill ("Tokens is not Midrange -- it works in
+ *           Aggro, Midrange and Combo"). [nearestFor]'s exact-match step now checks SET membership
+ *           (`archetype in it.archetypes`) rather than equality.
+ * @property postures Deck Analysis Engine v3 (spec §3, NEW) -- the ex-macros (`RAMP`/`TEMPO`) and
+ *           ex-themes (`ATTRITION`/`TOOLBOX`/`VOLTRON`/`GROUP_HUG`/`GROUP_SLUG`) that moved to
+ *           [PostureId] still need a curated entry (a player still wants to pick "Big Mana"/
+ *           "Voltron" from the picker) -- this is that entry's posture identity. Empty for every
+ *           entry that is a pure archetype/theme composition with no posture involved.
+ * @property themes 0..2 themes (mirrors [StrategyCatalog.MAX_THEMES]) layered on [archetypes].
  * @property requiresTribe `true` only for the Tribal entry -- mirrors
  *           [ThemeCatalogEntry.requiresTribe]; the (future) picker must collect a concrete
  *           creature type before this strategy resolves to a complete skeleton.
@@ -56,15 +65,14 @@ import com.mmg.manahub.core.model.DeckFormat
  *           this property below for the full per-`DeckFormat` design contract). Most entries are
  *           at least Commander + Casual; a subset is Commander-only either because the underlying
  *           theme is structurally Commander-only ([ArchetypeData.THEMES]'s `commanderOnly` flag --
- *           Group Hug/Group Slug/Clones & Theft) or because this v1 catalog deliberately curates it
- *           that way even though the theme itself has a valid 60-card resolution (Voltron -- see
- *           the curation study for the rationale).
+ *           Clones & Theft) or a deliberate v1 curation choice.
  */
 data class CuratedStrategy(
     val id: String,
     val displayName: String,
     val description: String,
-    val archetype: ArchetypeId,
+    val archetypes: Set<ArchetypeId>,
+    val postures: Set<PostureId> = emptySet(),
     val themes: List<ThemeId>,
     val requiresTribe: Boolean = false,
     val formats: Set<DeckFormat>,
@@ -114,8 +122,15 @@ object CuratedStrategyCatalog {
      * Version handle for this data table (plan §3.3: "so a future remote-config/JSON delivery
      * has a version handle" -- remote delivery itself is explicitly NOT built in this phase).
      * Bump whenever [ALL] changes (an entry added/removed/re-pointed to a different composition).
+     *
+     * v2 (Deck Analysis Engine v3, spec §4.2): [CuratedStrategy.archetype] widened to
+     * [CuratedStrategy.archetypes] (a set); the "balanced"/GENERIC entry removed (`ArchetypeId
+     * .GENERIC` no longer exists -- an unpinned/ambiguous deck now reads "Custom" with no catalog
+     * entry, per spec §2.1); RAMP/TEMPO/VOLTRON/TOOLBOX/GROUP_HUG/GROUP_SLUG entries re-pointed
+     * onto [CuratedStrategy.postures]; STAX re-pointed onto the new `ArchetypeId.PRISON` macro;
+     * `mill` retargeted onto `ThemeId.MILL_OPPONENT`.
      */
-    const val CATALOG_VERSION: Int = 1
+    const val CATALOG_VERSION: Int = 2
 
     // ── DeckFormat sets (Wave 2 B1 -- replaces the old ArchetypeFormat-keyed BOTH_FORMATS/
     //    COMMANDER_ONLY pair). Draft is deliberately never listed in ANY of these -- it is handled
@@ -149,33 +164,15 @@ object CuratedStrategyCatalog {
      */
     val ALL: List<CuratedStrategy> = listOf(
         // ── Pure archetypes (both formats) ──────────────────────────────────────────────────
-        // The neutral "no specific plan" default -- resolves via ArchetypeSkeletonResolver's own
-        // GENERIC base band (every resolve() starts from GENERIC before archetype/theme overrides
-        // apply), so no new engine data is introduced. Closes Wave 1 open question 3 (plan
-        // docs/plans/deck-analysis-engine-v2-plan.md): previously GENERIC had no catalog entry and
-        // nearestFor() fell through to null ("Custom"), a confusing default for a brand-new,
-        // never-pinned deck.
-        CuratedStrategy(
-            id = "balanced",
-            displayName = "Balanced",
-            description = StrategyCatalog.description(ArchetypeId.GENERIC),
-            archetype = ArchetypeId.GENERIC,
-            themes = emptyList(),
-            // Included in Standard v1 as a judgment call, not a meta-driven pick (Wave 2 Appendix
-            // A): this entry is the neutral "no specific plan" default every format needs -- the
-            // SAME rationale that earned it a catalog entry at all (A3, closing Wave 1 open
-            // question 3). Excluding it from Standard would leave a real gap: `nearestFor` already
-            // resolves a fresh/unpinned Standard deck onto this entry for DISPLAY (the header chip
-            // reads "Plan: Balanced (detected)") regardless of `formats` -- omitting STANDARD here
-            // would make that same strategy unpickable from the Standard picker, a display/picker
-            // mismatch. Mirrors CASUAL's own permissive-by-default philosophy.
-            formats = COMMANDER_CASUAL_STANDARD,
-        ),
+        // "balanced"/GENERIC REMOVED (Deck Analysis Engine v3): ArchetypeId.GENERIC no longer
+        // exists -- an unpinned/ambiguous deck now reads "Custom" (or a hybrid label) directly off
+        // AnalysisEngine.evaluate's own displayName fallback, per spec §2.1 ("never silently
+        // coerce"), with no catalog entry standing in for it.
         CuratedStrategy(
             id = "aggro",
             displayName = ArchetypeId.AGGRO.displayName,
             description = StrategyCatalog.description(ArchetypeId.AGGRO),
-            archetype = ArchetypeId.AGGRO,
+            archetypes = setOf(ArchetypeId.AGGRO),
             themes = emptyList(),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -183,7 +180,7 @@ object CuratedStrategyCatalog {
             id = "midrange",
             displayName = ArchetypeId.MIDRANGE.displayName,
             description = StrategyCatalog.description(ArchetypeId.MIDRANGE),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.MIDRANGE),
             themes = emptyList(),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -191,15 +188,19 @@ object CuratedStrategyCatalog {
             id = "control",
             displayName = ArchetypeId.CONTROL.displayName,
             description = StrategyCatalog.description(ArchetypeId.CONTROL),
-            archetype = ArchetypeId.CONTROL,
+            archetypes = setOf(ArchetypeId.CONTROL),
             themes = emptyList(),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
+        // TEMPO moved to PostureId (spec §2/§3) -- no longer its own macro. Kept as a curated
+        // pick via `postures`, matching against the two macros a tempo shell most naturally
+        // overlays (an aggressive or a controlling shell, per its own "aggro-control" identity).
         CuratedStrategy(
             id = "tempo",
-            displayName = ArchetypeId.TEMPO.displayName,
-            description = StrategyCatalog.description(ArchetypeId.TEMPO),
-            archetype = ArchetypeId.TEMPO,
+            displayName = PostureId.TEMPO.displayName,
+            description = "Efficient threats backed by protection and disruption -- keep the initiative and never let go.",
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.CONTROL),
+            postures = setOf(PostureId.TEMPO),
             themes = emptyList(),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -207,32 +208,47 @@ object CuratedStrategyCatalog {
             id = "combo",
             displayName = ArchetypeId.COMBO.displayName,
             description = StrategyCatalog.description(ArchetypeId.COMBO),
-            archetype = ArchetypeId.COMBO,
+            archetypes = setOf(ArchetypeId.COMBO),
             themes = emptyList(),
             // Excluded from Standard v1 (plan-proposed exclusion, confirmed by the meta check --
             // no dedicated "pure combo" archetype cracked the current top-10 Standard breakdown;
             // see Appendix A).
             formats = COMMANDER_CASUAL,
         ),
-        // Plan §3.2 names this "Big Mana" (a friendlier player-facing label than the internal
-        // RAMP archetype id) -- description still reuses RAMP's own StrategyCatalog copy
-        // verbatim, which already reads as a "big mana" game plan ("cast big, powerful spells
-        // early").
+        // Deck Analysis Engine v3 (spec §2.2, NEW macro): a stax skeleton wants its own BASE bands
+        // (3-5 finishers, 3-7 card draw), not an overlay on top of another archetype.
+        CuratedStrategy(
+            id = "prison",
+            displayName = ArchetypeId.PRISON.displayName,
+            description = "Slow the whole table down with resource-denial lock pieces -- taxes, resets, and asymmetric restrictions, then close with a lean finisher suite.",
+            archetypes = setOf(ArchetypeId.PRISON),
+            themes = emptyList(),
+            // Excluded from Standard v1 (mirrors the old STAX theme's own Standard exclusion --
+            // no dedicated prison/stax shell in the current top-10 Standard breakdown).
+            formats = COMMANDER_CASUAL,
+        ),
+        // Plan §3.2 named this "Big Mana" -- description reuses the RETIRED RAMP archetype's old
+        // StrategyCatalog copy verbatim (still reads correctly as a "big mana" game plan). RAMP
+        // moved to PostureId (spec §2/§3: "ramp into threats = Midrange, into a combo = Combo,
+        // into inevitability = Control") -- matches the 3 macros the posture naturally overlays.
         CuratedStrategy(
             id = "big_mana",
             displayName = "Big Mana",
-            description = StrategyCatalog.description(ArchetypeId.RAMP),
-            archetype = ArchetypeId.RAMP,
+            description = "Accelerate your mana ahead of schedule to cast big, powerful spells early.",
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO),
+            postures = setOf(PostureId.RAMP),
             themes = emptyList(),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
 
-        // ── Themed presets (composition = catalog defaultArchetype + theme unless noted) ─────
+        // ── Themed presets (composition = compatible archetypes + theme unless noted) ────────
+        // Deck Analysis Engine v3 (spec §4.2's own worked example): "Tokens is not Midrange -- it
+        // works in Aggro (go-wide), Midrange and Combo" -- widened from the old MIDRANGE-only entry.
         CuratedStrategy(
             id = "tokens",
             displayName = ThemeId.TOKENS.displayName,
             description = StrategyCatalog.description(ThemeId.TOKENS),
-            archetype = ArchetypeId.AGGRO,
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE, ArchetypeId.COMBO),
             themes = listOf(ThemeId.TOKENS),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -240,38 +256,41 @@ object CuratedStrategyCatalog {
             id = "aristocrats",
             displayName = ThemeId.ARISTOCRATS.displayName,
             description = StrategyCatalog.description(ThemeId.ARISTOCRATS),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE, ArchetypeId.COMBO),
             themes = listOf(ThemeId.ARISTOCRATS),
             // Excluded from Standard v1 (plan-proposed exclusion; not a distinct top-10 Standard
             // archetype at authoring time -- see Appendix A).
             formats = COMMANDER_CASUAL,
         ),
+        // TEMPO moved to PostureId -- SPELLSLINGER's compatible-archetype set widens to the 3
+        // remaining macros a spellslinger shell commonly overlays (mirrors StrategyCatalog's own
+        // THEME_CATALOG[SPELLSLINGER].compatibleArchetypes minus the now-retired TEMPO entry).
         CuratedStrategy(
             id = "spellslinger",
             displayName = ThemeId.SPELLSLINGER.displayName,
             description = StrategyCatalog.description(ThemeId.SPELLSLINGER),
-            archetype = ArchetypeId.TEMPO,
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.CONTROL, ArchetypeId.COMBO),
             themes = listOf(ThemeId.SPELLSLINGER),
             // Confirmed Standard-meta-relevant by the Wave 2 B1 meta check: Izzet Prowess +
             // Izzet Spellementals combined ~17% of the current Standard field (see Appendix A).
             formats = COMMANDER_CASUAL_STANDARD,
         ),
-        // Commander-only in v1 by deliberate curation choice, NOT because the theme itself is
-        // data-locked (ArchetypeData.THEMES[VOLTRON].commanderOnly is false -- a 60-card Voltron
-        // resolution exists). See the curation study for the rationale.
+        // VOLTRON moved to PostureId (spec §4.1) -- no longer a theme. Commander-only in v1 by
+        // deliberate curation choice (unchanged from the prior pass's own rationale).
         CuratedStrategy(
             id = "voltron",
-            displayName = ThemeId.VOLTRON.displayName,
-            description = StrategyCatalog.description(ThemeId.VOLTRON),
-            archetype = ArchetypeId.AGGRO,
-            themes = listOf(ThemeId.VOLTRON),
+            displayName = PostureId.VOLTRON.displayName,
+            description = "Stack auras, equipment, and buffs onto a single evasive threat and win through commander damage or raw power.",
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
+            postures = setOf(PostureId.VOLTRON),
+            themes = emptyList(),
             formats = COMMANDER_ONLY,
         ),
         CuratedStrategy(
             id = "reanimator",
             displayName = ThemeId.REANIMATOR.displayName,
             description = StrategyCatalog.description(ThemeId.REANIMATOR),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO),
             themes = listOf(ThemeId.REANIMATOR),
             // DEVIATION from the plan's proposed Standard v1 exclusion list, WITH rationale (Wave
             // 2 B1 meta check): the plan proposed excluding Reanimator as "not meta-real ... at
@@ -282,21 +301,15 @@ object CuratedStrategyCatalog {
             // genuinely meta right now, include it"). See Appendix A.
             formats = COMMANDER_CASUAL_STANDARD,
         ),
-        CuratedStrategy(
-            id = "stax",
-            displayName = ThemeId.STAX.displayName,
-            description = StrategyCatalog.description(ThemeId.STAX),
-            archetype = ArchetypeId.CONTROL,
-            themes = listOf(ThemeId.STAX),
-            // Excluded from Standard v1 (plan-proposed exclusion, confirmed by the meta check --
-            // no dedicated Stax shell in the current top-10 Standard breakdown; see Appendix A).
-            formats = COMMANDER_CASUAL,
-        ),
+        // LANDFALL: RAMP moved to PostureId -- widened to MIDRANGE/CONTROL/COMBO (the 3 macros a
+        // ramp-flavored theme most naturally overlays), keeping the RAMP posture as an optional
+        // (non-required) hint for the exact-match step.
         CuratedStrategy(
             id = "landfall",
             displayName = ThemeId.LANDFALL.displayName,
             description = StrategyCatalog.description(ThemeId.LANDFALL),
-            archetype = ArchetypeId.RAMP,
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO),
+            postures = setOf(PostureId.RAMP),
             themes = listOf(ThemeId.LANDFALL),
             // DEVIATION from the plan's proposed Standard v1 exclusion list, WITH rationale (Wave
             // 2 B1 meta check): the plan proposed excluding Landfall, but the current live
@@ -309,7 +322,7 @@ object CuratedStrategyCatalog {
             id = "lifegain",
             displayName = ThemeId.LIFEGAIN.displayName,
             description = StrategyCatalog.description(ThemeId.LIFEGAIN),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE, ArchetypeId.CONTROL),
             themes = listOf(ThemeId.LIFEGAIN),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -317,7 +330,7 @@ object CuratedStrategyCatalog {
             id = "plus1_counters",
             displayName = ThemeId.PLUS1_COUNTERS.displayName,
             description = StrategyCatalog.description(ThemeId.PLUS1_COUNTERS),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.PLUS1_COUNTERS),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -325,7 +338,7 @@ object CuratedStrategyCatalog {
             id = "tribal",
             displayName = ThemeId.TRIBAL.displayName,
             description = StrategyCatalog.description(ThemeId.TRIBAL),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.TRIBAL),
             requiresTribe = true,
             formats = COMMANDER_CASUAL_STANDARD,
@@ -334,7 +347,7 @@ object CuratedStrategyCatalog {
             id = "artifacts",
             displayName = ThemeId.ARTIFACTS.displayName,
             description = StrategyCatalog.description(ThemeId.ARTIFACTS),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.COMBO, ArchetypeId.CONTROL),
             themes = listOf(ThemeId.ARTIFACTS),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -342,7 +355,7 @@ object CuratedStrategyCatalog {
             id = "enchantress",
             displayName = ThemeId.ENCHANTRESS.displayName,
             description = StrategyCatalog.description(ThemeId.ENCHANTRESS),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO),
             themes = listOf(ThemeId.ENCHANTRESS),
             // Excluded from Standard v1 (plan-proposed exclusion; not a distinct top-10 Standard
             // archetype at authoring time -- see Appendix A).
@@ -352,17 +365,19 @@ object CuratedStrategyCatalog {
             id = "blink",
             displayName = ThemeId.BLINK.displayName,
             description = StrategyCatalog.description(ThemeId.BLINK),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO),
             themes = listOf(ThemeId.BLINK),
             // Excluded from Standard v1 (plan-proposed exclusion; see Appendix A).
             formats = COMMANDER_CASUAL,
         ),
+        // Retargeted onto ThemeId.MILL_OPPONENT (spec §4.2 split -- this entry is the win-condition
+        // half; SELF_MILL below is the enabler half).
         CuratedStrategy(
             id = "mill",
-            displayName = ThemeId.MILL.displayName,
-            description = StrategyCatalog.description(ThemeId.MILL),
-            archetype = ArchetypeId.CONTROL,
-            themes = listOf(ThemeId.MILL),
+            displayName = ThemeId.MILL_OPPONENT.displayName,
+            description = StrategyCatalog.description(ThemeId.MILL_OPPONENT),
+            archetypes = setOf(ArchetypeId.CONTROL, ArchetypeId.COMBO),
+            themes = listOf(ThemeId.MILL_OPPONENT),
             // Excluded from Standard v1 (plan-proposed exclusion; the meta check found no
             // dedicated mill/self-mill archetype at meaningful Standard share -- see Appendix A).
             formats = COMMANDER_CASUAL,
@@ -371,7 +386,7 @@ object CuratedStrategyCatalog {
             id = "wheels",
             displayName = ThemeId.WHEELS.displayName,
             description = StrategyCatalog.description(ThemeId.WHEELS),
-            archetype = ArchetypeId.CONTROL,
+            archetypes = setOf(ArchetypeId.CONTROL, ArchetypeId.COMBO),
             themes = listOf(ThemeId.WHEELS),
             // Excluded from Standard v1 (plan-proposed exclusion; see Appendix A).
             formats = COMMANDER_CASUAL,
@@ -380,37 +395,41 @@ object CuratedStrategyCatalog {
             id = "superfriends",
             displayName = ThemeId.SUPERFRIENDS.displayName,
             description = StrategyCatalog.description(ThemeId.SUPERFRIENDS),
-            archetype = ArchetypeId.CONTROL,
+            archetypes = setOf(ArchetypeId.CONTROL, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.SUPERFRIENDS),
             // Excluded from Standard v1 (plan-proposed exclusion; see Appendix A).
             formats = COMMANDER_CASUAL,
         ),
+        // TOOLBOX moved to PostureId (spec §4.1) -- no longer a theme.
         CuratedStrategy(
             id = "toolbox",
-            displayName = ThemeId.TOOLBOX.displayName,
-            description = StrategyCatalog.description(ThemeId.TOOLBOX),
-            archetype = ArchetypeId.CONTROL,
-            themes = listOf(ThemeId.TOOLBOX),
+            displayName = PostureId.TOOLBOX.displayName,
+            description = "Tutor for the exact answer or piece you need out of a wide toolbox of one-of effects.",
+            archetypes = setOf(ArchetypeId.CONTROL, ArchetypeId.MIDRANGE, ArchetypeId.COMBO),
+            postures = setOf(PostureId.TOOLBOX),
+            themes = emptyList(),
             // Excluded from Standard v1 (plan-proposed exclusion; see Appendix A).
             formats = COMMANDER_CASUAL,
         ),
-        // Commander-only per ArchetypeData.THEMES[GROUP_HUG].commanderOnly (structural, not a
-        // curation choice -- no 60-card shell exists for this theme at all).
+        // GROUP_HUG/GROUP_SLUG moved to PostureId (spec §4.1) -- Commander-only per
+        // [PostureDefinition.commanderOnly] (structural, not a curation choice -- no 60-card shell
+        // exists for a social/multiplayer-only posture at all).
         CuratedStrategy(
             id = "group_hug",
-            displayName = ThemeId.GROUP_HUG.displayName,
-            description = StrategyCatalog.description(ThemeId.GROUP_HUG),
-            archetype = ArchetypeId.CONTROL,
-            themes = listOf(ThemeId.GROUP_HUG),
+            displayName = PostureId.GROUP_HUG.displayName,
+            description = "Give every player extra resources -- mana, cards, or turns -- to keep the table peaceful and open-ended.",
+            archetypes = setOf(ArchetypeId.CONTROL),
+            postures = setOf(PostureId.GROUP_HUG),
+            themes = emptyList(),
             formats = COMMANDER_ONLY,
         ),
-        // Commander-only per ArchetypeData.THEMES[GROUP_SLUG].commanderOnly (structural).
         CuratedStrategy(
             id = "group_slug",
-            displayName = ThemeId.GROUP_SLUG.displayName,
-            description = StrategyCatalog.description(ThemeId.GROUP_SLUG),
-            archetype = ArchetypeId.CONTROL,
-            themes = listOf(ThemeId.GROUP_SLUG),
+            displayName = PostureId.GROUP_SLUG.displayName,
+            description = "Deal damage to every opponent equally with symmetrical effects that punish the whole table.",
+            archetypes = setOf(ArchetypeId.CONTROL, ArchetypeId.AGGRO),
+            postures = setOf(PostureId.GROUP_SLUG),
+            themes = emptyList(),
             formats = COMMANDER_ONLY,
         ),
         // Commander-only per ArchetypeData.THEMES[CLONES_THEFT].commanderOnly (structural).
@@ -418,7 +437,7 @@ object CuratedStrategyCatalog {
             id = "clones_theft",
             displayName = ThemeId.CLONES_THEFT.displayName,
             description = StrategyCatalog.description(ThemeId.CLONES_THEFT),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.COMBO, ArchetypeId.CONTROL),
             themes = listOf(ThemeId.CLONES_THEFT),
             formats = COMMANDER_ONLY,
         ),
@@ -426,7 +445,7 @@ object CuratedStrategyCatalog {
             id = "vehicles",
             displayName = ThemeId.VEHICLES.displayName,
             description = StrategyCatalog.description(ThemeId.VEHICLES),
-            archetype = ArchetypeId.AGGRO,
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
             themes = listOf(ThemeId.VEHICLES),
             formats = COMMANDER_CASUAL_STANDARD,
         ),
@@ -434,13 +453,39 @@ object CuratedStrategyCatalog {
             id = "self_mill",
             displayName = ThemeId.SELF_MILL.displayName,
             description = StrategyCatalog.description(ThemeId.SELF_MILL),
-            archetype = ArchetypeId.MIDRANGE,
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO),
             themes = listOf(ThemeId.SELF_MILL),
             // Excluded from Standard v1 (plan-proposed exclusion; Reanimator's inclusion above
             // covers the graveyard-plan angle already meta-relevant -- a SEPARATE dedicated
             // self-mill archetype is not independently tracked at meaningful Standard share --
             // see Appendix A).
             formats = COMMANDER_CASUAL,
+        ),
+        // Deck Analysis Engine v3 (spec §4.2, NEW themes).
+        CuratedStrategy(
+            id = "treasure",
+            displayName = ThemeId.TREASURE.displayName,
+            description = StrategyCatalog.description(ThemeId.TREASURE),
+            archetypes = setOf(ArchetypeId.MIDRANGE, ArchetypeId.COMBO),
+            themes = listOf(ThemeId.TREASURE),
+            formats = COMMANDER_CASUAL,
+        ),
+        CuratedStrategy(
+            id = "equipment",
+            displayName = ThemeId.EQUIPMENT.displayName,
+            description = StrategyCatalog.description(ThemeId.EQUIPMENT),
+            archetypes = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE),
+            themes = listOf(ThemeId.EQUIPMENT),
+            formats = COMMANDER_CASUAL_STANDARD,
+        ),
+        // sixtyOnly (spec §4.2) -- Commander is structurally excluded, not a curation choice.
+        CuratedStrategy(
+            id = "storm",
+            displayName = ThemeId.STORM.displayName,
+            description = StrategyCatalog.description(ThemeId.STORM),
+            archetypes = setOf(ArchetypeId.COMBO),
+            themes = listOf(ThemeId.STORM),
+            formats = setOf(DeckFormat.CASUAL, DeckFormat.STANDARD),
         ),
     )
 
@@ -458,54 +503,63 @@ object CuratedStrategyCatalog {
  * back off a legacy `Deck.archetypeOverride`/`themesOverride` pin -- onto the nearest
  * [CuratedStrategy].
  *
- * Resolution order:
- * 1. Exact match: a catalog entry with the SAME [archetype] and the SAME theme SET (order-
- *    insensitive -- inference's own ordering is "by descending confidence", which is not part of
- *    a strategy's identity). This now also covers `(`[ArchetypeId.GENERIC]`, emptyList())` --
- *    the "balanced" entry added to close Wave 1 open question 3 -- since that entry's own
- *    (archetype, themes) IS `(GENERIC, emptyList())`, no special-casing is needed for it here.
- * 2. Fallback: the PURE-archetype catalog entry for [archetype] (an entry with that archetype and
- *    an empty theme list) -- covers "confident archetype, but the detected theme combination
- *    itself isn't curated" (e.g. 2 confident themes that don't form a single curated preset).
- *    [ArchetypeId.GENERIC] is deliberately EXCLUDED from this fallback (see step 3) even though it
- *    now has a pure entry ("balanced") -- unlike every other archetype, GENERIC's pure entry means
- *    literally "no plan pinned", so a GENERIC pin that carries a theme must NOT be coerced into
- *    "balanced"; it's an incoherent/unusual legacy state that should read as "Custom" instead.
- * 3. No match at all -- returns `null`, the "Custom" sentinel. Applies to: a `null` archetype, OR
- *    [ArchetypeId.GENERIC] paired with one or more themes (see step 2's rationale -- this is the
- *    one case where an archetype has a pure catalog entry but still doesn't participate in the
- *    generic pure-archetype fallback). `null` over a dedicated marker type: every OTHER call site
- *    in this package that resolves an enum/string to a catalog value uses a plain nullable return
- *    for "no match" (see [ThemeId.fromDisplayName]), so this keeps the same, already-established
- *    convention rather than introducing a second "not found" shape into the same file. Callers
- *    that need a player-facing "Custom" label (Phase 3's picker) render that themselves off the
- *    `null`.
+ * Resolution order (Deck Analysis Engine v3, spec §4.2: "entries declare a SET of compatible
+ * archetypes" -- every membership check below is `archetype in it.archetypes`, not equality):
+ * 1. Posture-aware exact match (NEW): when [posture] is non-null, an entry whose [archetype] is in
+ *    [CuratedStrategy.archetypes], whose [posture] is in [CuratedStrategy.postures], AND whose
+ *    theme SET matches exactly. Tried FIRST so a posture-carrying entry (e.g. "Big Mana",
+ *    `postures = {RAMP}`) is preferred over a plain archetype/theme match when a real posture was
+ *    detected/pinned.
+ * 2. Exact match (no posture requirement): a catalog entry whose [CuratedStrategy.archetypes]
+ *    contains [archetype] and whose theme SET matches exactly (order-insensitive -- inference's
+ *    own ordering is "by descending confidence", not part of a strategy's identity).
+ * 3. Fallback: the PURE-archetype catalog entry compatible with [archetype] (an entry with that
+ *    archetype in its set and an empty theme list) -- covers "confident archetype, but the
+ *    detected theme combination itself isn't curated" (e.g. 2 confident themes that don't form a
+ *    single curated preset).
+ * 4. No match at all -- returns `null`, the "Custom" sentinel. Applies to a `null` archetype (Deck
+ *    Analysis Engine v3 removed `ArchetypeId.GENERIC` -- an ambiguous/unpinned resolution has no
+ *    catalog entry to fall back to at all, unlike the old GENERIC "balanced" entry). `null` over a
+ *    dedicated marker type: every OTHER call site in this package that resolves an enum/string to a
+ *    catalog value uses a plain nullable return for "no match" (see [ThemeId.fromDisplayName]), so
+ *    this keeps the same, already-established convention. Callers that need a player-facing
+ *    "Custom" label (Phase 3's picker, or [AnalysisEngine.evaluate]'s own displayName fallback)
+ *    render that themselves off the `null`.
  *
- * @param format Wave 2 B4 -- optional [DeckFormat] to restrict the search to. When non-null, BOTH
- *   resolution steps above (exact match, then pure-archetype fallback) only ever consider entries
- *   where [CuratedStrategy.availableIn] is true for [format] -- same fallback-chain SHAPE, just
- *   filtered at each step. This closes the gap where a format-blind exact match could surface a
- *   catalog entry the picker doesn't even offer for that format (e.g. inference detects STAX on a
- *   Standard deck -- "stax" is excluded from Standard v1, Appendix A -- the caller must not be
- *   handed a strategy the Standard picker can't show; this degrades to the pure "control" entry
- *   instead, since pure-archetype entries are Standard-available for every non-Commander-only
- *   archetype). Defaults to `null` (no restriction) so every pre-B4 call site and test -- most
- *   notably `AnalysisEngine.kt`'s `nearestFor(archetype, themes)` call, still 2-arg and therefore
- *   unaffected by this default -- keeps its exact prior behavior unchanged. `format` is NOT itself
+ * @param format Wave 2 B4 -- optional [DeckFormat] to restrict the search to. When non-null, EVERY
+ *   resolution step above only ever considers entries where [CuratedStrategy.availableIn] is true
+ *   for [format] -- same fallback-chain SHAPE, just filtered at each step. This closes the gap
+ *   where a format-blind exact match could surface a catalog entry the picker doesn't even offer
+ *   for that format (e.g. inference detects PRISON on a Standard deck -- "prison" is excluded from
+ *   Standard v1 -- the caller must not be handed a strategy the Standard picker can't show; this
+ *   degrades to the pure "control" entry instead). Defaults to `null` (no restriction) so every
+ *   pre-B4 call site and test keeps its exact prior behavior unchanged. `format` is NOT itself
  *   validated against [archetype]/[themes]; a caller passing an unmatched combination simply gets
  *   whatever the filtered fallback chain resolves to, same as the unfiltered version.
+ * @param posture Deck Analysis Engine v3 (spec §3), NEW, appended LAST and defaulted so every
+ *   pre-existing call site keeps compiling unchanged -- the second-stage posture classification
+ *   (or a user pin), used ONLY to prefer a posture-carrying catalog entry in step 1 above.
  */
 fun CuratedStrategyCatalog.nearestFor(
     archetype: ArchetypeId?,
     themes: List<ThemeId>,
     format: DeckFormat? = null,
+    posture: PostureId? = null,
 ): CuratedStrategy? {
     val themeSet = themes.toSet()
     val candidates = if (format == null) ALL else ALL.filter { it.availableIn(format) }
-    val exact = candidates.firstOrNull { it.archetype == archetype && it.themes.toSet() == themeSet }
+
+    if (archetype != null && posture != null) {
+        val postureExact = candidates.firstOrNull {
+            archetype in it.archetypes && posture in it.postures && it.themes.toSet() == themeSet
+        }
+        if (postureExact != null) return postureExact
+    }
+
+    val exact = candidates.firstOrNull { archetype in it.archetypes && it.themes.toSet() == themeSet }
     if (exact != null) return exact
-    if (archetype == null || archetype == ArchetypeId.GENERIC) return null
-    return candidates.firstOrNull { it.archetype == archetype && it.themes.isEmpty() }
+    if (archetype == null) return null
+    return candidates.firstOrNull { archetype in it.archetypes && it.themes.isEmpty() }
 }
 
 /**

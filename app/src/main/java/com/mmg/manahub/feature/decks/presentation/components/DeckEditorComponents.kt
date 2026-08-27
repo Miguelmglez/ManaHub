@@ -1,9 +1,6 @@
 package com.mmg.manahub.feature.decks.presentation.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,9 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.rounded.CollectionsBookmark
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -55,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -62,34 +60,33 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mmg.manahub.R
-import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.model.BASIC_LAND_NAMES
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.Deck
-import com.mmg.manahub.core.model.DeckFormat
 import com.mmg.manahub.core.model.DeckSlotEntry
 import com.mmg.manahub.core.model.GroupingMode
-import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
+import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CardName
+import com.mmg.manahub.core.ui.components.CardRow
+import com.mmg.manahub.core.ui.components.CardRarity
 import com.mmg.manahub.core.ui.components.ManaCostImages
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
-import com.mmg.manahub.core.ui.mtg_card_back
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import com.mmg.manahub.core.ui.components.SetSymbol
 import com.mmg.manahub.core.ui.components.manaColorFor
+import com.mmg.manahub.core.ui.mtg_card_back
+import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.CardCornerRadius
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.coloredShadow
-import com.mmg.manahub.core.ui.theme.ButtonShape
 import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.SmallCardShape
+import com.mmg.manahub.core.ui.theme.coloredShadow
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -97,289 +94,6 @@ import org.jetbrains.compose.resources.painterResource
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Shared deck-editor composables
-//
-//  Extracted from DeckBuilderScreen.kt (P1-T2) so both DeckMagicDetailScreen and
-//  the new DeckStudioScreen render identical rows/sheets/headers without
-//  duplicating UI. These are stateless and VM-agnostic by design: every callback
-//  is hoisted so each host wires its own ViewModel.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * A single card row inside a deck list (mainboard or sideboard).
- *
- * @param entry the deck slot to render.
- * @param isInCollection whether the user owns this card (shows a star).
- * @param onClick invoked when the row body is tapped (opens detail).
- * @param onRemove invoked when the close button is tapped (removes the slot).
- */
-@Composable
-fun CardRow(
-    entry: DeckSlotEntry,
-    isInCollection: Boolean,
-    onClick: () -> Unit,
-    onRemove: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val card = entry.card
-    if (card != null) {
-        // Delegates to the [Card]-based overload -- the single visual source of truth for a
-        // resolved slot. Only an unresolved slot (card == null) keeps its own minimal fallback
-        // below, since the [Card]-based overload requires a non-null card.
-        CardRow(
-            card = card,
-            isInCollection = isInCollection,
-            onClick = onClick,
-            onRemove = onRemove,
-            modifier = modifier,
-            quantity = entry.quantity,
-        )
-        return
-    }
-
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-    Surface(
-        onClick = onClick,
-        shape = SmallCardShape,
-        color = mc.surface,
-        modifier = modifier.fillMaxWidth().border(1.dp, mc.surfaceVariant.copy(alpha = 0.5f), SmallCardShape).semantics(mergeDescendants = true) {}
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.md)
-        ) {
-            AsyncImage(
-                model = null,
-                contentDescription = null,
-                placeholder = painterResource(Res.drawable.mtg_card_back),
-                error = painterResource(Res.drawable.mtg_card_back),
-                fallback = painterResource(Res.drawable.mtg_card_back),
-                modifier = Modifier
-                    .size(width = 44.dp, height = 62.dp)
-                    .clip(SmallCardShape)
-                    .border(1.dp, mc.surfaceVariant, SmallCardShape),
-                contentScale = ContentScale.Crop
-            )
-            CardName(
-                name = stringResource(R.string.deck_default_name),
-                showFrontOnly = true,
-                style = ty.titleMedium,
-                color = mc.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            if (entry.quantity > 1) {
-                Surface(shape = ChipShape, color = mc.primaryAccent.copy(alpha = 0.2f)) {
-                    Text("×${entry.quantity}", style = ty.labelMedium, color = mc.primaryAccent, modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp))
-                }
-            }
-            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Close, contentDescription = null, tint = mc.textDisabled, modifier = Modifier.size(18.dp))
-            }
-        }
-    }
-}
-
-/**
- * The [Card]-based sibling of the [DeckSlotEntry] overload above -- renders the identical visual
- * (image thumbnail, name, type line, mana cost, quantity badge, owned indicator, remove
- * affordance) but takes a raw [Card] instead of a deck-specific [DeckSlotEntry], so any caller
- * with only a `List<Card>` (e.g. the Deck Wizard's seed-picking flow, which has no
- * [DeckSlotEntry]) can reuse the exact same row instead of duplicating this markup.
- *
- * @param card the card to render.
- * @param isInCollection whether the user owns this card (shows a bookmark icon).
- * @param onClick invoked when the row body is tapped.
- * @param onRemove invoked when the trailing close button is tapped; the button is hidden
- *   entirely when null (e.g. a picker preview with no remove affordance).
- * @param modifier optional [Modifier].
- * @param quantity shown as a "×N" badge when greater than 1.
- * @param selected when true, tints the row's container with the same primaryAccent selected
- *   convention used elsewhere in the app (e.g. the Deck Wizard's `StrategyOptionRow`/
- *   `DirectionChip`) -- defaults to `false` so every pre-existing call site of this overload
- *   (DeckStudioScreen.kt, the Deck Wizard's seed-picker section) stays visually unchanged.
- */
-@Composable
-fun CardRow(
-    card: Card,
-    isInCollection: Boolean,
-    onClick: () -> Unit,
-    onRemove: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-    quantity: Int = 1,
-    selected: Boolean = false,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    // Map card colors to theme colors for the visual accent
-    val cardColors = remember(card.colors) {
-        card.colors.map { manaColorFor(it, mc) }
-    }
-    val primaryAccentColor = cardColors.firstOrNull() ?: mc.surfaceVariant
-
-    Surface(
-        onClick = onClick,
-        shape = SmallCardShape,
-        color = mc.surface,
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (selected) {
-                    Modifier.coloredShadow(
-                        color = mc.primaryAccent,
-                        borderRadius = CardCornerRadius,
-                        blurRadius = 12.dp,
-                        spread = 0.8f
-                    ).border(2.dp, mc.primaryAccent, SmallCardShape)
-                } else {
-                    Modifier.border(1.dp, mc.surfaceVariant.copy(alpha = 0.5f), SmallCardShape)
-                }
-            )
-            .semantics(mergeDescendants = true) {}
-    ) {
-        Box(Modifier.fillMaxWidth().heightIn(min = 68.dp)) {
-            // 1. Subtle art-crop background texture
-            if (card.imageArtCrop != null) {
-                AsyncImage(
-                    model = card.imageArtCrop,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alpha = 0.08f,
-                    modifier = Modifier.matchParentSize()
-                )
-            }
-
-            // 2. Subtle color gradient from the card's mana identity
-            if (cardColors.isNotEmpty()) {
-                val gradient = remember(cardColors) {
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            primaryAccentColor.copy(alpha = 0.12f),
-                            mc.surface.copy(alpha = 0f)
-                        )
-                    )
-                }
-                Box(Modifier.matchParentSize().background(gradient))
-            }
-
-            // 3. Color accent bar on the left
-            if (cardColors.isNotEmpty()) {
-                Box(
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .background(
-                            primaryAccentColor,
-                            shape = RoundedCornerShape(
-                                topStart = CardCornerRadius,
-                                bottomStart = CardCornerRadius
-                            )
-                        )
-                )
-            }
-
-            // 4. Content row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.md)
-            ) {
-                // Thumbnail with CardShape and a subtle border
-                AsyncImage(
-                    model = card.imageNormal,
-                    contentDescription = null,
-                    placeholder = painterResource(Res.drawable.mtg_card_back),
-                    error = painterResource(Res.drawable.mtg_card_back),
-                    fallback = painterResource(Res.drawable.mtg_card_back),
-                    modifier = Modifier
-                        .size(width = 44.dp, height = 62.dp)
-                        .clip(CardShape)
-                        .border(1.dp, mc.surfaceVariant.copy(alpha = 0.8f), CardShape),
-                    contentScale = ContentScale.Crop
-                )
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CardName(
-                            name = card.name,
-                            showFrontOnly = true,
-                            style = ty.titleMedium,
-                            color = mc.textPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (isInCollection) {
-                            Spacer(Modifier.width(spacing.xs))
-                            Icon(
-                                Icons.Rounded.CollectionsBookmark,
-                                contentDescription = null,
-                                tint = mc.primaryAccent,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        card.typeLine,
-                        style = ty.bodySmall,
-                        color = mc.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    
-                    if (card.manaCost != null) {
-                        Spacer(Modifier.height(spacing.xxs))
-                        ManaCostImages(
-                            manaCost = card.manaCost!!,
-                            symbolSize = 14.dp
-                        )
-                    }
-                }
-
-                // Trailing: Quantity and Remove
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm)
-                ) {
-                    if (quantity > 1) {
-                        Surface(
-                            shape = ChipShape,
-                            color = mc.secondaryAccent.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                "×$quantity",
-                                style = ty.labelMedium,
-                                color = mc.secondaryAccent,
-                                modifier = Modifier.padding(horizontal = spacing.sm, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    if (onRemove != null) {
-                        IconButton(
-                            onClick = onRemove,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = null,
-                                tint = mc.textDisabled,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 /**
  * A section/group header for a card list (e.g. "Creatures (12)", a color, or a CMC bucket).
@@ -387,6 +101,9 @@ fun CardRow(
  * @param label the raw group key; localized to a display name internally.
  * @param count the number of cards in the group.
  * @param showSuggestionToggle whether to show the land-suggestion toggle (lands group only).
+ * @param expandable whether this group can be expanded/collapsed (UI polish, 2026-08-25).
+ * @param expanded true when the group's cards are visible (valid only when [expandable] is true).
+ * @param onToggleExpand invoked when the header is tapped while [expandable] is true.
  */
 @Composable
 internal fun GroupHeader(
@@ -396,12 +113,23 @@ internal fun GroupHeader(
     showSuggestionToggle: Boolean = false,
     isSuggestionEnabled: Boolean = true,
     onToggleSuggestion: () -> Unit = {},
+    expandable: Boolean = false,
+    expanded: Boolean = true,
+    onToggleExpand: () -> Unit = {},
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val spacing = MaterialTheme.spacing
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 0f else -90f,
+        label = "GroupHeaderRotation"
+    )
+
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = spacing.sm),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (expandable) Modifier.clickable(onClick = onToggleExpand) else Modifier)
+            .padding(vertical = spacing.sm),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -431,6 +159,16 @@ internal fun GroupHeader(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+            if (expandable) {
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = mc.textSecondary,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { rotationZ = rotation }
+                )
+            }
             when {
                 label.length == 1 && label[0] in "WUBRG" -> {
                     ManaSymbolImage(token = label, size = 20.dp)
@@ -639,7 +377,6 @@ internal fun EditDeckSheet(
     cards: List<DeckSlotEntry>,
     onSave: (newName: String?, newCoverId: String?) -> Unit,
     onDismiss: () -> Unit,
-    onFormatChange: ((DeckFormat) -> Unit)? = null,
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
@@ -703,144 +440,6 @@ internal fun EditDeckSheet(
     }
 }
 
-/**
- * The deck formats offered by the studio's format selector (Group B / B1), in display order.
- *
- * A curated subset of [DeckFormat] — the formats a user actively builds toward. Other
- * [DeckFormat] entries (e.g. the engine-internal ones) are intentionally not offered here.
- *
- * [DeckFormat.STANDARD] re-enabled in Wave 2 / B5 (Deck Analysis Engine v2 now analyzes 60-card
- * constructed decks — see `docs/plans/deck-analysis-engine-v2-wave2-standard-plan.md`).
- * PIONEER/MODERN/PAUPER stay commented out: they are FUTURE DEBT per that plan's §0 — the engine
- * has the per-format extension points (`DeckFormat.isSixtyCardConstructed`, per-format legality)
- * but each needs its own meta-relevance/curation pass before the app offers users a deck they
- * can't yet build toward with a calibrated analysis.
- */
-internal val STUDIO_FORMATS: List<DeckFormat> = listOf(
-    DeckFormat.COMMANDER,
-    DeckFormat.STANDARD,
-    /*DeckFormat.PIONEER,
-    DeckFormat.MODERN,
-    DeckFormat.PAUPER,*/
-    DeckFormat.CASUAL,
-    DeckFormat.DRAFT,
-)
-
-/**
- * A row of pill-cards for picking a deck [DeckFormat] (Group B / B1), similar to the
- * game mode selector.
- *
- * Stateless: the currently selected format is passed in and every pick is a callback. Shared
- * by the Deck Studio empty-state and [EditDeckSheet] so the two surfaces look identical.
- *
- * @param selectedFormat the resolved current format (null when unrecognized → no chip selected).
- * @param onFormatSelected invoked with the picked format.
- */
-@Composable
-internal fun DeckFormatChipRow(
-    selectedFormat: DeckFormat?,
-    onFormatSelected: (DeckFormat) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val spacing = MaterialTheme.spacing
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(spacing.md),
-    ) {
-        STUDIO_FORMATS.forEach { format ->
-            DeckFormatPill(
-                format = format,
-                selected = format == selectedFormat,
-                onClick = { onFormatSelected(format) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-/**
- * A single pill card representing one [DeckFormat] option.
- */
-@Composable
-private fun DeckFormatPill(
-    format: DeckFormat,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val mc = MaterialTheme.magicColors
-    val ty = MaterialTheme.magicTypography
-    val spacing = MaterialTheme.spacing
-
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1.05f else 1f,
-        animationSpec = tween(durationMillis = 300),
-        label = "formatPillScale",
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (selected) mc.primaryAccent else mc.surfaceVariant.copy(alpha = 0.5f),
-        animationSpec = tween(durationMillis = 300),
-        label = "formatPillBorder",
-    )
-    val bgColor by animateColorAsState(
-        targetValue = if (selected) mc.primaryAccent.copy(alpha = 0.15f) else mc.surface,
-        animationSpec = tween(durationMillis = 300),
-        label = "formatPillBg",
-    )
-
-    Column(
-        modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                shape = ChipShape
-                clip = true
-            }
-            .background(bgColor)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = borderColor,
-                shape = ChipShape,
-            )
-            .clip(ChipShape)
-            .clickable(onClick = onClick)
-            .padding(vertical = spacing.md, horizontal = spacing.sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(spacing.xs),
-    ) {
-        Text(
-            text = when (format) {
-                DeckFormat.COMMANDER -> "⚔️"
-                DeckFormat.STANDARD -> "🏆"
-                DeckFormat.DRAFT -> "📦"
-                else -> "🔮"
-            },
-            style = ty.bodyMedium,
-        )
-        Text(
-            text = format.displayName,
-            // Local override: the design system's labelLarge tracking (3sp letter-spacing, per
-            // design-system.md) is tuned for wider single-pill contexts. At 4 pills per row
-            // (Wave 2 / B5 added STANDARD) the available label width shrinks to ~57dp, and
-            // 3sp/glyph tracking on "Commander"/"Standard" pushes the rendered text well past
-            // that before ellipsis kicks in, making it unreadable. Dropping tracking to 0 for
-            // THIS label only (font/size/weight untouched) reclaims enough width for the label
-            // to read clearly without touching DeckFormat.displayName or any other call site.
-            style = ty.labelLarge.copy(letterSpacing = 0.sp),
-            color = if (selected) mc.primaryAccent else mc.textPrimary,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = stringResource(R.string.decklist_card_count, format.targetDeckSize),
-            style = ty.labelSmall,
-            color = mc.textSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 
 /**

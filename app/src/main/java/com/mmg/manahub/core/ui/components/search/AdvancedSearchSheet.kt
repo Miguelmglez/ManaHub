@@ -1,6 +1,5 @@
 package com.mmg.manahub.core.ui.components.search
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,13 +24,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Gavel
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.MonetizationOn
@@ -41,9 +39,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
@@ -64,6 +59,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,7 +67,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -87,22 +82,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import coil3.svg.SvgDecoder
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.svg.SvgDecoder
 import com.mmg.manahub.R
-import com.mmg.manahub.core.tagging.label
 import com.mmg.manahub.core.model.AdvancedSearchQuery
 import com.mmg.manahub.core.model.ComparisonOperator
 import com.mmg.manahub.core.model.SearchDirection
 import com.mmg.manahub.core.model.SearchOrder
+import com.mmg.manahub.core.tagging.label
+import com.mmg.manahub.core.ui.components.MagicCtaButton
+import com.mmg.manahub.core.ui.components.MagicFilterChip
 import com.mmg.manahub.core.ui.components.ManaColorPicker
+import com.mmg.manahub.core.ui.components.SectionHeader
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
-import com.mmg.manahub.core.ui.components.MagicCtaButton
-import com.mmg.manahub.core.ui.components.MagicFilterChip
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -111,6 +107,17 @@ fun AdvancedSearchSheet(
     onSearch: (advancedQuery: AdvancedSearchQuery, rawScryfall: String) -> Unit,
     isCollectionMode: Boolean = false,
     getAvailableTags: () -> Set<com.mmg.manahub.core.model.CardTag> = { emptySet() },
+    /**
+     * A pre-decomposed structured query to seed this sheet's fields with on open (Suggestions Tab
+     * UI Polish plan, W11/D8 — Deck Analysis's "Browse for &lt;Category&gt;" entry point,
+     * [com.mmg.manahub.core.ui.components.CardSearchSheet]'s own `initialAdvancedQuery` param).
+     * `null` (default) keeps every existing call site unchanged. Applied via
+     * [AdvancedSearchViewModel.seedFrom] in a one-shot [androidx.compose.runtime.LaunchedEffect]
+     * below, keyed on this value's own identity/content — see that effect's comment for the known
+     * caveat around a cached `koinViewModel()` instance across repeated fixed-position opens
+     * (mirrors `feedback_koin_viewmodel_overlay_key_trap` memory's documented risk shape).
+     */
+    initialAdvancedQuery: AdvancedSearchQuery? = null,
     viewModel: AdvancedSearchViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -118,6 +125,16 @@ fun AdvancedSearchSheet(
     val ty = MaterialTheme.magicTypography
     val scope = rememberCoroutineScope()
     var canDismiss by remember { mutableStateOf(false) }
+
+    // W11 — one-shot seed from a caller-supplied structured preset. Runs once per distinct
+    // [initialAdvancedQuery] value (mirrors CardSearchSheet's own initialScryfallQuery/
+    // initialCollectionTagKeys preset pattern) so the sheet opens ALREADY SHOWING the translated
+    // filters instead of a blank form.
+    LaunchedEffect(initialAdvancedQuery) {
+        if (initialAdvancedQuery != null && !initialAdvancedQuery.isEmpty()) {
+            viewModel.seedFrom(initialAdvancedQuery)
+        }
+    }
 
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
@@ -260,7 +277,9 @@ fun AdvancedSearchSheet(
                 item {
                     SearchSection(
                         title = stringResource(R.string.advsearch_section_type),
-                        icon = Icons.Default.Style
+                        icon = Icons.Default.Style,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.primaryAccent,
                     ) {
                         var showTypePicker by remember { mutableStateOf(false) }
 
@@ -337,6 +356,24 @@ fun AdvancedSearchSheet(
                                 color = mc.textSecondary,
                             )
                         }
+                        // Suggestions Tab UI Polish plan (W11): backs SearchCriterion.CardType
+                        // .exclude -- Deck Analysis Curve sections seed this (e.g. excluding lands
+                        // from a mana-value bucket).
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Checkbox(
+                                checked = uiState.cardTypeExclude,
+                                onCheckedChange = viewModel::setCardTypeExclude,
+                                colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent),
+                            )
+                            Text(
+                                "Exclude selected types instead",
+                                style = ty.bodyMedium,
+                                color = mc.textSecondary,
+                            )
+                        }
 
                         if (showTypePicker) {
                             CardTypePickerSheet(
@@ -344,6 +381,175 @@ fun AdvancedSearchSheet(
                                 onToggleType = viewModel::toggleCardType,
                                 onDismiss = { showTypePicker = false },
                             )
+                        }
+                    }
+                }
+
+                // ── Card function ── (works in both Scryfall-search and Collection-filter modes,
+                // same as Card type above — not gated by isCollectionMode)
+                item {
+                    SearchSection(
+                        title = stringResource(R.string.advsearch_section_function),
+                        icon = Icons.Default.Bolt,
+                        titleColor = mc.textPrimary,
+                        iconColor = mc.goldMtg,
+                    ) {
+                        var showFunctionPicker by remember { mutableStateOf(false) }
+
+                        Surface(
+                            onClick = { showFunctionPicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = mc.surface,
+                            border = BorderStroke(
+                                width = if (uiState.cardFunction.isNotEmpty()) 1.5.dp else 0.5.dp,
+                                color = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.surfaceVariant,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(
+                                    text = if (uiState.cardFunction.isEmpty())
+                                        stringResource(R.string.advsearch_function_hint)
+                                    else
+                                        stringResource(R.string.advsearch_function_selected_count, uiState.cardFunction.size),
+                                    style = ty.bodyLarge,
+                                    color = if (uiState.cardFunction.isNotEmpty()) mc.primaryAccent else mc.textDisabled,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = mc.textDisabled,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+
+                        if (uiState.cardFunction.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(top = 8.dp),
+                            ) {
+                                uiState.cardFunction.forEach { value ->
+                                    val label = com.mmg.manahub.core.model.CardFunctionOption.allFunctions
+                                        .find { it.scryfallValue == value }?.label ?: value
+                                    InputChip(
+                                        selected = true,
+                                        onClick = { viewModel.toggleCardFunction(value) },
+                                        label = { Text(label, style = ty.labelMedium) },
+                                        trailingIcon = {
+                                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Checkbox(
+                                checked = uiState.cardFunctionMatchAll,
+                                onCheckedChange = viewModel::setCardFunctionMatchAll,
+                                colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent),
+                            )
+                            Text(
+                                "Match ALL selected functions (AND)",
+                                style = ty.bodyMedium,
+                                color = mc.textSecondary,
+                            )
+                        }
+
+                        if (showFunctionPicker) {
+                            CardFunctionPickerSheet(
+                                selectedFunctions = uiState.cardFunction,
+                                onToggleFunction = viewModel::toggleCardFunction,
+                                onDismiss = { showFunctionPicker = false },
+                            )
+                        }
+                    }
+                }
+
+                // ── Mana production (Suggestions Tab UI Polish plan, W11) ── seeded ONLY from
+                // Deck Analysis's "Browse for X" translation -- no manual picker exists, this is
+                // a read-only summary + a single clear action, rendered only while active.
+                if (uiState.manaProduction != null) {
+                    item {
+                        val mp = uiState.manaProduction!!
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_mana_production),
+                            icon = Icons.Default.Bolt,
+                        ) {
+                            val minDistinctColors = mp.minDistinctColors
+                            val summary = when {
+                                mp.colors.isNotEmpty() -> stringResource(
+                                    R.string.advsearch_mana_production_colors,
+                                    mp.colors.sorted().joinToString(""),
+                                )
+                                minDistinctColors != null -> stringResource(
+                                    R.string.advsearch_mana_production_threshold,
+                                    minDistinctColors,
+                                )
+                                else -> ""
+                            }
+                            InputChip(
+                                selected = true,
+                                onClick = viewModel::clearManaProduction,
+                                label = { Text(summary, style = ty.labelMedium) },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
+                                },
+                            )
+                        }
+                    }
+                }
+
+                // ── Curated oracle match (Suggestions Tab UI Polish plan, W11) ── seeded ONLY
+                // from Deck Analysis's TagDictionary-translated role fragments. Read-only (each
+                // term is a curated compile-time constant, not user-editable) -- one clear action
+                // removes the whole criterion. Still a real, structured AdvancedSearchSheet field,
+                // never a raw string in CardSearchSheet's plain search bar (D8's own mandate).
+                if (uiState.oracleTerms != null) {
+                    item {
+                        val terms = uiState.oracleTerms!!
+                        SearchSection(
+                            title = stringResource(R.string.advsearch_section_oracle_terms),
+                            icon = Icons.Default.Description,
+                        ) {
+                            val allTerms = terms.allOf + terms.anyOfGroups.flatten() + terms.typeLineAnyOf
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                allTerms.forEach { term ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = mc.surfaceVariant,
+                                    ) {
+                                        Text(
+                                            text = term,
+                                            style = ty.labelMedium,
+                                            color = mc.textPrimary,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            TextButton(onClick = viewModel::clearOracleTerms) {
+                                Text(stringResource(R.string.advsearch_clear), color = mc.lifeNegative, style = ty.bodyMedium)
+                            }
                         }
                     }
                 }
@@ -1082,38 +1288,18 @@ fun CardTypePickerSheet(
                     val isExpanded = isSearching || manualExpandedSections.contains(section)
 
                     item(key = "header:${section.name}") {
-                        val rotation by animateFloatAsState(
-                            targetValue = if (isExpanded) 180f else 0f,
-                            label = "chevronRotation",
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .clickable {
-                                    manualExpandedSections = if (manualExpandedSections.contains(section)) {
-                                        manualExpandedSections - section
-                                    } else {
-                                        manualExpandedSections + section
-                                    }
+                        SectionHeader(
+                            title = "${section.label} ($totalCount)",
+                            expanded = isExpanded,
+                            onToggle = {
+                                manualExpandedSections = if (manualExpandedSections.contains(section)) {
+                                    manualExpandedSections - section
+                                } else {
+                                    manualExpandedSections + section
                                 }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                "${section.label} ($totalCount)",
-                                style = ty.labelLarge,
-                                color = mc.textPrimary,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (isExpanded) "Collapse section" else "Expand section",
-                                tint = mc.textSecondary,
-                                modifier = Modifier.rotate(rotation),
-                            )
-                        }
+                            },
+                            titleColor = mc.textPrimary,
+                        )
                     }
 
                     if (isExpanded) {
@@ -1134,6 +1320,149 @@ fun CardTypePickerSheet(
                                 Checkbox(
                                     checked = isSelected,
                                     onCheckedChange = { onToggleType(option.scryfallValue) },
+                                    colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent)
+                                )
+                                Text(
+                                    option.label,
+                                    style = ty.bodyLarge,
+                                    color = mc.textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CardFunctionPickerSheet(
+    selectedFunctions: Set<String>,
+    onToggleFunction: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Search query filters within each section; manual expand/collapse state is the source of
+    // truth and is OR'd with "has a search match" while a query is active (restored as-is on clear).
+    var searchQuery by remember { mutableStateOf("") }
+    var manualExpandedSections by remember { mutableStateOf(setOf<com.mmg.manahub.core.model.CardFunctionSection>()) }
+
+    val query = searchQuery.trim()
+    val isSearching = query.isNotBlank()
+
+    val sectionRows = remember(query) {
+        com.mmg.manahub.core.model.CardFunctionSection.entries.mapNotNull { section ->
+            val all = com.mmg.manahub.core.model.CardFunctionOption.bySection[section].orEmpty()
+            val visible = if (isSearching) {
+                all.filter { option ->
+                    option.label.contains(query, ignoreCase = true) ||
+                        option.scryfallValue.contains(query, ignoreCase = true)
+                }
+            } else {
+                all
+            }
+            if (isSearching && visible.isEmpty()) null else Triple(section, all.size, visible)
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = mc.backgroundSecondary,
+        contentWindowInsets = { WindowInsets(0) },
+        dragHandle = null,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).navigationBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = mc.textPrimary)
+                }
+                Text(
+                    "Card Function",
+                    style = ty.titleLarge,
+                    color = mc.textPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(
+                        "Search functions…",
+                        color = mc.textDisabled,
+                        style = ty.bodyLarge,
+                    )
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = mc.textDisabled)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear search", tint = mc.textDisabled)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = magicOutlinedTextFieldColors(mc),
+                singleLine = true,
+            )
+
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                sectionRows.forEach { (section, totalCount, options) ->
+                    val isExpanded = isSearching || manualExpandedSections.contains(section)
+
+                    item(key = "header:${section.name}") {
+                        SectionHeader(
+                            title = "${section.label} ($totalCount)",
+                            expanded = isExpanded,
+                            onToggle = {
+                                manualExpandedSections = if (manualExpandedSections.contains(section)) {
+                                    manualExpandedSections - section
+                                } else {
+                                    manualExpandedSections + section
+                                }
+                            },
+                            titleColor = mc.textPrimary,
+                        )
+                    }
+
+                    if (isExpanded) {
+                        items(
+                            count = options.size,
+                            key = { i -> "${section.name}:${options[i].scryfallValue}" }
+                        ) { index ->
+                            val option = options[index]
+                            val isSelected = selectedFunctions.contains(option.scryfallValue)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .clickable { onToggleFunction(option.scryfallValue) },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { onToggleFunction(option.scryfallValue) },
                                     colors = CheckboxDefaults.colors(checkedColor = mc.primaryAccent)
                                 )
                                 Text(

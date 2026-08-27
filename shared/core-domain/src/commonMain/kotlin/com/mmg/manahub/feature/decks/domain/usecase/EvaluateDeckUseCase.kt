@@ -4,6 +4,7 @@ import com.mmg.manahub.core.common.CrashReporter
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.CardTag
 import com.mmg.manahub.core.model.DeckFormat
+import com.mmg.manahub.core.model.ScoreWeightOverrides
 import com.mmg.manahub.core.domain.usecase.decks.BasicLandCalculator
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
 import com.mmg.manahub.core.gamification.domain.event.ProgressionEvent
@@ -18,6 +19,7 @@ import com.mmg.manahub.feature.decks.domain.engine.CurveExemption
 import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.DeckEntry
 import com.mmg.manahub.feature.decks.domain.engine.DeckEvaluation
+import com.mmg.manahub.feature.decks.domain.engine.PostureId
 import com.mmg.manahub.feature.decks.domain.engine.DeckProfile
 import com.mmg.manahub.feature.decks.domain.engine.DeckScorer
 import com.mmg.manahub.feature.decks.domain.engine.DeckWarning
@@ -25,6 +27,7 @@ import com.mmg.manahub.feature.decks.domain.engine.ManaColor
 import com.mmg.manahub.feature.decks.domain.engine.ResolvedArchetypeSkeleton
 import com.mmg.manahub.feature.decks.domain.engine.ScoreWeights
 import com.mmg.manahub.feature.decks.domain.engine.ThemeId
+import com.mmg.manahub.feature.decks.domain.engine.toAnalysisWeights
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -117,10 +120,18 @@ class EvaluateDeckUseCase(
      *        still honored, layered on the INFERRED macro). Unrecognized entries are dropped.
      * @param commanderTags the resolved commander card's tags (A.6 "commander tags" classifier
      *        signal); empty for non-Commander decks or an unresolved commander.
-     * @param analysisWeights the (optionally debug-tuned) [AnalysisWeights] threaded through to
-     *        [evaluateDeckUseCaseV2] (Deck Analysis Engine v2 Phase 2). The default keeps every
-     *        caller byte-identical to pre-Phase-2 behavior for the LEGACY `evaluation`/`profile`
-     *        fields — only the new, additive [DeckHealth.analysis] field is affected.
+     * @param scoreWeightOverrides Deck Analysis Engine v3 (spec §8) — the raw (optionally
+     *        debug-tuned) [ScoreWeightOverrides], resolved into a concrete [AnalysisWeights] INSIDE
+     *        this method (not by the caller) via [AnalysisWeights.forMacro], because the macro this
+     *        needs is [resolution]'s, which is only known once resolved below — a caller (e.g.
+     *        [com.mmg.manahub.feature.decks.domain.orchestrator.DeckDoctorOrchestrator]) cannot
+     *        compute it earlier. Per-field overrides still win outright
+     *        ([ScoreWeightOverridesMapper.toAnalysisWeights]'s existing null-coalescing merge); only
+     *        fields left un-overridden now fall back to the macro-dependent base instead of a flat
+     *        default. The default (no overrides) keeps every caller byte-identical to pre-4.5
+     *        behavior ONLY for an ambiguous/`null`-macro deck (spec §8's own MIDRANGE fallback IS
+     *        this class's pre-4.5 flat default) — every other macro now weights differently, an
+     *        intentional score-moving change (spec §8).
      * @param sideboardCount total sideboard card count (Wave 2 / B3), forwarded to
      *        [evaluateDeckUseCaseV2] for P5's [com.mmg.manahub.feature.decks.domain.engine.Finding
      *        .SideboardOversized] check. Appended LAST and defaulted so every existing call site
@@ -139,7 +150,7 @@ class EvaluateDeckUseCase(
         archetypeOverride: String? = null,
         themesOverride: List<String> = emptyList(),
         commanderTags: List<CardTag> = emptyList(),
-        analysisWeights: AnalysisWeights = AnalysisWeights(),
+        scoreWeightOverrides: ScoreWeightOverrides = ScoreWeightOverrides.NONE,
         sideboardCount: Int = 0,
     ): DeckHealth = withContext(ioDispatcher) {
         val colorIdentity = deriveColorIdentity(mainboard, commanderIdentity)
@@ -175,9 +186,12 @@ class EvaluateDeckUseCase(
         // GENERIC/no-themes for Draft (no archetype skeleton exists for it, mirrors the pre-Phase-1
         // Draft short-circuit).
         val resolution = if (archetypeFormat == null) {
-            ArchetypeResolution(ArchetypeId.GENERIC, emptyList(), isManualOverride = false, confidence = 0f)
+            ArchetypeResolution(macro = null, themes = emptyList(), isManualOverride = false, confidence = 0f)
         } else {
-            resolveArchetype(mainboard, archetypeFormat, archetypeOverride, themesOverride, commanderTags)
+            resolveArchetype(
+                mainboard, archetypeFormat, archetypeOverride, themesOverride, commanderTags,
+                commanderColorIdentity = commanderIdentity.mapNotNull(::symbolToColor).toSet(),
+            )
         }
 
         // Deck Analysis Engine v2 (Phase 2) — runs UNCONDITIONALLY (even GENERIC/no-themes, even
@@ -193,6 +207,14 @@ class EvaluateDeckUseCase(
         // nullable (see its own KDoc), so a `null` fallback here needs no consumer change; every
         // OTHER field this method computes (the legacy `evaluation`/`profile`/`archetypeResolution`)
         // stays fully unaffected by a v2 failure.
+        // Deck Analysis Engine v3 (spec §8) -- resolved HERE, not earlier, because it needs
+        // resolution.macro (only known once resolveArchetype/the Draft short-circuit above has run).
+        // toAnalysisWeights' existing null-coalescing merge means any field the caller actually
+        // overrode still wins outright; only the un-overridden fields fall back to this macro-
+        // dependent base instead of the old flat AnalysisWeights() default.
+        val analysisWeights = scoreWeightOverrides.toAnalysisWeights(
+            AnalysisWeights.forMacro(resolution.macro, resolution.themes.size),
+        )
         val analysis: DeckAnalysis? = runCatching {
             evaluateDeckUseCaseV2(
                 mainboard = mainboard,
@@ -202,6 +224,13 @@ class EvaluateDeckUseCase(
                 resolution = resolution,
                 weights = analysisWeights,
                 sideboardCount = sideboardCount,
+                // Deck Analysis Engine v3, PHASE 5 (UI) -- this IS the real Analysis tab pass (the
+                // only production call site of evaluateDeckUseCaseV2), so it now opts into
+                // DeckAnalysis.debugSynergyGraph: the Suggestions tab's synergy-package UI renders
+                // producer -> payoff sections per live axis straight off it (see
+                // AxisCardBreakdown's own KDoc) -- computed AFTER compose() either way, so this can
+                // never influence totalScore/any pillar subscore.
+                includeDebugSynergyGraph = true,
             )
         }.onFailure { t ->
             crashReporter?.setCustomKey("deck_analysis_format", format.name)
@@ -216,9 +245,11 @@ class EvaluateDeckUseCase(
             return@withContext DeckHealth(evaluation = evaluation, profile = profile, archetypeResolution = resolution, analysis = analysis)
         }
 
-        if (resolution.macro == ArchetypeId.GENERIC && resolution.themes.isEmpty()) {
-            // Zero-regression path (1.4/1.8 exit criterion): GENERIC-with-no-themes returns the
-            // BASE evaluation untouched — no archetype warnings computed or substituted.
+        if (resolution.macro == null && resolution.themes.isEmpty()) {
+            // Zero-regression path (1.4/1.8 exit criterion): no-macro-with-no-themes (Deck Analysis
+            // Engine v3 removed ArchetypeId.GENERIC — this is the new "no confident macro, no
+            // theme" signal) returns the BASE evaluation untouched — no archetype warnings computed
+            // or substituted.
             return@withContext DeckHealth(evaluation = evaluation, profile = profile, archetypeResolution = resolution, analysis = analysis)
         }
 
@@ -233,27 +264,44 @@ class EvaluateDeckUseCase(
         DeckHealth(evaluation = archetypeEvaluation, profile = profile, archetypeResolution = resolution, analysis = analysis)
     }
 
-    /** Override wins when set and recognized; otherwise runs [InferDeckArchetypeUseCase]. */
+    /** Override wins when set and recognized; otherwise runs [InferDeckArchetypeUseCase].
+     * [commanderColorIdentity] is the SAME commander-identity signal [deriveColorIdentity] already
+     * folds into the deck-wide color identity above, converted once here and forwarded as the
+     * (weak, tiebreak-only) color half of the commander prior -- see
+     * [InferDeckArchetypeUseCase]'s own `commanderMacroPrior` KDoc. */
     private fun resolveArchetype(
         mainboard: List<DeckEntry>,
         format: ArchetypeFormat,
         archetypeOverride: String?,
         themesOverride: List<String>,
         commanderTags: List<CardTag>,
+        commanderColorIdentity: Set<ManaColor>,
     ): ArchetypeResolution {
         val pinnedMacro = archetypeOverride?.let { raw -> ArchetypeId.entries.firstOrNull { it.name == raw } }
         val pinnedThemes = themesOverride.mapNotNull { raw -> ThemeId.entries.firstOrNull { it.name == raw } }.take(2)
 
         if (pinnedMacro != null || pinnedThemes.isNotEmpty()) {
+            // Deck Analysis Engine v3: ArchetypeId.GENERIC no longer exists -- a themes-only pin
+            // (no macro) now resolves `macro = null` directly (the resolver's own "grade against
+            // the bare generic baseline" convention), rather than coercing to a removed enum value.
+            // No [ArchetypeResolution.resemblance] here -- a manual pin has no axes-based distance
+            // computation to report (resemblance is specifically the INFERENCE path's output).
             return ArchetypeResolution(
-                macro = pinnedMacro ?: ArchetypeId.GENERIC,
+                macro = pinnedMacro,
                 themes = pinnedThemes,
                 isManualOverride = true,
                 confidence = 1f,
             )
         }
-        val inferred = inferDeckArchetypeUseCase(mainboard, format, commanderTags)
-        return ArchetypeResolution(inferred.macro, inferred.themes, isManualOverride = false, confidence = inferred.confidence)
+        val inferred = inferDeckArchetypeUseCase(mainboard, format, commanderTags, commanderColorIdentity)
+        return ArchetypeResolution(
+            macro = inferred.macro,
+            posture = inferred.posture,
+            themes = inferred.themes,
+            isManualOverride = false,
+            confidence = inferred.confidence,
+            resemblance = inferred.resemblance,
+        )
     }
 
     /**
@@ -351,10 +399,22 @@ class EvaluateDeckUseCase(
  * detected-vs-manual indicator.
  */
 data class ArchetypeResolution(
-    val macro: ArchetypeId,
+    /** `null` = no confident macro (Deck Analysis Engine v3 removed `ArchetypeId.GENERIC` — an
+     * ambiguous inference, or Draft's no-skeleton placeholder, are both represented as `null` now,
+     * rather than a neutral enum value). The engine still grades against the bare generic
+     * baseline skeleton in this case (see [ArchetypeSkeletonResolver.resolve]'s own `null`
+     * convention) — only the DISPLAY label degrades to "Custom"/a hybrid, per spec §2.1. */
+    val macro: ArchetypeId?,
+    val posture: PostureId? = null,
     val themes: List<ThemeId>,
     val isManualOverride: Boolean,
     val confidence: Float,
+    /** Commander-prior workstream (2026-08-26): the full ranked, normalised resemblance across
+     * all 5 macros (see [InferDeckArchetypeUseCase.ArchetypeInference.resemblance]'s own KDoc) —
+     * forwarded verbatim from the inference path. Empty for a manual pin (no axes-based distance
+     * computation exists for a pin) and for Draft/the zero-signal placeholder. The domain model
+     * a future UI phase renders as e.g. "70% Aggro · 30% Midrange" instead of a bare "Custom". */
+    val resemblance: List<MacroResemblance> = emptyList(),
 )
 
 /**
@@ -373,6 +433,6 @@ data class ArchetypeResolution(
 data class DeckHealth(
     val evaluation: DeckEvaluation,
     val profile: DeckProfile,
-    val archetypeResolution: ArchetypeResolution = ArchetypeResolution(ArchetypeId.GENERIC, emptyList(), isManualOverride = false, confidence = 0f),
+    val archetypeResolution: ArchetypeResolution = ArchetypeResolution(macro = null, themes = emptyList(), isManualOverride = false, confidence = 0f),
     val analysis: DeckAnalysis? = null,
 )

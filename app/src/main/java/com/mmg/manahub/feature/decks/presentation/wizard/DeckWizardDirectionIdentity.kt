@@ -66,6 +66,7 @@ import com.mmg.manahub.core.ui.Res
 import com.mmg.manahub.core.ui.components.CircularDistribution
 import com.mmg.manahub.core.ui.components.MagicLoadingSize
 import com.mmg.manahub.core.ui.components.MagicLoadingSpinner
+import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.components.MagicCardInspectionOverlay
 import com.mmg.manahub.core.ui.components.ManaSymbolImage
 import com.mmg.manahub.core.ui.mtg_card_back
@@ -83,8 +84,6 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 import com.mmg.manahub.feature.decks.domain.template.CollectionTribeSignal
 import com.mmg.manahub.feature.decks.domain.template.OwnedCommanderCandidate
 import com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate
-import com.mmg.manahub.feature.decks.presentation.components.CardRow
-import com.mmg.manahub.feature.decks.presentation.components.CommanderBanner
 import org.jetbrains.compose.resources.painterResource
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -466,10 +465,17 @@ private fun CommanderPickerSection(
 
         val commander = uiState.selectedCommander
         if (commander != null) {
-            // Global CommanderBanner replaces the old bespoke WizardHeroRow -- an explicit
-            // "Change commander" affordance sits below it since the banner itself has no clear
+            // Global CardRow (commander style) replaces the old bespoke WizardHeroRow -- an explicit
+            // "Change commander" affordance sits below it since the row itself has no clear
             // action (unlike the old row's trailing close icon).
-            CommanderBanner(commander = commander, modifier = Modifier.fillMaxWidth())
+            CardRow(
+                card = commander,
+                isInCollection = true,
+                onClick = { /* Detail already visible if needed */ },
+                onRemove = null,
+                isCommander = true,
+                modifier = Modifier.fillMaxWidth()
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -974,9 +980,17 @@ private fun ThemeRow(themeId: ThemeId, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** One 1-2 line plain-English explanation per [ThemeId] (the 22 themes from Appendix A.2 --
- * see `ArchetypeModels.kt`). A bare theme name means little to a player unfamiliar with the term,
- * so the Identity step's theme list (see [ThemeRow]) always pairs the name with this description. */
+/** One 1-2 line plain-English explanation per [ThemeId] (the 21 themes from Deck Analysis Engine
+ * v3, spec §4 -- see `ArchetypeModels.kt`). A bare theme name means little to a player unfamiliar
+ * with the term, so the Identity step's theme list (see [ThemeRow]) always pairs the name with
+ * this description.
+ *
+ * Deck Analysis Engine v3 compat pass (2026-08-26): VOLTRON/STAX/GROUP_HUG/GROUP_SLUG/TOOLBOX
+ * removed (moved to PostureId/ArchetypeId.PRISON, spec §4.1/§2.2 -- none is a [ThemeId] any more);
+ * MILL renamed to MILL_OPPONENT (spec §4.2 split), reusing the SAME string resource verbatim (the
+ * win-condition copy is unchanged). TREASURE/EQUIPMENT/STORM (NEW) have no dedicated
+ * `deck_wizard_theme_desc_*` string resource yet -- reuse [StrategyCatalog.description] (plain
+ * commonMain copy) as a placeholder, flagged for a follow-up localized-resource pass. */
 @Composable
 private fun themeDescription(themeId: ThemeId): String = when (themeId) {
     ThemeId.REANIMATOR -> stringResource(R.string.deck_wizard_theme_desc_reanimator)
@@ -984,8 +998,6 @@ private fun themeDescription(themeId: ThemeId): String = when (themeId) {
     ThemeId.ARISTOCRATS -> stringResource(R.string.deck_wizard_theme_desc_aristocrats)
     ThemeId.TOKENS -> stringResource(R.string.deck_wizard_theme_desc_tokens)
     ThemeId.SPELLSLINGER -> stringResource(R.string.deck_wizard_theme_desc_spellslinger)
-    ThemeId.VOLTRON -> stringResource(R.string.deck_wizard_theme_desc_voltron)
-    ThemeId.STAX -> stringResource(R.string.deck_wizard_theme_desc_stax)
     ThemeId.LANDFALL -> stringResource(R.string.deck_wizard_theme_desc_landfall)
     ThemeId.LIFEGAIN -> stringResource(R.string.deck_wizard_theme_desc_lifegain)
     ThemeId.PLUS1_COUNTERS -> stringResource(R.string.deck_wizard_theme_desc_plus1_counters)
@@ -993,14 +1005,14 @@ private fun themeDescription(themeId: ThemeId): String = when (themeId) {
     ThemeId.ARTIFACTS -> stringResource(R.string.deck_wizard_theme_desc_artifacts)
     ThemeId.ENCHANTRESS -> stringResource(R.string.deck_wizard_theme_desc_enchantress)
     ThemeId.WHEELS -> stringResource(R.string.deck_wizard_theme_desc_wheels)
-    ThemeId.MILL -> stringResource(R.string.deck_wizard_theme_desc_mill)
-    ThemeId.GROUP_HUG -> stringResource(R.string.deck_wizard_theme_desc_group_hug)
-    ThemeId.GROUP_SLUG -> stringResource(R.string.deck_wizard_theme_desc_group_slug)
+    ThemeId.MILL_OPPONENT -> stringResource(R.string.deck_wizard_theme_desc_mill)
     ThemeId.BLINK -> stringResource(R.string.deck_wizard_theme_desc_blink)
     ThemeId.SUPERFRIENDS -> stringResource(R.string.deck_wizard_theme_desc_superfriends)
     ThemeId.VEHICLES -> stringResource(R.string.deck_wizard_theme_desc_vehicles)
-    ThemeId.TOOLBOX -> stringResource(R.string.deck_wizard_theme_desc_toolbox)
     ThemeId.CLONES_THEFT -> stringResource(R.string.deck_wizard_theme_desc_clones_theft)
+    ThemeId.TREASURE -> StrategyCatalog.description(ThemeId.TREASURE)
+    ThemeId.EQUIPMENT -> StrategyCatalog.description(ThemeId.EQUIPMENT)
+    ThemeId.STORM -> StrategyCatalog.description(ThemeId.STORM)
 }
 
 /**
@@ -1058,7 +1070,10 @@ private fun com.mmg.manahub.feature.decks.domain.usecase.SeedStrategyCandidate.d
     return when {
         archetype != null -> StrategyCatalog.description(archetype)
         theme != null -> StrategyCatalog.description(theme)
-        else -> StrategyCatalog.description(ArchetypeId.GENERIC)
+        // Deck Analysis Engine v3 removed ArchetypeId.GENERIC -- a fully unpinned candidate (no
+        // archetype AND no theme) has no catalog description any more; this literal mirrors
+        // GENERIC's own retired copy verbatim.
+        else -> "A flexible, balanced approach with no single dominant strategy."
     }
 }
 

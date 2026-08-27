@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.CardRow
 import com.mmg.manahub.core.ui.theme.MagicTheme
 
 @Preview(showBackground = true)
@@ -63,9 +64,21 @@ fun CommanderBannerPreview() {
     MagicTheme {
         Surface(color = MaterialTheme.colorScheme.background) {
             Column(modifier = Modifier.padding(16.dp)) {
-                CommanderBanner(commander = sampleCommander)
+                CardRow(
+                    card = sampleCommander,
+                    isInCollection = true,
+                    onClick = {},
+                    onRemove = null,
+                    isCommander = true
+                )
                 Spacer(Modifier.height(16.dp))
-                CommanderBanner(commander = noCostCommander)
+                CardRow(
+                    card = noCostCommander,
+                    isInCollection = false,
+                    onClick = {},
+                    onRemove = null,
+                    isCommander = true
+                )
             }
         }
     }

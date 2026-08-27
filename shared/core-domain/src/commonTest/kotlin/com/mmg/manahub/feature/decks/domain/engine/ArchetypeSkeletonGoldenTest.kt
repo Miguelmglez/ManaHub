@@ -71,7 +71,7 @@ class ArchetypeSkeletonGoldenTest {
         // (anti-role resolution / theme merges do not violate the invariant).
         ArchetypeFormat.entries.forEach { format ->
             ArchetypeId.entries.forEach { archetype ->
-                if (archetype == ArchetypeId.GENERIC) return@forEach
+                
                 val resolved = ArchetypeSkeletonResolver.resolve(format, archetype)
                 assertBandOrdered("resolved.$archetype.$format.lands", resolved.lands)
                 assertCurveOrdered("resolved.$archetype.$format", resolved.curve)
@@ -100,7 +100,7 @@ class ArchetypeSkeletonGoldenTest {
 
     @Test
     fun everyArchetypeFitsBudgetForBothFormats() {
-        ArchetypeId.entries.filter { it != ArchetypeId.GENERIC }.forEach { archetype ->
+        ArchetypeId.entries.forEach { archetype ->
             assertWithinBudget(
                 "$archetype/commander", 100,
                 ArchetypeSkeletonResolver.resolve(ArchetypeFormat.COMMANDER, archetype),
@@ -119,16 +119,16 @@ class ArchetypeSkeletonGoldenTest {
             Triple(ArchetypeFormat.COMMANDER, ArchetypeId.AGGRO, listOf(ThemeId.TRIBAL)),
             Triple(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.ARISTOCRATS)),
             Triple(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.REANIMATOR)),
-            Triple(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.VOLTRON)),
+            Triple(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.EQUIPMENT)),
             Triple(ArchetypeFormat.COMMANDER, ArchetypeId.CONTROL, listOf(ThemeId.SPELLSLINGER)),
-            Triple(ArchetypeFormat.COMMANDER, ArchetypeId.RAMP, listOf(ThemeId.LANDFALL)),
+            Triple(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.LANDFALL)),
             Triple(ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.ARISTOCRATS, ThemeId.TOKENS)),
             Triple(ArchetypeFormat.SIXTY, ArchetypeId.AGGRO, listOf(ThemeId.TRIBAL)),
             Triple(ArchetypeFormat.SIXTY, ArchetypeId.COMBO, listOf(ThemeId.SELF_MILL)),
         )
         combos.forEach { (format, archetype, themes) ->
             val deckSize = if (format == ArchetypeFormat.COMMANDER) 100 else 60
-            val skeleton = ArchetypeSkeletonResolver.resolve(format, archetype, themes)
+            val skeleton = ArchetypeSkeletonResolver.resolve(format, archetype, themes = themes)
             assertWithinBudget("$archetype+${themes.joinToString("+")}/$format", deckSize, skeleton)
         }
     }
@@ -194,13 +194,25 @@ class ArchetypeSkeletonGoldenTest {
             36, 3.4,
         ),
         ReferenceDeck(
-            "Sram voltron (equipment)", ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.VOLTRON), 1,
+            // Phase 3b STEP 0 fix (2026-08-26): this fixture predates the Deck Analysis Engine v3
+            // taxonomy migration. `ThemeId.EQUIPMENT` used to be folded into the old `VOLTRON` THEME
+            // (which relaxed finisher/removal_mass as an overlay); spec §4.1/§4.2 split it into a
+            // real, standalone `EQUIPMENT` theme (bands `equipment` 8-11-15, no relaxes at all) and
+            // moved VOLTRON itself to a POSTURE this fixture never requests (`ReferenceDeck` has no
+            // posture field). Two consequences, both genuine taxonomy changes, not resolver bugs:
+            // (1) the role key is `equipment`, not the legacy `equipment_or_aura` proxy -- renamed
+            // below (count unchanged, 19). (2) with no VOLTRON overlay relaxing them, this deck must
+            // clear MIDRANGE's own base `finisher` (min 9) / `removal_mass` (min 4) / curve
+            // ([2.8, 3.7]) bands directly -- bumped finisher 2->9, removal_mass 3->4, avgMv 2.5->3.0
+            // to a realistic "typical, healthy" equipment-voltron build that still clears them
+            // (mirrors every other WS5-retune bump in this same fixture list).
+            "Sram voltron (equipment)", ArchetypeFormat.COMMANDER, ArchetypeId.MIDRANGE, listOf(ThemeId.EQUIPMENT), 1,
             mapOf(
-                "ramp" to 9, "card_draw" to 10, "removal_spot" to 8, "removal_mass" to 3, "finisher" to 2,
-                "recursion" to 2, "tutor" to 4, "equipment_or_aura" to 19, "protection" to 9, "evasion" to 6,
+                "ramp" to 9, "card_draw" to 10, "removal_spot" to 8, "removal_mass" to 4, "finisher" to 9,
+                "recursion" to 2, "tutor" to 4, "equipment" to 19, "protection" to 9, "evasion" to 6,
                 "threat_early" to 6,
             ),
-            34, 2.5,
+            34, 3.0,
         ),
         ReferenceDeck(
             // WS5 retune (2026-07-28): card_draw/removal_mass/finisher bumped 8/3/8 -> 10/4/9 to
@@ -256,7 +268,7 @@ class ArchetypeSkeletonGoldenTest {
     @Test
     fun everyReferenceDeckHasZeroFalsePositivesOnItsOwnCorrectSkeleton() {
         referenceDecks.forEach { deck ->
-            val correctSkeleton = ArchetypeSkeletonResolver.resolve(deck.format, deck.archetype, deck.themes)
+            val correctSkeleton = ArchetypeSkeletonResolver.resolve(deck.format, deck.archetype, themes = deck.themes)
             val warnings = evaluateVector(deck, correctSkeleton)
             assertTrue(
                 warnings.isEmpty(),
@@ -271,7 +283,7 @@ class ArchetypeSkeletonGoldenTest {
             val isPureMidrangeNoTheme = deck.archetype == ArchetypeId.MIDRANGE && deck.themes.isEmpty()
             if (isPureMidrangeNoTheme) return@forEach // excluded by Appendix B's own script
 
-            val correctSkeleton = ArchetypeSkeletonResolver.resolve(deck.format, deck.archetype, deck.themes)
+            val correctSkeleton = ArchetypeSkeletonResolver.resolve(deck.format, deck.archetype, themes = deck.themes)
             val genericSkeleton = ArchetypeSkeletonResolver.resolve(deck.format)
             val correctWarnings = evaluateVector(deck, correctSkeleton)
             val genericWarnings = evaluateVector(deck, genericSkeleton)
@@ -305,11 +317,11 @@ class ArchetypeSkeletonGoldenTest {
             "Krenko goblins (aggro tribal)" to 5,
             "Talrand control (mono-U)" to 0,
             "Karador reanimator" to 0,
-            // WS5 retune (2026-07-28): 2 -> 4. NEW removal_spot/removal_mass gaps surface once
-            // GENERIC's mins were bumped (9/4, ep.658 "Baseline" row, plan line ~304); the
-            // pre-existing finisher/curve gaps (Sram's own VOLTRON relax intentionally drops
-            // finisher/curve well below GENERIC) are unchanged.
-            "Sram voltron (equipment)" to 4,
+            // Phase 3b STEP 0 fix (2026-08-26): 4 -> 1. The fixture bump above (finisher 2->9,
+            // removal_mass 3->4, avgMv 2.5->3.0 -- see ReferenceDeck's own comment) now ALSO clears
+            // GENERIC's own (lower) mins for those 3 roles, so only the pre-existing removal_spot
+            // gap (8 < GENERIC's min 9) remains against the GENERIC skeleton specifically.
+            "Sram voltron (equipment)" to 1,
             // WS5 retune (2026-07-28): 0 -> 1. Meren's removal_spot=8 clears MIDRANGE's own min
             // (8) but not GENERIC's bumped min (9, ep.658 "Baseline" row) -- expected, since this
             // check compares against the GENERIC skeleton specifically, not Meren's correct one.

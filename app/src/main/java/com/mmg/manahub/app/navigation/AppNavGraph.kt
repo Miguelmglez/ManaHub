@@ -525,7 +525,6 @@ fun AppNavGraph(
                             },
                             onAddCardClick = { navController.navigate(Screen.CollectionAddCard.route) },
                             onDeckClick = { id -> navController.navigate(Screen.DeckStudio.createRoute(id)) },
-                            onCreateDeck = { navController.navigate(Screen.DeckStudio.createRoute(null)) },
                             onPlaytestClick = { id ->
                                 navController.navigate(Screen.PlaytestSetup.createRoute(id))
                             },

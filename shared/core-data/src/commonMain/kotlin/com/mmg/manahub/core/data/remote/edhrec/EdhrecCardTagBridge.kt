@@ -49,21 +49,22 @@ import com.mmg.manahub.feature.decks.domain.engine.ThemeId
 val CARD_TAG_KEY_TO_THEME_ID: Map<String, ThemeId> = mapOf(
     "tokens" to ThemeId.TOKENS,
     "lifegain" to ThemeId.LIFEGAIN,
-    "stax" to ThemeId.STAX,
+    // "stax" removed (Deck Analysis Engine v3, 2026-08-26): STAX moved to the macro
+    // ArchetypeId.PRISON, no longer a ThemeId (see EdhrecSlugMapping.kt's own compat note).
     "reanimator" to ThemeId.REANIMATOR,
-    "mill" to ThemeId.MILL,
+    "mill" to ThemeId.MILL_OPPONENT,
     "wheel" to ThemeId.WHEELS,
     "spellslinger" to ThemeId.SPELLSLINGER,
     "artifacts_matter" to ThemeId.ARTIFACTS,
     "enchantress" to ThemeId.ENCHANTRESS,
-    "group_hug" to ThemeId.GROUP_HUG,
-    "group_slug" to ThemeId.GROUP_SLUG,
+    // "group_hug"/"group_slug" removed: GROUP_HUG/GROUP_SLUG moved to PostureId (spec §4.1).
     "blink" to ThemeId.BLINK,
     "landfall" to ThemeId.LANDFALL,
     "plus_counters" to ThemeId.PLUS1_COUNTERS,
     "vehicle" to ThemeId.VEHICLES,
-    "voltron" to ThemeId.VOLTRON,
+    // "voltron" removed: VOLTRON moved to PostureId (spec §4.1).
     "planeswalker" to ThemeId.SUPERFRIENDS,
-    // ThemeId.ARISTOCRATS, ThemeId.TOOLBOX, ThemeId.TRIBAL, ThemeId.CLONES_THEFT,
-    // ThemeId.SELF_MILL: intentionally absent — see KDoc above.
+    // ThemeId.ARISTOCRATS, ThemeId.TRIBAL, ThemeId.CLONES_THEFT, ThemeId.SELF_MILL,
+    // ThemeId.TREASURE, ThemeId.EQUIPMENT, ThemeId.STORM: intentionally absent — see KDoc above
+    // (the 3 new themes have no verified TagDictionary-key bridge yet either, same discipline).
 )

@@ -38,11 +38,29 @@ class BuildScryfallQueryUseCase {
             }
             is SearchCriterion.CardType -> {
                 if (criterion.types.isEmpty()) return null
+                if (criterion.exclude) {
+                    // Suggestions Tab UI Polish plan (W11): negated, AND'd together
+                    // (`-t:x -t:y`) — every listed type must be ABSENT, never an OR of negations.
+                    return criterion.types.joinToString(" ") { "-t:${escapeValue(it)}" }
+                }
                 val parts = criterion.types.map { "t:${escapeValue(it)}" }
                 if (criterion.matchAll) {
                     parts.joinToString(",", prefix = "(", postfix = ")")
                 } else {
                     "(${parts.joinToString(" OR ", prefix = "(", postfix = ")")})"
+                }
+            }
+            is SearchCriterion.CardFunction -> {
+                if (criterion.functions.isEmpty()) return null
+                // Closed, hand-curated enum (CardFunctionOption) — values are already [a-z-],
+                // never user-typed free text, so escapeValue() must NOT be applied here (it would
+                // be a no-op at best; running curated constants through it is explicitly disallowed
+                // by the plan to avoid ever accidentally mangling a future value).
+                val parts = criterion.functions.map { "function:$it" }
+                if (criterion.matchAll) {
+                    parts.joinToString(" ")
+                } else {
+                    parts.joinToString(",", prefix = "(", postfix = ")")
                 }
             }
             is SearchCriterion.Colors -> {
@@ -92,6 +110,33 @@ class BuildScryfallQueryUseCase {
                 "a:${escapeValue(criterion.value)}"
             is SearchCriterion.FlavorText ->
                 "ft:${escapeValue(criterion.value)}"
+            is SearchCriterion.ManaProduction -> {
+                val parts = mutableListOf<String>()
+                if (criterion.requireLand) parts += "t:land"
+                criterion.colors.forEach { parts += "produces:${it.lowercase()}" }
+                criterion.minDistinctColors?.let { parts += "produces>=$it" }
+                if (parts.isEmpty()) return null
+                parts.joinToString(" ")
+            }
+            is SearchCriterion.OracleTerms -> {
+                if (criterion.allOf.isEmpty() && criterion.anyOfGroups.isEmpty() && criterion.typeLineAnyOf.isEmpty()) return null
+                val parts = mutableListOf<String>()
+                // Curated compile-time constants only (see this criterion's own KDoc) -- rendered
+                // verbatim, deliberately NEVER through escapeValue() (would corrupt a multi-word
+                // quoted phrase into disconnected single-word tokens).
+                criterion.allOf.forEach { parts += "oracle:\"$it\"" }
+                criterion.anyOfGroups.forEach { group ->
+                    if (group.isNotEmpty()) {
+                        parts += if (group.size == 1) "oracle:\"${group[0]}\""
+                        else "(" + group.joinToString(" or ") { "oracle:\"$it\"" } + ")"
+                    }
+                }
+                if (criterion.typeLineAnyOf.isNotEmpty()) {
+                    parts += if (criterion.typeLineAnyOf.size == 1) "t:${criterion.typeLineAnyOf[0]}"
+                    else "(" + criterion.typeLineAnyOf.joinToString(" or ") { "t:$it" } + ")"
+                }
+                parts.joinToString(" ")
+            }
             // Collection-local filters have no Scryfall equivalent
             is SearchCriterion.CollectionStatus,
             is SearchCriterion.HasTag -> null

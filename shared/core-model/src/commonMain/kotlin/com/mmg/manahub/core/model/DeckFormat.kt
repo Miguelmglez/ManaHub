@@ -76,6 +76,14 @@ enum class DeckFormat(
         requiresCommander = true,
         uniqueCards       = true,
     ),
+    COMMANDER_CASUAL(
+        displayName       = "Commander Casual",
+        targetDeckSize    = 100,
+        targetLandCount   = 37,
+        maxCopies         = 1,
+        requiresCommander = true,
+        uniqueCards       = true,
+    ),
     // Casual: permissive — no legality restriction and no construction validation. Standard shape.
     CASUAL(
         displayName       = "Casual",

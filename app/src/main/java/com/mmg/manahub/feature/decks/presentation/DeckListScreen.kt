@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -56,7 +58,6 @@ import com.mmg.manahub.feature.decks.presentation.components.DeckImportSheet
 @Composable
 fun DeckListScreen(
     onDeckClick:       (deckId: String) -> Unit,
-    onCreateDeck:      () -> Unit,
     onPlaytestClick:   (deckId: String) -> Unit = {},
     onBrowseCommunityDecks: () -> Unit = {},
     viewModel:         DeckViewModel = koinViewModel(),
@@ -64,13 +65,23 @@ fun DeckListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mc = MaterialTheme.magicColors
 
+    var showCreateSheet by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is DeckListEvent.NavigateToDeck -> onDeckClick(event.deckId)
+            }
+        }
+    }
+
     Scaffold(
         containerColor = mc.background,
         contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
             if (uiState.decks.isNotEmpty()) {
                 FloatingActionButton(
-                    onClick = onCreateDeck,
+                    onClick = { showCreateSheet = true },
                     containerColor = mc.primaryAccent,
                     contentColor = mc.background,
                 ) {
@@ -91,7 +102,7 @@ fun DeckListScreen(
                 )
 
                 uiState.decks.isEmpty() -> EmptyDecksState(
-                    onCreateClick = onCreateDeck,
+                    onCreateClick = { showCreateSheet = true },
                     onBrowseCommunityDecks = onBrowseCommunityDecks,
                     modifier      = Modifier.align(Alignment.Center),
                 )
@@ -115,6 +126,15 @@ fun DeckListScreen(
                 }
             }
         }
+    }
+
+    if (showCreateSheet) {
+        com.mmg.manahub.feature.decks.presentation.components.DeckCreationSheet(
+            onDismiss = { showCreateSheet = false },
+            onCreate = { name, format ->
+                viewModel.createDeck(name, format)
+            }
+        )
     }
 
     if (uiState.showImportSheet) {

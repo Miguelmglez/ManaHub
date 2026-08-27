@@ -1,9 +1,10 @@
 package com.mmg.manahub.feature.decks.presentation.components
 
-import androidx.compose.animation.core.animateFloatAsState
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,56 +12,62 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Hub
-import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mmg.manahub.R
 import com.mmg.manahub.core.ui.components.CardName
 import com.mmg.manahub.core.ui.theme.CardShape
-import com.mmg.manahub.core.ui.theme.ChipShape
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
+import com.mmg.manahub.feature.decks.domain.engine.DeckAnalysis
 import com.mmg.manahub.feature.decks.domain.engine.Finding
 import com.mmg.manahub.feature.decks.domain.engine.FindingSeverity
 import com.mmg.manahub.feature.decks.domain.engine.PillarId
 import com.mmg.manahub.feature.decks.domain.engine.PillarResult
 import com.mmg.manahub.feature.decks.domain.engine.RoleCoverageEntry
+import com.mmg.manahub.feature.decks.domain.engine.ScoreLimiter
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Doctor — Health view
@@ -90,8 +97,14 @@ import com.mmg.manahub.feature.decks.domain.engine.RoleCoverageEntry
 /**
  * Resolves a 0..1 quality fraction to a theme color on the good → mid → low ramp.
  * 1.0 = healthy (`lifePositive`), ~0.5 = caution (`goldMtg`), 0.0 = alert (`lifeNegative`).
+ *
+ * Widened from `private` to `internal` (Deck Analysis Category Sections rework, W7) so
+ * `CardSectionComponents.kt`'s [com.mmg.manahub.feature.decks.presentation.components
+ * .CardSectionHeader] can reuse the SAME good→mid→low ramp [RoleCoverageEntryRow] uses, rather
+ * than duplicating it — a top-level `private` declaration is FILE-private in Kotlin, not
+ * package-private, so same-package access from another file still needs `internal`.
  */
-private fun MagicColors.qualityColor(fraction: Float): Color {
+internal fun MagicColors.qualityColor(fraction: Float): Color {
     val f = fraction.coerceIn(0f, 1f)
     return if (f >= 0.5f) {
         lerp(goldMtg, lifePositive, (f - 0.5f) / 0.5f)
@@ -113,7 +126,7 @@ fun HealthScoreRing(
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
     val fraction = (score / 100f).coerceIn(0f, 1f)
-    val animated by animateFloatAsState(targetValue = fraction, label = "healthScore")
+    val animated by androidx.compose.animation.core.animateFloatAsState(targetValue = fraction, label = "healthScore")
     val arcColor = mc.qualityColor(fraction)
 
     val verdict = when {
@@ -133,8 +146,8 @@ fun HealthScoreRing(
         Canvas(modifier = Modifier.fillMaxWidth().height(168.dp)) {
             val stroke = 14.dp.toPx()
             val inset = stroke / 2f
-            val arcSize = Size(size.width - stroke, size.height - stroke)
-            val topLeft = Offset(inset, inset)
+            val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
+            val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
             // Track
             drawArc(
                 color = mc.surfaceVariant,
@@ -172,6 +185,89 @@ fun HealthScoreRing(
     }
 }
 
+/**
+ * Small, tappable hint row shown near [HealthScoreRing] when [DeckAnalysis.limiter] reports that
+ * ONE specific thing is dominantly holding [DeckAnalysis.totalScore] back — see [ScoreLimiter]'s
+ * own KDoc for the live-device finding this exists to fix (a player reading a legality-capped
+ * score as "the strategy switcher must be broken", when 3 illegal cards were hard-capping the total
+ * regardless of the correctly-recomputing pillars underneath). Renders nothing for
+ * [ScoreLimiter.None] — the common case. Styled as an inline hint/caption (cautionary
+ * [MagicColors.goldMtg], matching [FindingSeverity.WARNING]'s own tint), not a
+ * `FullErrorState`/`MagicAlertDialog` — this is informational, not an error.
+ *
+ * Tapping jumps focus to the relevant pillar tile via [onExpandPillar] — the SAME `expandedPillar`
+ * state the pillar-tile row itself already drives (see `DeckStudioScreen`'s `SuggestionsTab` call
+ * site), never a second expansion mechanism.
+ */
+@Composable
+fun ScoreLimiterHint(
+    limiter: ScoreLimiter,
+    onExpandPillar: (PillarId) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (limiter == ScoreLimiter.None) return
+    val mc = MaterialTheme.magicColors
+    val ty = MaterialTheme.magicTypography
+
+    val (text, targetPillar) = when (limiter) {
+        is ScoreLimiter.LegalityCapped ->
+            stringResource(R.string.deck_analysis_limiter_legality_capped, limiter.uncappedScore) to PillarId.LEGALITY
+        is ScoreLimiter.DominantPillar -> {
+            val pillarLabel = limiter.pillarId.label()
+            stringResource(R.string.deck_analysis_limiter_dominant_pillar, pillarLabel) to limiter.pillarId
+        }
+        ScoreLimiter.None -> return
+    }
+    val actionLabel = stringResource(R.string.deck_analysis_limiter_action)
+
+    Surface(
+        color = mc.backgroundSecondary,
+        shape = CardShape,
+        border = BorderStroke(1.dp, mc.goldMtg.copy(alpha = 0.5f)),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Box(
+            modifier = Modifier.background(
+                Brush.verticalGradient(
+                    listOf(mc.goldMtg.copy(alpha = 0.12f), mc.backgroundSecondary)
+                )
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .sizeIn(minHeight = 48.dp)
+                    .clickable(onClickLabel = actionLabel, role = Role.Button) { onExpandPillar(targetPillar) }
+                    .padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(mc.goldMtg.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = mc.goldMtg,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Text(
+                    text = text,
+                    style = ty.bodySmall,
+                    color = mc.textPrimary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Deck Analysis Engine v2 Phase 3 (plan §3.4 items 2-4) — pillar tiles, the plan-role
 //  table, and severity-tinted finding rows. All typed against the v2 engine models
@@ -180,9 +276,10 @@ fun HealthScoreRing(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Icon per [PillarId] (plan §3.4 item 3: "icon, name, subscore, status color"). Purely
- * decorative pairing with the tile's own text label, real `androidx.compose.material.icons`. */
-private fun PillarId.icon(): ImageVector = when (this) {
-    PillarId.MANA_BASE -> Icons.Default.Landscape
+ * decorative pairing with the tile's own text label. Returns either an [ImageVector] or a
+ * resource ID [Int] (for ic_land). */
+private fun PillarId.iconRes(): Any = when (this) {
+    PillarId.MANA_BASE -> R.drawable.ic_land
     PillarId.CURVE -> Icons.AutoMirrored.Filled.TrendingUp
     PillarId.PLAN_ROLES -> Icons.Default.Checklist
     PillarId.SYNERGY -> Icons.Default.Hub
@@ -193,6 +290,14 @@ private fun PillarId.icon(): ImageVector = when (this) {
  * One pillar tile in the horizontal pillar row (plan §3.4 item 3): icon, [PillarId.label], the
  * 0-100 [PillarResult.subscore], and a status color from [MagicColors.qualityColor]. Tapping
  * toggles [expanded] (hoisted — the caller owns which single pillar is expanded).
+ *
+ * Deck Analysis Engine v3 fix (Phase 5, 2026-08-27): [PillarResult.notApplicable] (currently only
+ * SYNERGY, on a zero-edge deck) renders as a muted "N/A" badge instead of the forced `subscore = 0`
+ * — that 0 is a scoring formality with no real measurement behind it (see the field's own KDoc);
+ * showing it as a number here would read as "maximally incoherent" when the true state is "this
+ * pillar does not apply". [MagicColors.textDisabled] (not the [MagicColors.qualityColor] ramp,
+ * which would render 0 as an alert-red circle) keeps the tile visually distinct from a genuinely
+ * low-scoring pillar.
  */
 @Composable
 fun PillarTile(
@@ -203,36 +308,51 @@ fun PillarTile(
 ) {
     val mc = MaterialTheme.magicColors
     val ty = MaterialTheme.magicTypography
-    val statusColor = mc.qualityColor(pillar.subscore / 100f)
+    val statusColor = if (pillar.notApplicable) mc.textDisabled else mc.qualityColor(pillar.subscore / 100f)
 
     Surface(
         onClick = onClick,
         shape = CardShape,
-        color = if (expanded) statusColor.copy(alpha = 0.14f) else mc.surface,
-        border = BorderStroke(1.dp, if (expanded) statusColor else mc.surfaceVariant),
-        // Deck Analysis Engine v2 Phase 3 review fix (P1 #1): no `minWidth` here — this tile is
-        // always used with `Modifier.weight(1f)` across a 5-wide Row (DeckStudioScreen's pillar
-        // row); a minWidth floor fights the weight distribution and overflows/clips on narrow
-        // (~360dp) devices. `minHeight` alone is enough to keep the tile from collapsing vertically.
-        modifier = modifier.sizeIn(minHeight = 76.dp),
+        color = if (expanded) statusColor.copy(alpha = 0.14f) else mc.backgroundSecondary,
+        border = BorderStroke(
+            width = if (expanded) 2.dp else 1.dp,
+            color = if (expanded) statusColor else mc.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        modifier = modifier.height(100.dp),
     ) {
         Column(
             modifier = Modifier.padding(MaterialTheme.spacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs, Alignment.CenterVertically),
         ) {
-            Icon(pillar.id.icon(), contentDescription = null, tint = statusColor, modifier = Modifier.size(20.dp))
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(statusColor.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                val icon = pillar.id.iconRes()
+                if (icon is ImageVector) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                } else if (icon is Int) {
+                    Icon(
+                        painter = painterResource(id = icon),
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
             Text(
-                text = pillar.subscore.toString(),
-                style = ty.titleMedium,
+                text = if (pillar.notApplicable) stringResource(R.string.deck_analysis_pillar_not_applicable_badge) else pillar.subscore.toString(),
+                style = ty.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = statusColor,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = pillar.id.label(),
-                style = ty.labelSmall,
-                color = mc.textSecondary,
-                textAlign = TextAlign.Center,
             )
         }
     }
@@ -334,9 +454,11 @@ fun RoleCoverageEntryRow(
 }
 
 /** A single vertical tick at [fraction] of the track's width — used for the min/max band markers
- * on [RoleCoverageEntryRow]'s bar. */
+ * on [RoleCoverageEntryRow]'s bar. Widened from `private` to `internal` (Deck Analysis Category
+ * Sections rework, W7) so `CardSectionComponents.kt`'s [com.mmg.manahub.feature.decks
+ * .presentation.components.CardSectionHeader] can reuse the exact same bar geometry. */
 @Composable
-private fun RoleBandMarker(fraction: Float, color: Color) {
+internal fun RoleBandMarker(fraction: Float, color: Color) {
     Box(
         modifier = Modifier
             .fillMaxWidth(fraction.coerceIn(0f, 1f))
@@ -357,6 +479,15 @@ private fun FindingSeverity.tint(): Color {
         FindingSeverity.WARNING -> mc.goldMtg
         FindingSeverity.INFO -> mc.textSecondary
     }
+}
+
+/** Severity → icon (Suggestions Tab UI Polish plan, W4 visual pass — replaces the old bare 8dp
+ * color dot with a real icon-in-tonal-circle badge, matching [PillarTile]'s own icon-badge
+ * treatment elsewhere in this file, for a stronger type/severity hierarchy than a flat dot gave). */
+private fun FindingSeverity.icon(): ImageVector = when (this) {
+    FindingSeverity.BLOCKER -> Icons.Default.Error
+    FindingSeverity.WARNING -> Icons.Default.Warning
+    FindingSeverity.INFO -> Icons.Default.Info
 }
 
 /** Sentinel substituted for the card-name format arg when building a splittable sentence template
@@ -396,8 +527,15 @@ private fun findingCardNameSentence(finding: Finding): Triple<String, String, St
     )
 }
 
-/** One severity-tinted finding row (plan §3.4 item 4), mirroring the legacy `WarningChip`'s visual
- * language but colored per-[Finding.severity] instead of always the alert color. */
+/**
+ * One severity-tinted finding row (plan §3.4 item 4), mirroring the legacy `WarningChip`'s visual
+ * language but colored per-[Finding.severity] instead of always the alert color.
+ *
+ * Suggestions Tab UI Polish plan (W4) visual pass: the old flat tonal [Surface] + bare 8dp color
+ * dot + plain text ("se ven muy planos y con el texto muy aburrido", the user's own words) is
+ * replaced with an icon-in-tonal-circle severity badge (mirrors [PillarTile]'s own badge
+ * treatment elsewhere in this file) for a real type/severity hierarchy instead of a flat dot.
+ */
 @Composable
 fun FindingRow(
     finding: Finding,
@@ -409,60 +547,138 @@ fun FindingRow(
     val cardNameSentence = findingCardNameSentence(finding)
 
     Surface(
-        color = tint.copy(alpha = 0.14f),
-        shape = ChipShape,
+        color = mc.backgroundSecondary,
+        shape = CardShape,
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.3f)),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier.background(
+                Brush.verticalGradient(
+                    listOf(tint.copy(alpha = 0.1f), mc.backgroundSecondary)
+                )
+            )
         ) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(tint))
-            Spacer(Modifier.width(MaterialTheme.spacing.sm))
-            if (cardNameSentence != null) {
-                val (prefix, cardName, suffix) = cardNameSentence
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (prefix.isNotEmpty()) {
-                        Text(text = prefix, style = ty.bodyMedium, color = mc.textPrimary)
-                    }
-                    CardName(name = cardName, style = ty.bodyMedium, color = mc.textPrimary)
-                    if (suffix.isNotEmpty()) {
-                        Text(text = suffix, style = ty.bodyMedium, color = mc.textPrimary)
-                    }
+            Row(
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.sm),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(tint.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = finding.severity.icon(),
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(14.dp),
+                    )
                 }
-            } else {
-                Text(text = finding.label(), style = ty.bodyMedium, color = mc.textPrimary)
+                if (cardNameSentence != null) {
+                    val (prefix, cardName, suffix) = cardNameSentence
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        if (prefix.isNotEmpty()) {
+                            Text(text = prefix, style = ty.bodyMedium, color = mc.textPrimary)
+                        }
+                        CardName(name = cardName, style = ty.bodyMedium, color = mc.textPrimary)
+                        if (suffix.isNotEmpty()) {
+                            Text(text = suffix, style = ty.bodyMedium, color = mc.textPrimary)
+                        }
+                    }
+                } else {
+                    Text(
+                        text = finding.label(),
+                        style = ty.bodyMedium,
+                        color = mc.textPrimary,
+                        fontWeight = if (finding.severity == FindingSeverity.BLOCKER) FontWeight.SemiBold else FontWeight.Normal,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
         }
     }
 }
 
-/** Inert "+N more" caption for a pillar's [PillarResult.collapsedFindingsCount] (plan §3.3's
- * finding budget) — [PillarResult] only ever exposes the OVERFLOW COUNT, never the budgeted-out
- * [Finding] objects themselves ([com.mmg.manahub.feature.decks.domain.engine.AnalysisEngine]'s
- * `budgetFindings` computes the count then discards the rest), so there is nothing to reveal on
- * tap — this is deliberately NOT clickable (see this phase's report for why no Phase 2 touch-up
- * was needed here). */
+/**
+ * Show-first-N / show-more-less over a pillar's FULL findings list (Suggestions Tab UI Polish
+ * plan, W4/D5) — replaces the old engine-side hard truncation
+ * ([com.mmg.manahub.feature.decks.domain.engine.AnalysisEngine]'s `budgetFindings` used to discard
+ * anything past 3 non-BLOCKER findings; `PillarResult.collapsedFindingsCount`/
+ * `CollapsedFindingsCaption` were the only surviving trace of what got dropped, with no way to
+ * ever reveal it). [findings] is now the FULL BLOCKER-first, severity/magnitude-sorted list
+ * (`AnalysisEngine.sortFindings`) — this composable folds the first [initiallyShown] itself and
+ * reveals the rest on tap, entirely client-side, with no engine involvement.
+ *
+ * `showAll` is `remember`ed keyed on [findings] itself (not a pillar id) so it naturally resets
+ * whenever the caller swaps in a different pillar's finding list (switching the expanded pillar
+ * tile) — the simplest option per the plan's own note, and avoids a second id-keyed map alongside
+ * `DeckStudioScreen`'s existing `collapsedCategorySections`.
+ */
 @Composable
-fun CollapsedFindingsCaption(count: Int, modifier: Modifier = Modifier) {
-    if (count <= 0) return
+fun FindingsList(
+    findings: List<Finding>,
+    modifier: Modifier = Modifier,
+    initiallyShown: Int = 3,
+) {
+    if (findings.isEmpty()) return
+    var showAll by remember(findings) { mutableStateOf(false) }
+    val overflow = (findings.size - initiallyShown).coerceAtLeast(0)
+    val visible = if (showAll || overflow == 0) findings else findings.take(initiallyShown)
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs),
+    ) {
+        visible.forEach { finding -> FindingRow(finding = finding) }
+        if (overflow > 0) {
+            TextButton(
+                onClick = { showAll = !showAll },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(
+                    text = if (showAll) stringResource(R.string.deck_analysis_findings_show_less)
+                    else stringResource(R.string.deck_analysis_findings_show_more, overflow),
+                    style = MaterialTheme.magicTypography.labelMedium,
+                    color = MaterialTheme.magicColors.primaryAccent,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * SYNERGY-pillar-only sub-caption ("Aligned N / M non-lands") rendered under the pillar detail
+ * header — Deck Analysis Category Sections rework (W2). Reads
+ * [PillarResult.alignedNonLandCopies]/[PillarResult.totalNonLandCopies] directly (raw Ints the
+ * engine exposes; it never formats the sentence itself, per [Finding]'s own string-free
+ * discipline) so the number on screen is traceable to the SAME `alignedCopies`/`nonLandCount`
+ * [AnalysisEngine.evaluateSynergy]'s `subscore` is built from — never re-derived from
+ * [PillarResult.sections] (summing aligned sections' `current` would double-count a card aligned
+ * on 2+ keys). Deliberately plain/no extra visual weight: SYNERGY is the weakest-calibrated of the
+ * 5 pillars (see [AnalysisEngine.evaluateSynergy]'s KDoc) — this caption is the "honest framing"
+ * the plan calls for, not a badge or a second score.
+ */
+@Composable
+fun SynergyAlignmentCaption(alignedCopies: Int, totalCopies: Int, modifier: Modifier = Modifier) {
+    if (totalCopies <= 0) return
     Text(
-        text = stringResource(R.string.deck_analysis_findings_collapsed_count, count),
+        text = stringResource(R.string.deck_analysis_synergy_alignment_caption, alignedCopies, totalCopies),
         style = MaterialTheme.magicTypography.labelSmall,
         color = MaterialTheme.magicColors.textSecondary,
         modifier = modifier,
     )
 }
 
-/** Expand/collapse chevron affordance — reused wherever a pillar's detail section can be toggled
- * (kept here, not inline, since [PillarTile] itself never renders it: the WHOLE tile is the tap
- * target, per plan §3.4 item 3, "tapping a tile expands its detail section"). */
-@Composable
-fun ExpandChevron(expanded: Boolean, modifier: Modifier = Modifier) {
-    Icon(
-        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-        contentDescription = null,
-        tint = MaterialTheme.magicColors.textSecondary,
-        modifier = modifier.size(20.dp),
-    )
-}
+// ExpandChevron was deleted (Suggestions Tab UI Polish plan, W0/D1) — its one call site
+// (DeckStudioScreen.kt's SuggestionsTab pillar-detail header) was a hardcoded `expanded = true`,
+// decorative and non-functional (D1). The shared `SectionHeader` component
+// (`shared/core-ui/.../components/SectionHeader.kt`) now owns chevron rendering everywhere a
+// real (non-decorative) collapse toggle is needed, folding in the exact same icon-swap shape this
+// function used to provide.

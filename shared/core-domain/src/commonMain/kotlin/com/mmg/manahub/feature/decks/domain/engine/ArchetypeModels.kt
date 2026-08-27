@@ -32,24 +32,67 @@ import com.mmg.manahub.core.model.Card
  */
 typealias RoleKey = String
 
-/** The 7 macro archetypes from Appendix A.2 (plus GENERIC, the "no specific archetype" default). */
+/**
+ * A synergy-graph axis key (Deck Analysis Engine v3, spec §5.1-5.2), e.g. `"LIFE"`, `"GRAVEYARD"`,
+ * `"TRIBE"`. A plain `String` (not an enum), mirroring [RoleKey]'s own locale-safe string-keying
+ * convention. **Derived, never hand-authored**: an axis exists iff at least one [RoleSpec] declares
+ * it in [RoleSpec.produces] and at least one declares it in [RoleSpec.consumes] (the two
+ * payoff-optional exceptions — `MILL_OPP` and `TRIBE` with a lord present — are called out
+ * explicitly in the spec, not inferred). Phase 1 only populates these sets on [RoleSpec]s; the
+ * graph that walks them (edges, health, live-axis detection) is Phase 2's [SynergyGraph] (not yet
+ * built as of this file).
+ */
+typealias AxisKey = String
+
+/**
+ * The 5 macro archetypes -- Deck Analysis Engine v3 (spec §2) taxonomy, DOWN from the prior 7.
+ * `RAMP`/`TEMPO` moved to [PostureId] (a ramp/tempo shell is an ENGINE overlaid on top of a real
+ * macro -- "ramp into threats = Midrange, into a combo = Combo, into inevitability = Control" --
+ * not a parallel quadrant, and keeping them as macros split the vote in the old 5-way argmax,
+ * an undocumented cause of the MIDRANGE bias). `GENERIC` is REMOVED -- a "no confident macro"
+ * result is no longer representable as an enum value; [ArchetypeInference] now argmaxes over a
+ * REAL prototype distance for all 5 values below and separately flags ambiguity (spec §2.1)
+ * rather than falling back to a 6th neutral member. `PRISON` is NEW (spec §2.2) -- a stax
+ * skeleton is structurally incompatible with an overlay (it wants 3-5 finishers/3-7 card draw as
+ * its BASE, which a theme's `relaxes` cannot express cleanly on top of another macro).
+ */
 enum class ArchetypeId(val displayName: String) {
-    GENERIC("Generic"),
     AGGRO("Aggro"),
     MIDRANGE("Midrange"),
     CONTROL("Control"),
-    TEMPO("Tempo"),
     COMBO("Combo"),
-    RAMP("Ramp");
-
-    /** True for every archetype except the neutral default. */
-    val isSpecialized: Boolean get() = this != GENERIC
+    PRISON("Prison"),
 }
 
 /**
- * The 22 themes from Appendix A.2, layered on top of a macro [ArchetypeId]. [displayName] is a
- * plain English string (resource-free `commonMain`, mirrors `GameFormat.displayName`/
- * `SeedStrategy.displayName`'s precedent in [DeckEngineModels.kt]).
+ * The posture layer (spec §3) -- a delta applied BETWEEN archetype and themes (layer 2.5 in
+ * [ArchetypeSkeletonResolver]), reusing the exact same `adds`/`relaxes`/`landsDelta`/`curveDelta`
+ * machinery a [ThemeDefinition] already uses. `RAMP`/`TEMPO` are the two ex-macros that moved here;
+ * `ATTRITION`/`TOOLBOX`/`VOLTRON`/`GROUP_HUG`/`GROUP_SLUG` are themes that moved here because none
+ * of them owns a producer<->payoff synergy axis -- they only reshape the skeleton, which is
+ * exactly what a posture is for.
+ */
+enum class PostureId(val displayName: String) {
+    RAMP("Ramp"),
+    TEMPO("Tempo"),
+    ATTRITION("Attrition"),
+    TOOLBOX("Toolbox"),
+    VOLTRON("Voltron"),
+    GROUP_HUG("Group Hug"),
+    GROUP_SLUG("Group Slug"),
+}
+
+/**
+ * The 21 themes from Deck Analysis Engine v3 (spec §4), DOWN from 22 -- `VOLTRON`/`TOOLBOX`/
+ * `GROUP_HUG`/`GROUP_SLUG` moved to [PostureId] (spec §4.1: "none owns a producer<->payoff axis;
+ * they only reshape the skeleton") and `STAX` moved to the macro [ArchetypeId.PRISON]. `MILL` split
+ * into `MILL_OPPONENT` (the win condition -- milling the OPPONENT) and a retargeted `SELF_MILL`
+ * (the enabler for a graveyard payoff -- milling YOURSELF); spec §4.2: "milling yourself and
+ * milling the opponent are opposite axes ... merging them into `mill_engine` was a modelling
+ * error." `TREASURE`/`EQUIPMENT`/`STORM` are new (spec §4.2); `STORM` is `sixtyOnly` (see
+ * [ThemeDefinition.sixtyOnly]). [displayName] is a plain English string (resource-free
+ * `commonMain`, mirrors `GameFormat.displayName`/`SeedStrategy.displayName`'s precedent in
+ * [DeckEngineModels.kt]).
  */
 enum class ThemeId(val displayName: String) {
     REANIMATOR("Reanimator"),
@@ -57,8 +100,6 @@ enum class ThemeId(val displayName: String) {
     ARISTOCRATS("Aristocrats"),
     TOKENS("Tokens"),
     SPELLSLINGER("Spellslinger"),
-    VOLTRON("Voltron"),
-    STAX("Stax"),
     LANDFALL("Landfall"),
     LIFEGAIN("Lifegain"),
     PLUS1_COUNTERS("+1/+1 Counters"),
@@ -66,14 +107,14 @@ enum class ThemeId(val displayName: String) {
     ARTIFACTS("Artifacts"),
     ENCHANTRESS("Enchantress"),
     WHEELS("Wheels"),
-    MILL("Mill"),
-    GROUP_HUG("Group Hug"),
-    GROUP_SLUG("Group Slug"),
+    MILL_OPPONENT("Mill"),
     BLINK("Blink"),
     SUPERFRIENDS("Superfriends"),
     VEHICLES("Vehicles"),
-    TOOLBOX("Toolbox"),
     CLONES_THEFT("Clones & Theft"),
+    TREASURE("Treasure"),
+    EQUIPMENT("Equipment"),
+    STORM("Storm"),
     ;
 
     companion object {
@@ -112,7 +153,8 @@ enum class ArchetypeFormat {
         /** Maps the engine's [com.mmg.manahub.core.model.DeckFormat] to an [ArchetypeFormat], or
          * `null` when the format has no archetype skeleton (Draft). */
         fun of(format: com.mmg.manahub.core.model.DeckFormat): ArchetypeFormat? = when (format) {
-            com.mmg.manahub.core.model.DeckFormat.COMMANDER -> COMMANDER
+            com.mmg.manahub.core.model.DeckFormat.COMMANDER,
+            com.mmg.manahub.core.model.DeckFormat.COMMANDER_CASUAL -> COMMANDER
             com.mmg.manahub.core.model.DeckFormat.STANDARD,
             com.mmg.manahub.core.model.DeckFormat.PIONEER,
             com.mmg.manahub.core.model.DeckFormat.MODERN,
@@ -143,6 +185,14 @@ data class CurveBand(val min: Double, val ideal: Double, val max: Double)
 /**
  * One archetype's per-format template (Appendix A.2 `archetypes.<ARCH>.<fmt>`).
  *
+ * @property id `null` ONLY for [ArchetypeData.generic] — the neutral base every [resolve][
+ *           com.mmg.manahub.feature.decks.domain.engine.ArchetypeSkeletonResolver.resolve] starts
+ *           from before a real macro's overrides apply. Deck Analysis Engine v3 removed
+ *           `ArchetypeId.GENERIC` as a pickable macro, but the RESOLVER STILL needs a neutral
+ *           starting scaffold to merge a real macro's `roleTargets` onto — `null` is that
+ *           scaffold's identity, distinct from (and never confused with) "no macro was resolved"
+ *           at the inference layer (see [com.mmg.manahub.feature.decks.domain.usecase
+ *           .ArchetypeInference]'s `isAmbiguous` flag for THAT concept instead).
  * @property roleTargets REPLACES (not merges with) the matching GENERIC role band for every key
  *           present here (`roles_override` semantics).
  * @property antiRoles roles this archetype actively does NOT want; resolved to `[0, 0, priorMax]`
@@ -150,7 +200,7 @@ data class CurveBand(val min: Double, val ideal: Double, val max: Double)
  *           anti-role rule zeroes its min/ideal, never a hardcoded 0.
  */
 data class ArchetypeDefinition(
-    val id: ArchetypeId,
+    val id: ArchetypeId?,
     val format: ArchetypeFormat,
     val lands: RoleTarget,
     val roleTargets: Map<RoleKey, RoleTarget>,
@@ -178,8 +228,13 @@ data class ArchetypeDefinition(
  *           `null` when the theme carries no exemption. Purely advisory in Phase 1's `resolve()` —
  *           consumed by [com.mmg.manahub.feature.decks.domain.usecase.EvaluateDeckUseCase] to
  *           suppress a curve warning, never by the resolver itself.
- * @property commanderOnly themes that only make sense in Commander (GROUP_HUG/GROUP_SLUG/
- *           CLONES_THEFT — no 60-card shell exists for social/multiplayer-only strategies).
+ * @property commanderOnly themes that only make sense in Commander (CLONES_THEFT — no 60-card
+ *           shell exists for a steal-your-opponents'-best-stuff strategy in a 1v1 shell).
+ * @property sixtyOnly Deck Analysis Engine v3 (spec §4.2) — the mirror-image flag: a theme that
+ *           only makes sense in a 60-card shell (`STORM` — Commander's higher average curve and
+ *           lower spell density make a genuine storm-count kill implausible; storm decks are a
+ *           60-card-constructed-specific archetype). Never `true` at the same time as
+ *           [commanderOnly] on the same entry.
  * @property overlayRoles the subset of THIS theme's [adds] keys that belong to the global A.4
  *           OVERLAY set (payoff-style roles counted at 50% toward the budget cap). Informational —
  *           the canonical set lives in [ArchetypeData.OVERLAY_ROLES]; kept per-theme too so a
@@ -194,7 +249,31 @@ data class ThemeDefinition(
     val sixtyScale: Double = 0.5,
     val curveExemption: CurveExemption? = null,
     val commanderOnly: Boolean = false,
+    val sixtyOnly: Boolean = false,
     val overlayRoles: Set<RoleKey> = emptySet(),
+)
+
+/**
+ * One posture's definition (Deck Analysis Engine v3, spec §3) — deliberately the SAME shape as
+ * [ThemeDefinition]'s `adds`/`relaxes`/`landsDelta`/`curveDelta`/`sixtyScale` fields (spec: "reusing
+ * the existing adds/relaxes/landsDelta/curveDelta machinery verbatim" — a data change, not a new
+ * mechanism). Applied by [ArchetypeSkeletonResolver] as layer 2.5, between the archetype override
+ * (layer 2) and themes (layer 3).
+ *
+ * @property antiRoles spec §3: `TEMPO` "also carries `antiRoles = setOf(\"removal_mass\")`,
+ *           inherited from its old macro definition" — the only posture with its own anti-role.
+ * @property commanderOnly `GROUP_HUG`/`GROUP_SLUG` (spec §3's `*`) — no 60-card shell exists for a
+ *           social/multiplayer-only posture.
+ */
+data class PostureDefinition(
+    val id: PostureId,
+    val adds: Map<RoleKey, RoleTarget>,
+    val relaxes: Map<RoleKey, RoleTarget> = emptyMap(),
+    val landsDelta: Int = 0,
+    val curveDelta: Double = 0.0,
+    val sixtyScale: Double = 0.5,
+    val antiRoles: Set<RoleKey> = emptySet(),
+    val commanderOnly: Boolean = false,
 )
 
 /**
@@ -224,7 +303,13 @@ data class ColorModulationEntry(val manaFix: RoleTarget, val landsDelta: Int)
  */
 data class ResolvedArchetypeSkeleton(
     val format: ArchetypeFormat,
-    val archetype: ArchetypeId,
+    /** `null` ONLY for a bare generic-baseline resolve (no macro override applied) — mirrors
+     * [ArchetypeDefinition.id]'s own convention. Every real inference/pin path resolves a
+     * non-null value (one of the 5 real macros). */
+    val archetype: ArchetypeId?,
+    /** Deck Analysis Engine v3 (spec §3) — layer 2.5, applied between [archetype] and [themes].
+     * `null` when no posture was detected/pinned (the common case). */
+    val posture: PostureId? = null,
     val themes: List<ThemeId>,
     val roleTargets: Map<RoleKey, RoleTarget>,
     val antiRoles: Set<RoleKey>,
@@ -241,18 +326,25 @@ data class ResolvedArchetypeSkeleton(
      * Deck Wizard & Engine Rework plan, WS5.4 -- a player-facing label for this resolved plan
      * (e.g. `"Aggro"`, `"Tokens"`, `"Aggro + Tokens"`), used by [ArchetypeEvaluator] to name the
      * plan inside archetype-aware [DeckWarning] copy ("Aggro wants..." instead of a generic
-     * "this plan wants..."). [ArchetypeId.GENERIC] contributes nothing (a bare GENERIC skeleton
-     * with no themes never reaches this -- see [ArchetypeEvaluator]'s file header -- but a
-     * GENERIC-archetype-with-theme-only pin is valid, hence the theme-only fallback below).
+     * "this plan wants..."). Deck Analysis Engine v3: [ArchetypeId.GENERIC] no longer exists --
+     * [archetype] is always a real, specialized macro now, so the archetype part is unconditional;
+     * [posture], when present, is inserted between the archetype and its themes.
      */
     fun planLabel(): String {
-        val archetypePart = archetype.takeIf { it != ArchetypeId.GENERIC }?.displayName
+        val archetypePart = archetype?.displayName
+        val posturePart = posture?.displayName
         val themePart = themes.takeIf { it.isNotEmpty() }?.joinToString(" + ") { it.displayName }
-        return when {
-            archetypePart != null && themePart != null -> "$archetypePart ($themePart)"
+        val head = when {
+            archetypePart != null && posturePart != null -> "$archetypePart $posturePart"
             archetypePart != null -> archetypePart
+            posturePart != null -> posturePart
+            else -> null
+        }
+        return when {
+            head != null && themePart != null -> "$head ($themePart)"
+            head != null -> head
             themePart != null -> themePart
-            else -> "This plan" // defensive -- GENERIC + no themes never reaches ArchetypeEvaluator
+            else -> "This plan" // defensive -- no archetype/posture/themes never reaches ArchetypeEvaluator
         }
     }
 }
@@ -261,9 +353,30 @@ data class ResolvedArchetypeSkeleton(
  * A single dynamic role definition (Phase 1.1): a [key] in the Appendix A vocabulary, an English
  * [label] (no Android resource — this is `commonMain`), and a [matcher] returning a per-card
  * confidence in `[0,1]` (`0f` = no match). Registered in [ArchetypeRoleClassifier.ROLE_SPECS].
+ *
+ * Deck Analysis Engine v3, Phase 1 (spec §5.1) adds the synergy-axis fields below, all defaulting
+ * to empty so every pre-existing [RoleSpec] construction keeps compiling unchanged:
+ *
+ * @property produces [AxisKey]s this role feeds AS A PRODUCER (e.g. `token_generator` produces
+ *           `"TOKENS"`).
+ * @property consumes [AxisKey]s this role feeds AS A PAYOFF (e.g. `death_payoff` consumes
+ *           `"DEATH"`). Named `consumes` (not `payoffs`) to mirror the produces/consumes verb pair
+ *           the spec itself uses for a directed producer -> consumer graph edge.
+ * @property amplifies [AxisKey]s this role modulates without being a producer or payoff on its own
+ *           (e.g. `anthem` amplifies `"TOKENS"`/`"COUNTERS"`/`"TRIBE"`/`"ATTACK"`).
+ *
+ * These sets are populated ONLY for roles this classifier represents as an actual [RoleSpec]
+ * instance. The 5 [ArchetypeRoleClassifier.LEGACY_ROLE_MAP] roles (`ramp`, `card_draw`,
+ * `removal_spot`, `removal_mass`, `tutor`) are classified via the legacy [RoleClassifier] and never
+ * become a [RoleSpec] here, so the spec's axis-table cells that name them (e.g. LANDFALL's
+ * "land-based ramp" producer) cannot be attached to anything today — a known Phase 1 gap for
+ * Phase 2's [SynergyGraph] to address, not silently dropped.
  */
 data class RoleSpec(
     val key: RoleKey,
     val label: String,
     val matcher: (Card) -> Float,
+    val produces: Set<AxisKey> = emptySet(),
+    val consumes: Set<AxisKey> = emptySet(),
+    val amplifies: Set<AxisKey> = emptySet(),
 )

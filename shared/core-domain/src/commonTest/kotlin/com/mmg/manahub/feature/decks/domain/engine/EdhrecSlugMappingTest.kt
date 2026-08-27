@@ -54,14 +54,16 @@ class EdhrecSlugMappingTest {
         assertEquals(ArchetypeId.AGGRO, EDHREC_SLUG_TO_ARCHETYPE_ID["aggro"])
         assertEquals(ArchetypeId.MIDRANGE, EDHREC_SLUG_TO_ARCHETYPE_ID["midrange"])
         assertEquals(ArchetypeId.CONTROL, EDHREC_SLUG_TO_ARCHETYPE_ID["control"])
-        assertEquals(ArchetypeId.TEMPO, EDHREC_SLUG_TO_ARCHETYPE_ID["tempo"])
         assertEquals(ArchetypeId.COMBO, EDHREC_SLUG_TO_ARCHETYPE_ID["combo"])
-        assertEquals(ArchetypeId.RAMP, EDHREC_SLUG_TO_ARCHETYPE_ID["ramp"])
+        // Deck Analysis Engine v3: tempo/ramp slugs removed -- TEMPO/RAMP moved to PostureId, no
+        // longer ArchetypeId values (see EdhrecSlugMapping.kt's own compat note).
+        assertFalse("tempo" in EDHREC_SLUG_TO_ARCHETYPE_ID)
+        assertFalse("ramp" in EDHREC_SLUG_TO_ARCHETYPE_ID)
     }
 
     @Test
-    fun `GENERIC is deliberately unmapped`() {
-        assertFalse(EDHREC_SLUG_TO_ARCHETYPE_ID.containsValue(ArchetypeId.GENERIC))
+    fun `a null (unpinned) archetype is deliberately unmapped, and PRISON is unmapped pending live verification`() {
+        assertFalse(EDHREC_SLUG_TO_ARCHETYPE_ID.containsValue(ArchetypeId.PRISON))
     }
 
     @Test
@@ -71,8 +73,10 @@ class EdhrecSlugMappingTest {
     }
 
     @Test
-    fun `exactly the 6 non-generic archetypes are mapped`() {
-        val expected = ArchetypeId.entries.filter { it.isSpecialized }.toSet()
+    fun `exactly the 4 currently-verified macros are mapped`() {
+        // Deck Analysis Engine v3: PRISON has no verified live slug yet (see EdhrecSlugMapping.kt's
+        // own compat note) -- 4 of the 5 real macros are mapped, not all 5.
+        val expected = setOf(ArchetypeId.AGGRO, ArchetypeId.MIDRANGE, ArchetypeId.CONTROL, ArchetypeId.COMBO)
         assertEquals(expected, EDHREC_SLUG_TO_ARCHETYPE_ID.values.toSet())
     }
 

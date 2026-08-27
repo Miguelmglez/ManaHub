@@ -15,13 +15,13 @@ class StrategyPickerStateTest {
 
     @Test
     fun `selecting an archetype drops themes that are no longer compatible`() {
-        // STAX (CONTROL/COMBO only) is incompatible with AGGRO -- picking AGGRO after STAX was
+        // MILL_OPPONENT (CONTROL/COMBO only) is incompatible with AGGRO -- picking AGGRO after it was
         // selected must drop it rather than leaving an invalid selection.
-        val withStax = StrategyPickerSelection(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.STAX))
+        val withStax = StrategyPickerSelection(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.MILL_OPPONENT))
         val result = StrategyPickerLogic.selectArchetype(withStax, ArchetypeId.AGGRO)
 
         assertEquals(ArchetypeId.AGGRO, result.archetype)
-        assertTrue(ThemeId.STAX !in result.themes)
+        assertTrue(ThemeId.MILL_OPPONENT !in result.themes)
         assertTrue(result.isValid)
     }
 
@@ -35,11 +35,11 @@ class StrategyPickerStateTest {
     }
 
     @Test
-    fun `selecting GENERIC never drops any already-selected theme`() {
-        val selection = StrategyPickerSelection(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.STAX))
-        val result = StrategyPickerLogic.selectArchetype(selection, ArchetypeId.GENERIC)
+    fun `selecting null (unpinned) never drops any already-selected theme`() {
+        val selection = StrategyPickerSelection(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.MILL_OPPONENT))
+        val result = StrategyPickerLogic.selectArchetype(selection, null)
 
-        assertEquals(listOf(ThemeId.STAX), result.themes)
+        assertEquals(listOf(ThemeId.MILL_OPPONENT), result.themes)
     }
 
     @Test
@@ -59,15 +59,15 @@ class StrategyPickerStateTest {
     @Test
     fun `toggling an unselected compatible theme adds it`() {
         val selection = StrategyPickerSelection(archetype = ArchetypeId.CONTROL)
-        val result = StrategyPickerLogic.toggleTheme(selection, ThemeId.STAX)
+        val result = StrategyPickerLogic.toggleTheme(selection, ThemeId.MILL_OPPONENT)
 
-        assertEquals(listOf(ThemeId.STAX), result.themes)
+        assertEquals(listOf(ThemeId.MILL_OPPONENT), result.themes)
     }
 
     @Test
     fun `toggling an already-selected theme removes it`() {
-        val selection = StrategyPickerSelection(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.STAX))
-        val result = StrategyPickerLogic.toggleTheme(selection, ThemeId.STAX)
+        val selection = StrategyPickerSelection(archetype = ArchetypeId.CONTROL, themes = listOf(ThemeId.MILL_OPPONENT))
+        val result = StrategyPickerLogic.toggleTheme(selection, ThemeId.MILL_OPPONENT)
 
         assertTrue(result.themes.isEmpty())
     }
@@ -75,7 +75,7 @@ class StrategyPickerStateTest {
     @Test
     fun `toggling an incompatible theme is a no-op`() {
         val selection = StrategyPickerSelection(archetype = ArchetypeId.AGGRO)
-        val result = StrategyPickerLogic.toggleTheme(selection, ThemeId.STAX)
+        val result = StrategyPickerLogic.toggleTheme(selection, ThemeId.MILL_OPPONENT)
 
         assertTrue(result.themes.isEmpty())
         assertEquals(selection, result)
@@ -140,22 +140,22 @@ class StrategyPickerStateTest {
     }
 
     @Test
-    fun `isThemeSelectable is permissive under GENERIC or null archetype`() {
-        assertTrue(StrategyPickerLogic.isThemeSelectable(StrategyPickerSelection(archetype = null), ThemeId.STAX))
-        assertTrue(StrategyPickerLogic.isThemeSelectable(StrategyPickerSelection(archetype = ArchetypeId.GENERIC), ThemeId.STAX))
+    fun `isThemeSelectable is permissive under a null (unpinned) archetype`() {
+        assertTrue(StrategyPickerLogic.isThemeSelectable(StrategyPickerSelection(archetype = null), ThemeId.MILL_OPPONENT))
+        assertTrue(StrategyPickerLogic.isThemeSelectable(StrategyPickerSelection(archetype = null), ThemeId.MILL_OPPONENT))
     }
 
     @Test
     fun `isThemeSelectable rejects an incompatible theme under a specific archetype`() {
-        assertFalse(StrategyPickerLogic.isThemeSelectable(StrategyPickerSelection(archetype = ArchetypeId.AGGRO), ThemeId.STAX))
+        assertFalse(StrategyPickerLogic.isThemeSelectable(StrategyPickerSelection(archetype = ArchetypeId.AGGRO), ThemeId.MILL_OPPONENT))
     }
 
     @Test
     fun `toProfile carries the caller-supplied colors through unchanged`() {
-        val selection = StrategyPickerSelection(archetype = ArchetypeId.RAMP, themes = listOf(ThemeId.LANDFALL))
+        val selection = StrategyPickerSelection(archetype = ArchetypeId.MIDRANGE, themes = listOf(ThemeId.LANDFALL))
         val profile = selection.toProfile(setOf(ManaColor.G))
 
-        assertEquals(ArchetypeId.RAMP, profile.archetype)
+        assertEquals(ArchetypeId.MIDRANGE, profile.archetype)
         assertEquals(listOf(ThemeId.LANDFALL), profile.themes)
         assertEquals(setOf(ManaColor.G), profile.colors)
     }

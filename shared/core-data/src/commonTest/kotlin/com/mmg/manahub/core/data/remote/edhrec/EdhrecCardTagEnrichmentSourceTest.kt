@@ -118,8 +118,10 @@ class EdhrecCardTagEnrichmentSourceTest {
             respond(aristocratsPageJson, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
         }
         val source = EdhrecCardTagEnrichmentSource(clientWith(engine))
+        // Deck Analysis Engine v3: STAX moved to ArchetypeId.PRISON, MILL split into
+        // MILL_OPPONENT/SELF_MILL (spec §4.1/§4.2) -- swapped for still-real ThemeId values.
         val manyCandidates = listOf(
-            ThemeId.ARISTOCRATS, ThemeId.TOKENS, ThemeId.STAX, ThemeId.MILL, ThemeId.BLINK,
+            ThemeId.ARISTOCRATS, ThemeId.TOKENS, ThemeId.MILL_OPPONENT, ThemeId.WHEELS, ThemeId.BLINK,
         )
 
         source.confirmThemes("Blood Artist", manyCandidates)
