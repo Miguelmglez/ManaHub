@@ -25,7 +25,10 @@ import com.mmg.manahub.core.model.SearchCriterion
 import com.mmg.manahub.core.model.UserCardWithCard
 import com.mmg.manahub.core.model.groupByCard
 import com.mmg.manahub.core.model.groupCollection
+import com.mmg.manahub.core.sync.CollectionMergeConflict
+import com.mmg.manahub.core.sync.CollectionMergeConflictResolver
 import com.mmg.manahub.core.sync.CollectionSyncWorker
+import com.mmg.manahub.core.sync.MergeConflictResolution
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.util.AnalyticsHelper
@@ -65,6 +68,7 @@ class CollectionViewModel(
     private val openForTradeRepository: OpenForTradeRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val analyticsHelper: AnalyticsHelper,
+    private val collectionMergeConflictResolver: CollectionMergeConflictResolver,
 ) : ViewModel() {
 
     val gridState = LazyGridState()
@@ -296,6 +300,61 @@ class CollectionViewModel(
                         else it.hasUnsyncedChanges,
                     )
                 }
+                // Write-path hardening audit (Phase 7, 2026-09-06): a SUCCESS transition is the
+                // natural moment a first-login assignUserIdAndSync (now WorkManager-driven, Phase
+                // 5) could have just left a pending conflict behind — re-check here rather than
+                // polling.
+                if (state == SyncState.SUCCESS) {
+                    checkForMergeConflicts()
+                }
+            }
+        }
+    }
+
+    /**
+     * Refreshes [CollectionUiState.pendingMergeConflicts] for the current user. Cheap no-op for
+     * the overwhelming majority of users (zero guest/account collisions) — see
+     * [CollectionMergeConflictResolver]'s KDoc for why this is a one-shot check rather than a
+     * live Flow.
+     */
+    private fun checkForMergeConflicts() {
+        val userId = (uiState.value.sessionState as? SessionState.Authenticated)?.user?.id ?: return
+        viewModelScope.launch {
+            val conflicts = collectionMergeConflictResolver.getPendingConflicts(userId)
+            if (conflicts.isEmpty()) {
+                _uiState.update { it.copy(pendingMergeConflicts = emptyList()) }
+                return@launch
+            }
+            val cardsById = cardRepository
+                .getCardsByIds(conflicts.map { it.guestRow.scryfallId }.distinct())
+                .associateBy { it.scryfallId }
+            _uiState.update {
+                it.copy(
+                    pendingMergeConflicts = conflicts.map { conflict ->
+                        val card = cardsById[conflict.guestRow.scryfallId]
+                        MergeConflictUiItem(
+                            conflict = conflict,
+                            cardName = card?.name ?: conflict.guestRow.scryfallId,
+                            imageUrl = card?.imageArtCrop,
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    /**
+     * Resolves one pending [CollectionMergeConflict] per the user's explicit [resolution] choice
+     * and refreshes the conflict list. Dismissing the sheet without calling this loses nothing —
+     * the conflict simply remains pending for next time.
+     */
+    fun onResolveMergeConflict(conflict: CollectionMergeConflict, resolution: MergeConflictResolution) {
+        viewModelScope.launch {
+            collectionMergeConflictResolver.resolve(conflict, resolution)
+            _uiState.update { state ->
+                state.copy(
+                    pendingMergeConflicts = state.pendingMergeConflicts.filterNot { it.conflict == conflict },
+                )
             }
         }
     }
@@ -309,12 +368,16 @@ class CollectionViewModel(
                         CollectionSyncWorker.schedulePeriodicSync(workManager)
                         if (!previouslyAuthenticated) {
                             // First transition to authenticated in this session.
-                            // Set the flag BEFORE launching so a rapid second Authenticated
-                            // emit (profile enrichment) doesn't fire a second sync.
+                            // Set the flag BEFORE using it so a rapid second Authenticated
+                            // emit (profile enrichment) doesn't fire a second migration.
                             previouslyAuthenticated = true
-                            viewModelScope.launch {
-                                syncManager.assignUserIdAndSync(state.user.id)
-                            }
+                            // Collection sync data-loss fix, Phase 5 (2026-09-06): the
+                            // offline-to-online first-login full pull is no longer launched here
+                            // on viewModelScope (navigating away from this screen used to cancel
+                            // it mid-flight). It is now dispatched app-wide, as durable
+                            // WorkManager unique work, from the app-scoped session observer in
+                            // ManaHubApp.kt — see CollectionSyncWorker.enqueueFirstLoginSync.
+                            // This ViewModel only observes syncManager.syncState (below).
                             triggerTradeListMigration(state.user.id)
                         }
                     }
@@ -350,23 +413,29 @@ class CollectionViewModel(
 
     /**
      * Triggers a one-shot full sync (push + pull) for the current user.
-     * Runs inline so the UI reflects the result immediately via [SyncManager.syncState].
-     * After the sync completes, the pending-changes count is re-evaluated so the banner
-     * is hidden on success or kept visible on error.
+     *
+     * Collection sync data-loss fix, Phase 5 (2026-09-06): dispatched as durable WorkManager
+     * unique work ([CollectionSyncWorker.enqueueOneTimeSync]) instead of an inline
+     * `syncManager.sync(userId)` call on `viewModelScope` — the previous inline call was
+     * cancelled if the user navigated away from this screen mid-sync. The UI already observes
+     * [SyncManager.syncState] (SYNCING → SUCCESS/ERROR) via [observeSyncState]; this function only
+     * kicks the work off and no longer awaits a [SyncManager.SyncResult] directly, so `syncError`
+     * text now comes only from the trade-list migration below (the collection-sync outcome itself
+     * is still fully visible via `uiState.syncState`).
      */
     fun onSync() {
         viewModelScope.launch {
             val userId = authRepository.getCurrentUser()?.id ?: return@launch
             _uiState.update { it.copy(syncError = null) }
 
-            // Sync the main collection — drives syncState SYNCING → SUCCESS/ERROR
-            // which the UI observes via observeSyncState().
-            val syncResult = syncManager.sync(userId)
+            // Drives syncState SYNCING → SUCCESS/ERROR, observed via observeSyncState().
+            CollectionSyncWorker.enqueueOneTimeSync(workManager)
 
-            // Migrate any wishlist/open-for-trade entries added while offline.
-            // Capture the migration error so it can be surfaced to the UI — previously
-            // the Result was discarded, silently leaving the banner stuck when Supabase
-            // rejected the batch insert (e.g. network timeout or RLS violation).
+            // Migrate any wishlist/open-for-trade entries added while offline. Independent of the
+            // collection sync above (different tables/RPCs, no ordering requirement between them).
+            // Capture the migration error so it can be surfaced to the UI — previously the Result
+            // was discarded, silently leaving the banner stuck when Supabase rejected the batch
+            // insert (e.g. network timeout or RLS violation).
             val migrationError: String? =
                 if (wishlistUnsyncedCount > 0 || openForTradeUnsyncedCount > 0) {
                     migrateLocalTradeLists(userId)
@@ -382,9 +451,7 @@ class CollectionViewModel(
                     null
                 }
 
-            // Surface the first non-null error: collection sync error takes priority
-            // over migration error so the most critical failure is always visible.
-            _uiState.update { it.copy(syncError = syncResult.error ?: migrationError) }
+            _uiState.update { it.copy(syncError = migrationError) }
 
             // Re-evaluate the banner after migration has finished (success or failure).
             // observeSyncState() already set hasUnsyncedChanges = (wishlistCount > 0)

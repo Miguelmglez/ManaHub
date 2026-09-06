@@ -39,10 +39,13 @@ enum class UpdateEntryOutcome {
  * Sync is NOT part of this interface. The `SyncManager` owns the push/pull cycle. This repository
  * is responsible only for local CRUD and exposing observable streams to the UI layer.
  *
- * This is the platform-agnostic surface (KMP `commonMain`). The Android-only `PagingData` pager
- * lives on a separate `CollectionPagerSource` interface in `:app` so this contract stays free of
- * `androidx.paging`/Room and can be implemented by both the Android (Room-backed) repository and a
- * future web data source.
+ * This is the platform-agnostic surface (KMP `commonMain`) — free of `androidx.paging`/Room so it
+ * can be implemented by both the Android (Room-backed) repository and a future web data source. An
+ * Android-only `CollectionPagerSource`/`CollectionRemoteMediator` paging surface used to sit
+ * alongside this interface; it was deleted (collection sync data-loss fix, write-path hardening
+ * audit, Phase 7) as dead, unreferenced code that also reintroduced the exact tuple-collision and
+ * offset-pagination-vs-mutable-order hazards `SyncManager.pullCollectionRow`'s LWW/keyset-cursor
+ * logic exists to avoid — do not re-add an offset-paginated Supabase reader for this table.
  */
 interface UserCardRepository {
 

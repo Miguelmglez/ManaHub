@@ -13,6 +13,7 @@ import com.mmg.manahub.core.domain.usecase.collection.ScannedCardCommit
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.model.DataResult
 import com.mmg.manahub.core.model.WishlistEntry
+import com.mmg.manahub.core.ui.components.MagicToastType
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
 import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel.Companion.ANTI_DUPLICATE_MS
@@ -436,7 +437,7 @@ class ScannerViewModel @Inject constructor(
         lastAddedId = card.scryfallId
         lastAddedTime = System.currentTimeMillis()
 
-        _uiState.update { it.copy(toastMessage = card.name) }
+        _uiState.update { it.copy(toastMessage = card.name, toastType = MagicToastType.SUCCESS) }
 
         if (_uiState.value.isSoundEnabled) {
             soundManager.playForPrice(
@@ -523,16 +524,31 @@ class ScannerViewModel @Inject constructor(
         viewModelScope.launch {
             // Route through the scanner commit use case so this counts as a scan
             // (CardScanned XP) rather than a manual add — and is never double-counted.
-            commitScannedCards(listOf(entry.toCommit()))
+            val result = commitScannedCards(listOf(entry.toCommit()))
             analyticsHelper.logEvent(
                 "scanner_entry_to_collection",
                 mapOf("card_id" to entry.card.scryfallId)
             )
-            _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name))
-            }
-            if (_uiState.value.isAutoDeleteOnAddEnabled) {
-                onRemoveSessionCard(entry)
+            // Write-path hardening audit (2026-09-06): a failed write must not report success or
+            // remove the entry from the queue — the user would lose track of a card that was
+            // never actually saved.
+            if (result.failedEntries == 0) {
+                _uiState.update {
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name),
+                        toastType = MagicToastType.SUCCESS,
+                    )
+                }
+                if (_uiState.value.isAutoDeleteOnAddEnabled) {
+                    onRemoveSessionCard(entry)
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_add_failed, entry.card.name),
+                        toastType = MagicToastType.ERROR,
+                    )
+                }
             }
         }
     }
@@ -560,7 +576,10 @@ class ScannerViewModel @Inject constructor(
                 mapOf("card_id" to entry.card.scryfallId)
             )
             _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name))
+                it.copy(
+                    toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
+                    toastType = MagicToastType.SUCCESS,
+                )
             }
             if (_uiState.value.isAutoDeleteOnAddEnabled) {
                 onRemoveSessionCard(entry)
@@ -595,7 +614,10 @@ class ScannerViewModel @Inject constructor(
                 )
                 addToWishlist(wishlistEntry)
                 _uiState.update {
-                    it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name))
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_added_to_wishlist, entry.card.name),
+                        toastType = MagicToastType.SUCCESS,
+                    )
                 }
                 kotlinx.coroutines.delay(100)
             }
@@ -604,7 +626,10 @@ class ScannerViewModel @Inject constructor(
                 mapOf("count" to cards.size.toString()),
             )
             _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_all_to_wishlist, cards.size))
+                it.copy(
+                    toastMessage = context.getString(R.string.scanner_toast_added_all_to_wishlist, cards.size),
+                    toastType = MagicToastType.SUCCESS,
+                )
             }
         }
     }
@@ -869,29 +894,58 @@ class ScannerViewModel @Inject constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Persists every [ScannedCard] in the session to the collection,
-     * then clears the queue and closes the sheet.
+     * Persists every [ScannedCard] in the session to the collection in ONE batched
+     * [CommitScannedCardsUseCase] call, then clears the queue and closes the sheet.
+     *
+     * Write-path hardening audit (2026-09-06): this used to loop one
+     * `commitScannedCards(listOf(entry.toCommit()))` call per entry with a `delay(100)` between
+     * them and NO try/catch — a single throwing entry aborted the whole `viewModelScope.launch`
+     * coroutine uncaught, silently stranding every entry after it AND never reaching
+     * `onClearSession()`, so the already-committed entries stayed in the queue too (a retry would
+     * then double-add them). [CommitScannedCardsUseCase] already isolates per-entry failures
+     * internally (see its KDoc), so the batch call below cannot itself throw for a single bad
+     * card; only a fully successful batch clears the whole session, a partial one removes just the
+     * entries that actually committed and surfaces a [MagicToastType.WARNING] naming the shortfall.
      */
     fun onAddAllToCollection() {
         val cards = _uiState.value.scanSession.cards
         if (cards.isEmpty()) return
 
         viewModelScope.launch {
-            for (entry in cards) {
-                commitScannedCards(listOf(entry.toCommit()))
-                _uiState.update {
-                    it.copy(toastMessage = context.getString(R.string.scanner_toast_added_to_collection, entry.card.name))
-                }
-                kotlinx.coroutines.delay(100)
-            }
+            val result = commitScannedCards(cards.map { it.toCommit() })
+
             analyticsHelper.logEvent(
                 "scanner_add_all",
-                mapOf("count" to cards.size.toString()),
+                mapOf("count" to cards.size.toString(), "failed" to result.failedEntries.toString()),
             )
-            _uiState.update {
-                it.copy(toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size))
+
+            if (result.failedEntries == 0) {
+                _uiState.update {
+                    it.copy(
+                        toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size),
+                        toastType = MagicToastType.SUCCESS,
+                    )
+                }
+                onClearSession()
+            } else {
+                val succeededTimestamps = cards.filterIndexed { index, _ ->
+                    result.entrySucceeded.getOrElse(index) { false }
+                }.mapTo(mutableSetOf()) { it.timestamp }
+                _uiState.update { state ->
+                    state.copy(
+                        scanSession = state.scanSession.copy(
+                            cards = state.scanSession.cards.filterNot { it.timestamp in succeededTimestamps },
+                        ),
+                        toastMessage = context.getString(
+                            R.string.scanner_toast_add_all_partial_failure,
+                            result.failedEntries,
+                            cards.size,
+                        ),
+                        toastType = MagicToastType.WARNING,
+                    )
+                }
+                persistQueue()
             }
-            onClearSession()
         }
     }
 

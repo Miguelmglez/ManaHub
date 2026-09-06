@@ -49,6 +49,32 @@ class SupabaseCollectionDataSource(
         }
 
     /**
+     * Calls the `get_collection_changes_page` RPC (collection sync data-loss fix, Phase 1/3).
+     * `p_since` stays fixed as the window filter; `p_after_updated_at`/`p_after_id` are the
+     * keyset cursor advanced by the caller (see [CollectionRemoteDataSource.getChangesPage]'s
+     * KDoc). The server clamps `p_limit` to `LEAST(p_limit, 500)`.
+     */
+    override suspend fun getChangesPage(
+        since: Long,
+        afterUpdatedAt: Long?,
+        afterId: String?,
+        limit: Int,
+    ): Result<List<UserCardCollectionDto>> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val params = buildJsonObject {
+                    put("p_since", since)
+                    put("p_after_updated_at", afterUpdatedAt)
+                    put("p_after_id", afterId)
+                    put("p_limit", limit)
+                }
+                supabaseClient.postgrest
+                    .rpc("get_collection_changes_page", params)
+                    .decodeList<UserCardCollectionDto>()
+            }
+        }
+
+    /**
      * Serializes [rows] to a JSON array and calls `batch_upsert_collection`.
      * The RPC performs server-side upsert on the `id` primary key.
      */
@@ -88,4 +114,18 @@ class SupabaseCollectionDataSource(
             supabaseClient.postgrest.rpc("merge_collection_entry", params).decodeAs<Boolean>()
         }
     }
+
+    /**
+     * Calls the parameterless `get_collection_integrity()` RPC (collection sync data-loss fix,
+     * Phase 6). Table-returning single-row RPC — same `decodeSingle` pattern as
+     * `CommunityStatsRemoteDataSource.getCommunityStats`.
+     */
+    override suspend fun getIntegrity(): Result<CollectionIntegrityDto> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                supabaseClient.postgrest
+                    .rpc("get_collection_integrity", buildJsonObject {})
+                    .decodeSingle<CollectionIntegrityDto>()
+            }
+        }
 }

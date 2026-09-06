@@ -28,10 +28,31 @@ interface UserCardCollectionDao {
     @Query("UPDATE user_card_collection SET is_deleted = 1, updated_at = :updatedAt WHERE id = :id")
     fun softDelete(id: String, updatedAt: Long = System.currentTimeMillis())
 
-    // Assigns a real userId to all rows created during a guest session (user_id IS NULL or '').
+    // Assigns a real userId to rows created during a guest session (user_id IS NULL or '').
     // Called once on login/registration. Returns count of updated rows so the caller can
     // decide whether to trigger a full sync.
-    @Query("UPDATE user_card_collection SET user_id = :newUserId, updated_at = :updatedAt WHERE user_id IS NULL OR user_id = ''")
+    //
+    // Write-path hardening audit (Phase 7, 2026-09-06): the NOT EXISTS guard skips a guest row
+    // whose composite tuple (scryfall_id, is_foil, condition, language) already belongs to a LIVE
+    // row [newUserId] owns. Migrating it anyway would violate the composite UNIQUE index; the
+    // guest row now stays put (user_id remains NULL, still visible -- observeAll/observeAllLocal
+    // already include null-user rows) as a PENDING CONFLICT instead of being silently
+    // merged-then-deleted. CollectionMergeConflictResolver surfaces these for the user to resolve
+    // explicitly (sum / keep account / keep offline) via CollectionMergeConflictSheet -- nothing
+    // is ever discarded without that explicit choice.
+    @Query("""
+        UPDATE user_card_collection SET user_id = :newUserId, updated_at = :updatedAt
+        WHERE (user_id IS NULL OR user_id = '')
+          AND NOT EXISTS (
+              SELECT 1 FROM user_card_collection existing
+              WHERE existing.user_id = :newUserId
+                AND existing.is_deleted = 0
+                AND existing.scryfall_id = user_card_collection.scryfall_id
+                AND existing.is_foil = user_card_collection.is_foil
+                AND existing.condition = user_card_collection.condition
+                AND existing.language = user_card_collection.language
+          )
+    """)
     fun assignUserId(newUserId: String, updatedAt: Long = System.currentTimeMillis()): Int
 
     // ── Read operations ───────────────────────────────────────────────────────
@@ -127,6 +148,18 @@ interface UserCardCollectionDao {
     // migrated via assignUserIdAndSync first and must not inflate the banner count.
     @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId AND updated_at > :since")
     fun countPendingSync(userId: String, since: Long): Int
+
+    // Collection sync data-loss fix, Phase 6: total row count for [userId] INCLUDING tombstones
+    // -- mirrors the server's get_collection_integrity().total_rows exactly (that RPC also
+    // counts tombstones). Used by SyncManager's post-sync integrity self-check to detect a
+    // client/server row-count disagreement.
+    @Query("SELECT COUNT(*) FROM user_card_collection WHERE user_id = :userId")
+    fun getTotalRowCountForUser(userId: String): Int
+
+    // Live (non-deleted) summed quantity for [userId] -- mirrors get_collection_integrity()
+    // .liveQuantity. Diagnostic-only (logged alongside a mismatch), not itself the repair trigger.
+    @Query("SELECT COALESCE(SUM(quantity), 0) FROM user_card_collection WHERE user_id = :userId AND is_deleted = 0")
+    fun getLiveQuantityForUser(userId: String): Int
 
     // Card Versions & Languages, Phase 1A. Every non-deleted collection row for ANY
     // printing/language sharing the same oracle identity as the card being viewed — feeds

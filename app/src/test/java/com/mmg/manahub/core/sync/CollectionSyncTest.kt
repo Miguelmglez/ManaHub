@@ -120,8 +120,8 @@ class CollectionSyncTest {
         every { collectionDao.getAllSince(any(), any()) } returns emptyList()
         every { deckDao.getDecksSince(any(), any()) } returns emptyList()
         every { deckDao.getDeckCards(any()) } returns emptyList()
-        coEvery { collectionRemote.getChangesSince(any()) } returns Result.success(emptyList())
-        coEvery { deckRemote.getDeckChangesSince(any()) } returns Result.success(emptyList())
+        coEvery { collectionRemote.getChangesPage(any(), any(), any(), any()) } returns Result.success(emptyList())
+        coEvery { deckRemote.getDeckChangesPage(any(), any(), any(), any()) } returns Result.success(emptyList())
         coEvery { collectionRemote.batchUpsert(any()) } returns Result.success(Unit)
         coEvery { deckRemote.batchUpsertDecks(any()) } returns Result.success(Unit)
         coEvery { deckRemote.upsertDeckCards(any(), any()) } returns Result.success(Unit)
@@ -135,6 +135,14 @@ class CollectionSyncTest {
         coEvery { cardDao.getByIds(any()) } answers {
             firstArg<List<String>>().map { id -> mockk<CardEntity>(relaxed = true) { every { scryfallId } returns id } }
         }
+
+        // Phase 6 integrity self-check: default to "in sync" so it is a no-op unless a test
+        // explicitly overrides it.
+        coEvery { collectionRemote.getIntegrity() } returns Result.success(
+            com.mmg.manahub.core.data.remote.collection.CollectionIntegrityDto(
+                totalRows = 0, liveRows = 0, liveQuantity = 0, maxUpdatedAt = null,
+            )
+        )
 
         syncManager = SyncManager(
             collectionDao    = collectionDao,
@@ -244,7 +252,7 @@ class CollectionSyncTest {
         every {
             collectionDao.getByCompositeKey(remoteDeleted.userId, remoteDeleted.scryfallId, remoteDeleted.isFoil, remoteDeleted.condition, remoteDeleted.language)
         } returns localEntity
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDeleted))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDeleted))
         val capturedEntity = slot<UserCardCollectionEntity>()
         every { collectionDao.upsert(capture(capturedEntity)) } returns 1L
 
@@ -266,7 +274,7 @@ class CollectionSyncTest {
         every {
             collectionDao.getByCompositeKey(remoteDeleted.userId, remoteDeleted.scryfallId, remoteDeleted.isFoil, remoteDeleted.condition, remoteDeleted.language)
         } returns localEntity
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDeleted))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDeleted))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -285,7 +293,7 @@ class CollectionSyncTest {
         every {
             collectionDao.getByCompositeKey(remoteNew.userId, remoteNew.scryfallId, remoteNew.isFoil, remoteNew.condition, remoteNew.language)
         } returns null
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteNew))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteNew))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -321,7 +329,7 @@ class CollectionSyncTest {
             collectionDao.getByCompositeKey(dtoC.userId, dtoC.scryfallId, dtoC.isFoil, dtoC.condition, dtoC.language)
         } returns null
 
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(dtoA, dtoB, dtoC))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(dtoA, dtoB, dtoC))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -392,7 +400,7 @@ class CollectionSyncTest {
         every {
             collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
         } returns null
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDto))
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -415,7 +423,7 @@ class CollectionSyncTest {
         every {
             collectionDao.getByCompositeKey(remoteDto.userId, remoteDto.scryfallId, remoteDto.isFoil, remoteDto.condition, remoteDto.language)
         } returns localEntity
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteDto))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteDto))
         val capturedEntity = slot<UserCardCollectionEntity>()
         every { collectionDao.upsert(capture(capturedEntity)) } returns 1L
 
@@ -434,7 +442,7 @@ class CollectionSyncTest {
     @Test
     fun `given pull returns empty list when sync then collectionPulled is 0`() = runTest(testDispatcher) {
         // Arrange: remote has no changes since watermark
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(emptyList())
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(emptyList())
 
         // Act
         val result = syncManager.sync(USER_ID)
@@ -446,9 +454,11 @@ class CollectionSyncTest {
     }
 
     @Test
-    fun `given pull fails when sync then result is ERROR`() = runTest(testDispatcher) {
-        // Arrange
-        coEvery { collectionRemote.getChangesSince(any()) } returns
+    fun `given pull page fetch fails when sync then result is still SUCCESS with watermark capped at lastSync`() = runTest(testDispatcher) {
+        // Arrange. Collection sync data-loss fix, Phase 3: a page-FETCH failure is captured by
+        // drainPages (not rethrown), so it no longer aborts the cycle as SyncState.ERROR -- see
+        // SyncManagerTest's equivalent test for the full rationale.
+        coEvery { collectionRemote.getChangesPage(any(), any(), any(), any()) } returns
             Result.failure(RuntimeException("connection refused"))
 
         // Act
@@ -456,8 +466,9 @@ class CollectionSyncTest {
         advanceUntilIdle()
 
         // Assert
-        assertEquals(SyncState.ERROR, result.state)
-        assertEquals("connection refused", result.error)
+        assertEquals(SyncState.SUCCESS, result.state)
+        assertEquals(0, result.collectionPulled)
+        coVerify(exactly = 1) { syncPrefs.saveLastSyncMillis(USER_ID, LAST_SYNC) }
     }
 
     @Test
@@ -473,7 +484,7 @@ class CollectionSyncTest {
         every {
             collectionDao.getByCompositeKey(remoteNew.userId, remoteNew.scryfallId, remoteNew.isFoil, remoteNew.condition, remoteNew.language)
         } returns null
-        coEvery { collectionRemote.getChangesSince(LAST_SYNC) } returns Result.success(listOf(remoteNew))
+        coEvery { collectionRemote.getChangesPage(LAST_SYNC, any(), any(), any()) } returns Result.success(listOf(remoteNew))
 
         // Act
         val result = syncManager.sync(USER_ID)

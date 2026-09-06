@@ -7,12 +7,17 @@ import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.core.model.TradeItem
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -78,6 +83,16 @@ class UpdateTradeCollectionUseCaseTest {
 
     @Before
     fun setUp() {
+        // Write-path hardening audit (Phase 7, 2026-09-06): UpdateTradeCollectionUseCase now
+        // reports a real deleteCard/removeByCollectionIdAndSync failure via
+        // core/util/CrashlyticsHelper.recordNonFatal, which calls FirebaseCrashlytics.getInstance()
+        // directly (not through an injected abstraction) -- must be statically mocked here per the
+        // project's established pattern, or any GROUP 3 "throws" test crashes on the real,
+        // uninitialized Firebase singleton instead of exercising the intended failure-isolation path.
+        mockkStatic(FirebaseCrashlytics::class)
+        val crashlytics = mockk<FirebaseCrashlytics>(relaxed = true)
+        every { FirebaseCrashlytics.getInstance() } returns crashlytics
+
         coEvery { userCardRepository.addOrIncrement(any(), any(), any(), any(), any(), any(), any()) } returns
             AddOutcome.INCREMENTED_EXISTING
         useCase = UpdateTradeCollectionUseCase(
@@ -87,6 +102,11 @@ class UpdateTradeCollectionUseCaseTest {
             syncDao = syncDao,
             ioDispatcher = UnconfinedTestDispatcher(),
         )
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ══════════════════════════════════════════════════════════════════════════

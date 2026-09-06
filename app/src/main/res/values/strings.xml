@@ -292,6 +292,8 @@
     <string name="scanner_toast_added_to_wishlist">%1$s added to Wishlist</string>
     <string name="scanner_toast_added_all_to_wishlist">%1$d items added to Wishlist</string>
     <string name="scanner_toast_added_all_to_collection">%1$d items added to Collection</string>
+    <string name="scanner_toast_add_failed">Could not add %1$s — try again</string>
+    <string name="scanner_toast_add_all_partial_failure">%1$d of %2$d cards could not be added — kept in queue</string>
     <string name="scanner_queue_title">%1$d cards scanned</string>
     <string name="scanner_queue_search_hint">Filter by name…</string>
     <string name="scanner_queue_button_desc">Scan queue</string>

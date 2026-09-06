@@ -1358,7 +1358,7 @@ private fun ScanQueueSheet(
 
     LaunchedEffect(uiState.toastMessage) {
         uiState.toastMessage?.let {
-            sheetToastState.show(it)
+            sheetToastState.show(it, uiState.toastType)
             viewModel.onToastDismissed()
         }
     }

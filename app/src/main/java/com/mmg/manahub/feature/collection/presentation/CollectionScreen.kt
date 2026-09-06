@@ -1,5 +1,6 @@
 package com.mmg.manahub.feature.collection.presentation
 
+import com.mmg.manahub.feature.collection.presentation.components.CollectionMergeConflictSheet
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -210,6 +211,18 @@ fun CollectionScreen(
                 viewModel.applyAdvancedFilters(advancedQuery)
                 showAdvancedSearch = false
             },
+        )
+    }
+
+    // Write-path hardening audit (Phase 7, 2026-09-06): surfaces any guest/account collection
+    // rows left behind by the assignUserId collision guard for explicit resolution — see
+    // CollectionMergeConflictSheet's KDoc. Dismissing it loses nothing; unresolved conflicts
+    // simply reappear on the next sync/session check.
+    if (uiState.pendingMergeConflicts.isNotEmpty()) {
+        CollectionMergeConflictSheet(
+            conflicts = uiState.pendingMergeConflicts,
+            onResolve = { item, resolution -> viewModel.onResolveMergeConflict(item.conflict, resolution) },
+            onDismiss = { /* Non-destructive: dismissing keeps every conflict pending. */ },
         )
     }
 }

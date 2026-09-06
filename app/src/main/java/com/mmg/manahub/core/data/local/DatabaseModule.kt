@@ -150,6 +150,11 @@ object DatabaseModule {
                 // Clears archetype_override/themes_override on every deck (never migrated) --
                 // Deck Analysis Engine v3's taxonomy migration (Phase 3, spec §2/§3/§4).
                 MIGRATION_51_52,
+                // v52 → v53 lives as a top-level `val` in Migration_52_53.kt (same reason).
+                // Collection sync data-loss fix (linear-moseying-yeti plan), Phase 2: drops the
+                // RESTRICT FK on user_card_collection.scryfall_id -> cards.scryfall_id via the
+                // standard 12-step table recreation.
+                MIGRATION_52_53,
             )
             .build()
 

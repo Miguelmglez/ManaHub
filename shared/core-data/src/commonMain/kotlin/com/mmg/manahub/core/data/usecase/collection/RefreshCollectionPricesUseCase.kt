@@ -98,7 +98,15 @@ class RefreshCollectionPricesUseCase(
             // Only refresh what is stale (item 7f) — see class KDoc.
             val cachedMap = cardRepository.getCardsByIds(allIds).associateBy { it.scryfallId }
             val staleIds = allIds.filter { id ->
-                cachedMap[id]?.let { !CachePolicy.isFresh(it.cachedAt) } ?: true
+                val cached = cachedMap[id]
+                // Collection sync data-loss fix, Phase 4 guard audit: a pending-hydration
+                // placeholder (SyncManager.ensureCardsExist, `stale_reason ==
+                // "pending_hydration"`) has no real Scryfall id backing its own price fields yet
+                // -- refreshing "its" price would just re-fetch the same placeholder shell (or,
+                // worse, waste a Scryfall call on an id it may never resolve). CardHydrationWorker
+                // owns resolving these; price refresh must wait until a real card exists.
+                if (cached?.staleReason == "pending_hydration") return@filter false
+                cached?.let { !CachePolicy.isFresh(it.cachedAt) } ?: true
             }
             if (staleIds.isEmpty()) {
                 emit(Result.Success(0, 0, 0))

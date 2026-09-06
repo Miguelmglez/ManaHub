@@ -79,6 +79,30 @@ class SyncPreferencesStore @Inject constructor(
 
     private fun milliKey(userId: String) = longPreferencesKey("sync_millis_$userId")
 
+    // ── Collection integrity self-check rate limiting (Phase 6) ──────────────
+
+    /**
+     * Returns the epoch-millis timestamp of the last collection integrity REPAIR
+     * (watermark-clear-and-full-repull) triggered for [userId], or `null` if none has ever run.
+     * [com.mmg.manahub.core.sync.SyncManager] uses this to cap repairs at one per 24h — a
+     * permanent client/server disagreement (e.g. a genuinely un-syncable row) must not become an
+     * infinite full-pull loop.
+     */
+    suspend fun getLastCollectionRepairMillis(userId: String): Long? =
+        context.userPrefsDataStore.data
+            .map { prefs -> prefs[collectionRepairMilliKey(userId)] }
+            .first()
+
+    /** Records [millis] as the last collection integrity repair timestamp for [userId]. */
+    suspend fun saveLastCollectionRepairMillis(userId: String, millis: Long) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[collectionRepairMilliKey(userId)] = millis
+        }
+    }
+
+    private fun collectionRepairMilliKey(userId: String) =
+        longPreferencesKey("collection_repair_ms_$userId")
+
     // ── Collection-stats sync gating ─────────────────────────────────────────
 
     /**

@@ -96,6 +96,24 @@ abstract class CardDao {
     @Query("SELECT * FROM cards WHERE is_stale = 1")
     abstract fun observeStaleCards(): Flow<List<CardEntity>>
 
+    // Collection sync data-loss fix, Phase 4 (2026-09-06). Feeds CardHydrationWorker: finds ids
+    // still carrying SyncManager's `stale_reason = "pending_hydration"` placeholder (written by
+    // `ensureCardsExist` for a card Scryfall did not return during a collection/deck pull) that
+    // are still referenced by a LIVE collection row or ANY deck_cards row, capped at [limit]. Same
+    // cross-table-subquery shape as getScryfallIdsWithBlankOracleId/getScryfallIdsMissingStrategyTags
+    // above -- once a placeholder is resolved (is_stale flips to 0 via cardDao.upsertAll's @Update
+    // path), it drops out of future candidate lists on its own.
+    @Query("""
+        SELECT scryfall_id FROM cards
+        WHERE is_stale = 1 AND stale_reason = 'pending_hydration'
+          AND (
+              scryfall_id IN (SELECT scryfall_id FROM user_card_collection WHERE is_deleted = 0)
+              OR scryfall_id IN (SELECT scryfall_id FROM deck_cards)
+          )
+        LIMIT :limit
+    """)
+    abstract suspend fun getPendingHydrationIds(limit: Int): List<String>
+
     // Edge-case audit A3 (2026-07-15). Feeds CardRepositoryImpl.backfillMissingOracleIds: finds
     // cards referenced by a LIVE collection row OR any wishlist row whose cached row predates the
     // oracle_id column (oracle_id = ''), capped at [limit]. A single cross-table query (rather

@@ -85,6 +85,7 @@ class CollectionViewModelTest {
     private val openForTradeRepository    = mockk<OpenForTradeRepository>(relaxed = true)
     private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
     private val analyticsHelper           = mockk<AnalyticsHelper>(relaxed = true)
+    private val collectionMergeConflictResolver = mockk<com.mmg.manahub.core.sync.CollectionMergeConflictResolver>(relaxed = true)
 
     private lateinit var viewModel: CollectionViewModel
 
@@ -173,6 +174,7 @@ class CollectionViewModelTest {
             openForTradeRepository    = openForTradeRepository,
             userPreferencesRepository = userPreferencesRepository,
             analyticsHelper           = analyticsHelper,
+            collectionMergeConflictResolver = collectionMergeConflictResolver,
         )
     }
 

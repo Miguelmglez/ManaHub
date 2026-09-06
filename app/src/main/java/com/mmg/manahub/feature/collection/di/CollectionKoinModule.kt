@@ -1,6 +1,7 @@
 package com.mmg.manahub.feature.collection.di
 
 import androidx.work.WorkManager
+import com.mmg.manahub.core.sync.CollectionMergeConflictResolver
 import com.mmg.manahub.core.sync.CollectionSyncWorker
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.feature.collection.presentation.CollectionViewModel
@@ -113,6 +114,7 @@ fun collectionKoinModule(
             openForTradeRepository = get(),
             userPreferencesRepository = get(),
             analyticsHelper = get(),
+            collectionMergeConflictResolver = get(),
         )
     }
 }

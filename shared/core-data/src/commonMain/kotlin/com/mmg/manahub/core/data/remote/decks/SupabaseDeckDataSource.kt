@@ -48,6 +48,30 @@ class SupabaseDeckDataSource(
         }
 
     /**
+     * Calls the `get_deck_changes_page` RPC (collection sync data-loss fix, Phase 1/3) — see
+     * [DeckRemoteDataSource.getDeckChangesPage]'s KDoc for the cursor contract.
+     */
+    override suspend fun getDeckChangesPage(
+        since: Long,
+        afterUpdatedAt: Long?,
+        afterId: String?,
+        limit: Int,
+    ): Result<List<DeckSyncDto>> =
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val params = buildJsonObject {
+                    put("p_since", since)
+                    put("p_after_updated_at", afterUpdatedAt)
+                    put("p_after_id", afterId)
+                    put("p_limit", limit)
+                }
+                supabaseClient.postgrest
+                    .rpc("get_deck_changes_page", params)
+                    .decodeList<DeckSyncDto>()
+            }
+        }
+
+    /**
      * Serializes [rows] to a JSON array and calls `batch_upsert_decks`.
      * The RPC performs server-side upsert on the `id` primary key.
      */

@@ -2,21 +2,25 @@ package com.mmg.manahub.core.data.local.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Collection sync data-loss fix (linear-moseying-yeti plan), Phase 2, v52 -> v53
+ * ([MIGRATION_52_53][com.mmg.manahub.core.data.local.MIGRATION_52_53]): the RESTRICT foreign key
+ * to [CardEntity] that used to sit here was REMOVED.
+ *
+ * An ownership record must never depend on cache metadata being available. The old FK forced the
+ * sync PULL loop to skip (and thereby permanently strand, via the watermark) any collection row
+ * whose card could not yet be resolved from Scryfall -- see `CardDao`'s upsert KDoc and
+ * `SyncManager.ensureCardsExist`, which now writes a `stale_reason = "pending_hydration"`
+ * placeholder [CardEntity] for anything Scryfall hasn't returned instead of gating insertion on
+ * it. `CardDao.evictStaleCache` never relied on this FK (its cache eviction already excludes
+ * referenced ids via `NOT IN` subqueries against this table), so removing it does not change
+ * eviction behaviour.
+ */
 @Entity(
     tableName = "user_card_collection",
-    foreignKeys = [ForeignKey(
-        entity = CardEntity::class,
-        parentColumns = ["scryfall_id"],
-        childColumns = ["scryfall_id"],
-        // RESTRICT: any attempt to DELETE a card still referenced in the user's
-        // collection will throw SQLiteConstraintException immediately, making data
-        // loss loud and explicit instead of silent.
-        onDelete = ForeignKey.RESTRICT,
-    )],
     indices = [
         Index("scryfall_id"),
         Index("user_id"),

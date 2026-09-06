@@ -5,6 +5,7 @@ import com.mmg.manahub.core.model.CollectionCardGroup
 import com.mmg.manahub.core.model.CollectionGroupingMode
 import com.mmg.manahub.core.model.CollectionSection
 import com.mmg.manahub.core.model.CollectionViewMode
+import com.mmg.manahub.core.sync.CollectionMergeConflict
 import com.mmg.manahub.core.sync.SyncState
 import com.mmg.manahub.core.domain.auth.SessionState
 
@@ -39,6 +40,21 @@ data class CollectionUiState(
     val hasUnsyncedChanges:  Boolean                   = false,
     /** One-shot message surfaced as a Snackbar (e.g. trade list migration result). */
     val snackbarMessage:     String?                   = null,
+    /**
+     * Write-path hardening audit (Phase 7, 2026-09-06): guest/account collection rows left behind
+     * by [com.mmg.manahub.core.data.local.dao.UserCardCollectionDao.assignUserId]'s collision
+     * guard, awaiting an explicit user choice via [CollectionMergeConflictSheet]. Empty for the
+     * overwhelming majority of users (a collision only happens when the exact same
+     * card/foil/condition/language was added both offline and in a previously-logged-in session).
+     */
+    val pendingMergeConflicts: List<MergeConflictUiItem> = emptyList(),
+)
+
+/** Display-ready wrapper: a [CollectionMergeConflict] plus the card metadata to render it. */
+data class MergeConflictUiItem(
+    val conflict: CollectionMergeConflict,
+    val cardName: String,
+    val imageUrl: String?,
 )
 
 val CollectionUiState.activeFilterCount: Int

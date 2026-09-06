@@ -2,6 +2,7 @@ package com.mmg.manahub.feature.scanner.presentation
 
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
+import com.mmg.manahub.core.ui.components.MagicToastType
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Session models
@@ -123,6 +124,10 @@ data class ScannerUiState(
     val isLoadingPrints: Boolean = false,
     // Toast
     val toastMessage: String? = null,
+    // Write-path hardening audit (2026-09-06): explicit per-toast type so a WARNING (e.g. a
+    // partial scanner commit failure) never gets rendered with a stale/default SUCCESS look —
+    // every call site that sets toastMessage must also set this.
+    val toastType: MagicToastType = MagicToastType.SUCCESS,
     // Queue multi-select
     val multiSelectedIds: Set<String> = emptySet(),
     // Card outline overlay — populated by CardRecognizer via onRecognitionResult

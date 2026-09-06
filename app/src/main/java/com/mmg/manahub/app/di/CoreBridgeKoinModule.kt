@@ -20,6 +20,7 @@ import com.mmg.manahub.core.domain.repository.StatsRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
 import com.mmg.manahub.core.domain.repository.UserPreferencesRepository
 import com.mmg.manahub.core.gamification.domain.ProgressionEventBus
+import com.mmg.manahub.core.sync.CollectionMergeConflictResolver
 import com.mmg.manahub.core.sync.SyncManager
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.core.domain.repository.DraftRepository
@@ -157,6 +158,7 @@ fun coreBridgeKoinModule(
     supabaseClient: SupabaseClient,
     userCardRepository: () -> UserCardRepository,
     syncManager: SyncManager,
+    collectionMergeConflictResolver: CollectionMergeConflictResolver,
     appScope: CoroutineScope,
 ): Module = module {
     // ── KMP platform abstractions (not Hilt-owned — instantiated directly). ──
@@ -220,6 +222,7 @@ fun coreBridgeKoinModule(
     single { supabaseClient }
     single { userCardRepository() }
     single { syncManager }
+    single { collectionMergeConflictResolver }
 
     // Natively constructed (batch 4) — the SAME instance the whole gamification engine graph
     // (gamificationEngineKoinModule) and ManaHubApp's own direct emission share.

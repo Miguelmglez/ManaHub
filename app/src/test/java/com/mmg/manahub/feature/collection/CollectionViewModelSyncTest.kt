@@ -20,10 +20,14 @@ import com.mmg.manahub.core.domain.repository.OpenForTradeRepository
 import com.mmg.manahub.core.domain.repository.WishlistRepository
 import com.mmg.manahub.feature.trades.domain.usecase.GetLocalWishlistUseCase
 import com.mmg.manahub.feature.trades.domain.usecase.MigrateLocalTradeListsUseCase
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,6 +77,7 @@ class CollectionViewModelSyncTest {
     private val openForTradeRepository    = mockk<OpenForTradeRepository>(relaxed = true)
     private val userPreferencesRepository = mockk<UserPreferencesRepository>(relaxed = true)
     private val analyticsHelper           = mockk<AnalyticsHelper>(relaxed = true)
+    private val collectionMergeConflictResolver = mockk<com.mmg.manahub.core.sync.CollectionMergeConflictResolver>(relaxed = true)
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -92,6 +97,13 @@ class CollectionViewModelSyncTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // onSync()'s trade-list migration failure branch reports directly via
+        // FirebaseCrashlytics.getInstance() (not through an injected abstraction) — must be
+        // statically mocked, or any test exercising a migration failure crashes on the real,
+        // uninitialized Firebase singleton instead of exercising the intended syncError path.
+        mockkStatic(FirebaseCrashlytics::class)
+        every { FirebaseCrashlytics.getInstance() } returns mockk(relaxed = true)
+
         every { getCollection() } returns flowOf(emptyList())
         every { syncManager.syncState } returns MutableStateFlow(SyncState.IDLE)
         every { authRepository.sessionState } returns MutableStateFlow(SessionState.Unauthenticated)
@@ -104,6 +116,7 @@ class CollectionViewModelSyncTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(FirebaseCrashlytics::class)
     }
 
     // ── Builder ───────────────────────────────────────────────────────────────
@@ -122,6 +135,7 @@ class CollectionViewModelSyncTest {
         openForTradeRepository    = openForTradeRepository,
         userPreferencesRepository = userPreferencesRepository,
         analyticsHelper           = analyticsHelper,
+        collectionMergeConflictResolver = collectionMergeConflictResolver,
     )
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -156,12 +170,15 @@ class CollectionViewModelSyncTest {
     }
 
     @Test
-    fun `given logged-in user when onSync called and sync fails then syncError is populated`() = runTest {
+    fun `given trade list migration fails when onSync called then syncError is populated`() = runTest {
+        // Collection sync data-loss fix, Phase 5 (2026-09-06): onSync() no longer awaits
+        // syncManager.sync(...) directly (it is now dispatched as WorkManager unique work — see
+        // the GROUP 2b tests below), so syncError can only be populated by the trade-list
+        // migration branch now. The collection-sync outcome itself is surfaced separately via
+        // uiState.syncState (observeSyncState()).
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { syncManager.sync(USER_ID) } returns SyncResult(
-            state = SyncState.ERROR,
-            error = "network timeout",
-        )
+        every { wishlistRepository.observeUnsyncedCount() } returns MutableStateFlow(1)
+        coEvery { migrateLocalTradeLists(USER_ID) } returns Result.failure(RuntimeException("migration failed"))
 
         val vm = buildViewModel()
         advanceUntilIdle()
@@ -169,11 +186,11 @@ class CollectionViewModelSyncTest {
         vm.onSync()
         advanceUntilIdle()
 
-        assertEquals("network timeout", vm.uiState.value.syncError)
+        assertEquals("migration failed", vm.uiState.value.syncError)
     }
 
     @Test
-    fun `given no logged-in user when onSync called then syncManager sync is NOT called`() = runTest {
+    fun `given no logged-in user when onSync called then no sync work is enqueued`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns null
 
         val vm = buildViewModel()
@@ -182,13 +199,18 @@ class CollectionViewModelSyncTest {
         vm.onSync()
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { syncManager.sync(any()) }
+        verify(exactly = 0) {
+            workManager.enqueueUniqueWork(any(), any<androidx.work.ExistingWorkPolicy>(), any<androidx.work.OneTimeWorkRequest>())
+        }
     }
 
     @Test
-    fun `given logged-in user when onSync called then syncManager sync is invoked`() = runTest {
+    fun `given logged-in user when onSync called then a one-time collection sync work request is enqueued`() = runTest {
+        // Collection sync data-loss fix, Phase 5 (2026-09-06): onSync() dispatches
+        // CollectionSyncWorker.enqueueOneTimeSync (durable WorkManager unique work) instead of
+        // calling syncManager.sync(userId) inline on viewModelScope -- the inline call used to be
+        // cancelled if the user navigated away from this screen mid-sync.
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { syncManager.sync(USER_ID) } returns SyncResult(state = SyncState.SUCCESS)
 
         val vm = buildViewModel()
         advanceUntilIdle()
@@ -196,7 +218,14 @@ class CollectionViewModelSyncTest {
         vm.onSync()
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { syncManager.sync(USER_ID) }
+        verify(exactly = 1) {
+            workManager.enqueueUniqueWork(
+                eq(com.mmg.manahub.core.sync.CollectionSyncWorker.WORK_NAME_ONE_TIME),
+                any<androidx.work.ExistingWorkPolicy>(),
+                any<androidx.work.OneTimeWorkRequest>(),
+            )
+        }
+        coVerify(exactly = 0) { syncManager.sync(any()) }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -205,17 +234,23 @@ class CollectionViewModelSyncTest {
 
     @Test
     fun `given syncState is ERROR when onSyncDismissed then syncState resets to IDLE and syncError is cleared`() = runTest {
+        // Drive syncError via the trade-list migration failure path (the only remaining source of
+        // syncError text since Phase 5 -- see the GROUP 2b rewrite above) and syncState via the
+        // mocked syncManager.syncState StateFlow observeSyncState() forwards into uiState.
         coEvery { authRepository.getCurrentUser() } returns loggedInUser
-        coEvery { syncManager.sync(USER_ID) } returns SyncResult(
-            state = SyncState.ERROR,
-            error = "some error",
-        )
+        every { wishlistRepository.observeUnsyncedCount() } returns MutableStateFlow(1)
+        coEvery { migrateLocalTradeLists(USER_ID) } returns Result.failure(RuntimeException("some error"))
+        val syncStateFlow = MutableStateFlow(SyncState.IDLE)
+        every { syncManager.syncState } returns syncStateFlow
 
         val vm = buildViewModel()
         advanceUntilIdle()
         vm.onSync()
         advanceUntilIdle()
+        syncStateFlow.value = SyncState.ERROR
+        advanceUntilIdle()
         assertEquals("some error", vm.uiState.value.syncError)
+        assertEquals(SyncState.ERROR, vm.uiState.value.syncState)
 
         vm.onSyncDismissed()
 
@@ -239,7 +274,13 @@ class CollectionViewModelSyncTest {
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `given guest user when they first authenticate then assignUserIdAndSync is called once`() = runTest {
+    fun `given guest user when they first authenticate then CollectionViewModel never calls assignUserIdAndSync directly`() = runTest {
+        // Collection sync data-loss fix, Phase 5 (2026-09-06): the offline-to-online first-login
+        // full pull used to be launched here on viewModelScope, so navigating away from this
+        // screen mid-pull cancelled it. It is now dispatched as durable WorkManager unique work
+        // from the APP-SCOPED session observer in ManaHubApp.kt
+        // (CollectionSyncWorker.enqueueFirstLoginSync) instead -- this ViewModel must never call
+        // syncManager.assignUserIdAndSync directly any more.
         val sessionFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
         every { authRepository.sessionState } returns sessionFlow
 
@@ -250,11 +291,11 @@ class CollectionViewModelSyncTest {
         sessionFlow.value = SessionState.Authenticated(loggedInUser)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { syncManager.assignUserIdAndSync(USER_ID) }
+        coVerify(exactly = 0) { syncManager.assignUserIdAndSync(any()) }
     }
 
     @Test
-    fun `given already authenticated user when session emits authenticated again then assignUserIdAndSync is called only once`() = runTest {
+    fun `given already authenticated user when session emits authenticated again then CollectionViewModel still never calls assignUserIdAndSync`() = runTest {
         val sessionFlow = MutableStateFlow<SessionState>(SessionState.Unauthenticated)
         every { authRepository.sessionState } returns sessionFlow
 
@@ -269,7 +310,7 @@ class CollectionViewModelSyncTest {
         sessionFlow.value = SessionState.Authenticated(loggedInUser)
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { syncManager.assignUserIdAndSync(USER_ID) }
+        coVerify(exactly = 0) { syncManager.assignUserIdAndSync(any()) }
     }
 
     @Test
