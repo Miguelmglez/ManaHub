@@ -18,6 +18,7 @@ import com.mmg.manahub.core.data.remote.decks.DeckSyncDto
 import com.mmg.manahub.core.data.remote.decks.toDto
 import com.mmg.manahub.core.data.remote.decks.toEntity
 import com.mmg.manahub.core.data.remote.decks.toSyncDto
+import com.mmg.manahub.core.data.sync.SERVER_PAGE_CAP
 import com.mmg.manahub.core.data.sync.drainPages
 import com.mmg.manahub.core.di.IoDispatcher
 import kotlinx.coroutines.CancellationException
@@ -751,8 +752,18 @@ class SyncManager @Inject constructor(
     }
 
     companion object {
-        /** Requested page size for both `get_collection_changes_page` and `get_deck_changes_page`. */
-        private const val PAGE_SIZE = 500
+        /**
+         * Requested page size for both `get_collection_changes_page` and `get_deck_changes_page`.
+         *
+         * MUST stay `<= ` the server-side cap those RPCs enforce (`LIMIT least(coalesce(p_limit,
+         * 500), 500)`) — deliberately derived from [SERVER_PAGE_CAP] rather than a separate
+         * literal so the two can never drift apart. [drainPages] additionally clamps to
+         * [SERVER_PAGE_CAP] on its own, so even a future edit that reintroduces a raw literal here
+         * cannot resurrect the short-page-means-done misdetection this constant used to risk — but
+         * keep deriving from [SERVER_PAGE_CAP] anyway so there is exactly ONE number to reason
+         * about across both modules.
+         */
+        private const val PAGE_SIZE = SERVER_PAGE_CAP
 
         /** Collection push slice size — keeps one `batch_upsert_collection` jsonb payload bounded. */
         private const val PUSH_CHUNK_SIZE = 200

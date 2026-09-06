@@ -33,6 +33,20 @@ data class PageDrainResult(
 )
 
 /**
+ * The server's own page-size ceiling: every `*_changes_page` RPC computes
+ * `LIMIT least(coalesce(p_limit, 500), 500)`, so no page can ever come back larger than this
+ * regardless of what a caller asks for.
+ *
+ * [drainPages] clamps its requested `limit` to this value before ever calling [fetchPage][
+ * drainPages]'s `fetchPage` parameter, and `SyncManager.PAGE_SIZE` derives from this same
+ * constant. That is deliberate: it collapses "the client's requested page size" and "the
+ * server's page-size cap" into ONE number, so the short-page-means-done inference below can never
+ * be fooled by a client asking for more than the server will ever return. See [drainPages]'s
+ * "Cursor rule" section for why that inference would otherwise be silently wrong.
+ */
+const val SERVER_PAGE_CAP = 500
+
+/**
  * Drains every page of a keyset-paginated Supabase `*_changes_page` RPC, feeding rows to [onPage]
  * as they arrive and tracking the safe ceiling a caller's watermark formula must respect.
  *
@@ -46,8 +60,22 @@ data class PageDrainResult(
  * The NEXT page's cursor is derived from the LAST ROW OF THE CURRENT PAGE (never a computed max
  * across the page), matching the server's keyset contract `(updated_at, id) > (p_after_updated_at,
  * p_after_id)`. The first page passes `afterUpdatedAt = null, afterId = null`. The loop terminates
- * when a page returns FEWER rows than [limit] (the server itself caps at `LEAST(p_limit, 500)`, so
- * a full-sized page always means "there may be more").
+ * when a page returns FEWER rows than the EFFECTIVE limit (see below) — a full-sized page always
+ * means "there may be more".
+ *
+ * ## Why `limit` is clamped to [SERVER_PAGE_CAP] before use
+ * The loop may only conclude "fully drained" from evidence that CANNOT be produced by the
+ * server's own `LEAST(p_limit, 500)` cap. If a caller ever requests `limit > SERVER_PAGE_CAP`
+ * (e.g. a future `PAGE_SIZE` bump that forgets the server side), a full page comes back capped at
+ * 500 — which is `< limit` — and the old, unclamped comparison would misread that as "server ran
+ * out of rows" after the very first page, reporting [Long.MAX_VALUE] and letting the caller's
+ * watermark jump past everything never fetched. That is a silent re-creation of the collection
+ * sync data-loss bug this whole file exists to prevent, triggered from a different module than
+ * the SQL that constrains it. Clamping the effective limit to [SERVER_PAGE_CAP] up front — and
+ * using that SAME clamped value both as what's requested from [fetchPage] and as the
+ * short-page-means-done threshold — makes a false "done" structurally impossible: a page can only
+ * read as short if the server returned fewer rows than the cap it was asked to respect, which is
+ * evidence the cap did not produce.
  *
  * ## Safe-watermark ceiling on failure
  * On a page-fetch failure OR a page whose rows did not all apply, [PageDrainResult
@@ -61,10 +89,13 @@ data class PageDrainResult(
  * @param T Row type; must expose [KeysetPageRow.id]/[KeysetPageRow.updatedAt] for cursor advance.
  * @param since The caller's current watermark — the RPC's own `p_since` window filter. Also the
  *   fallback ceiling when the very first page fails (nothing was ever consumed this cycle).
- * @param limit Page size requested from the server (server itself caps at 500).
+ * @param limit Page size requested from the server. Clamped to [SERVER_PAGE_CAP] internally, so
+ *   passing a value above 500 has no effect beyond wasting the caller's own intent — it does NOT
+ *   risk a mis-detected "fully drained" the way it used to.
  * @param maxPages Hard cap on iterations so a server bug (e.g. a cursor that never advances)
  *   cannot spin this loop forever. 200 pages x 500 rows = 100k rows, far beyond any real user.
- * @param fetchPage `(afterUpdatedAt, afterId, limit) -> Result<List<T>>` — the RPC call.
+ * @param fetchPage `(afterUpdatedAt, afterId, limit) -> Result<List<T>>` — the RPC call. Receives
+ *   the CLAMPED limit, never the caller's raw [limit].
  * @param onPage Called once per successfully-fetched, non-empty page with its rows; returns
  *   `true` if every row in the page was applied, `false` if at least one failed to apply (e.g. a
  *   genuine Room write exception — NOT a card-metadata gap, which the placeholder path always
@@ -77,13 +108,14 @@ suspend fun <T : KeysetPageRow> drainPages(
     fetchPage: suspend (afterUpdatedAt: Long?, afterId: String?, limit: Int) -> Result<List<T>>,
     onPage: suspend (List<T>) -> Boolean,
 ): PageDrainResult {
+    val effectiveLimit = minOf(limit, SERVER_PAGE_CAP)
     var afterUpdatedAt: Long? = null
     var afterId: String? = null
     var lastConsumedUpdatedAt = since
     var pages = 0
 
     while (pages < maxPages) {
-        val pageResult = fetchPage(afterUpdatedAt, afterId, limit)
+        val pageResult = fetchPage(afterUpdatedAt, afterId, effectiveLimit)
         val page = pageResult.getOrElse { error ->
             if (error is CancellationException) throw error
             return PageDrainResult(lastConsumedUpdatedAt, pages)
@@ -107,7 +139,7 @@ suspend fun <T : KeysetPageRow> drainPages(
         afterUpdatedAt = last.updatedAt
         afterId = last.id
 
-        if (page.size < limit) {
+        if (page.size < effectiveLimit) {
             return PageDrainResult(Long.MAX_VALUE, pages)
         }
     }
