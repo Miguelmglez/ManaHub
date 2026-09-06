@@ -5,6 +5,7 @@ import android.graphics.PointF
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.mmg.manahub.core.domain.repository.CardRepository
 import com.mmg.manahub.core.domain.repository.UserCardRepository
+import com.mmg.manahub.core.domain.usecase.collection.CommitScanResult
 import com.mmg.manahub.core.domain.usecase.collection.CommitScannedCardsUseCase
 import com.mmg.manahub.core.util.AnalyticsHelper
 import com.mmg.manahub.feature.scanner.domain.model.RecognitionResult
@@ -12,6 +13,8 @@ import com.mmg.manahub.feature.scanner.presentation.ScannerViewModel
 import com.mmg.manahub.feature.scanner.presentation.SoundManager
 import com.mmg.manahub.feature.trades.domain.usecase.AddToWishlistUseCase
 import com.mmg.manahub.util.TestFixtures
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +29,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -729,5 +733,72 @@ class ScannerViewModelTest {
         assertFalse(state.showPriceDetailSheet)
         assertNull(state.detectedCorners)
         assertFalse(state.isSearching)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  GROUP — Write-path hardening audit (2026-09-06): onAddAllToCollection
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun onAddAllToCollection_calledTwiceBeforeFirstResolves_commitsOnlyOnce() = runTest {
+        viewModel.onRecognitionResult(identified())
+        advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.scanSession.cards.size) // precondition
+
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 0, entrySucceeded = listOf(true),
+        )
+
+        viewModel.onAddAllToCollection()
+        assertTrue(
+            "isCommittingQueue must flip synchronously, before the commit coroutine suspends",
+            viewModel.uiState.value.isCommittingQueue,
+        )
+        viewModel.onAddAllToCollection() // second tap while the first is still in flight
+
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { commitScannedCards(any()) }
+        assertFalse(viewModel.uiState.value.isCommittingQueue)
+    }
+
+    @Test
+    fun onAddAllToCollection_partialFailure_keepsFailedEntryByStableId_evenWithASharedTimestamp() = runTest {
+        val cardB = TestFixtures.buildCard(scryfallId = "card-b-999", name = "Counterspell", setCode = "lea")
+        viewModel.onRecognitionResult(identified(card = defaultCard))
+        advanceUntilIdle()
+        viewModel.onRecognitionResult(identified(card = cardB))
+        advanceUntilIdle()
+
+        val seeded = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, seeded.size) // precondition
+
+        // Force both entries to share the EXACT same timestamp (burst recognition, or a
+        // duplicate-entry action firing twice) via the public edit path, while their auto-assigned
+        // ids stay distinct -- reproduces the MEDIUM-6 collision deterministically.
+        val collidingTimestamp = 123_456_789L
+        seeded.forEach { entry ->
+            viewModel.onEditScannedCard(entry)
+            viewModel.onUpdateScannedCard(entry.copy(timestamp = collidingTimestamp))
+        }
+        val collided = viewModel.uiState.value.scanSession.cards
+        assertEquals(2, collided.size)
+        assertTrue(collided.all { it.timestamp == collidingTimestamp })
+        assertNotEquals(collided[0].id, collided[1].id)
+
+        // Entry 0 (defaultCard) fails, entry 1 (cardB) succeeds.
+        coEvery { commitScannedCards(any()) } returns CommitScanResult(
+            committedCopies = 1, failedEntries = 1, entrySucceeded = listOf(false, true),
+        )
+
+        viewModel.onAddAllToCollection()
+        advanceUntilIdle()
+
+        val remaining = viewModel.uiState.value.scanSession.cards
+        assertEquals(
+            "The FAILED entry must survive -- a shared timestamp must never drop it alongside the succeeded one",
+            1, remaining.size,
+        )
+        assertEquals(defaultCard.scryfallId, remaining[0].card.scryfallId)
     }
 }

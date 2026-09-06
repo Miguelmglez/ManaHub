@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.sync
+// COMMENTS_REVIEWED: 2026-09-06
 
 import android.content.Context
 import androidx.work.BackoffPolicy
@@ -18,18 +19,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * WorkManager worker that delegates to [SyncManager] for bidirectional sync.
- *
- * Only runs when [NetworkType.CONNECTED] is satisfied.
- *
- * Retry policy: exponential backoff starting at 15 minutes, up to 3 attempts
- * before the worker is marked as failed.
- *
- * KMP migration — Hilt→Koin cutover batch 6: converted from `@HiltWorker`/`@AssistedInject` to a plain
- * [CoroutineWorker] resolved by Koin's `worker { }` DSL, registered in `feature.collection.di.collectionKoinModule`
- * (co-located with the [SyncManager] bridge single it needs — [SyncManager] itself KEEPS its Hilt
- * `@Inject constructor` because `ManaHubApp` (`@AndroidEntryPoint`) still Hilt-injects it as a bridge
- * field into `collectionKoinModule(syncManager = ...)`; [authRepository] is a native Koin single in
- * `coreBridgeKoinModule`).
+ * Retry policy: exponential backoff starting at 15 minutes, up to 3 attempts.
  */
 class CollectionSyncWorker(
     appContext: Context,
@@ -40,24 +30,18 @@ class CollectionSyncWorker(
 
     companion object {
 
-        /** Unique name for the periodic background sync task. */
         const val WORK_NAME_PERIODIC = "collection_sync_periodic"
 
-        /** Unique name for on-demand (one-time) sync tasks. */
+        /** Unique name for on-demand (one-time) incremental sync tasks. */
         const val WORK_NAME_ONE_TIME = "collection_sync_one_time"
 
-        /**
-         * Input-data key (collection sync data-loss fix, Phase 5). When `true`, [doWork]
-         * dispatches [SyncManager.assignUserIdAndSync] instead of [SyncManager.sync] — the
-         * offline-to-online first-login full pull, which must survive the triggering screen being
-         * navigated away from or the process dying (see [oneTimeWorkRequestForFirstLogin]'s KDoc).
-         */
+        // Write-path hardening audit (2026-09-06): split from WORK_NAME_ONE_TIME -- both used to
+        // share that name, so ExistingWorkPolicy.KEEP could drop a first-login enqueue when a
+        // plain sync was already pending, silently skipping the guest-row migration.
+        const val WORK_NAME_FIRST_LOGIN = "collection_sync_first_login"
+
         const val INPUT_KEY_IS_FIRST_LOGIN = "is_first_login"
 
-        /**
-         * Builds a [PeriodicWorkRequest] that runs every hour with exponential
-         * backoff on failure, requiring a network connection.
-         */
         fun periodicWorkRequest() =
             PeriodicWorkRequestBuilder<CollectionSyncWorker>(1, TimeUnit.HOURS)
                 .setConstraints(
@@ -68,10 +52,6 @@ class CollectionSyncWorker(
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
                 .build()
 
-        /**
-         * Builds a [OneTimeWorkRequest] for an immediate incremental sync triggered by the user
-         * (e.g. a manual "Sync now" tap). Runs [SyncManager.sync].
-         */
         fun oneTimeWorkRequest() =
             OneTimeWorkRequestBuilder<CollectionSyncWorker>()
                 .setConstraints(
@@ -83,16 +63,9 @@ class CollectionSyncWorker(
                 .build()
 
         /**
-         * Builds a [OneTimeWorkRequest] for the offline-to-online first-login full pull
-         * ([SyncManager.assignUserIdAndSync]).
-         *
-         * Collection sync data-loss fix, Phase 5: this used to run inline on `viewModelScope`
-         * (`CollectionViewModel.observeSessionChanges`), so navigating away from the screen that
-         * triggered login cancelled the first full pull mid-flight — a first-login collection
-         * could be left partially migrated with no automatic retry. WorkManager unique work
-         * survives navigation and process death; [ExistingWorkPolicy.KEEP] on
-         * [WORK_NAME_ONE_TIME] means a rapid double-trigger (e.g. a second `Authenticated` emit
-         * from profile enrichment) never queues a duplicate run.
+         * Offline-to-online first-login full pull ([SyncManager.assignUserIdAndSync]). Runs as
+         * durable WorkManager unique work (not `viewModelScope`) so it survives navigation and
+         * process death instead of leaving a first-login account partially migrated.
          */
         fun oneTimeWorkRequestForFirstLogin() =
             OneTimeWorkRequestBuilder<CollectionSyncWorker>()
@@ -105,11 +78,6 @@ class CollectionSyncWorker(
                 .setInputData(Data.Builder().putBoolean(INPUT_KEY_IS_FIRST_LOGIN, true).build())
                 .build()
 
-        /**
-         * Convenience helper to enqueue the periodic sync from a ViewModel or Application.
-         * Uses [ExistingPeriodicWorkPolicy.KEEP] so repeated calls are no-ops if the
-         * worker is already scheduled.
-         */
         fun schedulePeriodicSync(workManager: WorkManager) {
             workManager.enqueueUniquePeriodicWork(
                 WORK_NAME_PERIODIC,
@@ -118,10 +86,7 @@ class CollectionSyncWorker(
             )
         }
 
-        /**
-         * Enqueues an immediate one-time incremental sync (e.g. a manual "Sync now" action).
-         * [ExistingWorkPolicy.KEEP] avoids piling up duplicate runs if tapped repeatedly.
-         */
+        /** Enqueues an immediate incremental sync (e.g. a manual "Sync now" tap). */
         fun enqueueOneTimeSync(workManager: WorkManager) {
             workManager.enqueueUniqueWork(
                 WORK_NAME_ONE_TIME,
@@ -131,13 +96,16 @@ class CollectionSyncWorker(
         }
 
         /**
-         * Enqueues the offline-to-online first-login full pull as durable unique work — see
-         * [oneTimeWorkRequestForFirstLogin]'s KDoc for why this must not run on a scope tied to a
-         * screen's lifecycle.
+         * Enqueues the first-login migration under its own unique name (never
+         * [WORK_NAME_ONE_TIME] -- see that constant's KDoc) so it can never be dropped by a
+         * plain sync's KEEP policy. A plain sync already queued is cancelled first: first-login
+         * is a strict push+pull superset, and racing it risks pushing not-yet-migrated guest
+         * rows (still `user_id IS NULL`) before [SyncManager.assignUserId] runs.
          */
         fun enqueueFirstLoginSync(workManager: WorkManager) {
+            workManager.cancelUniqueWork(WORK_NAME_ONE_TIME)
             workManager.enqueueUniqueWork(
-                WORK_NAME_ONE_TIME,
+                WORK_NAME_FIRST_LOGIN,
                 ExistingWorkPolicy.KEEP,
                 oneTimeWorkRequestForFirstLogin(),
             )
@@ -145,7 +113,6 @@ class CollectionSyncWorker(
     }
 
     override suspend fun doWork(): Result {
-        // Guest users have no Supabase account — skip sync entirely.
         val userId = authRepository.getCurrentUser()?.id ?: return Result.success()
 
         return try {
@@ -156,23 +123,17 @@ class CollectionSyncWorker(
                 syncManager.sync(userId)
             }
             if (result.state == SyncState.ERROR) {
-                // Retry on transient errors (network blip, Supabase timeout, etc.).
                 Result.retry()
             } else {
-                // Collection sync data-loss fix, Phase 4: a successful cycle may have just
-                // written pending-hydration placeholders (SyncManager.ensureCardsExist). Kick off
-                // an immediate hydration pass rather than waiting for CardHydrationWorker's hourly
-                // tick — see that worker's KDoc for why the exposure window matters.
+                // A successful cycle may have just written pending-hydration placeholders
+                // (SyncManager.ensureCardsExist) -- kick hydration off now instead of waiting for
+                // CardHydrationWorker's hourly tick.
                 CardHydrationWorker.enqueueImmediate(WorkManager.getInstance(applicationContext))
                 Result.success()
             }
         } catch (e: CancellationException) {
-            // Let WorkManager's own cooperative cancellation propagate (e.g. constraints no
-            // longer met, or the work was explicitly cancelled) instead of misreporting it as a
-            // retryable/failed run.
             throw e
         } catch (e: Exception) {
-            // Give up after 3 attempts to avoid draining the battery on a persistent failure.
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
     }

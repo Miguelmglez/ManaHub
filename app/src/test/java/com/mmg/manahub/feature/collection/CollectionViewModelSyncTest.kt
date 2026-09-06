@@ -320,4 +320,26 @@ class CollectionViewModelSyncTest {
 
         coVerify(exactly = 0) { syncManager.assignUserIdAndSync(any()) }
     }
+
+    @Test
+    fun `given authenticated user signs out then both the one-time and first-login work names are cancelled`() = runTest {
+        // Write-path hardening audit (2026-09-06): WORK_NAME_FIRST_LOGIN is a separate unique
+        // name from WORK_NAME_ONE_TIME (Critical 1 fix) -- a stale first-login work left behind
+        // by a missed cancel would KEEP-block the next account's enqueueFirstLoginSync call.
+        val sessionFlow = MutableStateFlow<SessionState>(SessionState.Authenticated(loggedInUser))
+        every { authRepository.sessionState } returns sessionFlow
+
+        buildViewModel()
+        advanceUntilIdle()
+
+        sessionFlow.value = SessionState.Unauthenticated
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            workManager.cancelUniqueWork(com.mmg.manahub.core.sync.CollectionSyncWorker.WORK_NAME_ONE_TIME)
+        }
+        verify(exactly = 1) {
+            workManager.cancelUniqueWork(com.mmg.manahub.core.sync.CollectionSyncWorker.WORK_NAME_FIRST_LOGIN)
+        }
+    }
 }

@@ -1432,7 +1432,7 @@ private fun ScanQueueSheet(
 
                 // Card List
                 LazyColumn(modifier = Modifier.weight(1f), state = listState) {
-                    items(filtered, key = { "${it.card.scryfallId}_${it.timestamp}" }) { entry ->
+                    items(filtered, key = { it.id }) { entry ->
                         QueueCardItem(
                             entry = entry,
                             preferredCurrency = preferredCurrency,
@@ -1459,6 +1459,8 @@ private fun ScanQueueSheet(
                         onClick = onAddAllToCollection,
                         text = stringResource(R.string.scanner_queue_add_all),
                         icon = @Composable { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null, modifier = Modifier.size(18.dp)) },
+                        enabled = !uiState.isCommittingQueue,
+                        isLoading = uiState.isCommittingQueue,
                         modifier = Modifier.fillMaxWidth()
                     )
 

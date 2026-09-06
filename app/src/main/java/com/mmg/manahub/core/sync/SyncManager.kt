@@ -301,46 +301,35 @@ class SyncManager @Inject constructor(
     suspend fun assignUserIdAndSync(newUserId: String): SyncResult = withContext(ioDispatcher) {
         // Protected by the same mutex as sync() to prevent concurrent execution.
         syncMutex.withLock {
-            val now = System.currentTimeMillis()
-
-            // Write-path hardening audit (Phase 7, 2026-09-06): assignUserId's own NOT EXISTS
-            // guard (UserCardDao) now skips a colliding guest row instead of requiring a
-            // destructive pre-merge here -- see that query's KDoc. A collision therefore simply
-            // stays as a pending conflict (user_id remains NULL) for
-            // CollectionMergeConflictResolver to surface, rather than being silently
-            // merged-then-deleted before this call.
-            val collectionMigrated = collectionDao.assignUserId(newUserId, now)
-            val decksMigrated = deckDao.assignDeckUserId(newUserId, now)
-
-            // Count rows that now belong to this user AFTER the migration above.
-            val localCollectionCount = collectionDao.getCountForUser(newUserId)
-            val localDeckCount = deckDao.getDeckCountForUser(newUserId)
-
-            // Clear the watermark in two scenarios:
-            //
-            // 1. Guest rows were migrated (collectionMigrated > 0 || decksMigrated > 0):
-            //    The watermark must be reset so the PUSH phase re-uploads the migrated rows
-            //    and the PULL phase fetches the full account history.
-            //
-            // 2. Room has no data for this user even though no rows were migrated
-            //    (localCollectionCount == 0 && localDeckCount == 0):
-            //    This indicates Room was wiped (destructive migration, user cleared app data,
-            //    or fresh install on a device where DataStore survived). The DataStore watermark
-            //    may still hold a stale timestamp from a previous installation, causing
-            //    the pull to return 0 rows because all Supabase data pre-dates the watermark.
-            //    Clearing it forces a full pull and restores the user's data.
-            //
-            //    Note: if the user genuinely has an empty collection (0 local + 0 remote),
-            //    clearing the watermark is harmless — the PULL will simply return 0 rows.
-            if (collectionMigrated > 0 || decksMigrated > 0 ||
-                (localCollectionCount == 0 && localDeckCount == 0)
-            ) {
-                syncPrefs.clearLastSyncMillis(newUserId)
-            }
-
             _syncState.value = SyncState.SYNCING
             try {
                 runCatching {
+                    val now = System.currentTimeMillis()
+
+                    // assignUserId's own NOT EXISTS guard (UserCardDao) parks a colliding guest
+                    // row (user_id stays NULL) instead of throwing -- CollectionMergeConflictResolver
+                    // surfaces it. This call now runs INSIDE the runCatching boundary (write-path
+                    // hardening audit, 2026-09-06): it used to run before _syncState was even set
+                    // to SYNCING, so any unexpected constraint failure here escaped uncaught to
+                    // CollectionSyncWorker, leaving _syncState stuck at IDLE with no ERROR ever
+                    // surfaced to the UI.
+                    val collectionMigrated = collectionDao.assignUserId(newUserId, now)
+                    val decksMigrated = deckDao.assignDeckUserId(newUserId, now)
+
+                    val localCollectionCount = collectionDao.getCountForUser(newUserId)
+                    val localDeckCount = deckDao.getDeckCountForUser(newUserId)
+
+                    // Clear the watermark when rows were migrated (PUSH must re-upload them and
+                    // PULL must fetch the full account history), OR when Room has no data at all
+                    // for this user despite no migration (a wiped Room DB with a stale DataStore
+                    // watermark would otherwise return 0 rows forever). Harmless no-op if the user
+                    // genuinely has an empty collection.
+                    if (collectionMigrated > 0 || decksMigrated > 0 ||
+                        (localCollectionCount == 0 && localDeckCount == 0)
+                    ) {
+                        syncPrefs.clearLastSyncMillis(newUserId)
+                    }
+
                     val lastSync = syncPrefs.getLastSyncMillis(newUserId)
 
                     // ── PUSH: collection ─────────────────────────────────────────────
@@ -416,9 +405,8 @@ class SyncManager @Inject constructor(
                 }.getOrElse { error ->
                     if (error is CancellationException) throw error
                     crashReporter.apply {
-                        log("assign_user_sync_failed: userId=$newUserId hasData=${localCollectionCount > 0}")
+                        log("assign_user_sync_failed: userId=$newUserId")
                         setCustomKey("sync_error_type", error::class.simpleName ?: "Unknown")
-                        setCustomKey("sync_user_has_data", (localCollectionCount > 0).toString())
                         recordException(error)
                     }
                     SyncResult(state = SyncState.ERROR, error = error.message)
@@ -676,14 +664,16 @@ class SyncManager @Inject constructor(
                 }
         }
 
-        // Anything still missing after the fetch above gets a pending-hydration placeholder so
-        // the ownership row can ALWAYS insert. `upsertAll` here is the same safe
-        // INSERT-OR-IGNORE + @Update transaction as above (never REPLACE) — a retry that finds a
-        // placeholder already present from a previous cycle just re-upserts it unchanged.
+        // Write-path hardening audit (2026-09-06): uses insertAllIgnore, NOT upsertAll -- a
+        // concurrent writer (manual AddCard, CardBackfillWorker) may cache real metadata for one
+        // of these ids during the Scryfall round-trip above. upsertAll's @Update fallback would
+        // overwrite that real row with placeholder junk (cmc=0, "Unresolved card", ...);
+        // INSERT-OR-IGNORE is structurally incapable of touching an existing row, so the race
+        // window closes itself regardless of timing.
         val stillMissing = scryfallIds.filterNot { it in existingIds }
         if (stillMissing.isNotEmpty()) {
             runCatching {
-                cardDao.upsertAll(stillMissing.map { buildPendingHydrationPlaceholder(it) })
+                cardDao.insertAllIgnore(stillMissing.map { buildPendingHydrationPlaceholder(it) })
             }.onSuccess {
                 crashReporter.apply {
                     log("collection_rows_awaiting_card_metadata")
@@ -692,7 +682,7 @@ class SyncManager @Inject constructor(
             }.onFailure { e ->
                 crashReporter.apply {
                     setCustomKey("sync_error_type", e::class.simpleName ?: "Unknown")
-                    recordException(RuntimeException("[ensureCardsExist] placeholder upsertAll failed", e))
+                    recordException(RuntimeException("[ensureCardsExist] placeholder insertAllIgnore failed", e))
                 }
             }
         }

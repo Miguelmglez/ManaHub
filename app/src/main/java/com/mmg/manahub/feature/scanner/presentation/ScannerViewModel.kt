@@ -193,6 +193,7 @@ class ScannerViewModel @Inject constructor(
                 put("language",         entry.language)
                 put("condition",        entry.condition)
                 put("timestamp",        entry.timestamp)
+                put("id",               entry.id)
             }
             array.put(obj)
         }
@@ -258,6 +259,9 @@ class ScannerViewModel @Inject constructor(
                         condition = obj.getString("condition"),
                         setCode   = obj.getString("setCode"),
                         timestamp = obj.getLong("timestamp"),
+                        // Backward-compat: a queue persisted before this field existed has no
+                        // "id" key -- fall back to a fresh one rather than failing the whole restore.
+                        id        = obj.optString("id").ifBlank { UUID.randomUUID().toString() },
                     )
                 )
             }
@@ -770,7 +774,7 @@ class ScannerViewModel @Inject constructor(
         val original = _uiState.value.editingCard ?: return
         _uiState.update { state ->
             val updatedList = state.scanSession.cards.map {
-                if (it.timestamp == original.timestamp) updatedEntry else it
+                if (it.id == original.id) updatedEntry else it
             }
             state.copy(
                 scanSession = state.scanSession.copy(cards = updatedList),
@@ -835,7 +839,7 @@ class ScannerViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 scanSession = state.scanSession.copy(
-                    cards = state.scanSession.cards.filter { it.timestamp != entry.timestamp },
+                    cards = state.scanSession.cards.filter { it.id != entry.id },
                 ),
                 multiSelectedIds = state.multiSelectedIds - entry.card.scryfallId,
             )
@@ -906,45 +910,58 @@ class ScannerViewModel @Inject constructor(
      * internally (see its KDoc), so the batch call below cannot itself throw for a single bad
      * card; only a fully successful batch clears the whole session, a partial one removes just the
      * entries that actually committed and surfaces a [MagicToastType.WARNING] naming the shortfall.
+     *
+     * Re-entrancy guard (write-path hardening audit, 2026-09-06): [ScannerUiState.isCommittingQueue]
+     * blocks a second tap while a commit is already in flight -- without it, two fast taps could
+     * commit the whole queue twice (doubled quantities, duplicate `CardScanned` XP events).
      */
     fun onAddAllToCollection() {
-        val cards = _uiState.value.scanSession.cards
-        if (cards.isEmpty()) return
+        val state = _uiState.value
+        val cards = state.scanSession.cards
+        if (cards.isEmpty() || state.isCommittingQueue) return
 
+        _uiState.update { it.copy(isCommittingQueue = true) }
         viewModelScope.launch {
-            val result = commitScannedCards(cards.map { it.toCommit() })
+            try {
+                val result = commitScannedCards(cards.map { it.toCommit() })
 
-            analyticsHelper.logEvent(
-                "scanner_add_all",
-                mapOf("count" to cards.size.toString(), "failed" to result.failedEntries.toString()),
-            )
+                analyticsHelper.logEvent(
+                    "scanner_add_all",
+                    mapOf("count" to cards.size.toString(), "failed" to result.failedEntries.toString()),
+                )
 
-            if (result.failedEntries == 0) {
-                _uiState.update {
-                    it.copy(
-                        toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size),
-                        toastType = MagicToastType.SUCCESS,
-                    )
+                if (result.failedEntries == 0) {
+                    _uiState.update {
+                        it.copy(
+                            toastMessage = context.getString(R.string.scanner_toast_added_all_to_collection, cards.size),
+                            toastType = MagicToastType.SUCCESS,
+                        )
+                    }
+                    onClearSession()
+                } else {
+                    // Stable id, not timestamp: two queue entries can share a millisecond (burst
+                    // recognition, or a duplicate-entry action firing twice), which would silently
+                    // drop the failed one from this filter alongside the succeeded one.
+                    val succeededIds = cards.filterIndexed { index, _ ->
+                        result.entrySucceeded.getOrElse(index) { false }
+                    }.mapTo(mutableSetOf()) { it.id }
+                    _uiState.update { s ->
+                        s.copy(
+                            scanSession = s.scanSession.copy(
+                                cards = s.scanSession.cards.filterNot { it.id in succeededIds },
+                            ),
+                            toastMessage = context.getString(
+                                R.string.scanner_toast_add_all_partial_failure,
+                                result.failedEntries,
+                                cards.size,
+                            ),
+                            toastType = MagicToastType.WARNING,
+                        )
+                    }
+                    persistQueue()
                 }
-                onClearSession()
-            } else {
-                val succeededTimestamps = cards.filterIndexed { index, _ ->
-                    result.entrySucceeded.getOrElse(index) { false }
-                }.mapTo(mutableSetOf()) { it.timestamp }
-                _uiState.update { state ->
-                    state.copy(
-                        scanSession = state.scanSession.copy(
-                            cards = state.scanSession.cards.filterNot { it.timestamp in succeededTimestamps },
-                        ),
-                        toastMessage = context.getString(
-                            R.string.scanner_toast_add_all_partial_failure,
-                            result.failedEntries,
-                            cards.size,
-                        ),
-                        toastType = MagicToastType.WARNING,
-                    )
-                }
-                persistQueue()
+            } finally {
+                _uiState.update { it.copy(isCommittingQueue = false) }
             }
         }
     }
@@ -1031,13 +1048,13 @@ class ScannerViewModel @Inject constructor(
         val original = _uiState.value.variantSelectorEntry ?: return
         _uiState.update { state ->
             val updatedCards = state.scanSession.cards.map {
-                if (it.timestamp == original.timestamp) it.copy(card = variant, setCode = variant.setCode) else it
+                if (it.id == original.id) it.copy(card = variant, setCode = variant.setCode) else it
             }
             state.copy(
                 scanSession = state.scanSession.copy(cards = updatedCards),
                 showVariantSelector = false,
                 variantSelectorEntry = null,
-                editingCard = if (state.editingCard?.timestamp == original.timestamp) {
+                editingCard = if (state.editingCard?.id == original.id) {
                     state.editingCard.copy(card = variant, setCode = variant.setCode)
                 } else state.editingCard
             )
@@ -1067,9 +1084,11 @@ class ScannerViewModel @Inject constructor(
      * no longer reachable from inside [EditScannedCardSheet].
      */
     fun onDuplicateSessionCard(original: ScannedCard) {
-        val duplicate = original.copy(timestamp = System.currentTimeMillis())
+        // id must also be regenerated -- copy() otherwise carries the original's id, giving two
+        // distinct queue entries the same identity.
+        val duplicate = original.copy(id = UUID.randomUUID().toString(), timestamp = System.currentTimeMillis())
         _uiState.update { state ->
-            val index = state.scanSession.cards.indexOfFirst { it.timestamp == original.timestamp }
+            val index = state.scanSession.cards.indexOfFirst { it.id == original.id }
             val updatedCards = if (index >= 0) {
                 state.scanSession.cards.toMutableList().apply { add(index + 1, duplicate) }
             } else {

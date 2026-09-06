@@ -3,6 +3,7 @@ package com.mmg.manahub.feature.scanner.presentation
 import android.graphics.PointF
 import com.mmg.manahub.core.model.Card
 import com.mmg.manahub.core.ui.components.MagicToastType
+import java.util.UUID
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Session models
@@ -20,6 +21,9 @@ data class ScannedCard(
     val condition: String,
     val setCode: String,
     val timestamp: Long,
+    // Write-path hardening audit (2026-09-06): stable identity for queue operations (edit/remove/
+    // duplicate/partial-retry) -- timestamp alone collides when two entries share a millisecond.
+    val id: String = UUID.randomUUID().toString(),
 )
 
 /**
@@ -159,4 +163,8 @@ data class ScannerUiState(
     val isLoadingVariants: Boolean = false,
     // Full-screen image viewer
     val expandedVariantImageUrl: String? = null,
+
+    // Re-entrancy guard for onAddAllToCollection -- a second tap before the first commit
+    // resolves must not double-commit the queue.
+    val isCommittingQueue: Boolean = false,
 )

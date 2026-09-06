@@ -636,6 +636,25 @@ class SyncManagerTest {
         coVerify(exactly = 0) { deckRemote.batchUpsertDecks(any()) }
     }
 
+    // Write-path hardening audit (CRITICAL 2, 2026-09-06): collectionDao.assignUserId used to run
+    // BEFORE _syncState was set to SYNCING and OUTSIDE the runCatching boundary -- a constraint
+    // failure there escaped uncaught to CollectionSyncWorker, leaving syncState stuck at IDLE
+    // forever with no ERROR ever surfaced to the UI. It now runs INSIDE that boundary.
+    @Test
+    fun `given assignUserId throws when assignUserIdAndSync runs then the exception is caught, ERROR is returned, and syncState is ERROR (never stuck at IDLE)`() =
+        runTest(testDispatcher) {
+            every { collectionDao.assignUserId(any(), any()) } throws RuntimeException("SQLITE_CONSTRAINT")
+
+            // Act: must NOT throw -- the whole point of the fix.
+            val result = syncManager.assignUserIdAndSync(USER_ID)
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals(SyncState.ERROR, result.state)
+            assertEquals(SyncState.ERROR, syncManager.syncState.value)
+            verify(exactly = 1) { crashReporter.recordException(any()) }
+        }
+
     // ══════════════════════════════════════════════════════════════════════════
     //  GROUP 10 — SyncState transitions
     // ══════════════════════════════════════════════════════════════════════════
@@ -792,14 +811,19 @@ class SyncManagerTest {
             advanceUntilIdle()
 
             // Assert: sync completes successfully, the collection row is inserted despite the
-            // unresolved card, ONE placeholder CardEntity is written (never the real-card
-            // upsertAll path, never the legacy per-card cardDao.upsert), and the watermark
-            // advances all the way to syncStartTime (nothing was left unapplied this cycle).
+            // unresolved card, ONE placeholder CardEntity is written via insertAllIgnore -- write-
+            // path hardening audit (HIGH 4, 2026-09-06): NEVER upsertAll (whose @Update fallback
+            // could overwrite real metadata a concurrent writer cached for this id during the
+            // Scryfall round-trip above) -- and the watermark advances all the way to
+            // syncStartTime (nothing was left unapplied this cycle).
             assertEquals(SyncState.SUCCESS, result.state)
             assertEquals(1, result.collectionPulled)
             verify(exactly = 1) { collectionDao.upsert(any()) }
             coVerify(exactly = 1) {
-                cardDao.upsertAll(match { cards -> cards.size == 1 && cards[0].staleReason == "pending_hydration" })
+                cardDao.insertAllIgnore(match { cards -> cards.size == 1 && cards[0].staleReason == "pending_hydration" })
+            }
+            coVerify(exactly = 0) {
+                cardDao.upsertAll(match { cards -> cards.any { it.staleReason == "pending_hydration" } })
             }
             coVerify(exactly = 0) { cardDao.upsert(any()) }
             val savedMillis = slot<Long>()

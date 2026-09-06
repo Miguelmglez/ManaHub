@@ -387,6 +387,7 @@ class CollectionViewModel(
                         // Supabase RPC failures if the worker ran now.
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
+                        workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_FIRST_LOGIN)
                         previouslyAuthenticated = false
                         // Clear any sync error so a stale ERROR from a previous background
                         // sync is not shown as fresh on the next app open or login.

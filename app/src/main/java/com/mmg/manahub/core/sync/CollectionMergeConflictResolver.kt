@@ -1,4 +1,5 @@
 package com.mmg.manahub.core.sync
+// COMMENTS_REVIEWED: 2026-09-06
 
 import com.mmg.manahub.core.data.local.dao.UserCardCollectionDao
 import com.mmg.manahub.core.data.local.entity.UserCardCollectionEntity
@@ -10,14 +11,10 @@ import javax.inject.Singleton
 
 /**
  * A guest (offline, `user_id IS NULL`) collection row whose composite tuple
- * `(scryfall_id, is_foil, condition, language)` already matches a LIVE row [accountRow] the
- * currently-signed-in user owns.
- *
- * Write-path hardening audit (Phase 7, 2026-09-06): [UserCardCollectionDao.assignUserId]'s
- * `NOT EXISTS` guard leaves exactly this shape of row behind (still `user_id = NULL`, still
- * visible via `observeAll`/`observeAllLocal`) instead of silently merging or discarding it — this
- * class is what surfaces it to the user for an explicit choice
- * ([CollectionMergeConflictSheet]/[resolve]).
+ * `(scryfall_id, is_foil, condition, language)` already matches a row [accountRow] the
+ * currently-signed-in user owns. [accountRow] may itself be a tombstone (soft-deleted) --
+ * [UserCardCollectionDao.assignUserId]'s guard parks a guest row equally in that case, since a
+ * tombstone still occupies its tuple at the DB level.
  */
 data class CollectionMergeConflict(
     val guestRow: UserCardCollectionEntity,
@@ -40,10 +37,8 @@ enum class MergeConflictResolution {
  * Finds and resolves [CollectionMergeConflict]s left behind by
  * [UserCardCollectionDao.assignUserId]'s collision guard.
  *
- * Deliberately NOT reactive (`Flow`) — collisions are rare (only surfaces when the exact same
- * card/foil/condition/language was added both offline and in a previously-logged-in session), so
- * a one-shot suspend check triggered after login/sync is simpler and sufficient; a live query
- * would need a custom multi-DAO Flow combinator for no real user-facing benefit.
+ * Deliberately NOT reactive (`Flow`) -- collisions are rare, so a one-shot suspend check
+ * triggered after login/sync is simpler and sufficient.
  */
 @Singleton
 class CollectionMergeConflictResolver @Inject constructor(
@@ -64,35 +59,41 @@ class CollectionMergeConflictResolver @Inject constructor(
         }
 
     /**
-     * Applies the user's [resolution] for [conflict]. The guest row is hard-deleted only AFTER
-     * the account-row write (if any) completes, and only as part of resolving THIS specific
-     * conflict — dismissing the sheet without calling this loses nothing, the guest row simply
-     * stays a pending conflict for next time.
+     * Applies the user's [resolution] for [conflict] atomically
+     * ([UserCardCollectionDao.resolveMergeConflict]) so a process-kill mid-resolve can never
+     * leave the account row written and the guest row still pending (which would double-count on
+     * the next resolve). Dismissing the sheet without calling this loses nothing -- the guest row
+     * simply stays a pending conflict for next time.
+     *
+     * A tombstoned [CollectionMergeConflict.accountRow] contributes nothing to SUM (its stale
+     * pre-deletion quantity/trade-flag reflect data the user already discarded) and is always
+     * revived (`isDeleted = false`) for SUM/KEEP_OFFLINE -- otherwise the merged result would
+     * write into a row `is_deleted = 1` still filters out of every observe query, silently
+     * losing the guest row's data into a dead tombstone.
      */
     suspend fun resolve(conflict: CollectionMergeConflict, resolution: MergeConflictResolution) =
         withContext(ioDispatcher) {
             val now = System.currentTimeMillis()
-            when (resolution) {
-                MergeConflictResolution.SUM -> collectionDao.upsert(
-                    conflict.accountRow.copy(
-                        quantity = conflict.accountRow.quantity + conflict.guestRow.quantity,
-                        isForTrade = conflict.accountRow.isForTrade || conflict.guestRow.isForTrade,
-                        updatedAt = now,
-                    )
+            val accountQuantity = if (conflict.accountRow.isDeleted) 0 else conflict.accountRow.quantity
+            val accountIsForTrade = !conflict.accountRow.isDeleted && conflict.accountRow.isForTrade
+
+            val resolvedAccountRow = when (resolution) {
+                MergeConflictResolution.SUM -> conflict.accountRow.copy(
+                    quantity = accountQuantity + conflict.guestRow.quantity,
+                    isForTrade = accountIsForTrade || conflict.guestRow.isForTrade,
+                    isDeleted = false,
+                    updatedAt = now,
                 )
 
-                MergeConflictResolution.KEEP_ACCOUNT -> {
-                    // Account row is already correct -- nothing to write.
-                }
+                MergeConflictResolution.KEEP_ACCOUNT -> null
 
-                MergeConflictResolution.KEEP_OFFLINE -> collectionDao.upsert(
-                    conflict.accountRow.copy(
-                        quantity = conflict.guestRow.quantity,
-                        isForTrade = conflict.guestRow.isForTrade,
-                        updatedAt = now,
-                    )
+                MergeConflictResolution.KEEP_OFFLINE -> conflict.accountRow.copy(
+                    quantity = conflict.guestRow.quantity,
+                    isForTrade = conflict.guestRow.isForTrade,
+                    isDeleted = false,
+                    updatedAt = now,
                 )
             }
-            collectionDao.deleteById(conflict.guestRow.id)
+            collectionDao.resolveMergeConflict(resolvedAccountRow, conflict.guestRow.id)
         }
 }

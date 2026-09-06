@@ -739,6 +739,10 @@ class ManaHubApp : Application(), KoinComponent {
                         previousUserId = null
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_PERIODIC)
                         workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_ONE_TIME)
+                        // Own unique name (write-path hardening audit, 2026-09-06): must be
+                        // cancelled too, or a stale first-login work would KEEP-block the next
+                        // account's enqueueFirstLoginSync call.
+                        workManager.cancelUniqueWork(CollectionSyncWorker.WORK_NAME_FIRST_LOGIN)
                         appScope.launch {
                             runCatching {
                                 val token = FirebaseMessaging.getInstance().token.await()
