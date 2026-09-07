@@ -44,6 +44,20 @@ XML, `strings.xml`, Composables, DAO queries, names, comments, KDoc.
 UI-facing strings in any other language. `TimeAgoFormatter` (`core/util/`) uses only its English
 output; do not restore `es`/`de` locale branches. → memory: `feedback_language_rules`
 
+## Comments & Code Style
+
+**Comments: precise, concise, or none.** Default to NO comments — well-named identifiers already show WHAT the code does. Add a comment ONLY when WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, or behavior that would surprise a reader. Never comment WHAT; never reference the feature/task/issue that prompted the code (belongs in commit messages, not code).
+
+**One-line comments max** (never multi-line comment blocks or docstrings for implementation code). Write as a sentence fragment:
+```kotlin
+// DAO uses INSERT OR IGNORE + @Update, never REPLACE (which cascades)
+// StateFlow self-assignment is a no-op on cold flow, safe to call
+```
+
+**Removing stale comments is mandatory:** `android-kotlin-architect` + `kmp-web-fullstack-dev` agents MUST, on first touch of a file, delete all outdated/obvious/multi-line comments. **Mark the file with a gitignored `.comments-reviewed` tag** (add `// COMMENTS_REVIEWED: 2026-09-06` as the first line after the package declaration) so agents skip it on future edits — never re-review a marked file unless the comment itself changes.
+
+→ memory: `feedback_comment_precision_2026-09-06`
+
 ## Build commands
 
 - YouTube API key is optional (Draft Guide video is silently disabled without it). Add
@@ -374,7 +388,7 @@ valuable user metrics:
 **All Android/Kotlin (`.kt`) work goes through the `android-kotlin-architect` agent** — net-new feature
 code included, not only bug fixes. The main agent must not edit `.kt` files directly; delegate (passing
 file path + line, the exact problem/feature, the proposed solution logic, and any CLAUDE.md constraints).
-Non-Kotlin work (Python `scripts/draftsim_py/`, Worker JS, Gradle, docs, memory) is handled directly.
+Non-Kotlin work (the Python draft-content pipeline, Worker JS, Gradle, docs, memory) is handled directly.
 → memory: `feedback_delegate_kotlin_to_architect`
 
 **All WEB-target work (implement / translate / fix) goes through the `kmp-web-fullstack-dev` agent** —

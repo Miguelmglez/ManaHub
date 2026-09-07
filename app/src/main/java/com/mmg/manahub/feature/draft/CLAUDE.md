@@ -1,9 +1,11 @@
 ### Draft Simulator (`feature/draft/`, NOT live — rebuild in progress)
 Content (tier list, guide, booster, engine) is generated offline and served by the Cloudflare
 `manahub-draft-api` Worker from R2. Must-know:
-- **Content pipeline is Python** at `scripts/draftsim_py/` (replaces the old Node `.mjs`). Generate one
-  set at a time; **always ask the user for the Draftsim URLs per set** (guide + pick-order) — old sets
-  break the canonical URL pattern, so never auto-derive them.
+- **Content pipeline lives OUTSIDE this repo**, at `E:/Projects/ManaHub-content/` (private, never
+  committed — `.gitignore` guards `scripts/draftsim*/`). One CLI, one set at a time:
+  `dossier -> research -> tier -> guide -> booster -> engine -> validate -> publish`. **Always ask the
+  user for the per-set source links** (17Lands first, then expert articles) — old sets break every
+  canonical URL pattern, so never auto-derive them.
 - **Booster = MTGJSON `play` collation.** Keep MTGJSON sheet names verbatim (the generic
   `WeightedBoosterGenerator` matches `variant.contents` keys to `sheets[name]`). Never collapse names —
   matching `"foil"` before `"land"` misfiles `foilLand`/`nonFoilLand` as foil and **deletes the land slot**.
