@@ -496,7 +496,7 @@ private fun AuthenticatedCard(
                             )
                         }
                         if (gameTag != null) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Box(
                                 modifier = Modifier
                                     .border(

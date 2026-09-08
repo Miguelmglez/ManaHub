@@ -115,6 +115,8 @@ import com.mmg.manahub.core.ui.components.rememberMagicToastState
 import com.mmg.manahub.core.ui.components.search.SetPickerSheet
 import com.mmg.manahub.core.ui.theme.MagicColors
 import com.mmg.manahub.core.ui.theme.CardShape
+import com.mmg.manahub.core.ui.theme.ExtraSmallCardShape
+import com.mmg.manahub.core.ui.theme.SmallCardShape
 import com.mmg.manahub.core.ui.theme.magicColors
 import com.mmg.manahub.core.ui.theme.magicTypography
 import com.mmg.manahub.core.ui.theme.spacing
@@ -828,14 +830,14 @@ private fun ArtistCardTile(
     val imageModifier = Modifier
         .width(100.dp)
         .aspectRatio(0.717f) // full MTG card aspect ratio (745:1040)
-        .clip(CardShape)
+        .clip(SmallCardShape)
 
     val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
         with(sharedTransitionScope) {
             imageModifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = sharedTransitionKey),
                 animatedVisibilityScope = animatedVisibilityScope,
-                clipInOverlayDuringTransition = OverlayClip(CardShape),
+                clipInOverlayDuringTransition = OverlayClip(SmallCardShape),
                 boundsTransform = { _, _ -> tween(durationMillis = 500, easing = FastOutSlowInEasing) },
                 renderInOverlayDuringTransition = true,
             )
@@ -1440,13 +1442,13 @@ private fun MostValuableSection(
                                 color = mc.primaryAccent.copy(alpha = 0.8f),
                                 modifier = Modifier.width(36.dp)
                             )
-                            val imageModifier = Modifier.width(40.dp).height(56.dp).clip(CardShape)
+                            val imageModifier = Modifier.width(40.dp).height(56.dp).clip(ExtraSmallCardShape)
                             val finalImageModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                                 with(sharedTransitionScope) {
                                     imageModifier.sharedBounds(
                                         sharedContentState = rememberSharedContentState(key = key),
                                         animatedVisibilityScope = animatedVisibilityScope,
-                                        clipInOverlayDuringTransition = OverlayClip(CardShape),
+                                        clipInOverlayDuringTransition = OverlayClip(ExtraSmallCardShape),
                                         boundsTransform = { _, _ -> tween(durationMillis = 500, easing = FastOutSlowInEasing) },
                                         renderInOverlayDuringTransition = true,
                                     )
